@@ -3,7 +3,12 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 
-internal data class SmtTypedTerm(val operator: String, val arguments: List<Int>, val sort: SmtSort)
+internal enum class SmtTypedDatatypeKind { CONSTRUCTOR, SELECTOR, TESTER }
+
+internal data class SmtTypedDatatypeOperator(val name: String, val kind: SmtTypedDatatypeKind)
+
+internal data class SmtTypedTerm(val operator: String, val arguments: List<Int>, val sort: SmtSort,
+    val datatype: SmtTypedDatatypeOperator? = null)
 
 internal data class SmtTypedDefinition(val parameters: List<Int>, val body: Int)
 

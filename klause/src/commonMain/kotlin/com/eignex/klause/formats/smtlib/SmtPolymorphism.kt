@@ -245,7 +245,15 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                     val symbol = symbol(node)
                     if (symbol == null) {
                         val head = node.operator.removePrefix("literal:")
-                        val expression = if (node.operator.startsWith("literal:")) SExpr.Atom(head)
+                        val expression = if (node.datatype != null) {
+                            val datatype = node.datatype
+                            val identifier = if (datatype.kind == SmtTypedDatatypeKind.TESTER)
+                                command("_", SExpr.Atom("is"), SExpr.Atom(datatype.name))
+                            else SExpr.Atom(datatype.name)
+                            val qualified = command("as", identifier, sortExpression(result))
+                            if (arguments.isEmpty()) qualified
+                            else SExpr.SList(listOf(qualified) + arguments.map { it.expression })
+                        } else if (node.operator.startsWith("literal:")) SExpr.Atom(head)
                         else if (head.startsWith('(')) {
                             val identifier = SExprReader(head).readAll().single()
                             if (arguments.isEmpty()) identifier else SExpr.SList(listOf(identifier) +
@@ -387,7 +395,8 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
 
     private fun universalTautology(root: Int): Boolean = smtUniversalTautology(source, root, cancellation)
 
-    private fun symbol(term: SmtTypedTerm): SmtTypedSymbol? = if (term.operator.startsWith("symbol:")) {
+    private fun symbol(term: SmtTypedTerm): SmtTypedSymbol? = if (term.datatype == null &&
+        term.operator.startsWith("symbol:")) {
         term.operator.substringAfter(':').substringBefore(':').toIntOrNull()?.let { symbols[it] }
     } else null
 

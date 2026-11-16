@@ -34,7 +34,7 @@ internal fun smtUniversalTautology(source: SmtTypedSource, root: Int, cancellati
             continue
         }
         val arguments = node.arguments.map { mapped.getValue(it) }
-        mapped[index] = when (node.operator) {
+        mapped[index] = if (node.datatype != null) formula("atom", atom = "term:$index") else when (node.operator) {
             "literal:true" -> truth
             "literal:false" -> falsity
             "and", "or", "xor", "=>", "not" -> formula(node.operator, arguments)

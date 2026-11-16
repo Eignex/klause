@@ -22,8 +22,8 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -31,6 +31,161 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SmtGroundDatatypesTest {
+    @Test
+    fun `polymorphic expansion keeps nullary constructors distinct from source marker names`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Color ((red) (green)))
+            (declare-const |datatype:red| Color)
+            (assert (distinct red |datatype:red|))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion keeps constructor names distinct from symbol identity markers`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Choice ((|symbol:0:f| (field Int)) (other)))
+            (declare-fun f (Int) Choice)
+            (assert (distinct (|symbol:0:f| 1) (f 1)))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion preserves constructor disjointness`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Color ((red) (green)))
+            (assert (= red green))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion preserves tester identity on distinct successors`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Nat ((zero) (succ (pred Nat))))
+            (declare-const x Nat)
+            (declare-const y Nat)
+            (assert (distinct x y))
+            (assert (= ((_ is succ) x) ((_ is succ) y)))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion preserves negative constructor testers`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Nat ((zero) (succ (pred Nat))))
+            (assert ((_ is succ) zero))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion retains match field bindings`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Option ((none) (some (field Int))))
+            (declare-const x Option)
+            (assert (= (match x ((none 0) ((some v) v))) 1))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion preserves match constructor guards`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Option ((none) (some (field Int))))
+            (assert (= (match none ((none 0) ((some v) v))) 1))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion retains match catch all bindings`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Option ((none) (some (field Int))))
+            (declare-const x Option)
+            (assert (= x (some 3)))
+            (assert (= (let ((v 9)) (match x ((none v) (rest (field rest))))) 3))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion preserves lexical match field shadowing`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Option ((none) (some (field Int))))
+            (assert (= (let ((v 9)) (match (some 3) ((none v) ((some v) v)))) 3))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion retains qualified phantom constructor ranks`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Phantom (par (T) ((none) (some (field Int)))))
+            (declare-const x (Phantom Bool))
+            (assert (distinct x (as none (Phantom Bool))))
+            (assert (= x ((as some (Phantom Bool)) 7)))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic expansion retains qualified numeric constructor ranks`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Box (par (T) ((box (field T)))))
+            (declare-const x (Box Real))
+            (assert (= x ((as box (Box Real)) 1)))
+            (assert (= (field x) 1.0))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
     @Test
     fun `different enumeration constructors are distinct`() {
         val parsed = SmtLib.parse("(declare-datatype Color ((red) (green))) (assert (= red green))")

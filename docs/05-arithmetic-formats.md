@@ -214,8 +214,11 @@ the source function name and concrete rank of every returned instance.
 
 Datatype declarations retain instantiated constructor and selector sorts, including
 parametric and mutually recursive declarations. Typed `match` patterns bind fields
-in their branch scope and require exhaustive coverage. Ill-founded declarations and
-recursive occurrences below a field sort's head are rejected.
+in their branch scope and require exhaustive coverage. Capture represents matches
+with tester, selector and conditional nodes; datatype operator metadata preserves
+raw symbol spelling, operator kind and instantiated rank through specialization.
+Ill-founded declarations and recursive occurrences below a field sort's head are
+rejected.
 
 Ground constructors, selectors and testers reduce to typed function consistency,
 constructor tags and strict integer depth comparisons. Exhaustiveness introduces
