@@ -814,6 +814,21 @@ class LpEngineTest {
         }
     }
 
+    @Test
+    fun `a leaf whose relaxation assembly is cancelled should be indeterminate`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0),
+        ), numRealVars = 2, realLower = DoubleArray(2), realUpper = DoubleArray(2) { 1.0 })
+        val params = LpParams(lpPlan = LpPlan(bounding = true, realResidual = true),
+            cancellation = Cancellation { true })
+
+        val leaf = LpEngine(problem, LinearObjective(), params, SolveStatsSink(backend = "cancelled-leaf")).use {
+            it.leafCertify(PropagationSession(problem))
+        }
+
+        assertEquals(LpVerdict.INDETERMINATE, leaf.verdict)
+    }
+
     private val decline = LpCertificationPolicy { _, _ -> false }
 
     private fun boundedProblem(): Problem = Problem(
