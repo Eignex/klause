@@ -16,6 +16,95 @@ import kotlin.test.assertTrue
 
 class LpSolveTest {
     @Test
+    fun `numerical refutations should carry no exact proof package`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.GE, 4.0)
+        }.build(Sense.MINIMIZE)
+        val context = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { _, _ -> error("exact certification was requested") },
+            numericalDeductions = true,
+        )
+
+        for (claim in listOf(LpClaim.FEASIBLE_COMPLETION, LpClaim.ATTAINED_OPTIMUM)) {
+            val result = solveAndCertify(model, context = context, floatAccept = { true }, claim = claim,
+                acceptFloatInfeasibility = true)
+
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            assertNotNull(result.floatInfeasibility)
+            assertNull(result.farkasRay)
+            assertNull(result.rationalConflict)
+            assertNull(result.conflictSupport)
+            assertNull(result.bound)
+            assertNull(result.witness)
+        }
+    }
+
+    @Test
+    fun `numerical refutations should require a current ray that passes its check`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.GE, 4.0)
+        }.build(Sense.MINIMIZE)
+        val feasible = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.LE, 4.0)
+        }.build(Sense.MINIMIZE)
+        val retained = assertNotNull(LpExactState(assertNotNull(model.authoritativeModel())).toWorkingModel())
+        val cases = listOf(
+            model to null,
+            model to doubleArrayOf(),
+            model to doubleArrayOf(0.0),
+            model to doubleArrayOf(Double.NaN),
+            feasible to doubleArrayOf(1.0),
+            retained to doubleArrayOf(1.0),
+        )
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false },
+            numericalDeductions = true)
+        for ((active, ray) in cases) {
+            val solver = object : LpSolver {
+                override val infeasibleRay: DoubleArray? = ray
+                override fun solve(warm: Basis?): FloatLpResult? = null
+                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            }
+
+            val result = LpCertificationSession(context, LpPricingOptions()).use {
+                it.certify(active, solver, null, ExecutionControl.Never, null, null,
+                    acceptFloatInfeasibility = true)
+            }
+
+            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+            assertNull(result.floatInfeasibility)
+        }
+    }
+
+    @Test
+    fun `a numerical refutation cancelled during its check should decide nothing`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.GE, 4.0)
+        }.build(Sense.MINIMIZE)
+        var cancelled = false
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray get() {
+                cancelled = true
+                return doubleArrayOf(1.0)
+            }
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+        }
+
+        val result = LpCertificationSession(LpSolveContext.finite(true), LpPricingOptions()).use {
+            it.certify(model, solver, null, ExecutionControl { cancelled }, null, null,
+                acceptFloatInfeasibility = true)
+        }
+
+        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        assertNull(result.floatInfeasibility)
+        assertNull(result.rationalConflict)
+    }
+
+    @Test
     fun `requested sparse recovery should certify independent denominators beyond the basis ceiling`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)

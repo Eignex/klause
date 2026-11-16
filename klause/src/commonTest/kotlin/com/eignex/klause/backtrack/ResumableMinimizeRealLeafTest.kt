@@ -53,6 +53,30 @@ import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
     @Test
+    fun `exhausted numerical leaves should report infeasible without exact certificates`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.GE, 4L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        ).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val params = BacktrackParams(lpPlan = LpPlan(bounding = false, componentSplit = false),
+            toleranceCheck = { true })
+        for (numerical in listOf(false, true)) {
+            val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false },
+                numericalDeductions = numerical)
+
+            val result = BacktrackSolver(problem, context).minimize(objective, params)
+
+            if (numerical) assertIs<MinimizeResult.Infeasible>(result) else assertIs<MinimizeResult.Unknown>(result)
+        }
+    }
+
+    @Test
     fun `witness-only repair should continue to a better sibling without closing unresolved coverage`() {
         val fixture = UnresolvedRealLeafFixture(true)
         fixture.acceptProof = { _, _ -> false }

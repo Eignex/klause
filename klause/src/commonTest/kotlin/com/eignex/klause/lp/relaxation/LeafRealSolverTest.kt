@@ -55,11 +55,13 @@ class LeafRealSolverTest {
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
         )
         val sample = Sample(booleanArrayOf(), longArrayOf())
-        val context = LpSolveContext.finite(true)
+        val cases = listOf(false to LpVerdict.INDETERMINATE, true to LpVerdict.INFEASIBLE)
+        for ((numerical, verdict) in cases) {
+            val result = leafRealFeasibility(problem, null, sample,
+                context = LpSolveContext.finite(numerical), toleranceCheck = { true })
 
-        val result = leafRealFeasibility(problem, null, sample, context = context, toleranceCheck = { true })
-
-        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+            assertEquals(verdict, result.verdict)
+        }
     }
 
     @Test
