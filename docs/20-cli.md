@@ -1,7 +1,7 @@
 # 20. Command line
 
-The CLI parses one source, binds shared [source setup](19-api.md#source-setup) and
-renders its results. Common controls reach every mode; format frontends retain
+The CLI parses sources, binds shared [source setup](19-api.md#source-setup) and
+renders their results. Common controls reach every mode; format frontends retain
 parsing and output semantics. The CLI adds no solving policy.
 
 ## CLI module
@@ -41,6 +41,13 @@ define supported names, aliases and help text.
 Each loader closes its input source when parsing returns or fails, including when
 the parser stops before end of file. Compressed sources release their readers and
 decompressor processes with the same lifetime.
+
+SMT-LIB scripts execute commands in order. Every `check-sat` or
+`check-sat-assuming` receives an independent active assertion snapshot through
+the shared solve driver. Status responses belong to the check command; enabled
+`get-model` and `get-value` requests inspect its retained interpretation. Stack
+operations, resets, model-production options and optional capability responses
+belong to the [SMT session](05-arithmetic-formats.md#supported-models).
 
 Exact objective and unattained-limit rendering follow the
 [arithmetic format contracts](05-arithmetic-formats.md#results-and-objectives);

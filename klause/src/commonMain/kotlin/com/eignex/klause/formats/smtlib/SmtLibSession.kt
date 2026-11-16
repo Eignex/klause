@@ -34,6 +34,7 @@ class SmtLibSession(
     private var logic: SExpr.SList? = null
     private var result: SmtSessionResult? = null
     private var exited = false
+    private var started = false
 
     /** Execute commands in order; errors are protocol responses and leave the session usable. */
     fun execute(reader: SExprReader) {
@@ -62,6 +63,7 @@ class SmtLibSession(
                     }
                     command.atom(1)
                     logic = command
+                    started = true
                     success()
                 }
                 "set-option" -> setOption(command)
@@ -77,18 +79,21 @@ class SmtLibSession(
                     success()
                 }
                 "get-info" -> getInfo(command)
-                "declare-sort", "define-sort", "declare-const", "declare-fun", "define-fun", "define-fun-rec",
+                "declare-sort", "define-sort", "declare-const", "define-const", "declare-fun", "define-fun", "define-fun-rec",
                 "define-funs-rec", "declare-datatype", "declare-datatypes" -> declare(command, head)
                 "assert" -> {
                     command.size(2)
                     scopes.last().assertions += command.items[1]
+                    started = true
                     invalidate()
                     success()
                 }
                 "push" -> {
                     command.size(2)
-                    repeat(command.numeral(1)) { scopes += Scope() }
-                    invalidate()
+                    val count = command.numeral(1)
+                    repeat(count) { scopes += Scope() }
+                    if (count > 0) invalidate()
+                    started = true
                     success()
                 }
                 "pop" -> {
@@ -99,12 +104,12 @@ class SmtLibSession(
                         val removed = scopes.removeAt(scopes.lastIndex)
                         scopes.first().entries += removed.entries.filter { it.global }
                     }
-                    invalidate()
+                    if (count > 0) invalidate()
                     success()
                 }
                 "reset-assertions" -> {
                     command.size(1)
-                    val retained = scopes.first().entries + scopes.drop(1).flatMap { scope -> scope.entries.filter { it.global } }
+                    val retained = scopes.flatMap { scope -> scope.entries.filter { it.global } }
                     scopes.clear()
                     scopes += Scope(retained.toMutableList())
                     invalidate()
@@ -117,6 +122,7 @@ class SmtLibSession(
                     options.clear()
                     information.clear()
                     logic = null
+                    started = false
                     invalidate()
                     success()
                 }
@@ -166,7 +172,7 @@ class SmtLibSession(
     private fun declare(command: SExpr.SList, head: String) {
         val names = when (head) {
             "declare-sort", "declare-const", "declare-datatype" -> { command.size(3); listOf(command.atom(1)) }
-            "define-sort", "declare-fun" -> { command.size(4); listOf(command.atom(1)) }
+            "define-sort", "define-const", "declare-fun" -> { command.size(4); listOf(command.atom(1)) }
             "define-fun", "define-fun-rec" -> { command.size(5); listOf(command.atom(1)) }
             "define-funs-rec" -> {
                 command.size(3)
@@ -186,6 +192,7 @@ class SmtLibSession(
             fail("symbol is already declared")
         }
         scopes.last().entries += Entry(command, names, enabled(":global-declarations"))
+        started = true
         invalidate()
         success()
     }
@@ -193,6 +200,9 @@ class SmtLibSession(
     private fun setOption(command: SExpr.SList) {
         command.size(3)
         val key = command.atom(1)
+        if (key != ":print-success" && (key.startsWith(":produce-") || key in setOf(":global-declarations", ":interactive-mode")) && started) {
+            fail("$key may be set only in start mode")
+        }
         when (key) {
             ":print-success", ":produce-models", ":produce-assertions", ":global-declarations" -> {
                 if (command.atom(2) !in setOf("true", "false")) fail("$key expects a Boolean")
@@ -231,18 +241,8 @@ class SmtLibSession(
         command.size(if (head == "check-sat") 1 else 2)
         val assumptions = if (head == "check-sat") emptyList() else {
             val list = command.items[1] as? SExpr.SList ?: fail("expected assumption literals")
-            list.items.onEach { term ->
-                val symbol = if (term is SExpr.Atom) term else {
-                    val negation = term as? SExpr.SList ?: fail("expected assumption literal")
-                    negation.size(2)
-                    if (negation.atom(0) != "not") fail("expected assumption literal")
-                    negation.items[1] as? SExpr.Atom ?: fail("expected assumption symbol")
-                }
-                val name = smtSessionSymbol(symbol.text)
-                if (scopes.none { scope -> scope.entries.any { name in it.names } }) fail("undeclared assumption symbol")
-            }
+            list.items
         }
-        invalidate()
         val source = buildString {
             logic?.let { appendLine(it.smtText()) }
             for (scope in scopes) for (entry in scope.entries) appendLine(entry.command.smtText())
@@ -250,8 +250,10 @@ class SmtLibSession(
             for (assumption in assumptions) appendLine("(assert ${assumption.smtText()})")
             appendLine("(check-sat)")
         }
-        result = solve(source)
+        val solved = solve(source)
         checkpoint()
+        result = solved
+        started = true
         respond(requireNotNull(result).status)
     }
 
@@ -264,7 +266,7 @@ class SmtLibSession(
 
     private fun enabled(key: String): Boolean = (options[key] ?: defaultOption(key)) == SExpr.Atom("true")
     private fun defaultOption(key: String): SExpr? = when (key) {
-        ":print-success" -> SExpr.Atom("true")
+        ":print-success" -> SExpr.Atom("false")
         ":produce-models", ":produce-assertions", ":global-declarations", ":produce-proofs", ":produce-unsat-cores",
         ":produce-unsat-assumptions", ":produce-assignments" -> SExpr.Atom("false")
         else -> null

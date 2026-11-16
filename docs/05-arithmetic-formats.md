@@ -157,7 +157,7 @@ and linear integer and real arithmetic with Boolean structure and supported
 `minimize`/`maximize` objectives, polynomial Int/Real/Bool satisfaction with products,
 integer exponentiation and fixed nonnegative real powers, and a real-function
 extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
-`check-sat` or `check-sat-assuming` query is accepted, with Boolean literal
+`check-sat` or `check-sat-assuming` query is accepted by `SmtLib.parse`, with Boolean formula
 assumptions conjoined to the assertions; `get-model` and `get-objectives` are
 accepted requests. Ground extensional arrays compose with admitted scalar sorts,
 including nested arrays and arrays used as indexes or function arguments and results.
@@ -248,6 +248,28 @@ Reconstruction tables are cached within one witness for mutually dependent
 instantiated sorts; nested parameters can therefore cross array fields without
 sharing a recursive table with a different instantiation. The retained typed
 registry supplies datatype cardinalities to extensional array value comparisons.
+
+### Command sessions
+
+`SmtLibSession` owns command-stream state separately from single-source admission.
+Each query rebuilds one active assertion snapshot; assumptions belong only to that
+query. Assertion levels scope declarations and definitions as well as assertions.
+Global declarations survive stack operations and `reset-assertions`; `reset`
+restores the initial state, including options. `:print-success` defaults to false,
+and model production must be enabled in start mode. Model queries inspect the same
+checked interpretation until the context changes. Unsupported optional proof,
+core and assignment capabilities respond `unsupported` without being enabled.
+
+Annotations normalize before typed capture. Closed `:named` subterms introduce
+nullary definitions in postorder, while other metadata leaves the term unchanged.
+`define-const` abbreviates a nullary `define-fun`.
+
+Recursive command-session definitions use necessary ground equations for
+refutation. A satisfying result requires either a total interpretation whose
+equations pass a counterexample check, or a checked integer ranking that proves
+all recursive calls decrease, followed by evaluation of the source assertions.
+Ground evaluation uses an explicit work stack and a resource allowance; exhausted
+work yields an inconclusive result and supplies no recursive completion claim.
 
 ### Declaration policy
 

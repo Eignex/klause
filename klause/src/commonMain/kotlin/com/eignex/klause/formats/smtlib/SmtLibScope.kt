@@ -207,14 +207,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 command.polynomialSize(2)
                 val assumptions = command.items[1] as? SExpr.SList ?: return false
                 for (assumption in assumptions.items) {
-                    val atom = if (assumption is SExpr.SList) {
-                        if (assumption.items.size != 2 || assumption.polynomialHead() != "not") return false
-                        assumption.items[1] as? SExpr.Atom ?: return false
-                    } else assumption as? SExpr.Atom ?: return false
-                    if (globals[polynomialSymbol(atom.text)]?.let {
-                            it.parameters.isEmpty() && it.result == SmtSort.Bool
-                        } != true) return false
                     val node = sort(assumption, null) ?: return false
+                    if (nodes[node].sort != SmtSort.Bool) return false
                     assertionNodes += node
                     sourceObligations += "assert" to node
                 }
@@ -237,6 +231,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             else -> smtUnsupported("unsupported command '$head'")
         }
     }
+
+    internal fun termSort(expression: SExpr): SmtSort? = sort(expression, null)?.let { nodes[it].sort }
 
     internal fun sourceSort(expression: SExpr, localParameters: Set<String> = emptySet(),
         allowGlobalParameters: Boolean = true, localBindings: Map<String, SmtSort> = emptyMap()): SmtSort {

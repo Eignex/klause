@@ -93,19 +93,17 @@ class SmtLibSessionTest {
 
         session.execute(SExprReader("""
             (set-option :print-success false)
+            (set-option :produce-models true)
             (declare-const p Bool)
             (check-sat)
-            (get-model)
-            (set-option :produce-models true)
             (get-value (p (not p)))
             (push 1)
             (get-model)
         """.trimIndent()))
 
         assertEquals("sat", replies[0])
-        assertTrue(replies[1].startsWith("(error "))
-        assertEquals("((p true) ((not p) true))", replies[2])
-        assertTrue(replies[3].startsWith("(error "))
+        assertEquals("((p true) ((not p) true))", replies[1])
+        assertTrue(replies[2].startsWith("(error "))
     }
 
     @Test
@@ -154,7 +152,7 @@ class SmtLibSessionTest {
             (get-option :produce-models)
         """.trimIndent()))
 
-        assertEquals(listOf("success", "success", "false"), replies)
+        assertEquals(listOf("false"), replies)
     }
 
     @Test
@@ -173,5 +171,48 @@ class SmtLibSessionTest {
         val commands = SExprReader(text).readAll()
 
         assertEquals(text, commands.joinToString(" ") { it.smtText() })
+    }
+
+    @Test
+    fun `print success defaults to false and applies to its own command`() {
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({ SmtSessionResult("sat") }, replies::add)
+
+        session.execute(SExprReader("(declare-const p Bool) (set-option :print-success true) (push 0) (set-option :print-success false)"))
+
+        assertEquals(listOf("success", "success"), replies)
+    }
+
+    @Test
+    fun `reset assertions removes base declarations unless global`() {
+        val snapshots = ArrayList<String>()
+        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, {})
+
+        session.execute(SExprReader("(declare-const p Bool) (reset-assertions) (declare-const p Int) (check-sat)"))
+
+        assertFalse("(declare-const p Bool)" in snapshots.single())
+        assertTrue("(declare-const p Int)" in snapshots.single())
+    }
+
+    @Test
+    fun `model production options reject changes after start mode`() {
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({ SmtSessionResult("sat") }, replies::add)
+
+        session.execute(SExprReader("(declare-const p Bool) (set-option :produce-models true) (get-option :produce-models)"))
+
+        assertTrue(replies[0].startsWith("(error "))
+        assertEquals("false", replies[1])
+    }
+
+    @Test
+    fun `query assumptions preserve arbitrary Boolean formulas`() {
+        val snapshots = ArrayList<String>()
+        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, {})
+
+        session.execute(SExprReader("(declare-const x Int) (check-sat-assuming ((> x 2) (or true false)))"))
+
+        assertTrue("(assert (> x 2))" in snapshots.single())
+        assertTrue("(assert (or true false))" in snapshots.single())
     }
 }
