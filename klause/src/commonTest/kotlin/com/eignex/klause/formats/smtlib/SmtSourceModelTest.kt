@@ -96,4 +96,20 @@ class SmtSourceModelTest {
             source.reconstructModel({ true }, { "0" }, { "0.0" }, ExecutionControl { true })
         }
     }
+
+    @Test
+    fun `function model arguments do not shadow constructor symbols`() {
+        val sort = SmtSort.Uninterpreted("T")
+        val declaration = SmtSourceDeclaration("f", listOf(SmtSort.Bool), sort)
+        val value = SmtValue.Function(listOf(SmtSort.Bool),
+            listOf(listOf(SmtValue.Boolean(true)) to SmtValue.Application("x0", listOf(SmtValue.Boolean(true)))),
+            SmtValue.Application("x0", listOf(SmtValue.Boolean(false))))
+
+        val model = SmtSourceModel(listOf(declaration to value)).toSmtLib()
+
+        val definition = ((SExprReader(model).readAll().single() as SExpr.SList).items.single() as SExpr.SList)
+        val formal = ((((definition.items[2] as SExpr.SList).items.single()) as SExpr.SList).items[0] as SExpr.Atom)
+        assertTrue(polynomialSymbol(formal.text) != "x0")
+        assertTrue(model.contains("(x0 true)"))
+    }
 }

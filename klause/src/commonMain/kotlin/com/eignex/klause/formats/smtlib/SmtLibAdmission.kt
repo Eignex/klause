@@ -109,13 +109,18 @@ internal fun lowerSmtReduction(
         }
     }
     cancellation.polynomialSourceCheckpoint()
-    val originals = reduction.declarations.filter { it.parameters.isEmpty() }.map { polynomialSymbol(it.name) }.toSet()
+        fun originals(sort: SmtSort): Set<String> = reduction.declarations.filter {
+            it.parameters.isEmpty() && it.result == sort
+        }.map { polynomialSymbol(it.name) }.toSet()
+        val originalIntegers = originals(SmtSort.Int)
+        val originalBooleans = originals(SmtSort.Bool)
+        val originalReals = originals(SmtSort.Real)
     return result.copy(sourceBindings = reduction.bindings,
         privateBindings = reduction.privateBindings, originalSource = reduction.original?.let(::SmtSourceSnapshot),
         sourceChecks = reduction.checks,
-        intVarNames = result.intVarNames.filterKeys { polynomialSymbol(it) in originals },
-        boolVarNames = result.boolVarNames.filterKeys { polynomialSymbol(it) in originals },
-        realVarNames = result.realVarNames.filterKeys { polynomialSymbol(it) in originals },
+            intVarNames = result.intVarNames.filterKeys { polynomialSymbol(it) in originalIntegers },
+            boolVarNames = result.boolVarNames.filterKeys { polynomialSymbol(it) in originalBooleans },
+            realVarNames = result.realVarNames.filterKeys { polynomialSymbol(it) in originalReals },
         encodingIntVarNames = result.intVarNames, encodingBoolVarNames = result.boolVarNames,
         encodingRealVarNames = result.realVarNames).withSourceWitnessValidation()
 }

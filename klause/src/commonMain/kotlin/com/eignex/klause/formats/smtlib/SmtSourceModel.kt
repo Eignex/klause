@@ -336,18 +336,47 @@ fun SmtValue.toSmtLib(): String = when (this) {
 
 /** Render original declarations without exposing private encoding names. */
 fun SmtSourceModel.toSmtLib(): String = buildString {
+    val usedNames = values.mapTo(HashSet()) { polynomialSymbol(it.first.name) }
+    val pending = ArrayDeque<SmtValue>()
+    for ((_, value) in values) pending.addLast(value)
+    while (pending.isNotEmpty()) {
+        val value = pending.removeLast()
+        if (value is SmtValue.Function) {
+            pending.addLast(value.default)
+            for ((arguments, result) in value.entries) {
+                pending.addLast(result)
+                for (argument in arguments) pending.addLast(argument)
+            }
+        } else {
+            val expressions = ArrayDeque<SExpr>()
+            for (expression in SExprReader(value.toSmtLib()).readAll()) expressions.addLast(expression)
+            while (expressions.isNotEmpty()) when (val expression = expressions.removeLast()) {
+                is SExpr.Atom -> usedNames += polynomialSymbol(expression.text)
+                is SExpr.SList -> for (item in expression.items) expressions.addLast(item)
+            }
+        }
+    }
+    var nextFormal = 0
+    fun formal(): String {
+        var name: String
+        do { name = ".klause.argument.${nextFormal++}" } while (!usedNames.add(name))
+        return name
+    }
     append("(\n")
     for ((declaration, value) in values) {
+        val formals = declaration.parameters.map { formal() }
         append("  (define-fun ${declaration.name} (")
         declaration.parameters.forEachIndexed { index, sort ->
             if (index > 0) append(' ')
-            append("(x$index ${sort.toSmtLib()})")
+            append("(${formals[index]} ${sort.toSmtLib()})")
         }
         append(") ${declaration.result.toSmtLib()} ")
         if (value is SmtValue.Function) {
             for ((arguments, result) in value.entries) {
                 append("(ite (and")
-                for ((index, argument) in arguments.withIndex()) append(" (= x$index ${argument.toSmtLib()})")
+                for ((index, argument) in arguments.withIndex()) {
+                    append(" (= ${formals[index]} ${argument.toSmtLib()})")
+                }
                 append(") ${result.toSmtLib()} ")
             }
             append(value.default.toSmtLib())

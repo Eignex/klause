@@ -120,6 +120,15 @@ class SmtGroundFunctionsTest {
     }
 
     @Test
+    fun `free sort identities do not appear in public integer name maps`() {
+        val parsed = SmtLib.parse("(declare-sort U 0) (declare-const a U) (declare-const n Int)")
+
+        assertEquals(setOf("n"), parsed.intVarNames.keys)
+        assertTrue(parsed.boolVarNames.isEmpty())
+        assertTrue(parsed.realVarNames.isEmpty())
+    }
+
+    @Test
     fun `unused functions have source typed defaults`() {
         val parsed = SmtLib.parse("(declare-sort U 0) (declare-fun f (Int) U)")
 
