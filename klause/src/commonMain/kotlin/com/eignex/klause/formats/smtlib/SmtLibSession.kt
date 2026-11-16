@@ -276,10 +276,7 @@ class SmtLibSession(
         val assumptions = if (head == "check-sat") emptyList() else
             (command.items[1] as? SExpr.SList)?.items ?: fail("expected assumption formulas")
         val prepared = prepareSmtSessionQueries(commands(), assumptions, cancellation)
-        val global = enabled(":global-declarations")
-        declarationScope(global).entries += prepared.definitions.map {
-            Entry(it, global, named = true)
-        }
+        addQueryDefinitions(prepared.definitions)
         val source = commands() + prepared.terms.map { SExpr.SList(listOf(SExpr.Atom("assert"), it)) }
         validate(source, cancellation)
         val solved = solve((source + SExpr.SList(listOf(SExpr.Atom("check-sat")))).joinToString("\n") { it.smtText() })
@@ -301,11 +298,14 @@ class SmtLibSession(
         val pairs = prepared.terms.mapIndexed { index, term ->
             "(${terms.items[index].smtText()} ${current.evaluate(withQueryDefinitions(term, definitions))})"
         }
-        scopes.last().entries += prepared.definitions.map {
-            Entry(it, enabled(":global-declarations"), named = true)
-        }
+        addQueryDefinitions(prepared.definitions)
         queryDefinitions += prepared.definitions
         channels.regular(pairs.joinToString(" ", "(", ")"))
+    }
+
+    private fun addQueryDefinitions(definitions: List<SExpr.SList>) {
+        val global = enabled(":global-declarations")
+        declarationScope(global).entries += definitions.map { Entry(it, global, named = true) }
     }
 
     private fun getAssignment(command: SExpr.SList) {

@@ -50,6 +50,17 @@ class SmtFixedModelTest {
     }
 
     @Test
+    fun `rotation queries reduce arbitrary numeral indices to the word width`() {
+        val parsed = SmtLib.parse("")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+
+        val result = model.evaluate(SExprReader("((_ rotate_left 18446744073709551617) #b1001)")
+            .readAll().single())
+
+        assertEquals("#b0011", result)
+    }
+
+    @Test
     fun `qualified helper calls retain quoted grammar-word identities`() {
         val parsed = SmtLib.parse("(define-fun |let| ((x Int)) Int (+ x 1))")
         val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))

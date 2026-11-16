@@ -554,7 +554,8 @@ internal class SmtFixedModel(
         val indices = identifier.items.drop(2).map { item ->
             val number = parseBigInt((item as SExpr.Atom).text)
             if (name in setOf("rotate_left", "rotate_right")) {
-                number.remainderOf(parseBigInt((args.single() as SmtValue.BitVector).bits.length.toString())).toInt()
+                val width = (args.single() as SmtValue.BitVector).bits.length
+                number.remainderOf(parseBigInt(width.toString())).toString().toInt()
             } else number.toString().toInt()
         }
         return bitVector(name, indices, args)

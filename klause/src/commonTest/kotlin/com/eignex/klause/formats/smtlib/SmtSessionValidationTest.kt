@@ -110,6 +110,32 @@ class SmtSessionValidationTest {
     }
 
     @Test
+    fun `named value query definitions survive global scope pops`() {
+        val replies = ArrayList<String>()
+        val snapshots = ArrayList<String>()
+        val model = object : SmtSessionModel {
+            override fun render(): String = "()"
+            override fun evaluate(term: SExpr): String = "true"
+        }
+        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat", model) }, replies::add)
+
+        session.execute(SExprReader("""
+            (set-option :global-declarations true)
+            (set-option :produce-models true)
+            (push 1)
+            (check-sat)
+            (get-value ((! true :named label)))
+            (pop 1)
+            (assert label)
+            (check-sat)
+        """.trimIndent()))
+
+        assertEquals(listOf("sat", "(((! true :named label) true))", "sat"), replies)
+        assertTrue("(define-fun label () Bool true)" in snapshots.last())
+        assertTrue("(assert label)" in snapshots.last())
+    }
+
+    @Test
     fun `named Boolean and arithmetic terms keep their distinct assignment roles`() {
         val replies = ArrayList<String>()
         val model = object : SmtSessionModel {
