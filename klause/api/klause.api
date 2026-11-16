@@ -12916,6 +12916,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveOutcome$Complete
 	public final fun getElapsedMs ()J
 	public final fun getSolutions ()J
 	public final fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun getTerminationReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun getUnboundedDirection ()Ljava/util/List;
 	public final fun getVerdict ()Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 }

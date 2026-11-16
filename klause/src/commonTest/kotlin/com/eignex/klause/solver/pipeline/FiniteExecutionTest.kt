@@ -21,6 +21,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.theory.SourceToleranceSearch
@@ -35,6 +36,45 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
+    @Test
+    fun `a local search portfolio should preserve a root refutation without presolve`() {
+        for (optimize in listOf(false, true)) {
+            val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+            val shape = FiniteSolveShape(problem, optimize, false, null,
+                if (optimize) LinearObjective(boolWeights = longArrayOf(1)) else null, null, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.LOCAL_SEARCH, presolveConfig = PresolveConfig.NONE,
+                randomSeed = 17L, defaultArms = 1,
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict, "optimize=$optimize")
+            assertEquals(false, result.completeSearchAdmitted)
+            assertEquals(0.0, completed.stats.ls.moves.sum)
+            assertNull(completed.terminationReason)
+        }
+    }
+
+    @Test
+    fun `an unfinished finite search should retain its fixed work stop`() {
+        for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
+            val shape = FiniteSolveShape(Problem.of(2, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(0, 2)))), false, false, null, null, null, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, engine, presolveConfig = PresolveConfig.NONE,
+                randomSeed = 17L, defaultArms = 1, nodeBudget = NodeBudget(0L),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNKNOWN, completed.verdict, "$engine")
+            assertEquals(TerminationReason.BudgetExhausted, completed.terminationReason, "$engine")
+        }
+    }
+
     // Binary64 `0.01 * 200` exceeds the declared bound `2.0` by `3/72057594037927936`.
     private fun roundedBound(declarations: String, constraints: String) = """
         var 0.0..2.0: y;

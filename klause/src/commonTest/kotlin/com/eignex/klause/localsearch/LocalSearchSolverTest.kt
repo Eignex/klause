@@ -28,6 +28,28 @@ import kotlin.test.assertTrue
 class LocalSearchSolverTest {
 
     @Test
+    fun `root propagation should refute satisfaction without local search moves`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+        val params = LocalSearchParams(maxFlips = 0L, randomSeed = 17L)
+
+        val result = LocalSearchSolver(problem.bake()).solve(params)
+
+        assertIs<SolveResult.Unsat>(result)
+        assertEquals(0.0, result.stats.ls.moves.sum)
+    }
+
+    @Test
+    fun `root propagation should prove infeasibility without local search moves`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+        val params = LocalSearchParams(maxFlips = 0L, randomSeed = 17L)
+
+        val result = LocalSearchSolver(problem.bake()).minimize(LinearObjective(boolWeights = longArrayOf(1)), params)
+
+        assertIs<MinimizeResult.Infeasible>(result)
+        assertEquals(0.0, result.stats.ls.moves.sum)
+    }
+
+    @Test
     fun `slice boundaries should preserve the seeded satisfaction walk`() {
         val problem = Problem(
             4,

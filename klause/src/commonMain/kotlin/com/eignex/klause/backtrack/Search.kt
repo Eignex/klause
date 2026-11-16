@@ -126,8 +126,9 @@ internal sealed interface SearchOutcome {
          *  certified feasible or infeasible (see `LpEngine.leafCertify`), so the tree is not provably
          *  all-infeasible — the terminal verdict must be `unknown`, not UNSAT. */
         val indeterminate: Boolean = false,
+        val stopCause: SearchStopCause? = null,
     ) : SearchOutcome
-    data object BudgetCapped : SearchOutcome
+    data class BudgetCapped(val stopCause: SearchStopCause? = null) : SearchOutcome
 }
 
 /** Lazy shared-session outcomes for satisfaction, enumeration, and sampling. */
@@ -332,7 +333,9 @@ internal class CpSatisfactionTraversal(
                             null
                         }
                         is ComponentResult.Conflict -> SearchOutcome.Exhausted()
-                        ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+                        ComponentResult.Indeterminate -> SearchOutcome.Exhausted(
+                            indeterminate = true, stopCause = session.executionControls.stopCause,
+                        )
                     }
                     if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
                 }
@@ -397,7 +400,9 @@ internal class CpSatisfactionTraversal(
                     null
                 }
                 is ComponentResult.Conflict -> exhausted
-                ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+                ComponentResult.Indeterminate -> SearchOutcome.Exhausted(
+                    indeterminate = true, stopCause = session.executionControls.stopCause,
+                )
             }
         }
         traversal.resetScope()
@@ -443,7 +448,9 @@ internal class CpSatisfactionTraversal(
                         null
                     }
                     is ComponentResult.Conflict -> SearchOutcome.Exhausted()
-                    ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+                    ComponentResult.Indeterminate -> SearchOutcome.Exhausted(
+                        indeterminate = true, stopCause = session.executionControls.stopCause,
+                    )
                 }
                 if (rootOutcome == null) {
                     run = session.openRun(problem.numBoolVars, traversal).also {
@@ -478,23 +485,26 @@ internal class CpSatisfactionTraversal(
             }
 
             SearchRunEvent.Indeterminate.Component -> {
+                val cause = run?.componentStop?.stopCause ?: learningSession?.executionControls?.stopCause
                 finishQuery()
-                if (params.cancellation()) SearchOutcome.BudgetCapped else SearchOutcome.Exhausted(indeterminate = true)
+                SearchOutcome.Exhausted(indeterminate = true, stopCause = cause)
             }
 
             SearchRunEvent.Paused -> if (slice != null) {
                 if (!traversal.clauseExchangeEnded) params.clauseExchange?.onSearchPause(cp.session)
                 null
             } else {
+                val cause = learningSession?.executionControls?.stopCause
                 finishQuery()
-                SearchOutcome.BudgetCapped
+                SearchOutcome.BudgetCapped(cause)
             }
 
             SearchRunEvent.Indeterminate.Budget,
             SearchRunEvent.Indeterminate.Cancelled,
             -> {
+                val cause = learningSession?.executionControls?.stopCause
                 finishQuery()
-                SearchOutcome.BudgetCapped
+                SearchOutcome.BudgetCapped(cause)
             }
         }
     }
