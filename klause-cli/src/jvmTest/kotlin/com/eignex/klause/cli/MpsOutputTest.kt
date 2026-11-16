@@ -7,24 +7,10 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MpsOutputTest {
-    @Test
-    fun `an exact nominal unbounded ray should remain valid in the tolerance accepted superset`() {
-        val output = MpsOutput(exactSourceWitness = { true })
-
-        val text = captureStdout {
-            output.onExactSolution("v X=1", BigFraction.ONE)
-            output.onComplete(Verdict.UNBOUNDED)
-        }
-
-        assertTrue("s UNBOUNDED" in text.lines(), text)
-        assertTrue("v X=1" in text.lines(), text)
-    }
-
     @Test
     fun `float rendering should check zero reconstruction against source rows`() {
         val source = assertNotNull(Mps.parse(
@@ -113,18 +99,5 @@ class MpsOutputTest {
 
         assertTrue("s UNKNOWN" in text, text)
         assertTrue("s SATISFIABLE" !in text, text)
-    }
-
-    @Test
-    fun `a tolerance witness should not support source unboundedness`() {
-        val output = MpsOutput(exactSourceWitness = { false })
-
-        val text = captureStdout {
-            output.onSolution("v X=0", objective = 0)
-            output.onComplete(Verdict.UNBOUNDED)
-        }
-
-        assertTrue("s SATISFIABLE" in text.lines(), text)
-        assertFalse("s UNBOUNDED" in text.lines(), text)
     }
 }

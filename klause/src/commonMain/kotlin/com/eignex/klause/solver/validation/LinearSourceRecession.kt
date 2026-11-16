@@ -7,14 +7,12 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 
-/**
- * Whether [direction], in declaration order, is a ray of the original source through the accepted [base] along
- * which the original objective strictly improves. Every coefficient is read exactly. A moved column has no bound
- * on the side it moves to, and every row active at [base] keeps its activity on its bounded sides, so no residual
- * of [base] grows while every moved term's magnitude eventually does: the ray's tail stays accepted under the
- * same tolerance. Integer columns, and with them the indicator guards, stay fixed, so integrality and the set of
- * active rows hold along the whole ray.
- */
+// Whether `direction`, in declaration order, is a ray of the original source through the accepted `base` along
+// which the original objective strictly improves. Every coefficient is read exactly. A moved column has no bound on
+// the side it moves to, and every row whose indicator guard holds at `base`, and every unguarded row, keeps its
+// slope on its bounded sides, whether or not the row is tight at `base`. So no residual of `base` grows while every
+// moved term's magnitude eventually does: the ray's tail stays accepted under the same tolerance. Integer columns,
+// and with them the indicator guards, stay fixed, so integrality and the set of enforced rows hold along the ray.
 internal fun checkLinearSourceRecession(
     base: LinearSourceWitness,
     direction: List<BigFraction>,
@@ -33,7 +31,7 @@ internal fun checkLinearSourceRecession(
     val values = base.values
     for (row in source.rowValues) {
         if (poll()) return false
-        if (!row.activeAt(values)) continue
+        if (!row.enforcedAt(values)) continue
         val sign = slope(row.termValues, direction, poll)?.signum() ?: return false
         if ((row.lower != null && sign < 0) || (row.upper != null && sign > 0)) return false
     }
@@ -42,13 +40,11 @@ internal fun checkLinearSourceRecession(
     return improves && !stop()
 }
 
-/**
- * [direction] moved onto the exact kernel of the active source rows that its binary64 projection keeps level.
- * Those rows hold with a zero slope in the working model, but their decimal coefficients can leave the exact
- * slope a rounding error away from zero. Columns the ray does not move stay fixed, one column per independent
- * level row absorbs that error, and every other column keeps its step. Null when [stop] fires; the result proves
- * nothing until [checkLinearSourceRecession] accepts it.
- */
+// `direction` moved onto the exact kernel of the enforced source rows that its binary64 projection keeps level.
+// Those rows hold with a zero slope in the working model, but their decimal coefficients can leave the exact slope
+// a rounding error away from zero. Columns the ray does not move stay fixed, one column per independent level row
+// absorbs that error, and every other column keeps its step. Null when `stop` fires; the result proves nothing
+// until [checkLinearSourceRecession] accepts it.
 internal fun levelLinearSourceRay(
     base: LinearSourceWitness,
     direction: List<BigFraction>,
@@ -61,32 +57,39 @@ internal fun levelLinearSourceRay(
     val pivots = ArrayList<Pair<Int, HashMap<Int, BigFraction>>>()
     for (row in source.rowValues) {
         if (poll()) return null
-        if (!row.activeAt(values)) continue
+        if (!row.enforcedAt(values)) continue
         val equation = row.levelEquation(direction, poll) ?: continue
         for ((column, pivot) in pivots) {
             if (poll()) return null
-            equation.remove(column)?.let { factor -> equation.subtract(factor, pivot, column) }
+            val factor = equation.remove(column) ?: continue
+            if (!equation.subtract(factor, pivot, column, poll)) return null
         }
-        val column = equation.entries.maxWithOrNull { a, b -> a.value.magnitude().compareTo(b.value.magnitude()) }
-            ?.key ?: continue
+        val column = equation.pivotColumn() ?: continue
         val scale = equation.getValue(column).reciprocal()
-        for (entry in equation.entries) entry.setValue(entry.value * scale)
+        for (entry in equation.entries) {
+            if (poll()) return null
+            entry.setValue(entry.value * scale)
+        }
         for ((_, pivot) in pivots) {
             if (poll()) return null
-            pivot.remove(column)?.let { factor -> pivot.subtract(factor, equation, column) }
+            val factor = pivot.remove(column) ?: continue
+            if (!pivot.subtract(factor, equation, column, poll)) return null
         }
         pivots += column to equation
     }
     val repaired = direction.toMutableList()
     for ((column, pivot) in pivots) {
         var step = BigFraction.ZERO
-        for ((other, coefficient) in pivot) if (other != column) step -= coefficient * direction[other]
+        for ((other, coefficient) in pivot) {
+            if (poll()) return null
+            if (other != column) step -= coefficient * direction[other]
+        }
         repaired[column] = step
     }
     return repaired.takeUnless { stop() }
 }
 
-// The row over the moved columns when its binary64 coefficients give a zero slope along [direction].
+// The row over the moved columns when its binary64 coefficients give a zero slope along `direction`.
 private fun LinearSourceRow.levelEquation(direction: List<BigFraction>, poll: Poll): HashMap<Int, BigFraction>? {
     var projected = BigFraction.ZERO
     val equation = HashMap<Int, BigFraction>()
@@ -102,16 +105,41 @@ private fun LinearSourceRow.levelEquation(direction: List<BigFraction>, poll: Po
     return equation.takeIf { projected.isZero && it.isNotEmpty() }
 }
 
-// Subtracts [factor] times [pivot], whose [column] coefficient is one and already removed from this row.
-private fun HashMap<Int, BigFraction>.subtract(factor: BigFraction, pivot: Map<Int, BigFraction>, column: Int) {
+// The largest-magnitude coefficient's column, the lowest column among equal magnitudes, so the pivot and with it
+// the leveled ray do not depend on hash iteration order.
+private fun Map<Int, BigFraction>.pivotColumn(): Int? {
+    var best: Int? = null
+    var bestMagnitude = BigFraction.ZERO
+    for ((column, coefficient) in this) {
+        val magnitude = coefficient.magnitude()
+        val order = magnitude.compareTo(bestMagnitude)
+        if (best == null || order > 0 || (order == 0 && column < best)) {
+            best = column
+            bestMagnitude = magnitude
+        }
+    }
+    return best
+}
+
+// Subtracts `factor` times `pivot`, whose `column` coefficient is one and already removed from this row. False when
+// `poll` fires.
+private fun HashMap<Int, BigFraction>.subtract(
+    factor: BigFraction,
+    pivot: Map<Int, BigFraction>,
+    column: Int,
+    poll: Poll,
+): Boolean {
     for ((other, coefficient) in pivot) {
+        if (poll()) return false
         if (other == column) continue
         val sum = (this[other] ?: BigFraction.ZERO) - factor * coefficient
         if (sum.isZero) remove(other) else this[other] = sum
     }
+    return true
 }
 
-private fun LinearSourceRow.activeAt(values: List<BigFraction>): Boolean {
+// A row is enforced when it is unguarded or its indicator guard holds; tightness at the point does not matter.
+private fun LinearSourceRow.enforcedAt(values: List<BigFraction>): Boolean {
     val guard = indicator ?: return true
     return values[guard.column] == if (guard.whenOne) BigFraction.ONE else BigFraction.ZERO
 }
