@@ -306,7 +306,7 @@ internal class MpsOutput(
             else -> null
         }
         val numerical = if (source.numericalClaims && source.conclusion in setOf(
-                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE,
+                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE, LinearSourceConclusion.UNBOUNDED,
             )) "MPS numerical status under configured tolerances" else null
         return listOfNotNull(declaration, numerical, qualification, witness, cause)
             .joinToString("; ").ifEmpty { null }
