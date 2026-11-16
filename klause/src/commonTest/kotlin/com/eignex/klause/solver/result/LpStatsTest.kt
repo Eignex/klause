@@ -11,6 +11,7 @@ import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ContinuationPhase
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
+import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -483,5 +484,158 @@ class LpStatsTest {
         sink.observeWork(2_500L)
 
         assertEquals(3_500.0, sink.snapshot().workOps.sum)
+    }
+
+    @Test
+    fun `auxiliary routes should accumulate paused deltas without counting extra passes`() {
+        val partial = LpSolveMetrics(pivots = 2, workOps = 7, warmAttempts = 1, warmHits = 1,
+            initialRefactorizations = 1, warmStartRefactorizations = 2, singularRecoveryRefactorizations = 3,
+            updateLimitRefactorizations = 4, backendRequestedRefactorizations = 5,
+            reconcileRecoveryRefactorizations = 6, numericalRecoveryRefactorizations = 7,
+            primalRefactorizations = 8, singularRefactorizations = 9, smallPivotBails = 10)
+        val final = partial + LpSolveMetrics(pivots = 3, workOps = 11, smallPivotBails = 1)
+        val expected = LpRouteSolveStats(
+            passes = SumResult(1.0), pivots = SumResult(5.0), workOps = SumResult(18.0),
+            warmStartAttempts = SumResult(1.0), warmStartHits = SumResult(1.0),
+            initialRefactorizations = SumResult(1.0), warmStartRefactorizations = SumResult(2.0),
+            singularRecoveryRefactorizations = SumResult(3.0), updateLimitRefactorizations = SumResult(4.0),
+            backendRequestedRefactorizations = SumResult(5.0), reconcileRecoveryRefactorizations = SumResult(6.0),
+            numericalRecoveryRefactorizations = SumResult(7.0), primalRefactorizations = SumResult(8.0),
+            singularRefactorizations = SumResult(9.0), smallPivotBails = SumResult(11.0),
+        )
+        for (route in listOf(LpRoute.STANDALONE, LpRoute.COMPONENT, LpRoute.ROOT)) {
+            val sink = LpStatsSink(route)
+            val observer = sink.certificationObserver()
+            observer.observeSolveProgress(partial, component = false, finished = false)
+            val paused = sink.snapshot()
+
+            observer.observeSolveProgress(final - partial, component = false, finished = true)
+            val stats = sink.snapshot()
+            val actual = when (route) {
+                LpRoute.STANDALONE -> stats.standaloneRoute
+                LpRoute.COMPONENT -> stats.componentRoute
+                LpRoute.ROOT -> stats.rootRoute
+                LpRoute.NODE -> error("node route")
+            }
+
+            assertEquals(expected, actual)
+            assertEquals(0.0, paused.standalonePasses.sum + paused.componentPasses.sum + paused.rootPasses.sum)
+            assertEquals(1.0, stats.standalonePasses.sum + stats.componentPasses.sum + stats.rootPasses.sum)
+            assertEquals(5.0, stats.standalonePivots.sum + stats.componentPivots.sum + stats.rootPivots.sum)
+            assertEquals(18.0, stats.standaloneWorkOps.sum + stats.componentWorkOps.sum + stats.rootWorkOps.sum)
+            assertEquals(0.0, stats.pivots.sum)
+            assertEquals(0.0, stats.solves.sum)
+        }
+    }
+
+    @Test
+    fun `node deltas should retain costs before a solve finishes`() {
+        val sink = LpStatsSink()
+        sink.observeNodePass()
+        val observer = sink.certificationObserver()
+        observer.observeSolveProgress(LpSolveMetrics(pivots = 2, workOps = 7, warmAttempts = 1, warmHits = 1,
+            warmStartRefactorizations = 1, singularRefactorizations = 2), component = false, finished = false)
+        val paused = sink.snapshot()
+
+        observer.observeSolveProgress(LpSolveMetrics(pivots = 3, workOps = 11, primalRefactorizations = 2,
+            smallPivotBails = 1), component = false, finished = true)
+        sink.observeSolve()
+        val stats = sink.snapshot()
+
+        assertEquals(0.0, paused.solves.sum)
+        assertEquals(7.0, paused.workOps.sum)
+        assertEquals(1.0, stats.nodePasses.sum)
+        assertEquals(1.0, stats.solves.sum)
+        assertEquals(5.0, stats.pivots.sum)
+        assertEquals(18.0, stats.workOps.sum)
+        assertEquals(1.0, stats.seeded.sum)
+        assertEquals(stats.seeded, stats.warmStartHits)
+        assertEquals(1.0, stats.warmStartAttempts.sum)
+        assertEquals(3.0, stats.refactorizations.sum)
+        assertEquals(2.0, stats.singularRefactorizations.sum)
+        assertEquals(1.0, stats.smallPivotBails.sum)
+    }
+
+    @Test
+    fun `standalone allowance should include only components invoked by standalone consumers`() {
+        val sink = LpStatsSink()
+        val standalone = sink.certificationObserver(LpRoute.STANDALONE)
+        standalone.observeSolveProgress(LpSolveMetrics(workOps = 7), component = true, finished = false)
+        val paused = sink.snapshot()
+
+        standalone.observeSolveProgress(LpSolveMetrics(workOps = 11), component = true, finished = true)
+        standalone.observeSolve(LpSolveMetrics(workOps = 13), component = false)
+        sink.certificationObserver(LpRoute.ROOT).observeSolve(LpSolveMetrics(workOps = 17), component = true)
+        val stats = sink.snapshot()
+
+        assertEquals(7.0, paused.componentWorkOps.sum)
+        assertEquals(0.0, paused.componentPasses.sum)
+        assertEquals(31L, sink.standaloneWork)
+        assertEquals(13.0, stats.standaloneWorkOps.sum)
+        assertEquals(35.0, stats.componentWorkOps.sum)
+        assertEquals(stats.componentWorkOps, stats.componentRoute.workOps)
+        assertEquals(2.0, stats.componentPasses.sum)
+        assertEquals(stats.componentPasses, stats.componentRoute.passes)
+    }
+
+    @Test
+    fun `component costs should sum in integer units before snapshot conversion`() {
+        val sink = LpStatsSink()
+        val largeWork = 9_007_199_254_740_993L
+        sink.certificationObserver(LpRoute.STANDALONE).observeSolve(
+            LpSolveMetrics(workOps = largeWork), component = true,
+        )
+        sink.certificationObserver(LpRoute.ROOT).observeSolve(LpSolveMetrics(workOps = 1), component = true)
+
+        val stats = sink.snapshot()
+
+        assertEquals((largeWork + 1L).toDouble(), stats.componentWorkOps.sum)
+        assertEquals(stats.componentWorkOps, stats.componentRoute.workOps)
+        assertEquals(largeWork, sink.standaloneWork)
+    }
+
+    @Test
+    fun `worker merge should retain paused work and terminal failed attempt costs`() {
+        val paused = LpStatsSink()
+        paused.observeEngineCost(LpRoute.ROOT, LpSolveMetrics(pivots = 2, workOps = 7), finished = false)
+        val failed = LpStatsSink()
+        failed.observeEngineCost(LpRoute.ROOT, LpSolveMetrics(pivots = 3, workOps = 11,
+            initialRefactorizations = 1, singularRefactorizations = 1, smallPivotBails = 1))
+
+        val stats = paused.snapshot().mergedWith(failed.snapshot())
+
+        assertEquals(1.0, stats.rootPasses.sum)
+        assertEquals(5.0, stats.rootPivots.sum)
+        assertEquals(18.0, stats.rootWorkOps.sum)
+        assertEquals(stats.rootPasses, stats.rootRoute.passes)
+        assertEquals(stats.rootPivots, stats.rootRoute.pivots)
+        assertEquals(stats.rootWorkOps, stats.rootRoute.workOps)
+        assertEquals(1.0, stats.rootRoute.singularRefactorizations.sum)
+        assertEquals(1.0, stats.rootRoute.smallPivotBails.sum)
+    }
+
+    @Test
+    fun `certifier snapshots and worker merges should preserve route outcomes`() {
+        val first = LpStatsSink(LpRoute.ROOT)
+        first.certificationObserver().observe(LpCertifier.INTEGER, false, LpCertifierCost.Metered(7))
+        val before = first.snapshot()
+        first.certificationObserver().observe(LpCertifier.INTEGER, true, LpCertifierCost.Metered(11))
+        val second = LpStatsSink()
+        second.certificationObserver(LpRoute.COMPONENT).observe(LpCertifier.INTEGER, false, LpCertifierCost.Metered(13))
+        second.certificationObserver(LpRoute.STANDALONE).observe(LpCertifier.INTEGER, true, LpCertifierCost.Metered(17))
+
+        val stats = first.snapshot().mergedWith(second.snapshot()).integerCertify
+
+        assertEquals(1.0, before.integerCertify.attempts.sum)
+        assertEquals(0.0, before.integerCertify.successes.sum)
+        assertEquals(4.0, stats.attempts.sum)
+        assertEquals(2.0, stats.successes.sum)
+        assertEquals(2.0, stats.declines.sum)
+        assertEquals(0.0, stats.node.attempts.sum)
+        assertEquals(2.0, stats.root.attempts.sum)
+        assertEquals(1.0, stats.root.successes.sum)
+        assertEquals(1.0, stats.root.declines.sum)
+        assertEquals(1.0, stats.component.declines.sum)
+        assertEquals(1.0, stats.standalone.successes.sum)
     }
 }

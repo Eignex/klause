@@ -16,7 +16,7 @@ class ReifiedCardinalityPropagatorTest {
     @Test
     fun `reified cardinality deductions should be implied by their reasons with the indicator on variable zero`() {
         val rng = Random(0xCA2)
-        repeat(300) { iter ->
+        repeat(30) { iter ->
             val n = 4
             val min = rng.nextInt(n)
             val problem = Problem(

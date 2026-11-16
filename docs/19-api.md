@@ -79,18 +79,20 @@ visited, including when its size exactly equals the assignment budget.
 Source setup is the one dispatcher every frontend and the CLI use. Attach a
 canonical `Problem` with `SourceAttachment(problem, definitionHints, searchHints)`
 and call `SourceSetup.prepare(SourceSetupRequest(...))`; the objective uses original
-direction and units. Setup prefers exact arithmetic for pure-real models and for
-linear integer objectives whose range exceeds binary64's exact integers; other finite
-models keep finite execution. Native snapshots (`PolynomialRealProblem`,
+direction and units. Setup prefers exact arithmetic for models without integer columns
+from a source without a positive feasibility tolerance and for linear integer objectives
+whose range exceeds binary64's exact integers; other finite models, including those
+without integer columns from a numerical source, keep finite execution. Native snapshots (`PolynomialRealProblem`,
 `NonlinearIntegerProblem`, `TranscendentalProblem`, `LinearSourceProblem`) attach
 with explicit `ProblemSettings` and keep their exact formula and objective. Hints are
 described under [source definition materialization](10-local-search.md#source-definition-materialization).
 
-`PreparedSourceInvocation` retains the selected route, source plan and operation
-admission. When preparation selects a private float grid, `FiniteSolveResult.outcome`
-reports source-qualified points and claims unless the consumer declares grid
-semantics. FlatZinc declares that scope, recorded by
-`SourceFloatProjection.declaredGridSemantics`, and reports grid witnesses, optima
+`PreparedSourceInvocation` retains the selected route, source plan, operation
+admission and any private grid. Setup finishes route and grid selection before
+returning it, so an invocation never changes its execution view. With a private
+float grid, `FiniteSolveResult.outcome` reports source-qualified points and claims
+unless the consumer declares grid semantics. FlatZinc declares that scope, recorded
+by `SourceFloatProjection.declaredGridSemantics`, and reports grid witnesses, optima
 and refutations. `nativeGridOutcome` keeps the grid's own outcome in either case.
 An interrupted preparation returns `Declined` with its stop reason.
 
@@ -198,8 +200,9 @@ storage. A location is valid only with its owning model, projection or layout.
 
 ## Snapshot and buffer ownership
 
-Source structures stay borrowed read-only; samples and exact assignments own their
-coordinates. Changing coordinates discards acceptance and requires a fresh check.
+`Problem.of` captures a model's structural arrays and factor payloads stay borrowed
+read-only; samples and exact assignments own their coordinates. Changing coordinates
+discards acceptance and requires a fresh check.
 [Model ownership](02-model.md#published-assignments-and-objectives) defines the full
 buffer, objective and lifetime contract.
 

@@ -24,7 +24,7 @@ class SolveCoreOpenLocalSearchTest(private val maximize: Boolean) {
 
     @Test
     fun `open local search should publish its exact cost before incomplete terminal reporting`() {
-        val model = Problem(
+        val model = Problem.of(
             0,
             0,
             emptyArray(),

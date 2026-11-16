@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -11,6 +13,24 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioInvocationResourcesTest {
+    @Test
+    fun `a slot should bind its seed shares and quota into backtrack and local search controls`() {
+        val quota = NodeBudget(5)
+        val slot = PortfolioWorkerSlot(1, 10, ExecutionControl.Never, quota, 3, setOf(0))
+
+        val backtrack = slot.backtrack(BacktrackParams(maxDecisions = 100, maxInstructions = 50))
+        val localSearch = slot.localSearch(LocalSearchParams(maxFlips = 40, maxInstructions = 9))
+
+        assertEquals(11L, backtrack.randomSeed)
+        assertEquals(13L, backtrack.maxDecisions)
+        assertEquals(50L, backtrack.maxInstructions)
+        assertSame(quota, backtrack.nodeBudget)
+        assertEquals(11L, localSearch.randomSeed)
+        assertEquals(20L, localSearch.maxFlips)
+        assertEquals(5L, localSearch.maxInstructions)
+        assertSame(quota, localSearch.nodeBudget)
+    }
+
     @Test
     fun `parallel slot quotas should keep aggregate work without taking a sibling allowance`() {
         val containing = NodeBudget(5)

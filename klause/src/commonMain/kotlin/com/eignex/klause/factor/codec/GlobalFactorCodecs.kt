@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.codec
 
+import com.eignex.klause.arithmetic.json.BigFractionSerializer
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.AllDifferentTuples

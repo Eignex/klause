@@ -22,7 +22,7 @@ class ChannelViewTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `inverse role views expose the same small source swap neighborhood`(transpose: Boolean) {
-        val source = Problem(
+        val source = Problem.of(
             0,
             6,
             Array(6) { IntDomain(0, 2) },
@@ -70,7 +70,7 @@ class ChannelViewTest {
     @ParameterizedTest
     @ValueSource(ints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
     fun `inverse role transposition preserves the grade at every source assignment`(bits: Int) {
-        val source = Problem(
+        val source = Problem.of(
             0,
             4,
             Array(4) { IntDomain(1, 2) },
@@ -93,7 +93,7 @@ class ChannelViewTest {
 
     @Test
     fun `inverse role transposition retains source holes semantics and implied roles`() {
-        val source = Problem(
+        val source = Problem.of(
             0,
             6,
             Array(6) { IntDomain(4, 6).excludeValue(5) },
@@ -110,7 +110,7 @@ class ChannelViewTest {
 
     @Test
     fun `inverse role transposition accepts a source permutation with unequal offsets`() {
-        val source = Problem(
+        val source = Problem.of(
             0,
             4,
             arrayOf(
@@ -134,7 +134,7 @@ class ChannelViewTest {
 
     @Test
     fun `aliased inverse channels decline without a partial view`() {
-        val source = Problem(
+        val source = Problem.of(
             0,
             2,
             Array(2) { IntDomain(0, 1) },
@@ -146,7 +146,7 @@ class ChannelViewTest {
 
     @Test
     fun `competing inverse channels decline without a partial view`() {
-        val source = Problem(
+        val source = Problem.of(
             0,
             6,
             Array(6) { IntDomain(0, 1) },
@@ -171,7 +171,7 @@ class ChannelViewTest {
 
     @Test
     fun `cancelled inverse role transposition publishes no view`() {
-        val source = Problem(
+        val source = Problem.of(
             0,
             4,
             Array(4) { IntDomain(0, 1) },

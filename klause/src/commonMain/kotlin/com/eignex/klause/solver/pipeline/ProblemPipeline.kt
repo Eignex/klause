@@ -106,8 +106,9 @@ sealed interface SourceProblemRoute {
 /**
  * Select the same source route as [SourceSetup.prepare].
  *
- * [routePureRealToTheory] and [routeLinearToTheory] are compatibility arguments; source mathematics and
- * objective precision determine ownership. [boundCancellation] bounds optional deduction and required admission.
+ * [routePureRealToTheory] and [routeLinearToTheory] are compatibility arguments; source mathematics, objective
+ * precision and the source feasibility tolerance determine ownership. [boundCancellation] bounds optional deduction
+ * and required admission.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
@@ -120,7 +121,8 @@ fun Problem.pipelineRoute(
 
 /**
  * Select the shared source route and observe bound-probing LP work.
- * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding source ownership.
+ * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding the ownership that
+ * source mathematics, objective precision and the source feasibility tolerance determine.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
@@ -140,7 +142,8 @@ fun Problem.pipelineRoute(
 
 /**
  * Select the shared source route with per-invocation factor projection providers.
- * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding source ownership.
+ * [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without overriding the ownership that
+ * source mathematics, objective precision and the source feasibility tolerance determine.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(
@@ -166,7 +169,8 @@ fun Problem.pipelineRoute(
  * [boundCancellation] stops optional deductions. [preparationCancellation] bounds complete source
  * installation and retains the containing invocation's deadline and work allowance. Completed bounds
  * survive either stop. [routePureRealToTheory] and [routeLinearToTheory] retain compatibility without
- * overriding source ownership.
+ * overriding the ownership that source mathematics, objective precision and the source feasibility tolerance
+ * determine.
  */
 @Suppress("UNUSED_PARAMETER")
 fun Problem.pipelineRoute(

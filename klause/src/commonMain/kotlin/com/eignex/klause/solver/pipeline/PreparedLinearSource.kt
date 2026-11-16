@@ -27,12 +27,12 @@ internal fun prepareLinearSource(
     source: LinearSourceProblem,
     stop: ExecutionControl,
     onLpStats: ((LpStats) -> Unit)?,
-): PreparedSourceInvocation {
+): SourceRouteSelection {
     if (request.objective != null || request.quadraticObjective != null) {
         throw PipelineConfigException("a linear source binds its original affine objective in the source snapshot")
     }
-    fun interrupted(): PreparedSourceInvocation =
-        PreparedSourceInvocation(request, SourceProblemRoute.NativeFormula(null), stop)
+    fun interrupted(): SourceRouteSelection =
+        SourceRouteSelection(request, SourceProblemRoute.NativeFormula(null), stop)
     if (stop()) return interrupted()
     val numerical = source.semantics.effective.feasibilityTolerance?.isExact == false
     val view = lowerLinearSource(source, request.source.settings, numerical, stop) ?: return interrupted()
@@ -44,7 +44,7 @@ internal fun prepareLinearSource(
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound)
     // A row without a finite working projection has no LP authority or finite owner, so it declines at once.
     if (!view.model.finiteRowsSupported()) {
-        return PreparedSourceInvocation(
+        return SourceRouteSelection(
             request,
             SourceProblemRoute.NativeFormula(null, TerminationReason.Unsupported),
             stop,
@@ -64,7 +64,7 @@ internal fun prepareLinearSource(
         routePureRealToTheory = false,
     )
     if (stop()) return interrupted()
-    return PreparedSourceInvocation(request, prepared.bind(route), stop, prepared)
+    return SourceRouteSelection(request, prepared.bind(route), stop, prepared)
 }
 
 private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemRoute {

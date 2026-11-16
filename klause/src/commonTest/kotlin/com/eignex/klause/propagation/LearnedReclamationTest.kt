@@ -439,4 +439,149 @@ class LearnedReclamationTest {
         assertEquals(3, candidates.backingData.size)
         assertEquals(listOf(7, 2, 9), candidates.toIntArray().toList())
     }
+
+    @Test
+    fun `repeated growth should return both stores to one released footprint`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(6, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            val policy = if (native) NativeCapConfiguration(false, 2, 6) else null
+
+            val footprints = List(3) {
+                repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+                repeat(40) {
+                    session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, nativePolicy = policy) { false }
+                }
+                repeat(40) {
+                    val work = session.work
+                    session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
+                    assertTrue(session.work - work <= 65_536L)
+                }
+                val observed = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+                observed.getValue("ownedPrimitiveBytes") to observed.getValue("ownedReferenceSlots")
+            }
+
+            assertEquals(0, session.activeLearnedClauseCount)
+            assertEquals(1, footprints.distinct().size)
+        }
+    }
+
+    @Test
+    fun `growing retirement should keep a live root reason usable after sibling undo on both stores`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(6, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(8, 10)), Clause(intArrayOf(1)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            val policy = if (native) NativeCapConfiguration(false, 2, 6) else null
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+            val reason = assertNotNull(session.boolReasonClause(1)).toList()
+            val held = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            repeat(4000) { session.addLearnedClause(Clause(intArrayOf(4, 6)), 9) }
+
+            repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, nativePolicy = policy) { false } }
+            repeat(40) { session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true } }
+            val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            session.pinBool(2, false)
+            session.popLast()
+
+            assertEquals(1, session.activeLearnedClauseCount)
+            assertEquals(held.getValue("learnedPayloadBytes"), released.getValue("learnedPayloadBytes"))
+            assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())
+            assertEquals(true, session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `a pending root assertion should survive growing cap windows on both stores`() {
+        for (native in listOf(false, true)) {
+            fun session() = PropagationSession(Problem(6, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(8, 10)), Clause(intArrayOf(1)))), nativeSat = native)
+            val shared = SharedClause(intArrayOf(0, 2), longArrayOf(), 2)
+            val unchanged = session()
+            unchanged.importClause(shared, origin = 7)
+            unchanged.pinBool(4, false)
+            unchanged.popLast()
+            val held = assertNotNull(unchanged.sharingMemory(maxWork = 1_000_000L).completeValues)
+            val session = session()
+            assertEquals(native, session.usesNativeSat)
+            val policy = if (native) NativeCapConfiguration(false, 2, 6) else null
+            repeat(4000) { session.addLearnedClause(Clause(intArrayOf(4, 6)), 9) }
+            session.importClause(shared, origin = 7)
+
+            repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, nativePolicy = policy) { false } }
+            repeat(40) { session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true } }
+            val pending = session.activeLearnedClauseCount
+            session.pinBool(4, false)
+            val published = session.boolValue(1)
+            session.popLast()
+            repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, nativePolicy = policy) { false } }
+            repeat(40) { session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true } }
+            val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            val active = session.activeLearnedClauseCount
+            session.pinBool(4, false)
+
+            // The general store retires around its pending attachment; the native lane defers until publication.
+            assertEquals(if (native) 4001 else 1, pending)
+            assertEquals(true, published)
+            assertEquals(1, active)
+            assertEquals(true, session.boolValue(1))
+            assertEquals(held.getValue("learnedPayloadBytes"), released.getValue("learnedPayloadBytes"))
+            assertTrue(released.getValue("sessionWatchCapacityBytes") <= held.getValue("sessionWatchCapacityBytes"))
+            assertEquals(1L, session.learnedLifecycle().getValue("learningClauseConsumed"))
+        }
+    }
+
+    @Test
+    fun `cancelled cleanup of a grown store should resume to the released footprint on both stores`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(6, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            val policy = if (native) NativeCapConfiguration(false, 2, 6) else null
+            val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+            repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, nativePolicy = policy) { false } }
+            val retired = assertNotNull(session.sharingMemory(maxWork = 1_000_000L,
+                maxScratchEntries = 1_000_000).completeValues)
+            val generation = session.learnedRetirementGeneration
+            val stopAt = session.work + 4L
+
+            session.compactLearnedClauses(65_536L, 1_048_576L, { session.work >= stopAt }) { _, _ -> true }
+            val cancelled = assertNotNull(session.sharingMemory(maxWork = 1_000_000L,
+                maxScratchEntries = 1_000_000).completeValues)
+            repeat(40) { session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true } }
+            val resumed = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(retired.getValue("ownedPrimitiveBytes"), cancelled.getValue("ownedPrimitiveBytes"))
+            assertEquals(retired.getValue("ownedReferenceSlots"), cancelled.getValue("ownedReferenceSlots"))
+            assertTrue(resumed.getValue("sessionWatchCapacityBytes") <= baseline.getValue("sessionWatchCapacityBytes"))
+            assertTrue(resumed.getValue("ownedPrimitiveBytes") <= baseline.getValue("ownedPrimitiveBytes"))
+            assertEquals(generation, session.learnedRetirementGeneration)
+        }
+    }
+
+    @Test
+    fun `a reseed retracting a decision mid cleanup should still release a grown store on both stores`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(6, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            val policy = if (native) NativeCapConfiguration(false, 2, 6) else null
+            val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            repeat(4000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+            repeat(40) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }, nativePolicy = policy) { false } }
+            session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
+            session.pinBool(4, false)
+
+            session.seed(Assumptions.None)
+            repeat(40) { session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true } }
+            val released = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertEquals(null, session.boolValue(5))
+            assertEquals(0, session.activeLearnedClauseCount)
+            assertTrue(released.getValue("sessionWatchCapacityBytes") <= baseline.getValue("sessionWatchCapacityBytes"))
+            assertTrue(released.getValue("ownedPrimitiveBytes") <= baseline.getValue("ownedPrimitiveBytes"))
+        }
+    }
 }

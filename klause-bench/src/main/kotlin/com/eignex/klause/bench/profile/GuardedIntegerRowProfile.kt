@@ -75,7 +75,7 @@ internal object GuardedIntegerRowProfile {
     }
 
     private fun source(truth: Boolean, element: Boolean): Problem = if (element) {
-        Problem(
+        Problem.of(
             0,
             6,
             arrayOf(
@@ -93,7 +93,7 @@ internal object GuardedIntegerRowProfile {
             ),
         )
     } else {
-        Problem(
+        Problem.of(
             1,
             3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
@@ -234,7 +234,7 @@ internal object GuardedIntegerRowProfile {
             if (element) {
                 source
             } else {
-                source.withFactors(source.factors + Clause(intArrayOf(Lit.make(0, truth))))
+                source.withFactors(source.factors.asList() + Clause(intArrayOf(Lit.make(0, truth))))
             }
             ).withIntDomains(domains)
         val stop = ExecutionControl.after(10.seconds)

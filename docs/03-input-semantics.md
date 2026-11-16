@@ -362,6 +362,13 @@ operands, including repeated references. Array selection retains a zero-based
 original condition polarity. Finite consumers use native filtering and scoring;
 arithmetic consumers use the [selection encodings](02-model.md#factor-projection-selection).
 
+Shared `lowering` helpers on `ProblemBuilder` construct finite integer auxiliaries,
+affine defining equalities, Boolean-to-integer channels and native arithmetic and
+selection relations for the schema and XCSP3 frontends. Schema lifting retains its
+name-based `Affine` fold and checked 32-bit admission, converting to ID-based
+`LinComb` only at materialization. Frontends choose auxiliary domains and retain
+source names, diagnostics and definition hints.
+
 ### Integer division
 
 Integer `/` and `%` share one truncating `DivMod` relation for the same operands,

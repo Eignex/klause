@@ -9,11 +9,12 @@ internal class EncodedTheoryModel(
     implied: BooleanArray?,
     realCount: Int,
     val sourceRealCount: Int = source.encodingSourceRealCount,
-) : Problem(
-    source.numBoolVars, source.numIntVars, source.declaredIntDomains, factors,
-    implied, source.hasSymmetryBreaking, realCount,
+    lower : DoubleArray =
     DoubleArray(realCount) { if (it < source.numRealVars) source.realLower[it] else Double.NEGATIVE_INFINITY },
+    upper: DoubleArray =
     DoubleArray(realCount) { if (it < source.numRealVars) source.realUpper[it] else Double.POSITIVE_INFINITY },
+) : Problem(source.numBoolVars, source.numIntVars, source.declaredIntDomains, factors,
+    implied, source.hasSymmetryBreaking, realCount, lower, upper,
     source.settings, source.semantics,
 )
 

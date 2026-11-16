@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.model.PbOp
@@ -54,6 +55,33 @@ class CardinalityInvariantTest {
                 ReifiedPseudoBoolean(4, longArrayOf(3, 2, 4, 1), mixed, PbOp.GE, 5L),
         )
         for ((label, factor) in cases) assertConsistent(label, Problem(5, 0, emptyArray(), listOf(factor)))
+    }
+
+    @Test
+    fun `reified flip deltas should match recomputation with repeated and cancelling literals`() {
+        val literals = intArrayOf(pos(0), pos(0), pos(1), neg(1), neg(2))
+        val factors = listOf(
+            ReifiedCardinality(4, literals, min = 2, max = 3),
+            ReifiedPseudoBoolean(4, longArrayOf(5, 2, 3, 3, 4), literals, PbOp.EQ, 4L),
+        )
+        for (factor in factors) for (cap in listOf(1, 3)) {
+            val problem = Problem(5, 0, emptyArray(), listOf(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+            state.violationSoftCap = cap
+            for (mask in 0 until 32) for (variable in 0 until 5) {
+                for (v in 0 until 5) state.assignment.setBool(v, mask and (1 shl v) != 0)
+                state.recompute()
+                val before = state.cost
+                val predicted = state.netDelta(BoolFlip(variable))
+
+                state.apply(BoolFlip(variable))
+                val applied = state.cost
+                state.recompute()
+
+                assertEquals(state.cost, applied)
+                assertEquals(state.cost - before, predicted)
+            }
+        }
     }
 
     @Test

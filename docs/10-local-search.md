@@ -205,6 +205,13 @@ feedback snapshot:
   Learned weights survive restarts; the assignment, tabu clock and
   configuration-checking flags reset.
 
+Stall schedules and diversification hooks share a progress window that observes
+one cost per engine step and re-anchors when the step counter rewinds. Weight and
+plateau schedules also recognize a lower repair fraction at equal integer cost;
+kick progress requires a strict integer-cost drop. A weight bump or successful kick restarts
+its own window while retaining the best cost. Plateau noise retains its window
+across weight bumps, and unsuccessful kick generation leaves its window elapsed.
+
 ### Tabu and configuration checking
 
 `TabuFilter` removes moves whose variable changed within the tenure; a compound is
@@ -263,6 +270,10 @@ Nested, mixed and opaque objective cones use the generic evaluator. The index
 supplies heuristic scores;
 complete grading and the canonical objective retain admission authority. Maintenance checks
 for the linear term view resume in batches of 256 definitions before move scoring.
+
+Reified cardinality and pseudo-Boolean invariants share signed aggregate flip
+accounting with their Boolean break/make helpers. Their truth predicates, initial
+aggregates and repair proposals remain factor-specific.
 
 Invariants substitute a new value into every position that reads the moved
 coordinate. Product residuals are computed exactly, with a private 128-bit

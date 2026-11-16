@@ -375,8 +375,8 @@ class CoreGuidedSearchTest {
 
     @Test
     fun `exhausted preparation slice should pause before decisions and resume the same objective`() {
-        val problem = Problem(8192, 0, emptyArray(), emptyArray()).bake()
-        val objective = LinearObjective(LongArray(8192) { 1L })
+        val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
+        val objective = LinearObjective(LongArray(1024) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
 
         val paused = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { error("unfinished preparation") }

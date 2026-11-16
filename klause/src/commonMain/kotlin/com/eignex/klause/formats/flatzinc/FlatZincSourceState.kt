@@ -11,6 +11,7 @@ import com.eignex.klause.solver.pipeline.FloatGridConsumerPurpose
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
@@ -28,62 +29,49 @@ internal class FlatZincGridGeometry(
 internal class FlatZincSourceState(
     val original: FlatZincProgram,
     private val declaredReals: Int,
-    private val selectLegacy: () -> Map<String, FloatRepresentation>,
+    private val selectRepresentations: () -> Map<String, FloatRepresentation>,
     sharedGeometry: Lazy<FlatZincGridGeometry>? = null,
-    private val fixedLegacy: FlatZincProgram? = null,
+    private val fixedCompatibility: FlatZincProgram? = null,
     private val projectSearch: (FlatZincProgram) -> FlatZincSearchHints? = { it.searchHints },
 ) {
     private val geometryOwner = sharedGeometry ?: lazy { prepareGeometry() }
     val geometry: FlatZincGridGeometry get() = geometryOwner.value
     internal val materialized: Boolean get() = geometryOwner.isInitialized()
-    val legacy: FlatZincProgram by lazy {
-        fixedLegacy ?: withSearch(projectedProgram(original, geometry))
+    val compatibility: FlatZincProgram by lazy {
+        fixedCompatibility ?: withSearch(projectedProgram(original, geometry))
     }
 
     private fun withSearch(program: FlatZincProgram): FlatZincProgram =
         program.copy(searchHints = projectSearch(program))
 
-    fun attachment(): SourceAttachment = SourceAttachment(
-        original.problem,
-        original.definitionHints,
-        original.searchHints?.toSearchHints(),
-        (0 until original.problem.numRealVars).map {
+    fun attachment(): SourceAttachment = SourceAttachment(original.problem, original.definitionHints,
+        original.searchHints?.toSearchHints(), (0 until original.problem.numRealVars).map {
             FloatGridVariable(SourceRealId(it), auxiliary = it >= declaredReals)
-        },
-    )
+        })
 
     private fun prepareGeometry(): FlatZincGridGeometry {
         if (original.semantics.effective.floats !is FloatSemantics.Grid) {
             return FlatZincGridGeometry(null, original.floatRepresentations)
         }
-        val (representations, variables) = requireNotNull(selection(ExecutionControl.Never))
+        val (representations, variables) = requireNotNull(gridVariables(ExecutionControl.Never))
         if (variables.isEmpty()) return FlatZincGridGeometry(null, representations)
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-                attachment(),
-                ExecutionOperation.SATISFY,
-                FiniteEngine.LOCAL_SEARCH,
-            ),
-        )
-        val prepared = SourceSetup.prepareSelectedFloatGrid(
-            invocation,
-            variables,
-            FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-            declaredGridSemantics = true,
-        )
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(attachment(), ExecutionOperation.SATISFY,
+            FiniteEngine.LOCAL_SEARCH))
+        val prepared = SourceSetup.prepareSelectedFloatGrid(selection, variables,
+            FloatGridConsumerPurpose.FINITE_COMPATIBILITY, declaredGridSemantics = true)
         if (prepared !is SelectedFloatGridPreparation.Prepared) {
             return FlatZincGridGeometry(null, original.floatRepresentations)
         }
-        val definition = requireNotNull(invocation.floatGrid).projection.mapping.definition()
+        val definition = requireNotNull(prepared.invocation.floatGrid).projection.mapping.definition()
         return FlatZincGridGeometry(definition, representations)
     }
 
-    private fun selection(
+    private fun gridVariables(
         cancellation: ExecutionControl,
     ): Pair<Map<String, FloatRepresentation>, List<FloatGridVariable>>? {
         cancellation.charge(original.problem.numFactors.toLong() + original.problem.numRealVars)
         if (cancellation()) return null
-        val representations = selectLegacy()
+        val representations = selectRepresentations()
         if (cancellation()) return null
         val components = IntDisjointSet(original.problem.numRealVars)
         for (factor in original.problem.factors) {
@@ -109,75 +97,43 @@ internal class FlatZincSourceState(
         return if (cancellation()) null else representations to variables
     }
 
-    fun prepare(invocation: PreparedSourceInvocation, purpose: FloatGridConsumerPurpose) {
-        val stop = invocation.cancellation
+    fun selectGrid(selection: SourceRouteSelection, purpose: FloatGridConsumerPurpose): SelectedFloatGridPreparation? {
+        val stop = selection.cancellation
         if (stop() || original.problem.numRealVars == 0 ||
             original.semantics.effective.floats !is FloatSemantics.Grid
-        ) {
-            return
-        }
+        ) return null
         if (geometryOwner.isInitialized()) {
-            geometry.definition?.let {
-                SourceSetup.prepareSelectedFloatGrid(invocation, it, purpose, declaredGridSemantics = true)
-            }
-        } else {
-            val (_, variables) = selection(stop) ?: return
-            if (variables.isNotEmpty()) {
-                SourceSetup.prepareSelectedFloatGrid(
-                    invocation,
-                    variables,
-                    purpose,
-                    declaredGridSemantics = true,
-                )
+            return geometry.definition?.let {
+                SourceSetup.prepareSelectedFloatGrid(selection, it, purpose, declaredGridSemantics = true)
             }
         }
+        val (_, variables) = gridVariables(stop) ?: return null
+        return if (variables.isEmpty()) null else SourceSetup.prepareSelectedFloatGrid(selection, variables, purpose,
+            declaredGridSemantics = true)
     }
 
     fun executionProgram(invocation: PreparedSourceInvocation): FlatZincProgram {
         val binding = invocation.floatGrid ?: return original
         val view = FlatZincGridGeometry(binding.projection.mapping.definition(), original.floatRepresentations)
         val program = withSearch(projectedProgram(original, view))
-        return program.suppliedCopy().retainSource(
-            FlatZincSourceState(
-                original,
-                declaredReals,
-                selectLegacy,
-                lazyOf(view),
-                program,
-                projectSearch,
-            ),
-        )
+        return program.suppliedCopy().retainSource(FlatZincSourceState(original, declaredReals, selectRepresentations,
+            lazyOf(view), program, projectSearch))
     }
 
     fun copyFor(copied: FlatZincProgram): FlatZincSourceState? {
-        if (copied.problem !== legacy.problem || copied.semantics !== original.semantics) return null
+        if (copied.problem !== compatibility.problem || copied.semantics !== original.semantics) return null
         val definition = geometry.definition
-        val sourceCopy = if (definition == null) {
-            copied.suppliedCopy()
-        } else {
-            copiedSourceProgram(original, legacy, copied, definition, sourceSearch(copied)) ?: return null
+        val sourceCopy = if (definition == null) copied.suppliedCopy() else {
+            copiedSourceProgram(original, compatibility, copied, definition, sourceSearch(copied)) ?: return null
         }
-        val search = if (copied.searchHints === legacy.searchHints) {
-            projectSearch
-        } else {
-            { program: FlatZincProgram ->
-                program.searchHints
-            }
-        }
-        return FlatZincSourceState(
-            sourceCopy,
-            declaredReals,
-            selectLegacy,
-            geometryOwner,
-            copied.suppliedCopy(),
-            search,
-        )
+        val copiedSearch = { program: FlatZincProgram -> program.searchHints }
+        val search = if (copied.searchHints === compatibility.searchHints) projectSearch else copiedSearch
+        return FlatZincSourceState(sourceCopy, declaredReals, selectRepresentations, geometryOwner,
+            copied.suppliedCopy(), search)
     }
 
     private fun sourceSearch(copied: FlatZincProgram): FlatZincSearchHints? =
-        if (copied.searchHints === legacy.searchHints) {
-            original.searchHints
-        } else {
+        if (copied.searchHints === compatibility.searchHints) original.searchHints else {
             copied.searchHints?.let { hints ->
                 val tiers = hints.tiers.mapNotNull { tier ->
                     val integers = tier.intVars.filter { it in 0 until original.problem.numIntVars }.toIntArray()
@@ -190,38 +146,29 @@ internal class FlatZincSourceState(
 
 private fun copiedSourceProgram(
     original: FlatZincProgram,
-    legacy: FlatZincProgram,
+    compatibility: FlatZincProgram,
     copied: FlatZincProgram,
     definition: FloatGridDefinition,
     sourceSearch: FlatZincSearchHints?,
 ): FlatZincProgram? {
     val floats = LinkedHashMap<String, FloatBucketing>()
     for ((name, value) in copied.floatVarsByName) {
-        floats[name] = if (value === legacy.floatVarsByName[name]) {
+        floats[name] = if (value === compatibility.floatVarsByName[name]) {
             original.floatVarsByName[name] ?: return null
-        } else {
-            originalBucketing(value, definition) ?: return null
-        }
+        } else originalBucketing(value, definition) ?: return null
     }
     val arrays = LinkedHashMap<String, FlatZincArray>()
     for ((name, array) in copied.arraysByName) {
-        arrays[name] = if (array === legacy.arraysByName[name]) {
+        arrays[name] = if (array === compatibility.arraysByName[name]) {
             original.arraysByName[name] ?: return null
-        } else {
-            originalArray(array, definition) ?: return null
-        }
+        } else originalArray(array, definition) ?: return null
     }
-    return FlatZincProgram(
-        original.problem, copied.solve, copied.boolVarsByName,
+    return FlatZincProgram(original.problem, copied.solve, copied.boolVarsByName,
         copied.intVarsByName.filter { (name, id) -> name !in floats && id < original.problem.numIntVars },
         floats, arrays, copied.outputItems, sourceSearch, copied.enumLabelsByVar, copied.setVarsByName,
-        if (copied.floatRepresentations === legacy.floatRepresentations) {
-            original.floatRepresentations
-        } else {
-            floats.mapValues { (_, value) -> FloatRepresentation(value.varId, null) }
-        },
-        copied.semantics, copied.definitionHints,
-    )
+        if (copied.floatRepresentations === compatibility.floatRepresentations) original.floatRepresentations
+        else floats.mapValues { (_, value) -> FloatRepresentation(value.varId, null) },
+        copied.semantics, copied.definitionHints)
 }
 
 private fun projectedProgram(original: FlatZincProgram, geometry: FlatZincGridGeometry): FlatZincProgram {
@@ -229,15 +176,9 @@ private fun projectedProgram(original: FlatZincProgram, geometry: FlatZincGridGe
     val columns = definition.columns().associateBy { it.source.index }
     fun convert(value: FloatBucketing): FloatBucketing {
         val grid = columns[value.varId]
-        return if (grid == null) {
-            value.copy(varId = definition.retainedReal(value.varId))
-        } else {
-            FloatBucketing(
-                grid.coordinate.variable,
-                grid.coordinate.lower,
-                grid.coordinate.upper,
-                grid.coordinate.buckets,
-            )
+        return if (grid == null) value.copy(varId = definition.retainedReal(value.varId)) else {
+            FloatBucketing(grid.coordinate.variable, grid.coordinate.lower, grid.coordinate.upper,
+                grid.coordinate.buckets)
         }
     }
     val floats = original.floatVarsByName.mapValues { convert(it.value) }
@@ -245,33 +186,22 @@ private fun projectedProgram(original: FlatZincProgram, geometry: FlatZincGridGe
         if (array is FlatZincArray.Vars && array.elementKind == FlatZincArray.Vars.ElementKind.Float) {
             val bucketings = requireNotNull(array.floatBucketings).map(::convert)
             array.copy(varIds = IntArray(bucketings.size) { bucketings[it].varId }, floatBucketings = bucketings)
-        } else {
-            array
-        }
+        } else array
     }
     val ints = original.intVarsByName.toMutableMap()
     for ((name, value) in floats) if (!value.lpOnly) ints[name] = value.varId
-    return FlatZincProgram(
-        definition.target, original.solve, original.boolVarsByName, ints, floats, arrays,
+    return FlatZincProgram(definition.target, original.solve, original.boolVarsByName, ints, floats, arrays,
         original.outputItems, original.searchHints, original.enumLabelsByVar, original.setVarsByName,
-        geometry.representations, original.semantics, original.definitionHints,
-    )
+        geometry.representations, original.semantics, original.definitionHints)
 }
 
 private fun originalBucketing(value: FloatBucketing, definition: FloatGridDefinition): FloatBucketing? {
     val id = if (value.lpOnly) {
         (0 until definition.source.numRealVars).firstOrNull { definition.retainedReal(it) == value.varId }
-    } else {
-        definition.columns().firstOrNull { it.coordinate.variable == value.varId }?.source?.index
-    }
+    } else definition.columns().firstOrNull { it.coordinate.variable == value.varId }?.source?.index
     id ?: return null
-    return FloatBucketing(
-        id,
-        definition.source.realLower[id],
-        definition.source.realUpper[id],
-        value.buckets,
-        lpOnly = true,
-    )
+    return FloatBucketing(id, definition.source.realLower[id], definition.source.realUpper[id], value.buckets,
+        lpOnly = true)
 }
 
 private fun originalArray(array: FlatZincArray, definition: FloatGridDefinition): FlatZincArray? {
@@ -282,7 +212,7 @@ private fun originalArray(array: FlatZincArray, definition: FloatGridDefinition)
     return array.copy(varIds = IntArray(converted.size) { converted[it].varId }, floatBucketings = converted)
 }
 
-/** Attach original real source declarations without requesting a legacy finite view. */
+/** Attach original real source declarations without requesting a finite compatibility view. */
 fun FlatZincProgram.sourceAttachment(): SourceAttachment = retainedSource?.attachment()
     ?: SourceAttachment(problem, definitionHints, searchHints?.toSearchHints())
 
@@ -310,9 +240,9 @@ private fun FlatZincProgram.prepareInvocation(
     onLpStats: ((LpStats) -> Unit)? = null,
 ): PreparedSourceInvocation {
     require(request.source.originalSource === sourceProgram.problem) { "FlatZinc request belongs to another source" }
-    val invocation = if (onLpStats == null) SourceSetup.prepare(request) else SourceSetup.prepare(request, onLpStats)
-    retainedSource?.prepare(invocation, purpose)
-    return invocation
+    val state = retainedSource
+    return SourceSetup.prepareWithGrid(request, { selection -> state?.selectGrid(selection, purpose) },
+        onLpStats = onLpStats)
 }
 
 internal fun FlatZincProgram.forSample(sample: Sample): FlatZincProgram {

@@ -1,6 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.global.Distinct
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -107,36 +111,54 @@ class SourceSetupRequest private constructor(
 /** Captures one source route and retains its operation binding for execution. */
 object SourceSetup {
     /** Prepare from neutral source data without allocating heuristic worker state. */
-    fun prepare(request: SourceSetupRequest): PreparedSourceInvocation = prepareObserved(request, null)
+    fun prepare(request: SourceSetupRequest): PreparedSourceInvocation = PreparedSourceInvocation(selectRoute(request))
 
     /** Prepare the same source binding while observing bound-probing LP work. */
     fun prepare(request: SourceSetupRequest, onLpStats: (LpStats) -> Unit): PreparedSourceInvocation =
-        prepareObserved(request, onLpStats)
+        PreparedSourceInvocation(selectRoute(request, onLpStats))
 
     internal fun prepare(
         request: SourceSetupRequest,
         polynomialCancellation: ExecutionControl,
-    ): PreparedSourceInvocation = prepareObserved(request, null, polynomialCancellation)
+    ): PreparedSourceInvocation =
+        PreparedSourceInvocation(selectRoute(request, null, polynomialCancellation))
 
-    private fun prepareObserved(
+    // The grid consumer runs on the selected route before the invocation exists, so no execution view escapes first.
+    internal fun prepareWithGrid(
         request: SourceSetupRequest,
-        onLpStats: ((LpStats) -> Unit)?,
+        privateGrid: (SourceRouteSelection) -> SelectedFloatGridPreparation?,
         polynomialCancellation: ExecutionControl = request.cancellation,
+        onLpStats: ((LpStats) -> Unit)? = null,
     ): PreparedSourceInvocation {
+        val selection = selectRoute(request, onLpStats,
+        polynomialCancellation)
+        val prepared = privateGrid(selection) as? SelectedFloatGridPreparation.Prepared
+            ?: return PreparedSourceInvocation(selection)
+        require(prepared.invocation.selection === selection) {
+            "grid invocation belongs to a different route selection"
+        }
+        return prepared.invocation
+    }
+
+    internal fun selectRoute(
+        request: SourceSetupRequest,
+        onLpStats: ((LpStats) -> Unit)? = null,
+        polynomialCancellation: ExecutionControl = request.cancellation,
+    ): SourceRouteSelection {
         val stop = request.cancellation.encodingPreparationScope()
         request.source.formula?.let { formula ->
             if (formula is AttachedSourceFormula.Linear) {
                 return prepareLinearSource(request, formula.problem, stop, onLpStats)
             }
             val route = prepareNativeSource(request, formula, stop)
-            return PreparedSourceInvocation(request, route, stop)
+            return SourceRouteSelection(request, route, stop)
         }
         val problem = request.source.problem
         if (problem.factors.any {
                 it is com.eignex.klause.factor.arithmetic.ExactRealEquality && it.value.algebraic == null
             }
         ) {
-            return PreparedSourceInvocation(request, prepareExactRealSource(request, stop), stop)
+            return SourceRouteSelection(request, prepareExactRealSource(request, stop), stop)
         }
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
@@ -145,7 +167,7 @@ object SourceSetup {
                 objective.boolWeightValues.any { it == Long.MIN_VALUE }
         } == true
         if (request.quadraticObjective != null || exactNormalization) {
-            return PreparedSourceInvocation(
+            return SourceRouteSelection(
                 request,
                 prepareFactorQuadratic(request, projections, polynomialCancellation or stop, stop),
                 stop,
@@ -159,7 +181,18 @@ object SourceSetup {
             preparationCancellation = stop,
             polynomialCancellation = polynomialCancellation or stop,
             onLpStats = onLpStats,
+            routePureRealToTheory = problem.semantics.effective.feasibilityTolerance?.isExact != false ||
+                request.operation == ExecutionOperation.ENUMERATE || problem.statesOpenRealComparison(),
         )
-        return PreparedSourceInvocation(request, route, stop)
+        return SourceRouteSelection(request, route, stop)
     }
+}
+
+// Whether a relation over reals states an open set: a strict row, a disequality, or a reified row whose false side
+// is a strict complement. The finite lane completes leaves over closed sets only, so a supremum such a relation
+// leaves unattained is the linear theory's to report.
+private fun Problem.statesOpenRealComparison(): Boolean = factors.any { factor ->
+    factor.variables.reals.isNotEmpty() && (factor is Distinct || factor.linearForm?.rows?.any { row ->
+        row.strict || row.relation == LinearOp.NE || row.activator != LinearRow.ALWAYS
+    } == true)
 }

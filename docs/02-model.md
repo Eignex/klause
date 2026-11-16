@@ -13,10 +13,15 @@ the propagation session; a declaration assigns no engine ownership. Domain table
 record whether their endpoint storage is stable or shares a live array. Views
 carrying a shared table retain that distinction even when their model type changes.
 
-`Problem` arrays and `Factor` payloads are borrowed read-only: their producer keeps
-them unchanged while any model, plan, lazy operation or proof uses them. A rewrite
-creates a fresh source scope. Custom factors keep their membership and structural
-keys stable.
+A `Problem` owns its structural arrays. `Problem.of` captures the factor array,
+implied mask and real bounds once; the list form of `withFactors` captures its factor
+list and mask and carries the real bounds from its source. Internal builders transfer
+fresh or already-owned arrays through internal constructors without a copy and never
+write them afterwards, so derived models may share a source's arrays. Reads return
+that storage without allocating, and readers never write it. `Factor` payloads stay
+borrowed read-only: every factor, built-in or custom, keeps its payload, membership
+and structural key unchanged while any model, plan, lazy operation or proof uses it.
+A rewrite creates a fresh source scope.
 
 Real coordinates are declared the same way. `RealFiniteDomain` retains an immutable
 finite set of exact binary64 values for one real coordinate, and a selected finite
@@ -245,7 +250,8 @@ larger encodings decline while native filtering and scoring remain.
 ### Private float projections
 
 `FloatSemantics.Grid` permits a private finite or heuristic projection without
-selecting one. A requesting consumer binds that view to its prepared invocation;
+selecting one. A requesting consumer selects that view during setup, after route
+selection and before the invocation is returned;
 [FlatZinc](04-finite-formats.md#flatzinc-floats) defines its automatic fallback.
 Original declarations, relations and objective remain on the attachment, and private
 helpers stay distinct. Unsupported factors or stops decline only the view.
@@ -278,10 +284,11 @@ arithmetic language; a factor class alone does not require polynomial traversal.
 coordinate mappings, component descriptors and objective direction. Its sealed
 payload is finite/linear (`ComponentPlan`), polynomial (`SharedPolynomialModel`),
 nonlinear-integer (see [its chapter](16-nonlinear-arithmetic.md#solving-and-composition)),
-transcendental or declined. Preparation invents no finite bounds for open integer
+transcendental or declined. That payload is the plan's only route representation:
+`kind` and `decline` both read it, and rebinding an objective never
+changes it. Preparation invents no finite bounds for open integer
 declarations: variables owned by an open theory never become finite CP domains,
 and continuous coordinates are never integer branch candidates.
-Planned: source preparation and execution converge on this one sealed payload.
 
 `LinearSourceProblem` retains the original rational terms, bounds, row sides,
 indicator pins and affine objective before normalization. Plans belong to the

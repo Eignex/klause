@@ -73,11 +73,16 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.checkPointRestrictions
+import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
+import com.eignex.klause.theory.AbsRealCompletion
+import com.eignex.klause.theory.requiresRealCompletionSearch
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
@@ -178,12 +183,13 @@ internal class ResumableMinimize(
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
+    // Work of the leaf searches, charged to slices as LP work. A search runs to completion like an LP factorization:
+    // a slice it overruns repays the excess from the slices that follow.
+    private var leafSearchWork = 0L
     private val slice = SliceBudget(
-        {
-            sink.search.searchWork + (clausePrimal?.work ?: 0L) +
-                (if (::lpEngine.isInitialized) lpEngine.primalSearchWork else 0L)
-        },
-        { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork },
+        { sink.search.searchWork + (clausePrimal?.work ?: 0L) +
+            (if (::lpEngine.isInitialized) lpEngine.primalSearchWork else 0L) },
+        { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork + leafSearchWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
                 (if (::lpEngine.isInitialized) lpEngine.primalPropagationWork else 0L)
@@ -325,6 +331,71 @@ internal class ResumableMinimize(
                 checkedLeafResult(sample, step.value).also { pendingRealResult = it }
             }
         }
+    }
+
+    // A leaf whose objective reads no real coordinate is completed the way a satisfaction leaf is: the search within
+    // the source tolerance decides a refused or refuted leaf, and an exact search completes a leaf with a disjunction
+    // the relaxation leaves undecided. Any completion of such a leaf attains its objective.
+    private val integralObjective = objective.realCoefficientValues.all { it == 0.0 }
+    private val leafToleranceSearch = params.toleranceCheck.toleranceSearch()?.takeIf { integralObjective }
+    private val leafSearch =
+        if (integralObjective && problem.requiresRealCompletionSearch()) AbsRealCompletion(problem) else null
+
+    // The leaf after its searches, cached with the pending leaf so a leaf re-entered after a pause is not searched
+    // again.
+    private var searchedResult: LeafRealResult? = null
+
+    private fun searchedLeaf(sample: Sample, real: LeafRealResult): LeafRealResult {
+        if (real === searchedResult) return real
+        if (real.verdict != LpVerdict.INFEASIBLE && real.verdict != LpVerdict.INDETERMINATE &&
+            real.verdict != LpVerdict.CERTIFIED_BOUND
+        ) return real
+        val stop = runEndToken()
+        val tolerant = when (val found = leafToleranceSearch?.complete(sample, stop, null, solver.lpSolveContext)) {
+            null, ToleranceSearchResult.Unavailable -> null
+            is ToleranceSearchResult.Refuted -> {
+                leafSearchWork += found.work
+                return LeafRealResult(LpVerdict.INFEASIBLE, doubleArrayOf()).also(::cacheSearched)
+            }
+            is ToleranceSearchResult.Undecided -> return real.also { leafSearchWork += found.work }
+            is ToleranceSearchResult.Witness -> {
+                leafSearchWork += found.work
+                val reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() }
+                val completed = sample.copy(reals = reals, exactReals = found.reals)
+                LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, reals, found.reals)
+                    .takeIf { params.toleranceCheck?.invoke(completed) == true }
+            }
+        }
+        // An exact completion strains no relation, so it is preferred to a point within tolerance.
+        if (real.verdict == LpVerdict.INFEASIBLE && tolerant == null) return real
+        val exact = leafSearch?.let { search ->
+            val completed = search.complete(sample, stop, null, solver.lpSolveContext)
+            leafSearchWork += completed.work
+            when (val result = completed.result) {
+                AbsRealCompletion.Result.Refuted -> LeafRealResult(LpVerdict.INFEASIBLE, doubleArrayOf())
+                AbsRealCompletion.Result.Undecided -> null
+                is AbsRealCompletion.Result.Witness -> {
+                    val reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() }
+                    LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, reals, result.reals).takeIf {
+                        verifyRealCoordinates(problem, sample.copy(reals = reals, exactReals = result.reals)) is
+                            Verification.Accepted
+                    }
+                }
+            }
+        }
+        val searched = when {
+            exact?.verdict == LpVerdict.ATTAINED_OPTIMUM -> exact
+            tolerant != null -> tolerant
+            exact != null -> exact
+            else -> real
+        }
+        if (!stop()) cacheSearched(searched)
+        return searched
+    }
+
+    private fun cacheSearched(result: LeafRealResult) {
+        searchedResult = result
+        pendingRealResult = result
     }
 
     private fun checkedLeafResult(sample: Sample, result: LeafRealResult): LeafRealResult {
@@ -1506,11 +1577,9 @@ internal class ResumableMinimize(
             val incumbent = if (problem.numRealVars == 0) {
                 recordIfImproving(sample, objective.evaluate(sample))
             } else {
-                val real = if (pausable) {
+                val real = searchedLeaf(sample, if (pausable) {
                     advanceRealLeaf(sample) ?: return SearchModelDisposition.Pause
-                } else {
-                    completeLeaf(sample, runEndToken())
-                }
+                } else completeLeaf(sample, runEndToken()))
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 

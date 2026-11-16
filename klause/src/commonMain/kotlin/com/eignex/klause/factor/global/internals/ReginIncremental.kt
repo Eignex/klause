@@ -272,7 +272,7 @@ private fun pruneUnsupportedEdges(
             val vNode = n + vid
             if (inc.sccId[i] == inc.sccId[vNode]) continue
             if (reached[vNode]) continue
-            val hall = sccHallVars.getOrPut(inc.sccId[vNode]) { hallVarsFrom(vNode, adj, n, vars) }
+            val hall = sccHallVars.getOrPut(inc.sccId[vNode]) { reginHallVarsFrom(vNode, adj, vars) }
             val ant = hallReasons.getOrPut(inc.sccId[vNode]) { hallReason(state, hall, premises) }
             if (!state.excludeIntValue(vars[i], cache.valueOfId[vid], ant)) {
                 val withI = hall.copyOf(hall.size + 1)
@@ -320,30 +320,4 @@ private fun reginRecomputeDirtyScc(
         if (dirtyNodes[c] < canonSub[r]) canonSub[r] = dirtyNodes[c]
     }
     for (c in 0 until d) inc.sccId[dirtyNodes[c]] = canonSub[rawSub[c]]
-}
-
-/** Variable ids forward-reachable from a value node [valNode] over [adj] — the sharp Hall set
- *  behind pruning that value's edges (matches [reginFilter]'s `hallVarsFor`). */
-private fun hallVarsFrom(valNode: Int, adj: Array<IntArrayList>, n: Int, vars: IntArray): IntArray {
-    val total = adj.size
-    val vis = BooleanArray(total)
-    val bfs = IntArray(total)
-    var qh = 0
-    var qt = 0
-    vis[valNode] = true
-    bfs[qt++] = valNode
-    val acc = IntArrayList()
-    while (qh < qt) {
-        val u = bfs[qh++]
-        if (u < n) acc.add(vars[u])
-        val a = adj[u]
-        for (k in 0 until a.size) {
-            val w = a[k]
-            if (!vis[w]) {
-                vis[w] = true
-                bfs[qt++] = w
-            }
-        }
-    }
-    return acc.toIntArray()
 }

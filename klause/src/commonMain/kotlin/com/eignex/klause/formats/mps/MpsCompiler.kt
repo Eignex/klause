@@ -59,7 +59,10 @@ class MpsCompiled(
     val sourceDifference: String?
         get() = if (sourceModel == null) "compiled model lacks source mapping" else sourceMismatch
 
-    internal fun withLinearSource(source: LinearSourceProblem, mismatch: String?): MpsCompiled = apply {
+    internal fun withLinearSource(
+        source: LinearSourceProblem,
+        mismatch: String?,
+    ): MpsCompiled = apply {
         check(sourceModel == null) { "MPS source model is already attached" }
         require(source.semantics == semantics) { "MPS source interpretation differs from the compiled model" }
         sourceModel = source
@@ -114,11 +117,8 @@ fun MpsModel.toProblem(
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): MpsCompiled {
     val source = checkNotNull(toLinearSourceProblem(semanticOverrides))
-    return compileMpsView(
-        source,
-        settings,
-        allowProjection = !checkNotNull(source.semantics.effective.feasibilityTolerance).isExact,
-    )
+    return compileMpsView(source, settings,
+        allowProjection = !checkNotNull(source.semantics.effective.feasibilityTolerance).isExact)
 }
 
 internal fun MpsModel.compileMpsView(
@@ -126,31 +126,22 @@ internal fun MpsModel.compileMpsView(
     settings: ProblemSettings,
     allowProjection: Boolean,
 ): MpsCompiled {
-    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection, ExecutionControl.Never))
+    val declarations = source.variables
+    // Rational zero has one value; the fresh compatibility view retains explicit binary64 bound signs.
+    val negativeZero = (-0.0).toRawBits()
+    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection, ExecutionControl.Never) { index, upper ->
+        val declaration = declarations[index]
+        val literal = variables[index]
+        if (upper) declaration.upper == SemanticRational.ZERO && literal.upper?.toRawBits() == negativeZero
+        else declaration.lower == SemanticRational.ZERO && literal.lower?.toRawBits() == negativeZero
+    })
     check(view.objectiveScale.den == BIG_ONE && view.objectiveScale.num.fitsLong()) {
         "shared MPS objective multiplier does not fit a signed word"
     }
-    val declarations = source.variables
     val columns = declarations.mapIndexed { index, variable ->
         val reference = view.columns[index]
         val real = Term.isReal(reference)
         MpsColumn(variable.name, real, if (real) Term.realVar(reference) else Term.intVar(reference))
-    }
-    // Rational zero has one value; the fresh compatibility view retains explicit binary64 bound signs.
-    for ((index, column) in columns.withIndex()) {
-        if (!column.real) continue
-        val literal = variables[index]
-        val declaration = declarations[index]
-        if (declaration.lower == SemanticRational.ZERO && literal.lower?.toRawBits() == (-0.0).toRawBits() &&
-            view.model.realLower[column.id] == 0.0
-        ) {
-            view.model.realLower[column.id] = -0.0
-        }
-        if (declaration.upper == SemanticRational.ZERO && literal.upper?.toRawBits() == (-0.0).toRawBits() &&
-            view.model.realUpper[column.id] == 0.0
-        ) {
-            view.model.realUpper[column.id] = -0.0
-        }
     }
     return MpsCompiled(
         view.model,

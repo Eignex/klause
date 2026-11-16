@@ -142,7 +142,7 @@ internal class FiniteNumericalCompanions private constructor(
         return listOf(
             factory(firstArm, ArmFamily.Backtrack) { slot ->
                 lateinit var worker: PortfolioWorker
-                worker = PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
+                worker = PortfolioWorker.ofMinimize(FiniteCompanionArms.NUMERICAL_TRAVERSAL, firstArm, resumable = {
                     val limits = local(slot)
                     val search = if (admission == null) {
                         numericalSearch(limits, worker, requireNotNull(context), sharePoints)
@@ -170,8 +170,7 @@ internal class FiniteNumericalCompanions private constructor(
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
                 val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion } }
-                companion = PortfolioWorker.ofMinimize(
-                    "ls/finite-joint-companion",
+                companion = PortfolioWorker.ofMinimize(FiniteCompanionArms.JOINT_REPAIR,
                     firstArm + 1,
                     countsInstructions = true,
                     resumable = {
@@ -257,8 +256,7 @@ internal class FiniteNumericalCompanions private constructor(
                 },
             ),
         )
-        return exactNeighborhoodWorker(
-            "ls/finite-joint-companion",
+        return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR,
             arm,
             objective,
             limits.cancellation,

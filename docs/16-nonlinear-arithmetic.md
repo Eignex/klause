@@ -224,6 +224,9 @@ procedure.
 
 `SharedPolynomialModel` installs selected polynomial encoders, source bounds and
 private definitions under the [prepared ownership plan](02-model.md#engine-projections-and-factor-capabilities).
+Both factor projections use a per-factor `PolynomialEncodingContext` for coordinate
+validation, conditional definitions and attribution. Each caller supplies its
+integer and real namespace placement and captured fixed-value policy.
 Only finite integers used by encoded equations receive numeric slots; their domains
 and globals remain finite-owned. Clauses keep Boolean disjunctions without numeric
 selectors. Surviving open integers select the
@@ -260,8 +263,12 @@ every finite assignment and completes its continuous objective exactly; branch
 optima and unattained limits combine in objective order. An unknown branch
 withholds global claims, while one checked unbounded branch proves unboundedness.
 LS and ALNS repair neighborhoods by finite enumeration with exact continuous
-completion. `solvePolynomialObjectiveImage` optimizes over a conditioned source with
-the same IR, and `tryConvexPolynomialOptimum` admits affine rows with a quadratic
+completion. Finite and open-integer quadratic workers compose
+`QuadraticWorkerRuntime` for retained handles, transient publication callbacks,
+interruption handling and cleanup. Complete-worker work counters remain specific to
+their traversal; neighborhood preparation converts native work to instructions
+before combining it with the retained cursor's work.
+`solvePolynomialObjectiveImage` optimizes over a conditioned source with the same IR, and `tryConvexPolynomialOptimum` admits affine rows with a quadratic
 objective through the
 [quadratic certificate kernel](18-exact-arithmetic.md#exact-quadratic-certificates).
 
@@ -302,6 +309,10 @@ default) return `Unknown(ResourceLimit)`; see
 [kernel resources](18-exact-arithmetic.md#invocation-resources). A complete
 portfolio worker keeps its root preparation between slices; see
 [portfolio preparation](12-portfolio.md#polynomial-root-preparation).
+
+The rational definition and support witness heuristics share bounded rational powers
+and scalar admission. Every check and multiplication retains the requesting
+polynomial arithmetic token; each heuristic owns its evaluation and early declines.
 
 #### Invocation ownership
 

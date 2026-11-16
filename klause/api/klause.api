@@ -1,3 +1,11 @@
+public final class com/eignex/klause/arithmetic/json/ExactRealJson {
+	public static final field INSTANCE Lcom/eignex/klause/arithmetic/json/ExactRealJson;
+	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun decodeFromString (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public final fun encodeToJsonElement (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Lkotlinx/serialization/json/JsonElement;
+	public final fun encodeToString (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/String;
+}
+
 public final class com/eignex/klause/arithmetic/polynomial/AlgebraicReal {
 	public final fun getDefiningCoefficients ()Ljava/util/List;
 	public final fun getLowerBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
@@ -77,7 +85,6 @@ public final class com/eignex/klause/arithmetic/real/ExactRealValue {
 public final class com/eignex/klause/arithmetic/real/ExactRealValuesKt {
 	public static final fun approximate (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)D
 	public static final fun compareExactly (Lcom/eignex/klause/arithmetic/real/ExactRealValue;Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/Integer;
-	public static final fun exactRealValue (Lcom/eignex/klause/solver/Sample;I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 	public static final fun toExactRealValue (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 	public static final fun toExactRealValue (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 }
@@ -2824,14 +2831,6 @@ public final class com/eignex/klause/formats/flatzinc/UnsupportedFlatZincExcepti
 	public fun <init> (Ljava/lang/String;II)V
 }
 
-public final class com/eignex/klause/formats/json/ExactRealJson {
-	public static final field INSTANCE Lcom/eignex/klause/formats/json/ExactRealJson;
-	public final fun decodeFromJsonElement (Lkotlinx/serialization/json/JsonElement;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
-	public final fun decodeFromString (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
-	public final fun encodeToJsonElement (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Lkotlinx/serialization/json/JsonElement;
-	public final fun encodeToString (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/String;
-}
-
 public class com/eignex/klause/formats/json/JsonFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -4094,14 +4093,7 @@ public final class com/eignex/klause/ir/PolynomialRelation : java/lang/Enum {
 }
 
 public class com/eignex/klause/ir/Problem : com/eignex/klause/ir/SourceSemanticsOwner {
-	public fun <init> (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/util/collections/Bits;Lcom/eignex/util/collections/Bits;Lcom/eignex/klause/ir/IntBounds;Lcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final field Companion Lcom/eignex/klause/ir/Problem$Companion;
 	public final fun getDeclaredIntDomains ()Lcom/eignex/klause/ir/SourceIntDomains;
 	public final fun getFactors ()[Lcom/eignex/klause/ir/Factor;
 	public final fun getHasSymmetryBreaking ()Z
@@ -4116,10 +4108,21 @@ public class com/eignex/klause/ir/Problem : com/eignex/klause/ir/SourceSemantics
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getSettings ()Lcom/eignex/klause/ir/ProblemSettings;
 	public final fun intDomainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
-	public final fun withFactors ([Lcom/eignex/klause/ir/Factor;[Z)Lcom/eignex/klause/ir/Problem;
-	public static synthetic fun withFactors$default (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/Factor;[ZILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public final fun withFactors (Ljava/util/List;[Z)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun withFactors$default (Lcom/eignex/klause/ir/Problem;Ljava/util/List;[ZILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
 	public final fun withIntDomains ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/Problem;
 	public final fun withSettings (Lcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/ir/Problem;
+}
+
+public final class com/eignex/klause/ir/Problem$Companion {
+	public final fun of (IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public final fun of (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public final fun of (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public final fun of (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;IILcom/eignex/klause/ir/SourceIntDomains;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZI[D[D[Z[ZLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun of$default (Lcom/eignex/klause/ir/Problem$Companion;ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;[ZZI[D[DLcom/eignex/klause/ir/ProblemSettings;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
 }
 
 public final class com/eignex/klause/ir/ProblemSettings {
@@ -11116,6 +11119,10 @@ public final class com/eignex/klause/solver/Sample {
 	public final fun intValue (I)J
 }
 
+public final class com/eignex/klause/solver/SampleExactRealsKt {
+	public static final fun exactRealValue (Lcom/eignex/klause/solver/Sample;I)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+}
+
 public final class com/eignex/klause/solver/ScoringCapability : java/lang/Enum {
 	public static final field GRADED Lcom/eignex/klause/solver/ScoringCapability;
 	public static final field HEURISTIC Lcom/eignex/klause/solver/ScoringCapability;
@@ -13384,7 +13391,6 @@ public final class com/eignex/klause/solver/pipeline/PreparedExecutionKind : jav
 }
 
 public final class com/eignex/klause/solver/pipeline/PreparedPlanDecline : java/lang/Enum {
-	public static final field CONTINUOUS_LINEAR_OBJECTIVE Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field OPEN_POLYNOMIAL_INTEGER Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field POLYNOMIAL_ENCODING Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field RESOURCE Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;

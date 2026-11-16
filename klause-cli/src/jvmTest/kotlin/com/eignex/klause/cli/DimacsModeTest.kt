@@ -4,26 +4,12 @@ import com.eignex.klause.solver.result.ConflictAnalysisStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.kumulant.stat.summary.SumResult
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DimacsModeTest {
-
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
-    }
 
     private fun cnf(text: String): String = File.createTempFile("dimacs", ".cnf").apply {
         writeText(text)
@@ -32,7 +18,7 @@ class DimacsModeTest {
 
     @Test
     fun `debug should print runtime counters with a terminal admission result`() {
-        val out = capture { assertEquals(0, runCli(arrayOf("--debug", cnf("p cnf 1 2\n1 0\n-1 0\n")))) }
+        val out = captureStdout { assertEquals(0, runCli(arrayOf("--debug", cnf("p cnf 1 2\n1 0\n-1 0\n")))) }
 
         assertTrue("s UNSATISFIABLE" in out, out)
         assertTrue("c runtimeDebug=true" in out, out)
@@ -46,7 +32,7 @@ class DimacsModeTest {
             ca = ConflictAnalysisStats(notApplicable = SumResult(3.0), nonAsserting = SumResult(2.0)),
         )
 
-        val out = capture { DimacsOutput().onStatistics(stats, solveTimeMs = 0, solutions = 0) }
+        val out = captureStdout { DimacsOutput().onStatistics(stats, solveTimeMs = 0, solutions = 0) }
 
         assertTrue("c caNotApplicable=3" in out, out)
         assertTrue("c caNonAsserting=2" in out, out)
@@ -54,7 +40,7 @@ class DimacsModeTest {
 
     @Test
     fun `a satisfiable cnf should print s SATISFIABLE with a full signed model line`() {
-        val out = capture { main(arrayOf(cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
+        val out = captureStdout { main(arrayOf(cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
         assertTrue("s SATISFIABLE" in out, out)
         val model = out.lines().first { it.startsWith("v ") }.removePrefix("v ").trim().split(" ")
         assertTrue(model.last() == "0", "model line must terminate with 0: $out")
@@ -63,7 +49,7 @@ class DimacsModeTest {
 
     @Test
     fun `a contradictory cnf should print s UNSATISFIABLE`() {
-        val out = capture { main(arrayOf(cnf("p cnf 1 2\n1 0\n-1 0\n"))) }
+        val out = captureStdout { main(arrayOf(cnf("p cnf 1 2\n1 0\n-1 0\n"))) }
         assertTrue("s UNSATISFIABLE" in out, out)
         assertTrue("SATISFIABLE" !in out.replace("UNSATISFIABLE", ""), out)
     }
@@ -74,7 +60,7 @@ class DimacsModeTest {
             "p cnf 1 2\n1 0\n-1 0\n",
             "p cnf 2 4\n1 2 0\n1 -2 0\n-1 2 0\n-1 -2 0\n",
         )) {
-            val out = capture {
+            val out = captureStdout {
                 assertEquals(0, runCli(arrayOf("--presolve", "off,+bve", cnf(text))))
             }
 
@@ -85,7 +71,7 @@ class DimacsModeTest {
 
     @Test
     fun `the statistics block should print the solutions count and search counters as c comments`() {
-        val out = capture { main(arrayOf("-s", cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
+        val out = captureStdout { main(arrayOf("-s", cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
         assertTrue("s SATISFIABLE" in out, out)
         assertTrue(out.lines().any { it.startsWith("v ") }, out)
         assertTrue("c solutions=1" in out, out)
@@ -101,8 +87,8 @@ class DimacsModeTest {
     @Test
     fun `the cnf extension and the explicit format should both route to the DIMACS front-end`() {
         val path = cnf("p cnf 1 1\n1 0\n")
-        val byExt = capture { main(arrayOf(path)) }
-        val byFormat = capture { main(arrayOf("--format", "dimacs", path)) }
+        val byExt = captureStdout { main(arrayOf(path)) }
+        val byFormat = captureStdout { main(arrayOf("--format", "dimacs", path)) }
         assertTrue("s SATISFIABLE" in byExt && "s SATISFIABLE" in byFormat, "$byExt\n---\n$byFormat")
     }
 }

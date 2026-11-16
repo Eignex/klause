@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ProblemTest {
@@ -122,5 +123,70 @@ class ProblemTest {
             assertEquals(semantics.declared, view.semantics.declared)
             assertEquals(semantics.effective, view.semantics.effective)
         }
+    }
+
+    @Test
+    fun `of should keep its model when the caller later writes the arrays it passed`() {
+        val noColumns = IntBounds.fromModelBounds(LongArray(0), LongArray(0), null, null)
+        val overloads = listOf<Pair<String, (Array<Factor>, BooleanArray, DoubleArray, DoubleArray) -> Problem>>(
+            "value sets" to { factors, implied, lower, upper ->
+                Problem.of(1, 0, emptyArray(), factors, implied, numRealVars = 1, realLower = lower, realUpper = upper)
+            },
+            "declarations" to { factors, implied, lower, upper ->
+                Problem.of(1, 0, SourceIntDomains.ofBounds(noColumns), factors, implied, numRealVars = 1,
+                    realLower = lower, realUpper = upper)
+            },
+            "bounds" to { factors, implied, lower, upper ->
+                Problem.of(1, noColumns, factors, implied, numRealVars = 1, realLower = lower, realUpper = upper)
+            },
+        )
+        for ((name, build) in overloads) {
+            val clause = Clause(intArrayOf(Lit.make(0, true)))
+            val factors = arrayOf<Factor>(clause)
+            val implied = booleanArrayOf(false)
+            val lower = doubleArrayOf(0.0)
+            val upper = doubleArrayOf(1.0)
+            val problem = build(factors, implied, lower, upper)
+
+            factors[0] = Clause(intArrayOf(Lit.make(0, false)))
+            implied[0] = true
+            lower[0] = -1.0
+            upper[0] = 2.0
+
+            assertSame(clause, problem.factors[0], name)
+            assertEquals(listOf(false), problem.impliedFactorMask?.toList(), name)
+            assertEquals(0.0, problem.realLower[0], name)
+            assertEquals(1.0, problem.realUpper[0], name)
+        }
+    }
+
+    @Test
+    fun `of should keep its integer declarations when the caller later writes the arrays it passed`() {
+        val domains = arrayOf(IntDomain(0, 3))
+        val openLower = booleanArrayOf(true)
+        val openUpper = booleanArrayOf(false)
+        val problem = Problem.of(0, 1, domains, emptyList(), openIntLo = openLower, openIntHi = openUpper)
+
+        domains[0] = IntDomain(1, 2)
+        openLower[0] = false
+        openUpper[0] = true
+
+        assertEquals(3, problem.declaredIntDomains.finiteDomain(0).max)
+        assertTrue(problem.intBounds.isOpenLower(0))
+        assertFalse(problem.intBounds.isOpenUpper(0))
+    }
+
+    @Test
+    fun `withFactors should keep its rows and mask when the caller later writes the ones it passed`() {
+        val source = Problem.of(1, 0, emptyArray(), emptyList())
+        val rows = mutableListOf<Factor>(Clause(intArrayOf(Lit.make(0, true))))
+        val implied = booleanArrayOf(true)
+
+        val rewritten = source.withFactors(rows, implied)
+        rows.clear()
+        implied[0] = false
+
+        assertEquals(1, rewritten.numFactors)
+        assertEquals(listOf(true), rewritten.impliedFactorMask?.toList())
     }
 }

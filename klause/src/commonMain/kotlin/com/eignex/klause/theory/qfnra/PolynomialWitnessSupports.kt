@@ -6,15 +6,16 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialWitnessSupports(
     private val arithmetic: PolynomialArithmetic,
     private val maximumTerms: Int,
     private val maximumDegree: Int,
-    private val maximumBits: Int,
+    maximumBits: Int,
     private val maximumRefinements: Int,
 ) {
+    private val rationals = BoundedWitnessRationals(arithmetic, maximumBits)
+
     private data class Term(val coefficient: BigFraction, val powers: List<Pair<Int, Int>>)
     private data class Row(val atom: PolynomialAtom, val terms: List<Term>, val variables: List<Int>)
     private data class Support(val row: Row, val variables: List<Int>)
@@ -33,7 +34,7 @@ internal class PolynomialWitnessSupports(
         for (variable in 0 until realCount) {
             arithmetic.step()
             val value = fixed[variable] ?: BigFraction.ZERO
-            if (!admitted(value)) return null
+            if (!rationals.admitted(value)) return null
             point[variable] = value
         }
         val owners = IntArray(realCount) {
@@ -105,7 +106,7 @@ internal class PolynomialWitnessSupports(
                         passes++
                     }
                     val value = refined.rational ?: continue
-                    if (!admitted(value)) return null
+                    if (!rationals.admitted(value)) return null
                     if (!takeProposal()) return null
                     point[variable] = value
                     when (holds(closing[index], point)) {
@@ -134,7 +135,7 @@ internal class PolynomialWitnessSupports(
             val terms = ArrayList<Term>()
             val referenced = HashSet<Int>()
             for (term in payload) {
-                if (!admitted(term.coefficient)) return null
+                if (!rationals.admitted(term.coefficient)) return null
                 val powers = ArrayList<Pair<Int, Int>>()
                 for (variable in term.monomial.variables) {
                     arithmetic.step()
@@ -180,16 +181,16 @@ internal class PolynomialWitnessSupports(
                         coefficient = BigFraction.ZERO
                         break
                     }
-                    val factor = power(coordinate, exponent) ?: return false
+                    val factor = rationals.power(coordinate, exponent) ?: return false
                     arithmetic.step()
                     coefficient *= factor
-                    if (!admitted(coefficient)) return false
+                    if (!rationals.admitted(coefficient)) return false
                 }
             }
             if (coefficient.isZero) continue
             arithmetic.step()
             val sum = (coefficients[degree] ?: BigFraction.ZERO) + coefficient
-            if (!admitted(sum)) return false
+            if (!rationals.admitted(sum)) return false
             coefficients[degree] = sum
         }
         return true
@@ -207,41 +208,16 @@ internal class PolynomialWitnessSupports(
                     product = BigFraction.ZERO
                     break
                 }
-                val factor = power(coordinate, exponent) ?: return null
+                val factor = rationals.power(coordinate, exponent) ?: return null
                 arithmetic.step()
                 product *= factor
-                if (!admitted(product)) return null
+                if (!rationals.admitted(product)) return null
             }
             if (product.isZero) continue
             arithmetic.step()
             sum += product
-            if (!admitted(sum)) return null
+            if (!rationals.admitted(sum)) return null
         }
         return sum
-    }
-
-    private fun power(value: BigFraction, exponent: Int): BigFraction? {
-        var result = BigFraction.ONE
-        var base = value
-        var remaining = exponent
-        while (remaining != 0) {
-            arithmetic.step()
-            if (remaining and 1 != 0) {
-                result *= base
-                if (!admitted(result)) return null
-            }
-            remaining = remaining ushr 1
-            if (remaining != 0) {
-                arithmetic.step()
-                base *= base
-                if (!admitted(base)) return null
-            }
-        }
-        return result
-    }
-
-    private fun admitted(value: BigFraction): Boolean {
-        arithmetic.step()
-        return value.num.magnitudeBitLength() <= maximumBits && value.den.magnitudeBitLength() <= maximumBits
     }
 }

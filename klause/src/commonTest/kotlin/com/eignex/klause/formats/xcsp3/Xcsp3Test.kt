@@ -138,6 +138,28 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `extremum objectives should preserve both optimization directions`() {
+        for ((type, minimizing, maximizing) in listOf(Triple("minimum", 0L, 1L), Triple("maximum", 1L, 2L))) {
+            for (sense in listOf("minimize", "maximize")) {
+                val parsed = Xcsp3.parse(
+                    """
+                    <instance type="COP"><variables><var id="x">0..2</var><var id="y">0..2</var></variables>
+                    <constraints><intension>eq(add(x,y),2)</intension></constraints>
+                    <objectives><$sense type="$type">x y x</$sense></objectives></instance>
+                    """.trimIndent(),
+                )
+
+                val result = BacktrackSolver(parsed.problem.bake())
+                    .minimize(requireNotNull(parsed.objective).toLinearObjective())
+
+                assertTrue(result is MinimizeResult.Optimal, "expected Optimal, got $result")
+                val expected = if (sense == "maximize") -maximizing else minimizing
+                assertEquals(expected.toDouble(), result.objective)
+            }
+        }
+    }
+
+    @Test
     fun `maximizing the minimum 32-bit coefficient should preserve objective direction`() {
         val parsed = Xcsp3.parse(
             """

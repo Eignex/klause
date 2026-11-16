@@ -26,7 +26,7 @@ class SourceSolvableTest(private val direction: String) {
 
     @Test
     fun `finite source definitions should retain one invocation and publish original objective units`() {
-        val source = Problem(
+        val source = Problem.of(
             0,
             2,
             arrayOf(IntDomain(0, 1), IntDomain(2, 3)),

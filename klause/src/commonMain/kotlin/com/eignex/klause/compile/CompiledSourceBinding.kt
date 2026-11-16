@@ -14,8 +14,9 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.pipeline.FloatGridConsumerPurpose
-import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
+import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
 import com.eignex.klause.solver.pipeline.preservesOriginalCompleteArm
@@ -43,46 +44,40 @@ internal class CompiledSourceBinding(
     val integerNames = integerNames.toMap()
     val realNames = realNames.toMap()
     private val variables = variables.toList()
-    private val legacyRepresentations = representations.toMap()
+    private val declaredRepresentations = representations.toMap()
     private val truncatedRows = truncatedRows.toSet()
-    private val legacyDefinition: Lazy<FloatGridDefinition?> = lazy { prepareLegacy() }
-    private val legacyColumns by lazy { legacyDefinition.value?.columns()?.associateBy { it.source.index }.orEmpty() }
-    val legacyProblem: Problem get() = legacyDefinition.value?.target ?: originalProblem
+    private val compatibilityDefinition: Lazy<FloatGridDefinition?> = lazy { prepareCompatibility() }
+    private val compatibilityColumns by lazy {
+        compatibilityDefinition.value?.columns()?.associateBy { it.source.index }.orEmpty()
+    }
+    val compatibilityProblem: Problem get() = compatibilityDefinition.value?.target ?: originalProblem
 
     fun attachment(): SourceAttachment = SourceAttachment(originalProblem, emptyList(), null, variables)
 
-    fun selectView(invocation: PreparedSourceInvocation) {
-        require(invocation.source.originalSource === originalProblem)
-        if (SourceSetup.preservesOriginalCompleteArm(invocation)) return
-        val selected = selectedVariables(invocation.cancellation) ?: return
-        if (selected.isNotEmpty()) {
-            SourceSetup.prepareSelectedFloatGrid(
-                invocation,
-                selected,
-                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
-                truncatedRows,
-            )
-        }
+    fun selectView(selection: SourceRouteSelection): SelectedFloatGridPreparation? {
+        require(selection.source.originalSource === originalProblem)
+        if (SourceSetup.preservesOriginalCompleteArm(selection)) return null
+        val selected = selectedVariables(selection.cancellation) ?: return null
+        return if (selected.isEmpty()) null else SourceSetup.prepareSelectedFloatGrid(selection, selected,
+            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY, truncatedRows)
     }
 
     fun floatRepresentations(): Map<String, FloatRepresentation> =
         if (originalProblem.semantics.effective.floats == FloatSemantics.Continuous) {
-            legacyRepresentations.mapValues { FloatRepresentation(it.value.component) }
-        } else {
-            legacyRepresentations.toMap()
-        }
+            declaredRepresentations.mapValues { FloatRepresentation(it.value.component) }
+        } else declaredRepresentations.toMap()
 
-    fun legacyColumn(name: String): FloatGridColumn? {
+    fun compatibilityColumn(name: String): FloatGridColumn? {
         val source = realNames[name] ?: return null
-        return legacyColumns[source]
+        return compatibilityColumns[source]
     }
 
-    fun legacyIntegerNames(): Map<String, Int> = integerNames + realNames.mapNotNull { (name, _) ->
-        legacyColumn(name)?.let { name to it.selector().coordinate.variable }
+    fun compatibilityIntegerNames(): Map<String, Int> = integerNames + realNames.mapNotNull { (name, _) ->
+        compatibilityColumn(name)?.let { name to it.selector().coordinate.variable }
     }.toMap()
 
-    fun legacyRealNames(): Map<String, Int> {
-        val definition = legacyDefinition.value ?: return realNames.toMap()
+    fun compatibilityRealNames(): Map<String, Int> {
+        val definition = compatibilityDefinition.value ?: return realNames.toMap()
         return realNames.mapNotNull { (name, source) ->
             definition.retainedReal(source).takeIf { it >= 0 }?.let { name to it }
         }.toMap()
@@ -91,7 +86,8 @@ internal class CompiledSourceBinding(
     fun isOriginal(sample: Sample): Boolean {
         val frame = sample.coordinateFrame
         if (frame === originalProblem) return true
-        require(frame == null || (legacyDefinition.isInitialized() && frame === legacyDefinition.value?.target)) {
+        val compatible = compatibilityDefinition.isInitialized() && frame === compatibilityDefinition.value?.target
+        require(frame == null || compatible) {
             "assignment belongs to a different compiled coordinate frame"
         }
         return false
@@ -107,16 +103,16 @@ internal class CompiledSourceBinding(
     }
 
     fun paired(objective: LinearObjective): LinearObjective {
-        val problem = legacyProblem
+        val problem = compatibilityProblem
         val integers = MutableList<QuadraticVariable?>(problem.numIntVars) { id ->
             if (id < originalProblem.numIntVars) QuadraticVariable.Int(SourceIntId(id)) else null
         }
-        legacyDefinition.value?.columns()?.forEach {
+        compatibilityDefinition.value?.columns()?.forEach {
             integers[it.coordinate.variable] = QuadraticVariable.Real(it.source)
         }
         val reals = MutableList<QuadraticVariable?>(problem.numRealVars) { null }
         for (id in 0 until originalProblem.numRealVars) {
-            val target = legacyDefinition.value?.retainedReal(id) ?: id
+            val target = compatibilityDefinition.value?.retainedReal(id) ?: id
             if (target >= 0) reals[target] = QuadraticVariable.Real(SourceRealId(id))
         }
         val booleans = List<QuadraticVariable?>(problem.numBoolVars) { id ->
@@ -131,11 +127,9 @@ internal class CompiledSourceBinding(
             require(pairing.owner === this) { "objective belongs to a different compiled source" }
             return pairing.original(objective)
         }
-        require(
-            objective.boolWeightValues.size <= originalProblem.numBoolVars &&
-                objective.intCoefficientValues.size <= originalProblem.numIntVars &&
-                objective.realCoefficientValues.size <= originalProblem.numRealVars,
-        ) {
+        require(objective.boolWeightValues.size <= originalProblem.numBoolVars &&
+            objective.intCoefficientValues.size <= originalProblem.numIntVars &&
+            objective.realCoefficientValues.size <= originalProblem.numRealVars) {
             "unbound objective does not use original source coordinates"
         }
         return objective.toQuadraticObjectiveSpec()
@@ -172,7 +166,7 @@ internal class CompiledSourceBinding(
         return LinearObjective(boolWeights, intWeights, constant.numerator.toLongExact(), realWeights)
     }
 
-    private fun prepareLegacy(): FloatGridDefinition? {
+    private fun prepareCompatibility(): FloatGridDefinition? {
         val selected = selectedVariables(ExecutionControl.Never) ?: error("schema finite view preparation interrupted")
         if (selected.isEmpty()) return null
         val request = FloatGridRequest(originalProblem, selected, truncatedRows = truncatedRows)
@@ -189,7 +183,7 @@ internal class CompiledSourceBinding(
         for ((name, id) in realNames) {
             cancellation.charge(1)
             if (cancellation()) return null
-            if (legacyRepresentations[name]?.approximate == true) selected += id
+            if (declaredRepresentations[name]?.approximate == true) selected += id
         }
         if (selected.isEmpty()) return emptyList()
         val incident = HashMap<Int, MutableList<Int>>()

@@ -117,7 +117,7 @@ internal class Lowering(
     val semantics: EffectiveSourceSemantics,
     val factorCodecs: FactorCodecs = FactorCodecs.builtin,
 ) : CnfLowering {
-    private val problemBuilder = ProblemBuilder(settings, semantics)
+    internal val problemBuilder = ProblemBuilder(settings, semantics)
 
     /** Factors posted by implied or symmetry-breaking constraints, by index. */
     val impliedFactors = HashSet<Int>()

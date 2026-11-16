@@ -13,14 +13,14 @@ internal class NonlinearIntegerPortfolio(
     private val request: NonlinearIntegerTheoryRequest,
     private val params: NonlinearIntegerTheoryParams,
     private val cores: Int,
-    private val engine: FiniteEngine = FiniteEngine.MIXED,
+    private val engine: FiniteEngine = FiniteEngine.MIXED
 ) {
     fun execute(): PolynomialTheoryExecution {
         val plan = request.preparedPlan
         if (!plan.capabilities.admission(engine).runnable) {
             return PolynomialTheoryExecution(
                 OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
-                PolynomialTheoryStats(),
+                PolynomialTheoryStats()
             )
         }
         val polynomial = params.polynomial
@@ -50,22 +50,15 @@ internal class NonlinearIntegerPortfolio(
                         cancellation = native.polynomial,
                         maximumWork = null,
                         strategy = strategy.copy(
-                            backtrack = strategy.backtrack.copy(
-                                randomSeed = slot.seed,
-                                maxDecisions = slot.nativeAllowance(strategy.backtrack.maxDecisions),
-                                nodeBudget = slot.nodeBudget,
+                            backtrack = slot.backtrack(strategy.backtrack
                             ),
-                            localSearch = strategy.localSearch.copy(
-                                randomSeed = slot.seed,
-                                maxFlips = slot.heuristicAllowance(strategy.localSearch.maxFlips),
-                                maxInstructions = strategy.localSearch.maxInstructions?.let(slot::heuristicAllowance),
-                                nodeBudget = slot.nodeBudget,
-                            ),
-                        ),
+                            localSearch = slot.localSearch( strategy.localSearch
+                            )
+                        )
                     ),
                     maximumCandidates = slot.nativeAllowance(params.maximumCandidates),
                     maximumMoves = slot.heuristicAllowance(params.maximumMoves),
-                    nodeBudget = slot.nodeBudget,
+                    nodeBudget = slot.nodeBudget
                 )
                 val selected = when (arm) {
                     0 -> FiniteEngine.BACKTRACK
@@ -96,16 +89,16 @@ internal class NonlinearIntegerPortfolio(
                 seed = seed ?: 1L,
                 cancellation = scope.polynomial,
                 nodeBudget = budget,
-                reseedStaleThreshold = 0,
+                reseedStaleThreshold = 0
             ),
             PortfolioEvidence(identity, polynomialWitnessVerifier(binding, scope.polynomial))
-                .bindInvocation(binding, scope.polynomial),
+                .bindInvocation(binding, scope.polynomial)
         ) { materialized ->
             val complete = materialized.indices.filter { materialized[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(
                 shares = DoubleArray(materialized.size) {
                     if (it in complete) 0.75 / complete.size else 0.0
-                },
+                }
             )
         }
         val result = invocation.use { it.solve(scope.polynomial) }
@@ -122,7 +115,7 @@ internal class NonlinearIntegerPortfolio(
                 } else {
                     result.reason
                 },
-                result.stats,
+                result.stats
             )
         }
         return PolynomialTheoryExecution(
@@ -131,7 +124,7 @@ internal class NonlinearIntegerPortfolio(
             workers.firstNotNullOfOrNull { it.resource },
             integerCells = cellReuseStats(params, workers),
             integerRoots = integerRootStats(params, workers),
-            integerResidues = integerResidueStats(params, workers),
+            integerResidues = integerResidueStats(params, workers)
         )
     }
 }

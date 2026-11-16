@@ -16,6 +16,24 @@ import kotlin.test.assertTrue
 
 class Xcsp3SelectionTest {
     @Test
+    fun `conditional affine operands should preserve wide values and condition polarity`() {
+        val parsed = Xcsp3.parse(
+            """
+            <instance><variables><var id="b">0..1</var><var id="x">3000000000..3000000001</var>
+            <var id="r">6000000001</var></variables>
+            <constraints><intension>eq(if(not(eq(b,1)),add(x,x,1),sub(x,1)),r)</intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+
+        val samples = BacktrackSolver(parsed.problem.bake()).enumerate(BacktrackParams(randomSeed = 0)).toList()
+
+        assertEquals(1, samples.size)
+        assertEquals(0L, samples.single().intValue(parsed.intVarNames.getValue("b")))
+        assertEquals(3000000000L, samples.single().intValue(parsed.intVarNames.getValue("x")))
+    }
+
+    @Test
     fun `nested conditional extrema should retain native definitions`() {
         val parsed = Xcsp3.parse(
             """

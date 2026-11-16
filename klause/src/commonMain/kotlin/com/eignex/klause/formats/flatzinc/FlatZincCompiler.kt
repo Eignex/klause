@@ -237,7 +237,7 @@ internal class FlatZincCompiler(
                 FlatZincSourceState(
                     program.suppliedCopy(),
                     declaredRealCount,
-                    selectLegacy = { finiteRepresentations },
+                selectRepresentations = { finiteRepresentations },
                     projectSearch = { compileSearchAnnotation(it) },
                 ),
             )

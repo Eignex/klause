@@ -6,14 +6,13 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialWitnessDefinitions(
     private val arithmetic: PolynomialArithmetic,
     private val maximumTerms: Int,
-    private val maximumDegree: Int,
-    private val maximumBits: Int,
+    private val maximumDegree: Int, maximumBits: Int,
 ) {
+    private val rationals = BoundedWitnessRationals(arithmetic, maximumBits)
     fun point(atoms: List<PolynomialAtom>, realCount: Int, fixed: Map<Int, BigFraction>): Map<Int, BigFraction>? =
         prepare(atoms, realCount, fixed)?.point()
 
@@ -29,7 +28,7 @@ internal class PolynomialWitnessDefinitions(
             val term = arithmetic.scale(Polynomial.variable(pivot.variable), pivot.coefficient)
             arithmetic.step()
             val inverse = pivot.coefficient.reciprocal().negated()
-            if (!admitted(inverse)) return null
+            if (!rationals.admitted(inverse)) return null
             val replacement = arithmetic.scale(arithmetic.subtract(polynomial, term), inverse)
             val updated = ArrayList<PolynomialAtom>()
             for ((index, atom) in residual.withIndex()) {
@@ -73,7 +72,7 @@ internal class PolynomialWitnessDefinitions(
         for (id in 0 until realCount) {
             arithmetic.step()
             val value = fixed[id] ?: if (id in referenced) BigFraction.ONE else BigFraction.ZERO
-            if (!admitted(value)) return null
+            if (!rationals.admitted(value)) return null
             point[id] = value
         }
         if (!hint(residual, point, fixed)) return null
@@ -105,7 +104,7 @@ internal class PolynomialWitnessDefinitions(
 
         fun point(variable: Int, value: BigFraction): Map<Int, BigFraction>? {
             arithmetic.step()
-            if (variable !in seed || variable in protectedVariables || !admitted(value)) return null
+            if (variable !in seed || variable in protectedVariables || !rationals.admitted(value)) return null
             return reconstruct(variable, value)
         }
 
@@ -149,7 +148,7 @@ internal class PolynomialWitnessDefinitions(
             if (variable in fixed || linear.monomial.exponent(variable) != 1) continue
             arithmetic.step()
             val root = atom.polynomial.coefficient(Monomial.ONE).negated() * linear.coefficient.reciprocal()
-            if (!admitted(root)) return false
+            if (!rationals.admitted(root)) return false
             arithmetic.step()
             val at = point.getValue(variable)
             val sign = if (linear.coefficient.signum() > 0) at.compareTo(root) else -at.compareTo(root)
@@ -161,7 +160,7 @@ internal class PolynomialWitnessDefinitions(
                 PolynomialRelation.LT -> BigFraction.MINUS_ONE
             }
             val next = root + if (linear.coefficient.signum() > 0) direction else direction.negated()
-            if (!admitted(next)) return false
+            if (!rationals.admitted(next)) return false
             point[variable] = next
         }
         return true
@@ -198,7 +197,7 @@ internal class PolynomialWitnessDefinitions(
             if (terms.size > maximumTerms - count) return false
             count += terms.size
             for (term in terms) {
-                if (!admitted(term.coefficient)) return false
+                if (!rationals.admitted(term.coefficient)) return false
                 for (variable in term.monomial.variables) {
                     arithmetic.step()
                     if (term.monomial.exponent(variable) > maximumDegree) return false
@@ -208,11 +207,6 @@ internal class PolynomialWitnessDefinitions(
         return true
     }
 
-    private fun admitted(value: BigFraction): Boolean {
-        arithmetic.step()
-        return value.num.magnitudeBitLength() <= maximumBits && value.den.magnitudeBitLength() <= maximumBits
-    }
-
     private fun evaluate(polynomial: Polynomial, point: Map<Int, BigFraction>): BigFraction? {
         var sum = BigFraction.ZERO
         for (term in polynomial.terms) {
@@ -220,35 +214,15 @@ internal class PolynomialWitnessDefinitions(
             var product = term.coefficient
             for (variable in term.monomial.variables) {
                 arithmetic.step()
-                val factor = power(point.getValue(variable), term.monomial.exponent(variable)) ?: return null
+                val factor = rationals. power(point.getValue(variable), term.monomial.exponent(variable)) ?: return null
                 arithmetic.step()
                 product *= factor
-                if (!admitted(product)) return null
+                if (!rationals.admitted(product)) return null
             }
             arithmetic.step()
             sum += product
-            if (!admitted(sum)) return null
+            if (!rationals.admitted(sum)) return null
         }
         return sum
-    }
-
-    private fun power(value: BigFraction, exponent: Int): BigFraction? {
-        var result = BigFraction.ONE
-        var base = value
-        var remaining = exponent
-        while (remaining != 0) {
-            arithmetic.step()
-            if (remaining and 1 != 0) {
-                result *= base
-                if (!admitted(result)) return null
-            }
-            remaining = remaining ushr 1
-            if (remaining != 0) {
-                arithmetic.step()
-                base *= base
-                if (!admitted(base)) return null
-            }
-        }
-        return result
     }
 }

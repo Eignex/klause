@@ -137,23 +137,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
         if (cur == firstActive) proposeReversals(state, order, sink, STRUCTURED_MOVE_CAP, MOVE_ATTEMPT_STRIDE)
     }
 
-    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
-        if (n < 2) return false
-        for (i in 0 until n) {
-            val target = (i + 1) % n
-            if (target.toLong() !in state.rootDomains[succ[i]]) return false
-            if (state.assumptions.isFrozenInt(
-                    succ[i],
-                ) && state.assignment.intValue(succ[i]) != target.toLong()
-            ) {
-                return false
-            }
-        }
-        for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], ((i + 1) % n).toLong())
-        }
-        return true
-    }
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean = n >= 2 && seedFullCycle(state)
 
     // A successor value as a node index, or -1 when it names no node; a wide value must not truncate into one.
     private fun nodeOf(value: Long): Int = if (value in 0L until n.toLong()) value.toInt() else -1

@@ -23,10 +23,8 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
-import java.io.PrintStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -279,7 +277,7 @@ class CliModePublicationTest {
             deleteOnExit()
         }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "--presolve", "off", source.absolutePath)))
         }
 
@@ -303,7 +301,7 @@ class CliModePublicationTest {
             deleteOnExit()
         }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "--presolve", "off", source.absolutePath)))
         }
 
@@ -360,7 +358,7 @@ class CliModePublicationTest {
         }
         lateinit var result: LinearOptimizationResult
 
-        val text = capture {
+        val text = captureStdout {
             output.begin(optimize = true, maximize = false)
             result = OpenTheoryPipeline.optimizeLinear(
                 context,
@@ -402,13 +400,13 @@ class CliModePublicationTest {
         }
         lateinit var result: LinearOptimizationResult
 
-        val progress = capture {
+        val progress = captureStdout {
             output.begin(optimize = true, maximize = false)
             result = OpenTheoryPipeline.optimizeLinear(context) { sample, value ->
                 publication.publish(render(sample), SourceValue.Rational(value))
             }
         }
-        val terminal = capture { reportLinearOptimization(result, render, output, publication, false, 0L, true) }
+        val terminal = captureStdout { reportLinearOptimization(result, render, output, publication, false, 0L, true) }
 
         assertTrue("define-fun x" in progress, progress)
         assertFalse("; objective=0\n" in progress, progress)
@@ -431,7 +429,7 @@ class CliModePublicationTest {
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
 
-        val text = capture {
+        val text = captureStdout {
             output.begin(optimize = true, maximize = false)
             reportLinearOptimization(result, { error("no source witness") }, output, publication, false, 0L, true)
         }
@@ -455,13 +453,13 @@ class CliModePublicationTest {
         }
         lateinit var result: LinearOptimizationResult
 
-        val progress = capture {
+        val progress = captureStdout {
             output.begin(optimize = true, maximize = false)
             result = OpenTheoryPipeline.optimizeLinear(context) { sample, value ->
                 publication.publish(render(sample), SourceValue.Rational(value))
             }
         }
-        val terminal = capture { reportLinearOptimization(result, render, output, publication, false, 0L, true) }
+        val terminal = captureStdout { reportLinearOptimization(result, render, output, publication, false, 0L, true) }
 
         assertTrue("define-fun x" in progress, progress)
         assertFalse("optimizationStatus" in progress, progress)
@@ -475,12 +473,12 @@ class CliModePublicationTest {
         val first = "(\n  (define-fun i () Int 0)\n)"
         val second = "(\n  (define-fun i () Int 1)\n)"
 
-        val progress = capture {
+        val progress = captureStdout {
             output.begin(optimize = true, maximize = true)
             output.onSolution(first, 7L)
             output.onSolution(second, 9L)
         }
-        val terminal = capture { output.onComplete(Verdict.OPTIMAL) }
+        val terminal = captureStdout { output.onComplete(Verdict.OPTIMAL) }
 
         assertEquals("; objective=7\nsat\n$first\n; objective=9\nsat\n$second\n", progress)
         assertEquals("sat\n; optimizationStatus=optimal\n", terminal)
@@ -492,11 +490,11 @@ class CliModePublicationTest {
         val publication = ArithmeticPublication(output)
         val model = "(\n  (define-fun x () Real (/ 1.0 3.0))\n)"
 
-        val progress = capture {
+        val progress = captureStdout {
             output.begin(optimize = true, maximize = false)
             publication.publish(model, SourceValue.Rational(BigFraction.ONE * BigFraction.ofLong(3).reciprocal()))
         }
-        val terminal = capture {
+        val terminal = captureStdout {
             publication.publish(model, SourceValue.Rational(BigFraction.ONE * BigFraction.ofLong(3).reciprocal()))
             output.onComplete(Verdict.OPTIMAL)
         }
@@ -522,11 +520,11 @@ class CliModePublicationTest {
         val output = SmtLibOutput()
         val publication = ArithmeticPublication(output)
 
-        val progress = capture {
+        val progress = captureStdout {
             output.begin(optimize = true, maximize = false)
             publication.publish(model, SourceValue.Algebraic(point.value))
         }
-        val terminal = capture {
+        val terminal = captureStdout {
             publication.quadratic(model, result)
             output.onComplete(Verdict.OPTIMAL)
         }
@@ -547,10 +545,10 @@ class CliModePublicationTest {
         val output = MiniZincOutput()
         val publication = ArithmeticPublication(output)
 
-        val progress = capture {
+        val progress = captureStdout {
             publication.publish("x = 1;\n----------\n", SourceValue.Rational(BigFraction.ONE))
         }
-        val terminal = capture {
+        val terminal = captureStdout {
             publication.publish("x = 1;\n----------\n", SourceValue.Rational(BigFraction.ONE))
             output.onComplete(Verdict.OPTIMAL)
         }
@@ -574,24 +572,12 @@ class CliModePublicationTest {
                 deleteOnExit()
             }
 
-            val output = capture {
+            val output = captureStdout {
                 assertEquals(0, runCli(arrayOf("--exact", "--output-objective", "-e", "cp", fzn.absolutePath)))
             }
 
             assertTrue("_objective = $expected;" in output, output)
             assertTrue("==========" in output, output)
         }
-    }
-
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
     }
 }

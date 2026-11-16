@@ -37,11 +37,15 @@ internal class LinearSourceView(
     val objectiveScale: BigFraction,
 )
 
+// [negativeZeroBound] reports whether a zero bound of source column `index` was written as binary64 -0.0; its
+// sign is applied before the model takes ownership of the bound arrays.
+
 internal fun lowerLinearSource(
     source: LinearSourceProblem,
     settings: ProblemSettings,
     numerical: Boolean,
     stop: ExecutionControl,
+    negativeZeroBound: ((index: Int, upper: Boolean) -> Boolean)? = null,
 ): LinearSourceView? {
     if (stop()) return null
     val integralBounds = source.integralRealBounds(stop) ?: return null
@@ -201,6 +205,14 @@ internal fun lowerLinearSource(
         }
     }
     if (stop()) return null
+    val modelLower = DoubleArray(reals) { if (it < realLower.size) realLower[it] else Double.NEGATIVE_INFINITY }
+    val modelUpper = DoubleArray(reals) { if (it < realUpper.size) realUpper[it] else Double.POSITIVE_INFINITY }
+    if (negativeZeroBound != null) for ((index, reference) in columns.withIndex()) {
+        if (!Term.isReal(reference)) continue
+        val id = Term.realVar(reference)
+        if (modelLower[id] == 0.0 && negativeZeroBound(index, false)) modelLower[id] = -0.0
+        if (modelUpper[id] == 0.0 && negativeZeroBound(index, true)) modelUpper[id] = -0.0
+    }
     val model = Problem(
         settings = settings,
         semantics = source.semantics,
@@ -208,8 +220,8 @@ internal fun lowerLinearSource(
         intBounds = IntBounds.fromModelBounds(lower, upper, openLower, openUpper),
         factors = factors.toTypedArray(),
         numRealVars = reals,
-        realLower = DoubleArray(reals) { if (it < realLower.size) realLower[it] else Double.NEGATIVE_INFINITY },
-        realUpper = DoubleArray(reals) { if (it < realUpper.size) realUpper[it] else Double.POSITIVE_INFINITY },
+        realLower = modelLower,
+        realUpper = modelUpper,
     )
     return LinearSourceView(
         source, model, objective, columns, sourceIntegers, sourceReals, exact, constraintsExact, objectiveScale,

@@ -7,9 +7,7 @@ import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ineffectiveNumerics
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -23,7 +21,7 @@ class CliModeOptionsTest {
             deleteOnExit()
         }
         for (work in listOf(0L, 4096L)) {
-            val output = capture {
+            val output = captureStdout {
                 assertEquals(
                     0,
                     runCli(
@@ -50,7 +48,7 @@ class CliModeOptionsTest {
         }
         for (engine in listOf("fixed", "backtrack", "mixed")) {
             for (enabled in listOf(false, true)) {
-                val output = capture {
+                val output = captureStdout {
                     assertEquals(
                         0,
                         runCli(
@@ -78,7 +76,7 @@ class CliModeOptionsTest {
         }
         var code = -1
 
-        val error = captureErr {
+        val error = captureStderr {
             code = runCli(arrayOf("--param", "open-linear-incremental=invalid", source.absolutePath))
         }
 
@@ -105,7 +103,7 @@ class CliModeOptionsTest {
         }
         var code = -1
 
-        val error = captureErr {
+        val error = captureStderr {
             code = runCli(arrayOf("--unbounded-real-lo", "1/3", input.absolutePath))
         }
 
@@ -151,7 +149,7 @@ class CliModeOptionsTest {
         }
         for (base in listOf("0", "-1", Long.MIN_VALUE.toString())) {
             var code = -1
-            val error = captureErr {
+            val error = captureStderr {
                 code = runCli(arrayOf("-e", "cp", "--param", "luby=$base", fzn.absolutePath))
             }
 
@@ -168,7 +166,7 @@ class CliModeOptionsTest {
             deleteOnExit()
         }
         var code = -1
-        val err = captureErr { code = runCli(arrayOf(fzn.absolutePath)) }
+        val err = captureStderr { code = runCli(arrayOf(fzn.absolutePath)) }
         assertEquals(2, code, err)
         assertTrue(err.trimStart().startsWith("klause FlatZinc:"), err)
     }
@@ -191,7 +189,7 @@ class CliModeOptionsTest {
             writeText(fzn)
             deleteOnExit()
         }
-        val out = capture {
+        val out = captureStdout {
             val flags = arrayOf("-e", "ls", "-p", "1", "-r", "17", "-a", "-s", "--presolve", "off")
             val allowance = arrayOf("--param", "node-limit=1000", "-t", "10000")
             main(flags + allowance + file.absolutePath)
@@ -253,7 +251,7 @@ class CliModeOptionsTest {
         System.setProperty("klause.engine", "fixed")
         try {
             assertTrue(defaultEngine() == FiniteEngine.FIXED, defaultEngine().id)
-            val out = capture { main(arrayOf("--help")) }
+            val out = captureStdout { main(arrayOf("--help")) }
             assertTrue("default: fixed" in out, out)
         } finally {
             System.clearProperty("klause.engine")
@@ -276,7 +274,7 @@ class CliModeOptionsTest {
         System.setProperty("klause.lp", "conservative")
         try {
             assertEquals("conservative", defaultLp())
-            val out = capture { main(arrayOf("--help")) }
+            val out = captureStdout { main(arrayOf("--help")) }
             assertTrue("default: conservative" in out, out)
         } finally {
             System.clearProperty("klause.lp")
@@ -294,7 +292,7 @@ class CliModeOptionsTest {
         }
         System.setProperty("klause.bitset.threshold", "777")
         try {
-            capture { main(arrayOf("-t", "5000", xml.absolutePath)) }
+            captureStdout { main(arrayOf("-t", "5000", xml.absolutePath)) }
             assertEquals(777, KlauseConfig.current.bitsetThreshold)
         } finally {
             System.clearProperty("klause.bitset.threshold")
@@ -305,7 +303,7 @@ class CliModeOptionsTest {
     @Test
     fun `--help should print usage with standard flags and known formats without an input file`() {
         for (flag in listOf("--help", "-h")) {
-            val out = capture { main(arrayOf(flag)) }
+            val out = captureStdout { main(arrayOf(flag)) }
             assertTrue("usage: klause-cli" in out, out)
             for (token in listOf("-a", "-i", "-n", "-f", "-s", "-v", "-t", "-r", "-p", "--engine")) {
                 assertTrue(token in out, "help missing $token:\n$out")
@@ -320,7 +318,7 @@ class CliModeOptionsTest {
 
     @Test
     fun `--version should print name and version on a single line`() {
-        val out = capture { main(arrayOf("--version")) }.trim()
+        val out = captureStdout { main(arrayOf("--version")) }.trim()
         assertTrue(out == "Klause 0.0.1", out)
     }
 
@@ -335,7 +333,7 @@ class CliModeOptionsTest {
             arrayOf("-e", "ls", "--param", "strategy=cbls", "--param", "tabu-tenure=5", "-t", "5000"),
             arrayOf("-e", "ls", "--param", "seed=7", "--param", "lambda=2.0", "-t", "5000"),
         )) {
-            val out = capture { main(engineArgs + fzn.absolutePath) }
+            val out = captureStdout { main(engineArgs + fzn.absolutePath) }
             assertTrue("x = " in out, out)
             assertTrue("----------" in out, out)
         }
@@ -352,7 +350,7 @@ class CliModeOptionsTest {
             arrayOf("--param", "strategy=feasibilityjump"),
             arrayOf("--param", "strategy=cbls", "--param", "acceptance=sa"),
         )) {
-            val out = capture { main(arrayOf("-e", "ls", "-t", "5000") + args + fzn.absolutePath) }
+            val out = captureStdout { main(arrayOf("-e", "ls", "-t", "5000") + args + fzn.absolutePath) }
             assertTrue("x = " in out, "$args -> $out")
             assertTrue("----------" in out, "$args -> $out")
         }
@@ -364,21 +362,21 @@ class CliModeOptionsTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        val default = captureErr { main(arrayOf("-e", "ls", "--param", "dry-run-solver=on", fzn.absolutePath)) }
+        val default = captureStderr { main(arrayOf("-e", "ls", "--param", "dry-run-solver=on", fzn.absolutePath)) }
         assertTrue("ls dry-run:" in default, default)
         assertTrue("cbls/fixed" in default, default)
 
-        val removed = captureErr {
+        val removed = captureStderr {
             main(arrayOf("-e", "ls", "--param", "sources=-violated", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("violated-repairs" !in removed, removed)
 
-        val scoped = captureErr {
+        val scoped = captureStderr {
             main(arrayOf("-e", "ls", "--param", "scoring=cbls.break", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("scoring=Break" in scoped, scoped)
 
-        val annealed = captureErr {
+        val annealed = captureStderr {
             main(arrayOf("-e", "ls", "--param", "acceptance=sa", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("acceptance=Metropolis" in annealed, annealed)
@@ -391,12 +389,12 @@ class CliModeOptionsTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        val out = captureErr { main(arrayOf("-e", "cp", "--param", "dry-run-solver=on", fzn.absolutePath)) }
+        val out = captureStderr { main(arrayOf("-e", "cp", "--param", "dry-run-solver=on", fzn.absolutePath)) }
         assertTrue("solver dry-run:" in out, out)
         assertTrue("backtrack" in out && "var-select:" in out, out)
         assertTrue("lp-pricing:  min-bound-support" in out, out)
 
-        val largestPivot = captureErr {
+        val largestPivot = captureStderr {
             main(
                 arrayOf(
                     "-e",
@@ -434,7 +432,7 @@ class CliModeOptionsTest {
         )
 
         val outputs = controls.map { parameters ->
-            captureErr {
+            captureStderr {
                 main(arrayOf("-e", "fixed", "--param", "dry-run-solver=on") + parameters + fzn.absolutePath)
             }
         }
@@ -448,7 +446,7 @@ class CliModeOptionsTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        val out = captureErr {
+        val out = captureStderr {
             main(
                 arrayOf(
                     "-e", "cp", "-p", "8", "--param", "var-selector=smallest-domain",
@@ -470,7 +468,7 @@ class CliModeOptionsTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        val dry = captureErr {
+        val dry = captureStderr {
             main(
                 arrayOf(
                     "-e",
@@ -485,7 +483,7 @@ class CliModeOptionsTest {
         }
         assertTrue("ls dry-run: 1 arm(s)" in dry, dry)
         assertTrue("cbls-plateau/ils-basin" in dry, dry)
-        val out = capture { main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath)) }
+        val out = captureStdout { main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath)) }
         assertTrue("x = " in out, out)
         assertTrue("----------" in out, out)
     }
@@ -511,7 +509,7 @@ class CliModeOptionsTest {
             arrayOf("-f", "-p", "2"),
             arrayOf("-e", "ls", "-p", "2"),
         )) {
-            val out = capture { main(engineArgs + arrayOf("-t", "10000", fzn.absolutePath)) }
+            val out = captureStdout { main(engineArgs + arrayOf("-t", "10000", fzn.absolutePath)) }
             assertTrue("x = " in out, out)
         }
     }
@@ -523,7 +521,7 @@ class CliModeOptionsTest {
             deleteOnExit()
         }
 
-        val out = capture {
+        val out = captureStdout {
             main(arrayOf("-e", "fixed", "--param", "var-selector=input-order", fzn.absolutePath))
         }
 
@@ -541,7 +539,7 @@ class CliModeOptionsTest {
         }
 
         var code = -1
-        val err = captureErr {
+        val err = captureStderr {
             code = runCli(arrayOf("-e", "fixed", "--param", "var-selector=input-order", fzn.absolutePath))
         }
 
@@ -559,20 +557,20 @@ class CliModeOptionsTest {
             writeText("var 1..9: x;\nsolve maximize x;\n")
             deleteOnExit()
         }
-        val cpOut = capture { main(arrayOf("-s", "-e", "cp", sat.absolutePath)) }
+        val cpOut = captureStdout { main(arrayOf("-s", "-e", "cp", sat.absolutePath)) }
         assertTrue("%%%mzn-stat: solveTime=" in cpOut, cpOut)
         assertTrue("%%%mzn-stat: solutions=1" in cpOut, cpOut)
         assertTrue("%%%mzn-stat: nodes=" in cpOut, cpOut)
         assertTrue("%%%mzn-stat-end" in cpOut, cpOut)
         assertTrue(cpOut.indexOf("==========") < cpOut.indexOf("%%%mzn-stat:"), cpOut)
 
-        val lsOut = capture { main(arrayOf("-s", "-e", "ls", sat.absolutePath)) }
+        val lsOut = captureStdout { main(arrayOf("-s", "-e", "ls", sat.absolutePath)) }
         assertTrue("%%%mzn-stat: solutions=1" in lsOut, lsOut)
         assertTrue("%%%mzn-stat: lsMoves=" in lsOut, lsOut)
         assertTrue("%%%mzn-stat: nodes=" !in lsOut, lsOut)
         assertTrue("%%%mzn-stat-end" in lsOut, lsOut)
 
-        val maxOut = capture {
+        val maxOut = captureStdout {
             main(arrayOf("-s", "-e", "ls", "--param", "node-limit=100", "-t", "10000", opt.absolutePath))
         }
         assertTrue("%%%mzn-stat: lsIncumbentObjective=" in maxOut, maxOut)
@@ -591,10 +589,10 @@ class CliModeOptionsTest {
             )
             deleteOnExit()
         }
-        val withFlag = capture { main(arrayOf("-e", "bt", "--output-objective", "-t", "5000", fzn.absolutePath)) }
+        val withFlag = captureStdout { main(arrayOf("-e", "bt", "--output-objective", "-t", "5000", fzn.absolutePath)) }
         assertTrue("_objective = 9;" in withFlag, withFlag)
 
-        val without = capture { main(arrayOf("-e", "bt", "-t", "5000", fzn.absolutePath)) }
+        val without = captureStdout { main(arrayOf("-e", "bt", "-t", "5000", fzn.absolutePath)) }
         assertTrue("_objective" !in without, without)
     }
 
@@ -607,7 +605,7 @@ class CliModeOptionsTest {
             )
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("-e", "bt", "-t", "5000", xml.absolutePath)) }
+        val out = captureStdout { main(arrayOf("-e", "bt", "-t", "5000", xml.absolutePath)) }
         assertTrue("s SATISFIABLE" in out, out)
         assertTrue("v <instantiation>" in out, out)
         assertTrue("<list> a b </list>" in out, out)
@@ -624,7 +622,7 @@ class CliModeOptionsTest {
             )
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("-e", "bt", "-t", "5000", "-s", xml.absolutePath)) }
+        val out = captureStdout { main(arrayOf("-e", "bt", "-t", "5000", "-s", xml.absolutePath)) }
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 3" in out, out)
         assertTrue("<values> 3 </values>" in out, out)
@@ -639,7 +637,7 @@ class CliModeOptionsTest {
             )
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("-t", "5000", smt.absolutePath)) }
+        val out = captureStdout { main(arrayOf("-t", "5000", smt.absolutePath)) }
         assertTrue(out.trim().startsWith("sat"), out)
         assertTrue("(define-fun x () Int" in out, out)
     }
@@ -653,31 +651,7 @@ class CliModeOptionsTest {
             )
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("--format", "xcsp3", "-t", "5000", txt.absolutePath)) }
+        val out = captureStdout { main(arrayOf("--format", "xcsp3", "-t", "5000", txt.absolutePath)) }
         assertTrue("s SATISFIABLE" in out, out)
-    }
-
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
-    }
-
-    private fun captureErr(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.err
-        System.setErr(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setErr(old)
-        }
-        return buf.toString()
     }
 }

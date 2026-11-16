@@ -289,15 +289,6 @@ internal class LagrangianBound(
         return Eval(feasible = true, cost = totalCost, values = values)
     }
 
-    /**
-     * One deflected (conjugate) subgradient ascent step on the multipliers; false if the subgradient
-     * is zero. Deflection after Camerini, Fratta and Maffioli, "On improving relaxation methods by
-     * modified gradient techniques", Math. Programming Study 1975 (https://doi.org/10.1007/BFb0120697),
-     * with γ = 1: the direction is `d = g + β·prevDir` with `β = max(0, −(g·prevDir)/‖prevDir‖²)`, which
-     * keeps `d·g ≥ 0` (a valid ascent direction) while damping the zigzag that slows plain subgradient.
-     * The step length is Polyak's (https://doi.org/10.1016/0041-5553(69)90061-5). The bound is exact
-     * for any λ, so the step choice affects only tightness.
-     */
     private fun subgradientStep(
         values: LongArray,
         p: LongArray,
@@ -306,7 +297,6 @@ internal class LagrangianBound(
         prevDir: DoubleArray,
     ): Boolean {
         val g = LongArray(multiplierCount)
-        var gNorm2 = 0.0
         for (r in 0 until multiplierCount) {
             var gr = -linkRhs[r]
             for (i in vars.indices) {
@@ -314,37 +304,8 @@ internal class LagrangianBound(
                 if (a != 0L) gr += a * values[i]
             }
             g[r] = gr
-            gNorm2 += (gr.toDouble() * gr.toDouble())
         }
-        if (gNorm2 == 0.0) return false // multipliers optimal for this subproblem
-        var gDotPrev = 0.0
-        var prevNorm2 = 0.0
-        for (r in 0 until multiplierCount) {
-            gDotPrev += g[r].toDouble() * prevDir[r]
-            prevNorm2 += prevDir[r] * prevDir[r]
-        }
-        val beta = if (prevNorm2 > 0.0 && gDotPrev < 0.0) -gDotPrev / prevNorm2 else 0.0
-        var dNorm2 = 0.0
-        val d = DoubleArray(multiplierCount)
-        for (r in 0 until multiplierCount) {
-            d[r] = g[r].toDouble() + beta * prevDir[r]
-            dNorm2 += d[r] * d[r]
-            prevDir[r] = d[r]
-        }
-        if (dNorm2 == 0.0) return false
-        // Polyak along the deflected direction: t = (UB − L) / ‖d‖²; p_r += trunc(Q·t·d_r), projected.
-        val lValue = num.toDouble() / Q.toDouble()
-        val t = (incumbent - lValue) / dNorm2
-        for (r in 0 until multiplierCount) {
-            val step = (Q.toDouble() * t * d[r]).toLong()
-            var pr = p[r] + step
-            when (linkSign[r]) {
-                1 -> if (pr < 0L) pr = 0L
-                -1 -> if (pr > 0L) pr = 0L
-            }
-            p[r] = pr
-        }
-        return true
+        return p.deflectedSubgradientStep(g, num, incumbent, prevDir, Q, linkSign)
     }
 
     /** Coefficient of [varId] in linking constraint [r], or 0. */

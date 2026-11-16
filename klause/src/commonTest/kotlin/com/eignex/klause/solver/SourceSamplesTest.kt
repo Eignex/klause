@@ -1,9 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.arithmetic.json.ExactRealJson
 import com.eignex.klause.arithmetic.real.compareExactly
-import com.eignex.klause.arithmetic.real.exactRealValue
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.formats.json.ExactRealJson
 import com.eignex.klause.formats.json.ProblemJson
 import kotlin.test.Test
 import kotlin.test.assertEquals

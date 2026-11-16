@@ -226,26 +226,7 @@ private fun reginFallbackFilter(
     val sccHallVars = MutableIntObjectMap<IntArray>()
     val hallReasons = HashMap<Int, IntArray?>()
     fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
-        val vis = BooleanArray(total)
-        val bfs = IntArray(total)
-        var qh = 0
-        var qt = 0
-        vis[valNode] = true
-        bfs[qt++] = valNode
-        val acc = IntArrayList()
-        while (qh < qt) {
-            val u = bfs[qh++]
-            if (u < n) acc.add(filteredVars[u])
-            val a = adj[u]
-            for (k in 0 until a.size) {
-                val w = a[k]
-                if (!vis[w]) {
-                    vis[w] = true
-                    bfs[qt++] = w
-                }
-            }
-        }
-        acc.toIntArray()
+        reginHallVarsFrom(valNode, adj, filteredVars)
     }
     for (i in 0 until n) {
         for (vid in valuesPerVar[i]) {

@@ -120,6 +120,11 @@ Read `klause-bench/README.md` before benchmarking. In short:
 
 - `ir` owns engine-neutral literals, variable descriptions, remapping, and structural keys. It does not
   depend on engines, compilation, or input formats.
+- A `Problem` owns its structural arrays: `Problem.of` captures them, internal builders hand over
+  fresh or already-owned arrays through the internal constructors and never write them again, and
+  nobody writes the arrays a model returns. Factor payloads stay borrowed and unchanged for the
+  source's lifetime; a rewrite is a fresh source and invalidates source-scoped plans, caches and
+  evidence.
 - `lowering` owns generic Boolean and constraint encodings shared by schema compilation and input formats.
   It does not depend on either caller. Input formats parse and lower source syntax; they are not compiler
   dependencies.
@@ -128,6 +133,9 @@ Read `klause-bench/README.md` before benchmarking. In short:
 - `arithmetic.difference` owns immutable difference-constraint representation, fragment extraction,
   and non-incremental graph operations. It must not depend on propagation state.
 - `simplex.exact` owns reusable exact rational arithmetic and feasibility simplex primitives.
+- `arithmetic.json` owns the exact integer, rational and real JSON codecs shared by `factor.codec` and
+  `formats.json`; it reads `ir` for `SemanticRational` and depends on neither of them. Arithmetic
+  packages do not depend on `solver` result types.
 - `lp.engine` owns solving an `LpModel` and certifying the result: the simplex, its basis, and the exact
   dual/Farkas certificates. It may depend only on `util`, `simplex.exact`, `lp.lattice`, and `simplex.basis` — never on
   factors, propagation, presolve, search, or the solver model. That closed list is what keeps the engine
@@ -136,6 +144,11 @@ Read `klause-bench/README.md` before benchmarking. In short:
   bounds a triangular block implies. It is a leaf: `util` and nothing else.
 - `lp` and its remaining subpackages own the model-facing half: relaxation assembly from factors,
   separators, bounding policy, open-model reasoning. Dependencies point at `lp.engine`, never back.
+- `PreparedFactorProjections` is an immutable per-source selection. LP template retention, admission,
+  funding and the inheritance mechanism belong to `lp.relaxation.LpPreparationCache`, which a selection
+  only carries. The selection decides which derivation inherits: engine views and unremapped projections
+  inherit the cache (only an identity-checked engine view keeps the row-layout token); appended, replaced
+  or remapped selections start a fresh one.
 - `bound` owns the combinatorial bounds a CP constraint admits on its own: Lagrangian duals over
   AllDifferent and multi-knapsack structure, energetic and flow feasibility over `Cumulative`. It
   reads factors, `ir`, `solver.objective`, and propagation state, and may read `lp.relaxation`

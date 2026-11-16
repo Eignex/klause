@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ArgminJump
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.schedule.ProgressWindow
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.WeightSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
@@ -75,25 +76,13 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
         require(perturbAfter >= 1) { "perturbAfter >= 1, got $perturbAfter" }
     }
 
-    private var lastSeenStep: Long = -1L
-    private var lastDropStep: Long = 0L
-    private var lastCost: Long = Long.MAX_VALUE
+    private val progress = ProgressWindow()
 
     override fun invoke(state: LocalSearchState): Move? {
-        if (state.step < lastSeenStep) {
-            lastDropStep = state.step
-            lastCost = state.cost
-            lastSeenStep = state.step
-        } else if (state.step != lastSeenStep) {
-            if (state.cost < lastCost) {
-                lastCost = state.cost
-                lastDropStep = state.step
-            }
-            lastSeenStep = state.step
-        }
-        if (state.step - lastDropStep < perturbAfter) return null
+        progress.observe(state.step, state.cost)
+        if (progress.elapsed(state.step) < perturbAfter) return null
         val kick = randomHotSpotJump(state) ?: return null
-        lastDropStep = state.step // fresh window after the kick
+        progress.restartAt(state.step)
         return kick
     }
 

@@ -264,7 +264,7 @@ internal class LpCapturedModel(
 
     companion object {
         fun capture(model: ExactLpModel): LpCapturedModel = capture(
-            requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" },
+            requireNotNull(model.toIntegerModel()) { "exact model is outside capture v1 authority" },
         )
 
         fun captureOrNull(model: LpModel): LpCapturedModel? {
@@ -499,7 +499,7 @@ internal class LpCapture internal constructor(
          * callers record only events exposed by their public engine seam. The capture contains no
          * factorization snapshot or other solver-private cache. */
         fun capture(model: ExactLpModel, settings: LpReplaySettings, events: List<LpReplayEvent>): LpCapture = capture(
-            requireNotNull(model.toLegacy()) { "exact model is outside capture v1 authority" },
+            requireNotNull(model.toIntegerModel()) { "exact model is outside capture v1 authority" },
             settings,
             events,
         )

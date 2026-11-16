@@ -64,7 +64,7 @@ internal object IntegerReasonReroutingProfile {
                 if (arm == "numeric-surrogate") {
                     selected.add(Linear(intArrayOf(scale + 1, -1), intArrayOf(0, 2), LinearOp.LE, 0))
                 }
-                val problem = Problem(
+                val problem = Problem.of(
                     0,
                     4,
                     arrayOf(

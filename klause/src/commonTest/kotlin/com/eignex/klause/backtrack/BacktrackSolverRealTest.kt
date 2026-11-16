@@ -136,24 +136,49 @@ class BacktrackSolverRealTest {
         assertEquals(LpVerdict.INDETERMINATE, res.verdict)
     }
 
+    // 1001 distinct rows over a chain of [reals] columns in `[0, 1]`: row i is `x(j) - x(j + 1) <= offset - i` with
+    // `j = i mod (reals - 1)`, so every offset below -1 is infeasible.
+    private fun manyRows(offset: Long, reals: Int = 2) = Problem(
+        numBoolVars = 0,
+        numIntVars = 1,
+        intDomains = arrayOf(IntDomain(0, 1)),
+        factors = Array<Factor>(1001) {
+            val column = it % (reals - 1)
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), intArrayOf(column, column + 1),
+                LinearOp.LE, offset - it)
+        },
+        numRealVars = reals,
+        realLower = DoubleArray(reals),
+        realUpper = DoubleArray(reals) { 1.0 },
+    )
+
     @Test
-    fun `a leaf no theory could decide should report unknown rather than unsat`() {
-        // Past RESIDUAL_MAX_ROWS the leaf certify declines deterministically rather than by cancellation.
-        val rows = Array<Factor>(1001) {
-            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
+    fun `a leaf with more than a thousand real rows should be completed`() {
+        val results = listOf(2, 70).map { reals ->
+            BacktrackSolver(manyRows(1000L, reals).bake()).solve(BacktrackParams(randomSeed = 1L))
         }
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 1)),
-            factors = rows,
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
-        )
-        val result = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 1L))
-        val unknown = assertIs<SolveResult.Unknown>(result)
-        assertEquals(TerminationReason.Unsupported, unknown.reason)
+
+        assertTrue(results.all { it is SolveResult.Sat }, "$results")
+    }
+
+    @Test
+    fun `a leaf with more than a thousand real rows should be refuted`() {
+        val results = listOf(2, 70).map { reals ->
+            BacktrackSolver(manyRows(-2L, reals).bake()).solve(BacktrackParams(randomSeed = 1L))
+        }
+
+        assertTrue(results.all { it is SolveResult.Unsat }, "$results")
+    }
+
+    @Test
+    fun `a leaf no exact certifier may decide should report unknown rather than unsat`() {
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L)
+        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+
+        val result = BacktrackSolver(problem(0, emptyArray(), 0.0, 1.0, row).bake(), vetoed)
+            .solve(BacktrackParams(randomSeed = 1L))
+
+        assertIs<SolveResult.Unknown>(result)
     }
 
     @Test

@@ -9,7 +9,6 @@ import com.eignex.klause.bound.SchedulingFeasibilityBound
 import com.eignex.klause.bound.StripEnergyFloor
 import com.eignex.klause.bound.StripEnergyMakespanBound
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
@@ -85,7 +84,6 @@ import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.constructionLongArray
 import com.eignex.util.arrays.emptyDoubleArray
-import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -1532,11 +1530,11 @@ internal class LpEngine(
     private var gatedFilter: GatedResidual? = null
 
     /** The gated residual filter with its enforcement refreshed to [session]'s pins, or null when the
-     *  model does not qualify (not pure-real, oversized, or no gated rows). */
+     *  model does not qualify (not pure-real, or no gated rows). */
     @Suppress("TooGenericExceptionCaught") // failed acquisition must restore ownership state for every throwable
     internal fun gatedResidual(session: PropagationSession): GatedResidual? {
         requireOpen()
-        if (!params.lpPlan.realResidual || residualOversized) return null
+        if (!params.lpPlan.realResidual) return null
         if (!gatedResolved) {
             gatedResolved = true
             val built = lpRelaxer?.buildGatedResidual(params.cancellation)
@@ -1566,11 +1564,6 @@ internal class LpEngine(
         filter.relaxation.gatedEnforcement(session, filter.enforced)
         return filter
     }
-    private var residualAuxVars: IntArray = emptyIntArray()
-
-    /** Whether the residual real model exceeds the per-node exact row cap. */
-    var residualOversized: Boolean = false
-        private set
 
     /** The asserting LP backjump clause derived during the last [pruneNode], or null. */
     fun lastBackjump(): Learned? = lpBackjump
@@ -1580,18 +1573,22 @@ internal class LpEngine(
      * [session] — the strict-aware decider with the
      * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
      * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
-     * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.FEASIBLE] and
+     * active rows' premises) and stashes it for [lastBackjump], unless [poolRefutation] is false: a caller that
+     * decides the leaf within a tolerance the exact rows do not read keeps no such lemma. On [LpVerdict.FEASIBLE] and
      * [LpVerdict.ATTAINED_OPTIMUM] the returned reals complete the assignment exactly; on
      * [LpVerdict.TOLERANCE_OPTIMUM] they are the float optimum [toleranceCheck] accepted. The float solve is
      * capped by work sized from the model; a leaf it stops short of a verdict is [LpVerdict.INDETERMINATE].
      */
-    fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
+    fun leafCertify(
+        session: PropagationSession,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+        poolRefutation: Boolean = true,
+    ): LeafRealResult {
         requireOpen()
         lpBackjump = null
-        if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val relaxer = selectedSourceRelaxation ?: lpRelaxer
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
-        val relaxation = nodeRelaxation(relaxer, session)
+        val relaxation = leafRelaxation(relaxer, session)
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
@@ -1626,7 +1623,7 @@ internal class LpEngine(
                     ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
                     ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                     ?: activePremiseClause(relaxation, session)
-                if (clause != null) lpNogoods?.add(clause)
+                if (clause != null && poolRefutation) lpNogoods?.add(clause)
                 LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray())
             }
 
@@ -1641,10 +1638,9 @@ internal class LpEngine(
     // which leaves the caller its own exact completion.
     fun leafFloatCompletion(session: PropagationSession, toleranceCheck: (Sample) -> Boolean): Sample? {
         requireOpen()
-        if (residualOversized) return null
         val check = toleranceCheck.floatingOptimumAcceptance() ?: return null
         val relaxer = selectedSourceRelaxation ?: lpRelaxer ?: return null
-        val relaxation = nodeRelaxation(relaxer, session) ?: return null
+        val relaxation = leafRelaxation(relaxer, session) ?: return null
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
@@ -1658,6 +1654,14 @@ internal class LpEngine(
         ) ?: return null
         sink.lp.observeComponentSplit(float.blocks)
         return leafSample(session, relaxation.floatReals(float.primal, problem))
+    }
+
+    // The leaf's relaxation, or null when cancellation stops its assembly. An engine that runs no node bounding
+    // assembles its layout here, at its first leaf.
+    private fun leafRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? = try {
+        nodeRelaxation(relaxer, session)
+    } catch (_: LpAssemblyCancelled) {
+        null
     }
 
     private fun leafSample(session: PropagationSession, reals: DoubleArray): Sample = Sample(
@@ -1797,7 +1801,6 @@ internal class LpEngine(
             objectiveAscending: Boolean,
         ): Boolean {
             val lpRelaxerL = lpRelaxer ?: return false
-            if (params.lpPlan.realResidual && residualOversized) return false
             if (lpEffortGovernor.allowanceSpent) return false
             lpEffortGovernor.observeNode()
             if (!params.lpPlan.realResidual && (
@@ -2045,34 +2048,6 @@ internal class LpEngine(
             }
             cumulativeFlowBound = CumulativeFlowBound(problem, bounded).takeIf { it.applicable }
         }
-        if (params.lpPlan.realResidual) {
-            val aux = BooleanArray(problem.numBoolVars)
-            yield(Unit)
-            var count = 0
-            var rows = 0
-            for (fid in problem.factors.indices) {
-                val factor = problem.factors[fid]
-                if (factor is ReifiedRealLinear) {
-                    if (!aux[factor.aux]) {
-                        aux[factor.aux] = true
-                        count++
-                    }
-                    rows++
-                } else if (factor.variables.reals.isNotEmpty()) {
-                    rows++
-                }
-                if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            }
-            val ids = IntArray(count)
-            yield(Unit)
-            var index = 0
-            for (v in aux.indices) {
-                if (aux[v]) ids[index++] = v
-                if ((v + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            }
-            residualAuxVars = ids
-            residualOversized = rows > RESIDUAL_MAX_ROWS
-        }
         var linearApplicable = true
         for (v in objective.realCoefficientValues.indices) {
             if (objective.realCoefficientValues[v] != 0.0) {
@@ -2091,9 +2066,6 @@ internal class LpEngine(
         )
     }.iterator()
 }
-
-/** Row cap for per-node / per-leaf exact residual work (one LU at ~1k rows is already ~ms-scale). */
-private const val RESIDUAL_MAX_ROWS = 1000
 
 /** Eta-chain length of the persistent gated-residual simplex before it refactorizes: its pivots
  *  (reconciliation and dual repair after each pin flip) accumulate across nodes, so the chain must span

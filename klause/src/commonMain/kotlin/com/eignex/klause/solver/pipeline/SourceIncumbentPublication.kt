@@ -13,31 +13,12 @@ data class SourceIncumbentPublication(
     val value: SourceValue,
 )
 
-internal class SourcePublicationObserver(private val callback: ((SourceIncumbentPublication) -> Unit)?) {
-    var latest: SourceIncumbentPublication? = null
-        private set
-    private var failure: Throwable? = null
+internal class SourcePublicationObserver( callback: ((SourceIncumbentPublication) -> Unit)?) {
+    private val observer = IncumbentPublicationObserver(callback)
 
-    @Suppress("TooGenericExceptionCaught")
-    fun accepted(sample: Sample, value: SourceValue, version: Long = (latest?.version ?: 0) + 1) {
-        val publication = SourceIncumbentPublication(version, sample, value)
-        latest = publication
-        try {
-            callback?.invoke(publication)
-        } catch (error: Throwable) {
-            failure = error
-            throw error
-        }
+    val latest: SourceIncumbentPublication? get() = observer.latest
+    fun accepted(sample: Sample, value: SourceValue, version: Long = observer.version + 1) {
+        observer.accepted( SourceIncumbentPublication(version, sample, value), version)
     }
-
-    @Suppress("TooGenericExceptionCaught")
-    fun <T> execute(action: () -> T): T = try {
-        val result = action()
-        failure?.let { throw it }
-        result
-    } catch (error: Throwable) {
-        val primary = failure ?: error
-        if (primary !== error) primary.addSuppressed(error)
-        throw primary
-    }
+    fun <T> execute(action: () -> T): T = observer.execute(action)
 }

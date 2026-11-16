@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.codec
 
+import com.eignex.klause.arithmetic.json.BigIntSerializer
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear

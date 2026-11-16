@@ -156,7 +156,7 @@ internal object RealBooleanCutProfile {
     }
 
     private fun source(refutation: Boolean, out: File): SourceProofContext {
-        val model = Problem(
+        val model = Problem.of(
             1,
             0,
             emptyArray(),

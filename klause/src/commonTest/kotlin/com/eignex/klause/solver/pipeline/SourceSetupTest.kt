@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -12,6 +13,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -231,6 +234,35 @@ class SourceSetupTest {
         assertEquals(3, replacements.size)
         assertTrue(replacements.values.all { it == 1 })
         assertTrue(selections.values.all { it == 1 })
+    }
+
+    @Test
+    fun `a FlatZinc source without integer columns should take the lane its tolerance and rows admit`() {
+        val rows = "var 0.0..2.0: y; constraint float_lin_le([3.0], [y], 6.0); solve satisfy;"
+        val numerical = SemanticOverrides()
+        val sources = mapOf(
+            "numerical rows" to Triple(rows, numerical, ExecutionOperation.SATISFY),
+            "exact rows" to Triple(rows, SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+                ExecutionOperation.SATISFY),
+            "all solutions" to Triple(rows, numerical, ExecutionOperation.ENUMERATE),
+            "numerical strict row" to Triple("var 0.0..2.0: y; constraint float_lt(y, 1.0); solve satisfy;",
+                numerical, ExecutionOperation.SATISFY),
+            "numerical disequality" to Triple("var 0.0..1.0: y; constraint float_ne(y, 1.0); solve satisfy;",
+                numerical, ExecutionOperation.SATISFY),
+            "numerical reified row" to Triple("var bool: p; var 0.0..2.0: y; " +
+                "constraint float_lin_le_reif([1.0], [y], 1.0, p); solve satisfy;", numerical,
+                ExecutionOperation.SATISFY),
+        )
+
+        val routes = sources.mapValues { (_, source) ->
+            val program = parseFlatZinc(source.first, semanticOverrides = source.second)
+            SourceSetup.prepare(SourceSetupRequest(program.sourceAttachment(), source.third,
+                FiniteEngine.FIXED)).route::class.simpleName
+        }
+
+        assertEquals(mapOf("numerical rows" to "Finite", "exact rows" to "OpenTheory", "all solutions" to "OpenTheory",
+            "numerical strict row" to "OpenTheory", "numerical disequality" to "OpenTheory",
+            "numerical reified row" to "OpenTheory"), routes)
     }
 
     @Test

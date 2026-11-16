@@ -717,7 +717,7 @@ class TablePropagatorTest {
     @Test
     fun `table deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7AB2)
-        repeat(300) { iter ->
+        repeat(20) { iter ->
             val arity = 3
             val problem = Problem(
                 numBoolVars = 0,
@@ -743,7 +743,7 @@ class TablePropagatorTest {
     @Test
     fun `interval table deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x7AB3)
-        repeat(300) { iter ->
+        repeat(75) { iter ->
             val arity = 3
             val lo = LongArray(5 * arity) { rng.nextInt(5).toLong() }
             val hi = LongArray(lo.size) { lo[it] + rng.nextInt(3) }

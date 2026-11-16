@@ -1,5 +1,7 @@
 package com.eignex.klause.factor.codec
 
+import com.eignex.klause.arithmetic.json.BigIntSerializer
+import com.eignex.klause.arithmetic.json.ExactRealValueSerializer
 import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AbsAffineValue

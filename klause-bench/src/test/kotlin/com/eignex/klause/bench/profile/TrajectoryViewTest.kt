@@ -167,7 +167,7 @@ class TrajectoryViewTest {
     }
 
     private fun view(scale: Long, seed: Long): TrajectoryView {
-        val problem = Problem(
+        val problem = Problem.of(
             0,
             2,
             Array(2) { IntDomain(0, 4) },

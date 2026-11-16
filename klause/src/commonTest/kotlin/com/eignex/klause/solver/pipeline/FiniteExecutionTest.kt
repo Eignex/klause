@@ -3,6 +3,8 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
@@ -18,6 +20,9 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.klause.solver.validation.capturedRealAcceptance
+import com.eignex.klause.theory.SourceToleranceSearch
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,12 +34,14 @@ import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
     // Binary64 `0.01 * 200` exceeds the declared bound `2.0` by `3/72057594037927936`.
-    private val roundedBound = """
+    private fun roundedBound(declarations: String, constraints: String) = """
         var 0.0..2.0: y;
         var 200..200: n;
         var 0.0..200.0: nf;
+        $declarations
         constraint int2float(n, nf);
         constraint float_lin_eq([0.01, -1.0], [nf, y], 0.0);
+        $constraints
         solve satisfy;
     """.trimIndent()
 
@@ -42,20 +49,29 @@ class FiniteExecutionTest {
         overrides: SemanticOverrides,
         engine: FiniteEngine = FiniteEngine.FIXED,
         onSample: (Sample) -> Unit = {},
+        declarations: String = "",
+        constraints: String = "",
+        source: String = roundedBound(declarations, constraints),
+        floatPoints: Boolean = true
     ): FiniteSolveVerdict {
-        val program = parseFlatZinc(roundedBound, semanticOverrides = overrides)
+        val program = parseFlatZinc(source, semanticOverrides = overrides)
+        val maximize = program.sourceProgram.solve is SolveDirective.Maximize
+        val objective = program.sourceProgram.linearObjective()?.let { if (maximize) it.negated() else it }
         val invocation = program.prepareSourceExecution(
             SourceSetupRequest(
                 program.sourceAttachment(),
-                ExecutionOperation.SATISFY,
+            if (objective == null)
+                ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
                 engine,
-            ),
+            objective = objective, maximize = maximize
+            )
         )
         val request = SourceExecutionPolicy().finiteRequest(
             invocation.finiteShape(),
             engine,
             presolveConfig = PresolveConfig.NONE,
             cancellation = ExecutionControl.after(1.seconds),
+            toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem)
         )
 
         val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample, {}))
@@ -85,6 +101,121 @@ class FiniteExecutionTest {
         }
     }
 
+    private val unrelatedNonlinear = listOf(
+        "constraint float_abs(a, b);",
+        "constraint array_float_element(i, [0.25, 0.5], b);"
+    )
+
+    private fun solveWithUnrelated(relation: String, overrides: SemanticOverrides) = solveFlatZinc(overrides,
+        declarations = "var -1.0..1.0: a; var 0.0..1.0: b; var 1..2: i;", constraints = relation)
+
+    @Test
+    fun `an unrelated nonlinear real relation should keep a FlatZinc completion within the declared tolerance`() {
+        val verdicts = unrelatedNonlinear.associateWith { solveWithUnrelated(it, SemanticOverrides()) }
+
+        assertEquals(unrelatedNonlinear.associateWith { FiniteSolveVerdict.SAT }, verdicts)
+    }
+
+    @Test
+    fun `an unrelated nonlinear real relation should keep a zero FlatZinc tolerance exact`() {
+        val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+
+        val verdicts = unrelatedNonlinear.associateWith { solveWithUnrelated(it, exact) }
+
+        assertEquals(unrelatedNonlinear.associateWith { FiniteSolveVerdict.UNSAT }, verdicts)
+    }
+
+    private val slackRelations = listOf(
+        "var 0.0..2.0: b;" to "constraint float_abs(y, b);",
+        "var 1..2: i;" to "constraint array_float_element(i, [2.0, 1.0], y);",
+        "var 1..3: k; var 1.0..3.0: kf; var 0.0..6.0: b;" to
+            "constraint int2float(k, kf); constraint float_times(kf, y, b);"
+    )
+
+    private fun solveSlackRelations(overrides: SemanticOverrides) =
+        slackRelations.associate { (declarations, relation) ->
+            relation to solveFlatZinc(overrides, declarations = declarations, constraints = relation)
+        }
+
+    @Test
+    fun `a real relation over a row that needs the slack should be judged within the declared tolerance`() {
+        val verdicts = solveSlackRelations(SemanticOverrides())
+
+        assertEquals(slackRelations.associate { it.second to FiniteSolveVerdict.SAT }, verdicts)
+    }
+
+    @Test
+    fun `a real relation over a row that needs the slack should be refuted at zero tolerance`() {
+        val verdicts = solveSlackRelations(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+
+        assertEquals(slackRelations.associate { it.second to FiniteSolveVerdict.UNSAT }, verdicts)
+    }
+
+    @Test
+    fun `incomplete engines should complete a real relation over a row that needs the slack`() {
+        val verdicts = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS).associateWith { engine ->
+            slackRelations.associate { (declarations, relation) ->
+                relation to solveFlatZinc(SemanticOverrides(), engine, declarations = declarations,
+                    constraints = relation)
+            }
+        }
+
+        assertEquals(listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS).associateWith {
+            slackRelations.associate { it.second to FiniteSolveVerdict.SAT }
+        }, verdicts)
+    }
+
+    // Source acceptance that refuses every floating point, so the search within tolerance decides each leaf.
+    private fun exactPointsOnly(source: Problem) = capturedRealAcceptance(source, ExecutionControl.Never)?.let { base ->
+        FiniteSourceAcceptance({ it.exactReals != null && base(it) }, permitsToleranceOptimum = true,
+            search = SourceToleranceSearch(source, checkNotNull(source.semantics.effective.feasibilityTolerance)))
+    }
+
+    @Test
+    fun `a leaf of linear rows should be completed by the search when its float point is refused`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), floatPoints = false)
+
+        assertEquals(FiniteSolveVerdict.SAT, verdict)
+    }
+
+    @Test
+    fun `minimization should complete a real relation over a row that needs the slack`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), floatPoints = false,
+            source = roundedBound("var 0.0..2.0: b; var 0..3: z;", "constraint float_abs(y, b);")
+                .replace("solve satisfy;", "solve minimize z;"))
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL, verdict)
+    }
+
+    @Test
+    fun `a FlatZinc source without integer columns should be decided within the declared tolerance`() {
+        val sources = mapOf(
+            "within the slack" to "var 0.0..2.0: y; constraint float_lin_eq([3.0], [y], 6.0000000001); " +
+                "solve satisfy;",
+            "beyond the slack" to "var 0.0..2.0: y; constraint float_lin_eq([3.0], [y], 9.0); solve satisfy;",
+            "optimum" to "var 0.0..2.0: y; var 0.0..5.0: z; constraint float_lin_eq([3.0], [y], 6.0000000001); " +
+                "constraint float_lin_le([1.0, 1.0], [y, z], 4.5); solve maximize z;",
+            "unbounded" to "var float: x; var float: y; constraint float_lin_le([1.0, -1.0], [x, y], 3.5); " +
+                "solve maximize x;",
+            "with Booleans" to "var bool: p; var bool: q; var 0.0..2.0: y; constraint bool_clause([p], [q]); " +
+                "constraint float_lin_eq([3.0], [y], 6.0000000001); solve satisfy;"
+        )
+
+        val verdicts = sources.mapValues { (_, source) -> solveFlatZinc(SemanticOverrides(), source = source) }
+
+        assertEquals(mapOf("within the slack" to FiniteSolveVerdict.SAT, "beyond the slack" to FiniteSolveVerdict.UNSAT,
+            "optimum" to FiniteSolveVerdict.OPTIMAL, "unbounded" to FiniteSolveVerdict.UNBOUNDED,
+            "with Booleans" to FiniteSolveVerdict.SAT), verdicts)
+    }
+
+    @Test
+    fun `a real relation violated beyond the declared tolerance should be refuted`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), declarations = "var -1.0..1.0: a; var 0.0..0.4: b;",
+            constraints = "constraint float_abs(a, b); constraint float_eq(a, -0.5);")
+
+        assertEquals(FiniteSolveVerdict.UNSAT, verdict)
+    }
+
     @Test
     fun `a zero FlatZinc tolerance should refute a completion only the slack admits`() {
         val verdict = solveFlatZinc(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
@@ -96,20 +227,20 @@ class FiniteExecutionTest {
     fun `adaptive companion repair should reject unknown modes and missing completion`() {
         for (settings in listOf("companion-repair=never", "companion-repair=adaptive")) {
             val shape = FiniteSolveShape(
-                Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()),
+                Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()),
                 true,
                 false,
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy().finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(listOf(settings)),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
@@ -120,14 +251,14 @@ class FiniteExecutionTest {
     fun `typed companion repair modes should reach completion enabled portfolios`() {
         for (repair in listOf("fixed", "adaptive")) {
             val options = ExecutionOptions(ExecutionOption.companionRepair(repair))
-            val model = Problem(
+            val model = Problem.of(
                 0,
                 1,
                 arrayOf(IntDomain(0, 1)),
                 emptyArray(),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(0.0)
             )
             val shape = FiniteSolveShape(
                 model,
@@ -136,7 +267,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy().finiteRequest(
                 shape,
@@ -144,13 +275,13 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
                 cancellation = ExecutionControl.after(1.seconds),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(
                 request,
                 FiniteSolveCallbacks({}, {}),
-                TheoryParams(sourceIncumbentCompletion = true),
+                TheoryParams(sourceIncumbentCompletion = true)
             )
 
             assertIs<FiniteSolveOutcome.Completed>(result.outcome)
@@ -161,14 +292,14 @@ class FiniteExecutionTest {
     fun `parsed companion repair modes should reach completion enabled portfolios`() {
         for (repair in listOf("fixed", "adaptive")) {
             val options = ExecutionOptions.parse(listOf("companion-repair=$repair"))
-            val model = Problem(
+            val model = Problem.of(
                 0,
                 1,
                 arrayOf(IntDomain(0, 1)),
                 emptyArray(),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(0.0)
             )
             val shape = FiniteSolveShape(
                 model,
@@ -177,7 +308,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy().finiteRequest(
                 shape,
@@ -185,13 +316,13 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
                 cancellation = ExecutionControl.after(1.seconds),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(
                 request,
                 FiniteSolveCallbacks({}, {}),
-                TheoryParams(sourceIncumbentCompletion = true),
+                TheoryParams(sourceIncumbentCompletion = true)
             )
 
             assertIs<FiniteSolveOutcome.Completed>(result.outcome)
@@ -202,9 +333,9 @@ class FiniteExecutionTest {
     fun `typed and parsed publication batching should execute curated integer optimization`() {
         for (options in listOf(
             ExecutionOptions(ExecutionOption.portfolioPublications("segment")),
-            ExecutionOptions.parse(listOf("portfolio-publications=segment")),
+            ExecutionOptions.parse(listOf("portfolio-publications=segment"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -212,7 +343,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -220,7 +351,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds),
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -235,23 +366,23 @@ class FiniteExecutionTest {
             listOf("portfolio-publications=never"),
             listOf("portfolio-publications=segment", "arms=2"),
             listOf("portfolio-publications=segment", "bt-arm=satOptimized"),
-            listOf("portfolio-publications=segment", "portfolio-work=100"),
+            listOf("portfolio-publications=segment", "portfolio-work=100")
         )) {
             val shape = FiniteSolveShape(
-                Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()),
+                Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()),
                 true,
                 false,
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(settings),
-                cancellation = ExecutionControl.after(1.seconds),
+                cancellation = ExecutionControl.after(1.seconds)
             )
 
             assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
@@ -264,9 +395,9 @@ class FiniteExecutionTest {
             Triple(false, 1, FiniteEngine.MIXED),
             Triple(true, 2, FiniteEngine.MIXED),
             Triple(true, 1, FiniteEngine.LOCAL_SEARCH),
-            Triple(true, 1, FiniteEngine.BACKTRACK),
+            Triple(true, 1, FiniteEngine.BACKTRACK)
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 optimize,
@@ -274,7 +405,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize },
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -282,7 +413,7 @@ class FiniteExecutionTest {
                 cores = cores,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(listOf("portfolio-publications=segment")),
-                cancellation = ExecutionControl.after(1.seconds),
+                cancellation = ExecutionControl.after(1.seconds)
             )
 
             assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
@@ -292,20 +423,20 @@ class FiniteExecutionTest {
     @Test
     fun `publication batching should reject Boolean sources`() {
         val shape = FiniteSolveShape(
-            Problem(1, 0, emptyArray(), emptyArray()),
+            Problem.of(1, 0, emptyArray(), emptyArray()),
             true,
             false,
             null,
             LinearObjective(longArrayOf(1)),
             0,
-            null,
+            null
         )
         val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
             shape,
             FiniteEngine.MIXED,
             presolveConfig = PresolveConfig.NONE,
             executionOptions = ExecutionOptions.parse(listOf("portfolio-publications=segment")),
-            cancellation = ExecutionControl.after(1.seconds),
+            cancellation = ExecutionControl.after(1.seconds)
         )
 
         assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
@@ -314,20 +445,20 @@ class FiniteExecutionTest {
     @Test
     fun `publication batching should require a containing deadline`() {
         val shape = FiniteSolveShape(
-            Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()),
+            Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()),
             true,
             false,
             null,
             LinearObjective(intCoefficients = longArrayOf(1)),
             0,
-            null,
+            null
         )
         val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
             shape,
             FiniteEngine.MIXED,
             presolveConfig = PresolveConfig.NONE,
             executionOptions = ExecutionOptions.parse(listOf("portfolio-publications=segment")),
-            nodeBudget = NodeBudget(8),
+            nodeBudget = NodeBudget(8)
         )
 
         assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
@@ -336,13 +467,13 @@ class FiniteExecutionTest {
     @Test
     fun `fixed cumulative optimization should automatically use cost aware propagation`() {
         for (hints in listOf(null, SearchHints(emptyList()))) {
-            val problem = Problem(
+            val problem = Problem.of(
                 0,
                 2,
                 Array(2) { IntDomain(0, 4) },
                 arrayOf(
-                    Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 1),
-                ),
+                    Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 1)
+                )
             )
             val shape = FiniteSolveShape(
                 problem,
@@ -352,12 +483,12 @@ class FiniteExecutionTest {
                 LinearObjective(intCoefficients = longArrayOf(1, 1)),
                 null,
                 null,
-                searchHints = hints,
+                searchHints = hints
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.FIXED,
-                presolveConfig = PresolveConfig.NONE,
+                presolveConfig = PresolveConfig.NONE
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -372,15 +503,15 @@ class FiniteExecutionTest {
     fun `explicit fifo should override automatic fixed cumulative scheduling`() {
         for (options in listOf(
             ExecutionOptions(ExecutionOption.costAwarePropagation(false)),
-            ExecutionOptions.parse(listOf("cost-aware-propagation=false")),
+            ExecutionOptions.parse(listOf("cost-aware-propagation=false"))
         )) {
-            val problem = Problem(
+            val problem = Problem.of(
                 0,
                 2,
                 Array(2) { IntDomain(0, 4) },
                 arrayOf(
-                    Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 1),
-                ),
+                    Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 1)
+                )
             )
             val shape = FiniteSolveShape(
                 problem,
@@ -389,13 +520,13 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1, 1)),
                 null,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.FIXED,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = options,
+                executionOptions = options
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -417,13 +548,13 @@ class FiniteExecutionTest {
             true to Cumulative(starts, durations, resources, 1, presents = intArrayOf(0, 0)),
             true to Cumulative(starts, durations, resources, 2, capacityVar = 2),
             true to Cumulative(starts, durations, resources, 1, durationVars = intArrayOf(2, 2)),
-            true to Cumulative(starts, durations, resources, 2, resourceVars = intArrayOf(2, 2)),
+            true to Cumulative(starts, durations, resources, 2, resourceVars = intArrayOf(2, 2))
         )) {
-            val problem = Problem(
+            val problem = Problem.of(
                 1,
                 3,
                 Array(3) { if (it == 2) IntDomain(1, 2) else IntDomain(0, 4) },
-                listOfNotNull(factor).toTypedArray(),
+                listOfNotNull(factor).toTypedArray()
             )
             val shape = FiniteSolveShape(
                 problem,
@@ -432,12 +563,12 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1, 1, 0)).takeIf { optimize },
                 null,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.FIXED,
-                presolveConfig = PresolveConfig.NONE,
+                presolveConfig = PresolveConfig.NONE
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -454,9 +585,9 @@ class FiniteExecutionTest {
             listOf("companion-admission=funded"),
             listOf("companion-admission=funded", "companion-after-incumbent=true"),
             listOf("companion-admission=progress-funded"),
-            listOf("companion-admission=progress-funded", "companion-after-incumbent=true"),
+            listOf("companion-admission=progress-funded", "companion-after-incumbent=true")
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -464,14 +595,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(settings),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
@@ -484,18 +615,18 @@ class FiniteExecutionTest {
             listOf(
                 ExecutionOptions(
                     ExecutionOption.companionAdmission(admission),
-                    ExecutionOption.companionAfterIncumbent(true),
+                    ExecutionOption.companionAfterIncumbent(true)
                 ),
                 ExecutionOptions.parse(
                     listOf(
                         "companion-admission=$admission",
-                        "companion-after-incumbent=true",
-                    ),
-                ),
+                        "companion-after-incumbent=true"
+                    )
+                )
             )
         }
         for (options in variants) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -503,7 +634,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -511,7 +642,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds),
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -526,7 +657,7 @@ class FiniteExecutionTest {
             true to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail")),
             true to ExecutionOptions(
                 ExecutionOption.arms(2),
-                ExecutionOption.backtrackArmsByLabel(listOf("first-fail")),
+                ExecutionOption.backtrackArmsByLabel(listOf("first-fail"))
             ),
             false to ExecutionOptions.parse(listOf("arms=2", "bt-arm=clausal-balanced")),
             false to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "boolean-proof-tasks=false")),
@@ -534,16 +665,16 @@ class FiniteExecutionTest {
             true to ExecutionOptions(
                 ExecutionOption.arms(2),
                 ExecutionOption.backtrackArmsByLabel(listOf("first-fail")),
-                ExecutionOption.booleanProofTasks(true),
-            ),
+                ExecutionOption.booleanProofTasks(true)
+            )
         )) {
-            val problem = Problem(
+            val problem = Problem.of(
                 2,
                 0,
                 emptyArray(),
                 arrayOf(
-                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                ),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+                )
             )
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
@@ -551,7 +682,7 @@ class FiniteExecutionTest {
                 FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -580,22 +711,22 @@ class FiniteExecutionTest {
             ExecutionOptions.parse(listOf("learned-memory-scratch-bytes=4194304")),
             ExecutionOptions(
                 ExecutionOption.privateRebuildWork(0L),
-                ExecutionOption.learnedMemoryScratchBytes(4_194_304L),
+                ExecutionOption.learnedMemoryScratchBytes(4_194_304L)
             ),
             ExecutionOptions.parse(listOf("private-rebuild-work=0", "learned-memory-scratch-bytes=4194304")),
             ExecutionOptions(
                 ExecutionOption.privateRebuildWork(-1L),
-                ExecutionOption.learnedMemoryScratchBytes(4_194_304L),
+                ExecutionOption.learnedMemoryScratchBytes(4_194_304L)
             ),
-            ExecutionOptions.parse(listOf("private-rebuild-work=-1", "learned-memory-scratch-bytes=4194304")),
+            ExecutionOptions.parse(listOf("private-rebuild-work=-1", "learned-memory-scratch-bytes=4194304"))
         )) {
-            val problem = Problem(
+            val problem = Problem.of(
                 2,
                 0,
                 emptyArray(),
                 arrayOf(
-                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                ),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+                )
             )
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
@@ -603,7 +734,7 @@ class FiniteExecutionTest {
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -612,7 +743,7 @@ class FiniteExecutionTest {
             assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
             assertEquals(
                 listOf("ls/probsat/plain", "bt/clausal-balanced"),
-                completed.stats.portfolio.arms.map { it.label },
+                completed.stats.portfolio.arms.map { it.label }
             )
             assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
         }
@@ -625,15 +756,15 @@ class FiniteExecutionTest {
             false to ExecutionOptions(
                 ExecutionOption.sliceWork(1_000L),
                 ExecutionOption.privateRebuildWork(0L),
-                ExecutionOption.privateRebuildBytes(4_194_304L),
+                ExecutionOption.privateRebuildBytes(4_194_304L)
             ),
             false to ExecutionOptions.parse(
                 listOf(
                     "slice-work=1000",
                     "private-rebuild-work=0",
-                    "private-rebuild-bytes=4194304",
-                ),
-            ),
+                    "private-rebuild-bytes=4194304"
+                )
+            )
         )) {
             val parity = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
@@ -644,16 +775,16 @@ class FiniteExecutionTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false)))
             )
-            val problem = Problem(144, 0, emptyArray(), (parity + contradiction).toTypedArray())
+            val problem = Problem.of(144, 0, emptyArray(), (parity + contradiction).toTypedArray())
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(50_000),
+                nodeBudget = NodeBudget(50_000)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -666,17 +797,17 @@ class FiniteExecutionTest {
             assertEquals(consumers, learning["privateRebuildAutomaticAttempts"] ?: 0L)
             assertEquals(
                 if (enabled) 4_194_304L else 0L,
-                learning["privateRebuildAutomaticByteLimit"] ?: 0L,
+                learning["privateRebuildAutomaticByteLimit"] ?: 0L
             )
             assertEquals(
                 if (enabled) 1_048_576L else 0L,
-                learning["privateRebuildAutomaticCanonicalScratchLimit"] ?: 0L,
+                learning["privateRebuildAutomaticCanonicalScratchLimit"] ?: 0L
             )
             assertEquals(consumers, learning["privateRebuildConsumers"] ?: 0L)
             assertEquals(consumers, learning["privateRebuildRetired"] ?: 0L)
             assertEquals(
                 listOf("ls/probsat/plain", "bt/clausal-balanced"),
-                completed.stats.portfolio.arms.map { it.label },
+                completed.stats.portfolio.arms.map { it.label }
             )
             assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
         }
@@ -689,30 +820,30 @@ class FiniteExecutionTest {
                 ExecutionOption.arms(2),
                 ExecutionOption.backtrackArmsByLabel(listOf("first-fail")),
                 ExecutionOption.privateRebuildWork(-1L),
-                ExecutionOption.learnedMemoryScratchBytes(4_194_304L),
+                ExecutionOption.learnedMemoryScratchBytes(4_194_304L)
             ),
             ExecutionOptions.parse(
                 listOf(
                     "arms=2",
                     "bt-arm=first-fail",
                     "private-rebuild-work=-1",
-                    "learned-memory-scratch-bytes=4194304",
-                ),
-            ),
+                    "learned-memory-scratch-bytes=4194304"
+                )
+            )
         )) {
             val clauses = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
                     Clause(IntArray(3) { Lit.make(row + 2 * (row / 16) + it, mask and (1 shl it) == 0) })
                 }
             } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
-            val problem = Problem(144, 0, emptyArray(), clauses.toTypedArray())
+            val problem = Problem.of(144, 0, emptyArray(), clauses.toTypedArray())
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(5_000),
+                nodeBudget = NodeBudget(5_000)
             )
             val samples = mutableListOf<Sample>()
 
@@ -726,7 +857,7 @@ class FiniteExecutionTest {
                 assertTrue(
                     clauses.all { clause ->
                         clause.literals.any { Lit.evaluate(it, sample.boolValue(Lit.variable(it))) }
-                    },
+                    }
                 )
             }
             val learning = completed.stats.search.learning
@@ -746,24 +877,24 @@ class FiniteExecutionTest {
                 ExecutionOption.arms(2),
                 ExecutionOption.backtrackArmsByLabel(listOf("first-fail")),
                 ExecutionOption.privateRebuildWork(65_536L),
-                ExecutionOption.booleanProofTasks(true),
+                ExecutionOption.booleanProofTasks(true)
             ),
             ExecutionOptions.parse(
                 listOf(
                     "arms=2",
                     "bt-arm=first-fail",
                     "private-rebuild-work=65536",
-                    "boolean-proof-tasks=true",
-                ),
-            ),
+                    "boolean-proof-tasks=true"
+                )
+            )
         )) {
-            val problem = Problem(
+            val problem = Problem.of(
                 2,
                 0,
                 emptyArray(),
                 arrayOf(
-                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                ),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+                )
             )
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
@@ -771,7 +902,7 @@ class FiniteExecutionTest {
                 FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -788,7 +919,7 @@ class FiniteExecutionTest {
     @Test
     fun `unsupported source models should keep ordinary solving and report only explicit task declines`() {
         for (explicit in listOf(false, true)) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -796,8 +927,8 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(
                     listOf("arms=2", "bt-arm=first-fail") +
-                        if (explicit) listOf("boolean-proof-tasks=true") else emptyList(),
-                ),
+                        if (explicit) listOf("boolean-proof-tasks=true") else emptyList()
+                )
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -817,7 +948,7 @@ class FiniteExecutionTest {
     @Test
     fun `Boolean proof controls should reject optimization and parallel lanes`() {
         for ((optimize, cores) in listOf(true to 1, false to 2)) {
-            val problem = Problem(2, 0, emptyArray(), emptyArray())
+            val problem = Problem.of(2, 0, emptyArray(), emptyArray())
             val objective = LinearObjective(boolWeights = longArrayOf(1L, 0L)).takeIf { optimize }
             val shape = FiniteSolveShape(problem, optimize, false, null, objective, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
@@ -825,7 +956,7 @@ class FiniteExecutionTest {
                 FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.NONE,
                 cores = cores,
-                executionOptions = ExecutionOptions.parse(listOf("boolean-proof-tasks=true")),
+                executionOptions = ExecutionOptions.parse(listOf("boolean-proof-tasks=true"))
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -837,7 +968,7 @@ class FiniteExecutionTest {
     @Test
     fun `automatic Boolean tasks should bypass optimization and parallel execution`() {
         for ((optimize, cores) in listOf(true to 1, false to 2)) {
-            val problem = Problem(2, 0, emptyArray(), emptyArray())
+            val problem = Problem.of(2, 0, emptyArray(), emptyArray())
             val objective = LinearObjective(boolWeights = longArrayOf(1L, 0L)).takeIf { optimize }
             val shape = FiniteSolveShape(problem, optimize, false, null, objective, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
@@ -845,7 +976,7 @@ class FiniteExecutionTest {
                 FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.NONE,
                 cores = cores,
-                executionOptions = ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail")),
+                executionOptions = ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail"))
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -863,9 +994,9 @@ class FiniteExecutionTest {
             "heuristic-second",
             "family-work",
             "heuristic-work",
-            "alns-work",
+            "alns-work"
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -873,14 +1004,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes(policy)),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -897,9 +1028,9 @@ class FiniteExecutionTest {
             ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-second")),
             ExecutionOptions(ExecutionOption.portfolioProbes("family-work")),
             ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -907,7 +1038,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -915,7 +1046,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds),
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -932,9 +1063,9 @@ class FiniteExecutionTest {
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work")),
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work")),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -942,7 +1073,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -950,7 +1081,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds),
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -967,9 +1098,9 @@ class FiniteExecutionTest {
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second", "portfolio-lp-start=after-probes")),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-lp-start=after-probes")),
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-lp-start=after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-lp-start=after-probes"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -977,7 +1108,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -985,7 +1116,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds),
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -999,21 +1130,21 @@ class FiniteExecutionTest {
         for (options in listOf(
             ExecutionOptions(
                 ExecutionOption.portfolioProbes("family-work"),
-                ExecutionOption.portfolioPublications("segment"),
+                ExecutionOption.portfolioPublications("segment")
             ),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-publications=segment")),
             ExecutionOptions(
                 ExecutionOption.portfolioProbes("heuristic-work"),
-                ExecutionOption.portfolioPublications("segment"),
+                ExecutionOption.portfolioPublications("segment")
             ),
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-publications=segment")),
             ExecutionOptions(
                 ExecutionOption.portfolioProbes("alns-work"),
-                ExecutionOption.portfolioPublications("segment"),
+                ExecutionOption.portfolioPublications("segment")
             ),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-publications=segment")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-publications=segment"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1021,7 +1152,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -1029,7 +1160,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds),
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -1059,9 +1190,9 @@ class FiniteExecutionTest {
             listOf("portfolio-probes=heuristic-work", "portfolio-work=100"),
             listOf("portfolio-probes=alns-work", "arms=2"),
             listOf("portfolio-probes=alns-work", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=alns-work", "portfolio-work=100"),
+            listOf("portfolio-probes=alns-work", "portfolio-work=100")
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1069,14 +1200,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(settings),
-                cancellation = ExecutionControl.after(1.seconds),
+                cancellation = ExecutionControl.after(1.seconds)
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1090,9 +1221,9 @@ class FiniteExecutionTest {
         for ((optimize, cores, engine) in listOf(
             Triple(false, 1, FiniteEngine.MIXED),
             Triple(true, 2, FiniteEngine.MIXED),
-            Triple(true, 1, FiniteEngine.BACKTRACK),
+            Triple(true, 1, FiniteEngine.BACKTRACK)
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 optimize,
@@ -1100,7 +1231,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize },
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -1108,7 +1239,7 @@ class FiniteExecutionTest {
                 cores = cores,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
-                cancellation = ExecutionControl.after(1.seconds),
+                cancellation = ExecutionControl.after(1.seconds)
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1124,23 +1255,23 @@ class FiniteExecutionTest {
             "lp-transfer",
             "family-work",
             "heuristic-work",
-            "alns-work",
+            "alns-work"
         )) {
             val shape = FiniteSolveShape(
-                Problem(1, 0, emptyArray(), emptyArray()),
+                Problem.of(1, 0, emptyArray(), emptyArray()),
                 true,
                 false,
                 null,
                 LinearObjective(longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes(policy)),
-                cancellation = ExecutionControl.after(1.seconds),
+                cancellation = ExecutionControl.after(1.seconds)
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1152,7 +1283,7 @@ class FiniteExecutionTest {
     @Test
     fun `early heuristic probes should execute Boolean and mixed finite optimization`() {
         for (intCount in listOf(0, 1)) {
-            val problem = Problem(1, intCount, Array(intCount) { IntDomain(0, 1) }, emptyArray())
+            val problem = Problem.of(1, intCount, Array(intCount) { IntDomain(0, 1) }, emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1160,7 +1291,7 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(boolWeights = longArrayOf(1), intCoefficients = LongArray(intCount) { 1L }),
                 null,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -1168,7 +1299,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
                 cancellation = ExecutionControl.after(1.seconds),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -1180,7 +1311,7 @@ class FiniteExecutionTest {
     @Test
     fun `early heuristic probes should retain the source annotation worker`() {
         val labels = listOf("ordinary", "heuristic-second").map { policy ->
-            val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
             val shape = FiniteSolveShape(
                 problem,
@@ -1190,7 +1321,7 @@ class FiniteExecutionTest {
                 LinearObjective(longArrayOf(1), longArrayOf(1)),
                 null,
                 null,
-                searchHints = hints,
+                searchHints = hints
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
@@ -1198,7 +1329,7 @@ class FiniteExecutionTest {
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=$policy")),
                 cancellation = ExecutionControl.after(1.seconds),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -1218,9 +1349,9 @@ class FiniteExecutionTest {
             emptyList(),
             listOf("portfolio-proof-workers=complete"),
             listOf("portfolio-proof-workers=retained"),
-            listOf("portfolio-proof-share=0.75"),
+            listOf("portfolio-proof-share=0.75")
         ).map { settings ->
-            val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
             val shape = FiniteSolveShape(
                 problem,
@@ -1230,14 +1361,14 @@ class FiniteExecutionTest {
                 LinearObjective(longArrayOf(1), longArrayOf(1)),
                 null,
                 null,
-                searchHints = hints,
+                searchHints = hints
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(settings),
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -1256,9 +1387,9 @@ class FiniteExecutionTest {
         for (options in listOf(
             ExecutionOptions(ExecutionOption.portfolioProofWorkers("complete")),
             ExecutionOptions.parse(listOf("portfolio-proof-workers=complete")),
-            ExecutionOptions.parse(listOf("portfolio-proof-workers=retained")),
+            ExecutionOptions.parse(listOf("portfolio-proof-workers=retained"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1266,14 +1397,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -1289,9 +1420,9 @@ class FiniteExecutionTest {
             listOf("portfolio-proof-workers=never"),
             listOf("portfolio-proof-workers=complete", "arms=2"),
             listOf("portfolio-proof-workers=complete", "bt-arm=satOptimized"),
-            listOf("portfolio-proof-workers=retained", "var-selector=vsids"),
+            listOf("portfolio-proof-workers=retained", "var-selector=vsids")
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1299,13 +1430,13 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(settings),
+                executionOptions = ExecutionOptions.parse(settings)
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1319,9 +1450,9 @@ class FiniteExecutionTest {
         for ((optimize, cores, engine) in listOf(
             Triple(false, 1, FiniteEngine.MIXED),
             Triple(true, 2, FiniteEngine.MIXED),
-            Triple(true, 1, FiniteEngine.LOCAL_SEARCH),
+            Triple(true, 1, FiniteEngine.LOCAL_SEARCH)
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 optimize,
@@ -1329,14 +1460,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize },
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 engine,
                 cores = cores,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofWorkers("complete")),
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofWorkers("complete"))
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1349,9 +1480,9 @@ class FiniteExecutionTest {
     fun `typed and parsed deferred LP controls should execute a curated finite integer optimization`() {
         for (options in listOf(
             ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-lp-start=after-probes"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1359,14 +1490,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -1381,9 +1512,9 @@ class FiniteExecutionTest {
         for (settings in listOf(
             listOf("portfolio-lp-start=never"),
             listOf("portfolio-lp-start=after-probes", "arms=2"),
-            listOf("portfolio-lp-start=after-probes", "bt-arm=satOptimized"),
+            listOf("portfolio-lp-start=after-probes", "bt-arm=satOptimized")
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1391,13 +1522,13 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(settings),
+                executionOptions = ExecutionOptions.parse(settings)
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1411,9 +1542,9 @@ class FiniteExecutionTest {
         for ((optimize, cores, engine) in listOf(
             Triple(false, 1, FiniteEngine.MIXED),
             Triple(true, 2, FiniteEngine.MIXED),
-            Triple(true, 1, FiniteEngine.BACKTRACK),
+            Triple(true, 1, FiniteEngine.BACKTRACK)
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 optimize,
@@ -1421,14 +1552,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize },
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 engine,
                 cores = cores,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes"))
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1440,19 +1571,19 @@ class FiniteExecutionTest {
     @Test
     fun `deferred LP controls should reject Boolean sources`() {
         val shape = FiniteSolveShape(
-            Problem(1, 0, emptyArray(), emptyArray()),
+            Problem.of(1, 0, emptyArray(), emptyArray()),
             true,
             false,
             null,
             LinearObjective(longArrayOf(1)),
             0,
-            null,
+            null
         )
         val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
             shape,
             FiniteEngine.MIXED,
             presolveConfig = PresolveConfig.NONE,
-            executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
+            executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes"))
         )
 
         assertFailsWith<PipelineConfigException> {
@@ -1464,9 +1595,9 @@ class FiniteExecutionTest {
     fun `typed and parsed proof shares should execute a curated finite optimization`() {
         for (options in listOf(
             ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
-            ExecutionOptions.parse(listOf("portfolio-proof-share=0.75")),
+            ExecutionOptions.parse(listOf("portfolio-proof-share=0.75"))
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val objective = LinearObjective(intCoefficients = longArrayOf(1))
             val shape = FiniteSolveShape(problem, true, false, null, objective, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
@@ -1474,7 +1605,7 @@ class FiniteExecutionTest {
                 FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.NONE,
                 executionOptions = options,
-                nodeBudget = NodeBudget(8),
+                nodeBudget = NodeBudget(8)
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -1487,7 +1618,7 @@ class FiniteExecutionTest {
     @Test
     fun `proof share should reject values outside the existing floor and full allocation`() {
         for (share in listOf(-1.0, 0.49, 1.01, Double.NaN, Double.POSITIVE_INFINITY)) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1495,13 +1626,13 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(share)),
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(share))
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1513,7 +1644,7 @@ class FiniteExecutionTest {
     @Test
     fun `proof share should reject explicit recipe ownership`() {
         for (selection in listOf("bt-arm=satOptimized", "arms=1", "var-selector=vsids")) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 true,
@@ -1521,13 +1652,13 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)),
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 FiniteEngine.MIXED,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(listOf("portfolio-proof-share=0.75", selection)),
+                executionOptions = ExecutionOptions.parse(listOf("portfolio-proof-share=0.75", selection))
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1541,9 +1672,9 @@ class FiniteExecutionTest {
         for ((optimize, cores, engine) in listOf(
             Triple(false, 1, FiniteEngine.MIXED),
             Triple(true, 2, FiniteEngine.MIXED),
-            Triple(true, 1, FiniteEngine.LOCAL_SEARCH),
+            Triple(true, 1, FiniteEngine.LOCAL_SEARCH)
         )) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(
                 problem,
                 optimize,
@@ -1551,14 +1682,14 @@ class FiniteExecutionTest {
                 null,
                 LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize },
                 0,
-                null,
+                null
             )
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape,
                 engine,
                 cores = cores,
                 presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(0.75))
             )
 
             assertFailsWith<PipelineConfigException> {
@@ -1573,15 +1704,15 @@ class FiniteExecutionTest {
             SourceSetupRequest(
                 SmtLib.parse("(declare-const b Bool) (assert b)").source,
                 ExecutionOperation.SATISFY,
-                FiniteEngine.MIXED,
-            ),
+                FiniteEngine.MIXED
+            )
         )
         val request = SourceExecutionRequest(
             invocation,
             ExecutionOptions(
                 ExecutionOption.backtrackArms(0),
-                ExecutionOption.localSearchArms(1),
-            ),
+                ExecutionOption.localSearchArms(1)
+            )
         )
 
         val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
@@ -1597,8 +1728,8 @@ class FiniteExecutionTest {
             SourceSetupRequest(
                 SmtLib.parse("(declare-const b Bool) (assert b)").source,
                 ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-            ),
+                FiniteEngine.BACKTRACK
+            )
         )
         val request = SourceExecutionRequest(invocation, ExecutionOptions(ExecutionOption.dryRunPresolve(true)))
 
@@ -1615,14 +1746,14 @@ class FiniteExecutionTest {
             SourceSetupRequest(
                 SmtLib.parse("(declare-const b Bool) (assert b)").source,
                 ExecutionOperation.SATISFY,
-                FiniteEngine.MIXED,
-            ),
+                FiniteEngine.MIXED
+            )
         )
         var cancelled = false
         val request = SourceExecutionRequest(
             invocation,
             ExecutionOptions(),
-            cancellation = ExecutionControl { cancelled },
+            cancellation = ExecutionControl { cancelled }
         )
         cancelled = true
 

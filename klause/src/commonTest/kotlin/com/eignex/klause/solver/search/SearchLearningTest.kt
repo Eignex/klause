@@ -646,4 +646,115 @@ class SearchLearningTest {
         assertEquals(true, session.boolValue(0))
         assertEquals(1L, session.learnedLifecycle()["learningClauseConsumed"])
     }
+
+    @Test
+    fun `growth past the count cap should physically release the excess within the production grant`() {
+        val cap = 4000
+        val excess = 500
+        val params = SearchLearnedDbParams(maxClauses = cap, glueLbd = 0)
+        val learning = SearchLearning(params)
+        val host = SearchSession(emptyList())
+        repeat(cap + excess) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
+        assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
+
+        repeat(excess / 10) {
+            var charged = 0L
+            learning.onRestart({ false }) { charged++ }
+            assertTrue(charged <= params.reclamationWork)
+        }
+        val released = observedMemory(learning)
+
+        assertEquals(cap, learning.size)
+        assertEquals(excess.toLong(), learning.snapshot().dropped)
+        assertEquals(0L, released.getValue("sharedLearnedRetiredObjects"))
+        assertEquals(cap * 2L * Int.SIZE_BYTES, released.getValue("sharedLearnedPayloadBytes"))
+    }
+
+    @Test
+    fun `clauses appended during unfinished release should return the store to its empty footprint`() {
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0))
+        val host = SearchSession(emptyList())
+        val empty = observedMemory(learning)
+
+        repeat(4) { round ->
+            repeat(250) { learning.learn(intArrayOf((round * 250 + it) * 4, (round * 250 + it) * 4 + 2), host) }
+            learning.propagate(host, IntArrayList())
+            learning.onRestart()
+        }
+        val growing = learning.size
+        repeat(200) { learning.onRestart() }
+        val released = observedMemory(learning)
+
+        assertTrue(growing > 0)
+        assertEquals(0, learning.size)
+        assertEquals(empty.getValue("ownedPrimitiveBytes"), released.getValue("ownedPrimitiveBytes"))
+        assertEquals(empty.getValue("ownedReferenceSlots"), released.getValue("ownedReferenceSlots"))
+    }
+
+    @Test
+    fun `cancelled release of a grown store should retain owners until resumed physical release`() {
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0))
+        val host = SearchSession(emptyList())
+        val empty = observedMemory(learning)
+        repeat(2000) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
+        learning.propagate(host, IntArrayList())
+
+        learning.onRestart({ learning.size < 1990 })
+        val partial = observedMemory(learning)
+        repeat(200) { learning.onRestart() }
+        val complete = observedMemory(learning)
+
+        assertEquals(1989L, partial.getValue("sharedLearnedObjects"))
+        assertEquals(1L, partial.getValue("sharedLearnedRetiredObjects"))
+        assertEquals(empty.getValue("ownedPrimitiveBytes"), complete.getValue("ownedPrimitiveBytes"))
+        assertEquals(empty.getValue("ownedReferenceSlots"), complete.getValue("ownedReferenceSlots"))
+    }
+
+    @Test
+    fun `growing soft reclamation should retain only the live reason owner`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        repeat(1000) { session.learn(SearchExplanation(intArrayOf(it * 4 + 8, it * 4 + 10))) }
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        session.push(SearchDecision.Bool(1))
+        assertEquals(true, session.boolValue(1))
+
+        var result = requireNotNull(session.reclaimLearningMemory())
+        repeat(200) { result = requireNotNull(session.reclaimLearningMemory()) }
+        val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val retained = requireNotNull(sample.snapshot { session.retainedLearningMemory(sample) }.completeValues)
+
+        assertEquals(SharedLearningReclamationStatus.ProtectedFloor, result.status)
+        assertEquals(1L, retained.getValue("sharedLearnedObjects"))
+        assertEquals(0L, retained.getValue("sharedLearnedRetiredObjects"))
+        assertEquals(setOf(0, 2), requireNotNull(session.reasonFor(1)).literals.toSet())
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `growing soft reclamation should protect pending attachments through suspension and resume`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
+        session.initialize()
+        val run = session.openRun(2)
+        run.pauseBeforeDecision = { true }
+        assertIs<SearchRunEvent.Paused>(run.next())
+        repeat(1000) { session.learn(SearchExplanation(intArrayOf(it * 4 + 8, it * 4 + 10))) }
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(1)))
+
+        repeat(200) { session.reclaimLearningMemory() }
+        val retained = session.learnedClauseCount
+        run.pauseBeforeDecision = { false }
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(2, retained)
+        assertEquals(false, session.boolValue(0))
+        assertEquals(true, session.boolValue(1))
+    }
+
+    private fun observedMemory(learning: SearchLearning): Map<String, Long> {
+        val sample = SharingMemoryObservation(10_000_000L, 1_000_000, { false }, {})
+        return requireNotNull(sample.snapshot { learning.retainedMemory(sample) }.completeValues)
+    }
 }

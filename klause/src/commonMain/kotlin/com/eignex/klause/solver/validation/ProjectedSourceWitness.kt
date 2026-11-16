@@ -34,11 +34,8 @@ internal fun verifyProjectedSourceWitness(
     }
     checkProjectedRealBounds(source, sample, cancellation)?.let { return it }
     val policy = source.semantics.effective.feasibilityTolerance
-    val checked = if (policy == null || policy.isExact) {
-        verifyRealCoordinates(source, sample, cancellation)
-    } else {
-        verifyCapturedLinearTolerance(source, sample, policy, cancellation)
-    }
+    val checked = if (policy == null || policy.isExact) verifyRealCoordinates(source, sample, cancellation)
+        else verifyCapturedRealTolerance(source, sample, policy, cancellation)
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
     when (checked) {
         is Verification.Accepted -> Unit

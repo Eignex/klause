@@ -7,10 +7,15 @@ import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -21,12 +26,15 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.SourceToleranceSearch
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -76,6 +84,23 @@ class LeafRealCompletionTest {
 
         val refuted = assertIs<Completion.Refuted>(completion)
         assertEquals(setOf(0, 1), refuted.factors.toSet())
+    }
+
+    @Test
+    fun `a refutation within tolerance should name the rows the LP proof combines`() {
+        val tenth = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+        val tolerant = Problem(0, 1, arrayOf(IntDomain(0, 5)), problem.factors + Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(1), doubleArrayOf(1.0), LinearOp.LE, 5.0), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(10.0, 10.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+                feasibilityTolerance = tenth).resolve())
+        val acceptance = FiniteSourceAcceptance(assertNotNull(capturedRealAcceptance(tolerant, ExecutionControl.Never)),
+            permitsToleranceOptimum = true, search = SourceToleranceSearch(tolerant, tenth))
+
+        val completion = LeafRealCompletion(tolerant, null, acceptance)
+            .complete(Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(1.0, 0.0)), ExecutionControl.Never)
+
+        assertEquals(setOf(0, 1), assertIs<Completion.Refuted>(completion).factors.toSet())
     }
 
     @Test

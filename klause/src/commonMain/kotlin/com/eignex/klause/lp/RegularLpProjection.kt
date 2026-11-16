@@ -2,10 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearOp
-import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
-import com.eignex.util.collections.LongArrayList
 
 /**
  * Layer-expanded DFA flow hull — the exact convex hull of the automaton's accepting strings. An arc
@@ -31,11 +28,7 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
     fun delta(state: Int, sym: Long): Int = trans[(state - 1) * s + (sym - 1).toInt()].toInt() // 1-based; 0 = dead
     val ns = numStates
 
-    val outCols = Array(len) { arrayOfNulls<IntArrayList>(ns + 1) }
-    val inCols = Array(len + 1) { arrayOfNulls<IntArrayList>(ns + 1) }
-    val chanCols = Array(len) { IntArrayList() }
-    val chanSym = Array(len) { IntArrayList() }
-    val acceptCols = IntArrayList()
+    val flow = LayeredFlowRows(len) { ns + 1 }
     for (t in 0 until len) {
         val box = builder.rootDomain(seq[t])
         val live = builder.liveDomain(seq[t])
@@ -52,57 +45,12 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
                     presence = longArrayOf(seq[t].toLong(), sym),
                     definition = LpAuxiliaryColumn(listOf(t.toLong(), state.toLong(), sym), 1L, true),
                 )
-                (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
-                (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)
-                chanCols[t].add(col)
-                chanSym[t].add(sym.toInt())
-                if (t == len - 1 && nxt in accepting) acceptCols.add(col)
+                flow.arc(t, state, nxt, col, sym)
+                if (t == len - 1 && nxt in accepting) flow.accepting.add(col)
             }
         }
     }
-    // Source: one unit leaves (0, q0).
-    val src = outCols[0][q0] ?: return
-    if (src.isEmpty()) return
-    builder.row(src.toIntArray(), LongArray(src.size) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
-    // Flow conservation at every interior node: Σ out − Σ in = 0.
-    for (t in 1 until len) {
-        reach[t].forEach { state ->
-            val cols = IntArrayList()
-            val vals = LongArrayList()
-            outCols[t][state]?.let {
-                for (k in 0 until it.size) {
-                    cols.add(it[k])
-                    vals.add(1L)
-                }
-            }
-            inCols[t][state]?.let {
-                for (k in 0 until it.size) {
-                    cols.add(it[k])
-                    vals.add(-1L)
-                }
-            }
-            if (!cols.isEmpty()) {
-                builder.row(cols.toIntArray(), vals.toLongArray(), LinearOp.EQ, 0L, Contribution.HULL)
-            }
-        }
-    }
-    // Acceptance: one unit enters an accepting state at the last layer.
-    if (acceptCols.isEmpty()) return // no accepting transition reachable — leave to propagation
-    builder.row(acceptCols.toIntArray(), LongArray(acceptCols.size) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
-    // Channel: Σ_s s·y = seq[t] at each position.
-    for (t in 0 until len) {
-        val k = chanCols[t].size
-        if (k == 0) return
-        val cols = IntArray(k + 1)
-        val vals = LongArray(k + 1)
-        for (i in 0 until k) {
-            cols[i] = chanCols[t][i]
-            vals[i] = chanSym[t][i].toLong()
-        }
-        cols[k] = builder.intColumn(seq[t])
-        vals[k] = -1L
-        builder.row(cols, vals, LinearOp.EQ, 0L, Contribution.HULL)
-    }
+    flow.emit(builder, seq, reach, q0)
 }
 
 internal fun Regular.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {

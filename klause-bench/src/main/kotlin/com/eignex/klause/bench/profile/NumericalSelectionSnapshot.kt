@@ -122,42 +122,6 @@ internal class NumericalSelectionSnapshot(private val stop: ExecutionControl) {
         }
     }
 
-    fun replayActiveRows(journal: Any, emit: (JsonObject) -> Unit) {
-        val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityReplay")
-        val instance = type.getField("INSTANCE").get(null)
-        val run = type.declaredMethods.single { it.name == "activeRows" }
-        var inspected = 0
-        for (record in records(journal)) {
-            if (stop()) break
-            val context = field(record, "context") as SourceProofContext
-            val booleans = context.scope.condition.bools
-            if (context.coordinates.none { it.kind == SourceCoordinate.Kind.Boolean && it.id !in booleans }) continue
-            val replay = run.invoke(instance, record, 20_000_000L, 67_108_864L, stop, false)
-            inspected++
-            emit(
-                buildJsonObject {
-                    put("originalQuery", field(record, "id") as Int)
-                    put("diagnosticOnly", true)
-                    put("sharedTraversalAllowance", false)
-                    put("maximumWork", 20_000_000L)
-                    put("maximumAllocation", 67_108_864L)
-                    put("maximumOperations", 2)
-                    put("operations", field(replay, "operations") as Int)
-                    put("work", field(replay, "work") as Long)
-                    put("allocation", field(replay, "allocation") as Long)
-                    put("stopped", field(replay, "stopped") as Boolean)
-                    field(replay, "query")?.let { put("query", query(it)) }
-                },
-            )
-        }
-        emit(
-            buildJsonObject {
-                put("inspectedOpenStates", inspected)
-                put("inspectionStopped", stop())
-            },
-        )
-    }
-
     @Suppress("UNCHECKED_CAST")
     private fun records(journal: Any): List<Any> = field(journal, "retained") as List<Any>
 

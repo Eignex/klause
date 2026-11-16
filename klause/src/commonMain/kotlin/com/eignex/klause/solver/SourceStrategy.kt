@@ -32,6 +32,7 @@ import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
+import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
@@ -39,6 +40,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.SourceIncumbentPublication
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
@@ -72,7 +74,7 @@ class SourceStrategy internal constructor(
     val compiledSchema: CompiledSchema? = null,
     /** Factor mechanisms selected afresh for each operation's canonical source preparation. */
     val projectionProviders: FactorProjectionProviders = (source as? BakedProblem)?.projectionProviders
-        ?: FactorProjectionProviders.Default,
+        ?: FactorProjectionProviders.Default
 ) {
     init {
         require(engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.LOCAL_SEARCH)
@@ -90,7 +92,7 @@ class SourceStrategy internal constructor(
         cores: Int = 1,
         timeout: ExecutionControl = ExecutionControl.Never,
         cancellation: ExecutionControl = ExecutionControl.Never,
-        nodeBudget: NodeBudget? = null,
+        nodeBudget: NodeBudget? = null
     ): OpenTheoryResult {
         val stop = timeout.withAccounting(cancellation) or cancellation
         fun stopped(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
@@ -99,18 +101,16 @@ class SourceStrategy internal constructor(
             } else {
                 TerminationReason.Cancelled
             },
-            stats,
+            stats
         )
-        val invocation = SourceSetup.prepare(
+        val invocation = SourceSetup.prepareWithGrid(
             SourceSetupRequest(
                 sourceAttachment(),
                 ExecutionOperation.SATISFY,
                 engine,
                 providers = projectionProviders,
-                cancellation = stop,
-            ),
-        )
-        compiledSchema?.sourceBinding?.selectView(invocation)
+                cancellation = stop
+            ), ::selectPrivateGrid)
         var finiteWitness: Sample? = null
         val execution = SourceSetup.execute(
             SourceExecutionRequest(
@@ -119,9 +119,9 @@ class SourceStrategy internal constructor(
                 cores = cores,
                 timeout = timeout,
                 cancellation = cancellation,
-                nodeBudget = nodeBudget,
+                nodeBudget = nodeBudget
             ),
-            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ finiteWitness = it }, {})),
+            SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ finiteWitness = it }, {}))
         )
         val result = when (execution) {
             is SourceExecutionResult.Polynomial -> execution.result.result
@@ -138,7 +138,7 @@ class SourceStrategy internal constructor(
                 when (outcome.verdict) {
                     FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
                         OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample ?: finiteWitness)),
-                        outcome.stats,
+                        outcome.stats
                     )
 
                     FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
@@ -152,7 +152,7 @@ class SourceStrategy internal constructor(
                             } else {
                                 TerminationReason.BudgetExhausted
                             },
-                        outcome.stats,
+                        outcome.stats
                     )
                 }
             }
@@ -194,7 +194,7 @@ class SourceStrategy internal constructor(
         cores: Int = 1,
         timeout: ExecutionControl = ExecutionControl.Never,
         cancellation: ExecutionControl = ExecutionControl.Never,
-        nodeBudget: NodeBudget? = null,
+        nodeBudget: NodeBudget? = null
     ): QuadraticOptimizationExecution {
         val original = compiledSchema?.sourceBinding?.originalObjective(objective) ?: run {
             require(objective.sourcePairing == null) {
@@ -214,7 +214,7 @@ class SourceStrategy internal constructor(
         cores: Int = 1,
         timeout: ExecutionControl = ExecutionControl.Never,
         cancellation: ExecutionControl = ExecutionControl.Never,
-        nodeBudget: NodeBudget? = null,
+        nodeBudget: NodeBudget? = null
     ): QuadraticOptimizationExecution {
         val stop = timeout.withAccounting(cancellation) or cancellation
         val invocation = SourceSetup.prepare(
@@ -226,8 +226,8 @@ class SourceStrategy internal constructor(
                 projectionProviders,
                 stop,
                 stop,
-                requiresQuadraticCompletion = true,
-            ),
+                requiresQuadraticCompletion = true
+            )
         )
         val execution = SourceSetup.execute(
             SourceExecutionRequest(
@@ -236,8 +236,8 @@ class SourceStrategy internal constructor(
                 cores = cores,
                 timeout = timeout,
                 cancellation = cancellation,
-                nodeBudget = nodeBudget,
-            ),
+                nodeBudget = nodeBudget
+            )
         )
         return when (execution) {
             is SourceExecutionResult.Quadratic -> compiledSchema?.sourceBinding?.bindResult(execution) {
@@ -262,25 +262,25 @@ class SourceStrategy internal constructor(
      */
     fun solve(
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
-        theory: TheoryParams = TheoryParams(),
+        theory: TheoryParams = TheoryParams()
     ): OpenTheoryResult = solveSource(polynomial, theory).withSourceSemantics(source.semantics)
 
     private fun solveSource(polynomial: PolynomialTheoryParams, theory: TheoryParams): OpenTheoryResult {
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
-        val invocation = SourceSetup.prepare(
+        val invocation = SourceSetup.prepareWithGrid(
             SourceSetupRequest(
                 sourceAttachment(),
                 ExecutionOperation.SATISFY,
                 engine,
                 providers = projectionProviders,
                 cancellation = scope.stop,
-                boundCancellation = scope.stop,
+                boundCancellation = scope.stop
             ),
-            polynomialCancellation = scope.polynomialPreparation(),
+            ::selectPrivateGrid,
+            polynomialCancellation = scope.polynomialPreparation()
         )
-        compiledSchema?.sourceBinding?.selectView(invocation)
         val route = invocation.engineRoute
         if (scope.stop()) return scope.unknown()
         val result = when (route) {
@@ -288,7 +288,7 @@ class SourceStrategy internal constructor(
                 if (!scope.supportsPolynomial(engine)) return scope.unsupported()
                 when (
                     val execution = SourceSetup.execute(
-                        SourceExecutionRequest(invocation, polynomial = scope.polynomial),
+                        SourceExecutionRequest(invocation, polynomial = scope.polynomial)
                     )
                 ) {
                     is SourceExecutionResult.Polynomial -> execution.result.result
@@ -355,7 +355,7 @@ class SourceStrategy internal constructor(
     fun solve(
         params: BacktrackParams,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
-        theory: TheoryParams = TheoryParams(),
+        theory: TheoryParams = TheoryParams()
     ): OpenTheoryResult {
         require(engine == FiniteEngine.BACKTRACK) { "BacktrackParams require a backtracking source strategy" }
         return solve(polynomial.copy(strategy = polynomial.strategy.copy(backtrack = params)), theory)
@@ -365,7 +365,7 @@ class SourceStrategy internal constructor(
     fun solve(
         params: LocalSearchParams,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
-        theory: TheoryParams = TheoryParams(),
+        theory: TheoryParams = TheoryParams()
     ): OpenTheoryResult {
         require(engine == FiniteEngine.LOCAL_SEARCH) { "LocalSearchParams require a local-search source strategy" }
         return solve(polynomial.copy(strategy = polynomial.strategy.copy(localSearch = params)), theory)
@@ -379,14 +379,14 @@ class SourceStrategy internal constructor(
     fun optimize(
         objective: LinearObjective,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
-        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE
     ): QuadraticOptimizationExecution = optimizeSource(objective, polynomial, sense)
         .withSourceSemantics(source.semantics)
 
     private fun optimizeSource(
         objective: LinearObjective,
         polynomial: PolynomialTheoryParams,
-        sense: ObjectiveSense,
+        sense: ObjectiveSense
     ): QuadraticOptimizationExecution {
         compiledSchema?.let { return optimizeSource(it.sourceBinding.originalObjective(objective), polynomial, sense) }
         require(objective.sourcePairing == null) { "compiled helper objective requires its compiled source strategy" }
@@ -398,7 +398,7 @@ class SourceStrategy internal constructor(
         objective: LinearObjective,
         params: BacktrackParams,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
-        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE
     ): QuadraticOptimizationExecution {
         require(engine == FiniteEngine.BACKTRACK) { "BacktrackParams require a backtracking source strategy" }
         return optimize(objective, polynomial.copy(strategy = polynomial.strategy.copy(backtrack = params)), sense)
@@ -409,7 +409,7 @@ class SourceStrategy internal constructor(
         objective: LinearObjective,
         params: LocalSearchParams,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
-        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE
     ): QuadraticOptimizationExecution {
         require(engine == FiniteEngine.LOCAL_SEARCH) { "LocalSearchParams require a local-search source strategy" }
         return optimize(objective, polynomial.copy(strategy = polynomial.strategy.copy(localSearch = params)), sense)
@@ -419,14 +419,14 @@ class SourceStrategy internal constructor(
     fun optimize(
         objective: QuadraticObjectiveSpec,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
-        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE
     ): QuadraticOptimizationExecution = optimizeSource(objective, polynomial, sense)
         .withSourceSemantics(source.semantics)
 
     private fun optimizeSource(
         objective: QuadraticObjectiveSpec,
         polynomial: PolynomialTheoryParams,
-        sense: ObjectiveSense,
+        sense: ObjectiveSense
     ): QuadraticOptimizationExecution {
         val scope = scope(polynomial, TheoryParams())
         if (scope.stop()) return unsupportedQuadratic(sense, scope.unknown().reason)
@@ -440,17 +440,17 @@ class SourceStrategy internal constructor(
                 projectionProviders,
                 scope.stop,
                 scope.stop,
-                requiresQuadraticCompletion = true,
+                requiresQuadraticCompletion = true
             ),
-            polynomialCancellation = scope.polynomialPreparation(),
+            polynomialCancellation = scope.polynomialPreparation()
         )
         return when (
             val execution = SourceSetup.execute(
                 SourceExecutionRequest(
                     invocation,
                     theory = scope.theory,
-                    polynomial = scope.polynomial,
-                ),
+                    polynomial = scope.polynomial
+                )
             )
         ) {
             is SourceExecutionResult.Quadratic -> compiledSchema?.sourceBinding?.bindResult(execution) {
@@ -472,7 +472,7 @@ class SourceStrategy internal constructor(
         objective: LinearObjective,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         theory: TheoryParams = TheoryParams(),
-        sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
+        sense: ObjectiveSense = ObjectiveSense.MINIMIZE
     ): OpenTheoryExecution = optimizeOpenSource(objective, polynomial, theory, sense)
         .withSourceSemantics(source.semantics)
 
@@ -480,7 +480,7 @@ class SourceStrategy internal constructor(
         objective: LinearObjective,
         polynomial: PolynomialTheoryParams,
         theory: TheoryParams,
-        sense: ObjectiveSense,
+        sense: ObjectiveSense
     ): OpenTheoryExecution {
         require(compiledSchema != null || objective.sourcePairing == null) {
             "compiled helper objective requires its compiled source strategy"
@@ -490,16 +490,17 @@ class SourceStrategy internal constructor(
                 objective
             } else {
                 return OpenTheoryExecution.Optimize(
-                    OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY),
+                    OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY)
                 )
             }
         val scope = scope(polynomial, theory)
         fun incomplete(reason: TerminationReason): OpenTheoryExecution = OpenTheoryExecution.Optimize(
-            OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY),
+            OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY)
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
         if (!scope.supportsSource()) return incomplete(TerminationReason.Unsupported)
-        val invocation = SourceSetup.prepare(
+        var stoppedBeforeGrid = false
+        val invocation = SourceSetup.prepareWithGrid(
             SourceSetupRequest(
                 sourceAttachment(),
                 ExecutionOperation.OPTIMIZE,
@@ -508,12 +509,14 @@ class SourceStrategy internal constructor(
                 maximize = sense == ObjectiveSense.MAXIMIZE,
                 providers = projectionProviders,
                 cancellation = scope.stop,
-                boundCancellation = scope.stop,
+                boundCancellation = scope.stop
             ),
-            polynomialCancellation = scope.polynomialPreparation(),
-        )
-        if (scope.stop()) return incomplete(scope.unknown().reason)
-        compiledSchema?.sourceBinding?.selectView(invocation)
+            { selection ->
+                stoppedBeforeGrid = scope.stop()
+        if (stoppedBeforeGrid) null else selectPrivateGrid(selection)
+            },
+            polynomialCancellation =scope.polynomialPreparation())
+        if (stoppedBeforeGrid) return incomplete(scope.unknown().reason)
         val route = invocation.engineRoute
         if (route is SourceProblemRoute.UnsupportedOpen &&
             route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
@@ -547,14 +550,17 @@ class SourceStrategy internal constructor(
     private fun sourceAttachment(): SourceAttachment = compiledSchema?.sourceBinding?.attachment()
         ?: SourceAttachment(source)
 
+    private fun selectPrivateGrid(selection: SourceRouteSelection): SelectedFloatGridPreparation? =
+        compiledSchema?.sourceBinding?.selectView(selection)
+
     private fun unsupportedQuadratic(
         sense: ObjectiveSense,
-        reason: TerminationReason = TerminationReason.Unsupported,
+        reason: TerminationReason = TerminationReason.Unsupported
     ): QuadraticOptimizationExecution = QuadraticOptimizationExecution(
         QuadraticOptimizationResult.Unknown(null, reason, sense, SolveStats.EMPTY),
         PolynomialTheoryStats(),
         0,
-        0,
+        0
     )
 
     private fun finiteSolve(invocation: PreparedSourceInvocation, scope: SourceInvocation): OpenTheoryResult {
@@ -566,7 +572,7 @@ class SourceStrategy internal constructor(
         return when (outcome.verdict) {
             FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
                 OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample)),
-                outcome.stats,
+                outcome.stats
             )
 
             FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
@@ -580,7 +586,7 @@ class SourceStrategy internal constructor(
                     } else {
                         TerminationReason.BudgetExhausted
                     },
-                outcome.stats,
+                outcome.stats
             )
 
             else -> error("source satisfaction returned an optimization verdict")
@@ -596,7 +602,7 @@ class SourceStrategy internal constructor(
                     else -> error("unsupported source strategy $engine")
                 }
                 FiniteSolveRequest(shape, controls)
-            }),
+            })
         )
         return (execution as SourceExecutionResult.Finite).result
     }
@@ -604,7 +610,7 @@ class SourceStrategy internal constructor(
     private fun finiteOptimize(
         invocation: PreparedSourceInvocation,
         scope: SourceInvocation,
-        objective: LinearObjective,
+        objective: LinearObjective
     ): OpenTheoryExecution {
         val result = executeFinite(invocation, scope)
         val outcome = result.outcome as FiniteSolveOutcome.Completed
@@ -632,13 +638,13 @@ class SourceStrategy internal constructor(
             FiniteSolveVerdict.OPTIMAL -> OpenTheoryOptimum.Optimal(
                 requireNotNull(point),
                 requireNotNull(value),
-                outcome.stats,
+                outcome.stats
             )
 
             FiniteSolveVerdict.UNBOUNDED -> OpenTheoryOptimum.Unbounded(
                 requireNotNull(point),
                 requireNotNull(value),
-                outcome.stats,
+                outcome.stats
             )
 
             FiniteSolveVerdict.UNSAT -> OpenTheoryOptimum.Infeasible(outcome.stats)
@@ -647,7 +653,7 @@ class SourceStrategy internal constructor(
                 point,
                 value,
                 reason,
-                outcome.stats,
+                outcome.stats
             )
 
             FiniteSolveVerdict.SAT -> error("source optimization returned a satisfaction verdict")
@@ -658,8 +664,8 @@ class SourceStrategy internal constructor(
                     SourceIncumbentPublication(
                         1L,
                         sample,
-                        SourceValue.Rational(requireNotNull(sourceValue)),
-                    ),
+                        SourceValue.Rational(requireNotNull(sourceValue))
+                    )
                 )
             }
         }
@@ -694,12 +700,12 @@ class SourceStrategy internal constructor(
         val backtrack = polynomial.strategy.backtrack.copy(
             assumptions = assumptions,
             cancellation = stop,
-            nodeBudget = budget,
+            nodeBudget = budget
         )
         val localSearch = polynomial.strategy.localSearch.copy(
             assumptions = assumptions,
             cancellation = stop,
-            nodeBudget = budget,
+            nodeBudget = budget
         )
         val open = when (engine) {
             FiniteEngine.BACKTRACK -> theory.copy(
@@ -707,10 +713,10 @@ class SourceStrategy internal constructor(
                 maxDecisions = minOf(
                     theory.maxDecisions,
                     backtrack.maxDecisions,
-                    backtrack.maxInstructions ?: Long.MAX_VALUE,
+                    backtrack.maxInstructions ?: Long.MAX_VALUE
                 ),
                 nodeBudget = budget,
-                randomSeed = backtrack.randomSeed ?: theory.randomSeed,
+                randomSeed = backtrack.randomSeed ?: theory.randomSeed
             )
 
             FiniteEngine.LOCAL_SEARCH -> theory.copy(
@@ -718,10 +724,10 @@ class SourceStrategy internal constructor(
                 maxFlips = minOf(theory.maxFlips, localSearch.maxFlips),
                 maxInstructions = minOf(
                     theory.maxInstructions ?: Long.MAX_VALUE,
-                    localSearch.maxInstructions ?: Long.MAX_VALUE,
+                    localSearch.maxInstructions ?: Long.MAX_VALUE
                 ).takeIf { it != Long.MAX_VALUE },
                 nodeBudget = budget,
-                randomSeed = localSearch.randomSeed ?: theory.randomSeed,
+                randomSeed = localSearch.randomSeed ?: theory.randomSeed
             )
 
             else -> error("unsupported source strategy $engine")
@@ -738,9 +744,9 @@ class SourceStrategy internal constructor(
                 strategy = polynomial.strategy.copy(
                     backtrack = backtrack,
                     localSearch = localSearch,
-                    assumptions = assumptions,
-                ),
-            ),
+                    assumptions = assumptions
+                )
+            )
         )
     }
 
@@ -751,13 +757,13 @@ class SourceStrategy internal constructor(
         val backtrack: BacktrackParams,
         val localSearch: LocalSearchParams,
         val theory: TheoryParams,
-        private val originalPolynomial: PolynomialTheoryParams,
+        private val originalPolynomial: PolynomialTheoryParams
     ) {
         private val preparationPool = WorkCreditPool(originalPolynomial.maximumWork)
         private val preparationPools = listOf(preparationPool)
         private val preparationWork: Long get() = preparationPool.spent
         val polynomial: PolynomialTheoryParams get() = originalPolynomial.copy(
-            maximumWork = originalPolynomial.maximumWork?.let { (it - preparationWork).coerceAtLeast(0) },
+            maximumWork = originalPolynomial.maximumWork?.let { (it - preparationWork).coerceAtLeast(0) }
         )
         fun polynomialPreparation(): ExecutionControl {
             if (originalPolynomial.maximumWork == null) return stop
@@ -790,7 +796,7 @@ class SourceStrategy internal constructor(
             } else {
                 TerminationReason.Cancelled
             },
-            stats,
+            stats
         )
         fun supportsSource(): Boolean = assumptions.deductions.isEmpty &&
             backtrack.toleranceCheck == null && backtrack.componentFactory == null

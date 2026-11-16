@@ -20,13 +20,16 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.model.IntAbs
 import com.eignex.klause.model.IntDomainSpec
+import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntMul
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.IntSum
+import com.eignex.klause.model.InverseChannel
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
@@ -53,6 +56,50 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CompilerLiftTest {
+    @Test
+    fun `channeling globals should preserve affine permutation operands`() {
+        val terms = listOf(IntSum(listOf(IntRef("x"), IntLit(1))), IntRef("y"))
+        for (relation in listOf(
+            SymmetricAllDifferent(terms, indexOffset = 1),
+            InverseChannel(terms, terms, fOffset = 1, gOffset = 1),
+        )) {
+            val schema = SchemaDef<SchemaEntry>(
+                mapOf("x" to IntSpec(0, 1), "y" to IntSpec(1, 2), "relation" to NamedConstraint(relation)),
+            )
+            val compiled = schema.compile()
+
+            val actual = BacktrackSolver(compiled.problem.bake()).enumerate(BacktrackParams(randomSeed = 0))
+                .map { sample -> listOf("x", "y").map { sample.intValue(compiled.intVarIdByName.getValue(it)) } }
+                .toSet()
+
+            assertEquals(setOf(listOf(0L, 2L), listOf(1L, 1L)), actual)
+        }
+    }
+
+    @Test
+    fun `materialized affine operands should preserve repeated terms`() {
+        val lowering = Lowering(ProblemSettings(), schemaSemantics.resolve())
+        val x = lowering.bindIntName("x", lowering.newIntVar(IntDomain(-2, 2)))
+        val expression = IntSum(listOf(IntRef("x"), IntRef("x"), IntLit(1)))
+
+        val result = lowering.intVarOf(lowering.materializeIntVar(expression).name)
+        val samples = BacktrackSolver(lowering.buildProblem().bake())
+            .enumerate(BacktrackParams(randomSeed = 0)).toList()
+
+        assertEquals(5, samples.size)
+        for (sample in samples) assertEquals(2 * sample.intValue(x) + 1, sample.intValue(result))
+    }
+
+    @Test
+    fun `materialization should retain checked schema negation limits`() {
+        for (expression in listOf(IntLit(Int.MIN_VALUE), IntScale(Int.MIN_VALUE, IntRef("x")))) {
+            val lowering = Lowering(ProblemSettings(), schemaSemantics.resolve())
+            lowering.bindIntName("x", lowering.newIntVar(IntDomain(0, 0)))
+
+            assertFailsWith<IllegalArgumentException> { lowering.materializeIntVar(expression) }
+        }
+    }
+
     @Test
     fun `a repeated quotient and remainder alias should reject inconsistent source roles`() {
         val parsed = parseFlatZinc(

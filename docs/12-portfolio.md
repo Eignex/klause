@@ -19,8 +19,12 @@ seed offsets, parallel quotas, scheduler controls, result verification and clean
 mutable services registered with a slot close when the slot is released, and each
 replica gets private state. ALNS operator choices and inner repair seeds derive
 from its worker seed in ordinary and diagnostic schedules. Native reservations
-divide the complete family's allowance across its slots. Heuristic-only factories carry witness authority, and
-`FIXED` rejects multiple cores.
+divide the complete family's allowance across its slots. In the polynomial,
+quadratic, nonlinear-integer and transcendental portfolios, a slot binds the
+backtrack seed, decision share and node quota, and the local-search seed, flip and
+instruction shares and node quota; other limits keep their own work currencies,
+and finite and linear open factories bind their slots directly. Heuristic-only
+factories carry witness authority, and `FIXED` rejects multiple cores.
 
 `SourceExecutionPolicy` sets finite arm defaults and LP ceilings before worker
 construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
@@ -98,7 +102,9 @@ Curated backtrack filtering reports unmet model needs; selected finite recipes r
 their actual worker authority. Explicit named recipes bypass automatic filtering.
 An explicit arm count, including the default-sized count, prevents automatic numerical
 companions. A missing complete affine capture declines both companions without
-removing finite workers.
+removing finite workers. `FiniteCompanionArms` owns companion admission, construction,
+arm order, preparation telemetry and scheduler shares; the finite portfolio only
+seats the arms it returns.
 
 The numerical companion retains its checked root-global bound across pauses and
 retirement. Finite results carry this evidence separately from additive counters.
@@ -1033,7 +1039,10 @@ terminal verdicts, and a closed handle's totals merge into its arm once.
 
 Ordinary arm exceptions retire their producer and leave siblings running; the
 schedule keeps one truncated diagnostic per arm. Output callback exceptions still
-propagate, and source-refuted claims remain quarantine faults.
+propagate, and source-refuted claims remain quarantine faults. Source and quadratic
+publication records share an invocation-local observer: it installs the latest
+record and version before calling the output callback, retains a callback failure
+as the primary exception, and suppresses a distinct later execution failure.
 
 ### Incumbent guidance
 

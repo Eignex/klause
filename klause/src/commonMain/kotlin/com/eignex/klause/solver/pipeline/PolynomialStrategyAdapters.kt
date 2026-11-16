@@ -22,7 +22,7 @@ data class PolynomialStrategyParams(
     /** Common finite pins captured for this invocation. */
     val assumptions: Assumptions = Assumptions.None,
     /** ALNS destroy/repair iteration cap. */
-    val alnsIterations: Int = 50,
+    val alnsIterations: Int = 50
 ) {
     init {
         require(alnsIterations >= 0)
@@ -35,7 +35,7 @@ internal class PolynomialStrategyAdapters(
     private val scope: PolynomialInvocationScope,
     private val params: PolynomialStrategyParams,
     private val cancellation: ExecutionControl,
-    private val parallelism: Int,
+    private val parallelism: Int
 ) {
     fun solve(engine: FiniteEngine): SolveResult = if (usesPortfolio(engine)) {
         portfolio(engine).use { it.solve(cancellation) }
@@ -55,7 +55,7 @@ internal class PolynomialStrategyAdapters(
     private fun <T> standalone(
         engine: FiniteEngine,
         objective: LinearObjective? = null,
-        action: (PolynomialWorkerAdapter) -> T,
+        action: (PolynomialWorkerAdapter) -> T
     ): T {
         val complete = engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.FIXED
         val budget = if (complete) params.backtrack.nodeBudget else params.localSearch.nodeBudget
@@ -65,7 +65,7 @@ internal class PolynomialStrategyAdapters(
             params.localSearch.randomSeed ?: 0,
             cancellation,
             budget,
-            if (complete) setOf(0) else emptySet(),
+            if (complete) setOf(0) else emptySet()
         ).use { resources ->
             val slot = resources.slots.single()
             val execution = if (complete) {
@@ -78,24 +78,17 @@ internal class PolynomialStrategyAdapters(
                 ModelIdentity.of(model.source, objective),
                 objective,
                 params.assumptions,
-                execution,
+                execution
             )
             action(PolynomialWorkerAdapter(model, scope.worker(slot), params, binding, scope.workerCancellation(slot)))
         }
     }
 
     private fun workerParams(slot: PortfolioWorkerSlot): PolynomialStrategyParams = params.copy(
-        backtrack = params.backtrack.copy(
-            randomSeed = slot.seed,
-            maxDecisions = slot.nativeAllowance(params.backtrack.maxDecisions),
-            nodeBudget = slot.nodeBudget,
+        backtrack = slot.backtrack(params.backtrack
         ),
-        localSearch = params.localSearch.copy(
-            randomSeed = slot.seed,
-            maxFlips = slot.heuristicAllowance(params.localSearch.maxFlips),
-            maxInstructions = params.localSearch.maxInstructions?.let(slot::heuristicAllowance),
-            nodeBudget = slot.nodeBudget,
-        ),
+        localSearch = slot.localSearch( params.localSearch
+        )
     )
 
     private fun portfolio(engine: FiniteEngine, objective: LinearObjective? = null): PortfolioInvocation {
@@ -129,7 +122,7 @@ internal class PolynomialStrategyAdapters(
                     scope.worker(slot),
                     controls,
                     workerBinding,
-                    scope.workerCancellation(slot),
+                    scope.workerCancellation(slot)
                 ).worker(arm, objective, slot)
             }
         }
@@ -147,11 +140,11 @@ internal class PolynomialStrategyAdapters(
                 seed = seed ?: 0,
                 cancellation = cancellation,
                 nodeBudget = budget,
-                reseedStaleThreshold = 0,
+                reseedStaleThreshold = 0
             ),
             PortfolioEvidence(identity, polynomialWitnessVerifier(binding, cancellation))
                 .bindInvocation(binding, cancellation),
-            objective,
+            objective
         )
     }
 }

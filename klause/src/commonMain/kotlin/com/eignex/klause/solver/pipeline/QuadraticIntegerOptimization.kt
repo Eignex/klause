@@ -3,9 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
-import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.ceilInteger
 import com.eignex.klause.arithmetic.polynomial.exactInteger
 import com.eignex.klause.backtrack.searchWork
@@ -18,8 +16,6 @@ import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.InstructionSlicedSearch
-import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
@@ -31,7 +27,6 @@ import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.openPolynomial
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
-import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticIncumbent
@@ -64,8 +59,6 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
-import kotlin.coroutines.cancellation.CancellationException
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Optimize a quadratic objective over exact open integer and real source coordinates.
@@ -163,21 +156,8 @@ fun OpenTheoryPipeline.minimize(
                                 maximumWork = null,
                                 cancellation = scope.polynomial,
                                 strategy = controls.strategy.copy(
-                                    backtrack = controls.strategy.backtrack.copy(
-                                        randomSeed = slot.seed,
-                                        maxDecisions = slot.nativeAllowance(controls.strategy.backtrack.maxDecisions),
-                                        nodeBudget = slot.nodeBudget,
-                                    ),
-                                    localSearch = controls.strategy.localSearch.copy(
-                                        randomSeed = slot.seed,
-                                        maxFlips = slot.heuristicAllowance(controls.strategy.localSearch.maxFlips),
-                                        maxInstructions = controls.strategy.localSearch.maxInstructions
-                                            ?.let(slot::heuristicAllowance),
-                                        nodeBudget = slot.nodeBudget,
-                                    ),
-                                ),
-                            ),
-                        )
+                                    backtrack = slot.backtrack(controls.strategy.backtrack),
+                                    localSearch = slot.localSearch(controls.strategy.localSearch))))
                         val selected = when (arm) {
                             0 -> FiniteEngine.BACKTRACK
                             1 -> FiniteEngine.LOCAL_SEARCH
@@ -241,16 +221,20 @@ internal class QuadraticIntegerOptimization(
     private var limit: AlgebraicReal? = null
     private var attained = false
     private val proofs = mutableListOf<SourceDerivation>()
-    private var interrupted = false
     private var neighborhoodPoint: QuadraticIncumbent? = null
     private var globalUnbounded: SourceDerivation? = null
     private var initialized = false
     private var traversal: QuadraticIntegerTraversalCursor? = null
     private var neighborhood: QuadraticNeighborhoodCursor? = null
-    private var neighborhoodPreparationInstructions = 0L
     private var operation: ExecutionControl = ExecutionControl.Never
-    private var terminal: QuadraticOptimizationResult? = null
-    private var publish: ((QuadraticIncumbent) -> Unit)? = null
+    private val runtime = QuadraticWorkerRuntime(native, sense, { stats }, ::partial) {
+        try { traversal?.close() } finally {
+            try { neighborhood?.close() } finally { sink.stop() }
+        }
+    }
+    private var terminal: QuadraticOptimizationResult?
+        get() = runtime.terminal
+        set(value) { runtime.terminal = value }
     var readIncumbent: () -> QuadraticIncumbent? = { null }
     var onAccepted: ((QuadraticIncumbent) -> Unit)? = null
     private val stats: SolveStats get() = neighborhood?.let { sink.snapshot().mergedWith(it.stats) } ?: sink.snapshot()
@@ -305,7 +289,7 @@ internal class QuadraticIntegerOptimization(
         initialized = true
     }
 
-    fun execute(): QuadraticOptimizationResult = try {
+    fun execute(): QuadraticOptimizationResult = runtime.execute {
         initialize()
         when (engine) {
             FiniteEngine.LOCAL_SEARCH -> {
@@ -322,16 +306,6 @@ internal class QuadraticIntegerOptimization(
 
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> complete()
         }
-    } catch (_: PolynomialInterrupted) {
-        partial()
-    } catch (stop: PolynomialResourceLimit) {
-        native.decline(stop.resource)
-        partial()
-    } catch (_: CancellationException) {
-        interrupted = true
-        partial()
-    } finally {
-        close()
     }
 
     fun worker(arm: Int, prepared: PreparedSourcePlan = plan): PortfolioWorker {
@@ -364,22 +338,8 @@ internal class QuadraticIntegerOptimization(
 
     private fun countedWork(): Long = native.work + minOf(sink.search.searchWork, Long.MAX_VALUE - native.work)
 
-    private fun completeHandle(): QuadraticPortfolioSearch = object : QuadraticPortfolioSearch, ReseedGuard {
-        override val canReseed: Boolean get() = false
-        override val completion: QuadraticOptimizationResult? get() = terminal
-        override val isDone: Boolean get() = terminal != null
-        override val stats: SolveStats get() = this@QuadraticIntegerOptimization.stats
-        override val work: Long get() = countedWork()
-        override fun runSlice(
-            global: ExecutionControl,
-            sliceMillis: Long,
-            sliceNodes: Long,
-            onIncumbent: (MinimizeResult.WithSample) -> Unit,
-        ): MinimizeResult? = run(onIncumbent) {
-            advanceComplete(global, sliceMillis, sliceNodes)
-        }
-        override fun close() = this@QuadraticIntegerOptimization.close()
-    }
+    private fun completeHandle(): QuadraticPortfolioSearch =
+        runtime.completeHandle(::countedWork, ::advanceComplete)
 
     private fun advanceComplete(global: ExecutionControl, millis: Long, work: Long) {
         operation = global
@@ -442,95 +402,14 @@ internal class QuadraticIntegerOptimization(
         }
     }
 
-    private fun neighborhoodHandle(adaptive: Boolean): QuadraticPortfolioSearch =
-        object : QuadraticPortfolioSearch, InstructionSlicedSearch, ReseedGuard {
-            override val canReseed: Boolean get() = false
-            override val completion: QuadraticOptimizationResult? get() = terminal
-            override val isDone: Boolean get() = terminal != null
-            override val stats: SolveStats get() = this@QuadraticIntegerOptimization.stats
-            override val work: Long get() = neighborhoodPreparationInstructions + minOf(
-                neighborhood?.work ?: 0L,
-                Long.MAX_VALUE - neighborhoodPreparationInstructions,
-            )
-            override val chargedInstructions: Long get() = work
-            override fun runSlice(
-                global: ExecutionControl,
-                sliceMillis: Long,
-                sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit,
-            ): MinimizeResult? = runInstructionSlice(global, sliceMillis, sliceNodes, onIncumbent)
-            override fun runInstructionSlice(
-                global: ExecutionControl,
-                sliceMillis: Long,
-                sliceInstructions: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit,
-            ): MinimizeResult? = run(onIncumbent) {
-                val cursor = neighborhood ?: kotlin.run {
-                    val before = native.work
-                    try {
-                        initialize()
-                        retainedNeighborhood(adaptive)
-                    } finally {
-                        neighborhoodPreparationInstructions += minOf(
-                            quadraticNativeInstructions((native.work - before).coerceAtLeast(0)),
-                            Long.MAX_VALUE - neighborhoodPreparationInstructions,
-                        )
-                    }
-                }
-                val stop = native.polynomial or controls.strategy.localSearch.cancellation or global
-                val segment = stop or if (sliceMillis == Long.MAX_VALUE) {
-                    ExecutionControl.Never
-                } else {
-                    ExecutionControl.after(sliceMillis.milliseconds)
-                }
-                val done = cursor.advance(
-                    segment,
-                    if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions,
-                    global,
-                )
-                if (done || stop()) terminal = partial()
-            }
-            override fun close() = this@QuadraticIntegerOptimization.close()
-        }
-
-    private fun run(onIncumbent: (MinimizeResult.WithSample) -> Unit, advance: () -> Unit): MinimizeResult? {
-        terminal?.let { return scalar(it) }
-        check(!closed) { "quadratic worker is closed" }
-        publish = { onIncumbent(quadraticScalar(it, sense, stats)) }
-        try {
-            advance()
-        } catch (_: PolynomialInterrupted) {
-            terminal = partial()
-        } catch (limited: PolynomialResourceLimit) {
-            native.decline(limited.resource)
-            terminal = partial()
-        } catch (_: CancellationException) {
-            interrupted = true
-            terminal = partial()
-        } finally {
-            publish = null
-        }
-        return terminal?.let(::scalar)
+    private fun neighborhoodHandle(adaptive: Boolean): QuadraticPortfolioSearch = runtime.neighborhoodHandle(
+        controls.strategy.localSearch.cancellation, { neighborhood },
+    ) {
+        initialize()
+        retainedNeighborhood(adaptive)
     }
 
-    private fun scalar(result: QuadraticOptimizationResult): MinimizeResult =
-        (result as? QuadraticOptimizationResult.WithIncumbent)?.let { quadraticScalar(it.incumbent, sense, stats) }
-            ?: MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
-
-    private var closed = false
-    override fun close() {
-        if (closed) return
-        closed = true
-        try {
-            traversal?.close()
-        } finally {
-            try {
-                neighborhood?.close()
-            } finally {
-                sink.stop()
-            }
-        }
-    }
+    override fun close() = runtime.close()
 
     private fun assumptions(): PolynomialCondition {
         fun pins(local: Boolean): PolynomialCondition {
@@ -861,7 +740,7 @@ internal class QuadraticIntegerOptimization(
             }
             incumbent = point
             onAccepted?.invoke(point)
-            publish?.invoke(point)
+            runtime.publish(point)
             val approximate = point.value.rational?.toDouble()
                 ?: (point.value.lowerBound.toDouble() / 2 + point.value.upperBound.toDouble() / 2)
             sink.ls.recordIncumbent(approximate, 0.0, sink.elapsedMs())
@@ -878,10 +757,8 @@ internal class QuadraticIntegerOptimization(
     private fun partial(): QuadraticOptimizationResult {
         val worker = if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             controls.strategy.localSearch.cancellation
-        } else {
-            controls.strategy.backtrack.cancellation
-        }
-        val reason = if (interrupted || worker()) TerminationReason.Cancelled else native.reason()
+        } else controls.strategy.backtrack.cancellation
+        val reason = if (runtime.interrupted || worker()) TerminationReason.Cancelled else native.reason()
         return incumbent?.let { QuadraticOptimizationResult.BestFound(it, rootBound, reason, sense, stats) }
             ?: QuadraticOptimizationResult.Unknown(rootBound, reason, sense, stats)
     }

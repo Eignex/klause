@@ -3,24 +3,21 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.newIntSelection
 
 internal fun Compiler.Builder.selectionTerm(condition: Int, whenTrue: Int, whenFalse: Int): IntComb {
     val index = litTo01(condition)
-    val result = newAuxVar(
+    val domain = IntDomain(
         minOf(domains[whenTrue].min, domains[whenFalse].min),
-        maxOf(domains[whenTrue].max, domains[whenFalse].max),
+        maxOf(domains[whenTrue].max, domains[whenFalse].max)
     )
-    factors.add(
-        Element(
+    val result = problemBuilder.newIntSelection(
             index,
-            result,
-            longArrayOf(whenFalse.toLong(), whenTrue.toLong()),
-            arrIsVars = true,
-            indexOffset = 0,
-        ),
+            longArrayOf(whenFalse.toLong(), whenTrue.toLong()), domain
     )
     definedVars.add(result)
     return IntComb.Narrow(LinComb(mapOf(result to 1L), 0L))
@@ -48,7 +45,7 @@ internal fun Compiler.Builder.elementConstantMatrix(
     column: Int,
     result: Int,
     rowOffset: Int,
-    columnOffset: Int,
+    columnOffset: Int
 ) {
     val cells = rows.sumOf { it.size.toLong() }
     require(cells <= Int.MAX_VALUE) { "element: matrix is too large" }
@@ -75,8 +72,8 @@ internal fun Compiler.Builder.elementConstantMatrix(
             longArrayOf(1, 1, -1),
             intArrayOf(start, column, index),
             LinearOp.EQ,
-            columnOffset.toLong(),
-        ),
+            columnOffset.toLong()
+        )
     )
     factors.add(
         Element(
@@ -84,7 +81,7 @@ internal fun Compiler.Builder.elementConstantMatrix(
             result,
             rows.flatMap { it.map(Int::toLong) }.toLongArray(),
             arrIsVars = false,
-            indexOffset = 0,
-        ),
+            indexOffset = 0
+        )
     )
 }

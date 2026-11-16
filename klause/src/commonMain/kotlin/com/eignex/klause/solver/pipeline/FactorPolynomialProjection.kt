@@ -1,12 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
@@ -17,8 +15,6 @@ import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.theory.TheoryEncoding
-import com.eignex.klause.theory.TheoryRealId
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
@@ -28,7 +24,7 @@ internal class FactorPolynomialProjection(
     val model: Problem,
     val formula: NonlinearIntegerProblem,
     val projections: PreparedFactorProjections,
-    attributions: List<EncodingAttribution>,
+    attributions: List<EncodingAttribution>
 ) {
     val attributions = attributions.toList()
 
@@ -36,11 +32,11 @@ internal class FactorPolynomialProjection(
         projections.requireSource(model)
         require(
             original.numIntVars == model.numIntVars && original.numRealVars == model.numRealVars &&
-                original.numBoolVars == model.numBoolVars,
+                original.numBoolVars == model.numBoolVars
         )
         require(
             original.numFactors == model.numFactors &&
-                model.factors.indices.all { original.factors[it] === model.factors[it] },
+                model.factors.indices.all { original.factors[it] === model.factors[it] }
         )
         require(this.attributions.map { it.sourceFactorIndex } == model.factors.indices.toList())
         require(formula.integerCoordinates == (0 until model.numIntVars).toList())
@@ -53,7 +49,7 @@ internal fun Problem.integerPolynomialProjection(
     original: Problem,
     projections: PreparedFactorProjections,
     cancellation: ExecutionControl,
-    onDecline: (EncoderDecline) -> Unit,
+    onDecline: (EncoderDecline) -> Unit
 ): FactorPolynomialProjection? {
     projections.requireSource(this)
     val stop = cancellation.encodingPreparationScope()
@@ -80,7 +76,7 @@ internal fun Problem.integerPolynomialProjection(
             factors.indices.toList(),
             fixedIntegers = fixedIntegers,
             cancellation = stop,
-            onDecline = onDecline,
+            onDecline = onDecline
         ) ?: return null
         val lowering = PolynomialRealLowering(numIntVars + numRealVars)
         val formulas = ArrayList<PolynomialRealFormula>()
@@ -90,66 +86,17 @@ internal fun Problem.integerPolynomialProjection(
         for ((position, index) in request.indices.withIndex()) {
             checkpoint()
             val factor = factors[index]
-            val emitted = ArrayList<PolynomialRealFormula>()
-            val integerMapping = LinkedHashMap<SourceIntId, TheoryRealId>()
-            val realMapping = LinkedHashMap<SourceRealId, TheoryRealId>()
-            val auxiliaries = ArrayList<TheoryRealId>()
-            val encoding = object : TheoryEncoding {
-                override val target = EncodingTarget.POLYNOMIAL
-                override val sourceFactorIndex = index
-                override val cancellation = request.cancellation
-                override fun fixedInteger(id: SourceIntId): BigInt? = request.fixedIntegers[id]
-                override fun fixedBoolean(id: SourceBoolId): Boolean? = request.fixedBooleans[id]
-                override fun linear(form: LinearForm): Unit = error("polynomial target requires a formula")
-                private fun coordinates() =
-                    (integerMapping.values + realMapping.values + auxiliaries).map { it.index }.toSet()
-                override fun polynomial(formula: PolynomialRealFormula) {
-                    validatePolynomialEncodingCoordinates(
-                        formula,
-                        null,
-                        coordinates(),
-                        factor.boolVars.toSet(),
-                        cancellation,
-                    )
-                    emitted += formula
-                }
-                override fun integer(id: SourceIntId): PolynomialExpression {
-                    require(id.index in factor.intVars)
-                    integerMapping[id] = TheoryRealId(id.index)
-                    return integer(id.index)
-                }
-                override fun real(id: SourceRealId): PolynomialExpression {
-                    require(id.index in factor.variables.reals)
-                    realMapping[id] = TheoryRealId(numIntVars + id.index)
-                    return real(id.index)
-                }
-                override fun conditional(
-                    condition: PolynomialRealFormula,
-                    whenTrue: PolynomialExpression,
-                    whenFalse: PolynomialExpression,
-                ): PolynomialExpression {
-                    val coordinates = coordinates()
-                    val booleans = factor.boolVars.toSet()
-                    validatePolynomialEncodingCoordinates(condition, null, coordinates, booleans, cancellation)
-                    validatePolynomialEncodingCoordinates(null, whenTrue, coordinates, booleans, cancellation)
-                    validatePolynomialEncodingCoordinates(null, whenFalse, coordinates, booleans, cancellation)
-                    val before = lowering.realCount
-                    return lowering.conditional(condition, whenTrue, whenFalse).also {
-                        for (id in before until lowering.realCount) auxiliaries += TheoryRealId(id)
-                    }
-                }
-            }
+            val encoding = PolynomialEncodingContext(index, factor, lowering, request.cancellation,
+                integerCoordinate = { it }, realCoordinate = {numIntVars + it
+                },
+                fixedIntegers = request.fixedIntegers, fixedBooleans = request.fixedBooleans)
             val decline = request.encoders[position].install(factor, encoding)
-            if (decline != null || emitted.isEmpty()) {
+            if (decline != null || encoding.formulas.isEmpty()) {
                 onDecline(decline ?: EncoderDecline.UNSUPPORTED)
                 return null
             }
-            formulas += emitted
-            attributions += EncodingAttribution(
-                index, factor.boolVars.map(::SourceBoolId),
-                factor.intVars.map(::SourceIntId), factor.variables.reals.map(::SourceRealId),
-                integerMapping, realMapping, auxiliaries,
-                request.fixedIntegers, request.fixedBooleans,
+            formulas += encoding.formulas
+            attributions += encoding.attribution(
             )
         }
         fun bound(expression: PolynomialExpression, relation: PolynomialRelation, value: Long) {
@@ -157,7 +104,7 @@ internal fun Problem.integerPolynomialProjection(
             formulas += PolynomialRealFormula.Atom(
                 expression,
                 relation,
-                PolynomialRealLowering.constant(BigFraction.ofLong(value)),
+                PolynomialRealLowering.constant(BigFraction.ofLong(value))
             )
         }
         for (id in 0 until numIntVars) {
@@ -175,7 +122,7 @@ internal fun Problem.integerPolynomialProjection(
                     alternatives += PolynomialRealFormula.Atom(
                         value,
                         PolynomialRelation.EQ,
-                        PolynomialRealLowering.constant(BigFraction.ofLong(it)),
+                        PolynomialRealLowering.constant(BigFraction.ofLong(it))
                     )
                 }
                 formulas += PolynomialRealFormula.Or(alternatives)
@@ -187,7 +134,7 @@ internal fun Problem.integerPolynomialProjection(
             checkpoint()
             for ((endpoint, relation) in listOf(
                 realLower[id] to PolynomialRelation.GE,
-                realUpper[id] to PolynomialRelation.LE,
+                realUpper[id] to PolynomialRelation.LE
             )) {
                 if (endpoint.isNaN()) {
                     onDecline(EncoderDecline.UNSUPPORTED)
@@ -201,7 +148,7 @@ internal fun Problem.integerPolynomialProjection(
                     formulas += PolynomialRealFormula.Atom(
                         real(id),
                         relation,
-                        PolynomialRealLowering.constant(requireNotNull(BigFraction.ofDouble(endpoint))),
+                        PolynomialRealLowering.constant(requireNotNull(BigFraction.ofDouble(endpoint)))
                     )
                 }
             }
@@ -227,7 +174,7 @@ internal fun Problem.integerPolynomialProjection(
             integers,
             reals,
             booleans,
-            original.semantics,
+            original.semantics
         )
         checkpoint()
         return FactorPolynomialProjection(original, this, native, projections, attributions)
@@ -248,13 +195,13 @@ internal fun FactorPolynomialProjection.prepareExecutionPlan(): PreparedSourcePl
             (0 until model.numIntVars).toList(),
             (model.numIntVars until formula.numericCount).toList(),
             (0 until model.numBoolVars).toList(),
-            nonlinearIntegerExecutionContract(),
-        ),
+            nonlinearIntegerExecutionContract()
+        )
     ),
     model.numBoolVars,
     model.numIntVars,
     model.numRealVars,
     integerCoordinates = formula.integerCoordinates,
     realCoordinates = formula.realCoordinates,
-    factorProjections = projections,
+    factorProjections = projections
 )

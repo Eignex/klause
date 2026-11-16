@@ -673,14 +673,11 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     val pruned: CountStat = CountStat()
     val infeasible: CountStat = CountStat()
     val fixed: CountStat = CountStat()
-    val pivots: CountStat = CountStat()
     val luMaxFill: MaxStat = MaxStat()
     val luMaxDensity: MaxStat = MaxStat()
     val luMaxDim: MaxStat = MaxStat()
     val cuts: CountStat = CountStat()
     val backjumps: CountStat = CountStat()
-    val seeded: CountStat = CountStat()
-    val refactorizations: CountStat = CountStat()
     val componentSplits: CountStat = CountStat()
     val componentBlocks: MaxStat = MaxStat()
     val certified: CountStat = CountStat()
@@ -692,55 +689,26 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     val farkasExactBasis: CountStat = CountStat()
     val farkasRounded: CountStat = CountStat()
     val farkasNone: CountStat = CountStat()
-    val singularRefactorizations: CountStat = CountStat()
-    val smallPivotBails: CountStat = CountStat()
 
     private var nodePasses = 0L
-    private var standalonePasses = 0L
-    private var componentPasses = 0L
-    private var rootPasses = 0L
-    private var standalonePivots = 0L
-    private var standaloneWorkOps = 0L
-    private var standaloneComponentWork = 0L
+    // Standalone component work also spends its caller's allowance.
+    private val standaloneComponents = LpRouteSolveStatsSink()
 
-    internal val standaloneWork: Long get() = standaloneWorkOps + standaloneComponentWork
-    private var componentPivots = 0L
-    private var componentWorkOps = 0L
-    private var rootPivots = 0L
-    private var rootWorkOps = 0L
-    private var warmStartAttempts = 0L
-    private var warmStartHits = 0L
-    private var initialRefactorizations = 0L
-    private var warmStartRefactorizations = 0L
-    private var singularRecoveryRefactorizations = 0L
-    private var updateLimitRefactorizations = 0L
-    private var backendRequestedRefactorizations = 0L
-    private var reconcileRecoveryRefactorizations = 0L
-    private var numericalRecoveryRefactorizations = 0L
-    private var primalRefactorizations = 0L
+    internal val standaloneWork: Long get() = routeMetrics[LpRoute.STANDALONE.ordinal].work + standaloneComponents.work
     private var cutCandidates = 0L
     private var cutSelected = 0L
     private val cutActive = MaxStat()
     private var rootReducedCostFixes = 0L
-    private val certifierAttempts = LongArray(LpCertifier.entries.size)
-    private val certifierSuccesses = LongArray(LpCertifier.entries.size)
-    private val certifierDeclines = LongArray(LpCertifier.entries.size)
-    private val certifierRouteAttempts = Array(LpRoute.entries.size) { LongArray(LpCertifier.entries.size) }
-    private val certifierRouteSuccesses = Array(LpRoute.entries.size) { LongArray(LpCertifier.entries.size) }
-    private val certifierRouteDeclines = Array(LpRoute.entries.size) { LongArray(LpCertifier.entries.size) }
+    private val certifiers = Array(LpCertifier.entries.size) { LpCertifierStatsSink() }
     private var exactInputAttempts = 0L
     private var exactInputRejections = 0L
-    private val routeMetrics = Array(LpRoute.entries.size) { LpRouteSolveStatsSink() }
+    private val routeMetrics = Array(LpRoute.entries.size) { LpRouteSolveStatsSink(node = it == LpRoute.NODE.ordinal) }
 
     private var rootBound: Double = Double.NaN
     private var rootMatrixMinValue: Double = Double.NaN
     private var rootMatrixMaxValue: Double = Double.NaN
     private var rootRowRatio: Double = Double.NaN
     private var ms: Long = 0L
-
-    // A running total, not a [CountStat]: that counts observations and ignores their magnitude, which is
-    // how the other counters record units (a unit update repeated). Work is a magnitude per solve.
-    private var workOpsTotal: Long = 0L
     private var overheadOpsTotal: Long = 0L
     private var workAllowanceSpent = false
     private var demoted = false
@@ -759,6 +727,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     /** Route-specific engine cost. The pivot, work, warm-start and refactor totals are node-only,
      * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics, finished: Boolean = true) {
+        recordEngineCost (route, metrics, finished)
+    }
+
+    private fun recordEngineCost(
+        route: LpRoute, metrics: LpSolveMetrics, finished: Boolean, standaloneComponent: Boolean = false,
+    ) {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
         cutLifecycle.shared(
             "SOLVE",
@@ -811,28 +785,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                 ),
             )
         }
-        if (effectiveRoute != LpRoute.NODE) routeMetrics[effectiveRoute.ordinal].observe(metrics, finished)
-        when (effectiveRoute) {
-            LpRoute.NODE -> observeMetrics(metrics)
-
-            LpRoute.STANDALONE -> {
-                if (finished) standalonePasses++
-                standalonePivots += metrics.pivots
-                standaloneWorkOps += metrics.workOps
-            }
-
-            LpRoute.COMPONENT -> {
-                if (finished) componentPasses++
-                componentPivots += metrics.pivots
-                componentWorkOps += metrics.workOps
-            }
-
-            LpRoute.ROOT -> {
-                if (finished) rootPasses++
-                rootPivots += metrics.pivots
-                rootWorkOps += metrics.workOps
-            }
-        }
+        val owner =
+        if (standaloneComponent) standaloneComponents else routeMetrics[effectiveRoute.ordinal]
+        owner.observe(metrics, finished)
     }
 
     private var basisVerification = LpBasisVerificationStats()
@@ -868,12 +823,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                             outcomes = mapOf((if (success) "CERTIFIED" else "DECLINED") to 1L),
                         ),
                     )
-                    val i = certifier.ordinal
-                    certifierAttempts[i]++
-                    if (success) certifierSuccesses[i]++ else certifierDeclines[i]++
-                    val routeIndex = route.ordinal
-                    certifierRouteAttempts[routeIndex][i]++
-                    if (success) certifierRouteSuccesses[routeIndex][i]++ else certifierRouteDeclines[routeIndex][i]++
+                    certifiers[ certifier.ordinal].observe (route,success)
                 }
                 override fun observeContinuation(metrics: ExactContinuationMetrics) {
                     continuation = continuation.mergedWith(metrics.toStats())
@@ -937,8 +887,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     private fun observeCertifiedSolve(route: LpRoute, metrics: LpSolveMetrics, component: Boolean, finished: Boolean) {
-        if (component && route == LpRoute.STANDALONE) standaloneComponentWork += metrics.workOps
-        observeEngineCost(if (component) LpRoute.COMPONENT else route, metrics, finished)
+        recordEngineCost(if (component) LpRoute.COMPONENT else route, metrics, finished,
+            standaloneComponent = component && route == LpRoute.STANDALONE)
     }
 
     /** The local bridge passed into engine exact checks. */
@@ -965,34 +915,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (probeRoute == LpRoute.NODE) rootReducedCostFixes += count.coerceAtLeast(0)
     }
 
-    private fun observeMetrics(metrics: LpSolveMetrics) {
-        observePivots(metrics.pivots)
-        observeWork(metrics.workOps)
-        repeat(metrics.warmHits) { seeded.update(1.0) }
-        warmStartAttempts += metrics.warmAttempts
-        warmStartHits += metrics.warmHits
-        repeat(
-            metrics.initialRefactorizations + metrics.warmStartRefactorizations +
-                metrics.singularRecoveryRefactorizations +
-                metrics.updateLimitRefactorizations + metrics.backendRequestedRefactorizations +
-                metrics.reconcileRecoveryRefactorizations + metrics.numericalRecoveryRefactorizations +
-                metrics.primalRefactorizations,
-        ) { refactorizations.update(1.0) }
-        initialRefactorizations += metrics.initialRefactorizations
-        warmStartRefactorizations += metrics.warmStartRefactorizations
-        singularRecoveryRefactorizations += metrics.singularRecoveryRefactorizations
-        updateLimitRefactorizations += metrics.updateLimitRefactorizations
-        backendRequestedRefactorizations += metrics.backendRequestedRefactorizations
-        reconcileRecoveryRefactorizations += metrics.reconcileRecoveryRefactorizations
-        numericalRecoveryRefactorizations += metrics.numericalRecoveryRefactorizations
-        primalRefactorizations += metrics.primalRefactorizations
-        observeNumericalTrouble(metrics.singularRefactorizations, metrics.smallPivotBails)
-    }
-
     /** A node whose subtree was cut by the LP-relaxation bound because its bound dominated the
-     *  incumbent (or an LP-derived deduction emptied a domain). */
-    fun observePrune() {
-        if (probeRoute == LpRoute.NODE) pruned.update(1.0)
+     *  incumbent (or an LP-derived deduction emptied a domain). */ fun observePrune() {
+        if(probeRoute == LpRoute.NODE) pruned.update(1.0)
     }
 
     /** A node pruned because the LP relaxation was infeasible — counted in both [pruned] (the total)
@@ -1024,11 +949,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (probeRoute == LpRoute.NODE) fixed.update(1.0)
     }
 
-    /** Record [count] simplex pivots from one node LP solve. */
-    fun observePivots(count: Int) {
-        repeat(count) { pivots.update(1.0) }
-    }
-
     /** Record that LP work spent its cumulative allowance. */
     fun observeWorkAllowanceSpent() {
         workAllowanceSpent = true
@@ -1042,7 +962,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     /** Record one node LP solve's deterministic work. Accumulated in a single update: the figure runs
      *  to millions of operations, so a per-unit loop would cost more than the solve it measures. */
     fun observeWork(ops: Long) {
-        if (ops > 0L) workOpsTotal += ops
+        routeMetrics[LpRoute.NODE.ordinal].observeWork (ops)
     }
 
     /** Record node-LP work the simplex does not meter; see [LpStats.overheadOps]. */
@@ -1068,23 +988,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     /** A non-chronological backjump driven by an LP infeasibility certificate. */
     fun observeBackjump() {
         backjumps.update(1.0)
-    }
-
-    /** A node LP solve that started from a prior basis instead of the slack cold start. */
-    fun observeSeeded() {
-        seeded.update(1.0)
-    }
-
-    /**
-     * Record the numerical trouble one node LP solve met: [singular] factorizations and [smallPivot]
-     * pivots abandoned as too small.
-     *
-     * Read off the engine's metrics rather than its result: a solve lost to either has no result, and
-     * those are precisely the solves worth counting here.
-     */
-    fun observeNumericalTrouble(singular: Int, smallPivot: Int) {
-        repeat(singular) { singularRefactorizations.update(1.0) }
-        repeat(smallPivot) { smallPivotBails.update(1.0) }
     }
 
     /** Record the root-node (decision level 0) relaxation's coefficient spread; first write at the root
@@ -1135,30 +1038,38 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         componentBlocks.update(blocks.toDouble())
     }
 
-    fun snapshot(): LpStats = LpStats(
+    fun snapshot(): LpStats {
+        val node = routeMetrics[LpRoute.NODE.ordinal].snapshot()
+        val standalone = routeMetrics[LpRoute.STANDALONE.ordinal].snapshot()
+        val component = routeMetrics[LpRoute.COMPONENT.ordinal].snapshot(standaloneComponents)
+        val root = routeMetrics[LpRoute.ROOT.ordinal].snapshot()
+        return snapshot(node, standalone, component, root)
+    }
+
+    private fun snapshot(
+        node: LpRouteSolveStats, standalone: LpRouteSolveStats, component: LpRouteSolveStats, root: LpRouteSolveStats,
+    ): LpStats = LpStats(
         phases = phaseSnapshot(),
         sparseTrial = sparseTrial,
         nodePasses = SumResult(nodePasses.toDouble()),
-        standalonePasses = SumResult(standalonePasses.toDouble()),
-        componentPasses = SumResult(componentPasses.toDouble()),
-        rootPasses = SumResult(rootPasses.toDouble()),
-        standalonePivots = SumResult(standalonePivots.toDouble()),
-        standaloneWorkOps = SumResult(standaloneWorkOps.toDouble()),
-        componentPivots = SumResult(componentPivots.toDouble()),
-        componentWorkOps = SumResult(componentWorkOps.toDouble()),
-        rootPivots = SumResult(rootPivots.toDouble()),
-        rootWorkOps = SumResult(rootWorkOps.toDouble()),
-        standaloneRoute = routeMetrics[LpRoute.STANDALONE.ordinal].snapshot(),
-        componentRoute = routeMetrics[LpRoute.COMPONENT.ordinal].snapshot(),
-        rootRoute = routeMetrics[LpRoute.ROOT.ordinal].snapshot(),
+        standalonePasses = standalone.passes,
+        componentPasses = component.passes,
+        rootPasses = root.passes,standalonePivots = standalone.pivots,standaloneWorkOps = standalone.workOps,
+        componentPivots = component.pivots,
+        componentWorkOps = component.workOps,
+        rootPivots = root.pivots,
+        rootWorkOps = root.workOps,
+        standaloneRoute = standalone,
+        componentRoute = component,
+        rootRoute = root,
         solves = solves.read(),
         pruned = pruned.read(),
         infeasible = infeasible.read(),
         rootBound = rootBound,
         ms = ms,
         fixed = fixed.read(),
-        pivots = pivots.read(),
-        workOps = SumResult(workOpsTotal.toDouble()),
+        pivots = node.pivots,
+        workOps = node.workOps,
         overheadOps = SumResult(overheadOpsTotal.toDouble()),
         workAllowanceSpent = workAllowanceSpent,
         demoted = demoted,
@@ -1171,22 +1082,22 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         cutActive = cutActive.read(),
         rootReducedCostFixes = SumResult(rootReducedCostFixes.toDouble()),
         backjumps = backjumps.read(),
-        seeded = seeded.read(),
-        refactorizations = refactorizations.read(),
-        warmStartAttempts = SumResult(warmStartAttempts.toDouble()),
-        warmStartHits = SumResult(warmStartHits.toDouble()),
-        initialRefactorizations = SumResult(initialRefactorizations.toDouble()),
-        warmStartRefactorizations = SumResult(warmStartRefactorizations.toDouble()),
-        singularRecoveryRefactorizations = SumResult(singularRecoveryRefactorizations.toDouble()),
-        updateLimitRefactorizations = SumResult(updateLimitRefactorizations.toDouble()),
-        backendRequestedRefactorizations = SumResult(backendRequestedRefactorizations.toDouble()),
-        reconcileRecoveryRefactorizations = SumResult(reconcileRecoveryRefactorizations.toDouble()),
-        numericalRecoveryRefactorizations = SumResult(numericalRecoveryRefactorizations.toDouble()),
-        primalRefactorizations = SumResult(primalRefactorizations.toDouble()),
+        seeded = node.warmStartHits,
+        refactorizations = SumResult(routeMetrics[LpRoute.NODE.ordinal]. refactorizations.toDouble()),
+        warmStartAttempts = node.warmStartAttempts,
+        warmStartHits = node.warmStartHits,
+        initialRefactorizations = node.initialRefactorizations,
+        warmStartRefactorizations = node.warmStartRefactorizations,
+        singularRecoveryRefactorizations = node.singularRecoveryRefactorizations,
+        updateLimitRefactorizations = node.updateLimitRefactorizations,
+        backendRequestedRefactorizations = node.backendRequestedRefactorizations,
+        reconcileRecoveryRefactorizations = node.reconcileRecoveryRefactorizations,
+        numericalRecoveryRefactorizations = node.numericalRecoveryRefactorizations,
+        primalRefactorizations = node.primalRefactorizations,
         componentSplits = componentSplits.read(),
         componentBlocks = componentBlocks.read(),
-        singularRefactorizations = singularRefactorizations.read(),
-        smallPivotBails = smallPivotBails.read(),
+        singularRefactorizations = node.singularRefactorizations,
+        smallPivotBails = node.smallPivotBails,
         rootMatrixMinValue = rootMatrixMinValue,
         rootMatrixMaxValue = rootMatrixMaxValue,
         rootRowRatio = rootRowRatio,
@@ -1211,30 +1122,16 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         exactInputRejections = SumResult(exactInputRejections.toDouble()),
     )
 
-    private fun certifierStats(certifier: LpCertifier): LpCertifierStats {
-        val i = certifier.ordinal
-        return LpCertifierStats(
-            SumResult(certifierAttempts[i].toDouble()),
-            SumResult(certifierSuccesses[i].toDouble()),
-            SumResult(certifierDeclines[i].toDouble()),
-            certifierRouteStats(LpRoute.NODE, i),
-            certifierRouteStats(LpRoute.STANDALONE, i),
-            certifierRouteStats(LpRoute.COMPONENT, i),
-            certifierRouteStats(LpRoute.ROOT, i),
+    private fun certifierStats(certifier: LpCertifier): LpCertifierStats = certifiers[ certifier.ordinal].snapshot(
         )
     }
 
-    private fun certifierRouteStats(route: LpRoute, certifier: Int) = LpCertifierRouteStats(
-        SumResult(certifierRouteAttempts[route.ordinal][certifier].toDouble()),
-        SumResult(certifierRouteSuccesses[route.ordinal][certifier].toDouble()),
-        SumResult(certifierRouteDeclines[route.ordinal][certifier].toDouble()),
-    )
-}
-
-private class LpRouteSolveStatsSink {
+    private class LpRouteSolveStatsSink(private val node: Boolean = false
+    ) {
     private var passes = 0L
     private var pivots = 0L
     private var workOps = 0L
+    val work: Long get() = workOps
     private var warmAttempts = 0L
     private var warmHits = 0L
     private var singularRefactorizations = 0L
@@ -1248,9 +1145,10 @@ private class LpRouteSolveStatsSink {
     private var numericalRecoveryRefactorizations = 0L
     private var primalRefactorizations = 0L
 
-    fun observe(value: LpSolveMetrics, finished: Boolean = true) {
+    fun observe(value: LpSolveMetrics, finished: Boolean) {
         if (finished) passes++
         pivots += value.pivots
+        if (node) observeWork(value.workOps) else
         workOps += value.workOps
         warmAttempts += value.warmAttempts
         warmHits += value.warmHits
@@ -1266,21 +1164,72 @@ private class LpRouteSolveStatsSink {
         primalRefactorizations += value.primalRefactorizations
     }
 
-    fun snapshot() = LpRouteSolveStats(
-        passes = SumResult(passes.toDouble()),
-        pivots = SumResult(pivots.toDouble()),
-        workOps = SumResult(workOps.toDouble()),
-        warmStartAttempts = SumResult(warmAttempts.toDouble()),
-        warmStartHits = SumResult(warmHits.toDouble()),
-        initialRefactorizations = SumResult(initialRefactorizations.toDouble()),
-        warmStartRefactorizations = SumResult(warmStartRefactorizations.toDouble()),
-        singularRecoveryRefactorizations = SumResult(singularRecoveryRefactorizations.toDouble()),
-        updateLimitRefactorizations = SumResult(updateLimitRefactorizations.toDouble()),
-        backendRequestedRefactorizations = SumResult(backendRequestedRefactorizations.toDouble()),
-        reconcileRecoveryRefactorizations = SumResult(reconcileRecoveryRefactorizations.toDouble()),
-        numericalRecoveryRefactorizations = SumResult(numericalRecoveryRefactorizations.toDouble()),
-        primalRefactorizations = SumResult(primalRefactorizations.toDouble()),
-        singularRefactorizations = SumResult(singularRefactorizations.toDouble()),
-        smallPivotBails = SumResult(smallPivotBails.toDouble()),
+    fun observeWork(ops: Long) {
+        if(ops > 0L) workOps += ops
+    }
+
+    val refactorizations: Long
+        get() = initialRefactorizations + warmStartRefactorizations + singularRecoveryRefactorizations +
+            updateLimitRefactorizations + backendRequestedRefactorizations + reconcileRecoveryRefactorizations +
+            numericalRecoveryRefactorizations + primalRefactorizations
+
+    fun snapshot(other: LpRouteSolveStatsSink? = null) = LpRouteSolveStats(
+        passes = SumResult((passes + (other?.passes ?: 0L)).toDouble()),
+        pivots = SumResult((pivots + (other?.pivots ?: 0L)).toDouble()),
+        workOps = SumResult((workOps + (other?.workOps ?: 0L)).toDouble()),
+        warmStartAttempts = SumResult((warmAttempts + (other?.warmAttempts ?: 0L)).toDouble()),
+        warmStartHits = SumResult((warmHits + (other?.warmHits ?: 0L)).toDouble()),
+        initialRefactorizations = SumResult(
+            (initialRefactorizations + (other?.initialRefactorizations ?: 0L)).toDouble(),),
+        warmStartRefactorizations = SumResult(
+            (warmStartRefactorizations + (other?.warmStartRefactorizations ?: 0L)).toDouble(),),
+        singularRecoveryRefactorizations = SumResult(
+            (singularRecoveryRefactorizations + (other?.singularRecoveryRefactorizations ?: 0L)).toDouble(),),
+        updateLimitRefactorizations = SumResult(
+            (updateLimitRefactorizations + (other?.updateLimitRefactorizations ?: 0L)).toDouble(),),
+        backendRequestedRefactorizations = SumResult(
+            (backendRequestedRefactorizations + (other?.backendRequestedRefactorizations ?: 0L)).toDouble(),),
+        reconcileRecoveryRefactorizations = SumResult(
+            (reconcileRecoveryRefactorizations + (other?.reconcileRecoveryRefactorizations ?: 0L)).toDouble(),),
+        numericalRecoveryRefactorizations = SumResult(
+            (numericalRecoveryRefactorizations + (other?.numericalRecoveryRefactorizations ?: 0L)).toDouble(),),
+        primalRefactorizations = SumResult((primalRefactorizations + (other?.primalRefactorizations ?: 0L)).toDouble()),
+        singularRefactorizations = SumResult(
+            (singularRefactorizations + (other?.singularRefactorizations ?: 0L)).toDouble(),),
+        smallPivotBails = SumResult((smallPivotBails + (other?.smallPivotBails ?: 0L)).toDouble()),
     )
+}
+
+private class LpCertifierStatsSink {
+    private val successes = LongArray(LpRoute.entries.size)
+    private val declines = LongArray(LpRoute.entries.size)
+
+    fun observe(route: LpRoute, success: Boolean) {
+        if (success) successes[route.ordinal]++ else declines[route.ordinal]++
+    }
+
+    fun snapshot(): LpCertifierStats {
+        val successCount = successes.sum()
+        val declineCount = declines.sum()
+        return LpCertifierStats(
+            attempts = SumResult((successCount + declineCount).toDouble()),
+            successes = SumResult(successCount.toDouble(
+    )),
+            declines = SumResult(declineCount.toDouble()),
+            node = snapshot(LpRoute.NODE),
+            standalone = snapshot(LpRoute.STANDALONE),
+            component = snapshot(LpRoute.COMPONENT),
+            root = snapshot(LpRoute.ROOT),
+    )
+}
+
+    private fun snapshot(route: LpRoute): LpCertifierRouteStats {
+        val successCount = successes[route.ordinal]
+        val declineCount = declines[route.ordinal]
+        return LpCertifierRouteStats(
+            SumResult((successCount + declineCount).toDouble()),
+            SumResult(successCount.toDouble()),
+            SumResult(declineCount.toDouble()),
+        )
+    }
 }

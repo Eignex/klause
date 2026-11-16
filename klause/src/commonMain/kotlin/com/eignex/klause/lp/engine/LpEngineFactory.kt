@@ -65,13 +65,24 @@ internal interface LpEngineFactory {
     ): PersistentLpSolver
 }
 
-internal object ProductionLpEngineFactory : LpEngineFactory {
+internal object ProductionLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions())
+
+/** Explicit rollback factory for callers comparing or recovering with the unscaled float view. */
+internal object UnscaledLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions(enabled = false))
+
+private class ScalingLpEngineFactory(private val scalingOptions: LpScalingOptions) : LpEngineFactory {
     override fun newGeneralSolver(
         model: LpModel,
         cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
-    ): LpSolver = RevisedSimplex(model, cancellation, workLimit = workLimit, pricing = pricing)
+    ): LpSolver = RevisedSimplex(
+        model,
+        cancellation,
+        workLimit = workLimit,
+        pricing = pricing,
+        scalingOptions = scalingOptions,
+    )
 
     override fun newComponentSolver(
         model: LpModel,
@@ -101,6 +112,7 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
         workLimit = workLimit,
         trackDegeneracy = trackDegeneracy,
         pricing = pricing,
+        scalingOptions = scalingOptions,
     )
 
     override fun newPersistentSolver(
@@ -119,6 +131,7 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
         workLimit = workLimit,
         trackDegeneracy = trackDegeneracy,
         pricing = pricing,
+        scalingOptions = scalingOptions,
     )
 }
 

@@ -5,7 +5,6 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.real.ExactRealArithmetic
-import com.eignex.klause.arithmetic.real.exactRealValue
 import com.eignex.klause.arithmetic.real.toExactRealValue
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted

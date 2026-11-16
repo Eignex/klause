@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
 class MpsLpAdmissionTest {
     @Test
     fun `root inspection retains an emitted row with appended constructor defaults`() {
-        val problem = Problem(
+        val problem = Problem.of(
             0,
             1,
             arrayOf(IntDomain(0, 2)),
@@ -45,7 +45,7 @@ class MpsLpAdmissionTest {
     @ParameterizedTest
     @EnumSource(value = EngineMix::class, names = ["MIXED", "BACKTRACK"])
     fun `recipe inspection accepts the current portfolio fact API`(mix: EngineMix) {
-        val problem = Problem(
+        val problem = Problem.of(
             0,
             1,
             arrayOf(IntDomain(0, 2)),
@@ -61,7 +61,7 @@ class MpsLpAdmissionTest {
     @Test
     fun `prepared source objective should retain its coefficients and minimization direction`() {
         val working = LinearObjective(intCoefficients = longArrayOf(7))
-        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
+        val model = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
         val initial = model.prepareExecutionPlan(working, preferFinite = true)
         val bind = initial.javaClass.methods.single { it.name.startsWith("withLinearSource") }
         for ((sense, expected) in listOf(ObjectiveSense.MINIMIZE to 7L, ObjectiveSense.MAXIMIZE to -7L)) {
