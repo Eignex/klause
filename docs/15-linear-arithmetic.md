@@ -325,9 +325,10 @@ follows the [LP certification](17-linear-programming.md#lp-certification) resour
 [ExactLinearFragment](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/ExactLinearFragment.kt)
 defines linear factor admission.
 [ExactLiraSearchComponent](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/QfLiraSolver.kt)
-implements integer and mixed checks, the branch order and the reduction cache,
-building on the echelon/Hermite and double-bounded split helpers in `lp` and
-`simplex.exact`.
+implements integer and mixed checks and the branch order.
+[ExactLiraReduction](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/ExactLiraReduction.kt)
+owns the reduction cache and bounded search, using the echelon/Hermite and
+double-bounded split helpers in `lp` and `simplex.exact`.
 [OpenTheoryMinimizer](../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/OpenTheoryMinimize.kt)
 implements the integral descent. The pipeline names the integer-containing route
 `EXACT_LIRA`.
