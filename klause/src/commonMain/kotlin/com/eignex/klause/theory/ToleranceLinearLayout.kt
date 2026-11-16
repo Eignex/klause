@@ -41,14 +41,14 @@ import com.eignex.util.numbers.toLongExact
 // relation. Each such region lies inside the one the point check accepts, so an exact witness of [model] is a point
 // within tolerance, and a refutation shows that no point holds every relation within that slack.
 //
-// A component that holds exactly keeps its exact encodings and declarations, and so does a component with a real
-// product without finite choices or a power above one, which no linear model states once the discrete coordinates
-// are fixed.
+// A component that holds exactly keeps its exact encodings and declarations. A source with a real product without
+// finite choices or a power above one, which no linear model states once the discrete coordinates are fixed, or with
+// a kept relation no linear encoder enforces, is not [searchable].
 internal class ToleranceLinearLayout(private val problem: Problem, policy: SourceTolerance) {
     private val scope = RealToleranceScope.of(problem)
     private val relaxed = ArrayList<Int>()
     private val kept = ArrayList<Int>()
-    private val linearRoots = BooleanArray(problem.numRealVars) { true }
+    private val linear = problem.factors.all { it.variables.reals.isEmpty() || it.statesLinearly() }
     private val fixedForms = HashMap<Int, List<LinearForm>>()
     private val declarations = ArrayList<ExactSearchRow>()
     private val lower = DoubleArray(problem.numRealVars) { problem.realLower[it] }
@@ -56,11 +56,6 @@ internal class ToleranceLinearLayout(private val problem: Problem, policy: Sourc
     private val rows = ToleranceRows(problem.numRealVars, policy)
 
     init {
-        for (factor in problem.factors) {
-            if (factor.variables.reals.isNotEmpty() && !factor.statesLinearly()) {
-                linearRoots[scope.component(factor.variables.reals[0])] = false
-            }
-        }
         for ((index, factor) in problem.factors.withIndex()) {
             if (factor.variables.reals.isEmpty()) continue
             if (factor is Distinct || !relaxes(factor.variables.reals[0])) kept += index else {
@@ -81,7 +76,14 @@ internal class ToleranceLinearLayout(private val problem: Problem, policy: Sourc
         }
     }
 
-    private fun relaxes(id: Int): Boolean = !scope.isExact(id) && linearRoots[scope.component(id)]
+    private fun relaxes(id: Int): Boolean = !scope.isExact(id)
+
+    // Whether [model] states every relation: each relaxed one linearly, and each kept one through an encoder that
+    // enforces it.
+    fun searchable(encoders: PreparedFactorProjections): Boolean = linear && kept.all { index ->
+        val encoder = encoders.encoder(index, EncodingTarget.LINEAR)
+        encoder.enforcesSource || encoder.support == EncoderSupport.CONDITIONED
+    }
 
     // The completion model at [sample]'s discrete coordinates. Null when an encoder declines or [cancellation]
     // stops the encoding.

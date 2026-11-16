@@ -38,6 +38,11 @@ internal sealed interface ToleranceSearchResult {
     class Witness(val reals: List<BigFraction>, override val work: Long) : ToleranceSearchResult
     class Refuted(override val work: Long) : ToleranceSearchResult
     class Undecided(override val work: Long) : ToleranceSearchResult
+
+    // The source has a relation the search cannot state, so the caller keeps the verdict it reached without it.
+    data object Unavailable : ToleranceSearchResult {
+        override val work: Long get() = 0L
+    }
 }
 
 internal fun ((Sample) -> Boolean)?.permitsToleranceOptimum(): Boolean =

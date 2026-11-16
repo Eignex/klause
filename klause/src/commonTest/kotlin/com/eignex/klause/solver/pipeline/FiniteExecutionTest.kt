@@ -160,6 +160,13 @@ class FiniteExecutionTest {
     }
 
     @Test
+    fun `a leaf of linear rows should be completed by the search when its float point is refused`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), floatPoints = false)
+
+        assertEquals(FiniteSolveVerdict.SAT, verdict)
+    }
+
+    @Test
     fun `minimization should complete a real relation over a row that needs the slack`() {
         val verdict = solveFlatZinc(SemanticOverrides(), floatPoints = false,
             source = roundedBound("var 0.0..2.0: b; var 0..3: z;", "constraint float_abs(y, b);")

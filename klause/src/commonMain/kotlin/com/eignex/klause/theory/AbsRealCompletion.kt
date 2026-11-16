@@ -40,6 +40,9 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
     private val encoders = source.selectedFactorProjections()
     private val layout = tolerance?.takeUnless { it.isExact }?.let { ToleranceLinearLayout(source, it) }
 
+    // Whether the search within tolerance states every relation of the source.
+    val searchesWithinTolerance: Boolean = layout?.searchable(encoders) == true
+
     sealed interface Result {
         // A completion; [withinTolerance] when it holds the relations only within the source tolerance.
         class Witness(val reals: List<BigFraction>, val withinTolerance: Boolean = false) : Result
@@ -130,13 +133,16 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
 }
 
 // The tolerance search of a source, read through [lift] from the frame its callers complete in.
+// Built on first use and shared by every worker of an execution: the completion holds only immutable state, and each
+// search encodes and solves its own model.
 internal class SourceToleranceSearch private constructor(
-    private val completion: AbsRealCompletion,
+    private val completion: Lazy<AbsRealCompletion?>,
     private val realCount: Int,
     private val lift: (Sample) -> Sample,
 ) : ToleranceRealSearch {
-    constructor(source: Problem, policy: SourceTolerance) :
-        this(AbsRealCompletion(source, policy), source.numRealVars, { it })
+    constructor(source: Problem, policy: SourceTolerance) : this(
+        lazy { AbsRealCompletion(source, policy).takeIf { it.searchesWithinTolerance } }, source.numRealVars, { it },
+    )
 
     override fun complete(
         discrete: Sample,
@@ -144,8 +150,10 @@ internal class SourceToleranceSearch private constructor(
         controls: SearchExecutionControls?,
         context: LpSolveContext,
     ): ToleranceSearchResult {
+        val search = completion.value ?: return ToleranceSearchResult.Unavailable
         val point = lift(discrete)
-        val completed = completion.complete(point, cancellation, controls, context)
+        require(point.numRealVars == 0 || point.numRealVars == realCount) { "leaf frame differs from its source" }
+        val completed = search.complete(point, cancellation, controls, context)
         return when (val result = completed.result) {
             is AbsRealCompletion.Result.Witness -> if (result.reals.size == realCount) {
                 ToleranceSearchResult.Witness(result.reals, completed.work)

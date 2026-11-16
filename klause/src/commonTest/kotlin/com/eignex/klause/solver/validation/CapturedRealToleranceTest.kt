@@ -103,16 +103,6 @@ class CapturedRealToleranceTest {
         assertFalse(accepts(point(0.5)))
     }
 
-    // `abs(x(a)) = abs(x(b))`: a disjunction of two equalities, which has no tolerance reading.
-    private fun unread(a: Int, b: Int): Factor = object : Factor by Linear(
-        intArrayOf(), doubleArrayOf(), intArrayOf(a, b), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
-    ) {
-        override val linearForm: LinearForm = LinearForm.Disjunction(listOf(1.0, -1.0).map { sign ->
-            LinearRow.ofColumns(intArrayOf(), intArrayOf(a, b),
-                RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, sign)), 0.0, false),
-                LinearOp.EQ)
-        })
-    }
 
     private val residuals = mapOf(
         "abs" to (source(RealAbs(0, 1), reals = 2) to doubleArrayOf(0.5, 0.58, 0.65)),
@@ -207,6 +197,18 @@ class CapturedRealToleranceTest {
         assertEquals(listOf(true, false), listOf(accepts(point(-0.5, -0.2)), accepts(point(-0.5, 0.125))))
     }
 
+    // `0.9999999^1000` is about `0.99990000499`, a power too wide to form exactly.
+    @Test
+    fun `a wide power should be decided against its slack by a bracket`() {
+        val wide = Power(Power.Coordinate.Real(SourceRealId(0)), 1000, Power.Coordinate.Real(SourceRealId(1)))
+        val accepts = assertNotNull(capturedRealAcceptance(source(wide, reals = 2), Cancellation.Never))
+        val results = listOf(0.9999, 0.5, 0.8999000049958865, 0.8999000049938864)
+
+        val accepted = results.map { accepts(point(0.9999999, it)) }
+
+        assertEquals(listOf(true, false, true, false), accepted)
+    }
+
     @Test
     fun `a zeroth power should read its result as the row r = 1`() {
         val unit = Power(Power.Coordinate.Real(SourceRealId(0)), 0, Power.Coordinate.Real(SourceRealId(1)))
@@ -217,13 +219,13 @@ class CapturedRealToleranceTest {
 
     @Test
     fun `a relation without a tolerance reading in every real component should leave completion exact`() {
-        assertNull(capturedRealAcceptance(source(unread(0, 1), reals = 2), Cancellation.Never))
+        assertNull(capturedRealAcceptance(source(unreadRelation(0, 1), reals = 2), Cancellation.Never))
     }
 
     @Test
     fun `a relation without a tolerance reading in another component should leave a row within the slack accepted`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unread(1, 2), reals = 3), Cancellation.Never),
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3), Cancellation.Never),
         )
 
         assertTrue(accepts(point(0.3, 0.5, 0.5)))
@@ -232,7 +234,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a relation without a tolerance reading should hold exactly in its own component`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unread(1, 2), reals = 3), Cancellation.Never),
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3), Cancellation.Never),
         )
 
         assertFalse(accepts(point(0.25, 0.5, 0.45)))
@@ -242,7 +244,7 @@ class CapturedRealToleranceTest {
     fun `a row sharing a component with a relation without a tolerance reading should hold exactly`() {
         val accepts = assertNotNull(
             capturedRealAcceptance(
-                source(row(LinearOp.EQ, 0.45), unread(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
+                source(row(LinearOp.EQ, 0.45), unreadRelation(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
                 Cancellation.Never,
             ),
         )
@@ -253,7 +255,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a relation without a tolerance reading that holds exactly should be accepted in its own component`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unread(1, 2), reals = 3), Cancellation.Never),
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3), Cancellation.Never),
         )
 
         assertTrue(accepts(point(0.25, 0.5, 0.5)))
@@ -263,7 +265,7 @@ class CapturedRealToleranceTest {
     fun `a row that holds exactly in a component without a tolerance reading should be accepted`() {
         val accepts = assertNotNull(
             capturedRealAcceptance(
-                source(row(LinearOp.EQ, 0.5), unread(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
+                source(row(LinearOp.EQ, 0.5), unreadRelation(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
                 Cancellation.Never,
             ),
         )
@@ -274,7 +276,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a declaration should hold exactly in a component without a tolerance reading`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(unread(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
+            capturedRealAcceptance(source(unreadRelation(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
                 Cancellation.Never),
         )
 
@@ -286,7 +288,7 @@ class CapturedRealToleranceTest {
         val link = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0)
         val accepts = assertNotNull(
             capturedRealAcceptance(
-                source(row(LinearOp.EQ, 0.45), link, unread(1, 2), row(LinearOp.EQ, 0.25, real = 3), reals = 4),
+                source(row(LinearOp.EQ, 0.45), link, unreadRelation(1, 2), row(LinearOp.EQ, 0.25, real = 3), reals = 4),
                 Cancellation.Never,
             ),
         )
@@ -299,7 +301,8 @@ class CapturedRealToleranceTest {
         val tolerant = Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)
         val exact = Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(1), doubleArrayOf(1.0), LinearOp.EQ, 0.0)
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(tolerant, exact, unread(1, 2), reals = 3, ints = 1), Cancellation.Never),
+            capturedRealAcceptance(source(tolerant, exact, unreadRelation(1, 2), reals = 3, ints = 1),
+                Cancellation.Never),
         )
 
         assertTrue(accepts(point(0.3, 0.0, 0.0, ints = longArrayOf(0))))
@@ -307,7 +310,7 @@ class CapturedRealToleranceTest {
 
     @Test
     fun `a real in no relation should leave an otherwise exact source without acceptance`() {
-        assertNull(capturedRealAcceptance(source(unread(0, 1), reals = 3), Cancellation.Never))
+        assertNull(capturedRealAcceptance(source(unreadRelation(0, 1), reals = 3), Cancellation.Never))
     }
 
     @Test
@@ -316,4 +319,15 @@ class CapturedRealToleranceTest {
 
         assertNull(capturedRealAcceptance(exact, Cancellation.Never))
     }
+}
+
+// `abs(x(a)) = abs(x(b))` as a disjunction of two equalities, a relation without a tolerance reading.
+internal fun unreadRelation(a: Int, b: Int): Factor = object : Factor by Linear(
+    intArrayOf(), doubleArrayOf(), intArrayOf(a, b), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
+) {
+    override val linearForm: LinearForm = LinearForm.Disjunction(listOf(1.0, -1.0).map { sign ->
+        LinearRow.ofColumns(intArrayOf(), intArrayOf(a, b),
+            RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, sign)), 0.0, false),
+            LinearOp.EQ)
+    })
 }
