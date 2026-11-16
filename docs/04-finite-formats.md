@@ -206,8 +206,8 @@ fields feed the same local search weights and presolve symmetry gate as
 
 FlatZinc is MiniZinc's flat constraint language. The frontend keeps source names,
 constraints, search annotations and output reconstruction. Float components retain
-their source arithmetic, accepted within the declared tolerance or exactly, or declared
-grid semantics; grid refutations and optima apply only to that finite interpretation.
+their source arithmetic, accepted within the declared tolerance or exactly. A private
+float grid only finds candidate points; its refutations and optima are not verdicts.
 
 ### Declared semantics and caller ranges
 
@@ -345,10 +345,15 @@ membership or a product.
 
 In the compatibility view, a component that needs approximation or has more than
 4,096 finite alternatives uses integer buckets. Bucketed search decides a finite
-grid: it may miss solutions between grid points, and rounding can produce
-candidates that violate continuous-source equations. FlatZinc publishes those
-candidates as grid witnesses, and completed search reports the grid optimum or
-refutation. Grid relations (`GridArrayMinMax`, `GridAbs`,
+grid: it misses solutions between grid points, and rounding can produce candidates
+that violate the source relations. The grid is therefore neither the model's meaning
+nor a relaxation of it. A grid point is published only when the original source
+accepts it, within the declared tolerance or exactly, so a found point is a source
+solution or incumbent. A grid refutation, a grid optimum and an exhausted grid
+enumeration decide nothing about the source: the source verdict is unknown, or
+satisfiable or best-found when a point was accepted. A pure local-search or ALNS
+engine has no complete arm, so it uses the grid whenever a component needs one and
+reports no refutation or optimum. Grid relations (`GridArrayMinMax`, `GridAbs`,
 `GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
 
 The original arm is numerical under the declared tolerance. Finite LP deductions are
@@ -456,12 +461,12 @@ block has decimal assignments and no exact comments.
 Mixed exact/grid witnesses add
 `% klause-coordinate:` and `% klause-float-component:` comments with each grid
 point's binary64 value and approximation reason. With a selected finite grid,
-`==========` reports a grid optimum or completed satisfaction search, and
-`=====UNSATISFIABLE=====` reports a grid refutation. The
-`% klause-float-claim:` comment scopes these claims to the declared finite grid,
-and `% klause-grid-verdict:` retains the native grid verdict. Rounded grid witnesses
-need not satisfy continuous-source equations. Incomplete optimization keeps its
-incumbent without an optimum marker; an unresolved search remains UNKNOWN.
+`==========` follows only a source-accepted satisfaction point, never a grid
+optimum, and the grid prints no `=====UNSATISFIABLE=====`. The
+`% klause-float-claim:` comment marks the private grid, and
+`% klause-grid-verdict:` retains the native grid verdict as a comment. Optimization
+keeps its accepted incumbent without an optimum marker; a search without an
+accepted point remains UNKNOWN.
 Caller declaration-range overrides still withhold default-source completion claims.
 
 `OznApplier` renders bindings through the parsed `.ozn` output model with signed

@@ -235,7 +235,7 @@ class FiniteSolveResult(
     val preparation: FinitePipelinePreparation,
     /** Time spent preparing the canonical model and any private search view. */
     val preparationElapsed: Duration,
-    /** Terminal result, scoped to the grid when [SourceFloatProjection.declaredGridSemantics] is true. */
+    /** Terminal result in source terms; a private grid's verdict stays in [FiniteSolveResult.nativeGridOutcome]. */
     val outcome: FiniteSolveOutcome,
 ) {
     private var completeSearch: Boolean? = null

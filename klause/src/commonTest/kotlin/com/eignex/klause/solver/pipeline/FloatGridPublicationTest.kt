@@ -9,7 +9,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
@@ -19,6 +21,7 @@ import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -30,26 +33,28 @@ import kotlin.time.Duration
 
 class FloatGridPublicationTest {
     @Test
-    fun `interrupted declared grid enumeration should retain points without claiming completion`() {
-        val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
-        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
-            ExecutionOperation.ENUMERATE, FiniteEngine.FIXED))
-        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
-            SourceSetup.prepareSelectedFloatGrid(selection,
-                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-                declaredGridSemantics = true)).invocation
-        val binding = assertNotNull(invocation.floatGrid)
-        val publication = FloatGridPublication(binding, ExecutionControl.Never, null, FiniteSolveCallbacks({}, {}))
-        publication.onSample(Sample(booleanArrayOf(), longArrayOf(1)))
+    fun `grid enumeration should retain points without claiming a complete source enumeration`() {
+        for (native in listOf(FiniteSolveVerdict.UNKNOWN, FiniteSolveVerdict.SAT)) {
+            val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+            val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
+                ExecutionOperation.ENUMERATE, FiniteEngine.FIXED))
+            val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+                SourceSetup.prepareSelectedFloatGrid(selection,
+                    listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+                .invocation
+            val binding = assertNotNull(invocation.floatGrid)
+            val publication = FloatGridPublication(binding, ExecutionControl.Never, null, FiniteSolveCallbacks({}, {}))
+            publication.onSample(Sample(booleanArrayOf(), longArrayOf(1)))
 
-        val result = publication.result(FinitePipelinePreparation(binding.projection.problem, null, { it }, null),
-            Duration.ZERO, FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 1, null, 0))
+            val result = publication.result(FinitePipelinePreparation(binding.projection.problem, null, { it }, null),
+                Duration.ZERO, FiniteSolveOutcome.Completed(native, SolveStats.EMPTY, 1, null, 0))
 
-        val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-        assertEquals(FiniteSolveVerdict.UNKNOWN, outcome.verdict)
-        assertEquals(BigFraction.ofDouble(0.5), assertNotNull(outcome.bestSample).exactReals?.single())
+            val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNKNOWN, outcome.verdict, "$native")
+            assertEquals(BigFraction.ofDouble(0.5), assertNotNull(outcome.bestSample).exactReals?.single())
+        }
     }
 
     @Test
@@ -62,8 +67,7 @@ class FloatGridPublicationTest {
             LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-                declaredGridSemantics = true)).invocation
+                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val publication = FloatGridPublication(binding, ExecutionControl.Never, { it.approximateRealValue(0) <= 0.5 },
             FiniteSolveCallbacks({}, {}))
@@ -163,33 +167,39 @@ class FloatGridPublicationTest {
     }
 
     @Test
-    fun `private grid exhaustion should retain its refutation without refuting the original real source`() {
-        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
-            intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)), numRealVars = 1,
-            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
-        val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
-            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
-            SourceSetup.prepareSelectedFloatGrid(selection,
-                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
-        val publications = ArrayList<Sample>()
+    fun `private grid exhaustion should retain its refutation without refuting the source under any tolerance`() {
+        val tenMillionth = SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000))
+        for (tolerance in listOf(null, SourceTolerance(tenMillionth))) {
+            val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000),
+                    feasibilityTolerance = tolerance).resolve())
+            val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
+                ExecutionOperation.SATISFY, FiniteEngine.FIXED))
+            val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
+                SourceSetup.prepareSelectedFloatGrid(selection,
+                    listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+                .invocation
+            val publications = ArrayList<Sample>()
 
-        val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
-            FiniteSolveRequest(shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
-                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
-                randomSeed = 0, defaultArms = 1, lpConfig = LpConfig.OFF,
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
-                onEvent = null, onPortfolioEvent = null)
-        }), SourceExecutionCallbacks(finite = FiniteSolveCallbacks(publications::add, {})))
+            val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                FiniteSolveRequest(shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false,
+                    ExecutionControl.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 0, defaultArms = 1, lpConfig = LpConfig.OFF,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
+                    onEvent = null, onPortfolioEvent = null)
+            }), SourceExecutionCallbacks(finite = FiniteSolveCallbacks(publications::add, {})))
 
-        val result = assertIs<SourceExecutionResult.Finite>(execution).result
-        assertEquals(FiniteSolveVerdict.UNKNOWN, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
-        val native = assertNotNull(result.nativeGridOutcome)
-        assertEquals(FiniteSolveVerdict.UNSAT, assertIs<FiniteSolveOutcome.Completed>(native.outcome).verdict)
-        assertSame(source, native.projection.source.originalSource)
-        assertTrue(publications.isEmpty())
+            val result = assertIs<SourceExecutionResult.Finite>(execution).result
+            assertEquals(FiniteSolveVerdict.UNKNOWN, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
+            val native = assertNotNull(result.nativeGridOutcome)
+            assertEquals(FiniteSolveVerdict.UNSAT, assertIs<FiniteSolveOutcome.Completed>(native.outcome).verdict)
+            assertSame(source, native.projection.source.originalSource)
+            assertTrue(publications.isEmpty())
+        }
     }
 
     @Test
