@@ -165,24 +165,26 @@ internal fun smtPolymorphicPoint(sort: SmtSort, second: Boolean, values: SmtMode
     externalPoint: ((SmtSort, Boolean) -> SmtValue?)? = null): SmtValue {
     values.checkpoint()
     if (externalPoint != null) return externalPoint(sort, second) ?: throw SmtSourceCheckingUnavailable()
-    return smtArrayModelPoint(sort, values) { leaf -> when (leaf) {
-        SmtSort.Bool -> SmtValue.Boolean(second)
-        SmtSort.Int -> SmtValue.Integer(if (second) "1" else "0")
-        SmtSort.Real -> SmtValue.Real(if (second) "1.0" else "0.0")
-        is SmtSort.BitVector -> SmtValue.BitVector("0".repeat(leaf.width - 1) + if (second) "1" else "0")
-        is SmtSort.Uninterpreted -> {
-            val identity = buildString {
-                append("@klause.poly.point.")
-                for (character in leaf.toSmtLib()) {
-                    values.checkpoint()
-                    append(character.code.toString(16).padStart(4, '0'))
+    return smtArrayModelPoint(sort, values) { leaf ->
+        when (leaf) {
+            SmtSort.Bool -> SmtValue.Boolean(second)
+            SmtSort.Int -> SmtValue.Integer(if (second) "1" else "0")
+            SmtSort.Real -> SmtValue.Real(if (second) "1.0" else "0.0")
+            is SmtSort.BitVector -> SmtValue.BitVector("0".repeat(leaf.width - 1) + if (second) "1" else "0")
+            is SmtSort.Uninterpreted -> {
+                val identity = buildString {
+                    append("@klause.poly.point.")
+                    for (character in leaf.toSmtLib()) {
+                        values.checkpoint()
+                        append(character.code.toString(16).padStart(4, '0'))
+                    }
+                    append(if (second) ".1" else ".0")
                 }
-                append(if (second) ".1" else ".0")
+                SmtValue.Uninterpreted(leaf, identity)
             }
-            SmtValue.Uninterpreted(leaf, identity)
+            is SmtSort.Array -> error("array prefixes are handled before scalar model points")
         }
-        is SmtSort.Array -> error("array prefixes are handled before scalar model points")
-    } } ?: throw SmtSourceCheckingUnavailable()
+    } ?: throw SmtSourceCheckingUnavailable()
 }
 
 private fun smtArrayModelPoint(sort: SmtSort, values: SmtModelValues,
