@@ -39,7 +39,16 @@ internal fun normalizeSmtSourceCommands(
             when (node) {
                 is SExpr.Atom -> values += node
                 is SExpr.SList -> if (combine) {
-                    val items = List(node.items.size) { values.removeLast() }.reversed()
+                    var changed: MutableList<SExpr>? = null
+                    for (index in node.items.indices.reversed()) {
+                        val child = values.removeLast()
+                        if (child !== node.items[index]) {
+                            if (changed == null) changed = node.items.toMutableList()
+                            changed[index] = child
+                        }
+                    }
+                    val combined = if (changed == null) node else SExpr.SList(changed)
+                    val items = combined.items
                     if ((items.firstOrNull() as? SExpr.Atom)?.text == "!") {
                         if (items.size < 3) smtUnsupported("annotated term requires at least one attribute")
                         val body = items[1]
@@ -64,7 +73,7 @@ internal fun normalizeSmtSourceCommands(
                             }
                         }
                         values += body
-                    } else values += SExpr.SList(items)
+                    } else values += combined
                 } else {
                     work += AnnotationFrame(node, true)
                     val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
