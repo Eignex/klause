@@ -2,6 +2,7 @@ package com.eignex.klause.util
 
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.AtomicCells
+import com.eignex.util.numbers.saturatedAdd
 
 // Allowances need exact integer saturation; floating-point statistical sums lose unit debits above 2^53.
 internal class WorkCounter(val concurrency: Concurrency = Concurrency.None, initial: Long = 0L) {
@@ -14,15 +15,13 @@ internal class WorkCounter(val concurrency: Concurrency = Concurrency.None, init
         require(units >= 0L)
         val cell = shared
         if (cell == null) {
-            serial = sum(serial.coerceAtLeast(0L), units)
+            serial = saturatedAdd(serial.coerceAtLeast(0L), units)
             return
         }
         while (true) {
             val current = cell.load()
-            val next = sum(current.coerceAtLeast(0L), units)
+            val next = saturatedAdd(current.coerceAtLeast(0L), units)
             if (current == next || cell.compareAndSet(current, next)) return
         }
     }
-
-    private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
 }

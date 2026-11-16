@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.LinRelation
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.subExactOrNull
 
 internal class AffineDistinctGroup(val vars: IntArray, val offsets: LongArray, val sourceRows: IntArray)
 
@@ -74,7 +75,7 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
                     var selected: Long? = null
                     for (offset in anchor.getValue(vars[i]).keys) {
                         if (!spend(cancellation)) return result
-                        val difference = subtractExact(offset, seed) ?: continue
+                        val difference = subExactOrNull(offset, seed) ?: continue
                         if (difference !in pivot.getValue(vars[i])) continue
                         // Ambiguous triangles need a search; this bounded recognizer declines them.
                         if (selected != null) {
@@ -94,7 +95,7 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
                 for (i in vars.indices) {
                     for (j in i + 1 until vars.size) {
                         if (!spend(cancellation)) return result
-                        val difference = subtractExact(offsets[j], offsets[i])
+                        val difference = subExactOrNull(offsets[j], offsets[i])
                         if (difference == null || difference !in edges.getValue(vars[i]).getValue(vars[j])) {
                             consistent = false
                             break
@@ -125,11 +126,6 @@ internal class Xcsp3AffineDistinctness(private val workLimit: Int = 1_000_000) {
         const val MAX_EDGES = 32_768
         const val MAX_ALTERNATIVES = 8
     }
-}
-
-private fun subtractExact(left: Long, right: Long): Long? {
-    val difference = left - right
-    return if (((left xor right) and (left xor difference)) < 0L) null else difference
 }
 
 internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistinctness,

@@ -14,6 +14,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.followStopControl
 import com.eignex.klause.util.workScheduled
+import com.eignex.util.numbers.saturatedAdd
 
 /**
  * The satisfaction driver for a single-threaded portfolio: one [CpSatisfactionTraversal] advanced a slice at a
@@ -95,7 +96,7 @@ internal class ResumableSatisfaction(
 
     override val work: Long get() = slice.spent()
 
-    internal val clauseWork: Long get() = saturatedWork(
+    internal val clauseWork: Long get() = saturatedAdd(
         sink.search.searchWork.coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE,
         traversal.propagationWork(),
     )

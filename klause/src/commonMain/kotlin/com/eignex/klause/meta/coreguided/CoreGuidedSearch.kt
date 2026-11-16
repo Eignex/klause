@@ -43,6 +43,7 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.saturatedAdd
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toDouble
 import kotlin.math.nextDown
@@ -148,8 +149,8 @@ internal class CoreGuidedSearch(
         val live = query?.stats?.search?.propagationWork?.sum?.toLong() ?: 0L
         val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + live % PROPAGATION_WORK_PER_NODE +
             preparationVisits % PROPAGATION_WORK_PER_NODE) / PROPAGATION_WORK_PER_NODE
-        return addWork(addWork(completedWork, query?.work ?: 0L),
-            addWork(preparationVisits / PROPAGATION_WORK_PER_NODE, carried))
+        return saturatedAdd(saturatedAdd(completedWork, query?.work ?: 0L),
+            saturatedAdd(preparationVisits / PROPAGATION_WORK_PER_NODE, carried))
     }
     private val allowanceExhausted: Boolean get() = maximumWork?.let { work >= it } == true ||
         maximumMillis?.let { activeTime + (activeSlice?.elapsedNow() ?: Duration.ZERO) >= it.milliseconds } == true
@@ -215,7 +216,7 @@ internal class CoreGuidedSearch(
             activeTime += checkNotNull(activeSlice).elapsedNow()
             activeSlice = null
             preparationToken = ExecutionControl.Never
-            if (offered >= 0L) workDebt = addWork(workDebt, (work - start - offered).coerceAtLeast(0L))
+            if (offered >= 0L) workDebt = saturatedAdd(workDebt, (work - start - offered).coerceAtLeast(0L))
         }
     }
 
@@ -294,7 +295,7 @@ internal class CoreGuidedSearch(
                 return if (allowanceExhausted) finish(stopped(TerminationReason.BudgetExhausted)) else null
             }
             val decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
-            val decisions = addWork(completedStats.search.nodes.sum.toLong(), handle.stats.search.nodes.sum.toLong())
+            val decisions = saturatedAdd(completedStats.search.nodes.sum.toLong(), handle.stats.search.nodes.sum.toLong())
             val quotaExhausted = params.nodeBudget?.allowance?.exhausted() == true || decisions >= decisionLimit
             val paused = result is SolveResult.Unknown &&
                 (result.reason == TerminationReason.Cancelled || result.reason == TerminationReason.BudgetExhausted) &&
@@ -467,7 +468,7 @@ internal class CoreGuidedSearch(
         var maximum: BigInt? = null
         for (weight in weights.values) {
             recordPreparation(1L)
-            thresholdVisits = addWork(thresholdVisits, 1L)
+            thresholdVisits = saturatedAdd(thresholdVisits, 1L)
             if ((below == null || weight < below) && (maximum == null || weight > maximum)) maximum = weight
             yield(Unit)
         }
@@ -487,7 +488,7 @@ internal class CoreGuidedSearch(
         val pins = LinkedHashMap<Int, Boolean>()
         for ((literal, weight) in weights) {
             recordPreparation(1L)
-            thresholdVisits = addWork(thresholdVisits, 1L)
+            thresholdVisits = saturatedAdd(thresholdVisits, 1L)
             if (weight >= (threshold ?: BIG_ZERO)) {
                 literals.add(literal)
                 pins[Lit.variable(literal)] = !Lit.isPositive(literal)
@@ -531,7 +532,7 @@ internal class CoreGuidedSearch(
                 ResumableSatisfaction(solver, queryParams, ownsWorkDebt = false, projectAssumptionCore = projected)
             } else {
                 PreparingSatisfaction(solver, queryParams.copy(nativeSat = false), projectAssumptionCore = projected)
-            }.also { queryCount = addWork(queryCount, 1L) }
+            }.also { queryCount = saturatedAdd(queryCount, 1L) }
         } catch (failure: SearchInitializationCancelled) {
             settleQuery(failure.stats, failure.work)
             // A native opening is atomic; after a stop the retained general preparer guarantees progress.
@@ -549,7 +550,7 @@ internal class CoreGuidedSearch(
     }
 
     private fun recordPreparation(units: Long) {
-        preparationVisits = addWork(preparationVisits, units)
+        preparationVisits = saturatedAdd(preparationVisits, units)
     }
 
     private fun publishLowerBound() {
@@ -580,8 +581,8 @@ internal class CoreGuidedSearch(
         val visits = queryStats.search.propagationWork.sum.toLong()
         val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + visits % PROPAGATION_WORK_PER_NODE) /
             PROPAGATION_WORK_PER_NODE
-        completedPropagation = addWork(completedPropagation, visits)
-        completedWork = addWork(completedWork, addWork(queryWork, carried))
+        completedPropagation = saturatedAdd(completedPropagation, visits)
+        completedWork = saturatedAdd(completedWork, saturatedAdd(queryWork, carried))
     }
 
     private fun stopped(reason: TerminationReason): MinimizeResult = best?.let {
@@ -665,6 +666,3 @@ internal class CoreGuidedSearch(
         }
     }
 }
-
-private fun addWork(left: Long, right: Long): Long =
-    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right

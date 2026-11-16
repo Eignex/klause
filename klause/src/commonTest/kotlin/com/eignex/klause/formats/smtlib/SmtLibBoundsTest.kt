@@ -8,9 +8,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SmtLibBoundsTest {
+    @Test
+    fun `bounds should decline products outside the signed integer range`() {
+        for ((coefficient, value) in listOf(-1L to Long.MIN_VALUE, Long.MIN_VALUE to -1L)) {
+            val result = mulAdd(0L, coefficient, value)
+
+            assertNull(result)
+        }
+    }
+
     @Test
     fun `private quotient coordinates should retain their declared open bounds during inference`() {
         val original = captureSmtSource(SExprReader("(declare-const x Int)").readAll(), ExecutionControl.Never)

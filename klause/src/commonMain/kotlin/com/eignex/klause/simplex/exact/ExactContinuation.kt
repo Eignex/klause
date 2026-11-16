@@ -7,6 +7,7 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.saturatedAdd
 import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.toLong
@@ -198,13 +199,10 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
 
     fun account(work: Long, allocation: Long, elapsedNs: Long) {
         require(work >= 0L && allocation >= 0L && elapsedNs >= 0L)
-        this.work = saturatingAdd(this.work, work)
-        this.allocation = saturatingAdd(this.allocation, allocation)
-        elapsed = saturatingAdd(elapsed, elapsedNs)
+        this.work = saturatedAdd(this.work, work)
+        this.allocation = saturatedAdd(this.allocation, allocation)
+        elapsed = saturatedAdd(elapsed, elapsedNs)
     }
-
-    private fun saturatingAdd(left: Long, right: Long): Long =
-        if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
 
     fun resume(
         limits: ExactContinuationLimits = ExactContinuationLimits(),

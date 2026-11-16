@@ -9,7 +9,9 @@ import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.addExactOrNull
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.mulExactOrNull
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toDouble
@@ -214,14 +216,14 @@ class LinearObjective(
     private fun discreteSumOrNull(sample: Sample): Long? {
         var total = constant
         for (b in 0 until minOf(sample.numBoolVars, boolWeightValues.size)) {
-            if (sample.boolValue(b)) total = addOrNull(total, boolWeightValues[b]) ?: return null
+            if (sample.boolValue(b)) total = addExactOrNull(total, boolWeightValues[b]) ?: return null
         }
         for (i in 0 until minOf(sample.numIntVars, intCoefficientValues.size)) {
             val c = intCoefficientValues[i]
             val x = sample.intValue(i)
             if (c == 0L || x == 0L) continue
-            val term = if (fitsHalf(c) && fitsHalf(x)) c * x else multiplyOrNull(c, x) ?: return null
-            total = addOrNull(total, term) ?: return null
+            val term = if (fitsHalf(c) && fitsHalf(x)) c * x else mulExactOrNull(c, x) ?: return null
+            total = addExactOrNull(total, term) ?: return null
         }
         return total
     }
@@ -314,20 +316,6 @@ fun LinearObjectiveSpec.toLinearObjective(): LinearObjective = LinearObjective(
 
 // Whether [v] fits 31 bits, so a product of two such values cannot leave the 64-bit range.
 private fun fitsHalf(v: Long): Boolean = v in -HALF_RANGE..HALF_RANGE
-
-private fun multiplyOrNull(a: Long, b: Long): Long? {
-    val product = a * b
-    return if (product / b == a && !(a == -1L && b == Long.MIN_VALUE) && !(b == -1L && a == Long.MIN_VALUE)) {
-        product
-    } else {
-        null
-    }
-}
-
-private fun addOrNull(a: Long, b: Long): Long? {
-    val sum = a + b
-    return if (((a xor sum) and (b xor sum)) < 0L) null else sum
-}
 
 private const val HALF_RANGE: Long = (1L shl 31) - 1
 

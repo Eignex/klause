@@ -3,6 +3,8 @@ package com.eignex.klause.solver.resources
 import com.eignex.klause.util.WorkCounter
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.Mutex
+import com.eignex.util.numbers.saturatedAdd
+import com.eignex.util.numbers.saturatedMul
 
 internal class NodeAllowance private constructor(
     val limit: Long,
@@ -19,7 +21,7 @@ internal class NodeAllowance private constructor(
     private val moves = WorkCounter(Concurrency.Relaxed)
     private var children: List<NodeAllowance>? = null
 
-    val spent: Long get() = saturatedSum(used.value, pricedInstructions(moves.value))
+    val spent: Long get() = saturatedAdd(used.value, pricedInstructions(moves.value))
 
     internal fun spend() {
         record(nodes = 1L, instructions = 0L)
@@ -72,14 +74,8 @@ internal class NodeAllowance private constructor(
 }
 
 private fun pricedInstructions(instructions: Long): Long =
-    saturatedSum(saturatedProduct(instructions / 4L, 5L), instructions % 4L * 5L / 4L)
+    saturatedAdd(saturatedMul(instructions / 4L, 5L), instructions % 4L * 5L / 4L)
 
 private fun instructionsFor(work: Long): Long = work / 5L * 4L + (work % 5L * 4L + 3L) / 5L
-
-private fun saturatedProduct(value: Long, weight: Long): Long =
-    if (value > Long.MAX_VALUE / weight) Long.MAX_VALUE else value * weight
-
-private fun saturatedSum(left: Long, right: Long): Long =
-    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
 
 internal const val LS_INSTRUCTIONS_PER_WORK: Double = 0.8

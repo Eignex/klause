@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.saturatedAdd
 
 internal class PrivateRebuildBakeWork(private val outer: ExecutionControl) : ExecutionControl() {
     var constructionEntries = 0L
@@ -13,13 +14,13 @@ internal class PrivateRebuildBakeWork(private val outer: ExecutionControl) : Exe
         override fun charge(units: Long) = outer.charge(units)
 
         override fun construction(entries: Long) {
-            constructionEntries = saturatedWork(constructionEntries, entries)
+            constructionEntries = saturatedAdd(constructionEntries, entries)
             val root = outer.accounting as? RootWorkMeter
             if (root == null) outer.charge(entries) else root.construction(entries)
         }
 
         override fun propagation(units: Long) {
-            propagationWork = saturatedWork(propagationWork, units)
+            propagationWork = saturatedAdd(propagationWork, units)
             val root = outer.accounting as? RootWorkMeter
             if (root == null) outer.charge(units) else root.propagation(units)
         }

@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.saturatedAdd
 
 internal class LpWorkingModel(val source: LpExactState, auxiliary: ExactLpModel) {
     val state = LpExactState(auxiliary)
@@ -60,7 +61,7 @@ internal data class LpWorkingMetrics(
 }
 
 private fun saturatedSum(vararg parts: Long): Long =
-    parts.fold(0L) { total, part -> if (total > Long.MAX_VALUE - part) Long.MAX_VALUE else total + part }
+    parts.fold(0L, ::saturatedAdd)
 
 internal class LpWorkingScope internal constructor(
     model: LpWorkingModel,

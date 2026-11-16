@@ -87,6 +87,7 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -310,7 +311,7 @@ internal class LpEngine(
         finished: Boolean = true,
     ) {
         val charged = if (retainedRootEnabled) metrics.copy(workOps =
-            saturatingAdd(metrics.workOps, metrics.preparationOps)) else metrics
+            saturatedAdd(metrics.workOps, metrics.preparationOps)) else metrics
         sink.lp.observeEngineCost(LpRoute.ROOT, charged, finished)
         chargeWork(charged.workOps)
     }
@@ -435,7 +436,7 @@ internal class LpEngine(
 
     internal fun rootComponentRepairWorkAvailable(): Boolean =
         retainedRootRemainingWork() > 0L &&
-            retainedRootCumulativeWork() > saturatingAdd(primalPropagationWork, sink.lp.standaloneWork)
+            retainedRootCumulativeWork() > saturatedAdd(primalPropagationWork, sink.lp.standaloneWork)
 
     // Numerical pivots spend the containing allowance, not the separate transport and construction cap.
     internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =
@@ -1066,13 +1067,13 @@ internal class LpEngine(
 
     /** Add one solve's work to the current node's total. */
     internal fun noteSolveOps(ops: Long) {
-        pendingSolveOps = saturatingAdd(pendingSolveOps, ops)
+        pendingSolveOps = saturatedAdd(pendingSolveOps, ops)
         chargeWork(ops)
     }
 
     private fun chargeWork(ops: Long) {
         containingWork(ops)
-        totalSolveOps = saturatingAdd(totalSolveOps, ops)
+        totalSolveOps = saturatedAdd(totalSolveOps, ops)
         lpEffortGovernor.chargeWork(ops)
         if (lpEffortGovernor.allowanceSpent) sink.lp.observeWorkAllowanceSpent()
     }
@@ -1095,12 +1096,10 @@ internal class LpEngine(
      */
     internal fun noteNodeOverhead(ops: Long) {
         if (ops <= 0L) return
-        totalOverheadOps = saturatingAdd(totalOverheadOps, ops)
+        totalOverheadOps = saturatedAdd(totalOverheadOps, ops)
         noteSolveOps(ops)
         sink.lp.observeOverhead(ops)
     }
-
-    private fun saturatingAdd(a: Long, b: Long): Long = if (b > 0L && a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
 
     /**
      * Whether the LP has spent [budgetOps] of work in total.
@@ -1928,10 +1927,7 @@ internal class LpEngine(
             knapsackLagBound?.let { LagrangianArm(it) },
             LpSimplexBound(),
         )
-
     }.iterator()
-
-
 }
 
 /** Eta-chain length of the persistent gated-residual simplex before it refactorizes: its pivots

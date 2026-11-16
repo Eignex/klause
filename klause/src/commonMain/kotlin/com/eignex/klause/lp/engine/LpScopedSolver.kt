@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.pollStop
 import com.eignex.klause.util.workScheduled
+import com.eignex.util.numbers.saturatedAdd
 
 internal data class LpScopedMetrics(
     val editAttempts: Long,
@@ -771,9 +772,6 @@ internal class LpScopedSolver(
         }
     }
 
-    private fun saturatingAdd(left: Long, right: Long): Long =
-        if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
-
     private fun appendComponentRows(
         next: LpExactState,
         components: ComponentLpSolver,
@@ -789,27 +787,27 @@ internal class LpScopedSolver(
         closeOwner(components, primary)
         throw primary
     } finally {
-        preparationWork = saturated(preparationWork, components.lastMetrics.workOps)
-        reservedConstructionWork = saturated(reservedConstructionWork, components.lastReservedConstructionWork)
-        constructionWork = saturated(constructionWork, components.lastMetrics.preparationOps)
+        preparationWork = saturatedAdd(preparationWork, components.lastMetrics.workOps)
+        reservedConstructionWork = saturatedAdd(reservedConstructionWork, components.lastReservedConstructionWork)
+        constructionWork = saturatedAdd(constructionWork, components.lastMetrics.preparationOps)
         preparationRefactorizations += components.lastRefactorizations
     }
 
     private fun recordAppendWork(work: Long?, complete: Boolean = work != null) {
         var aggregateComplete = true
         if (work != null) {
-            appendBasisWork = saturatingAdd(appendBasisWork, work)
+            appendBasisWork = saturatedAdd(appendBasisWork, work)
             aggregateComplete = appendBasisWork != Long.MAX_VALUE
         }
         if (!complete || work == null || !aggregateComplete) {
-            appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+            appendUnknownWork = saturatedAdd(appendUnknownWork, 1)
         }
     }
 
     private fun appendBasisLifecycleWork(owner: RetainedLpSolver) = try {
         (owner as? PersistentLpSolver)?.basisLifecycleWork
     } catch (telemetry: Throwable) {
-        appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+        appendUnknownWork = saturatedAdd(appendUnknownWork, 1)
         throw telemetry
     }
 
@@ -827,7 +825,7 @@ internal class LpScopedSolver(
     private fun recordPendingAppendSolve(current: RetainedLpSolver) {
         if (!pendingAppendSolve) return
         if (current !== pendingAppendSolveOwner) {
-            appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+            appendUnknownWork = saturatedAdd(appendUnknownWork, 1)
             clearPendingAppendSolve()
             return
         }
@@ -839,7 +837,7 @@ internal class LpScopedSolver(
             val delta = if (before != null && after != null && after >= before) after - before else null
             recordAppendWork(delta, beforeComplete && basisWorkComplete(afterWork))
         } catch (failure: Throwable) {
-            appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+            appendUnknownWork = saturatedAdd(appendUnknownWork, 1)
             throw failure
         } finally {
             clearPendingAppendSolve()
@@ -953,8 +951,8 @@ internal class LpScopedSolver(
                     else -> null
                 }
             } finally {
-                preparationWork = saturated(preparationWork, candidate.lastMetrics.workOps)
-                constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
+                preparationWork = saturatedAdd(preparationWork, candidate.lastMetrics.workOps)
+                constructionWork = saturatedAdd(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
             if (!basis.validFor(next.model) || (warm == null &&
@@ -975,8 +973,8 @@ internal class LpScopedSolver(
             failure = primary
             throw primary
         } finally {
-            preparationWork = saturated(preparationWork, projection.work)
-            reservedConstructionWork = saturated(reservedConstructionWork, constructionBound)
+            preparationWork = saturatedAdd(preparationWork, projection.work)
+            reservedConstructionWork = saturatedAdd(reservedConstructionWork, constructionBound)
             if (!accepted && candidate != null) {
                 closeRejectedCandidate(candidate, recordRejectedAppendWork, failure)
             }
@@ -990,7 +988,7 @@ internal class LpScopedSolver(
             try {
                 recordAppendWork((candidate as? PersistentLpSolver)?.basisLifecycleWork)
             } catch (telemetry: Throwable) {
-                appendUnknownWork = saturatingAdd(appendUnknownWork, 1)
+                appendUnknownWork = saturatedAdd(appendUnknownWork, 1)
                 if (failure == null) failure = telemetry else failure.addSuppressed(telemetry)
             }
         }
@@ -1025,5 +1023,3 @@ internal class LpScopedSolver(
         if (current != null) closeOwner(current)
     }
 }
-
-private fun saturated(total: Long, add: Long): Long = if (total > Long.MAX_VALUE - add) Long.MAX_VALUE else total + add

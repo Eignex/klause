@@ -10,6 +10,21 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class MaxRegretTest {
+    @Test
+    fun `minimum long coefficient should retain its regret magnitude`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            factors = emptyArray(),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, Long.MIN_VALUE))
+        val session = PropagationSession(problem)
+
+        val picked = MaxRegret(objective).pick(session, Random(0L))
+
+        assertEquals(VarRef.IntVar(1), picked)
+    }
 
     @Test
     fun `MaxRegret should saturate instead of wrapping on a full long span`() {

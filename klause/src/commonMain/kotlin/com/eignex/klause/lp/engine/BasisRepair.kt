@@ -7,6 +7,7 @@ import com.eignex.klause.simplex.basis.BasisRepairStop
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.saturatedAdd
 
 internal data class BasisBoundState(val hasLower: Boolean, val hasUpper: Boolean, val fixed: Boolean) {
     init {
@@ -106,9 +107,9 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
         cancellation: ExecutionControl = ExecutionControl.Never,
         control: BasisRepairControl = BasisRepairControl(cancellation),
     ): BasisRecoveryResult {
-        attempts = saturatingIncrement(attempts)
+        attempts = saturatedAdd(attempts, 1L)
         val evidence = exactBasisRankEvidence(exactModel, requested, exactRankLimits, cancellation)
-        rankEvidence[evidence] = saturatingIncrement(rankEvidence[evidence] ?: 0L)
+        rankEvidence[evidence] = saturatedAdd(rankEvidence[evidence] ?: 0L, 1L)
         if (evidence == ExactBasisRankEvidence.RESOURCE_DECLINED) recordDecline(BasisRepairDecline.RESOURCE_DECLINED)
         if (evidence == ExactBasisRankEvidence.CANCELLED || cancellation()) {
             return failed(BasisRepairDecline.CANCELLED, evidence)
@@ -161,9 +162,9 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
                 BasisRepairDecline.INVALID_REPAIR,
                 control,
             )
-        successes = saturatingIncrement(successes)
-        avoidedLogicalRebuilds = saturatingIncrement(avoidedLogicalRebuilds)
-        if (repaired.repaired) repairedUnitSuccesses = saturatingIncrement(repairedUnitSuccesses)
+        successes = saturatedAdd(successes, 1L)
+        avoidedLogicalRebuilds = saturatedAdd(avoidedLogicalRebuilds, 1L)
+        if (repaired.repaired) repairedUnitSuccesses = saturatedAdd(repairedUnitSuccesses, 1L)
         return BasisRecoveryResult.Recovered(candidate, repaired = true, evidence)
     }
 
@@ -178,11 +179,11 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
     ): BasisRecoveryResult {
         recordDecline(repairDecline)
         if (!control.check()) return stopped(control, evidence)
-        logicalFallbacks = saturatingIncrement(logicalFallbacks)
+        logicalFallbacks = saturatedAdd(logicalFallbacks, 1L)
         val logicals = IntArray(bounds.size - structuralColumns) { structuralColumns + it }
         val state = normalizeBasisState(logicals, bounds, statuses)
             ?: run {
-                logicalFallbackFailures = saturatingIncrement(logicalFallbackFailures)
+                logicalFallbackFailures = saturatedAdd(logicalFallbackFailures, 1L)
                 return failed(BasisRepairDecline.LOGICAL_FALLBACK_FAILED, evidence)
             }
         control.charge(logicals.size.toLong())
@@ -198,14 +199,14 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
         }
         val admitted = control.check()
         if (!factorized || !admitted) {
-            logicalFallbackFailures = saturatingIncrement(logicalFallbackFailures)
+            logicalFallbackFailures = saturatedAdd(logicalFallbackFailures, 1L)
             return failed(
                 if (!admitted) stopDecline(control) else BasisRepairDecline.LOGICAL_FALLBACK_FAILED,
                 evidence,
             )
         }
-        successes = saturatingIncrement(successes)
-        logicalFallbackSuccesses = saturatingIncrement(logicalFallbackSuccesses)
+        successes = saturatedAdd(successes, 1L)
+        logicalFallbackSuccesses = saturatedAdd(logicalFallbackSuccesses, 1L)
         return BasisRecoveryResult.Recovered(state, repaired = false, evidence)
     }
 
@@ -225,7 +226,7 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
     }
 
     private fun recordDecline(decline: BasisRepairDecline) {
-        declines[decline] = saturatingIncrement(declines[decline] ?: 0L)
+        declines[decline] = saturatedAdd(declines[decline] ?: 0L, 1L)
     }
 }
 
@@ -428,5 +429,3 @@ private fun fractionDigits(value: BigFraction): Int =
 private fun decimalDigits(value: String): Int = value.length - if (value.startsWith('-')) 1 else 0
 
 private fun boundedAdd(left: Int, right: Int, cap: Int): Int = if (left > cap - right) cap else left + right
-
-private fun saturatingIncrement(value: Long): Long = if (value == Long.MAX_VALUE) value else value + 1L

@@ -12,6 +12,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource
 
@@ -35,9 +36,9 @@ internal class LpExactContinuationCache {
             it.account(work, allocation, timeNs)
             return
         }
-        inputWork = addCost(inputWork, work)
-        inputAllocation = addCost(inputAllocation, allocation)
-        inputTimeNs = addCost(inputTimeNs, timeNs)
+        inputWork = saturatedAdd(inputWork, work)
+        inputAllocation = saturatedAdd(inputAllocation, allocation)
+        inputTimeNs = saturatedAdd(inputTimeNs, timeNs)
     }
 
     fun initialize(input: ExactContinuationInput): ExactContinuation = continuation ?: ExactContinuation(input).also {
@@ -55,9 +56,6 @@ internal class LpExactContinuationCache {
         statuses = null
         continuation = null
     }
-
-    private fun addCost(left: Long, right: Long): Long =
-        if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
 }
 
 internal class LpContinuationTarget(val basis: Basis?, val metrics: ExactContinuationMetrics)

@@ -4,8 +4,6 @@ import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.ShortestPaths
-import com.eignex.klause.arithmetic.difference.checkedDifferenceSubtract
-import com.eignex.klause.arithmetic.difference.checkedDifferenceSum
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
@@ -27,7 +25,9 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.addExactOrNull
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.subExactOrNull
 
 /**
  * Incremental difference-logic search component: consistency is a feasible potential over the active edges,
@@ -197,7 +197,7 @@ class DifferenceSearchComponent private constructor(
                     val zero = outcome.values[fragment.zeroNode]
                     val values = LongArray(model.numIntVars)
                     for (node in fragment.nodes.indices) {
-                        values[fragment.nodes[node]] = checkedDifferenceSubtract(outcome.values[node], zero)
+                        values[fragment.nodes[node]] = subExactOrNull(outcome.values[node], zero)
                             ?: return ComponentCheck.Indeterminate
                     }
                     values
@@ -421,7 +421,7 @@ class DifferenceSearchComponent private constructor(
             }
             val edge = fragment.edges[edgeIndex]
             if (edge.source != fragment.edges[next].target) return false
-            sum = checkedDifferenceSum(sum, edge.bound) ?: return false
+            sum = addExactOrNull(sum, edge.bound) ?: return false
         }
         return sum < 0L
     }

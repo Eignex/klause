@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -96,8 +97,8 @@ internal class SliceBudget(
     }
 
     /** Work spent so far: nodes plus LP and propagation work, charged or not. */
-    fun spent(): Long = addWork(
-        addWork(nodeCount(), lpWork() / LP_WORK_PER_NODE), propagationWork() / PROPAGATION_WORK_PER_NODE,
+    fun spent(): Long = saturatedAdd(
+        saturatedAdd(nodeCount(), lpWork() / LP_WORK_PER_NODE), propagationWork() / PROPAGATION_WORK_PER_NODE,
     )
 
     /** Whether the armed slice has spent its allowance. */
@@ -108,7 +109,7 @@ internal class SliceBudget(
 
     fun workExpired(): Boolean = workBounded && sliceSpent() >= nodeAllowance
 
-    private fun sliceSpent(): Long = addWork((nodeCount() - nodeStart).coerceAtLeast(0L), auxiliaryNodes)
+    private fun sliceSpent(): Long = saturatedAdd((nodeCount() - nodeStart).coerceAtLeast(0L), auxiliaryNodes)
 
     /**
      * Spend the LP and propagation work done since the last charge from the slice's budget. The charge lands at a
@@ -118,10 +119,10 @@ internal class SliceBudget(
     fun charge() {
         if (!workBounded) return
         val nodes = (lpWork() - lpWorkMark) / LP_WORK_PER_NODE
-        auxiliaryNodes = addWork(auxiliaryNodes, nodes)
+        auxiliaryNodes = saturatedAdd(auxiliaryNodes, nodes)
         lpWorkMark += nodes * LP_WORK_PER_NODE
         val propagationNodes = (propagationWork() - propagationWorkMark) / PROPAGATION_WORK_PER_NODE
-        auxiliaryNodes = addWork(auxiliaryNodes, propagationNodes)
+        auxiliaryNodes = saturatedAdd(auxiliaryNodes, propagationNodes)
         propagationWorkMark += propagationNodes * PROPAGATION_WORK_PER_NODE
     }
 
@@ -131,14 +132,11 @@ internal class SliceBudget(
         charge()
         if (ownsWorkDebt) {
             val overspend = (sliceSpent() - nodeAllowance).coerceAtLeast(0L)
-            nodeDebt = addWork(nodeDebt, (overspend - settledOverspend).coerceAtLeast(0L))
+            nodeDebt = saturatedAdd(nodeDebt, (overspend - settledOverspend).coerceAtLeast(0L))
             settledOverspend = overspend
         }
     }
 }
-
-private fun addWork(left: Long, right: Long): Long =
-    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
 
 // Converts simplex and node-LP work to approximate CP-node cost for slice accounting.
 internal const val LP_WORK_PER_NODE = 600L

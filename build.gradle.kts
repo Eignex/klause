@@ -29,7 +29,7 @@ val kumulantPins = mapOf("jvm" to 130, "linuxx64" to 130, "linuxarm64" to 130, "
     .mapValues { (_, build) -> "0.3.4-20261105.142345-$build" }
 
 val utilPins = listOf("util", "util-jvm", "util-linuxx64", "util-linuxarm64", "util-macosarm64")
-    .associateWith { "0.0.1-20261116.095002-19" }
+    .associateWith { "0.0.1-20261116.114943-24" }
 
 if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.

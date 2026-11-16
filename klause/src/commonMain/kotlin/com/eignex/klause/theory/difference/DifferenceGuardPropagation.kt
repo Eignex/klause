@@ -5,14 +5,14 @@ import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.DifferencePathCompletion
 import com.eignex.klause.arithmetic.difference.DifferencePathEdges
 import com.eignex.klause.arithmetic.difference.DifferencePathScratch
-import com.eignex.klause.arithmetic.difference.checkedDifferenceSubtract
-import com.eignex.klause.arithmetic.difference.checkedDifferenceSum
 import com.eignex.klause.arithmetic.difference.differenceShortestPaths
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.addExactOrNull
+import com.eignex.util.numbers.subExactOrNull
 
 // Theory propagation of open guards whose edge would close a negative cycle, as in Cotton and Maler,
 // "Fast and Flexible Difference Constraint Propagation for DPLL(T)", SAT 2006, https://doi.org/10.1007/11814948_19.
@@ -116,9 +116,9 @@ internal class DifferenceGuardPropagation private constructor(
             stop.charge(1)
             if (stop()) return finish(ComponentResult.Indeterminate)
             if (!active[edge]) continue
-            val first = checkedDifferenceSum(potential[source[edge]], weights[edge])
+            val first = addExactOrNull(potential[source[edge]], weights[edge])
                 ?: return finish(ComponentResult.Consistent)
-            val reduced = checkedDifferenceSubtract(first, potential[target[edge]])
+            val reduced = subExactOrNull(first, potential[target[edge]])
                 ?: return finish(ComponentResult.Consistent)
             if (reduced < 0L) return finish(ComponentResult.Consistent)
         }
@@ -168,9 +168,9 @@ internal class DifferenceGuardPropagation private constructor(
                 val guard = base.edges[edge].guard
                 if (context.boolValue(Lit.variable(guard)) != null || !scratch.settled(source[edge])) continue
                 stop.charge(3)
-                val offset = checkedDifferenceSubtract(scratch.distance[source[edge]], potential[origin]) ?: continue
-                val distance = checkedDifferenceSum(offset, potential[source[edge]]) ?: continue
-                val cycle = checkedDifferenceSum(distance, weights[edge]) ?: continue
+                val offset = subExactOrNull(scratch.distance[source[edge]], potential[origin]) ?: continue
+                val distance = addExactOrNull(offset, potential[source[edge]]) ?: continue
+                val cycle = addExactOrNull(distance, weights[edge]) ?: continue
                 if (cycle >= 0L) continue
                 if (forcePoll()) return ComponentResult.Indeterminate
                 val path = scratch.pathTo(source[edge], source, stop)
@@ -208,11 +208,11 @@ internal class DifferenceGuardPropagation private constructor(
                 if (context.boolValue(Lit.variable(guard)) != Lit.isPositive(guard)) return null
                 literals.add(Lit.negate(guard))
             }
-            sum = checkedDifferenceSum(sum, weights[step]) ?: return null
+            sum = addExactOrNull(sum, weights[step]) ?: return null
             current = source[step]
         }
         if (current != target[edge]) return null
-        val cycle = checkedDifferenceSum(sum, weights[edge]) ?: return null
+        val cycle = addExactOrNull(sum, weights[edge]) ?: return null
         if (cycle >= 0L) return null
         stop.charge(literals.size.toLong())
         return if (forcePoll()) null else SearchExplanation(literals.toIntArray())

@@ -5,6 +5,7 @@ import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.pollStop
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.TimeSource
 
 internal enum class InprocessingKind { Root, Probe, Subsumption, Vivification }
@@ -39,7 +40,7 @@ internal class InprocessingSpending(private val kind: InprocessingKind) {
         } finally {
             val spent = budget.spent
             val added = (spent - budget.limit).coerceAtLeast(0L)
-            debt = saturatedWork(debt, added)
+            debt = saturatedAdd(debt, added)
             if (added > 0L) budget.note("DebtAdded", added)
             budget.note("Work", spent)
             stats.noteInprocessingDuration("inprocess${kind.name}", start.elapsedNow().inWholeNanoseconds)
@@ -116,6 +117,3 @@ internal fun SearchStatsSink?.noteInprocessingDuration(prefix: String, nanos: Lo
     }
     noteInprocessing("${prefix}Latency$bucket", 1L)
 }
-
-internal fun saturatedWork(left: Long, right: Long): Long =
-    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right

@@ -14,6 +14,7 @@ import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.AtomicCells
 import com.eignex.util.concurrent.Mutex
 import com.eignex.util.concurrent.SerialCells
+import com.eignex.util.numbers.saturatedAdd
 
 internal class QuadraticNativeScope private constructor(
     private val params: PolynomialTheoryParams,
@@ -127,7 +128,7 @@ internal class QuadraticNativeScope private constructor(
         private val dyadicBases = WorkCounter(concurrency, -1L)
         private val coupledWorkDeclines = WorkCounter(concurrency, -1L)
         private val dyadicPreExtractionDeclines = WorkCounter(concurrency, -1L)
-        val work: Long get() = sum(polynomialWork.value, quadraticWork.value)
+        val work: Long get() = saturatedAdd(polynomialWork.value, quadraticWork.value)
 
         fun observe(stats: QfNraStats) {
             projected.add(stats.projectedPolynomials)
@@ -143,5 +144,3 @@ internal class QuadraticNativeScope private constructor(
             coupledWorkDeclines.value.takeIf { it >= 0L }, dyadicPreExtractionDeclines.value.takeIf { it >= 0L })
     }
 }
-
-private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)

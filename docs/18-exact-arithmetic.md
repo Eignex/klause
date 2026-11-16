@@ -284,8 +284,10 @@ scatter, gather and pivot-candidate slices in `util.SparseSlices`. Koblas suppli
 validated CSC containers, structural transposes and vector/indexed kernels; Kumulant
 supplies online statistics and adaptive bandits. Eignex Util supplies primitive
 collections, array algorithms, exact integer and rational primitives, signed integer
-division, saturating arithmetic and synchronous locks.
-They do not select models, routes or result semantics.
+division, checked and saturating arithmetic, and synchronous locks. Checked Long
+operations provide throwing and nullable results; solver paths use nullable results
+when overflow declines a deduction. These dependencies do not select models, routes
+or result semantics.
 
 The [root build](../build.gradle.kts) pins immutable timestamps for KMP roots and
 platform modules. Modules consuming Kumulant declare strict Koblas constraints at

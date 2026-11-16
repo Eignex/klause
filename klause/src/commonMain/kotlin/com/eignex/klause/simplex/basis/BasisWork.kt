@@ -268,5 +268,5 @@ internal val ForrestTomlinWork.units: Long
 
 internal fun saturatedAdd(left: Long, right: Long): Long {
     require(left >= 0 && right >= 0)
-    return if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
+    return com.eignex.util.numbers.saturatedAdd(left, right)
 }
