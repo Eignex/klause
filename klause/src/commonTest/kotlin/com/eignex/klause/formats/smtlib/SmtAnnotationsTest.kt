@@ -88,15 +88,14 @@ class SmtAnnotationsTest {
     @Test
     fun `closed named terms support deep lexical binding chains`() {
         val depth = 10_000
-        val body = buildString {
-            for (index in 0 until depth) {
-                val value = if (index == 0) "true" else "b${index - 1}"
-                append("(let ((b$index $value)) ")
-            }
-            append("b${depth - 1}")
-            repeat(depth) { append(')') }
+        var body: SExpr = SExpr.Atom("b${depth - 1}")
+        for (index in depth - 1 downTo 0) {
+            val value = if (index == 0) "true" else "b${index - 1}"
+            val binding = SExpr.SList(listOf(SExpr.Atom("b$index"), SExpr.Atom(value)))
+            body = SExpr.SList(listOf(SExpr.Atom("let"), SExpr.SList(listOf(binding)), body))
         }
-        val commands = SExprReader("(assert (! $body :named label))").readAll()
+        val annotation = SExpr.SList(listOf(SExpr.Atom("!"), body, SExpr.Atom(":named"), SExpr.Atom("label")))
+        val commands = listOf(SExpr.SList(listOf(SExpr.Atom("assert"), annotation)))
 
         val result = normalizeSmtSourceCommands(commands, SmtLibScope(ExecutionControl.Never), ExecutionControl.Never)
 

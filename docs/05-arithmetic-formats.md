@@ -271,6 +271,8 @@ switching destinations closes the previous owned sink, and reset restores both d
 
 Annotations normalize before typed capture. Closed `:named` subterms introduce
 nullary definitions in postorder, while other metadata leaves the term unchanged.
+The scope infers each named body's sort and registers its typed definition in one
+operation; the containing command still validates its own lexical context.
 Explicit binding entry and exit frames share counted lexical names, keeping live
 scope storage linear in nested bindings; annotation and closedness walks charge
 the same execution control.

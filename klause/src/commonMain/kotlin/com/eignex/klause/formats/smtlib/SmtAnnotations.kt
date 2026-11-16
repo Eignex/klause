@@ -66,10 +66,11 @@ internal fun normalizeSmtSourceCommands(
                                         .any { it in bound }) {
                                     smtUnsupported(":named requires a closed term")
                                 }
-                                val sort = scope.termSort(body)
-                                    ?: smtUnsupported(":named requires a closed well-sorted term")
-                                accept(SExpr.SList(listOf(SExpr.Atom("define-fun"), label, SExpr.SList(emptyList()),
-                                    SExprReader(sort.toSmtLib()).readAll().single(), body)))
+                                val sort = scope.defineClosedConstant(label, body)
+                                    ?: smtUnsupported(":named requires a fresh symbol and a closed well-sorted term")
+                                normalized += SExpr.SList(listOf(SExpr.Atom("define-fun"), label,
+                                    SExpr.SList(emptyList()),
+                                    SExprReader(sort.toSmtLib()).readAll().single(), body))
                             }
                         }
                         values += body

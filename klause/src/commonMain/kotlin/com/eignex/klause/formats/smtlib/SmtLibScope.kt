@@ -74,9 +74,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     fun command(expression: SExpr): Boolean {
         val command = expression as? SExpr.SList ?: return false
         val head = command.polynomialHead()
-        if (exited || (querySeen && head !in setOf("get-model", "get-objectives", "exit", "set-info", "set-option"))) {
-            return false
-        }
+        if (!acceptsCommand(head)) return false
         return when (head) {
             "declare-datatype", "declare-datatypes" -> {
                 for ((spelling, arity) in datatypes.headers(command)) {
@@ -153,10 +151,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             }
             "define-fun" -> {
                 command.polynomialSize(5)
-                val name = command.polynomialName(1)
-                if (name in globals || datatypes.hasOperator(name) || theoryFunction(name) || reservedName(name)) {
-                    return false
-                }
+                val label = command.items[1] as? SExpr.Atom ?: smtUnsupported("malformed polynomial symbol")
+                val name = definitionName(label) ?: return false
                 val parameters = command.items.getOrNull(2) as? SExpr.SList ?: return false
                 val names = ArrayList<String>()
                 val uniqueNames = HashSet<String>()
@@ -176,13 +172,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     names[index] to term("parameter:${symbolIdentity++}", emptyList(), sorts[index])
                 }
                 val body = sort(command.items.getOrNull(4) ?: return false, Locals(locals, null)) ?: return false
-                if (!accepts(result, nodes[body].sort)) return false
-                val identity = symbolIdentity++
-                globals[name] = Signature(sorts, result, identity)
-                typedSymbols += SmtTypedSymbol(identity,
-                    SmtSourceDeclaration((command.items[1] as SExpr.Atom).text, sorts, result),
-                    SmtTypedDefinition(names.map { locals.getValue(it) }, body))
-                true
+                registerDefinition(name, SmtSourceDeclaration(label.text, sorts, result),
+                    names.map { locals.getValue(it) }, body)
             }
             "assert", "minimize", "maximize" -> {
                 command.polynomialSize(2)
@@ -230,6 +221,36 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             }
             else -> smtUnsupported("unsupported command '$head'")
         }
+    }
+
+    private fun acceptsCommand(head: String): Boolean = !exited &&
+        (!querySeen || head in setOf("get-model", "get-objectives", "exit", "set-info", "set-option"))
+
+    private fun definitionName(label: SExpr.Atom): String? {
+        val name = SExpr.SList(listOf(label)).polynomialName(0)
+        return name.takeUnless {
+            it in globals || datatypes.hasOperator(it) || theoryFunction(it) || reservedName(it)
+        }
+    }
+
+    private fun registerDefinition(name: String, declaration: SmtSourceDeclaration,
+        parameters: List<Int>, body: Int): Boolean {
+        if (!accepts(declaration.result, nodes[body].sort)) return false
+        val identity = symbolIdentity++
+        globals[name] = Signature(declaration.parameters, declaration.result, identity)
+        typedSymbols += SmtTypedSymbol(identity, declaration, SmtTypedDefinition(parameters, body))
+        return true
+    }
+
+    internal fun defineClosedConstant(label: SExpr.Atom, body: SExpr): SmtSort? {
+        if (!acceptsCommand("define-fun")) return null
+        val name = definitionName(label) ?: return null
+        val node = sort(body, null) ?: return null
+        val result = nodes[node].sort
+        if (!registerDefinition(name, SmtSourceDeclaration(label.text, emptyList(), result), emptyList(), node)) {
+            return null
+        }
+        return result
     }
 
     internal fun termSort(expression: SExpr): SmtSort? = sort(expression, null)?.let { nodes[it].sort }
