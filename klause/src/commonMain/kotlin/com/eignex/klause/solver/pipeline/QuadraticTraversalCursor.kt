@@ -74,7 +74,7 @@ internal class QuadraticTraversalCursor(
             }
             when (val event = traversal.next()) {
                 is SearchOutcome.Found -> pending = event.sample
-                is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> {
+                is SearchOutcome.Exhausted, is SearchOutcome.BudgetCapped -> {
                     terminal = event
                     return event
                 }
@@ -84,7 +84,7 @@ internal class QuadraticTraversalCursor(
                 }
             }
         }
-        terminal = SearchOutcome.BudgetCapped
+        terminal = SearchOutcome.BudgetCapped()
         return terminal
     }
 

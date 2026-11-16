@@ -439,8 +439,11 @@ class Portfolio(
                     verdicts.filterIsInstance<SolveResult.Unknown>().map { it.reason },
                 ), stats)
             } else {
-                SolveResult.Unknown(if (run.workLimitReached) TerminationReason.BudgetExhausted
-                else TerminationReason.Cancelled, stats)
+                SolveResult.Unknown(when {
+                    run.token.deadline()?.hasPassedNow() == true -> TerminationReason.Timeout
+                    run.workLimitReached -> TerminationReason.BudgetExhausted
+                    else -> TerminationReason.Cancelled
+                }, stats)
             }
         }
     }
@@ -826,6 +829,7 @@ class Portfolio(
         // ExecutionControl or retirement stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
         val reason = when {
             run.allRetired -> PortfolioReduction.unsettledReason(stopReasons)
+            run.token.deadline()?.hasPassedNow() == true -> TerminationReason.Timeout
             run.workLimitReached -> TerminationReason.BudgetExhausted
             else -> TerminationReason.Cancelled
         }

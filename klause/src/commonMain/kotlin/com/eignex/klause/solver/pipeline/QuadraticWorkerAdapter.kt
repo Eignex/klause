@@ -371,7 +371,7 @@ internal class QuadraticWorkerAdapter(
                     is SearchOutcome.Exhausted -> return repairPoint?.let {
                         ExactNeighborhoodResult.Witness(it.sample)
                     } ?: if (event.indeterminate) ExactNeighborhoodResult.Undecided else ExactNeighborhoodResult.Refuted
-                    SearchOutcome.BudgetCapped, null -> return ExactNeighborhoodResult.Undecided
+                    is SearchOutcome.BudgetCapped, null -> return ExactNeighborhoodResult.Undecided
                 }
             }
             return ExactNeighborhoodResult.Undecided

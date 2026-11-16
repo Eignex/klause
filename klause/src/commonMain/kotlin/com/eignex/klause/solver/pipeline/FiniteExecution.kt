@@ -47,6 +47,8 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.terminationReason
 import com.eignex.klause.solver.result.withPresolve
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.LinearSourceCheck
@@ -333,7 +335,14 @@ sealed class FiniteSolveOutcome {
          * variable id, along which [bestSample] stays feasible and the objective strictly decreases.
          */
         val unboundedDirection: List<BigFraction>? = null,
-    ) : FiniteSolveOutcome()
+    ) : FiniteSolveOutcome() {
+        private var recordedReason: TerminationReason? = null
+
+        /** Recorded cause of an incomplete result; absent for a definitive verdict. */
+        val terminationReason: TerminationReason? get() = recordedReason
+
+        internal fun withTerminationReason(reason: TerminationReason?): Completed = apply { recordedReason = reason }
+    }
 }
 
 /** Verdict vocabulary exposed by the finite solve facade. */
@@ -456,6 +465,7 @@ private sealed class FiniteExecutionResult {
         val unboundedDirection: List<BigFraction>? = null,
         val nativeSourceResult: SolveResult? = null,
         val nativeSourceMinimum: MinimizeResult? = null,
+        val terminationReason: TerminationReason? = null,
     ) : FiniteExecutionResult() {
         var completeSearchAdmitted: Boolean? = null
         var nativeObjectiveBound: FiniteObjectiveBound? = null
@@ -565,7 +575,8 @@ internal fun FinitePipeline.solve(
         return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
             Duration.ZERO,
-            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L)
+                .withTerminationReason(request.interruptedReason()),
         )
     }
     val preparationStart = TimeSource.Monotonic.markNow()
@@ -597,7 +608,8 @@ internal fun FinitePipeline.solve(
         return result(
             preparation,
             preparationElapsed,
-            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L)
+                .withTerminationReason(request.interruptedReason()),
         )
     }
     val objectiveCoordinates = if (!stop() && !request.presolveCancellation() &&
@@ -818,7 +830,7 @@ private fun FiniteExecutionResult.toSolveOutcome(): FiniteSolveOutcome = when (t
         bestSample,
         elapsedMs,
         unboundedDirection,
-    )
+    ).withTerminationReason(terminationReason)
 }
 
 private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSolveOutcome = when (this) {
@@ -829,7 +841,7 @@ private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSol
         bestSample,
         elapsedMs,
         unboundedDirection,
-    )
+    ).withTerminationReason(terminationReason)
 
     else -> this
 }
@@ -864,6 +876,7 @@ private fun FiniteExecutionResult.reconstructed(
             point,
             elapsedMs,
             direction,
+            terminationReason = terminationReason,
         )
     }
 }
@@ -925,6 +938,7 @@ private fun executeSourceFinite(
         sample,
         start.elapsedNow().inWholeMilliseconds,
         nativeSourceResult = solved,
+        terminationReason = (solved as? SolveResult.Unknown)?.reason,
     )
 }
 
@@ -964,6 +978,7 @@ private fun executeSourceMinimum(
         start.elapsedNow().inWholeMilliseconds,
         (result as? MinimizeResult.Unbounded)?.direction,
         nativeSourceMinimum = result,
+        terminationReason = result.incompleteReason(),
     )
 }
 
@@ -1039,17 +1054,20 @@ private fun executeFixedSatisfy(
             solutions = if (result is SolveResult.Sat) 1 else 0,
             bestSample = null,
             elapsedMs = start.elapsedNow().inWholeMilliseconds,
+            terminationReason = (result as? SolveResult.Unknown)?.reason,
         )
     }
 
     var solutions = 0L
     var timedOut = false
     var indeterminate = false
+    var reason: TerminationReason? = null
     for (outcome in solver.enumerationOutcomes(params)) {
         when (outcome) {
             is SearchOutcome.Found -> {
                 if (request.deadlineExceeded()) {
                     timedOut = true
+                    reason = TerminationReason.Timeout
                     break
                 }
                 callbacks.onSample(outcome.sample)
@@ -1059,11 +1077,18 @@ private fun executeFixedSatisfy(
 
             is SearchOutcome.Exhausted -> {
                 indeterminate = outcome.indeterminate
+                if (indeterminate) reason = outcome.stopCause.terminationReason()
                 break
             }
 
-            SearchOutcome.BudgetCapped -> {
+            is SearchOutcome.BudgetCapped -> {
                 timedOut = true
+                reason = outcome.stopCause?.terminationReason() ?: when {
+                    request.deadlineExceeded() -> TerminationReason.Timeout
+                    request.nodeBudget?.exhausted() == true -> TerminationReason.BudgetExhausted
+                    request.cancellation() -> TerminationReason.Cancelled
+                    else -> TerminationReason.BudgetExhausted
+                }
                 break
             }
         }
@@ -1079,6 +1104,7 @@ private fun executeFixedSatisfy(
         solutions = solutions,
         bestSample = null,
         elapsedMs = start.elapsedNow().inWholeMilliseconds,
+        terminationReason = reason,
     )
 }
 
@@ -1092,8 +1118,10 @@ private fun executeFixedOptimize(
     var solutions = 0L
     var stats = SolveStats.EMPTY
     var bestSample: Sample? = null
+    var reason: TerminationReason? = null
     for (step in solver.improvements(objective, params)) {
         stats = step.stats
+        reason = step.incompleteReason()
         when (step) {
             is MinimizeResult.WithSample -> {
                 callbacks.onSample(step.sample)
@@ -1134,6 +1162,7 @@ private fun executeFixedOptimize(
                 solutions = solutions,
                 bestSample = bestSample,
                 elapsedMs = start.elapsedNow().inWholeMilliseconds,
+                terminationReason = step.reason,
             )
         }
     }
@@ -1147,6 +1176,7 @@ private fun executeFixedOptimize(
         solutions = solutions,
         bestSample = bestSample,
         elapsedMs = start.elapsedNow().inWholeMilliseconds,
+        terminationReason = reason,
     )
 }
 
@@ -1336,9 +1366,9 @@ private fun executePortfolio(
                 callbacks.onImprovement(improvement.toFiniteImprovement())
                 streamed++
             }
-            executePortfolioOptimize(result, streamed, !request.engine.pureLocalSearch, callbacks, start)
+            executePortfolioOptimize(result, streamed, callbacks, start)
         } else {
-            executePortfolioSatisfy(it.solve(request.cancellation), !request.engine.pureLocalSearch, callbacks, start)
+            executePortfolioSatisfy(it.solve(request.cancellation), callbacks, start)
         }
         completed.nativeObjectiveBound = finiteObjectiveBound(it.nativeObjectiveBound, request.sourceMapping)
         return completed.withCompleteSearch(it.completeSearchAdmitted)
@@ -1364,7 +1394,6 @@ internal fun clausalDefaultScenario(
 
 private fun executePortfolioSatisfy(
     result: SolveResult,
-    complete: Boolean,
     callbacks: FiniteExecutionCallbacks,
     start: TimeMark,
 ): FiniteExecutionResult.Completed {
@@ -1374,7 +1403,7 @@ private fun executePortfolioSatisfy(
             FiniteExecutionVerdict.SAT
         }
 
-        is SolveResult.Unsat -> if (complete) FiniteExecutionVerdict.UNSAT else FiniteExecutionVerdict.UNKNOWN
+        is SolveResult.Unsat -> FiniteExecutionVerdict.UNSAT
 
         is SolveResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
     }
@@ -1384,13 +1413,13 @@ private fun executePortfolioSatisfy(
         solutions = if (result is SolveResult.Sat) 1 else 0,
         bestSample = null,
         elapsedMs = start.elapsedNow().inWholeMilliseconds,
+        terminationReason = (result as? SolveResult.Unknown)?.reason,
     )
 }
 
 private fun executePortfolioOptimize(
     result: MinimizeResult,
     streamed: Long,
-    complete: Boolean,
     callbacks: FiniteExecutionCallbacks,
     start: TimeMark,
 ): FiniteExecutionResult.Completed {
@@ -1398,7 +1427,7 @@ private fun executePortfolioOptimize(
         is MinimizeResult.Optimal -> FiniteExecutionVerdict.OPTIMAL
         is MinimizeResult.Unbounded -> FiniteExecutionVerdict.UNBOUNDED
         is MinimizeResult.BestFound -> FiniteExecutionVerdict.BEST_FOUND
-        is MinimizeResult.Infeasible -> if (complete) FiniteExecutionVerdict.UNSAT else FiniteExecutionVerdict.UNKNOWN
+        is MinimizeResult.Infeasible -> FiniteExecutionVerdict.UNSAT
         is MinimizeResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
     }
     val sample = (result as? MinimizeResult.WithSample)?.sample
@@ -1416,7 +1445,21 @@ private fun executePortfolioOptimize(
         bestSample = sample,
         elapsedMs = start.elapsedNow().inWholeMilliseconds,
         unboundedDirection = (result as? MinimizeResult.Unbounded)?.direction,
+        terminationReason = result.incompleteReason(),
     )
+}
+
+private fun FiniteSolveRequest.interruptedReason(): TerminationReason = when {
+    deadlineExceeded() || cancellation.deadline()?.hasPassedNow() == true -> TerminationReason.Timeout
+    nodeBudget?.exhausted() == true -> TerminationReason.BudgetExhausted
+    cancellation() -> TerminationReason.Cancelled
+    else -> TerminationReason.BudgetExhausted
+}
+
+private fun MinimizeResult.incompleteReason(): TerminationReason? = when (this) {
+    is MinimizeResult.Unknown -> reason
+    is MinimizeResult.BestFound -> reason
+    else -> null
 }
 
 private fun localSearchDryRun(pool: List<() -> LocalSearchRecipe>?): FiniteExecutionResult.DryRun {

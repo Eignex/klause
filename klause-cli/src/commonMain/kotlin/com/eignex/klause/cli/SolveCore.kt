@@ -546,6 +546,7 @@ internal object SolveCore {
                 output.onVerdictContext(
                     VerdictContext(
                         budgetExhausted = budgetSpent(common, outcome.stats.run.timedOut),
+                        terminationReason = outcome.terminationReason,
                         completePool = result.completeSearchAdmitted,
                     ),
                 )

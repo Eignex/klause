@@ -6,6 +6,10 @@ outputs consistent. Before publication a zero-violation candidate passes
 [source validation](07-presolve.md#source-witness-validation) of the relations the walk
 cannot score and arithmetic completion. Unsuccessful search supplies no
 refutation or optimum proof.
+Root propagation over the declared finite domains can prove infeasibility before
+the walk starts. Satisfaction and optimization retain that proof even in a pure
+local-search portfolio. A refutation of a private float grid remains scoped to
+that grid, as described in [finite formats](04-finite-formats.md#flatzinc-floats).
 
 Optional phase timing partitions active preparation, seeding, selection,
 application, publication and other time. Publication includes synchronous offers

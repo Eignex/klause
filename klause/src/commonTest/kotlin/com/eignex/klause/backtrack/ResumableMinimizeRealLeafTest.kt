@@ -793,7 +793,8 @@ class ResumableMinimizeRealLeafTest {
             BacktrackSolver(problem).resumable(LinearObjective(boolWeights = longArrayOf(1L)), params).use { search ->
                 val result = assertIs<MinimizeResult.Unknown>(search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
 
-                assertEquals(TerminationReason.Unsupported, result.reason)
+                assertEquals(if (cause == SearchStopCause.RepresentationDecline) TerminationReason.RepresentationDeclined
+                else TerminationReason.BudgetExhausted, result.reason)
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
                 assertEquals(

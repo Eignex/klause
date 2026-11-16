@@ -73,7 +73,7 @@ internal class SourceWitnessPublication(
         if (!failed) return result
         return FiniteSolveResult(result.preparation, result.preparationElapsed, FiniteSolveOutcome.Completed(
             FiniteSolveVerdict.UNKNOWN, completed?.stats ?: SolveStats.EMPTY, 0L, null, completed?.elapsedMs ?: 0L,
-        )).also { it.bindCompleteSearchAdmission(result.completeSearchAdmitted) }
+        ).withTerminationReason(reason)).also { it.bindCompleteSearchAdmission(result.completeSearchAdmitted) }
     }
 
     fun callbacks(original: SourceExecutionCallbacks): SourceExecutionCallbacks {

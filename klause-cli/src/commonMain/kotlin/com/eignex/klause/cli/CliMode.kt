@@ -588,7 +588,7 @@ internal enum class Verdict {
 internal class VerdictContext(
     /** The wall-clock budget fired before the search finished. */
     val budgetExhausted: Boolean = false,
-    /** Precise open-theory stop reason when one is available. */
+    /** Recorded solver stop reason when one is available. */
     val terminationReason: TerminationReason? = null,
     /** Resolved complete-search admission; absent when preparation ended before strategy selection. */
     val completePool: Boolean? = null,
