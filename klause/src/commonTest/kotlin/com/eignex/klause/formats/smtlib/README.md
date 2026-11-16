@@ -84,7 +84,7 @@ or Boolean branches whose value is already known.
 | Annotations | General attributes parsed; closed `:named` subterms introduce nullary definitions in left-to-right post-order, with ordinary declaration lifetime and visibility within the same command | `SmtLibSessionTest` |
 | Recursive definitions | Definitions constrain every argument, including unused functions; productive checked SAT/UNSAT controls; an unresolved definition cannot justify SAT by finite unfolding alone | `SmtLibSessionTest` |
 | Declaration policy | Semantic numeric endpoints apply only to original numeric constants; composite IDs, function values and private encoding coordinates do not inherit them | `SmtLibSemanticsTest`, `SmtLibBitVectorTest`, `SmtGroundFunctionsTest`, `SmtGroundDatatypesTest` |
-| Model reconstruction | Original declarations and source sorts; total function/default-array values; actual constructor trees; no public auxiliary IDs; exact rational/algebraic/symbolic authority retained | `SmtSourceModelTest`, `SmtSemanticEqualityTest`, C01/C03/C05/C07/C10 |
+| Model reconstruction | Original declarations and source sorts; total function/default-array values; actual constructor trees; no public auxiliary IDs; exact rational/algebraic/symbolic authority retained | `SmtSourceModelTest`, `SmtSemanticEqualityTest`, C01/C03/C05/C07/C10/C32/C33 |
 | Model syntax | Qualified abstract values, fresh function formals, no forward references to ordinary model definitions; monomorphic get-value terms; consistent reuse of prior abstract values | `SmtSourceModelTest`, `SmtLibSessionTest` |
 | Publication | Source checks precede callbacks and final SAT/optimum publication, including finite shapes, native formulas and quadratic samples; rejection/unavailability/interruption removes unchecked terminal authority | `SourceWitnessValidationTest`, `SourceExecutionTest`, `SmtSemanticEqualityTest` |
 | Resources | Admission and current execution allowances are independent; compound closure, circuit work and exact comparisons poll/charge cancellation; attachments retain no shared execution state | `SourceWitnessValidationTest`, family cancellation tests |
@@ -180,6 +180,12 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | C29 | `mutual recursive definitions retain total interpretations at new arguments` | SAT; mutually defined parity functions retain their total meaning on later inputs |
 | C30 | `mutual recursive equations refute inconsistent ground applications` | UNSAT; simultaneous recursive equations require both observed applications to agree |
 | C31 | `assignment queries evaluate true and false named terms in the checked model` | Actual SAT/assignment transcript reports both selected truth values |
+| C32 | `retained symbolic coordinates preserve native inverse identities` | A captured native exp(1) coordinate satisfies log(x)=1 and differs from its approximate placeholder zero without re-solving |
+| C33 | `symbolic query syntax cannot replace unavailable native authority` | A matching printed symbolic term without certified authority declines arithmetic evaluation |
+
+C32 and C33 cover retained representations of the existing real-function
+extensions. Their expected results use mathematical inverse/sign identities and
+the native coordinate certificate.
 
 The V fixtures exercise typed `get-value` evaluation in a retained empty model,
 which still interprets every standard builtin. They complement source-lowering

@@ -108,6 +108,7 @@ Terms	!	C21; SmtAnnotationsTest; SmtSessionValidationTest
 Terms	attribute	C21; SmtAnnotationsTest; SmtSessionValidationTest
 Terms	:named	C21; SmtAnnotationsTest; SmtSessionValidationTest
 Source model	native exact composite equality	C18; SmtSemanticEqualityTest; SmtArrayValuesTest
+Source model	retained native symbolic authority	C32; C33; SourceSamplesTest#exact native equality should retain algebraic and symbolic coordinate authority
 Source model	total arithmetic choices	C19; SmtFixedModelTest; SmtArithmeticReductionTest
 Source model	total selector choices	C20; SmtGroundDatatypesTest
 Source model	abstract domain values	C24; SmtGroundFunctionsTest

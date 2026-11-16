@@ -2,6 +2,9 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
+import com.eignex.klause.arithmetic.real.ExactRealFunction
+import com.eignex.klause.arithmetic.real.ExactRealValue
+import com.eignex.klause.arithmetic.real.toExactRealValue
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -21,6 +24,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -581,6 +585,39 @@ class SmtQfConformanceTest {
         assertEquals("sat", replies[0])
         val assignment = SExprReader(replies[1]).readAll().single() as SExpr.SList
         assertEquals(listOf("(falsehood false)", "(truth true)"), assignment.items.map { it.smtText() }.sorted())
+    }
+
+    @Test
+    fun `retained symbolic coordinates preserve native inverse identities`() {
+        val parsed = SmtLib.parse("(declare-const x Real)")
+        val exponential = smtExactArithmetic(ExecutionControl.Never)
+            .function(ExactRealFunction.EXP, BigFraction.ONE.toExactRealValue())
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), symbolicReals = listOf(exponential))
+
+        val model = parsed.reconstructSessionModel(sample)
+
+        assertEquals("true", model.evaluate(SExprReader("(= (log x) 1.0)").readAll().single()))
+        assertEquals("false", model.evaluate(SExprReader("(= x 0.0)").readAll().single()))
+    }
+
+    @Test
+    fun `symbolic query syntax cannot replace unavailable native authority`() {
+        val source = SExprReader("(declare-const x Real)").readAll()
+        val value = SmtValue.Real("(exp 1.0)")
+        val declaration = SmtSourceDeclaration("x", emptyList(), SmtSort.Real)
+        val values = object : SmtModelValues {
+            override fun checkpoint(units: Long) = Unit
+            override fun boolean(name: String): Boolean = error(name)
+            override fun integer(name: String): String = error(name)
+            override fun real(name: String): String = value.term
+            override fun value(name: String): SmtValue = value
+            override fun exactReal(value: SmtValue.Real): ExactRealValue? = null
+        }
+        val model = SmtFixedModel(source, SmtSourceModel(listOf(declaration to value)), values, ExecutionControl.Never)
+
+        assertFailsWith<UnsupportedSmtException> {
+            model.evaluate(SExprReader("(= (log x) 1.0)").readAll().single())
+        }
     }
 
     private fun solveSession(text: String): SmtSessionResult {
