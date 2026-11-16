@@ -937,15 +937,16 @@ internal class ResumableMinimize(
     }
 
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
+        val reason = (run.componentStop?.stopCause ?: searchSession.executionControls.stopCause).terminationReason()
         if (sawIndeterminateLeaf) observeIncomplete(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf)
         sink.stop()
         val stats = sink.snapshot()
         val b = incumbents.current()
         return when {
             b != null && sawIndeterminateLeaf ->
-                MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.Unsupported, stats)
+                MinimizeResult.BestFound(b.assignment, b.objective.display, reason, stats)
 
-            sawIndeterminateLeaf -> MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
+            sawIndeterminateLeaf -> MinimizeResult.Unknown(reason, stats)
 
             externalShared && b != null ->
                 MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.SearchExhausted, stats)
