@@ -371,6 +371,11 @@ operation checks independently validate retained quotient, floor and power value
 before a witness is published.
 Arithmetic operands containing the partial logarithm extension retain their
 conditional activation, including the auxiliary equations and original checks.
+Mandatory constant equalities can substitute exact source coordinates before
+arithmetic reduction; their original defining equalities remain in the encoded
+source. Closed arithmetic and certified function enclosures simplify exact floors
+without introducing a finite search window. Zero-division interpretations retain
+the selected ground results and one total default for later fixed-model queries.
 
 ### Polynomial source lowering
 

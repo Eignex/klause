@@ -21,6 +21,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 class SmtArithmeticReductionTest {
+    private var diagnostic: String? = null
     @Test
     fun `variable integer division should keep euclidean signs`() {
         val input = SmtLib.parse("(declare-const n Int) (declare-const d Int) " +
@@ -29,7 +30,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -39,7 +40,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -49,7 +50,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -59,7 +60,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -68,7 +69,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -78,7 +79,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -88,7 +89,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -98,7 +99,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -108,7 +109,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -117,7 +118,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -127,7 +128,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -136,7 +137,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -146,7 +147,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -155,7 +156,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -165,7 +166,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -175,7 +176,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -185,7 +186,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
@@ -208,7 +209,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -217,7 +218,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -227,7 +228,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -240,7 +241,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNKNOWN, result)
+        assertEquals(FiniteSolveVerdict.UNKNOWN, result, diagnostic)
     }
 
     @Test
@@ -249,7 +250,7 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.SAT, result)
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
     }
 
     @Test
@@ -260,13 +261,13 @@ class SmtArithmeticReductionTest {
 
         val result = solve(input)
 
-        assertEquals(FiniteSolveVerdict.UNSAT, result)
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
     }
 
     @Test
     fun `source integer power checks should reject an incorrect candidate`() {
         val values = object : SmtModelValues {
-            override val cancellation = com.eignex.klause.util.Cancellation.Never
+            override val cancellation = com.eignex.klause.util.ExecutionControl.Never
             override fun checkpoint(units: Long) = Unit
             override fun integer(name: String): String = mapOf("b" to "2", "e" to "3", "r" to "7").getValue(name)
             override fun boolean(name: String): Boolean = error("unexpected Boolean")
@@ -277,6 +278,38 @@ class SmtArithmeticReductionTest {
         val accepted = SmtArithmeticCheck(SmtArithmeticOperation.POWER, listOf("b", "e", "r")).check(values)
 
         assertEquals(false, accepted)
+    }
+
+    @Test
+    fun `zero division interpretation should retain the selected result`() {
+        val original = SmtLib.parse("(assert (= (div 4 0) 12))")
+        var interpretation: SmtValue.Function? = null
+        val input = original.copy(sourceChecks = original.sourceChecks + SmtSourceCheck { values ->
+            interpretation = values.value("@operation:div") as SmtValue.Function
+            true
+        }).withSourceWitnessValidation()
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
+        assertEquals(listOf(listOf(SmtValue.Integer("4"), SmtValue.Integer("0")) to SmtValue.Integer("12")),
+            interpretation?.entries)
+    }
+
+    @Test
+    fun `unobserved zero division arguments should have one total default`() {
+        val original = SmtLib.parse("(declare-const |operation:div| Int) (assert (= |operation:div| 5))")
+        var interpretation: SmtValue.Function? = null
+        val input = original.copy(sourceChecks = original.sourceChecks + SmtSourceCheck { values ->
+            interpretation = values.value("@operation:div") as SmtValue.Function
+            values.integer("operation:div") == "5"
+        }).withSourceWitnessValidation()
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
+        assertEquals(SmtValue.Integer("0"), interpretation?.default)
+        assertEquals(emptyList(), interpretation?.entries)
     }
 
     private fun solve(input: SmtLibProblem): FiniteSolveVerdict {
@@ -295,6 +328,7 @@ class SmtArithmeticReductionTest {
             is SourceExecutionResult.Declined -> return FiniteSolveVerdict.UNKNOWN
             else -> error("unexpected arithmetic execution")
         }
+        diagnostic = native.toString()
         return when (native) {
             is OpenTheoryResult.Sat -> FiniteSolveVerdict.SAT
             is OpenTheoryResult.Unsat -> FiniteSolveVerdict.UNSAT

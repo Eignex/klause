@@ -7,7 +7,7 @@ import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO

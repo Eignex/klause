@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -9,10 +9,10 @@ import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
-internal fun reduceSmtArithmetic(input: SmtReduction, cancellation: Cancellation): SmtReduction =
+internal fun reduceSmtArithmetic(input: SmtReduction, cancellation: ExecutionControl): SmtReduction =
     SmtArithmeticReducer(input, cancellation).reduce()
 
-private class SmtArithmeticReducer(private val input: SmtReduction, private val cancellation: Cancellation) {
+private class SmtArithmeticReducer(private val input: SmtReduction, private val cancellation: ExecutionControl) {
     private data class Division(val numerator: SExpr, val denominator: SExpr, val quotient: SExpr,
         val remainder: SExpr?, val activation: String?)
     private data class Key(val operator: String, val arguments: List<Int>, val activation: String? = null)
@@ -40,8 +40,12 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
     private var identity = 0
     private var active: String? = null
     private var guardPartials = false
+    private val constants = SmtArithmeticConstants(cancellation)
+    private val fixings = LinkedHashMap<String, SExpr>()
+    private val scalarNames = LinkedHashMap<String, Pair<String, String>>()
 
     fun reduce(): SmtReduction {
+        collectFixings()
         for (declaration in input.declarations) {
             step()
             used += polynomialSymbol(declaration.name)
@@ -75,7 +79,13 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
                 else -> command
             }
         }.toMutableList()
-        if (declarations.isEmpty() && obligations.isEmpty()) return input.copy(commands = commands)
+        val interpretations = input.privateBindings + mapOf(
+            "@operation:div" to SmtArithmeticInterpretation(integerChecks.toList(), 2, false),
+            "@operation:mod" to SmtArithmeticInterpretation(integerChecks.toList(), 3, false),
+            "@operation:/" to SmtArithmeticInterpretation(realChecks.toList(), 2, true))
+        if (declarations.isEmpty() && obligations.isEmpty()) {
+            return input.copy(commands = commands, privateBindings = interpretations)
+        }
         // Definitions can depend on later private coordinates, so all scalar declarations precede formulas.
         val insertion = commands.indexOfFirst { it is SExpr.SList && it.polynomialHead() in setOf(
             "assert", "minimize", "maximize", "check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
@@ -93,7 +103,7 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
         commands.addAll(query, obligations.map { form("assert", it) })
         val checks = sourceChecks + listOf(SmtArithmeticCongruenceCheck(integerChecks.toList(), false),
             SmtArithmeticCongruenceCheck(realChecks.toList(), true))
-        return input.copy(commands = commands, checks = input.checks + checks)
+        return input.copy(commands = commands, checks = input.checks + checks, privateBindings = interpretations)
     }
 
     private fun rewrite(root: SExpr): SExpr {
@@ -106,7 +116,8 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
             when (val frame = work.removeLast()) {
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
-                        values.addLast(node)
+                        val value = fixings[polynomialSymbol(node.text)] ?: node
+                        values.addLast(value)
                         ids.addLast(atomIds.getOrPut(node.text) { nextNode++ })
                     }
                     is SExpr.SList -> {
@@ -150,7 +161,7 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
                     val key = Key(name ?: head.toString(), arguments, frame.activation)
                     active = frame.activation
                     val value = cache.getOrPut(key) {
-                        when (name) {
+                        constants.fold(name ?: "", args) ?: when (name) {
                             "div" -> args.reduce { a, b -> divide(a, b, remainder = false) }
                             "mod" -> divide(args[0], args[1], remainder = true)
                             "/" -> args.reduce(::divideReal)
@@ -171,6 +182,62 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
             }
         }
         return values.single()
+    }
+
+    private fun collectFixings() {
+        val premises = ArrayList<SExpr>()
+        for (expression in input.commands) {
+            step()
+            val command = expression as? SExpr.SList ?: continue
+            when (command.polynomialHead()) {
+                "declare-const", "declare-fun" -> {
+                    val sort = (command.items.lastOrNull() as? SExpr.Atom)?.text ?: continue
+                    val spelling = (command.items[1] as SExpr.Atom).text
+                    if (sort in setOf("Int", "Real", "Bool")) scalarNames[polynomialSymbol(spelling)] = spelling to sort
+                }
+                "assert" -> premises += command.items[1]
+            }
+        }
+        var changed: Boolean
+        do {
+            val previous = fixings.size
+            val work = ArrayDeque<SExpr>()
+            premises.forEach(work::addLast)
+            while (work.isNotEmpty()) {
+                step()
+                val premise = work.removeLast()
+                if (premise is SExpr.Atom) bind(premise, SExpr.Atom("true"))
+                else {
+                    premise as SExpr.SList
+                    when ((premise.items.firstOrNull() as? SExpr.Atom)?.text) {
+                        "and" -> premise.items.drop(1).forEach(work::addLast)
+                        "not" -> if (premise.items.size == 2) bind(premise.items[1], SExpr.Atom("false"))
+                        "=" -> for (index in 1 until premise.items.lastIndex) {
+                            bind(premise.items[index], premise.items[index + 1])
+                            bind(premise.items[index + 1], premise.items[index])
+                        }
+                    }
+                }
+            }
+            changed = previous != fixings.size
+        } while (changed)
+        for ((name, value) in fixings) {
+            obligations += form("=", SExpr.Atom(scalarNames.getValue(name).first), value)
+        }
+    }
+
+    private fun bind(expression: SExpr, candidate: SExpr) {
+        val symbol = (expression as? SExpr.Atom)?.text?.let(::polynomialSymbol) ?: return
+        if (symbol in fixings) return
+        val declaration = scalarNames[symbol] ?: return
+        val value = (candidate as? SExpr.Atom)?.text?.let(::polynomialSymbol)?.let(fixings::get) ?: candidate
+        if (declaration.second == "Bool") {
+            if ((value as? SExpr.Atom)?.text in setOf("true", "false")) fixings[symbol] = value
+        } else {
+            val number = constants.knownRational(value) ?: return
+            if (declaration.second == "Int" && number.den != com.eignex.util.numbers.BIG_ONE) return
+            fixings[symbol] = constants.literal(number)
+        }
     }
 
     private fun activation(parent: String?, condition: SExpr): String? {
