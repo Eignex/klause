@@ -415,8 +415,9 @@ at that point, and the side of each disequality, leave a polyhedron inside the s
 model, and the exact LP over it gives the next incumbent. A refutation proves the
 incumbent optimal, or the leaf infeasible when there is none. A polyhedron whose strict
 row keeps it from its infimum contributes that infimum as the row `c * x <= infimum`, so
-another polyhedron that attains it still decides the leaf; only a refuted infimum leaves
-the leaf undecided. The exact encoding is minimized first, and an exact optimum stands in
+another polyhedron that attains it still decides the leaf. A refuted infimum is the
+leaf's floor: its point stands as an incumbent, and the run reports an optimum only
+when its best is at or below every such floor. The exact encoding is minimized first, and an exact optimum stands in
 every mode, since it strains no relation. In numerical mode the model within the slack
 is minimized when the exact one refutes the leaf or cannot state it, and its optimum is
 reported at its point; a ray of that model's polyhedron proves the objective unbounded

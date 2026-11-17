@@ -3,9 +3,12 @@ package com.eignex.klause.theory
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.ResumableMinimize
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -101,6 +104,24 @@ class RealLeafOptimizationTest {
         val result = BacktrackSolver(source.bake()).minimize(objective)
 
         assertEquals(0.0, assertIs<MinimizeResult.Optimal>(result).objective)
+    }
+
+    @Test
+    fun `minimization should prove an optimum below a leaf infimum in either branch order`() {
+        // `b` holds exactly when `x > 1`: the side `b` approaches 1 without attaining it, the other side attains 0.
+        val source = Problem(
+            1, 0, emptyArray(),
+            arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE,
+                1.0, strict = true)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
+        ).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+
+        val results = listOf(IndomainMin, IndomainMax).associateWith { selector ->
+            BacktrackSolver(source).minimize(objective, BacktrackParams(randomSeed = 0L, valueSelector = selector))
+        }
+
+        assertEquals(listOf(0.0, 0.0), results.values.map { assertIs<MinimizeResult.Optimal>(it).objective })
     }
 
     @Test

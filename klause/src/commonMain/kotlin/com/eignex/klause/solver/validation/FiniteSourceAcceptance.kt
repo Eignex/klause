@@ -79,10 +79,12 @@ internal sealed interface RealOptimizationResult {
     class Refuted(override val withinTolerance: Boolean) : RealOptimizationResult
 
     // The minimum was not decided: a stop, a declining encoder, or an infimum the model does not attain. [incumbent]
-    // is the best point found, when there is one.
+    // is the best point found, when there is one. A complete search that refuted everything below [infimum] states it:
+    // the model attains no value at or below it, and attains values arbitrarily close above it.
     class Undecided(
         val incumbent: List<BigFraction>?,
         override val withinTolerance: Boolean,
+        val infimum: BigFraction? = null,
     ) : RealOptimizationResult
 }
 

@@ -3,19 +3,26 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -178,5 +185,62 @@ class SourceRecessionTest {
         )
 
         for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
+    }
+
+    // `x0` and `x1` within a tenth, free unless [lower] bounds `x0`, under the objective `x0`.
+    private fun provesWithinTenth(
+        factors: List<Factor>,
+        reals: List<BigFraction>,
+        direction: List<Long>,
+        lower: Double = Double.NEGATIVE_INFINITY,
+    ): Boolean {
+        val tenth = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+        val problem = Problem(
+            0, 0, emptyArray(), factors.toTypedArray(),
+            numRealVars = 2,
+            realLower = doubleArrayOf(lower, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+                feasibilityTolerance = tenth).resolve(),
+        )
+        val point = Sample(BooleanArray(0), LongArray(0), DoubleArray(2) { reals[it].toDouble() }, reals)
+        return problem.provesUnboundedWithinTolerance(LinearObjective(realCoefficients = doubleArrayOf(1.0, 0.0)),
+            point, direction.map(BigFraction::ofLong), tenth)
+    }
+
+    // `sum(coefficients(i) * x(reals(i))) op bound` over the reals alone.
+    private fun realRow(
+        reals: IntArray,
+        coefficients: DoubleArray,
+        op: LinearOp,
+        bound: Double,
+        strict: Boolean = false,
+    ) =
+        Linear(intArrayOf(), doubleArrayOf(), reals, coefficients, op, bound, strict)
+
+    // `x0 - x1 <= -0.05` holds only within the slack at the origin.
+    private val slackRow = realRow(intArrayOf(0, 1), doubleArrayOf(1.0, -1.0), LinearOp.LE, -0.05)
+    private val lowerRow = realRow(intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.05)
+    private val strictRow = realRow(intArrayOf(0, 1), doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0, strict = true)
+    private val disequality = realRow(intArrayOf(1), doubleArrayOf(1.0), LinearOp.NE, 5.0)
+
+    @Test
+    fun `provesUnboundedWithinTolerance should accept only a ray that keeps every residual within the slack`() {
+        val origin = listOf(BigFraction.ZERO, BigFraction.ZERO)
+        val unit = listOf(BigFraction.ONE, BigFraction.ONE)
+        val diagonal = listOf(-1L, -1L)
+
+        val cases = mapOf(
+            "slack row kept" to provesWithinTenth(listOf(slackRow), origin, diagonal),
+            "row residual grows" to provesWithinTenth(listOf(lowerRow), origin, listOf(-1L, 0L)),
+            "absolute value sign flips" to provesWithinTenth(listOf(RealAbs(0, 1)), unit, listOf(-1L, 1L)),
+            "strict row on its boundary" to provesWithinTenth(listOf(strictRow), origin, diagonal),
+            "disequality moved" to provesWithinTenth(listOf(disequality), origin, diagonal),
+            "toward a declared bound" to provesWithinTenth(emptyList(), origin, listOf(-1L, 0L), lower = -10.0),
+        )
+
+        assertEquals(mapOf("slack row kept" to true, "row residual grows" to false,
+            "absolute value sign flips" to false, "strict row on its boundary" to false, "disequality moved" to false,
+            "toward a declared bound" to false), cases)
     }
 }
