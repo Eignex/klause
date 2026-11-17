@@ -184,6 +184,10 @@ proofs and numerical claims keep their own cancellation boundaries.
 Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
 [LP certification](21-lp-engine.md#lp-certification); a floating status alone is
 insufficient. Strict infeasibility requires a completed strict-feasibility check.
+An encoder-owned relation needs no finite propagator for witness publication.
+If the original point checker is unavailable, the captured linear components check
+the same fully fixed source point, retaining private helpers and source conditions
+inside their query. This point check supplies no source-wide refutation.
 
 Complete affine source capture uses `LinearAuthorityInvocation` through
 `RationalTheoryDescent`: attained witnesses, checked strict approach paths and

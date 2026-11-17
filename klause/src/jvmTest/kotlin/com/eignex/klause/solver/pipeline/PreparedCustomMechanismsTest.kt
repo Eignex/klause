@@ -5,7 +5,10 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.localsearch.NoInvariant
@@ -27,6 +30,11 @@ import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingAffineExpression
+import com.eignex.klause.theory.EncodingLinearTerm
+import com.eignex.klause.theory.EncodingTarget
+import com.eignex.klause.theory.LinearEncodingFormula
+import com.eignex.util.numbers.BigFraction
 import org.junit.BeforeClass
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -44,23 +52,34 @@ class PreparedCustomMechanismsTest(
     companion object {
         @JvmStatic
         @BeforeClass
-        fun initializeRuntime() = FiniteTranscendentalWorkerTest.initializeRuntime()
+        fun initializeRuntime() {
+            FiniteTranscendentalWorkerTest.initializeRuntime()
+            val source = Problem(1, 2, Array(2) { IntDomain(0, 1) },
+                arrayOf(Clause(intArrayOf(0)), AllDifferent(intArrayOf(0, 1), 0, 2)))
+            val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { null })
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
+                ExecutionOperation.SATISFY, FiniteEngine.FIXED, providers = providers))
+            SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions()))
+        }
 
         @JvmStatic
         @Parameterized.Parameters(name = "{0} {1} {2}")
         fun cases(): List<Array<Any>> = listOf("finite", "polynomial", "function").flatMap { route ->
             listOf("native", "no-scoring", "no-relaxation", "no-encoder", "no-propagation", "unsupported-propagation",
-                "inert-propagation", "custom-check", "missing-check", "encoder-only").flatMap { mechanisms ->
-                FiniteEngine.entries.map { arrayOf(route, mechanisms, it) }
-            }
+                "inert-propagation", "custom-check", "missing-check", "encoder-only", "encoder-auxiliary")
+                .flatMap { mechanisms ->
+                    FiniteEngine.entries.map { arrayOf(route, mechanisms, it) }
+                }
         }
     }
 
     @Test
     fun `installed custom mechanisms should agree with execution admission`() {
         val clause = Clause(intArrayOf(0))
-        val relation = if (mechanisms in setOf("custom-check", "missing-check", "encoder-only")) {
-            object : Factor by clause {}
+        val relation = if (mechanisms in setOf("custom-check", "missing-check", "encoder-only", "encoder-auxiliary")) {
+            object : Factor by clause {
+                override val linearForm: LinearForm? = null
+            }
         } else clause
         val native = arrayOf(relation, AllDifferent(intArrayOf(0, 1), 0, 2))
         val factors = if (route == "polynomial") native + ContinuousProduct(0, 0, 0) else native
@@ -69,10 +88,24 @@ class PreparedCustomMechanismsTest(
             realLower = if (route == "polynomial") doubleArrayOf(0.0) else doubleArrayOf(),
             realUpper = if (route == "polynomial") doubleArrayOf(0.0) else doubleArrayOf())
         val providers = when (mechanisms) {
-            "encoder-only" -> FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            "encoder-only", "encoder-auxiliary" -> FactorProjectionProviders(encoder = EncoderProvider {
+                    factor,
+                    target,
+                ->
                 if (factor === relation) {
                     val selected = BuiltInEncoderProvider.select(clause, target)
-                    Encoder(selected.support) { _, encoding -> selected.install(clause, encoding) }
+                    Encoder(selected.support) { _, encoding ->
+                        if (mechanisms == "encoder-auxiliary" && target == EncodingTarget.LINEAR) {
+                            val helper = encoding.realAuxiliary()
+                            encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                                EncodingLinearTerm.auxiliary(helper, BigFraction.ONE),
+                                EncodingLinearTerm.source(Term.ofLit(0), BigFraction.MINUS_ONE))),
+                                LinearOp.EQ, BigFraction.ZERO))
+                            encoding.linearFormula(LinearEncodingFormula.Comparison(EncodingAffineExpression(listOf(
+                                EncodingLinearTerm.auxiliary(helper, BigFraction.ONE))), LinearOp.EQ, BigFraction.ONE))
+                            null
+                        } else selected.install(clause, encoding)
+                    }
                 } else BuiltInEncoderProvider.select(factor, target)
             })
             "no-scoring" -> FactorProjectionProviders(scoring = ScoringProjectionProvider { null })
@@ -122,7 +155,8 @@ class PreparedCustomMechanismsTest(
             "$route $mechanisms $engine")
 
         var finiteSample: Sample? = null
-        val controls = ExecutionOptions(ExecutionOption.maxFlips(16L), ExecutionOption.maxInstructions(100000L),
+        val controls = if (SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE) ExecutionOptions()
+        else ExecutionOptions(ExecutionOption.maxFlips(16L), ExecutionOption.maxInstructions(100000L),
             ExecutionOption.alnsIterations(4))
         val execution = SourceSetup.execute(SourceExecutionRequest(invocation, controls),
             SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ finiteSample = it }, {})))
@@ -147,12 +181,12 @@ class PreparedCustomMechanismsTest(
                 OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample ?: finiteSample))
             }
             is SourceExecutionResult.Polynomial -> assertIs<OpenTheoryResult.Sat>(execution.result.result,
-                "$route $mechanisms $engine ${execution.result.result}").assignment
+                "$route $mechanisms $engine").assignment
             is SourceExecutionResult.Transcendental -> assertIs<OpenTheoryResult.Sat>(execution.result.result,
-                "$route $mechanisms $engine ${execution.result.result}").assignment
+                "$route $mechanisms $engine").assignment
             is SourceExecutionResult.Linear -> assertIs<OpenTheoryResult.Sat>(
                 assertIs<OpenTheoryExecution.Satisfy>(execution.result).result,
-                "$route $mechanisms $engine ${execution.result}").assignment
+                "$route $mechanisms $engine").assignment
             else -> error("$route $mechanisms $engine: $execution")
         }
         assertTrue(point.boolValue(0))

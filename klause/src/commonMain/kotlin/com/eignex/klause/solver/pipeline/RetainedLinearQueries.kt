@@ -5,6 +5,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.AssembledSearchModel
@@ -62,6 +64,41 @@ internal class RetainedLinearQueries(
     val declined: Boolean get() = sourceDeclined
     val exhausted: Boolean get() = sourceDeclined || !state.work.hasAllowance() ||
         state.work.acceptedChecks >= params.maxLeaves
+
+    fun checkPoint(sample: Sample, cancellation: ExecutionControl): Verification<Sample, Unit> {
+        check(!closed && !checking) { "point checking requires an idle query owner" }
+        if (cancellation()) return Verification.Indeterminate("source point checking cancelled")
+        if (sample.numBoolVars != model.numBoolVars || sample.numIntVars != model.numIntVars ||
+            sample.numRealVars != model.numRealVars
+        ) return Verification.Rejected("assignment does not cover the source coordinates")
+        val reals = sample.exactReals.orEmpty()
+        if (reals.size != model.numRealVars) {
+            return Verification.Indeterminate("linear point checking requires rational real coordinates")
+        }
+        val bools = LinkedHashMap<Int, Boolean>()
+        val coordinates = LinkedHashMap<Int, BigFraction>()
+        for (id in 0 until model.numBoolVars) {
+            cancellation.charge(1)
+            if (cancellation()) return Verification.Indeterminate("source point checking cancelled")
+            bools[id] = sample.boolValue(id)
+        }
+        for (id in 0 until model.numIntVars) {
+            cancellation.charge(1)
+            if (cancellation()) return Verification.Indeterminate("source point checking cancelled")
+            coordinates[id] = BigFraction.of(sample.exactIntValue(id), BIG_ONE)
+        }
+        for (id in reals.indices) {
+            cancellation.charge(1)
+            if (cancellation()) return Verification.Indeterminate("source point checking cancelled")
+            coordinates[model.numIntVars + id] = reals[id]
+        }
+        return when (check(ExactNeighborhoodCondition(bools, coordinates, coordinates), cancellation)) {
+            is ExactNeighborhoodResult.Witness -> Verification.Accepted(Candidate(sample, Unit))
+            ExactNeighborhoodResult.Refuted -> Verification.Rejected("captured source relations refute the point")
+            ExactNeighborhoodResult.Undecided, ExactNeighborhoodResult.Paused ->
+                Verification.Indeterminate("captured source point check undecided")
+        }
+    }
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl, action: () -> T): T {
         check(!closed) { "conditioned query owner is closed" }

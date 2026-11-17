@@ -1,11 +1,17 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchCandidateHints
@@ -16,6 +22,7 @@ import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
@@ -29,6 +36,116 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class RetainedLinearQueriesTest {
+    @Test
+    fun `point checking should debit and retain its containing work allowance`() {
+        val model = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(2)),
+                LinearOp.EQ, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val plan = model.componentPlan()
+        var charged = 0L
+        var limit = Long.MAX_VALUE
+        val stop = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = charged >= limit
+            override val accounting = WorkMeter { charged += it }
+        }
+        val queries = RetainedLinearQueries(model, TheoryParams(), null) { token, _ ->
+            plan.search(model, emptyMap(), cancellation = token)
+        }
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5),
+            exactReals = listOf(BigFraction.ofLong(2).reciprocal()))
+
+        queries.use {
+            assertIs<Verification.Accepted<*, *>>(it.checkPoint(point, stop))
+            assertTrue(charged > 1)
+            limit = charged
+
+            assertIs<Verification.Indeterminate>(it.checkPoint(point, stop))
+        }
+    }
+
+    @Test
+    fun `point checking should fix original Boolean integer and rational coordinates together`() {
+        val third = BigFraction.ofLong(3).reciprocal()
+        val model = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf(Clause(intArrayOf(0)),
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ofLong(-3)), LinearOp.EQ, BigFraction.ZERO)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val plan = model.componentPlan()
+        val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->
+            plan.search(model, plan.cpSourceDomains(model), cancellation = stop)
+        }
+        val point = Sample(booleanArrayOf(true), longArrayOf(1), doubleArrayOf(third.toDouble()),
+            exactReals = listOf(third))
+
+        val checked = queries.use { it.checkPoint(point, ExecutionControl.Never) }
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
+
+    @Test
+    fun `point checking should reject individually feasible coordinates without a common completion`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val plan = model.componentPlan()
+        val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->
+            plan.search(model, plan.cpSourceDomains(model), cancellation = stop)
+        }
+        val point = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
+
+        val checked = queries.use { it.checkPoint(point, ExecutionControl.Never) }
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `a refuted point should not constrain a sibling source point`() {
+        val model = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val plan = model.componentPlan()
+        val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->
+            plan.search(model, emptyMap(), cancellation = stop)
+        }
+
+        queries.use {
+            assertIs<Verification.Rejected>(it.checkPoint(Sample(booleanArrayOf(false), longArrayOf()),
+                ExecutionControl.Never))
+            assertIs<Verification.Accepted<*, *>>(it.checkPoint(Sample(booleanArrayOf(true), longArrayOf()),
+                ExecutionControl.Never))
+        }
+    }
+
+    @Test
+    fun `point checking should not renew its native check allowance`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray())
+        val plan = model.componentPlan()
+        val queries = RetainedLinearQueries(model, TheoryParams(maxLeaves = 1), null) { stop, _ ->
+            plan.search(model, emptyMap(), maxChecks = 1, cancellation = stop)
+        }
+        val point = Sample(booleanArrayOf(), longArrayOf())
+
+        queries.use {
+            assertIs<Verification.Accepted<*, *>>(it.checkPoint(point, ExecutionControl.Never))
+            assertIs<Verification.Indeterminate>(it.checkPoint(point, ExecutionControl.Never))
+        }
+    }
+
+    @Test
+    fun `cancelled point checking should withhold acceptance`() {
+        val model = Problem(1, 0, emptyArray(), emptyArray())
+        val plan = model.componentPlan()
+        val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->
+            plan.search(model, emptyMap(), cancellation = stop)
+        }
+
+        val checked = queries.use {
+            it.checkPoint(Sample(booleanArrayOf(false), longArrayOf()), ExecutionControl { true })
+        }
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
     @Test
     fun `unpinned retained query should select its prepared component preference`() {
         val model = Problem(

@@ -100,6 +100,9 @@ internal class OpenExactNeighborhood(
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl, action: () -> T): T =
         queries.withCondition(condition, cancellation, action)
 
+    fun checkPoint(sample: Sample, cancellation: ExecutionControl): Verification<Sample, Unit> =
+        queries.checkPoint(sample, cancellation)
+
     override fun check(
         condition: ExactNeighborhoodCondition,
         cancellation: ExecutionControl,
@@ -110,6 +113,7 @@ internal class OpenExactNeighborhood(
                 cancellation,
             ) or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
         val sample = result.sample
+        val stop = params.timeout.withAccounting(cancellation) or params.cancellation or cancellation
         val checked = try {
             if (sample.exactInts?.any { !it.fitsLong() } == true ||
                 model.factors.any { it is ExactSearchRow || it is EncodedTheoryFactor }
@@ -124,7 +128,8 @@ internal class OpenExactNeighborhood(
         } catch (_: CancellationException) {
             return ExactNeighborhoodResult.Undecided
         }
-        if (checked !is Verification.Accepted || (params.timeout.withAccounting(
+        val authoritative = if (checked is Verification.Indeterminate && !stop()) checkPoint(sample, stop) else checked
+        if (authoritative !is Verification.Accepted || (params.timeout.withAccounting(
                 cancellation,
             ) or params.cancellation or cancellation)()) {
             return ExactNeighborhoodResult.Undecided

@@ -32,8 +32,7 @@ internal val finiteOperations = ExecutionOperation.entries.toSet()
 internal fun Problem.unplacedArithmeticContract(
     projections: PreparedFactorProjections? = null,
     encoding: EncoderFailure? = null,
-):
-    ComponentExecutionContract {
+): ComponentExecutionContract {
     val missing = ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(), listOf(ExecutionDecline(
         ExecutionDeclineCause.SOURCE_COMPLETION, "unplaced-arithmetic",
         encoding?.factorIndex, PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT, encoding)))

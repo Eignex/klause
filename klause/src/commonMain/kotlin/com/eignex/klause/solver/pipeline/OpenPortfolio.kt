@@ -2,6 +2,7 @@
 
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchEngine
@@ -147,7 +148,8 @@ internal class OpenPortfolio(
                 cancellation = lifetime.includingStop( cancellation),
                 nodeBudget = theoryParams.nodeBudget,
             ),
-            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null, null, stop) { witnessProjection })
+            PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null, null, stop,
+                preparedPlan, theoryParams.nodeBudget) { witnessProjection })
                 .bindInvocation(binding, lifetime.includingStop( cancellation),
                 ),
         ) { workers ->
@@ -273,7 +275,8 @@ internal class OpenPortfolio(
                 binding = { SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs) },
             ) { slot -> factory.materialize(preparedPlan, slot) }
         }
-        val verifier = openWitnessVerifier(sourceModel, objective, context, stop) { witnessProjection }
+        val verifier = openWitnessVerifier(sourceModel, objective, context, stop,
+            preparedPlan, theoryParams.nodeBudget) { witnessProjection }
         val evidence = PortfolioEvidence(identity, verifier).bindInvocation(binding, stop)
         val profile = ProblemProfile.of(model, optimizing = true)
         val share = if (integral != null || rational) DESCENT_SHARE else 0.0
@@ -588,9 +591,11 @@ internal fun openWitnessVerifier(
     objective: LinearObjective?,
     context: SourceProofContext? = null,
     cancellation: ExecutionControl = ExecutionControl.Never,
+    preparedSource: PreparedSourcePlan? = null,
+    pointNodeBudget: NodeBudget? = null,
 ): CandidateVerifier<Sample, Double?> {
     val projection by lazy { PropagationProblem(model) }
-    return openWitnessVerifier(model, objective, context, cancellation) { projection }
+    return openWitnessVerifier(model, objective, context, cancellation, preparedSource, pointNodeBudget) { projection }
 }
 
 private fun openWitnessVerifier(
@@ -598,6 +603,8 @@ private fun openWitnessVerifier(
     objective: LinearObjective?,
     context: SourceProofContext?,
     cancellation: ExecutionControl,
+    preparedSource: PreparedSourcePlan? = null,
+    pointNodeBudget: NodeBudget? = null,
     projection: () -> PropagationProblem,
 ): CandidateVerifier<Sample, Double?> = CandidateVerifier { candidate ->
     val sample = candidate.assignment
@@ -617,14 +624,20 @@ private fun openWitnessVerifier(
     ) {
         val source = model.absSourceWitnessContext(objective ?: LinearObjective(), cancellation)
             ?: model.linearAuthorityContext(objective ?: LinearObjective(), ObjectiveSense.MINIMIZE, cancellation)
-            ?: return@CandidateVerifier Verification.Indeterminate("exact original-source witness check unavailable")
-        source.linearWitnessVerifier(cancellation).verify(candidate)
+        source?.linearWitnessVerifier(cancellation)?.verify(candidate)
+            ?: Verification.Indeterminate("exact original-source witness check unavailable")
     } else {
         verifyOpenWitness(model, sample, cancellation, projection())
     }
-    when (checked) {
-        is Verification.Rejected -> return@CandidateVerifier checked
-        is Verification.Indeterminate -> return@CandidateVerifier checked
+    val authoritative = if (checked is Verification.Indeterminate && preparedSource != null && !cancellation()) {
+        OpenExactNeighborhood(model, TheoryParams(cancellation = cancellation, nodeBudget = pointNodeBudget),
+            objective, preparedSource).use {
+            it.checkPoint(sample, cancellation)
+        }
+    } else checked
+    when (authoritative) {
+        is Verification.Rejected -> return@CandidateVerifier authoritative
+        is Verification.Indeterminate -> return@CandidateVerifier authoritative
         is Verification.Accepted -> Unit
     }
     if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
