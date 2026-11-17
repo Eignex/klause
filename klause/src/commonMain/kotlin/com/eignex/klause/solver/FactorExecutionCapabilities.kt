@@ -152,7 +152,7 @@ private fun Factor.generalExecutionCapabilities(): FactorExecutionCapabilities? 
     is ComparisonClause, is Xor, is LexLess, is Sort, is AllDifferentTuples -> finiteFiltering
     is GridArrayMinMax -> filteringRelaxation
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
-    is RealArrayMinMax -> if (leafEnforced) realArithmetic else
+    is RealArrayMinMax -> if (leafEnforced) realArithmetic.copy(scoring = ScoringCapability.INERT) else
         realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)
     is RealAbs, is RealProduct, is ReifiedRealLinear -> realArithmetic
     is RealFiniteDomain -> if (size == 0) realArithmetic.copy(
