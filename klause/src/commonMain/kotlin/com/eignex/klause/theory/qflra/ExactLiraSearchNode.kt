@@ -29,16 +29,6 @@ import com.eignex.util.numbers.minus
 
 internal data class IntegerBranch(val variable: Int, val lower: BigInt? = null, val upper: BigInt? = null)
 
-internal data class IntegerLinearBranch(
-    val variables: IntArray,
-    val coefficients: Array<BigInt>,
-    val lower: BigInt? = null,
-    val upper: BigInt? = null,
-) {
-    fun sameShape(other: IntegerLinearBranch): Boolean =
-        variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
-}
-
 internal data class RowAddress(val factor: Int, val row: Int) : Comparable<RowAddress> {
     override fun compareTo(other: RowAddress): Int = compareValuesBy(this, other, RowAddress::factor, RowAddress::row)
 }
@@ -56,21 +46,10 @@ internal data class SearchNode(
     val sourceBranches: List<SourceBoundAtom> = emptyList(),
     val retainedReduction: ExactLiraReduction.Bounded? = null,
     val reducedBranches: List<IntegerBranch> = emptyList(),
-    val transformedBranches: List<IntegerLinearBranch> = emptyList(),
     val rowAssertions: Map<RowAddress, RegisteredTheoryDecision> = emptyMap(),
     val disequalityDirections: Map<RowAddress, LinearOp> = emptyMap(),
     val directionPremises: Map<RowAddress, SearchAtomPremise> = emptyMap(),
 ) {
-    fun withBranch(branch: IntegerBranch): SearchNode {
-        val existing = branches.indexOfFirst { it.variable == branch.variable }
-        if (existing < 0) return copy(branches = branches + branch)
-        val merged = branches[existing].copy(
-            lower = maxOfNullable(branches[existing].lower, branch.lower),
-            upper = minOfNullable(branches[existing].upper, branch.upper),
-        )
-        return copy(branches = branches.toMutableList().also { it[existing] = merged })
-    }
-
     fun withReducedBranch(branch: IntegerBranch): SearchNode {
         val existing = reducedBranches.indexOfFirst { it.variable == branch.variable }
         if (existing < 0) return copy(reducedBranches = reducedBranches + branch)
@@ -80,23 +59,6 @@ internal data class SearchNode(
         )
         return copy(reducedBranches = reducedBranches.toMutableList().also { it[existing] = merged })
     }
-
-    fun withTransformedBranch(branch: IntegerLinearBranch): SearchNode =
-        copy(transformedBranches = transformedBranches + branch)
-
-    fun withTransformedSplit(branch: IntegerLinearBranch, lower: BigInt? = null, upper: BigInt? = null): SearchNode =
-        copy(
-            transformedBranches = transformedBranches.map { existing ->
-                if (!existing.sameShape(branch)) {
-                    existing
-                } else {
-                    existing.copy(
-                        lower = maxOfNullable(existing.lower, lower),
-                        upper = minOfNullable(existing.upper, upper),
-                    )
-                }
-            },
-        )
 
     fun withDirection(factor: RowAddress, direction: LinearOp): SearchNode =
         copy(disequalityDirections = disequalityDirections + (factor to direction))
@@ -152,21 +114,8 @@ internal data class SearchNode(
     }
 }
 
-internal fun SearchNode.withReductionBounds(reduction: ExactLiraReduction.Bounded): SearchNode {
-    var bounded = this
-    for (integer in 0 until reduction.system.integerColumns) {
-        val lower = reduction.bounds.integerLower[integer]
-        val upper = reduction.bounds.integerUpper[integer]
-        if (lower == null && upper == null) continue
-        val coefficients = reduction.system.transformedIntegerCoefficients(integer)
-        val branch = IntegerLinearBranch(coefficients.index, coefficients.value, lower, upper)
-        if (bounded.transformedBranches.none { it.sameShape(branch) }) bounded = bounded.withTransformedBranch(branch)
-    }
-    return bounded
-}
-
-// Every bounded integer folded into the node's branches as [SearchNode.withBranch] would, in one pass: folding them
-// one at a time scans and copies the branch list per bound, quadratic in the bounds a large root publishes.
+// Every bounded integer is folded into the node's branches in one pass: folding them one at a time scans and copies
+// the branch list per bound, quadratic in the bounds a large root publishes.
 internal fun SearchNode.withPublishedBounds(
     numIntVars: Int,
     lowerBound: (Int) -> Long?,

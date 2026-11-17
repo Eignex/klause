@@ -1923,8 +1923,6 @@ private const val MAX_POINT_HINT_BITS = 4096
 private const val FALSE = 0
 internal const val LIRA_TRUE = 1
 
-private fun BooleanArray.toStates(): IntArray = IntArray(size) { if (this[it]) LIRA_TRUE else FALSE }
-
 private fun IntArray.toCompleteValues(): BooleanArray = BooleanArray(size) { variable ->
     when (this[variable]) {
         LIRA_TRUE -> true
