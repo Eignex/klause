@@ -42,7 +42,7 @@ class WideLinearPropagatorTest {
     @Test
     fun `wide linear deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x1DE0)
-        for (op in LinearOp.entries) {
+        for (op in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.GE)) {
             repeat(40) { iter ->
                 val n = 3
                 val problem = Problem(
@@ -66,6 +66,41 @@ class WideLinearPropagatorTest {
                             1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
                             else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `wide linear not-equal deductions should be implied by their reasons once all but one term is fixed`() {
+        val rng = Random(0x1DE1)
+        repeat(60) { iter ->
+            val n = 3
+            val coefficients = LongArray(n) { listOf(-3L, -2L, -1L, 1L, 2L, 3L).random(rng) }
+            val excluded = LongArray(n) { rng.nextInt(4).toLong() }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    Linear(
+                        IntArray(n) { it },
+                        Array(n) { w * bigIntOf(coefficients[it]) },
+                        LinearOp.NE,
+                        w * bigIntOf((0 until n).sumOf { coefficients[it] * excluded[it] }),
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "wide-linear-NE#$iter") { state ->
+                val open = rng.nextInt(n)
+                val alsoOpen = if (rng.nextInt(4) == 0) rng.nextInt(n) else -1
+                (0 until n).all { v ->
+                    val pick = rng.nextInt(4)
+                    when {
+                        v == alsoOpen || (v == open && pick < 2) -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                        pick == 3 -> state.setInt(v, rng.nextInt(4).toLong())
+                        else -> state.setInt(v, excluded[v])
                     }
                 }
             }

@@ -269,7 +269,7 @@ class AllDifferentPropagatorTest {
     @Test
     fun `alldifferent except zero deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xAD04)
-        repeat(150) { iter ->
+        repeat(50) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,
@@ -280,7 +280,13 @@ class AllDifferentPropagatorTest {
                 ),
             )
             PropagationReasonOracle.assertReasonsImply(problem, "alldiff-except0#$iter") { state ->
-                (0 until 6).all { state.excludeIntValue(rng.nextInt(n), 1L + rng.nextInt(4)) }
+                (0 until n).all { v ->
+                    when (rng.nextInt(4)) {
+                        0 -> state.setInt(v, 1L + rng.nextInt(4))
+                        2 -> true
+                        else -> state.excludeIntValue(v, 0)
+                    }
+                } && (0 until 5).all { state.excludeIntValue(rng.nextInt(n), 1L + rng.nextInt(4)) }
             }
         }
     }

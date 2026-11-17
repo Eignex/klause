@@ -158,7 +158,7 @@ class LinearPropagatorTest {
     @Test
     fun `linear deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0x11E0)
-        for (op in LinearOp.entries) {
+        for (op in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.GE)) {
             repeat(50) { iter ->
                 val n = 3
                 val problem = Problem(
@@ -182,6 +182,41 @@ class LinearPropagatorTest {
                             1 -> state.tightenIntMin(v, 1L + rng.nextInt(3))
                             else -> state.tightenIntMax(v, 1L + rng.nextInt(3))
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `linear not-equal deductions should be implied by their reasons once all but one term is fixed`() {
+        val rng = Random(0x11E1)
+        repeat(50) { iter ->
+            val n = 3
+            val coefficients = IntArray(n) { (1 + rng.nextInt(3)) * (if (rng.nextBoolean()) 1 else -1) }
+            val excluded = IntArray(n) { rng.nextInt(5) }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 4) },
+                factors = arrayOf<Factor>(
+                    Linear(
+                        coefficients,
+                        IntArray(n) { it },
+                        LinearOp.NE,
+                        (0 until n).sumOf { coefficients[it] * excluded[it] },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "linear-NE#$iter") { state ->
+                val open = rng.nextInt(n)
+                val alsoOpen = if (rng.nextInt(4) == 0) rng.nextInt(n) else -1
+                (0 until n).all { v ->
+                    val pick = rng.nextInt(4)
+                    when {
+                        v == alsoOpen || (v == open && pick < 2) -> state.excludeIntValue(v, rng.nextInt(5).toLong())
+                        pick == 3 -> state.setInt(v, rng.nextInt(5).toLong())
+                        else -> state.setInt(v, excluded[v].toLong())
                     }
                 }
             }

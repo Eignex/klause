@@ -294,12 +294,12 @@ class CumulativePropagatorTest {
     @Test
     fun `cumulative deductions over optional tasks should be implied by their reasons`() {
         val rng = Random(0xC0A1)
-        repeat(60) { iter ->
+        repeat(40) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = n,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(0, 5) },
+                intDomains = Array(n) { IntDomain(0, 4) },
                 factors = arrayOf<Factor>(
                     Cumulative(
                         starts = IntArray(n) { it },
@@ -311,14 +311,10 @@ class CumulativePropagatorTest {
                 ),
             )
             PropagationReasonOracle.assertReasonsImply(problem, "cumulative#$iter") { state ->
-                (0 until n).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
-                    (0 until 3).all {
-                        val v = rng.nextInt(n)
-                        if (rng.nextBoolean()) {
-                            state.tightenIntMax(v, rng.nextInt(4).toLong())
-                        } else {
-                            state.tightenIntMin(v, 1L + rng.nextInt(4))
-                        }
+                (0 until n).all { b -> rng.nextInt(4) == 0 || state.pinBool(b, rng.nextInt(4) != 0) } &&
+                    (0 until n).all { v ->
+                        val earliest = rng.nextInt(3).toLong()
+                        state.tightenIntMin(v, earliest) && state.tightenIntMax(v, earliest + 1 + rng.nextInt(3))
                     }
             }
         }
@@ -384,17 +380,16 @@ class CumulativePropagatorTest {
     @Test
     fun `cumulative deductions over variable demands and capacity should be implied by their reasons`() {
         val rng = Random(0xC0C)
-        repeat(60) { iter ->
+        repeat(70) { iter ->
             val n = 2
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 3 * n + 1,
                 intDomains = Array(3 * n + 1) {
                     when {
-                        it < n -> IntDomain(0, 4)
+                        it < n -> IntDomain(0, 3)
                         it < 2 * n -> IntDomain(1, 3)
-                        it < 3 * n -> IntDomain(1, 2)
-                        else -> IntDomain(1, 3)
+                        else -> IntDomain(1, 2)
                     }
                 },
                 factors = arrayOf<Factor>(
@@ -410,15 +405,17 @@ class CumulativePropagatorTest {
                 ),
             )
             PropagationReasonOracle.assertReasonsImply(problem, "cumulative-vars#$iter") { state ->
-                (0 until 4).all {
-                    val v = rng.nextInt(3 * n + 1)
-                    val d = state.intDomains[v]
-                    when (rng.nextInt(3)) {
-                        0 -> state.tightenIntMin(v, d.min + rng.nextInt(2))
-                        1 -> state.tightenIntMax(v, d.max - rng.nextInt(2))
-                        else -> state.excludeIntValue(v, d.min + rng.nextInt((d.max - d.min + 1).toInt()))
-                    }
-                }
+                val fixed = rng.nextInt(3) == 0
+                (0 until n).all { v ->
+                    val earliest = rng.nextInt(3).toLong()
+                    state.tightenIntMin(v, earliest) && state.tightenIntMax(v, earliest + 1 + rng.nextInt(3))
+                } &&
+                    (n until 2 * n).all { v -> rng.nextBoolean() || state.tightenIntMin(v, 2L + rng.nextInt(2)) } &&
+                    (2 * n until 3 * n).all { v -> rng.nextInt(3) != 0 || state.tightenIntMin(v, 2L) } &&
+                    (!fixed || (n..3 * n).all { v ->
+                        val d = state.intDomains[v]
+                        state.setInt(v, if (v == 3 * n) d.max else d.min + rng.nextInt((d.max - d.min + 1).toInt()))
+                    })
             }
         }
     }
