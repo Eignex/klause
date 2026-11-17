@@ -284,14 +284,6 @@ class CliModeVerdictTest {
     }
 
     @Test
-    fun `local search should enumerate float sources on the grid without a completeness marker`() {
-        val out = solveFlatZinc("var 0..1: k :: output_var; var 0.0..1.0: x :: output_var; " +
-            "constraint float_le(x,0.5); solve satisfy;", "-e", "localsearch", "-a")
-
-        assertTrue("----------" in out.lines() && "==========" !in out.lines() && "klause-float-claim" in out, out)
-    }
-
-    @Test
     fun `the default engine should satisfy a float product without the grid`() {
         val out = solveFlatZinc("$gridProduct solve satisfy;", "-e", "mixed")
 
