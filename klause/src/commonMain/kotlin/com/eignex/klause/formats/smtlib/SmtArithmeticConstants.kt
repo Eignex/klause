@@ -36,22 +36,25 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
     }
 
     fun rational(expression: SExpr): BigFraction? {
-        val work = ArrayDeque<Pair<SExpr, Boolean>>()
+        val work = ArrayDeque<SExpr>()
+        val pending = ArrayDeque<SExpr.SList>()
         val values = ArrayDeque<BigFraction>()
-        work.addLast(expression to false)
+        work.addLast(expression)
         while (work.isNotEmpty()) {
             control.polynomialSourceCheckpoint(1)
-            val (node, combine) = work.removeLast()
+            val node = work.removeLast()
             when (node) {
                 is SExpr.Atom -> values.addLast(atomRational(node.text) ?: return null)
                 is SExpr.SList -> {
                     val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
                     if ((head != "-" && head != "/") || (head == "-" && node.items.size != 2) ||
                         (head == "/" && node.items.size != 3)) return null
-                    if (!combine) {
-                        work.addLast(node to true)
-                        for (argument in node.items.drop(1).asReversed()) work.addLast(argument to false)
+                    if (pending.lastOrNull() !== node) {
+                        pending.addLast(node)
+                        work.addLast(node)
+                        for (index in node.items.lastIndex downTo 1) work.addLast(node.items[index])
                     } else {
+                        pending.removeLast()
                         val last = values.removeLast()
                         if (head == "-") values.addLast(last.negated()) else {
                             if (last.isZero) return null
@@ -66,6 +69,8 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
 
     private fun atomRational(text: String): BigFraction? {
         control.polynomialSourceCheckpoint(text.length.toLong())
+        if (text == "0") return BigFraction.ZERO
+        if (text == "1") return BigFraction.ONE
         val parts = text.split('.')
         if (parts.size !in 1..2 || parts.any { it.isEmpty() || it.any { c -> c !in '0'..'9' } }) return null
         val numerator = parseBigInt(parts.joinToString(""))

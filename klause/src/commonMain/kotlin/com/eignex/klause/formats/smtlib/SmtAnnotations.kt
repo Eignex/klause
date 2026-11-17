@@ -141,11 +141,18 @@ private class AnnotationBindings(private val cancellation: ExecutionControl) {
     operator fun contains(name: String): Boolean = name in counts
 }
 
-private fun annotationBindingNames(expression: SExpr?): Set<String> =
-    (expression as? SExpr.SList)?.items.orEmpty().mapNotNull {
+private fun annotationBindingNames(expression: SExpr?): Set<String> {
+    val bindings = (expression as? SExpr.SList)?.items.orEmpty()
+    if (bindings.size == 1) {
+        val binding = bindings[0] as? SExpr.SList ?: return emptySet()
+        val name = (binding.items.firstOrNull() as? SExpr.Atom)?.text ?: return emptySet()
+        return setOf(smtSessionSymbol(name))
+    }
+    return bindings.mapNotNull {
         val name = ((it as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
         name?.let(::smtSessionSymbol)
     }.toSet()
+}
 
 private fun freeAnnotationSymbols(
     root: SExpr,

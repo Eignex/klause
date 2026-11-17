@@ -1,11 +1,54 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SmtLibSessionTest {
+    @Test
+    fun `interrupted command preparation preserves the active assertion snapshot`() {
+        var work = 0L
+        var limit = Long.MAX_VALUE
+        val control = ExecutionControl(Cancellation { work >= limit }, WorkMeter { work += it })
+        val snapshots = ArrayList<String>()
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("unknown")
+        }, replies::add, control)
+        session.execute(SExprReader("(assert true) (check-sat)"))
+        val command = SExprReader("(assert (and${" true".repeat(64)}))").readAll().single()
+        limit = work + 16
+
+        assertFailsWith<CancellationException> { session.execute(command) }
+        limit = Long.MAX_VALUE
+        session.execute(SExprReader("(check-sat)"))
+
+        assertEquals(listOf("unknown", "unknown"), replies)
+        assertEquals(2, snapshots.size)
+        assertEquals(snapshots.first(), snapshots.last())
+    }
+
+    @Test
+    fun `interrupted assumption preparation returns unknown without solving`() {
+        var work = 0L
+        val control = ExecutionControl(Cancellation { work >= 16 }, WorkMeter { work += it })
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({ error("interrupted assumptions cannot be solved") }, replies::add, control)
+        val command = SExprReader("(check-sat-assuming ((and${" true".repeat(64)})))").readAll().single()
+
+        val open = session.execute(command)
+
+        assertFalse(open)
+        assertEquals(listOf("unknown"), replies)
+    }
+
     @Test
     fun `each query solves the active assertion stack`() {
         val snapshots = ArrayList<String>()

@@ -110,7 +110,9 @@ fun solveSmtRecursiveSession(
                 SmtSort.Int -> SExpr.Atom("0")
                 SmtSort.Real -> SExpr.Atom("0.0")
                 is SmtSort.BitVector -> recList("_", SExpr.Atom("bv0"), SExpr.Atom(type.width.toString()))
-                else -> null
+                else -> sourceScope.datatypes.instance(type)?.constructors?.firstOrNull { it.fields.isEmpty() }
+                    ?.let { recList("as", SExpr.Atom(it.name), sort) }
+                    ?.takeIf { sourceScope.termSort(it) == type }
             }
             literal ?: fresh().also {
                 val declaration = recList("declare-const", it, sort)

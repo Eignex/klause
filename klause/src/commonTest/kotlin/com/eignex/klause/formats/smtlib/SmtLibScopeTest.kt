@@ -35,6 +35,13 @@ class SmtLibScopeTest {
     }
 
     @Test
+    fun `single let bindings require a symbol and exactly one value`() {
+        for (binding in listOf("x", "(x)", "(x true false)", "((x) true)", "(0 true)")) {
+            assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(assert (let ($binding) true))") }
+        }
+    }
+
+    @Test
     fun `unused helper result sorts should be checked independently of logic declarations`() {
         for (logic in listOf("", "(set-logic QF_LIA)", "(set-logic QF_NRA)", "(set-logic ALL)")) {
             val source = "$logic (define-fun invalid ((n Int)) Bool (+ n 1)) (assert true)"

@@ -91,6 +91,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
     private val output = ArrayList<SExpr>()
     private val atoms = HashMap<String, Term>()
     private val nodes = HashMap<NodeKey, Term>()
+    private val coordinateSorts = HashMap<Int, SmtSort>()
     private val applications = HashMap<ApplicationKey, Term>()
     private val identities = LinkedHashMap<SmtSort.Uninterpreted, MutableList<String>>()
     private val usedNames = HashSet<String>()
@@ -212,6 +213,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             output += groundCommand("declare-const", SExpr.Atom(declaration.name), sortExpression(declaration.result))
             atom(declaration.name, declaration.result)
         }
+        coordinateSorts[term.id] = declaration.result
         bindings[name] = Binding(bindings.size, term = term)
     }
 
@@ -357,7 +359,13 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         applications[key]?.let { return it }
         val argumentNames = args.mapIndexed { index, argument ->
             step()
-            val captured = freshValue(function.declaration.parameters[index])
+            val parameter = function.declaration.parameters[index]
+            coordinateSorts[argument.id]?.let { sort ->
+                sort.checkpointStructure(cancellation)
+                parameter.checkpointStructure(cancellation)
+                if (sort == parameter) return@mapIndexed (argument.expression as SExpr.Atom).text
+            }
+            val captured = freshValue(parameter)
             output += groundCommand("assert", expression("=", captured.expression, argument.expression))
             (captured.expression as SExpr.Atom).text
         }
@@ -392,7 +400,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             names += name
             FreeSortReconstruction(sort, name)
         } else SmtReconstruction.Scalar(name, sort)
-        return atom(name, encodedSort)
+        return atom(name, encodedSort).also { coordinateSorts[it.id] = sort }
     }
 
     private fun atom(text: String, sort: SmtSort? = null): Term {
