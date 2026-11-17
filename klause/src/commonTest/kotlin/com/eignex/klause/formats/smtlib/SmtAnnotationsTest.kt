@@ -34,6 +34,16 @@ class SmtAnnotationsTest {
     }
 
     @Test
+    fun `empty quoted symbol binders still prevent named capture`() {
+        val commands = SExprReader("""
+            (declare-const || Int)
+            (assert (let ((|| 1)) (= (! || :named captured) 1)))
+        """.trimIndent()).readAll()
+
+        assertFailsWith<UnsupportedSmtException> { captureSmtSource(commands, ExecutionControl.Never) }
+    }
+
+    @Test
     fun `parallel binding values keep the enclosing symbol scope`() {
         val commands = SExprReader("""
             (declare-const x Int)
@@ -53,6 +63,18 @@ class SmtAnnotationsTest {
         """.trimIndent()).readAll()
 
         assertFailsWith<UnsupportedSmtException> { captureSmtSource(commands, ExecutionControl.Never) }
+    }
+
+    @Test
+    fun `leaving a quoted binder restores the global name for named terms`() {
+        val commands = SExprReader("""
+            (declare-const x Int)
+            (assert (= (let ((|x| 1)) x) (! x :named global)))
+        """.trimIndent()).readAll()
+
+        val result = captureSmtSource(commands, ExecutionControl.Never)
+
+        assertEquals("(define-fun global () Int x)", result.commands[1].smtText())
     }
 
     @Test

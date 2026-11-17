@@ -320,9 +320,10 @@ The scope infers each named body's sort and registers its typed definition in on
 operation; the containing command still validates its own lexical context.
 Explicit binding entry and exit frames share counted lexical names, keeping live
 scope storage linear in nested bindings; annotation and closedness walks charge
-the same execution control. Their stacks reuse list cursors and carry unbound atoms
-directly. The typed scope walk reuses evaluation cursors across single-binding
-`let` values and bodies, with continuations retaining the enclosing lexical scope.
+the same execution control. The annotation walk reuses list cursors; both walks carry
+unbound atoms directly. The annotation walk also carries singleton binding names directly.
+The typed scope walk reuses evaluation cursors across single-binding `let` values and
+bodies, with continuations retaining the enclosing lexical scope.
 Literal tokens are classified before canonical term-name lookup. Qualified
 function names, sorts and indexes do not capture surrounding term binders.
 `define-const` abbreviates a nullary `define-fun`. Named definitions share the
