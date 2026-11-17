@@ -402,8 +402,30 @@ the same way when the objective reads no real coordinate; in every mode, a leaf 
 absolute value, finite membership or choice product that the leaf LP leaves undecided
 is completed by the exact search. Local-search and ALNS workers
 [complete candidates](13-neighborhoods.md#continuous-candidate-completion) the same way.
-A leaf whose objective reads a real coordinate completes through the leaf LP alone, so
-its refusals and refutations are those of the float point and the exact LP. Projected
+
+A leaf whose objective reads a real coordinate keeps the leaf LP's optimum when the LP
+certifies it. The LP states only the envelope of an absolute value, a finite membership
+or a choice product, and the closure of a disjunction, disequality or strict row, so its
+optimum can lie off the relation; such a leaf, one with an
+uncertified completion, and in numerical mode one the exact LP refutes, is minimized by
+the same search extended with the objective. Each round asks the search for a point
+below the incumbent, stated as the strict row `c * x < incumbent`, so the search refutes
+every partial choice whose relaxation cannot beat it. The disjunct each relation takes
+at that point, and the side of each disequality, leave a polyhedron inside the search
+model, and the exact LP over it gives the next incumbent. A refutation proves the
+incumbent optimal, or the leaf infeasible when there is none. A polyhedron whose strict
+row keeps it from its infimum contributes that infimum as the row `c * x <= infimum`, so
+another polyhedron that attains it still decides the leaf; only a refuted infimum leaves
+the leaf undecided. The exact encoding is minimized first, and an exact optimum stands in
+every mode, since it strains no relation. In numerical mode the model within the slack
+is minimized when the exact one refutes the leaf or cannot state it, and its optimum is
+reported at its point; a ray of that model's polyhedron proves the objective unbounded
+when its point holds within the absolute slack and no relation's residual grows along
+it. The rounds are leaf search work: the minimize path charges them to its slice and
+pauses between rounds, resuming the pending leaf; a round itself runs to completion, so
+a leaf with many choice combinations can overrun its slice and repay the excess from the
+slices that follow. A stopped round decides nothing, and a refutation that finishes as
+the stop fires is not trusted. Projected
 grid witnesses are checked against the same readings.
 
 A source without integer columns takes the finite lane under a positive tolerance and

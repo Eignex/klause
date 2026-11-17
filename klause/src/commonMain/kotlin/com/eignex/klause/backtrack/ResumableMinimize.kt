@@ -23,6 +23,8 @@ import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LeafRealSolver
+import com.eignex.klause.lp.relaxation.provesUnbounded
+import com.eignex.klause.lp.relaxation.provesUnboundedWithinTolerance
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
@@ -73,13 +75,19 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.solver.validation.RealCompletionOptimization
+import com.eignex.klause.solver.validation.RealOptimizationResult
+import com.eignex.klause.solver.validation.RealOptimizationStep
 import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.checkPointRestrictions
+import com.eignex.klause.solver.validation.exactFirst
+import com.eignex.klause.solver.validation.exactRealCosts
 import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.theory.requiresRealCompletionSearch
+import com.eignex.klause.theory.statesRealChoices
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.workScheduled
@@ -146,7 +154,7 @@ internal class ResumableMinimize(
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
         get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && !rootLayoutPending &&
-            pendingRealLeaf == null && pendingRealResult == null &&
+            pendingRealLeaf == null && pendingRealResult == null && pendingOptimization == null &&
             (!::run.isInitialized || !run.learnedPropagationPending)
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
@@ -343,8 +351,99 @@ internal class ResumableMinimize(
     // again.
     private var searchedResult: LeafRealResult? = null
 
-    private fun searchedLeaf(sample: Sample, real: LeafRealResult): LeafRealResult {
+    // A leaf whose objective reads a real coordinate and that the leaf LP leaves undecided is minimized over the
+    // choices of its real relations (absolute values, finite memberships, choice products, disjunctions, disequalities
+    // and strict rows): exactly first, and within the source tolerance where acceptance reads it when the exact
+    // optimization refutes the leaf or cannot state it, as after an exact refutation of the LP. An exact optimum
+    // strains no relation, so it is the leaf's optimum wherever one exists. The optimization runs in rounds charged as
+    // leaf search work, and a paused one resumes with the pending leaf.
+    private val realCosts =
+        if (integralObjective) null else exactRealCosts(objective.realCoefficientValues, problem.numRealVars)
+    private val choiceSearch =
+        if (realCosts != null && problem.statesRealChoices()) AbsRealCompletion(problem) else null
+    private var pendingOptimization: RealCompletionOptimization? = null
+
+    // Whether a leaf's real optimization paused at a slice boundary and resumes with its leaf.
+    internal val leafOptimizationPending: Boolean get() = pendingOptimization != null
+
+    // Whether a leaf's completion is under way and the traversal must return to it before anything else.
+    private val leafPending: Boolean
+        get() = pendingRealLeaf != null || pendingRealResult != null || pendingOptimization != null
+
+    // The leaf after its searches, or null when its optimization paused at a slice boundary.
+    private fun searchedLeaf(sample: Sample, real: LeafRealResult): LeafRealResult? {
         if (real === searchedResult) return real
+        val costs = realCosts ?: return integralLeaf(sample, real)
+        val tolerance = completionToleranceCheck()?.toleranceSearch()
+        val undecided = when (real.verdict) {
+            LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM, LpVerdict.UNBOUNDED -> false
+            LpVerdict.INFEASIBLE -> tolerance != null
+            else -> true
+        }
+        if (!undecided) return real
+        val context = solver.lpSolveContext
+        val optimization = pendingOptimization ?: exactFirst(
+            choiceSearch?.takeIf { real.verdict != LpVerdict.INFEASIBLE }?.optimize(sample, costs, context),
+        ) { tolerance?.optimize(sample, costs, context) }?.also { pendingOptimization = it } ?: return real
+        val stop = runEndToken()
+        val before = optimization.work
+        val step = if (pausable) {
+            val allowance = slice.remainingLpWork()
+            if (allowance == 0L) return null
+            optimization.advance(stop, allowance ?: 0L) { !slice.workBounded && sliceExpired() }
+        } else optimization.advance(stop)
+        leafSearchWork += optimization.work - before
+        val result = (step as? RealOptimizationStep.Completed)?.result ?: return null
+        pendingOptimization = null
+        val searched = optimizedLeaf(sample, real, result)
+        if (!stop()) cacheSearched(searched)
+        return searched
+    }
+
+    // The leaf an optimization decided, with each point checked against the source the way its search reads it.
+    private fun optimizedLeaf(sample: Sample, real: LeafRealResult, result: RealOptimizationResult): LeafRealResult {
+        fun completed(reals: List<BigFraction>) =
+            sample.copy(reals = DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals)
+
+        fun accepted(point: Sample) = if (result.withinTolerance) {
+            completionToleranceCheck()?.invoke(point) == true
+        } else verifyRealCoordinates(problem, point) is Verification.Accepted
+
+        // A point without an optimality proof completes the leaf without deciding it; a point within tolerance keeps
+        // its exact coordinates, which acceptance read.
+        fun incomplete(point: Sample) = if (result.withinTolerance) {
+            LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf(), uncertifiedReals = point.reals,
+                uncertifiedExactReals = point.exactReals)
+        } else LeafRealResult(LpVerdict.FEASIBLE, point.reals, point.exactReals)
+
+        // An exact refutation of the LP decides nothing about the region within the slack.
+        val unresolved = if (real.verdict != LpVerdict.INFEASIBLE) {
+            real
+        } else LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
+        return when (result) {
+            is RealOptimizationResult.Refuted -> LeafRealResult(LpVerdict.INFEASIBLE, doubleArrayOf())
+            is RealOptimizationResult.Optimum -> completed(result.reals).takeIf(::accepted)?.let { point ->
+                LeafRealResult(if (result.withinTolerance) LpVerdict.TOLERANCE_OPTIMUM else LpVerdict.ATTAINED_OPTIMUM,
+                    point.reals, result.reals)
+            } ?: unresolved
+            is RealOptimizationResult.Unbounded -> {
+                val point = completed(result.reals)
+                val policy = problem.semantics.effective.feasibilityTolerance
+                when {
+                    !accepted(point) -> unresolved
+                    problem.provesUnbounded(objective, point, result.direction) ||
+                        (result.withinTolerance && policy != null &&
+                            problem.provesUnboundedWithinTolerance(objective, point, result.direction, policy)) ->
+                        LeafRealResult(LpVerdict.UNBOUNDED, point.reals, result.reals, result.direction)
+                    else -> incomplete(point)
+                }
+            }
+            is RealOptimizationResult.Undecided ->
+                result.incumbent?.let(::completed)?.takeIf(::accepted)?.let(::incomplete) ?: unresolved
+        }
+    }
+
+    private fun integralLeaf(sample: Sample, real: LeafRealResult): LeafRealResult {
         if (real.verdict != LpVerdict.INFEASIBLE && real.verdict != LpVerdict.INDETERMINATE &&
             real.verdict != LpVerdict.CERTIFIED_BOUND
         ) return real
@@ -355,7 +454,13 @@ internal class ResumableMinimize(
                 leafSearchWork += found.work
                 return LeafRealResult(LpVerdict.INFEASIBLE, doubleArrayOf()).also(::cacheSearched)
             }
-            is ToleranceSearchResult.Undecided -> return real.also { leafSearchWork += found.work }
+            // An exact refutation of the LP decides nothing about the region within the slack.
+            is ToleranceSearchResult.Undecided -> {
+                leafSearchWork += found.work
+                return if (real.verdict != LpVerdict.INFEASIBLE) {
+                    real
+                } else LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
+            }
             is ToleranceSearchResult.Witness -> {
                 leafSearchWork += found.work
                 val reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() }
@@ -778,6 +883,7 @@ internal class ResumableMinimize(
         val pending = pendingRealLeaf
         pendingRealLeaf = null
         pendingRealResult = null
+        pendingOptimization = null
         pending?.close()
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
@@ -827,7 +933,7 @@ internal class ResumableMinimize(
             done?.let { return StepEvent.Terminal(it) }
             check(!closed) { "search is closed" }
             if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
-            if (pendingRealLeaf != null || pendingRealResult != null) return traversalEvent()
+            if (leafPending) return traversalEvent()
             if (run.learnedPropagationPending) {
                 if (treeBudgetExhausted) return terminal(terminalBudget())
                 return traversalEvent()
@@ -1499,13 +1605,15 @@ internal class ResumableMinimize(
             } else {
                 val real = searchedLeaf(sample, if (pausable) {
                     advanceRealLeaf(sample) ?: return SearchModelDisposition.Pause
-                } else completeLeaf(sample, runEndToken()))
+                } else completeLeaf(sample, runEndToken())) ?: return SearchModelDisposition.Pause
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 
                     LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
                         sawIndeterminateLeaf = true
-                        val witness = real.uncertifiedReals?.let { sample.copy(reals = it) }
+                        val witness = real.uncertifiedReals?.let {
+                            sample.copy(reals = it, exactReals = real.uncertifiedExactReals)
+                        }
                         val accepted = witness != null && !params.cancellation() &&
                             params.toleranceCheck?.invoke(witness) == true && !params.cancellation()
                         if (pausable && params.cancellation()) return SearchModelDisposition.Pause
@@ -1540,6 +1648,7 @@ internal class ResumableMinimize(
                 }
             }
             pendingRealResult = null
+            pendingOptimization = null
             pendingIncumbent = incumbent
             return when {
                 unboundedLeaf != null -> SearchModelDisposition.Surface
@@ -1594,7 +1703,7 @@ internal class ResumableMinimize(
         override fun onResume(context: SearchContext): SearchRunDisposition {
             val simplified = simplify(context, false)
             if (simplified != SearchRunDisposition.Continue) return simplified
-            if (pendingRealLeaf != null || pendingRealResult != null) return SearchRunDisposition.Continue
+            if (leafPending) return SearchRunDisposition.Continue
             boundExchange.applySharedFloor()
             val local = incumbents.current()
             if (params.valueSelector is SolutionGuided && (local != null || lpEngine.params.lpPlan.bounding)) {

@@ -36,6 +36,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
@@ -115,6 +116,10 @@ class FiniteExecutionTest {
         constraints: String = "",
         source: String = roundedBound(declarations, constraints),
         floatPoints: Boolean = true,
+        nodeBudget: NodeBudget? = null,
+        onImprovement: (Sample) -> Unit = {},
+        presolve: PresolveConfig = PresolveConfig.NONE,
+        deadline: Duration = 1.seconds,
     ): FiniteSolveVerdict {
         val program = parseFlatZinc(source, semanticOverrides = overrides)
         val maximize = program.sourceProgram.solve is SolveDirective.Maximize
@@ -123,10 +128,11 @@ class FiniteExecutionTest {
             if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE, engine,
             objective = objective, maximize = maximize))
         val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), engine,
-            presolveConfig = PresolveConfig.NONE, cancellation = ExecutionControl.after(1.seconds),
-            toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem))
+            presolveConfig = presolve, cancellation = ExecutionControl.after(deadline),
+            toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem),
+            nodeBudget = nodeBudget)
 
-        val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample, {}))
+        val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample) { onImprovement(it.sample) })
 
         return assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict
     }
@@ -237,6 +243,190 @@ class FiniteExecutionTest {
                 .replace("solve satisfy;", "solve minimize z;"))
 
         assertEquals(FiniteSolveVerdict.OPTIMAL, verdict)
+    }
+
+    // An absolute value over an operand in [-2.0, 3.0] beside a row every k leaves slack: each leaf has the optimum.
+    private fun absObjective(direction: String) = """
+        var 1..2: k;
+        var 1.0..2.0: kf;
+        var -2.0..3.0: x;
+        var 0.0..5.0: y;
+        constraint int2float(k, kf);
+        constraint float_lin_le([1.0, -1.0], [x, kf], 2.0);
+        constraint float_abs(x, y);
+        solve $direction;
+    """.trimIndent()
+
+    // Exact optima in the minimized frame the source objective reads: a maximum of 3.0 is -3.0.
+    private val absOptima = mapOf("minimize y" to 0.0, "maximize y" to -3.0, "minimize x" to -2.0, "maximize x" to -3.0)
+    private val resultDirections = listOf("minimize y", "maximize y")
+    private val operandDirections = listOf("minimize x", "maximize x")
+
+    private val numerical = SemanticOverrides()
+    private val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+
+    // The verdict and the source objective at the last point [engine] publishes for [source]. Incomplete engines run a
+    // short move budget, which completes candidates without exhausting the search.
+    private fun outcome(
+        engine: FiniteEngine,
+        overrides: SemanticOverrides,
+        source: String,
+        presolve: PresolveConfig = PresolveConfig.NONE,
+        floatPoints: Boolean = true,
+        deadline: Duration = 1.seconds,
+    ): Pair<FiniteSolveVerdict, Double?> {
+        val samples = ArrayList<Sample>()
+        val verdict = solveFlatZinc(overrides, engine, samples::add, source = source, floatPoints = floatPoints,
+            nodeBudget = NodeBudget(64).takeIf { engine != FiniteEngine.FIXED }, onImprovement = samples::add,
+            presolve = presolve, deadline = deadline)
+        val objective = parseFlatZinc(source).sourceProgram.linearObjective()
+        return verdict to objective?.let { samples.lastOrNull()?.let(objective::evaluate) }
+    }
+
+    private fun absValues(engine: FiniteEngine, overrides: SemanticOverrides, directions: List<String>) =
+        directions.associateWith { outcome(engine, overrides, absObjective(it)).second }
+
+    @Test
+    fun `backtracking should prove the exact optimum of a real objective over an absolute value within tolerance`() {
+        val reached = absOptima.keys.associateWith { outcome(FiniteEngine.FIXED, numerical, absObjective(it)) }
+
+        assertEquals(absOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
+    }
+
+    @Test
+    fun `backtracking should prove the optimum of a real objective over an absolute value exactly`() {
+        val reached = absOptima.keys.associateWith { outcome(FiniteEngine.FIXED, exact, absObjective(it)) }
+
+        assertEquals(absOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
+    }
+
+    @Test
+    fun `backtracking should prove the optimum of a real objective over an absolute value under presolve`() {
+        val reached = outcome(FiniteEngine.FIXED, numerical, absObjective("maximize y"), PresolveConfig())
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL to -3.0, reached)
+    }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value result within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, numerical, resultDirections))
+    }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value operand within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, numerical, operandDirections))
+    }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value result exactly`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, exact, resultDirections))
+    }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value operand exactly`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, exact, operandDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value result within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.ALNS, numerical, resultDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value operand within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.ALNS, numerical, operandDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value result exactly`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.ALNS, exact, resultDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value operand exactly`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.ALNS, exact, operandDirections))
+    }
+
+    @Test
+    fun `a real objective over an absolute value beyond the declared tolerance should be refuted`() {
+        val source = """
+            var 1..2: k;
+            var -1.0..1.0: a;
+            var 0.0..0.4: b;
+            constraint float_abs(a, b);
+            constraint float_eq(a, -0.5);
+            solve minimize b;
+        """.trimIndent()
+
+        assertEquals(FiniteSolveVerdict.UNSAT, outcome(FiniteEngine.FIXED, numerical, source).first)
+    }
+
+    @Test
+    fun `a real objective over strict rows should be optimized over the region satisfaction decides`() {
+        val directions = mapOf("satisfy" to FiniteSolveVerdict.SAT, "maximize x" to FiniteSolveVerdict.OPTIMAL,
+            "minimize x" to FiniteSolveVerdict.OPTIMAL)
+
+        val verdicts = directions.keys.associateWith { solve ->
+            val source = "var 1..2: k; var 0.0..1.0: x; var 0.0..1.0: y; constraint float_lt(x, y); " +
+                "constraint float_le(y, x); solve $solve;"
+            outcome(FiniteEngine.FIXED, numerical, source).first
+        }
+
+        assertEquals(directions, verdicts)
+    }
+
+    // Two rows that hold together only within the slack: `x - y <= -2^-25` and `x - y >= -2^-26`. Acceptance refuses
+    // floating points, so the exact LP refutes every leaf and the search within the slack decides it.
+    private fun slackRows(solve: String, domain: String = "0.0..1.0") = """
+        var 1..2: k;
+        var $domain: x;
+        var $domain: y;
+        constraint float_lin_le([1.0, -1.0], [x, y], -0.0000000298023223876953125);
+        constraint float_lin_le([-1.0, 1.0], [x, y], 0.00000001490116119384765625);
+        solve $solve;
+    """.trimIndent()
+
+    @Test
+    fun `a real objective should be optimized over the tolerance region the satisfaction search decides`() {
+        val directions = mapOf("satisfy" to FiniteSolveVerdict.SAT, "maximize x" to FiniteSolveVerdict.OPTIMAL,
+            "minimize x" to FiniteSolveVerdict.OPTIMAL)
+
+        val verdicts = directions.keys.associateWith { solve ->
+            outcome(FiniteEngine.FIXED, numerical, slackRows(solve), floatPoints = false).first
+        }
+
+        assertEquals(directions, verdicts)
+    }
+
+    @Test
+    fun `incomplete engines should complete a real objective over the region satisfaction decides`() {
+        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
+
+        val published = engines.associateWith { engine ->
+            listOf("maximize x", "minimize x").associateWith { solve ->
+                outcome(engine, numerical, slackRows(solve), floatPoints = false).second != null
+            }
+        }
+
+        assertEquals(engines.associateWith { mapOf("maximize x" to true, "minimize x" to true) }, published)
+    }
+
+    @Test
+    fun `a ray within the declared tolerance should prove a real objective unbounded`() {
+        val source = slackRows("minimize x", domain = "float")
+
+        // The deadline only caps the run, whose first exact LP certification loads its classes.
+        val verdict = outcome(FiniteEngine.FIXED, numerical, source, deadline = 10.seconds).first
+
+        assertEquals(FiniteSolveVerdict.UNBOUNDED, verdict)
     }
 
     @Test

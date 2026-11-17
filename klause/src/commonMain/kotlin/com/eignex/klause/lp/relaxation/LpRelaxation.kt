@@ -521,6 +521,8 @@ internal class LeafRealResult(
     val refutingFactors: IntArray = emptyIntArray(),
     // A private numerical proposal; only an original-source point check may give it witness authority.
     val uncertifiedReals: DoubleArray? = null,
+    // The exact coordinates [uncertifiedReals] rounds, when the proposal has them; the check reads these.
+    val uncertifiedExactReals: List<BigFraction>? = null,
 )
 
 internal fun LeafRealResult.checkedEncoding(

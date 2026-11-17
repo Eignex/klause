@@ -15,3 +15,16 @@ internal fun cancelledWhen(
 ): ExecutionControl = PredicateExecutionControl(cancelled, deadlineOf, workScheduledOf, pollingOf)
 
 internal fun ExecutionControl.workScheduled(): Boolean = workScheduled
+
+/** This control, with every unit it is charged also reported to [record]. */
+internal fun ExecutionControl.counting(record: (Long) -> Unit): ExecutionControl {
+    val containing = this
+    return object : ExecutionControl() {
+        override fun isCancelled(): Boolean = containing()
+        override fun deadline() = containing.deadline()
+        override val accounting: WorkMeter = WorkMeter { units ->
+            record(units)
+            containing.charge(units)
+        }
+    }
+}
