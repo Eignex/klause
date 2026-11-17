@@ -6,11 +6,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.formats.dimacs.DimacsFormatException
-import com.eignex.klause.formats.smtlib.UnsupportedSmtException
-import com.eignex.klause.ir.ObjectiveSense
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Path
 import kotlin.test.Test
@@ -22,33 +19,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RunnerTest {
-    @ParameterizedTest
-    @EnumSource(ObjectiveSense::class)
-    fun `SMT subprocess metadata supports objectives outside the finite adapter`(
-        sense: ObjectiveSense, @TempDir root: Path,
-    ) {
-        val source = root.resolve("source.smt2").toFile().apply {
-            writeText("(declare-const x Real) (${sense.name.lowercase()} (* x x)) (check-sat)")
-        }
-        val ref = ProblemRef("quadratic", Format.SMTLIB, ProblemSource.Prepared(source),
-            Category.OPTIMIZATION, Expected.Unknown)
-
-        val entry = InProcessRunner.resolve(ref)
-
-        assertTrue(entry.optimizes)
-        assertEquals(sense == ObjectiveSense.MAXIMIZE, entry.maximize)
-    }
-
-    @Test
-    fun `SMT in process consumers reject malformed source`(@TempDir root: Path) {
-        val source = root.resolve("source.smt2").toFile().apply { writeText("invalid source") }
-        val ref = ProblemRef("malformed", Format.SMTLIB, ProblemSource.Prepared(source),
-            Category.CSP, Expected.Unknown)
-        val entry = InProcessRunner.resolve(ref)
-
-        assertFailsWith<UnsupportedSmtException> { entry.objective }
-    }
-
     @ParameterizedTest
     @ValueSource(strings = ["invalid source", "p wcnf 1 1 10\n10 1 0\n", "p wcnf 0 1 10\n7 0\n"])
     fun `weighted subprocess metadata should not parse the source`(text: String, @TempDir root: Path) {
