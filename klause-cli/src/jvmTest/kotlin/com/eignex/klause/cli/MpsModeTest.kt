@@ -666,4 +666,69 @@ class MpsModeTest {
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o -0.3" in text.lines(), text)
     }
+
+    @Test
+    fun `an incumbent within the optimality gap should be reported optimal with its proved bound`() {
+        for (engine in listOf("cp", "mixed")) {
+            val text = triangleCover("-e", engine, "--source-relative-optimality-tolerance", "1/2")
+
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+            assertTrue("o 2.1" in text.lines(), text)
+            assertTrue("c optimizationStatus=gap-optimum" in text.lines(), text)
+            assertTrue("c objectiveBoundDirection=lower" in text.lines(), text)
+            assertTrue("c objectiveBound=1.1" in text.lines(), text)
+        }
+    }
+
+    @Test
+    fun `exact MPS loading should close the bound before claiming an optimum`() {
+        val text = triangleCover("-e", "cp", "--exact")
+
+        assertTrue("o 2" in text.lines(), text)
+        assertTrue("c optimizationStatus=attained-optimum" in text.lines(), text)
+        assertFalse("objectiveBound=" in text, text)
+    }
+
+    @Test
+    fun `an unbounded model should stay unbounded under a loose optimality gap`() {
+        val text = looseGap("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 1\n" +
+            " M1 'MARKER' 'INTEND'\n X COST -1 R 1\nRHS\n RHS R 1\nBOUNDS\n UP B I 3\nENDATA\n")
+
+        assertTrue("s UNBOUNDED" in text.lines(), text)
+    }
+
+    @Test
+    fun `an infeasible model should stay infeasible under a loose optimality gap`() {
+        val text = looseGap("ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 1\n" +
+            " M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 5\nBOUNDS\n UP B I 3\n UP B X 1\nENDATA\n")
+
+        assertTrue("s UNSATISFIABLE" in text.lines(), text)
+    }
+
+    private fun looseGap(model: String): String {
+        val source = File.createTempFile("mps-loose-gap", ".mps").apply {
+            writeText(model)
+            deleteOnExit()
+        }
+        return captureStdout {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--source-relative-optimality-tolerance", "1/2",
+                source.absolutePath)))
+        }
+    }
+
+    // A weighted triangle cover: the first incumbent costs 2.1, the optimum 2.
+    private fun triangleCover(vararg flags: String): String {
+        val source = File.createTempFile("mps-triangle-cover", ".mps").apply {
+            writeText(
+                "ROWS\n N COST\n G R1\n G R2\n G R3\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " X1 COST 1.1 R1 1\n X1 R3 1\n X2 COST 1 R1 1\n X2 R2 1\n X3 COST 1 R2 1\n X3 R3 1\n" +
+                    " M1 'MARKER' 'INTEND'\nRHS\n RHS R1 1 R2 1\n RHS R3 1\n" +
+                    "BOUNDS\n UP B X1 1\n UP B X2 1\n UP B X3 1\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+        return captureStdout {
+            assertEquals(0, runCli(arrayOf("-p", "1", *flags, source.absolutePath)))
+        }
+    }
 }

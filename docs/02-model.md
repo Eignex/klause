@@ -43,13 +43,17 @@ declarations with an explicit range keep it (see
 `max(absolute, relative * scale)`, where a row's scale is the larger of its finite
 bound magnitude and the sum of absolute term activities. Zero components require
 exact checking, and integrality is always exact.
-`OptimalityTolerance` declares when two evaluations of one point's objective agree:
-a source value `v` and a native value `p` agree when
-`abs(v - p) <= max(absolute, relative * scale)`, where `scale` is the sum of the
-point's absolute objective term activities, constant excluded. It qualifies a
-reported optimum only; it bounds no search, makes no unproved bound an optimum and
-makes no other point optimal. Zero components require equal values, and an exact
-feasibility tolerance makes the effective gap zero.
+`OptimalityTolerance` declares the optimality gap `max(absolute, relative * scale)`,
+with a relative component below one. Optimization ends when a bound the run proved,
+`b`, lies within the gap of the incumbent value `z`: `abs(z - b) <= max(absolute,
+relative * abs(z))` in source units. This is the absolute-or-relative rule of MIP
+solvers, measured against the incumbent and independent of the objective
+direction, so a zero incumbent closes within the absolute floor alone and a
+negative one by its magnitude. Two evaluations of one point's objective, a source
+value `v` and a native value `p`, agree when `abs(v - p) <= max(absolute, relative *
+scale)`, where `scale` is the sum of the point's absolute objective term activities,
+constant excluded. Zero components require a closed bound and equal values, and an
+exact feasibility tolerance makes the effective gap zero.
 
 `EffectiveSourceSemantics` keeps both the defaults and the effective policy.
 `isApproximate` marks a grid or positive tolerance and `hasOverrides` records any

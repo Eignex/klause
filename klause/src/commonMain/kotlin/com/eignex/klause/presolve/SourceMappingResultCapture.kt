@@ -12,8 +12,11 @@ import com.eignex.klause.solver.evidence.SourceMappingEvidence
 import com.eignex.klause.solver.evidence.SourceResultCapture
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.floorDouble
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 
@@ -106,6 +109,15 @@ private fun SourceMapping.captureOptimal(
     cancellation: ExecutionControl,
 ): MinimizeResult.Optimal {
     val point = sourcePoint(reduced, result.sample)
+    result.gapBound?.let { bound ->
+        val incumbent = MinimizeResult.BestFound(point, objective.minimizedTelemetry(point, capture),
+            TerminationReason.SearchExhausted, result.stats)
+        val evidence = capture.minimize(incumbent, objective, producer, cancellation = cancellation).evidence
+            ?: SourceResultEvidence(capture.context.scope, emptyList())
+        val sourceBound = objectiveAdjustment.sourceValue(checkNotNull(BigFraction.ofDouble(bound))).floorDouble()
+        return MinimizeResult.Optimal(point, incumbent.objective, result.stats,
+            evidence.withMappings(capture.context.scope, listOf(mapping)), gapBound = sourceBound)
+    }
     val candidate = MinimizeResult.Optimal(point, objective.minimizedTelemetry(point, capture), result.stats)
     val provisional = capture.minimize(candidate, objective, producer,
         SourceDerivation.Unavailable("mapped objective bound capture unavailable"), cancellation)

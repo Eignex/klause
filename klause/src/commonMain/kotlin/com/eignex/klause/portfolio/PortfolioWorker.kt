@@ -17,6 +17,7 @@ import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.result.TerminationReason
@@ -58,6 +59,9 @@ class PortfolioWorker private constructor(
 
     /** Where this worker's sharing traffic is recorded, or null when it is not measured. */
     internal var sharingMeter: SharingMeter? = null
+
+    /** The optimality gap this worker prunes against, in its pool's objective units; null closes bounds exactly. */
+    internal var optimalityGap: OptimalityGap? = null
 
     internal var publicationExchange: IncumbentExchange<Sample, Double>? = null
 

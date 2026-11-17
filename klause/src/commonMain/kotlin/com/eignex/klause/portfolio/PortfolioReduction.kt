@@ -64,13 +64,15 @@ internal object PortfolioReduction {
      * not [isExhausted]), classify the outcome. Clean exhaustion with an incumbent
      * is Optimal; clean without one is Infeasible; a dirty stop keeps the incumbent as BestFound or, with
      * none, reports Unknown. Taking one snapshot rather than a (sample, bound) pair is what keeps a reported
-     * bound from belonging to a different assignment than the sample reported beside it.
+     * bound from belonging to a different assignment than the sample reported beside it. A clean stop that proved
+     * only [gapBound] reports the optimum within the optimality gap.
      */
     fun terminal(
         incumbent: VerifiedIncumbent<Sample, Double>?,
         dirty: Boolean,
         reason: TerminationReason,
         stats: SolveStats,
+        gapBound: Double? = null,
     ): MinimizeResult =
         when {
             incumbent != null && dirty -> MinimizeResult.BestFound(
@@ -80,7 +82,8 @@ internal object PortfolioReduction {
                 stats,
             )
 
-            incumbent != null -> MinimizeResult.Optimal(incumbent.assignment, incumbent.objective, stats)
+            incumbent != null -> MinimizeResult.Optimal(incumbent.assignment, incumbent.objective, stats,
+                gapBound = gapBound)
 
             dirty -> MinimizeResult.Unknown(reason, stats)
 

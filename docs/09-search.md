@@ -242,6 +242,25 @@ without changing ordinary objective bounds.
 Branch proposals determine the next exhaustive split. Component hints order its
 alternatives; source-bound atoms give arithmetic decisions stable Boolean names.
 
+### Optimality gap
+
+`BacktrackParams.optimalityGap` ends minimization within a source
+[optimality gap](02-model.md#typed-source-semantics). `OptimalityGap` maps a working
+objective value `w` to `scale * w + offset` in source units and holds the one rule:
+a proved bound `b` closes the gap of the incumbent `z` when `z - b <= max(absolute,
+relative * abs(z))` there, and an integral working objective rounds `b` up first.
+Node bounding then reads the gap cutoff, the least bound that closes the gap of the
+incumbent or of the external cutoff, instead of the incumbent itself; a node whose
+bound reaches it holds no point outside the gap. With a relative component below one
+the cutoff rises with the incumbent, so a cutoff read earlier proved at least as much.
+An integral objective whose gap admits no integer below the incumbent keeps the
+incumbent as its cutoff. Exhaustion after a prune or fixing against a cutoff below
+the incumbent reports `MinimizeResult.Optimal.gapBound`: the cutoff, raised by the
+root relaxation bound, or null when that bound reaches the incumbent. A search that
+never bounded below its incumbent proves its optimum exactly, and a repairing search
+ignores the gap. The incumbent stays a checked point; the gap changes only which
+bound closes the search.
+
 ### Lazy branch selection
 
 `SearchBranchProposal` supplies exhaustive, mutually exclusive alternatives without

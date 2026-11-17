@@ -5,6 +5,7 @@ import com.eignex.klause.formats.mps.MpsModel
 import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.formats.mps.mpsSemantics
 import com.eignex.klause.formats.mps.toLinearSourceProblem
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.LinearSourceConclusion
@@ -229,29 +230,35 @@ internal class MpsOutput(
 
     override fun keepStat(key: String): Boolean = true
 
-    override fun completionMetadata(verdict: Verdict): String? {
+    override fun completionMetadata(verdict: Verdict): List<String> {
         linearSource?.let { source ->
-            if (best == null) return null
+            if (best == null) return emptyList()
             if (verdict == Verdict.OPTIMAL && source.conclusion == LinearSourceConclusion.OPTIMAL) {
+                // The incumbent lies within the optimality gap of a proved bound that need not be attained.
+                source.gapBound?.let { bound ->
+                    val direction = if (source.source.objective?.sense == ObjectiveSense.MAXIMIZE) "upper" else "lower"
+                    return listOf("optimizationStatus=gap-optimum", "objectiveBoundDirection=$direction",
+                        "objectiveBound=${exactMpsNumber(bound)}", "objectiveBoundStrict=false")
+                }
                 val attained = source.incumbent?.objective?.let { it == source.acceptedObjectiveBound } == true ||
                     (source.nominalSourceExact && source.claimsCoverTolerance && source.incumbent?.exact == true &&
                         nativeOptimumExact)
                 val status = if (source.numericalClaims && !attained) "tolerance-optimum" else "attained-optimum"
-                return "optimizationStatus=$status"
+                return listOf("optimizationStatus=$status")
             }
-            if (source.nativeConclusion != LinearSourceConclusion.OPTIMAL) return null
+            if (source.nativeConclusion != LinearSourceConclusion.OPTIMAL) return emptyList()
             val status = if (source.nominalSourceExact && source.incumbent?.exact == true && nativeOptimumExact) {
                 "attained-optimum"
             } else "tolerance-optimum"
-            return "${source.nativeScope()}OptimizationStatus=$status"
+            return listOf("${source.nativeScope()}OptimizationStatus=$status")
         }
-        if (verdict != Verdict.OPTIMAL || best == null) return null
+        if (verdict != Verdict.OPTIMAL || best == null) return emptyList()
         val status = when (exactSourceWitness()) {
             true -> "attained-optimum"
             false -> "tolerance-optimum"
-            null -> return null
+            null -> return emptyList()
         }
-        return "optimizationStatus=$status"
+        return listOf("optimizationStatus=$status")
     }
 
     override fun verdictReason(verdict: Verdict): String? {

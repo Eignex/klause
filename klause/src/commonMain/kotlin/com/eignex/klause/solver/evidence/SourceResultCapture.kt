@@ -103,9 +103,11 @@ class SourceResultCapture private constructor(
         ) return result
         val sample = result.assignment
         val witness = sample?.let { SourceClaim.Witness(it) }
-        val value = if (result is MinimizeResult.Optimal) {
+        // A gap optimum's bound has no captured derivation, so only its point is claimed.
+        val exactOptimum = result is MinimizeResult.Optimal && result.gapBound == null
+        val value = if (exactOptimum) {
             try {
-                exactValue(objective, result.sample, cancellation)
+                exactValue(objective, checkNotNull(sample), cancellation)
             } catch (_: PolynomialInterrupted) {
                 return result
             } catch (_: PolynomialResourceLimit) {
@@ -113,7 +115,9 @@ class SourceResultCapture private constructor(
             }
         } else null
         val claim: SourceClaim = when (result) {
-            is MinimizeResult.Optimal -> SourceClaim.Optimal(result.sample, checkNotNull(value))
+            is MinimizeResult.Optimal -> if (exactOptimum) {
+                SourceClaim.Optimal(result.sample, checkNotNull(value))
+            } else checkNotNull(witness)
             is MinimizeResult.Infeasible -> SourceClaim.Refutation
             is MinimizeResult.Unbounded -> SourceClaim.Ray(result.sample,
                 result.direction.withIndex().associate { (id, step) ->

@@ -281,6 +281,15 @@ admission: a finite cutoff supports only its conditional bound, while unrestrict
 exhaustion with a checked incumbent establishes attainment. Heuristic and
 improvement-only arms gain no completion authority from exhaustion.
 
+Under an [optimality gap](09-search.md#optimality-gap), backtrack arms on the pooled
+model prune against the gap cutoff of the shared incumbent, and the scheduler records
+that cutoff as the arm's execution bound. A run also ends when the shared objective
+bound, the maximum of the global bounds the arms published, closes the gap of the
+pooled incumbent. The resulting optimum carries the gap bound: the cutoff of the final
+incumbent raised by the exhausting arm's proved bound and the shared bound, or none
+when one of them reaches the incumbent. Incomplete arms and unpublished estimates
+never close the gap.
+
 Finite metadata reports complete search only when a backtrack-family worker permits
 source proofs and is neither auxiliary nor improvement-only; this metadata never
 establishes a verdict.

@@ -99,10 +99,23 @@ differ by rounding still report the optimum. A different accepted point that
 improves on it must agree with the native value within the feasibility slack; when
 it does not, the result prints `SATISFIABLE` with that point as the incumbent. An
 objective over integer columns alone is evaluated exactly on both sides and must
-agree exactly. The gap never ends search or accepts an unproved bound, and a zero
-gap does not make a float-certified leaf optimum exact: that certificate keeps its
-own fixed float tolerance. Interrupted search, rejected terminal witnesses
-and restricted acceptance filters cannot supply these native completion claims.
+agree exactly. A zero gap does not make a float-certified leaf optimum exact: that
+certificate keeps its own fixed float tolerance. Interrupted search, rejected
+terminal witnesses and restricted acceptance filters cannot supply these native
+completion claims.
+
+A positive gap also ends finite optimization, as described under
+[search termination](09-search.md#optimality-gap). The finite route maps it onto the
+working objective through the source objective scale and the presolve objective
+adjustment, and applies it only to a model with a discrete coordinate, whose search
+has nodes to bound. A native optimum within the gap carries its proved bound, and
+the source outcome reports it optimal only when that bound, in original units,
+closes the gap of the reported source point; `LinearSourceOutcome.gapBound` keeps
+the bound. Such a result prints `OPTIMUM FOUND`, `optimizationStatus=gap-optimum`
+and the bound as `objectiveBoundDirection`, `objectiveBound` and
+`objectiveBoundStrict=false`. A gap optimum states only what the run proved, so it
+may also be exact. The open linear, polynomial and quadratic routes close their
+bounds exactly.
 
 `optimizationStatus=tolerance-optimum` identifies numerical optimality. An exact
 point alone does not establish an exact optimum. `attained-optimum` requires an

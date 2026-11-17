@@ -133,13 +133,18 @@ sealed interface MinimizeResult {
         override val objectiveValue: Double get() = objective
     }
 
-    /** A proven-optimal solution. */
+    /**
+     * A proven-optimal solution: exactly when [gapBound] is null, otherwise within the optimality gap of
+     * [gapBound], a proved bound below [objective] on every feasible objective value.
+     */
     data class Optimal(
         override val sample: Sample,
         override val objective: Double,
         override val stats: SolveStats = SolveStats.EMPTY,
         override val evidence: SourceResultEvidence? = null,
         override val semantics: EffectiveSourceSemantics? = sample.semantics,
+        /** Proved objective bound that closes the optimality gap, or null for an exact optimum. */
+        val gapBound: Double? = null,
     ) : WithSample
 
     /** Best solution found before the search stopped. */

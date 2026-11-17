@@ -52,7 +52,7 @@ internal sealed interface CompletedEngineResult {
         }
         override val evidence: SourceResultEvidence? get() = result.evidence
         val executionBound: Double? get() = when (val actual = capturedResult) {
-            is MinimizeResult.Optimal -> actual.objective
+            is MinimizeResult.Optimal -> actual.gapBound ?: actual.objective
             else -> executionCutoff
         }
         override fun attests(kind: EvidenceKind): Boolean = when (kind) {

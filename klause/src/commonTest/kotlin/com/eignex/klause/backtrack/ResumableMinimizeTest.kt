@@ -15,7 +15,9 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.Basis
@@ -40,6 +42,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
@@ -49,6 +52,7 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -669,6 +673,36 @@ class ResumableMinimizeTest {
 
         assertEquals(6.0, published.firstOrNull())
         assertEquals(6.0, result.objectiveValue)
+    }
+
+    @Test
+    fun `a starting incumbent within the optimality gap of the root bound should be optimal with that bound`() {
+        val result = gapFixtureResult(OptimalityGap(gapFixtureTolerance, integral = true))
+
+        assertEquals(10_001.0, result.objective)
+        assertEquals(10_000.0, result.gapBound)
+    }
+
+    @Test
+    fun `a search without an optimality gap should close the bound exactly`() {
+        val result = gapFixtureResult(null)
+
+        assertEquals(10_000.0, result.objective)
+        assertNull(result.gapBound)
+    }
+
+    private val gapFixtureTolerance = OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10_000)))
+
+    private fun gapFixtureResult(gap: OptimalityGap?): MinimizeResult.Optimal {
+        val problem = Problem(0, 1, arrayOf(IntDomain(10_000L, 20_000L)), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(valueSelector = IndomainMax, optimalityGap = gap)
+        return ResumableMinimize(
+            BacktrackSolver(problem), objective, params, pausable = false,
+            initialCandidate = Sample(BooleanArray(0), longArrayOf(10_001L)),
+        ).use { search ->
+            assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
+        }
     }
 }
 

@@ -3,6 +3,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.ir.EffectiveSourceSemantics
+import com.eignex.klause.solver.GapBoundedSearch
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
@@ -21,6 +22,7 @@ import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.BooleanProofStats
 import com.eignex.klause.solver.result.HeuristicStartStats
@@ -450,6 +452,12 @@ class Portfolio(
 
     internal var exactLinearObjective: LinearObjective? = null
 
+    // The gap the complete arms prune against; with it, a proved bound within the gap of the incumbent ends the run.
+    private val optimalityGap: OptimalityGap? = workers.firstNotNullOfOrNull { it.optimalityGap }
+
+    // The cross-arm proved objective bound, the same pool through any worker that shares one.
+    private val sharedObjectiveBound = workers.firstNotNullOfOrNull { it.sharedPools?.bounds }
+
     /**
      * Branch-and-bound: run arms in scheduled segments, carrying one shared incumbent. Each segment streams
      * against its arm's own objective representation, sees the shared bound (backtrack prunes on it) and the
@@ -499,6 +507,7 @@ class Portfolio(
         var callbackFailure: Throwable? = null
         var unbounded: MinimizeResult.Unbounded? = null
         var exhausted = false
+        var exhaustionBound = Double.NEGATIVE_INFINITY
         val stopReasons = ArrayList<TerminationReason>()
         var terminalPublished = false
         var acceptedVersion = 0L
@@ -587,7 +596,8 @@ class Portfolio(
                 val current = incumbent.current()
                 val cutoff = incumbents.bound(current)
                 run.exits?.cutoff(arm, cutoff, current?.version ?: 0L)
-                observedCutoffs[arm] = cutoff.takeIf(Double::isFinite)
+                // A complete arm prunes against the gap cutoff of what it reads; its exhaustion proves that cutoff.
+                observedCutoffs[arm] = (optimalityGap?.cutoff(cutoff) ?: cutoff).takeIf(Double::isFinite)
                 if (current != null) run.incumbentRead(arm, current.version)
                 cutoff
             }
@@ -688,7 +698,10 @@ class Portfolio(
                     ) MinimizeResult.Infeasible(stats = completed.stats) else completed
                     is MinimizeResult.BestFound -> if (completed.reason == TerminationReason.SearchExhausted) {
                         MinimizeResult.Optimal(completed.sample, completed.objective, completed.stats,
-                            evidence = completed.evidence, semantics = completed.semantics)
+                            evidence = completed.evidence, semantics = completed.semantics,
+                            gapBound = optimalityGap?.takeIf {
+                                (handle as? GapBoundedSearch)?.appliedOptimalityGap != false
+                            }?.exhaustedBound(completed.objective))
                     } else completed
                     else -> completed
                 }
@@ -806,6 +819,21 @@ class Portfolio(
                 // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
                 if (!claim.indeterminate && PortfolioReduction.isExhausted(terminal)) {
                     exhausted = true
+                    // An arm that never bounded below its cutoff proved no point lies under the incumbent.
+                    exhaustionBound = when (val done = terminal) {
+                        is MinimizeResult.Optimal -> done.gapBound ?: done.objective
+                        else -> if ((handle as? GapBoundedSearch)?.appliedOptimalityGap == false) {
+                            Double.POSITIVE_INFINITY
+                        } else observedCutoffs[arm] ?: Double.NEGATIVE_INFINITY
+                    }
+                    run.finish()
+                }
+                // A bound some arm proved within the gap of the pool's incumbent ends the run like an exhaustion.
+                val gap = optimalityGap
+                val shared = sharedObjectiveBound?.current() ?: Double.NEGATIVE_INFINITY
+                if (!exhausted && gap != null && gap.closes(incumbents.bound(), shared)) {
+                    exhausted = true
+                    exhaustionBound = shared
                     run.finish()
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
@@ -833,7 +861,12 @@ class Portfolio(
             run.workLimitReached -> TerminationReason.BudgetExhausted
             else -> TerminationReason.Cancelled
         }
-        return PortfolioReduction.terminal(incumbents.projected(), dirty = !exhausted, reason, stats)
+        val standing = incumbents.projected()
+        val proved = maxOf(exhaustionBound, sharedObjectiveBound?.current() ?: Double.NEGATIVE_INFINITY)
+        // The gap floor reads the incumbent's rounded-up bound, so the reported bound closes its exact value.
+        val gapBound = if (standing == null || proved >= standing.objective) null
+        else optimalityGap?.exhaustedBound(incumbents.bound(), proved)
+        return PortfolioReduction.terminal(standing, dirty = !exhausted, reason, stats, gapBound)
     }
 
     private fun verifyWitness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {

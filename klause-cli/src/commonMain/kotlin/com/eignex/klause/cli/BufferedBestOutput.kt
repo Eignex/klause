@@ -25,7 +25,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
 
     protected open val objectivePrefix: String = "o "
 
-    protected open fun completionMetadata(verdict: Verdict): String? = null
+    protected open fun completionMetadata(verdict: Verdict): List<String> = emptyList()
 
     /** Render an incumbent objective for an output protocol. */
     protected open fun formatObjective(objective: Long): String = objective.toString()
@@ -110,7 +110,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
 
     final override fun onComplete(verdict: Verdict) {
         println(statusLine(verdict))
-        completionMetadata(verdict)?.let { println("$commentPrefix $it") }
+        completionMetadata(verdict).forEach { println("$commentPrefix $it") }
         // A comment, so it rides alongside the status line without touching what either protocol
         // promises: `;` is an SMT-LIB comment and `c` is one in the competition protocol.
         verdictReason(verdict)?.let { println("$commentPrefix $it") }

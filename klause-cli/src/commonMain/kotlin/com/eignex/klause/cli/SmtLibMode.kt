@@ -240,8 +240,8 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
         else -> arithmeticObjectiveText(objective)
     }
 
-    override fun completionMetadata(verdict: Verdict): String? {
-        if (!optimize) return null
+    override fun completionMetadata(verdict: Verdict): List<String> {
+        if (!optimize) return emptyList()
         val status = if (linearResult?.terminal?.claim is SourceClaim.Limit) {
             if (linearResult?.scope?.objective?.sense == ObjectiveSense.MINIMIZE) {
                 "unattained-infimum"
@@ -259,7 +259,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
                 else -> verdict.name.lowercase().replace('_', '-')
             }
         }
-        return "optimizationStatus=$status"
+        return listOf("optimizationStatus=$status")
     }
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
