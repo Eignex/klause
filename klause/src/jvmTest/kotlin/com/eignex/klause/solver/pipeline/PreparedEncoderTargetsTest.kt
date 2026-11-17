@@ -54,8 +54,9 @@ class PreparedEncoderTargetsTest(language: String, private val engine: FiniteEng
             ExecutionOperation.SATISFY, engine, providers = providers))
         assertTrue(requireNotNull(invocation.admission).runnable)
 
-        val execution = SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions(
-            ExecutionOption.maxFlips(16L), ExecutionOption.maxInstructions(100000L), ExecutionOption.alnsIterations(4))))
+        val controls = ExecutionOptions(ExecutionOption.maxFlips(16L), ExecutionOption.maxInstructions(100000L),
+            ExecutionOption.alnsIterations(4))
+        val execution = SourceSetup.execute(SourceExecutionRequest(invocation, controls))
 
         val result = when (execution) {
             is SourceExecutionResult.Linear -> assertIs<OpenTheoryExecution.Satisfy>(execution.result).result
