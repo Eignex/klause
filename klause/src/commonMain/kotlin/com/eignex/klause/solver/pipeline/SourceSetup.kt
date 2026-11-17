@@ -184,7 +184,7 @@ object SourceSetup {
     }
 }
 
-// Whether a relation over reals states an open set: a strict row the absolute slack leaves without a margin, a
+// Whether a relation over reals states an open set: a strict row at zero tolerance, a
 // disequality, or a reified row whose false side is a strict complement. The finite lane completes leaves over
 // closed sets only, so a supremum such a relation leaves unattained is the linear theory's to report. An
 // unconditional strict row with a margin states the closed row `a·x <= b - margin`.

@@ -191,7 +191,7 @@ class CliModeVerdictTest {
     }
 
     private val strictGapRows = "var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; var 0.0..1.0: p; " +
-        "constraint float_lt(x,y); constraint float_lin_lt([1.0,-1.0],[y,x],0.00000015);"
+        "constraint float_lt(x,y); constraint float_lin_lt([1.0,-1.0],[y,x],0.0000015);"
 
     private fun strictGapTerminals(model: String) =
         mapOf("default" to emptyArray<String>(), "exact" to arrayOf("--exact")).mapValues { (_, args) ->
@@ -199,25 +199,25 @@ class CliModeVerdictTest {
         }
 
     @Test
-    fun `the exact flag should accept a FlatZinc strict row gap below the absolute slack`() {
+    fun `the exact flag should accept a FlatZinc strict row gap below the fixed margin`() {
         val terminals = strictGapTerminals("$strictGapRows solve satisfy;")
 
         assertEquals(mapOf("default" to "=====UNSATISFIABLE=====", "exact" to "=========="), terminals)
     }
 
     @Test
-    fun `the exact flag should accept a strict row gap below the absolute slack beside a product`() {
+    fun `the exact flag should accept a strict row gap below the fixed margin beside a product`() {
         val terminals = strictGapTerminals("$strictGapRows constraint float_times(x,y,p); solve satisfy;")
 
         assertEquals(mapOf("default" to "=====UNSATISFIABLE=====", "exact" to "=========="), terminals)
     }
 
     @Test
-    fun `a FlatZinc strict lower bound should attain its minimum at the absolute slack by default`() {
+    fun `a FlatZinc strict lower bound should attain its minimum at the fixed margin by default`() {
         val out = solveFlatZinc("var 0.0..1.0: x :: output_var; constraint float_lt(0.0,x); solve minimize x;")
 
         val value = out.lines().first { it.startsWith("x = ") }.removePrefix("x = ").removeSuffix(";").toDouble()
-        assertEquals(1e-7, value, 1e-20, out)
+        assertEquals(1e-6, value, 1e-20, out)
         assertTrue("==========" in out.lines() && "unattained-infimum" !in out, out)
     }
 
