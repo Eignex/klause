@@ -349,6 +349,14 @@ unrestricted products go to [polynomial completion](19-nonlinear-arithmetic.md#p
 consumers install alternatives privately; an LP relaxation alone never establishes
 membership or a product.
 
+The [FlatZinc transcendental builtins](https://docs.minizinc.dev/en/stable/lib-flatzinc-float.html)
+`float_exp`, `float_ln`, `float_log2`, `float_log10`, `float_sin`, `float_cos`,
+`float_tan`, `float_asin`, `float_acos`, `float_atan`, `float_sinh`, `float_cosh`,
+`float_tanh`, `float_asinh`, `float_acosh` and `float_atanh` are unsupported.
+In both default and exact mode, loading one raises `UnsupportedFlatZincException`
+with `unsupported FlatZinc builtin` and the predicate name. FlatZinc does not lower
+these predicates to the [transcendental theory](19-nonlinear-arithmetic.md#transcendental-real-arithmetic).
+
 In the compatibility view, a component that needs approximation or has more than
 4,096 finite alternatives uses integer buckets. Bucketed search decides a finite
 grid: it misses solutions between grid points, and rounding can produce candidates
