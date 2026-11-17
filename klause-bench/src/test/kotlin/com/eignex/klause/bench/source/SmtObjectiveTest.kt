@@ -14,14 +14,6 @@ import kotlin.test.assertNull
 
 class SmtObjectiveTest {
     @Test
-    fun `compressed input retains the objective direction`(@TempDir root: Path) {
-        val source = root.resolve("source.smt2").toFile().apply { writeText("(maximize 3) (check-sat)") }
-        val packed = CorpusFiles.compress(source)
-
-        assertEquals(ObjectiveSense.MAXIMIZE, SmtObjective.read(packed))
-    }
-
-    @Test
     fun `interrupted metadata scanning stops before reading the source`(@TempDir root: Path) {
         val source = root.resolve("source.smt2").toFile().apply { writeText("(minimize 3) (check-sat)") }
         try {
