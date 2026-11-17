@@ -30,6 +30,7 @@ class FlatZincAffineFloatImagesTest {
             constraint int_eq(n, 2);
             solve satisfy;
             """.trimIndent(),
+            exactFloats = true,
         )
 
         val deductions = assertIs<PropagationResult.Implied>(program.problem.baked)
@@ -58,6 +59,7 @@ class FlatZincAffineFloatImagesTest {
                 constraint int_eq(n, 2);
                 solve satisfy;
                 """.trimIndent(),
+                exactFloats = true,
             )
 
             val deductions = assertIs<PropagationResult.Implied>(program.problem.baked)
@@ -102,6 +104,7 @@ class FlatZincAffineFloatImagesTest {
             constraint int_eq(n, 1);
             solve satisfy;
             """.trimIndent(),
+            exactFloats = true,
         )
 
         assertIs<PropagationResult.Unsat>(program.problem.baked)

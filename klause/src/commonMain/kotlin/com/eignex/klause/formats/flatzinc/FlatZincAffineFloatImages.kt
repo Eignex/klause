@@ -110,6 +110,8 @@ internal fun FlatZincCompiler.postIntegerImagePredicate(
     strict: Boolean,
     reifier: Int?,
 ): Boolean {
+    // A tolerant real image can differ from its defining affine expression.
+    if (sourceSemantics.effective.feasibilityTolerance?.isExact == false) return false
     var image = AffineFloatImage(emptyMap())
     for (i in variables.indices) {
         if (coefficients[i] == 0.0) continue

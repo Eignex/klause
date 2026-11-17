@@ -148,6 +148,16 @@ class FiniteExecutionTest {
     }
 
     @Test
+    fun `fixed search should accept single variable float rows that conflict only within the slack`() {
+        val source = "var 0.0..1.0: z; constraint float_eq(z,0.3); " +
+            "constraint float_le(z,0.29999995); solve satisfy;"
+
+        val verdict = solveFlatZinc(SemanticOverrides(), source = source)
+
+        assertEquals(FiniteSolveVerdict.SAT, verdict)
+    }
+
+    @Test
     fun `incomplete engines should accept a FlatZinc real completion within the declared tolerance`() {
         for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)) {
             val samples = ArrayList<Sample>()
