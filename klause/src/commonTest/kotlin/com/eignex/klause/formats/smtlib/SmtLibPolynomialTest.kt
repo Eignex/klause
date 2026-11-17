@@ -25,7 +25,11 @@ class SmtLibPolynomialTest {
     @Test
     fun `pre cancelled lowering should not read its source`() {
         val source = object : CharSource {
-            override fun next(): String? = error("cancelled source must not be read")
+            private var closed = false
+            override fun close() {
+                closed = true
+            }
+            override fun next(): String? = if (closed) null else error("cancelled source must not be read")
         }
 
         assertFailsWith<PolynomialSourceInterrupted> { SmtLibPolynomial.parse(source, ExecutionControl { true }) }
@@ -336,6 +340,15 @@ class SmtLibPolynomialTest {
     }
 
     @Test
+    fun `arithmetic query assumptions constrain the polynomial formula`() {
+        val assumed = SmtLibPolynomial.parse("(declare-const x Real) (check-sat-assuming ((> x 0)))")
+        val asserted = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0)) (check-sat)")
+
+        assertEquals(asserted.formula, assumed.formula)
+        assertEquals(asserted.realVarNames, assumed.realVarNames)
+    }
+
+    @Test
     fun `unconstrained declarations should retain source names and counts`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (declare-const b Bool) (check-sat)")
 
@@ -395,7 +408,6 @@ class SmtLibPolynomialTest {
             "(declare-const x Real) (minimize (* x x x))",
             "(push 1)", "(get-value (x))", "(check-sat) (check-sat)", "(exit) (assert false)",
             "(check-sat) (assert true)",
-            "(declare-const x Real) (check-sat-assuming ((> x 0)))",
         )
         for (source in cases) {
             assertFailsWith<UnsupportedSmtException>(source) { SmtLibPolynomial.parse(source) }

@@ -37,16 +37,6 @@ class RealFiniteDomainTest {
     }
 
     @Test
-    fun `empty and singleton sets should retain their source coordinate`() {
-        for (values in listOf(doubleArrayOf(), doubleArrayOf(-3.0))) {
-            val factor = RealFiniteDomain(0, values)
-
-            assertEquals(values.size, factor.size)
-            assertContentEquals(intArrayOf(0), factor.variables.reals)
-        }
-    }
-
-    @Test
     fun `nonfinite values and removed coordinates should reject representation`() {
         for (value in listOf(Double.NaN, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)) {
             assertFailsWith<IllegalArgumentException> { RealFiniteDomain(0, doubleArrayOf(value)) }

@@ -10,7 +10,10 @@ import com.eignex.klause.util.SharingMemorySnapshot
 import com.eignex.klause.util.SharingMemoryStatus
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.LongHashSet
-import com.eignex.util.collections.hashTableCapacity
+import com.eignex.util.collections.cooperative.containsBounded
+import com.eignex.util.collections.cooperative.tryAddBounded
+import com.eignex.util.collections.storage.hashTableCapacity
+import com.eignex.util.collections.storage.primitiveCapacityBytes
 import com.eignex.util.concurrent.Mutex
 import com.eignex.util.hash.fibonacciHash
 
@@ -490,7 +493,7 @@ internal class PoolClauseExchange(
 
     private fun ownedMemory(): Map<String, Long> = pool.memory() + mapOf(
         "seenKeys" to seen.size.toLong(),
-        "seenCapacityBytes" to seen.allocatedBytes,
+        "seenCapacityBytes" to seen.primitiveCapacityBytes,
     )
 
     private fun observe(session: PropagationSession) {
@@ -510,9 +513,9 @@ internal class PoolClauseExchange(
         if (sessionIdentity === session.sharingIdentity) {
             val identity = session.sharingIdentity
             session.retainedSharingMemory = { sample ->
-                if (sessionIdentity === identity) sample.owned(seen, seen.allocatedBytes, protected = true)
+                if (sessionIdentity === identity) sample.owned(seen, seen.primitiveCapacityBytes, protected = true)
             }
-            session.retainedSharingSize = { if (sessionIdentity === identity) seen.allocatedBytes else 0L }
+            session.retainedSharingSize = { if (sessionIdentity === identity) seen.primitiveCapacityBytes else 0L }
         }
     }
 

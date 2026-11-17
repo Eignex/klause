@@ -388,7 +388,7 @@ internal object ImplicationGraph {
         while (!stack.isEmpty()) {
             if (!work.visit()) return null
             val node = stack.last()
-            stack.removeAt(stack.size - 1)
+            stack.removeAtSwap(stack.size - 1)
             adj.neighbours(node).forEach { next ->
                 if (!work.visit()) return null
                 if (next !in seen && live.getOrDefault(Edge(node, next).key, 0) > 0) {
@@ -457,15 +457,15 @@ internal object ImplicationGraph {
                     while (true) {
                         if (!work.visit()) return null
                         val w = tarjanStack.last()
-                        tarjanStack.removeAt(tarjanStack.size - 1)
+                        tarjanStack.removeAtSwap(tarjanStack.size - 1)
                         onStack[w] = false
                         component[w] = nextComponent
                         if (w == node) break
                     }
                     nextComponent++
                 }
-                callNode.removeAt(callNode.size - 1)
-                callNeighbour.removeAt(callNeighbour.size - 1)
+                callNode.removeAtSwap(callNode.size - 1)
+                callNeighbour.removeAtSwap(callNeighbour.size - 1)
                 if (!callNode.isEmpty()) {
                     val parent = callNode[callNode.size - 1]
                     if (low[node] < low[parent]) low[parent] = low[node]

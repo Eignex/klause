@@ -142,7 +142,8 @@ internal data class LpSolveContext(
     val onQuery: ((LpQueryObservation) -> Unit)? = null,
     /**
      * Finite-lane LP deductions consume float results within tolerances instead of exact certificates. Only the
-     * finite pipeline sets it; the open theories and leaf completion never read it.
+     * finite pipeline selects it from source semantics. Leaf completion opts in for tolerance requests;
+     * open theories and source LP optimization keep exact certification.
      */
     val numericalDeductions: Boolean = false,
 ) {

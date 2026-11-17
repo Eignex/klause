@@ -13,6 +13,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     private data class RootCount(val polynomial: RationalPolynomial, val count: Int)
     private var currentRootCount: RootCount? = null
     private var previousRootCount: RootCount? = null
+    private var narrowing: Pair<RationalPolynomial, List<RationalPolynomial>>? = null
 
     fun rational(value: BigFraction): AlgebraicReal = arithmetic.execution.operation {
         arithmetic.step()
@@ -70,6 +71,27 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         value.definingPolynomial, value.rootIndex, univariate.refine(value.definingPolynomial, value.interval),
         value.image,
     )
+
+    // [value] narrowed to the side of [split] that holds its root, or to [split] itself when that is the root. A split
+    // outside the open interval leaves [value] unchanged.
+    fun splitAt(value: AlgebraicReal, split: BigFraction): AlgebraicReal = arithmetic.execution.operation {
+        arithmetic.step()
+        if (split <= value.interval.lower || value.interval.upper <= split) return@operation value
+        val polynomial = value.definingPolynomial
+        val interval = if (univariate.evaluate(polynomial, split).isZero) {
+            RationalInterval(split, split)
+        } else {
+            val below = RationalInterval(value.interval.lower, split)
+            if (univariate.countOpen(narrowingSequence(polynomial), below) == 1) below
+            else RationalInterval(split, value.interval.upper)
+        }
+        return@operation AlgebraicReal(polynomial, value.rootIndex, interval, value.image)
+    }
+
+    private fun narrowingSequence(polynomial: RationalPolynomial): List<RationalPolynomial> {
+        narrowing?.let { (cached, sequence) -> if (cached === polynomial) return sequence }
+        return univariate.sturm(polynomial).also { narrowing = polynomial to it }
+    }
 
     fun compare(left: AlgebraicReal, right: AlgebraicReal): Int = arithmetic.execution.operation {
         compareValue(left, right)

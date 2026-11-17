@@ -33,7 +33,7 @@ enforced by a selected arithmetic encoder.
 
 A source model records how its syntax must be read. `ir.SourceSemantics` describes
 numeric literal authority, float interpretation, default undeclared ranges, source
-feasibility tolerance and absent optional values. A format declares only the
+feasibility tolerance, optimality tolerance and absent optional values. A format declares only the
 policies that apply to it, and a caller cannot introduce an absent one.
 
 `SemanticOverrides` replaces applicable policies before lowering. `BoundsOverride`
@@ -43,6 +43,13 @@ declarations with an explicit range keep it (see
 `max(absolute, relative * scale)`, where a row's scale is the larger of its finite
 bound magnitude and the sum of absolute term activities. Zero components require
 exact checking, and integrality is always exact.
+`OptimalityTolerance` declares when two evaluations of one point's objective agree:
+a source value `v` and a native value `p` agree when
+`abs(v - p) <= max(absolute, relative * scale)`, where `scale` is the sum of the
+point's absolute objective term activities, constant excluded. It qualifies a
+reported optimum only; it bounds no search, makes no unproved bound an optimum and
+makes no other point optimal. Zero components require equal values, and an exact
+feasibility tolerance makes the effective gap zero.
 
 `EffectiveSourceSemantics` keeps both the defaults and the effective policy.
 `isApproximate` marks a grid or positive tolerance and `hasOverrides` records any
@@ -69,7 +76,7 @@ coordinates. Array getters return independent buffers, and scalar reads retain
 exact integer and rational authority. Replacing coordinates requires a fresh
 witness check. `Sample.symbolicReals` retains exact analytic expressions for
 transcendental coordinates (see
-[exact analytic real coordinates](18-exact-arithmetic.md#exact-analytic-real-coordinates)).
+[exact analytic real coordinates](22-exact-arithmetic.md#exact-analytic-real-coordinates)).
 
 Linear objectives capture their coefficient arrays at construction, so no getter
 or copy can mutate them. Incumbent extensions supply immutable assignment and
@@ -83,23 +90,23 @@ objective payloads, or capture producer state in their verifier before acceptanc
 repeated coordinate expressing a square. Coefficients are literal reduced
 rationals, and direction belongs to the invocation. Linear objectives bridge into
 this representation with unchanged IDs. The
-[certificate kernel](18-exact-arithmetic.md#exact-quadratic-certificates) checks
-rational convex subproblems, and [polynomial real arithmetic](16-nonlinear-arithmetic.md#polynomial-real-arithmetic)
+[certificate kernel](22-exact-arithmetic.md#exact-quadratic-certificates) checks
+rational convex subproblems, and [polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic)
 owns quadratic optimization results.
 
 ## Optional completed-result evidence
 
 Completed satisfaction and minimization results can retain optional
 `SourceResultEvidence`. It binds exact claims to the original revision, restrictions,
-objective and semantics; [derivation checking](13-evidence.md) owns proof coverage.
+objective and semantics; [derivation checking](16-evidence.md) owns proof coverage.
 
 ## Source relations
 
 Factors retain source relations through remapping. Propagation, scoring and
 arithmetic consumers build separate projections; a relaxation never enforces a
 factor. The relations below describe their semantic distinctions. Consumer mechanics
-belong to [propagation](08-search.md#finite-propagation),
-[local search](10-local-search.md) and [theory encoding](14-theories.md).
+belong to [propagation](09-search.md#finite-propagation),
+[local search](12-local-search.md) and [theory encoding](17-theories.md).
 
 ### Source definition hints
 
@@ -111,7 +118,7 @@ renumbers every role; a removed required coordinate declines the hint rather tha
 inventing a value, unless [presolve](07-presolve.md#guarantees-and-source-mappings)
 rebuilt it exactly from retained columns. [FlatZinc](04-finite-formats.md#source-definitions)
 and [XCSP3](04-finite-formats.md#expressions-and-selection) produce these records, and
-[local search](10-local-search.md#source-definition-materialization) materializes its
+[local search](12-local-search.md#source-definition-materialization) materializes its
 private view only when requested.
 
 ### Distinct integer positions
@@ -157,7 +164,7 @@ by dividend, divisor coordinate or constant, and convention. Additional outputs 
 equality aliases; the index is discarded before solving.
 `lowering.DivModEncoding` owns the formulas: linear encoding requires a literal or
 fixed divisor, polynomial encoding retains every sign case, and difference encoding
-is unsupported. [Local search](10-local-search.md#definitions-and-repairs) maintains
+is unsupported. [Local search](12-local-search.md#definitions-and-repairs) maintains
 eligible outputs and correlated repairs.
 
 ### Absolute-value relations
@@ -178,7 +185,9 @@ available alongside arithmetic participation.
 
 `RealArrayMinMax` and `RealElement` are the real-valued counterparts: their implied
 inequalities form a relaxation, and complete encoders also require the selected
-equality. `GridArrayMinMax` filters with exact integer activities and establishes
+equality. A finite view under a positive absolute tolerance marks each
+`RealArrayMinMax` leaf-enforced, which finite search leaves inert; without that mark it
+has no finite propagation. `GridArrayMinMax` filters with exact integer activities and establishes
 nothing outside the declared grid policy.
 
 ### Exact linear source relations
@@ -262,7 +271,7 @@ published. Grid exhaustion and optimization prove only grid claims, kept in
 `FiniteSolveResult.nativeGridOutcome`; `outcome` reports unknown, or the accepted
 point as satisfiable or best-found. A satisfiable grid enumeration claims no
 complete list of solutions. `outcome` is unsatisfiable only when root propagation
-refutes the source's integer and Boolean relations alone. See [source checking](07-presolve.md#source-witness-validation) and
+refutes the source's integer and Boolean relations alone. See [source checking](08-presolve-reductions.md#source-witness-validation) and
 [reconstruction](07-presolve.md#guarantees-and-source-mappings).
 
 ## Engine projections and factor capabilities
@@ -270,7 +279,7 @@ refutes the source's integer and Boolean relations alone. See [source checking](
 Preparation selects the primary owner of every coordinate and factor before opening
 engine state. Participation can overlap; primary ownership cannot.
 `SourceAttachment` retains the original model and semantics;
-[source setup](19-api.md#source-setup) binds the operation and prepares execution.
+[source setup](23-api.md#source-setup) binds the operation and prepares execution.
 Interrupted preparation exports no partial plan.
 
 ### The prepared plan
@@ -283,7 +292,7 @@ arithmetic language; a factor class alone does not require polynomial traversal.
 `PreparedSourcePlan` retains the original source, canonical execution model,
 coordinate mappings, component descriptors and objective direction. Its sealed
 payload is finite/linear (`ComponentPlan`), polynomial (`SharedPolynomialModel`),
-nonlinear-integer (see [its chapter](16-nonlinear-arithmetic.md#solving-and-composition)),
+nonlinear-integer (see [its chapter](19-nonlinear-arithmetic.md#solving-and-composition)),
 transcendental or declined. That payload is the plan's only route representation:
 `kind` and `decline` both read it, and rebinding an objective never
 changes it. Preparation invents no finite bounds for open integer
@@ -319,7 +328,7 @@ scoring, relaxation and theory encoder descriptors against one canonical `Proble
 A null descriptor marks an unsupported role and an explicit inert descriptor a
 deliberate absence. A rewritten model selects against its own factors; a certified
 deletion may retain built-in descriptors through the checked
-[retained-factor mapping](07-presolve.md#source-routing-and-encoder-selection).
+[retained-factor mapping](08-presolve-reductions.md#source-routing-and-encoder-selection).
 
 Direct and equivalent encoders enforce the whole factor; conditioned encoders
 require captured source pins; relaxation-only descriptors confer no ownership.
@@ -340,8 +349,8 @@ complete check exists, and execution stays unknown otherwise.
 Shared search exchanges Boolean literals, exact integer bounds and typed theory
 decisions. Each component contributes only its owned source coordinates; missing or
 multiply represented coordinates withhold publication.
-[Typed contributions](19-api.md#typed-contributions) define the assembly boundary,
-and [coordinate agreement](09-learning.md#arithmetic-coordinate-agreement) defines
+[Typed contributions](23-api.md#typed-contributions) define the assembly boundary,
+and [coordinate agreement](11-search-policies.md#arithmetic-coordinate-agreement) defines
 checks between registered arithmetic peers.
 
 ### Finite execution options
@@ -353,7 +362,7 @@ Malformed values keep their diagnostic until a route consumes them. Each plan ge
 a fresh consumption view and produces worker factories, and every worker builds
 its own mutable selectors. Node allowances, cancellation and lane counts remain
 invocation arguments owned by [resources](06-sessions.md#resource-allowances) and
-[portfolios](12-portfolio.md).
+[portfolios](14-portfolio.md).
 
 When preparation selects a finite route, `open-linear-incremental` stays at the
 source boundary and is omitted from finite engine settings. This filtering covers

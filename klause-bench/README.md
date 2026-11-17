@@ -134,6 +134,16 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+Lab workers seed the wrapper-pinned Gradle distribution through the JDK release-asset transport
+described in the lab's [run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md).
+JVM CI exercises the pinned Gradle and SDK release assets with
+`bash klause-bench/scripts/run-verified-gradle.sh GRADLE_ARGUMENTS...`. This CI/manual entry point
+requires Linux, `gh`, `sha256sum` and the JDK archive tool. It checks the Gradle asset against the wrapper
+version and SHA-256, verifies every SDK artifact, and extracts only verified bytes into a private
+temporary directory removed after Gradle exits, with daemon reuse disabled for that distribution.
+It keeps the caller's Gradle dependency cache.
+Lab workers use their JDK transport and do not invoke this shell entry point.
+
 Gradle stages the checksum-pinned Lab Bench SDK `0.1.1` through the public GitHub release-asset API using the JDK.
 The SDK supplies the shared workspace checksum cache used for input and build provenance.
 Verified artifacts are cached under `GRADLE_USER_HOME/caches/eignex/lab-bench-sdk`, shared across fresh
@@ -472,6 +482,8 @@ retain its output through `$OUT`.
 
 Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
 and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
+Recordings capture up to 128 stack frames. Clock-conversion summaries retain up to
+32 frames per sampled caller chain and mark capture truncation.
 Summary generation runs in the bench process after CLI exit, outside the subprocess
 `elapsedMs` and GNU time metrics and inside the containing case and job allowances.
 These instrumented captures support attribution; use separate uninstrumented controls
@@ -746,7 +758,7 @@ files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 WBO and haplotyping MaxSAT tails, and the weighted `mprime` incumbent control.
 
 The scoped automatic weighted-core source policy is described in
-[portfolios](../docs/12-portfolio.md#boolean-objective-core-search). Compare the
+[portfolios](../docs/15-portfolio-scheduling.md#boolean-objective-core-search). Compare the
 default run against `param.core-early=false` and `param.core-refinement=none` at
 the same source revision, seeds, resources and containing allowance. That control
 retains delayed, unrefined core search. Keep actual admission/refinement consumption,

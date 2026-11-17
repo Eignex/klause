@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.util.collections.storage.borrowBackingArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -41,7 +42,7 @@ class IntEventOverflowTest {
             } catch (_: ReclamationPreparation.Deferred) { }
         }
         assertEquals(128, assertNotNull(index[4]).size)
-        assertEquals(256, assertNotNull(index[4]).backingData.size)
+        assertEquals(256, assertNotNull(index[4]).borrowBackingArray().size)
         repeat(8) {
             val budget = ReclamationPreparation(512L, 1024L, { false }, {})
             try {
@@ -49,7 +50,7 @@ class IntEventOverflowTest {
             } catch (_: ReclamationPreparation.Deferred) { }
         }
 
-        assertEquals(128, assertNotNull(index[4]).backingData.size)
+        assertEquals(128, assertNotNull(index[4]).borrowBackingArray().size)
         assertEquals((0 until 128).toSet(), assertNotNull(index[4]).toSet())
     }
 

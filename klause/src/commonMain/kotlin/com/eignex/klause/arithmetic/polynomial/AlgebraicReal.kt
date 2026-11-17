@@ -21,6 +21,22 @@ class AlgebraicReal internal constructor(
 
     /** Exact upper isolating bound, excluded for a nonpoint interval. */
     val upperBound: BigFraction get() = interval.upper
+
+    // How the isolating interval stands against binary64 rounding; see [roundToBinary64].
+    internal fun binaryRounding(): BinaryRounding = roundToBinary64(interval)
+
+    // The binary64 value nearest this root, or null while the isolating interval spans more than one rounding cell.
+    internal val nearestDouble: Double? get() = (binaryRounding() as? BinaryRounding.Determined)?.value
+
+    // A cheap guide for search: the rational's conversion, or the mean of the converted interval endpoints.
+    internal val guideDouble: Double
+        get() = rational?.toDouble() ?: (interval.lower.toDouble() / 2 + interval.upper.toDouble() / 2)
+
+    // [nearestDouble] when the interval settles it, otherwise the rounding of the interval's midpoint.
+    internal val approximateDouble: Double get() = when (val rounding = binaryRounding()) {
+        is BinaryRounding.Determined -> rounding.value
+        is BinaryRounding.Split -> rounding.approximate
+    }
 }
 
 internal class AlgebraicImage(val base: AlgebraicReal, val polynomial: RationalPolynomial)

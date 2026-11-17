@@ -37,4 +37,23 @@ class RealArrayMinMaxInvariantTest {
             assertEquals(0L, state.cost)
         }
     }
+
+    @Test
+    fun `a leaf enforced extremum should stay inert in local search`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(RealArrayMinMax(0, intArrayOf(1, 2), true).leafEnforcedCopy()),
+            numRealVars = 3,
+            realLower = doubleArrayOf(0.0, 0.0, 0.0),
+            realUpper = doubleArrayOf(4.0, 4.0, 4.0),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(source), Random(0))
+        state.assignment.setReal(0, 0.0)
+        state.assignment.setReal(1, 3.0)
+        state.recompute()
+
+        assertEquals(0L, state.cost)
+    }
 }

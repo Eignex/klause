@@ -2,6 +2,7 @@ package com.eignex.klause.bench.tools
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class CliProfileTest {
     @Test
@@ -30,7 +31,7 @@ class CliProfileTest {
             "arithmetic.polynomial.RationalPolynomialArithmetic.sturm",
             "arithmetic.polynomial.RationalPolynomialArithmetic.refine",
             "arithmetic.polynomial.AlgebraicArithmetic.compare",
-            "theory.qfnra.QfNraSolverKt.liftFrame",
+            "theory.qfnra.PolynomialCellSearchKt.liftFrame",
         ).map { "com.eignex.klause.$it" }
 
         val callers = CliProfile.cliPolynomialCheckpointCallers(stack)
@@ -72,13 +73,22 @@ class CliProfileTest {
             "solver.pipeline.ExactNeighborhood.advance" to "neighborhood entry",
             "solver.pipeline.OpenExactNeighborhood.check" to "neighborhood entry",
             "lp.LpProbeSolver.probe" to "presolve probe entry",
-            "theory.qflra.QfLiraSolverKt.sharedExactLiraSource" to "source preparation entry",
+            CliProfile.EXACT_LIRA_SOURCE_PREPARATION.removePrefix("com.eignex.klause.") to "source preparation entry",
             "solver.pipeline.PreparedSearchComponents.prepareSource" to "source preparation entry",
         )) {
             val markers = CliProfile.cliContextMarkers(listOf("com.eignex.klause.$frame"))
 
             assertEquals("observed: $expected", markers, frame)
         }
+    }
+
+    @Test
+    fun `exact lira source preparation frame should name a loaded klause method`() {
+        val frame = CliProfile.EXACT_LIRA_SOURCE_PREPARATION
+
+        val methods = Class.forName(frame.substringBeforeLast('.')).declaredMethods.map { it.name }
+
+        assertTrue(frame.substringAfterLast('.') in methods, frame)
     }
 
     @Test
@@ -298,7 +308,7 @@ class CliProfileTest {
         for ((frame, expected) in listOf(
             "PreparedSearchComponents.<init>" to "shared source preparation",
             "PreparedSearchComponents.prepareSource" to "shared source preparation",
-            "QfLiraSolverKt.sharedExactLiraSource" to "shared source preparation",
+            CliProfile.EXACT_LIRA_SOURCE_PREPARATION to "shared source preparation",
             "ComponentPlanKt.componentPlan" to "shared source preparation",
             "PreparedSourcePlanKt.prepareExecutionPlan" to "shared source preparation",
             "ExactLiraSearchComponent.installSource" to "shared theory source installation",

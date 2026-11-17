@@ -34,7 +34,8 @@ internal object PortfolioReduction {
         ) {
             is SolveResult.Sat -> winner.copy(stats = stats)
             is SolveResult.Unsat -> winner.copy(stats = stats)
-            else -> SolveResult.Unknown(TerminationReason.Cancelled, stats)
+            else -> SolveResult.Unknown(unsettledReason(results.filterIsInstance<SolveResult.Unknown>()
+                .map { it.reason }), stats)
         }
     }
 

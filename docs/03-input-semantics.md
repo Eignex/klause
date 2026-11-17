@@ -20,7 +20,7 @@ schema frontend. The next two chapters cover file formats.
 
 Formats declare their defaults as
 [typed source semantics](02-model.md#typed-source-semantics) that caller overrides
-replace before lowering; [source setup](19-api.md#source-setup) consumes them.
+replace before lowering; [source setup](23-api.md#source-setup) consumes them.
 MPS attaches its original linear snapshot to the same setup, which routes its lowered
 model like any other source and qualifies results under its captured certification policy.
 
@@ -36,7 +36,7 @@ model like any other source and qualifies results under its captured certificati
 An exact source representation does not select an arithmetic engine. Completion
 consumes captured encoder support, and a numerical representation limit can
 withhold one projection while the source model stays the same. See
-[encoder composition](14-theories.md#extension-roles-and-completeness).
+[encoder composition](17-theories.md#extension-roles-and-completeness).
 
 ## Finite and open models
 
@@ -66,14 +66,14 @@ The format chapters define source-specific admission and strategy limits.
 | Model family | Mechanisms | Boundary |
 |---|---|---|
 | Boolean and finite integer factors | Finite propagation and backtracking; local search and portfolios | Refutations and optima require completed traversal and proof checks |
-| [Difference logic](14-theories.md#difference-logic) | Integer graph components or real graph checks inside the linear route | Requires complete fragment coverage |
-| [Linear real arithmetic](15-linear-arithmetic.md) | Exact real theory or certified LP completion | Bounds, strictness and Boolean structure stay authoritative |
-| [Linear integer arithmetic](15-linear-arithmetic.md#linear-integer-arithmetic) | Shared search, exact linear checks, integer reductions and branching | Open integer state stays theory-owned |
-| [Linear mixed arithmetic](15-linear-arithmetic.md#linear-mixed-arithmetic) | Exact linear checks with integer branching | Relaxation feasibility alone does not establish integrality |
-| [Nonlinear integer arithmetic](16-nonlinear-arithmetic.md) | Exact integer candidates and repairs; quadratic optimization by integer branching | Incomplete; exhausted allowances yield UNKNOWN |
-| [Polynomial real arithmetic](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Exact conditioned completion with backtracking, local search, ALNS and portfolios | Finite factors and exact quadratic objectives compose |
-| [Transcendental real arithmetic](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) | Exact function checks through shared traversal and LS/ALNS | Incomplete; unsupported equality certification yields UNKNOWN |
-| [Quadratic optimization](16-nonlinear-arithmetic.md#quadratic-objectives) | Checked convex bounds, objective-image completion and integer splits | Nonconvex or unresolved branches withhold global claims |
+| [Difference logic](17-theories.md#difference-logic) | Integer graph components or real graph checks inside the linear route | Requires complete fragment coverage |
+| [Linear real arithmetic](18-linear-arithmetic.md) | Exact real theory or certified LP completion | Bounds, strictness and Boolean structure stay authoritative |
+| [Linear integer arithmetic](18-linear-arithmetic.md#linear-integer-arithmetic) | Shared search, exact linear checks, integer reductions and branching | Open integer state stays theory-owned |
+| [Linear mixed arithmetic](18-linear-arithmetic.md#linear-mixed-arithmetic) | Exact linear checks with integer branching | Relaxation feasibility alone does not establish integrality |
+| [Nonlinear integer arithmetic](19-nonlinear-arithmetic.md) | Exact integer candidates and repairs; quadratic optimization by integer branching | Incomplete; exhausted allowances yield UNKNOWN |
+| [Polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Exact conditioned completion with backtracking, local search, ALNS and portfolios | Finite factors and exact quadratic objectives compose |
+| [Transcendental real arithmetic](19-nonlinear-arithmetic.md#transcendental-real-arithmetic) | Exact function checks through shared traversal and LS/ALNS | Incomplete; unsupported equality certification yields UNKNOWN |
+| [Quadratic optimization](19-nonlinear-arithmetic.md#quadratic-objectives) | Checked convex bounds, objective-image completion and integer splits | Nonconvex or unresolved branches withhold global claims |
 
 A relaxation supplies deductions, not support for omitted source constraints.
 [Factor capabilities](../klause/src/commonMain/kotlin/com/eignex/klause/solver/FactorExecutionCapabilities.kt)

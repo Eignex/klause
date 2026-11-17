@@ -611,6 +611,21 @@ class SmtGroundDatatypesTest {
     }
 
     @Test
+    fun `single constructor selector queries retain fields on observed and fresh values`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((box (field Bool))))
+            (declare-const x Box)
+            (assert (field x))
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+
+        val model = parsed.reconstructSessionModel(assignment)
+
+        assertEquals("true", model.evaluate(SExprReader("(field x)").readAll().single()))
+        assertEquals("false", model.evaluate(SExprReader("(field (box false))").readAll().single()))
+    }
+
+    @Test
     fun `real constructor fields retain exact rational values`() {
         val parsed = SmtLib.parse("""
             (declare-datatype Box ((box (field Real))))

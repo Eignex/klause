@@ -8,30 +8,6 @@ import com.eignex.klause.util.pollStop
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.saturatedAdd
 
-internal data class LpScopedMetrics(
-    val editAttempts: Long,
-    val editSuccesses: Long,
-    val preparationAttempts: Long,
-    val preparationSuccesses: Long,
-    val preparationWork: Long,
-    val preparationRefactorizations: Long,
-    val createdOwners: Long,
-    val closedOwners: Long,
-    val peakOwners: Long,
-    val retainedRows: Int,
-    val activeRows: Int,
-    val appendBasisWork: Long,
-    val appendUnknownWork: Long,
-    // [preparationWork] charges each owner's construction at its reserved bound, the allowance preparation spends;
-    // the ledger swaps that bound for the work the owners reported building their scaling views.
-    val reservedConstructionWork: Long = 0L,
-    val constructionWork: Long = 0L,
-) {
-    val editDeclines: Long get() = editAttempts - editSuccesses
-    val preparationDeclines: Long get() = preparationAttempts - preparationSuccesses
-    val currentOwners: Long get() = createdOwners - closedOwners
-}
-
 @Suppress("TooGenericExceptionCaught") // Ownership boundaries preserve arbitrary primary and cleanup failures.
 internal class LpScopedSolver(
     initial: LpExactState,
@@ -814,12 +790,6 @@ internal class LpScopedSolver(
     private fun recordAppendWork(work: com.eignex.klause.simplex.basis.BasisOperationWork?) {
         recordAppendWork(basisWorkUnits(work), basisWorkComplete(work))
     }
-
-    private fun basisWorkUnits(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =
-        work?.takeUnless { it.saturated }?.units
-
-    private fun basisWorkComplete(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Boolean =
-        work != null && work.complete && !work.saturated
 
     @Suppress("TooGenericExceptionCaught")
     private fun recordPendingAppendSolve(current: RetainedLpSolver) {

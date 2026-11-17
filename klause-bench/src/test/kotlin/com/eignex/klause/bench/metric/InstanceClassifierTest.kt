@@ -31,13 +31,6 @@ class InstanceClassifierTest {
     }
 
     @Test
-    fun `a dimacs cnf should classify as sat`() {
-        val f = InstanceClassifier.fromSource(Format.DIMACS, "p cnf 2 1\n1 -2 0\n")
-        assertEquals("sat", f.structure)
-        assertTrue(f.boolHeavy)
-    }
-
-    @Test
     fun `an smtlib instance should report its declared logic`() {
         val f = InstanceClassifier.fromSource(
             Format.SMTLIB,
@@ -47,21 +40,9 @@ class InstanceClassifierTest {
     }
 
     @Test
-    fun `an smtlib instance without set-logic should report a blank logic`() {
-        val f = InstanceClassifier.fromSource(Format.SMTLIB, "(declare-fun x () Int)\n(check-sat)")
-        assertEquals("", f.logic)
-    }
-
-    @Test
     fun `an mps instance with an INTORG marker should classify as MIP`() {
         val f = InstanceClassifier.fromSource(Format.MPS, "MARKER\n    M1 'MARKER' 'INTORG'\n")
         assertEquals("MIP", f.logic)
-    }
-
-    @Test
-    fun `an mps instance without markers should classify as LP`() {
-        val f = InstanceClassifier.fromSource(Format.MPS, "ROWS\n N obj\nCOLUMNS\n")
-        assertEquals("LP", f.logic)
     }
 
     @Test

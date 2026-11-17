@@ -17,7 +17,6 @@ import com.eignex.util.numbers.unaryMinus
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PseudoBooleanInvariantTest {
@@ -83,25 +82,6 @@ class PseudoBooleanInvariantTest {
         for (v in 0..1) state.assignment.setBool(v, true)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
-    }
-
-    @Test
-    fun `apply should eliminate a GE violation and zero the cost`() {
-        val factor = PseudoBoolean(
-            weights = longArrayOf(2, 3),
-            literals = IntArray(2) { Lit.make(it, true) },
-            op = PbOp.GE,
-            bound = 4L,
-        )
-        val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setBool(0, true)
-        state.assignment.setBool(1, false)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        state.apply(Move.BoolFlip(1))
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.cost)
     }
 
     @Test

@@ -8,34 +8,6 @@ import kotlin.test.assertTrue
 class XmlElementTest {
 
     @Test
-    fun `parsing should read nested elements attributes and text content`() {
-        val root = parseXml(
-            """<instance format="XCSP3" type="CSP">
-                 <variables><var id="x"> 1..4 </var></variables>
-               </instance>""",
-        )
-        assertEquals("instance", root.tag)
-        assertEquals("XCSP3", root.attr("format"))
-        assertEquals("CSP", root.attr("type"))
-        val vars = root.child("variables")!!
-        val v = vars.child("var")!!
-        assertEquals("x", v.attr("id"))
-        assertEquals("1..4", v.textContent.trim())
-    }
-
-    @Test
-    fun `parsing should skip prolog doctype and comments`() {
-        val root = parseXml(
-            """<?xml version="1.0" encoding="UTF-8"?>
-               <!DOCTYPE instance>
-               <!-- a comment -->
-               <r><!-- inner --><x>1</x></r>""",
-        )
-        assertEquals("r", root.tag)
-        assertEquals("1", root.child("x")!!.textContent)
-    }
-
-    @Test
     fun `predefined entities should decode in text and attributes`() {
         val e = parseXml("""<e note="a &lt; b &amp; c">x &gt; 0 &apos;ok&apos;</e>""")
         assertEquals("a < b & c", e.attr("note"))

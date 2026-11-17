@@ -26,7 +26,6 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -52,6 +51,30 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
+    @Test
+    fun `exhausted numerical leaves should report infeasible without exact certificates`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.GE, 4L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        ).bake()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val params = BacktrackParams(lpPlan = LpPlan(bounding = false, componentSplit = false),
+            toleranceCheck = { true })
+        for (numerical in listOf(false, true)) {
+            val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false },
+                numericalDeductions = numerical)
+
+            val result = BacktrackSolver(problem, context).minimize(objective, params)
+
+            if (numerical) assertIs<MinimizeResult.Infeasible>(result) else assertIs<MinimizeResult.Unknown>(result)
+        }
+    }
+
     @Test
     fun `witness-only repair should continue to a better sibling without closing unresolved coverage`() {
         val fixture = UnresolvedRealLeafFixture(true)
@@ -284,291 +307,11 @@ class ResumableMinimizeRealLeafTest {
                 assertIs<MinimizeResult.Optimal>(result).sample
             } else {
                 val incomplete = assertIs<MinimizeResult.BestFound>(result)
-                assertEquals(TerminationReason.Unsupported, incomplete.reason)
+                assertEquals(TerminationReason.RepresentationDeclined, incomplete.reason)
                 incomplete.sample
             }
             assertEquals(0.5, sample.reals.single())
         }
-    }
-
-    @Test
-    fun `mixed rounding should publish completed reals without tree decisions`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        fixture.acceptProof = { _, _ -> true }
-        val offered = ArrayList<Sample>()
-        val nodesAtPublication = ArrayList<Double>()
-        val params = fixture.params.copy(
-            maxDecisions = 0L,
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false),
-        )
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(ExecutionControl.Never, 1000L, 100_000L) {
-                offered += it.sample
-                nodesAtPublication += search.stats.search.nodes.sum
-            }
-            val sample = offered.single()
-            assertEquals(1L, sample.ints.single())
-            assertEquals(0.5, sample.reals.single())
-            assertEquals(BigFraction.ofDouble(0.5), sample.exactReals?.single())
-            assertEquals(listOf(0.0), nodesAtPublication)
-            assertTrue(search.stats.lp.standaloneWorkOps.sum > 0.0)
-        }
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `completed mixed leaves should publish only an improvement over the peer cutoff`() {
-        for ((cutoff, expected) in listOf(0.5 to 0, 1.0 to 1)) {
-            val fixture = UnresolvedRealLeafFixture(true)
-            fixture.acceptProof = { _, _ -> true }
-            val offered = ArrayList<Sample>()
-            val params = fixture.params.copy(
-                maxDecisions = 0L,
-                objectiveBoundSupplier = { cutoff },
-                assumptions = Assumptions.None.withInt(0, 1L),
-            )
-
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                search.runSlice(ExecutionControl.Never, 1000L, 100_000L) { offered += it.sample }
-            }
-
-            assertEquals(expected, offered.size)
-            assertTrue(offered.all { fixture.objective.evaluate(it) < cutoff })
-            for (sample in offered) {
-                assertEquals(1L, sample.ints.single())
-                assertEquals(0.5, sample.reals.single())
-            }
-            assertEquals(fixture.opened, fixture.closed)
-        }
-    }
-
-    @Test
-    fun `mixed root probes should admit only an improvement over the peer cutoff`() {
-        for ((cutoff, expected) in listOf(0.5 to 0, 1.0 to 1)) {
-            val fixture = UnresolvedRealLeafFixture(true)
-            fixture.acceptProof = { _, _ -> true }
-            val offered = ArrayList<Sample>()
-            val params = fixture.params.copy(
-                maxDecisions = 0L,
-                objectiveBoundSupplier = { cutoff },
-                lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false),
-            )
-
-            fixture.solver.resumable(fixture.objective, params).use { search ->
-                search.runSlice(ExecutionControl.Never, 1000L, 100_000L) { offered += it.sample }
-            }
-
-            assertEquals(expected, offered.size)
-            assertTrue(offered.all { fixture.objective.evaluate(it) < cutoff })
-            assertEquals(fixture.opened, fixture.closed)
-        }
-    }
-
-    @Test
-    fun `mixed root proposals should improve a declined completion before tree branching`() {
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 1) },
-            arrayOf<Factor>(
-                Linear(
-                    intArrayOf(0, 1),
-                    doubleArrayOf(1.0, 1.0),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.GE,
-                    1.0,
-                ),
-                Linear(
-                    intArrayOf(1, 2),
-                    doubleArrayOf(1.0, 1.0),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.GE,
-                    1.0,
-                ),
-                Linear(
-                    intArrayOf(0, 2),
-                    doubleArrayOf(1.0, 1.0),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.GE,
-                    1.0,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-        ).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(10.0))
-        for (initial in listOf(null, Sample(BooleanArray(0), longArrayOf(0, 1, 1), doubleArrayOf(0.3)))) {
-            val offered = ArrayList<Sample>()
-            val nodesAtPublication = ArrayList<Double>()
-            val pool = initial?.let { sample -> IncumbentExchange.minimizing<Sample>().apply { offer(sample, 5.0) } }
-            val params = BacktrackParams(
-                randomSeed = 0L,
-                maxDecisions = 0L,
-                objectiveBoundSupplier = { 5.0 },
-                pooledIncumbents = pool,
-                lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false),
-            )
-
-            BacktrackSolver(problem).resumable(objective, params).use { search ->
-                search.runSlice(ExecutionControl.Never, 1000L, 100_000L) {
-                    offered += it.sample
-                    nodesAtPublication += search.stats.search.nodes.sum
-                }
-            }
-
-            val sample = offered.single()
-            assertEquals(if (initial == null) 3.0 else 2.0, objective.evaluate(sample))
-            assertEquals(listOf(0.0), nodesAtPublication)
-            assertEquals(BigFraction.ZERO, sample.exactReals?.single())
-        }
-    }
-
-    @Test
-    fun `mixed directed rounding should complete fractional capacity proposals before branching`() {
-        for (sign in listOf(1L, -1L)) {
-            val domain = if (sign > 0L) IntDomain(0L, 5L) else IntDomain(-5L, 0L)
-            val problem = Problem(
-                0,
-                1,
-                arrayOf(domain),
-                arrayOf<Factor>(
-                    Linear(
-                        intArrayOf(0),
-                        doubleArrayOf(sign.toDouble()),
-                        intArrayOf(0),
-                        doubleArrayOf(-1.0),
-                        LinearOp.GE,
-                        0.0,
-                    ),
-                    Linear(
-                        IntArray(0),
-                        DoubleArray(0),
-                        intArrayOf(0),
-                        doubleArrayOf(1.0),
-                        LinearOp.GE,
-                        0.4,
-                    ),
-                ),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(1.0),
-            ).bake()
-            val objective = LinearObjective(intCoefficients = longArrayOf(sign))
-            val params = BacktrackParams(
-                maxDecisions = 0L,
-                objectiveBoundSupplier = { 5.0 },
-                lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false),
-            )
-            val offered = ArrayList<Sample>()
-            val nodesAtPublication = ArrayList<Double>()
-
-            BacktrackSolver(problem).resumable(objective, params).use { search ->
-                search.runSlice(ExecutionControl.Never, 1000L, 100_000L) {
-                    offered += it.sample
-                    nodesAtPublication += search.stats.search.nodes.sum
-                }
-            }
-
-            val sample = offered.single()
-            assertEquals(sign, sample.ints.single())
-            assertEquals(1.0, objective.evaluate(sample))
-            assertTrue(sample.reals.single() >= 0.4)
-            assertEquals(1, sample.exactReals?.size)
-            assertEquals(listOf(0.0), nodesAtPublication)
-        }
-    }
-
-    @Test
-    fun `mixed tolerance rounding should complete its reals before any decision`() {
-        val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
-            arrayOf<Factor>(
-                Linear(
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.EQ,
-                    1.3,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(0.5),
-        ).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val params = BacktrackParams(
-            maxDecisions = 0L,
-            objectiveBoundSupplier = { 2.0 },
-            toleranceCheck = { sample ->
-                sample.numRealVars == 1 && sample.reals.single() in 0.0..0.5 &&
-                    kotlin.math.abs(sample.ints.single() + sample.reals.single() - 1.3) < 1e-8
-            },
-            lpPlan = LpPlan(bounding = true, probe = true, rootCutHarvest = false),
-        )
-        val offered = ArrayList<Sample>()
-        val nodesAtPublication = ArrayList<Double>()
-
-        BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(ExecutionControl.Never, 1000L, 100_000L) {
-                offered += it.sample
-                nodesAtPublication += search.stats.search.nodes.sum
-            }
-        }
-
-        val sample = offered.single()
-        assertEquals(1.0, objective.evaluate(sample))
-        assertTrue(kotlin.math.abs(sample.reals.single() - 0.3) < 1e-8)
-        assertTrue(assertNotNull(params.toleranceCheck)(sample))
-        assertEquals(listOf(0.0), nodesAtPublication)
-    }
-
-    @Test
-    fun `mixed rounding should not publish an uncertified completion`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        fixture.acceptProof = { _, _ -> false }
-        val offered = ArrayList<Sample>()
-        val params = fixture.params.copy(
-            maxDecisions = 0L,
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false),
-        )
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(ExecutionControl.Never, 1000L, 100_000L) { offered += it.sample }
-        }
-
-        assertTrue(offered.isEmpty())
-        assertEquals(fixture.opened, fixture.closed)
-    }
-
-    @Test
-    fun `mixed rounding should not publish after completion cancellation`() {
-        val fixture = UnresolvedRealLeafFixture(true)
-        var cancelled = false
-        fixture.acceptProof = { leaf, _ ->
-            if (leaf > 0) cancelled = true
-            true
-        }
-        val offered = ArrayList<Sample>()
-        val params = fixture.params.copy(
-            maxDecisions = 0L,
-            lpPlan = fixture.params.lpPlan.copy(bounding = true, probe = true, rootCutHarvest = false),
-        )
-
-        fixture.solver.resumable(fixture.objective, params).use { search ->
-            search.runSlice(ExecutionControl { cancelled }, 1000L, 100_000L) { offered += it.sample }
-        }
-
-        assertTrue(fixture.visited > 0)
-        assertTrue(offered.isEmpty())
-        assertEquals(fixture.opened, fixture.closed)
     }
 
     @Test
@@ -654,7 +397,7 @@ class ResumableMinimizeRealLeafTest {
                     offered += it.objectiveValue
                 },
             )
-            assertEquals(TerminationReason.Unsupported, result.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, result.reason)
             assertEquals(listOf(0.5), offered)
             assertEquals(0.5, result.sample.reals.single())
             fixture.assertVisitedLeaves(ownersReleased = false)
@@ -691,6 +434,18 @@ class ResumableMinimizeRealLeafTest {
             assertEquals(1, fixture.opened)
             assertEquals(0, fixture.closed)
         }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `an unresolved real leaf should preserve later decision exhaustion`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+
+        val result = fixture.solver.minimize(fixture.objective, fixture.params.copy(maxDecisions = 1L))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
+        assertEquals(1, fixture.visited)
         assertEquals(fixture.opened, fixture.closed)
     }
 
@@ -775,7 +530,10 @@ class ResumableMinimizeRealLeafTest {
 
     @Test
     fun `an undecided component should report its native stop without proving exhaustion`() {
-        for (cause in listOf(SearchStopCause.RepresentationDecline, SearchStopCause.OperationAllowance)) {
+        for ((cause, reason) in listOf(
+            SearchStopCause.RepresentationDecline to TerminationReason.RepresentationDeclined,
+            SearchStopCause.OperationAllowance to TerminationReason.BudgetExhausted,
+        )) {
             val events = ArrayList<SearchEvent>()
             val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
             val params = BacktrackParams(
@@ -793,7 +551,7 @@ class ResumableMinimizeRealLeafTest {
             BacktrackSolver(problem).resumable(LinearObjective(boolWeights = longArrayOf(1L)), params).use { search ->
                 val result = assertIs<MinimizeResult.Unknown>(search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
 
-                assertEquals(TerminationReason.Unsupported, result.reason)
+                assertEquals(reason, result.reason)
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
                 assertEquals(

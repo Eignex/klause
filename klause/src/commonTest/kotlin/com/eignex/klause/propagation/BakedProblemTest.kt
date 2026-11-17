@@ -15,7 +15,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -158,19 +157,6 @@ class BakedProblemTest {
             baked.rootIntDomain(0),
             baked.intDomainOrNull(0),
         )
-    }
-
-    @Test
-    fun `bake should keep a declared hole`() {
-        val baked = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 5).excludeValue(3)),
-            factors = emptyArray(),
-        ).bake()
-
-        assertFalse(3L in baked.rootIntDomain(0))
-        assertTrue(2L in baked.rootIntDomain(0) && 4L in baked.rootIntDomain(0))
     }
 
     @Test

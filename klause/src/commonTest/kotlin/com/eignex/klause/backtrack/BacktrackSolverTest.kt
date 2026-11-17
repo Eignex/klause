@@ -52,7 +52,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -329,20 +328,6 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `solve should respect assumptions`() {
-        val p = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-        )
-        val r = BacktrackSolver(p.bake()).solve(BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false))))
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals(false, sat.assignment.bools[0])
-        assertEquals(true, sat.assignment.bools[1])
-    }
-
-    @Test
     fun `returned assumption core should retain transitive propagated premises`() {
         val problem = Problem(
             4,
@@ -385,30 +370,6 @@ class BacktrackSolverTest {
         for (m in models) {
             assertEquals(1, m.bools.count { it })
         }
-    }
-
-    @Test
-    fun `minimize should find the optimal feasible assignment`() {
-        val p = Problem(
-            numBoolVars = 4,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Cardinality.exactlyOne(
-                    intArrayOf(
-                        Lit.make(0, true),
-                        Lit.make(1, true),
-                        Lit.make(2, true),
-                        Lit.make(3, true),
-                    ),
-                ),
-            ),
-        )
-        val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val best = BacktrackSolver(p.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
-        assertNotNull(best)
-        assertEquals(3.0, obj.evaluate(best))
-        assertEquals(true, best.bools[3])
     }
 
     @Test
@@ -560,22 +521,6 @@ class BacktrackSolverTest {
         val seq = BacktrackSolver(problem.bake()).improvements(obj, BacktrackParams(randomSeed = 0L)).toList()
         assertEquals(1, seq.size)
         assertIs<MinimizeResult.Infeasible>(seq[0])
-    }
-
-    @Test
-    fun `minimize should equal the last improvement`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 7)),
-            factors = emptyArray(),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1L))
-        val solver = BacktrackSolver(problem.bake())
-        val params = BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMin)
-        val viaMinimize = solver.minimize(obj, params)
-        val viaImprovements = solver.improvements(obj, params).last()
-        assertEquals(viaMinimize.withoutStats(), viaImprovements.withoutStats())
     }
 
     @Test

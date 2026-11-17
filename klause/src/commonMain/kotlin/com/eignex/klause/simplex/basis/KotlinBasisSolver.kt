@@ -1,5 +1,6 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import kotlin.math.abs
@@ -563,9 +564,9 @@ internal class KotlinBasisSolver private constructor(
                 val start = sourcePointers[column]
                 val count = sourcePointers[column + 1] - start
                 if (transpose) {
-                    product[j] = qualityColumnDot(solution, start, count)
+                    product[j] = qualityColumnDot(solution, column, start, count)
                 } else {
-                    addQualityColumn(solution[j], start, count)
+                    addQualityColumn(solution[j], column, start, count)
                 }
             }
         }
@@ -581,19 +582,19 @@ internal class KotlinBasisSolver private constructor(
         return BasisSolveQuality(residual, residual / scale)
     }
 
-    private fun qualityColumnDot(solution: IndexedVector, start: Int, count: Int): Double {
-        if (count > MAX_SCALAR_COLUMN_ENTRIES) return solution.dot(sourceRows, start, sourceValues, start, count)
+    private fun qualityColumnDot(solution: IndexedVector, column: Int, start: Int, count: Int): Double {
+        if (count > MAX_SCALAR_COLUMN_ENTRIES) return solution.dotColumn(source, column)
         var result = 0.0
         for (at in start until start + count) result += sourceValues[at] * solution[sourceRows[at]]
         return result
     }
 
-    private fun addQualityColumn(alpha: Double, start: Int, count: Int) {
+    private fun addQualityColumn(alpha: Double, column: Int, start: Int, count: Int) {
         if (count <= MAX_SCALAR_COLUMN_ENTRIES) {
             for (at in start until start + count) qualityProduct[sourceRows[at]] += alpha * sourceValues[at]
             return
         }
-        koblas.axpy(sourceRows, start, sourceValues, start, count, alpha, qualityProduct)
+        koblas.axpy(alpha, source.columnView(column), DenseVector.wrap(qualityProduct))
     }
 
     override val factorCopy: BasisFactorCopy?

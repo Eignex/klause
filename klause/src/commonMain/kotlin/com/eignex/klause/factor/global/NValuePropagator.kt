@@ -136,7 +136,7 @@ internal class NValuePropagator(
         }
         while (!stack.isEmpty()) {
             val i = stack[stack.size - 1]
-            stack.removeAt(stack.size - 1)
+            stack.removeAtSwap(stack.size - 1)
             val row = m.adj[i]
             for (k in 0 until row.size) {
                 val v = row[k]
@@ -294,7 +294,7 @@ internal class NValuePropagator(
                 stack.add(node)
                 while (!stack.isEmpty()) {
                     val u = stack[stack.size - 1]
-                    stack.removeAt(stack.size - 1)
+                    stack.removeAtSwap(stack.size - 1)
                     val a = adj[u]
                     for (k in 0 until a.size) {
                         if (!reached[a[k]]) {

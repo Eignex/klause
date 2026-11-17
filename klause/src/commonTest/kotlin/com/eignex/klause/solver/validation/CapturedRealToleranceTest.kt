@@ -15,6 +15,7 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
@@ -25,6 +26,7 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -348,4 +350,20 @@ internal fun unreadRelation(a: Int, b: Int): Factor = object : Factor by Linear(
             RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, sign)), 0.0, false),
             LinearOp.EQ)
     })
+
+    @Test
+    fun `the optimality gap should scale with objective term magnitudes above its absolute floor`() {
+        val gap = OptimalityTolerance(
+            SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000)), SemanticRational.of(bigIntOf(1), bigIntOf(10_000)),
+        )
+        val thousand = BigFraction.ofLong(1_000)
+        val step = BigFraction.ofLong(10).reciprocal()
+        val billionth = BigFraction.ofLong(1_000_000_000).reciprocal()
+
+        assertTrue(withinOptimalityGap(gap, billionth, BigFraction.ZERO, BigFraction.ZERO))
+        assertTrue(withinOptimalityGap(gap, thousand + step, thousand, thousand))
+        assertFalse(withinOptimalityGap(gap, thousand + BigFraction.ONE, thousand, thousand))
+        assertFalse(withinOptimalityGap(OptimalityTolerance(), thousand + billionth, thousand, thousand))
+        assertTrue(withinOptimalityGap(null, thousand, thousand, thousand))
+    }
 }

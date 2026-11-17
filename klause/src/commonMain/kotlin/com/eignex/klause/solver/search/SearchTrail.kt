@@ -4,6 +4,10 @@ import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.storage.forEachValueSlot
+import com.eignex.util.collections.storage.primitiveCapacityBytes
+import com.eignex.util.collections.storage.referenceCapacity
+import com.eignex.util.collections.storage.valueStorageIdentity
 
 internal class SearchTrail {
     private val decisions = ArrayList<SearchDecision>()
@@ -40,7 +44,7 @@ internal class SearchTrail {
         boolReasons.forEachValueSlot { value ->
             sample.step()
             if (value == null) return@forEachValueSlot
-            val literals = (value as SearchExplanation).literals
+            val literals = value.literals
             if (sample.retain(arrays, literals)) payload += literals.size.toLong() * Int.SIZE_BYTES
             sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, protected = true)
         }

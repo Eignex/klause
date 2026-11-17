@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
@@ -312,9 +313,10 @@ private fun Problem.pipelineRouteObserved(
     val nativeFiniteAfterBounds = !exactObjective &&
         routed.nativeFiniteSource(projections, preparationStop)
     // The finite lane states each unconditional strict real row as the closed margin row acceptance and the tolerance
-    // search read, so every engine decides the same row. Without an absolute slack it states the source rows. The view
-    // is built only when the finite lane is considered.
-    val finite by lazy { routed.withStrictRowMargins(preparationStop) ?: routed }
+    // search read, so every engine decides the same row, and leaves each real extremum inert for leaf completion to
+    // enforce within the slack. Without an absolute slack it states the source relations. The view is built only when
+    // the finite lane is considered.
+    val finite by lazy { routed.withAbsoluteSlack(preparationStop) ?: routed }
     val finiteProjections by lazy { if (finite === routed) projections else selection.forEngineView(finite) }
     val finiteCompletion = nativeFiniteAfterBounds || (
         finiteIntegerRanges &&
@@ -407,8 +409,9 @@ private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, s
 }
 
 // This model with each unconditional strict real row replaced by its closed margin row under the source's absolute
-// slack, or null when it states no such row or no absolute slack applies. Each factor read charges [control].
-private fun Problem.withStrictRowMargins(control: ExecutionControl): Problem? {
+// slack and each real extremum marked leaf-enforced, or null when it states neither or no absolute slack
+// applies. Each factor read charges [control].
+private fun Problem.withAbsoluteSlack(control: ExecutionControl): Problem? {
     val margin = semantics.effective.feasibilityTolerance.strictMargin()
     if (margin.isZero) return null
     var margined = false
@@ -420,6 +423,9 @@ private fun Problem.withStrictRowMargins(control: ExecutionControl): Problem? {
             val row = factor as Linear
             control.charge(row.size.toLong())
             row.marginRow(margin)
+        } else if (factor is RealArrayMinMax) {
+            margined = true
+            factor.leafEnforcedCopy()
         } else factor
     }
     return if (margined) withFactors(rewritten, impliedFactorMask?.copyOf()) else null

@@ -1,8 +1,8 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.DenseMatrix
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
-import com.eignex.koblas.dense.ger
 import com.eignex.koblas.koblas
 import com.eignex.koblas.transpose
 import kotlin.math.abs
@@ -106,9 +106,8 @@ internal class DenseBasisFactors(private val source: SparseMatrix) {
         val extent = n - start
         updates += extent.toLong() * extent
         koblas.ger(
-            -1.0, multipliers, pivotRow, matrix,
-            rowOffset = start, columnOffset = start, rows = extent, columns = extent,
-            xOffset = start, yOffset = start,
+            -1.0, DenseVector.wrap(multipliers, start, extent), DenseVector.wrap(pivotRow, start, extent),
+            matrix.view(start, start, extent, extent),
         )
         for (j in k + 1 until n) {
             for (i in k + 1 until n) {
@@ -147,7 +146,7 @@ internal class DenseBasisFactors(private val source: SparseMatrix) {
 
     private fun transpose(source: SparseMatrix): SparseMatrix {
         visits += 3L * n + 2L * source.nnz
-        return source.transpose()
+        return source.transpose() as SparseMatrix
     }
 
     private fun work(entries: Int = 0) = LuBuildWork(

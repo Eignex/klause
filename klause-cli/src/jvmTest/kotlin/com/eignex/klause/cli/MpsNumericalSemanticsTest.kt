@@ -25,7 +25,8 @@ class MpsNumericalSemanticsTest {
             MpsMode.newSession().load(source.absolutePath, options)
 
             assertEquals(
-                "c numericalSemantics=${mpsNumericalSemantics(checkNotNull(options.sourceSemantics))}\n",
+                "c numericalSemantics=${mpsNumericalSemantics(checkNotNull(options.sourceSemantics))}\n" +
+                    "c optimalityTolerance=${mpsOptimalityTolerance(checkNotNull(options.sourceSemantics))}\n",
                 bytes.toString().replace("\r\n", "\n"),
             )
         } finally {
@@ -35,16 +36,16 @@ class MpsNumericalSemanticsTest {
     }
 
     @Test
-    fun `default MPS policy should declare an absolute only rational tolerance`() {
+    fun `default MPS policy should export exactly the versioned policy keys`() {
+        val policy = "{\"numericAuthority\":\"DECIMAL_LITERALS\"," +
+            "\"feasibilityTolerance\":{\"absolute\":\"1/10000000\",\"relative\":\"0/1\"}," +
+            "\"undeclaredIntegers\":{\"lower\":\"0\",\"upper\":\"1\"}," +
+            "\"undeclaredReals\":{\"lower\":\"0/1\",\"upper\":null}," +
+            "\"integrality\":\"exact\",\"objective\":\"exact\"}"
+
         val exported = mpsNumericalSemantics(mpsSemantics.resolve())
 
-        assertContains(exported, "\"schema\":\"mps-decimal-semantics-v1\"")
-        assertContains(exported, "\"numericAuthority\":\"DECIMAL_LITERALS\"")
-        assertEquals(2, Regex("\"absolute\":\"1/10000000\"").findAll(exported).count())
-        assertEquals(2, Regex("\"relative\":\"0/1\"").findAll(exported).count())
-        assertContains(exported, "\"undeclaredIntegers\":{\"lower\":\"0\",\"upper\":\"1\"}")
-        assertContains(exported, "\"undeclaredReals\":{\"lower\":\"0/1\",\"upper\":null}")
-        assertContains(exported, "\"integrality\":\"exact\",\"objective\":\"exact\"")
+        assertEquals("{\"schema\":\"mps-decimal-semantics-v1\",\"declared\":$policy,\"effective\":$policy}", exported)
     }
 
     @Test
@@ -53,8 +54,28 @@ class MpsNumericalSemanticsTest {
 
         val exported = mpsNumericalSemantics(policy)
 
-        assertEquals(1, Regex("\"absolute\":\"1/10000000\"").findAll(exported).count())
-        assertEquals(1, Regex("\"absolute\":\"0/1\"").findAll(exported).count())
-        assertContains(exported.substringAfter("\"effective\":"), "\"relative\":\"0/1\"")
+        assertContains(exported.substringBefore("\"effective\":"),
+            "\"feasibilityTolerance\":{\"absolute\":\"1/10000000\",\"relative\":\"0/1\"}")
+        assertContains(exported.substringAfter("\"effective\":"),
+            "\"feasibilityTolerance\":{\"absolute\":\"0/1\",\"relative\":\"0/1\"}")
+    }
+
+    @Test
+    fun `default MPS policy should declare a relative optimality gap with the feasibility floor`() {
+        val exported = mpsOptimalityTolerance(mpsSemantics.resolve())
+
+        val gap = "{\"absolute\":\"1/10000000\",\"relative\":\"1/10000\"}"
+        assertEquals(2, Regex.fromLiteral(gap).findAll(exported).count())
+    }
+
+    @Test
+    fun `exact MPS loading should print a zero optimality gap`() {
+        val options = CommonOptions().apply { exact = true }
+
+        options.sourceOverrides(mpsSemantics)
+
+        val exported = mpsOptimalityTolerance(checkNotNull(options.sourceSemantics))
+        assertContains(exported.substringAfter("\"effective\":"),
+            "{\"absolute\":\"0/1\",\"relative\":\"0/1\"}")
     }
 }

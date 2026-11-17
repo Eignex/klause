@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.util.collections.storage.borrowBackingArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -16,7 +17,7 @@ class GeneralWatchReclamationTest {
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
         val state = session.explanationState
-        val capacity = state.watches.byLit[0].backingData.size
+        val capacity = state.watches.byLit[0].borrowBackingArray().size
         val generation = session.learnedRetirementGeneration
 
         repeat(128) {
@@ -27,7 +28,7 @@ class GeneralWatchReclamationTest {
 
         assertEquals(0, state.watches.byLit[0].size)
         assertEquals(0, state.watches.byLit[2].size)
-        assertTrue(state.watches.byLit[0].backingData.size < capacity)
+        assertTrue(state.watches.byLit[0].borrowBackingArray().size < capacity)
         assertEquals(generation, session.learnedRetirementGeneration)
     }
 
@@ -88,7 +89,7 @@ class GeneralWatchReclamationTest {
             repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
             repeat(8) { session.maintainCapWindow(0, 32_768L, 4096L, { false }) { false } }
             val generation = session.learnedRetirementGeneration
-            val before = session.explanationState.watches.byLit[0].backingData.size
+            val before = session.explanationState.watches.byLit[0].borrowBackingArray().size
             val indexBytes = session.explanationState.watches.pos.primitiveCapacityBytes
             val indexReferences = session.explanationState.watches.pos.referenceCapacity
 
@@ -100,7 +101,7 @@ class GeneralWatchReclamationTest {
 
             assertEquals(permanentCount, session.activeLearnedClauseCount)
             assertEquals(0, session.explanationState.watches.byLit[0].size)
-            assertTrue(session.explanationState.watches.byLit[0].backingData.size < before)
+            assertTrue(session.explanationState.watches.byLit[0].borrowBackingArray().size < before)
             assertTrue(session.explanationState.watches.pos.size > 0)
             assertTrue(session.explanationState.watches.pos.primitiveCapacityBytes < indexBytes)
             assertTrue(session.explanationState.watches.pos.referenceCapacity < indexReferences)
@@ -137,7 +138,7 @@ class GeneralWatchReclamationTest {
         repeat(1024) { session.addLearnedClause(base, 9) }
         repeat(8) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
         val watches = session.explanationState.watches
-        val before = watches.byLit[0].backingData.size
+        val before = watches.byLit[0].borrowBackingArray().size
 
         repeat(32) {
             val work = session.work
@@ -147,9 +148,9 @@ class GeneralWatchReclamationTest {
 
         assertEquals(20_000, session.activeLearnedClauseCount)
         assertEquals(20_000, watches.byLit[0].size)
-        assertTrue(watches.byLit[0].backingData.size < before)
-        assertEquals(20_000, watches.byLit[0].backingData.size)
-        assertEquals(20_000, watches.blockersByLit[0].backingData.size)
+        assertTrue(watches.byLit[0].borrowBackingArray().size < before)
+        assertEquals(20_000, watches.byLit[0].borrowBackingArray().size)
+        assertEquals(20_000, watches.blockersByLit[0].borrowBackingArray().size)
         session.pinBool(0, false)
         assertEquals(true, session.boolValue(1))
     }
@@ -184,7 +185,7 @@ class GeneralWatchReclamationTest {
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
         repeat(160) { session.compactLearnedClauses(256L, 256L, { false }) { _, _ -> true } }
         val state = session.explanationState
-        val before = state.watches.byLit[0].backingData.size
+        val before = state.watches.byLit[0].borrowBackingArray().size
         val generation = session.learnedRetirementGeneration
 
         repeat(16) {
@@ -193,9 +194,9 @@ class GeneralWatchReclamationTest {
             assertTrue(session.work - work <= 8192L)
         }
 
-        assertTrue(state.watches.byLit[0].backingData.size < before)
-        assertEquals(1000, state.watches.byLit[0].backingData.size)
-        assertEquals(1000, state.watches.blockersByLit[0].backingData.size)
+        assertTrue(state.watches.byLit[0].borrowBackingArray().size < before)
+        assertEquals(1000, state.watches.byLit[0].borrowBackingArray().size)
+        assertEquals(1000, state.watches.blockersByLit[0].borrowBackingArray().size)
         assertEquals(generation, session.learnedRetirementGeneration)
     }
 

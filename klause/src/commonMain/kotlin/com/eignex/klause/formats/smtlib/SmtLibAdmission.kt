@@ -22,7 +22,7 @@ internal fun parseSmtLibSource(
     val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
     if (cancellation()) return null
     return try {
-        val commands = withSource(openSource, cancellation) { source ->
+        val commands = withSource(openSource) { source ->
             val reader = SExprReader(AdmissionSource(source, cancellation))
             val commands = ArrayList<SExpr>()
             while (true) {
@@ -141,7 +141,16 @@ internal fun lowerSmtReduction(
 }
 
 private class AdmissionSource(private val source: CharSource, private val cancellation: ExecutionControl) : CharSource {
+    private var closed = false
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        source.close()
+    }
+
     override fun next(): String? {
+        if (closed) return null
         if (cancellation()) throw PolynomialSourceInterrupted()
         return source.next()
     }
@@ -202,7 +211,6 @@ private fun buildLinearAdmission(
 
 private fun <T> withSource(
     openSource: () -> CharSource,
-    cancellation: ExecutionControl,
     read: (CharSource) -> T,
 ): T {
     val source = openSource()
@@ -214,14 +222,7 @@ private fun <T> withSource(
             ) interrupted = true
         }
     } finally {
-        if (source is AutoCloseable) source.close()
-        else while (!interrupted) {
-            if (cancellation()) {
-                interrupted = true
-                break
-            }
-            if (source.next() == null) break
-        }
+        source.close()
     }
     if (interrupted) throw PolynomialSourceInterrupted()
     return outcome.getOrThrow()

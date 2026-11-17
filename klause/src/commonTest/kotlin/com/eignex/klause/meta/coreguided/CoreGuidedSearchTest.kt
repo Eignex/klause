@@ -162,7 +162,7 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `an unsupported native component without cancellation should retire the core query`() {
+    fun `an undecided native component without cancellation should retire the core query`() {
         val params = BacktrackParams(nativeSat = false, componentFactory = {
             listOf(object : SearchComponent {
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
@@ -179,7 +179,7 @@ class CoreGuidedSearchTest {
         val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE,
             -1L) { error("renewed unsupported query") }
 
-        assertEquals(TerminationReason.Unsupported, assertIs<MinimizeResult.Unknown>(stopped).reason)
+        assertEquals(TerminationReason.RepresentationDeclined, assertIs<MinimizeResult.Unknown>(stopped).reason)
         assertTrue(search.isDone)
         assertEquals(stopped, resumed)
         assertEquals(charged, search.work)

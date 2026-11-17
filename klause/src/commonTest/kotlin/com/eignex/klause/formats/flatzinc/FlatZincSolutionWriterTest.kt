@@ -1,16 +1,27 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.RationalInterval
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.shl
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -29,6 +40,55 @@ class FlatZincSolutionWriterTest {
         assertTrue("% klause-exact: x = root(2;[-2,0,1]);" in output.lines(), output)
         assertTrue("% klause-exact: _objective = root(2;[-2,0,1]);" in output.lines(), output)
         assertTrue(output.endsWith("----------\n"), output)
+    }
+
+    @Test
+    fun `solved algebraic coordinates should print their nearest binary64 value`() {
+        for ((square, printed) in listOf("1.0" to 1.0, "2.0" to sqrt(2.0))) {
+            val program = parseFlatZinc(
+                "var 0.0..3.0: x :: output_var; var 0.0..3.0: y; constraint float_times(x, x, y); " +
+                    "constraint float_eq(y, $square); solve satisfy;",
+                exactFloats = true,
+            )
+            val request = program.problem.pipelineRequest()
+            val execution = OpenTheoryPipeline.execute(request, engine = FiniteEngine.BACKTRACK)
+            val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+
+            val output = writeFlatZincSolution(program.sourceProgram, witness)
+
+            assertTrue("x = $printed;" in output.lines(), output)
+        }
+    }
+
+    @Test
+    fun `a coordinate past binary64 should print the largest finite value as an overflow`() {
+        val program = parseFlatZinc("var float: x :: output_var; solve satisfy;", exactFloats = true)
+        fun power(exponent: Int) = BigFraction.of(BIG_ONE shl exponent, BIG_ONE)
+        val root = AlgebraicReal(RationalPolynomial(listOf(power(2100).negated(), BigFraction.ZERO, BigFraction.ONE)),
+            2, RationalInterval(power(1049), power(1051)))
+        val rational = power(1100)
+        val outputs = listOf(
+            "algebraic" to writeFlatZincSolution(program.sourceProgram,
+                OpenTheoryAssignment.ExactNra(ExactNraAssignment(BooleanArray(0), listOf(root)))),
+            "rational" to writeFlatZincSolution(program.sourceProgram,
+                Sample(BooleanArray(0), LongArray(0), doubleArrayOf(rational.toDouble()), listOf(rational))),
+        )
+        for ((name, output) in outputs) {
+            assertTrue("x = ${Double.MAX_VALUE};" in output.lines(), "$name\n$output")
+            assertTrue("% klause-float-rounding: x = overflow" in output.lines(), "$name\n$output")
+        }
+    }
+
+    @Test
+    fun `a narrowing out of allowance should print the interval midpoint as undetermined`() {
+        val program = parseFlatZinc("var 0.0..2.0: x :: output_var; solve satisfy;", exactFloats = true)
+        val root = AlgebraicArithmetic().roots(RationalPolynomial.of(-1, 0, 1)).last()
+        val assignment = OpenTheoryAssignment.ExactNra(ExactNraAssignment(BooleanArray(0), listOf(root)))
+
+        val output = writeFlatZincSolution(program.sourceProgram, assignment, false, ExecutionControl { true })
+
+        assertTrue("x = ${root.approximateDouble};" in output.lines(), output)
+        assertTrue("% klause-float-rounding: x = undetermined" in output.lines(), output)
     }
 
     @Test

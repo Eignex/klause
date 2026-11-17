@@ -3241,6 +3241,21 @@ public final class com/eignex/klause/formats/smtlib/SmtLibSemanticsKt {
 	public static final fun getSmtLibSemantics ()Lcom/eignex/klause/ir/SourceSemantics;
 }
 
+public final class com/eignex/klause/formats/smtlib/SmtLibSession : java/lang/AutoCloseable {
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/ExecutionControl;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/ExecutionControl;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun close ()V
+	public final fun comment (Ljava/lang/String;)V
+	public final fun diagnose (Ljava/lang/String;)V
+	public final fun execute (Lcom/eignex/klause/formats/smtlib/SExpr;)Z
+	public final fun execute (Lcom/eignex/klause/formats/smtlib/SExprReader;)V
+	public final fun interrupt (Ljava/lang/String;)V
+}
+
+public final class com/eignex/klause/formats/smtlib/SmtLibSessionKt {
+	public static final fun smtText (Lcom/eignex/klause/formats/smtlib/SExpr;)Ljava/lang/String;
+}
+
 public abstract interface class com/eignex/klause/formats/smtlib/SmtModelValues {
 	public abstract fun boolean (Ljava/lang/String;)Z
 	public abstract fun checkpoint (J)V
@@ -3292,6 +3307,52 @@ public final class com/eignex/klause/formats/smtlib/SmtReconstruction$Scalar : c
 	public fun hashCode ()I
 	public fun reconstruct (Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Lcom/eignex/klause/formats/smtlib/SmtValue;
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/smtlib/SmtRecursiveSessionKt {
+	public static final fun solveSmtRecursiveSession (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/ExecutionControl;I)Lcom/eignex/klause/formats/smtlib/SmtSessionResult;
+	public static synthetic fun solveSmtRecursiveSession$default (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/ExecutionControl;IILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtSessionResult;
+}
+
+public abstract interface class com/eignex/klause/formats/smtlib/SmtSessionModel {
+	public fun abstractValues ()Ljava/util/Map;
+	public abstract fun evaluate (Lcom/eignex/klause/formats/smtlib/SExpr;)Ljava/lang/String;
+	public abstract fun render ()Ljava/lang/String;
+	public fun withRecursiveDefinitions (Ljava/util/List;)Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+}
+
+public final class com/eignex/klause/formats/smtlib/SmtSessionModel$DefaultImpls {
+	public static fun abstractValues (Lcom/eignex/klause/formats/smtlib/SmtSessionModel;)Ljava/util/Map;
+	public static fun withRecursiveDefinitions (Lcom/eignex/klause/formats/smtlib/SmtSessionModel;Ljava/util/List;)Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+}
+
+public final class com/eignex/klause/formats/smtlib/SmtSessionReconstructionKt {
+	public static final fun reconstructSessionModel (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+	public static final fun reconstructSessionModel (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+	public static synthetic fun reconstructSessionModel$default (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/util/ExecutionControl;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+	public static synthetic fun reconstructSessionModel$default (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/util/ExecutionControl;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+}
+
+public final class com/eignex/klause/formats/smtlib/SmtSessionResult {
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/formats/smtlib/SmtSessionModel;Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/formats/smtlib/SmtSessionModel;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/formats/smtlib/SmtSessionModel;Ljava/lang/String;Ljava/util/List;)Lcom/eignex/klause/formats/smtlib/SmtSessionResult;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtSessionResult;Ljava/lang/String;Lcom/eignex/klause/formats/smtlib/SmtSessionModel;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtSessionResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getModel ()Lcom/eignex/klause/formats/smtlib/SmtSessionModel;
+	public final fun getObservations ()Ljava/util/List;
+	public final fun getReasonUnknown ()Ljava/lang/String;
+	public final fun getStatus ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/formats/smtlib/SmtSessionSink : java/lang/AutoCloseable {
+	public abstract fun write (Ljava/lang/String;)V
 }
 
 public abstract interface class com/eignex/klause/formats/smtlib/SmtSort {
@@ -4281,6 +4342,22 @@ public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 	public static fun values ()[Lcom/eignex/klause/ir/ObjectiveSense;
 }
 
+public final class com/eignex/klause/ir/OptimalityTolerance {
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/ir/SemanticRational;Lcom/eignex/klause/ir/SemanticRational;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/SemanticRational;Lcom/eignex/klause/ir/SemanticRational;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun component2 ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun copy (Lcom/eignex/klause/ir/SemanticRational;Lcom/eignex/klause/ir/SemanticRational;)Lcom/eignex/klause/ir/OptimalityTolerance;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/OptimalityTolerance;Lcom/eignex/klause/ir/SemanticRational;Lcom/eignex/klause/ir/SemanticRational;ILjava/lang/Object;)Lcom/eignex/klause/ir/OptimalityTolerance;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAbsolute ()Lcom/eignex/klause/ir/SemanticRational;
+	public final fun getRelative ()Lcom/eignex/klause/ir/SemanticRational;
+	public fun hashCode ()I
+	public final fun isExact ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class com/eignex/klause/ir/PolynomialExpression {
 }
 
@@ -4597,18 +4674,20 @@ public final class com/eignex/klause/ir/SearchHints {
 
 public final class com/eignex/klause/ir/SemanticOverrides {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/FloatSemantics;
 	public final fun component2 ()Lcom/eignex/klause/ir/BoundsOverride;
 	public final fun component3 ()Lcom/eignex/klause/ir/BoundsOverride;
 	public final fun component4 ()Lcom/eignex/klause/ir/SourceTolerance;
 	public final fun component5 ()Ljava/lang/Boolean;
-	public final fun copy (Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;)Lcom/eignex/klause/ir/SemanticOverrides;
-	public static synthetic fun copy$default (Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/eignex/klause/ir/SemanticOverrides;
+	public final fun component6 ()Lcom/eignex/klause/ir/OptimalityTolerance;
+	public final fun copy (Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;)Lcom/eignex/klause/ir/SemanticOverrides;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/SemanticOverrides;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/BoundsOverride;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;ILjava/lang/Object;)Lcom/eignex/klause/ir/SemanticOverrides;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getFeasibilityTolerance ()Lcom/eignex/klause/ir/SourceTolerance;
 	public final fun getFloats ()Lcom/eignex/klause/ir/FloatSemantics;
+	public final fun getOptimalityTolerance ()Lcom/eignex/klause/ir/OptimalityTolerance;
 	public final fun getPinAbsentOptionalValues ()Ljava/lang/Boolean;
 	public final fun getUndeclaredIntegers ()Lcom/eignex/klause/ir/BoundsOverride;
 	public final fun getUndeclaredReals ()Lcom/eignex/klause/ir/BoundsOverride;
@@ -4719,8 +4798,8 @@ public final class com/eignex/klause/ir/SourceRealId {
 }
 
 public final class com/eignex/klause/ir/SourceSemantics {
-	public fun <init> (Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/SourceFormat;
 	public final fun component2 ()Lcom/eignex/klause/ir/NumericAuthority;
 	public final fun component3 ()Lcom/eignex/klause/ir/FloatSemantics;
@@ -4728,13 +4807,15 @@ public final class com/eignex/klause/ir/SourceSemantics {
 	public final fun component5 ()Lcom/eignex/klause/ir/UndeclaredRealBounds;
 	public final fun component6 ()Lcom/eignex/klause/ir/SourceTolerance;
 	public final fun component7 ()Ljava/lang/Boolean;
-	public final fun copy (Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;)Lcom/eignex/klause/ir/SourceSemantics;
-	public static synthetic fun copy$default (Lcom/eignex/klause/ir/SourceSemantics;Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;ILjava/lang/Object;)Lcom/eignex/klause/ir/SourceSemantics;
+	public final fun component8 ()Lcom/eignex/klause/ir/OptimalityTolerance;
+	public final fun copy (Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;)Lcom/eignex/klause/ir/SourceSemantics;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/SourceSemantics;Lcom/eignex/klause/ir/SourceFormat;Lcom/eignex/klause/ir/NumericAuthority;Lcom/eignex/klause/ir/FloatSemantics;Lcom/eignex/klause/ir/UndeclaredIntegerBounds;Lcom/eignex/klause/ir/UndeclaredRealBounds;Lcom/eignex/klause/ir/SourceTolerance;Ljava/lang/Boolean;Lcom/eignex/klause/ir/OptimalityTolerance;ILjava/lang/Object;)Lcom/eignex/klause/ir/SourceSemantics;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getFeasibilityTolerance ()Lcom/eignex/klause/ir/SourceTolerance;
 	public final fun getFloats ()Lcom/eignex/klause/ir/FloatSemantics;
 	public final fun getFormat ()Lcom/eignex/klause/ir/SourceFormat;
 	public final fun getNumericAuthority ()Lcom/eignex/klause/ir/NumericAuthority;
+	public final fun getOptimalityTolerance ()Lcom/eignex/klause/ir/OptimalityTolerance;
 	public final fun getPinAbsentOptionalValues ()Ljava/lang/Boolean;
 	public final fun getUndeclaredIntegers ()Lcom/eignex/klause/ir/UndeclaredIntegerBounds;
 	public final fun getUndeclaredReals ()Lcom/eignex/klause/ir/UndeclaredRealBounds;
@@ -11403,6 +11484,7 @@ public final class com/eignex/klause/solver/Sample {
 	public final fun hammingDistanceTo (Lcom/eignex/klause/solver/Sample;)I
 	public fun hashCode ()I
 	public final fun intValue (I)J
+	public final fun undeterminedReals ()Ljava/util/List;
 }
 
 public final class com/eignex/klause/solver/SampleExactRealsKt {
@@ -12855,6 +12937,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveOutcome$Complete
 	public final fun getElapsedMs ()J
 	public final fun getSolutions ()J
 	public final fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun getTerminationReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun getUnboundedDirection ()Ljava/util/List;
 	public final fun getVerdict ()Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 }

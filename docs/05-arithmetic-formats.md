@@ -36,7 +36,11 @@ defaults.
 MPS defaults to `SourceTolerance(absolute=1/10000000)`: an absolute slack with no
 relative component. Each component can be replaced independently. Zero in both requires
 exact checks and certificates, including exact finite LP certification; a positive
-component makes finite LP deductions numerical. `--exact` sets the tolerance to zero.
+component makes finite LP deductions numerical. MPS also declares
+`OptimalityTolerance(absolute=1/10000000, relative=1/10000)`. Its absolute floor
+is a separate constant equal to the default absolute slack, the amount by which an
+accepted point is already uncertain; replacing the feasibility slack does not move
+it. An exact feasibility tolerance, including `--exact`, makes the gap zero.
 The CLI captures one
 [linear source snapshot](#source-correspondence) and registers it with the common
 invocation, which owns preparation, validation and result qualification. Slack and
@@ -87,9 +91,17 @@ float witness is kept. This changes no search or optimization authority.
 With positive feasibility tolerance, completed native optimization and refutation
 report `OPTIMUM FOUND` and `UNSATISFIABLE` under numerical certification policy.
 They do not require a separate proof over the feasible set enlarged by tolerance.
-The final optimizing point must pass original-source checks, its objective must
-agree with the native value within captured source slack, and the native terminal
-must cover the unrestricted model. Interrupted search, rejected terminal witnesses
+The final optimizing point must pass original-source checks and the native
+terminal must cover the unrestricted model. The native optimal point's source
+objective must agree with the native optimal value within the optimality gap,
+scaled by its objective term magnitudes, so two evaluations of one optimum that
+differ by rounding still report the optimum. A different accepted point that
+improves on it must agree with the native value within the feasibility slack; when
+it does not, the result prints `SATISFIABLE` with that point as the incumbent. An
+objective over integer columns alone is evaluated exactly on both sides and must
+agree exactly. The gap never ends search or accepts an unproved bound, and a zero
+gap does not make a float-certified leaf optimum exact: that certificate keeps its
+own fixed float tolerance. Interrupted search, rejected terminal witnesses
 and restricted acceptance filters cannot supply these native completion claims.
 
 `optimizationStatus=tolerance-optimum` identifies numerical optimality. An exact
@@ -101,9 +113,22 @@ use numerical tolerance policy, and output identifies that scope.
 
 Zero tolerance, including `--exact`, requires exact original-source certification.
 Native proof metadata retains its nominal-source or working-model scope when no
-qualified claim is available. Unboundedness requires a checked source recession
-proof under either policy. Original decimal objectives and caller declaration
+qualified claim is available. Original decimal objectives and caller declaration
 scope remain visible in both modes.
+
+`UNBOUNDED` requires a checked source recession proof under either policy. Under
+zero tolerance the lowered model must equal the source exactly and the base point
+must pass without slack. With positive tolerance the base point passes the
+original-source checks within slack, and the native ray, read in the exact source
+coefficients, must strictly improve the objective, move no integer column, move
+no column towards a declared bound, and keep the slope of every unguarded row and
+every row whose indicator guard holds at the base point on its bounded sides,
+whether or not that row is tight there. Such a ray keeps every residual of the base point from
+growing, so the ray's tail stays accepted. A slope that only binary64 rounding
+made zero is not trusted: a ray whose projection is level on a row whose exact
+slope is not is first moved onto the exact kernel of those rows, and the moved
+ray must pass the same check. A ray that fails both leaves a feasible point
+without an unboundedness claim.
 
 ## Routing and result strength
 
@@ -134,7 +159,7 @@ See [PreparedLinearSource](../klause/src/commonMain/kotlin/com/eignex/klause/sol
 and [MpsMode](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/MpsMode.kt).
 
 Sequential mixed optimization pools over a linear source append bounded numerical
-frontier and joint-repair workers; [portfolios](12-portfolio.md) defines their
+frontier and joint-repair workers; [portfolios](14-portfolio.md) defines their
 admission and proof transport.
 
 ## SMT-LIB source semantics
@@ -148,22 +173,21 @@ arithmetic mechanism.
 
 `SmtLib.parse` returns one `SmtLibProblem` with a `SourceAttachment`, declared name
 maps and the original objective and direction. Callers pass
-`SmtLibProblem.source` to [source setup](19-api.md#source-setup), as the CLI does;
+`SmtLibProblem.source` to [source setup](23-api.md#source-setup), as the CLI does;
 the frontend never classifies a source by the solver it will need. Interruption
 throws `CancellationException` before any source is published.
 
-The frontend admits ground free sorts and functions, quantifier-free bitvectors,
-and linear integer and real arithmetic with Boolean structure and supported
-`minimize`/`maximize` objectives, polynomial Int/Real/Bool satisfaction with products,
-integer exponentiation and fixed nonnegative real powers, and a real-function
-extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
-`check-sat` or `check-sat-assuming` query is accepted, with Boolean literal
-assumptions conjoined to the assertions; `get-model` and `get-objectives` are
+The frontend admits quantifier-free Boolean structure, free sorts and functions,
+bitvectors, arrays, algebraic datatypes and exact integer and real arithmetic.
+Supported `minimize`/`maximize` objectives include affine and quadratic arithmetic.
+The real-function extension admits unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
+`check-sat` or `check-sat-assuming` query is accepted by `SmtLib.parse`, with Boolean
+formula assumptions conjoined to the assertions; `get-model` and `get-objectives` are
 accepted requests. Ground extensional arrays compose with admitted scalar sorts,
 including nested arrays and arrays used as indexes or function arguments and results.
-Strings, quantifiers, negative or noninteger real powers, multiple or nonquadratic objectives, incremental
-commands, multiple queries and `get-value` decline explicitly, even inside a
-constant Boolean branch.
+Floating point, strings, regular expressions, quantifiers and higher-order maps
+are outside the supported source language. Negative or noninteger real powers and
+multiple or nonquadratic objectives decline explicitly, including in constant branches.
 
 ### Bitvector lowering
 
@@ -188,17 +212,28 @@ gate and work budgets stop admission cleanly, including constant-folded operatio
 ### Ground functions and type parameters
 
 Free sort constructors, sort aliases and typed ground functions are resolved before
-scalar lowering. Each ground application receives a private result and captured
+scalar lowering. Builtin rewrites preserve selected numeric ranks through composite
+capture, including Real qualifications whose arguments are integer literals.
+Definition arguments and results retain declared Real ranks with explicit
+integer-to-real coercions, including later queries on the retained model.
+Retained query evaluation records source result ranks in one typed traversal per
+query or specialized definition body. Selected conditional and match branches
+retain their common rank before enclosing polymorphic function lookup; lookup
+selects the instantiated source rank before inspecting its fixed interpretation.
+Each ground application receives a private result and captured
 arguments. Pairwise congruence requires equal results whenever evaluated arguments
 are equal, including exact arithmetic arguments. Only free sort identities receive
 finite representative domains; interpreted arithmetic domains remain open. Model
 recipes restore original ranks, typed domain values, function entries and total
 defaults while public scalar maps retain original scalar sorts.
+Unobserved arguments share an observed result as the total default at the same
+function rank; functions without applications receive a fresh typed result.
 
 Array and datatype lowering expose ground helper bodies before scalar compilation.
 Admission skips early exposure when the source has no array or datatype structure
-and no partial logarithm checks. The direct scalar lowering route retains lexical
-`let` sharing.
+and no partial logarithm checks. The direct scalar lowering route evaluates each
+lexical `let` binding and each `define-fun` argument once, reusing its compiled
+value throughout the body.
 
 Global sort parameters retain their universal source obligations. Necessary ground
 instances can refute them; finite instance satisfaction alone supplies no SAT
@@ -247,12 +282,64 @@ exclude cycles without a depth bound. Reconstruction follows the observed acycli
 constructor graph and assigns unused minimum-depth constructor terms to remaining
 identities, preserving disequalities. Source checks compare actual constructor
 fields and enforce consistent total selectors even on a different constructor.
-Each observed selector rank retains its checked function table and typed default;
-later ground queries use that interpretation for the underspecified branch.
+With multiple constructors, each observed selector rank retains its checked
+function table and typed default for later queries on the underspecified branch.
+Selectors of a sole constructor always return its fields and need no default.
 Reconstruction tables are cached within one witness for mutually dependent
 instantiated sorts; nested parameters can therefore cross array fields without
 sharing a recursive table with a different instantiation. The retained typed
 registry supplies datatype cardinalities to extensional array value comparisons.
+
+### Command sessions
+
+`SmtLibSession` owns command-stream state separately from single-source admission.
+Each query rebuilds one active assertion snapshot; assumptions belong only to that
+query. Assertion levels scope declarations and definitions as well as assertions.
+Global declarations enter the base signature in source order and survive stack
+operations and `reset-assertions`; `reset`
+restores the initial state, including options. `:print-success` defaults to false,
+and model production must be enabled in start mode. Model queries inspect the same
+checked interpretation until the context changes. Assignment production returns
+the values of Boolean named terms. Enabling optional proof, core and
+unsat-assumption production responds `unsupported`; querying disabled production
+is a protocol error. Unsupported standard options retain their specified default
+in `get-option`.
+
+Each command validates syntax, declaration order and expression sorts before it
+changes the session. Protocol errors preserve the previous assertion context and
+checked model. `get-assertions` preserves original annotations. Regular and
+diagnostic channels route independently to stdout, stderr or append-file sinks;
+switching destinations closes the previous owned sink, and reset restores both defaults.
+
+Annotations normalize before typed capture. Closed `:named` subterms introduce
+nullary definitions in postorder, while other metadata leaves the term unchanged.
+The scope infers each named body's sort and registers its typed definition in one
+operation; the containing command still validates its own lexical context.
+Explicit binding entry and exit frames share counted lexical names, keeping live
+scope storage linear in nested bindings; annotation and closedness walks charge
+the same execution control.
+Literal tokens are classified before canonical term-name lookup. Qualified
+function names, sorts and indexes do not capture surrounding term binders.
+`define-const` abbreviates a nullary `define-fun`. Named definitions share the
+declaration lifetime, including names introduced by assumptions and value queries.
+
+`reconstructSessionModel` captures owned scalar values, composite recipes, native
+exact-real authorities and underspecified total-function tables while the checked
+assignment remains available. Later `get-value` terms evaluate in that fixed
+interpretation, including new polymorphic ranks. Evaluation shares the invocation
+control; an unavailable certificate or exhausted representation reports an explicit
+query error without replacing the retained model.
+
+Recursive command-session definitions use necessary ground equations for
+refutation. Initial instances use false or zero literals for Boolean, integer,
+real and bit-vector arguments, and fresh constants for other sorts. A satisfying
+result requires either a total interpretation whose equations pass a counterexample
+check, or a checked integer ranking that proves all recursive calls decrease for
+arbitrary inputs, followed by evaluation of the source assertions.
+Call collection expands parallel lets and substitutes typed match fields and
+constructor guards throughout definition bodies.
+Ground evaluation uses an explicit work stack and a resource allowance; exhausted
+work yields an inconclusive result and supplies no recursive completion claim.
 
 ### Declaration policy
 
@@ -276,6 +363,13 @@ coercions are rejected. Logic declarations do not choose a representation. Quote
 and bare spellings of a symbol share one identity, and a negative numeral must be
 written `(- n)`. A semicolon starts a line comment even when it directly follows a
 bare token.
+
+Structured sort equality, hashing and rendering use explicit work stacks. Frontend
+interning and composite sort-key operations charge their current execution control
+for structural work. A shared builtin result-sort helper keeps post-reduction
+bookkeeping consistent across arrays and datatypes, including qualified and indexed
+operators and mixed numeric conditionals. Lexical scope, user ranks and source
+well-sortedness remain owned by the typed admission walk.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun`
 macros capture their definition scope and check argument sorts even for unused
@@ -349,7 +443,7 @@ For up to eight Boolean inputs, a scalar defined by consistent, complete cases a
 supplies a verified affine row beside the source factors.
 
 The exact real component can certify supported difference fragments with a graph;
-see [real graph admission](14-theories.md#real-graph-admission-and-checks).
+see [real graph admission](17-theories.md#real-graph-admission-and-checks).
 
 ### Integer division
 
@@ -401,8 +495,8 @@ integer operands receive exact defining equalities, and bounded fixed powers abo
 one retain `Power`. Scalar multiplication stays linear. Refuted integer premises
 retain an explicit contradiction for shared routing after full source validation;
 they do not trigger nonlinear fallback. Open or overflowing integers keep typed arbitrary-precision
-coordinates for [nonlinear integer execution](16-nonlinear-arithmetic.md), and finite
-mixed products compose through [exact polynomial completion](16-nonlinear-arithmetic.md#shared-model-composition).
+coordinates for [nonlinear integer execution](19-nonlinear-arithmetic.md), and finite
+mixed products compose through [exact polynomial completion](19-nonlinear-arithmetic.md#shared-model-composition).
 A source outside the factor representation keeps an exact expression snapshot with
 its original names; the same attachment carries factor sources and the exact real,
 integer-polynomial and function snapshots.
@@ -426,7 +520,7 @@ negation cannot make an invalid `log` term satisfiable, and domain obligations s
 inside their conditional branch. There is no delta or tolerance mode. Function
 constraints run through traversal, LS, ALNS and portfolios with original-source
 checks; function objectives return UNKNOWN. See the
-[transcendental theory](16-nonlinear-arithmetic.md#transcendental-real-arithmetic).
+[transcendental theory](19-nonlinear-arithmetic.md#transcendental-real-arithmetic).
 
 ### Results and objectives
 

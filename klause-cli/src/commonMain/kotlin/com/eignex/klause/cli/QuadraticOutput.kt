@@ -22,7 +22,7 @@ internal fun reportQuadraticOptimization(
         else -> null
     }
     output.onVerdictContext(VerdictContext(terminationReason = reason, completePool = completePool))
-    val rendered = point?.let { render(it.sample) }
+    val rendered = if (publication.published(receipt?.version)) null else point?.let { render(it.sample) }
     val accepted = publication.quadratic(rendered, result, receipt?.version, point)
     val verdict = if (!accepted) {
         if (publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN

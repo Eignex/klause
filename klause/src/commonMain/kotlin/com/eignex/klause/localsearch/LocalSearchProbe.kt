@@ -15,6 +15,7 @@ import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.storage.borrowBackingArray
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.minus
@@ -331,7 +332,7 @@ internal class LocalSearchProbe(
         val w = weights.factorWeights
         var delta = 0.0
         // Keep factor-id order so floating-point accumulation matches a full degree scan.
-        touchedFactors.backingData.sort(0, touchedFactors.size)
+        touchedFactors.borrowBackingArray().sort(0, touchedFactors.size)
         for (p in 0 until touchedFactors.size) {
             val i = touchedFactors[p]
             val d = factorDegree[i] - degBefore[i]

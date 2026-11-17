@@ -38,6 +38,27 @@ import kotlin.test.assertTrue
 
 class CliModeVerdictTest {
     @Test
+    fun `local search should publish root refutations with presolve disabled`() {
+        for (operation in listOf("satisfy", "minimize x")) {
+            val out = solveFlatZinc("var 0..1: x; constraint int_eq(x,0); constraint int_eq(x,1); solve $operation;",
+                "-e", "localsearch", "--presolve", "off", "--lp", "off")
+
+            assertTrue("=====UNSATISFIABLE=====" in out.lines(), out)
+        }
+    }
+
+    @Test
+    fun `finite unknown output should name its fixed work stop`() {
+        for (engine in listOf("fixed", "backtrack", "localsearch")) {
+            val out = solveFlatZinc("var 0..1: x; var 0..1: y; constraint int_ne(x,y); solve satisfy;",
+                "-e", engine, "--presolve", "off", "--lp", "off", "--param", "node-limit=0")
+
+            assertTrue("=====UNKNOWN=====" in out.lines(), out)
+            assertTrue("fixed work exhausted" in out, out)
+        }
+    }
+
+    @Test
     fun `source-qualified output should retain rational policy and the selected protocol terminal`() {
         val semantics = smtLibSemantics.resolve(SemanticOverrides(undeclaredReals = BoundsOverride(
             upper = BoundOverride.Value(SemanticRational.of(bigIntOf(1), bigIntOf(3))),
@@ -137,6 +158,17 @@ class CliModeVerdictTest {
 
             assertTrue(terminal in out.lines(), out)
         }
+    }
+
+    @Test
+    fun `the exact flag should refute a FlatZinc float maximum over a bound that only tolerance admits`() {
+        val model = "var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; var 0.0..1.0: z; " +
+            "var 0.0..2.0: m; constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); " +
+            "constraint float_max(y,z,m); solve satisfy;"
+
+        val terminals = strictGapTerminals(model)
+
+        assertEquals(mapOf("default" to "==========", "exact" to "=====UNSATISFIABLE====="), terminals)
     }
 
     // The CLI output of a FlatZinc [model] solved single-threaded under [args], by the backtrack engine unless `-e`

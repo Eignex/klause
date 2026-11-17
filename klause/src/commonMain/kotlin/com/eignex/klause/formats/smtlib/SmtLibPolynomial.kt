@@ -176,20 +176,6 @@ internal class SmtLibPolynomialCompiler(
                 command.polynomialSize(2)
                 val assumptions = command.items[1] as? SExpr.SList ?: smtUnsupported("malformed polynomial assumptions")
                 for (assumption in assumptions.items) {
-                    val atom = when (assumption) {
-                        is SExpr.Atom -> assumption
-                        is SExpr.SList -> {
-                            assumption.polynomialSize(2)
-                            if (assumption.polynomialHead() != "not") {
-                                smtUnsupported("polynomial assumption must be a Boolean literal")
-                            }
-                            assumption.items[1] as? SExpr.Atom
-                                ?: smtUnsupported("polynomial assumption must be a Boolean literal")
-                        }
-                    }
-                    if (environment.value(polynomialSymbol(atom.text)) !is PolynomialValue.Boolean) {
-                        smtUnsupported("polynomial assumption must name a declared Boolean")
-                    }
                     assertions.add(assumption to environment)
                 }
                 querySeen = true
@@ -376,8 +362,18 @@ private class PolynomialSourceInput(
 ) : CharSource {
     private var chunk = ""
     private var offset = 0
+    private var closed = false
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        chunk = ""
+        offset = 0
+        source.close()
+    }
 
     override fun next(): String? {
+        if (closed) return null
         cancellation.polynomialSourceCheckpoint()
         if (offset == chunk.length) {
             chunk = source.next() ?: return null

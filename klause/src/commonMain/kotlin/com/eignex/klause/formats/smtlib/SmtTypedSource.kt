@@ -42,10 +42,7 @@ internal data class SmtReduction(
 
 internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionControl): SmtReduction {
     val scope = SmtLibScope(cancellation)
-    for (command in commands) {
-        cancellation.polynomialSourceCheckpoint(1)
-        if (!scope.command(command)) smtUnsupported("source symbol or expression sort is invalid in its lexical scope")
-    }
+    val normalized = normalizeSmtSourceCommands(commands, scope, cancellation)
     val declarations = scope.declarations
     val original = SmtTypedSource(commands.toList(), declarations, scope.terms, scope.assertions,
         scope.sortParameters, scope.symbols, scope.obligations,
@@ -54,6 +51,6 @@ internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionCont
         cancellation.polynomialSourceCheckpoint(1)
         SmtSourceBinding(it, SmtReconstruction.Scalar(it.name, it.result))
     }
-    return SmtReduction(original.commands.map { canonicalSmtCore(it, cancellation) },
+    return SmtReduction(normalized.map { canonicalSmtCore(it, cancellation) },
         declarations, bindings, original = original)
 }

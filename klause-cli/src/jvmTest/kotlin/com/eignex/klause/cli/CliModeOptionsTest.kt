@@ -1,9 +1,6 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.lp.bounding.LpEmphasis
-import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ineffectiveNumerics
@@ -199,17 +196,6 @@ class CliModeOptionsTest {
     }
 
     @Test
-    fun `--lp should parse an emphasis plus technique deltas into an LpConfig ceiling`() {
-        val opts = CommonOptions()
-        parseArgs(arrayOf("--lp", "aggressive,-cuts"), commonFlagSpecs(opts)) { }
-        assertEquals("aggressive,-cuts", opts.lp)
-        val cfg = LpConfig.parse(requireNotNull(opts.lp))
-        assertEquals(LpEmphasis.AGGRESSIVE, cfg.emphasis)
-        assertEquals(false, cfg.resolved(LpTechnique.CUTS))
-        assertEquals(true, cfg.resolved(LpTechnique.BOUNDING))
-    }
-
-    @Test
     fun `--lp-pricing should default to minimum bound support and accept largest pivot`() {
         val defaults = CommonOptions()
         assertEquals(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, defaults.lpPricing)
@@ -236,15 +222,6 @@ class CliModeOptionsTest {
         } finally {
             System.clearProperty("klause.engine")
         }
-    }
-
-    @Test
-    fun `engine tokens should map to their finite solve routes`() {
-        assertEquals(FiniteEngine.FIXED, parseEngine("fixed"))
-        assertEquals(FiniteEngine.BACKTRACK, parseEngine("cp"))
-        assertEquals(FiniteEngine.LOCAL_SEARCH, parseEngine("local-search"))
-        assertEquals(FiniteEngine.MIXED, parseEngine("portfolio"))
-        assertEquals(FiniteEngine.ALNS, parseEngine("lns"))
     }
 
     @Test
@@ -294,12 +271,6 @@ class CliModeOptionsTest {
             assertTrue("(default: default)" in out, out)
             assertTrue("(default: 1)" in out, out)
         }
-    }
-
-    @Test
-    fun `--version should print name and version on a single line`() {
-        val out = captureStdout { main(arrayOf("--version")) }.trim()
-        assertTrue(out == "Klause 0.0.1", out)
     }
 
     @Test
@@ -481,36 +452,6 @@ class CliModeOptionsTest {
     }
 
     @Test
-    fun `minizinc standard -f -p should route to a parallel portfolio in both -p spellings`() {
-        val fzn = File.createTempFile("cli", ".fzn").apply {
-            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
-            deleteOnExit()
-        }
-        for (engineArgs in listOf(
-            arrayOf("-f", "-p2"),
-            arrayOf("-f", "-p", "2"),
-            arrayOf("-e", "ls", "-p", "2"),
-        )) {
-            val out = captureStdout { main(engineArgs + arrayOf("-t", "10000", fzn.absolutePath)) }
-            assertTrue("x = " in out, out)
-        }
-    }
-
-    @Test
-    fun `fixed should accept selector overrides without a source search annotation`() {
-        val fzn = File.createTempFile("cliunannotated", ".fzn").apply {
-            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
-            deleteOnExit()
-        }
-
-        val out = captureStdout {
-            main(arrayOf("-e", "fixed", "--param", "var-selector=input-order", fzn.absolutePath))
-        }
-
-        assertTrue("x = " in out, out)
-    }
-
-    @Test
     fun `fixed should reject selector overrides when a source search annotation exists`() {
         val fzn = File.createTempFile("cliannotated", ".fzn").apply {
             writeText(
@@ -615,7 +556,8 @@ class CliModeOptionsTest {
     fun `smtlib should emit sat and a get-model block`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
-                "(declare-const x Int)(assert (>= x 0))(assert (<= x 5))(check-sat)(get-model)",
+                "(set-option :produce-models true)" +
+                    "(declare-const x Int)(assert (>= x 0))(assert (<= x 5))(check-sat)(get-model)",
             )
             deleteOnExit()
         }

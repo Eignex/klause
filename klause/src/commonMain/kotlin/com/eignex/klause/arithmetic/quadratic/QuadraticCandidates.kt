@@ -1,5 +1,6 @@
 package com.eignex.klause.arithmetic.quadratic
 
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.koblas
 import com.eignex.util.numbers.BigFraction
 import kotlin.math.max
@@ -77,7 +78,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             return null
         var norm = hessian.maxOfOrNull { row ->
             control.execution.pollingCost(row.size)
-            koblas.asum(row, 0, row.size)
+            koblas.asum(DenseVector.wrap(row))
         } ?: 0.0
         for (row in coefficients) norm += 16.0 * dot(0.0, row, row)
         if (!norm.isFinite()) return null
@@ -133,13 +134,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
         if (left.isEmpty()) return initial
         if (left.size == 1) control.step() else control.steps(left.size)
-        return initial + koblas.dot(left, 0, right, 0, left.size)
+        return initial + koblas.dot(DenseVector.wrap(left), DenseVector.wrap(right))
     }
 
     private fun axpy(alpha: Double, source: DoubleArray, destination: DoubleArray) {
         if (source.isEmpty()) return
         if (source.size == 1) control.step() else control.steps(source.size)
-        koblas.axpy(destination, 0, alpha, source, 0, source.size)
+        koblas.axpy(alpha, DenseVector.wrap(source), DenseVector.wrap(destination))
     }
 
     private fun eliminate(matrix: Array<Array<BigFraction>>): List<BigFraction>? {

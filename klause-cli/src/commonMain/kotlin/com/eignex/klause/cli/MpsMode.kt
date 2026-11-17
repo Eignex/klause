@@ -59,6 +59,7 @@ internal object MpsMode : CliMode {
                     start.elapsedNow().inWholeMilliseconds,
                 )
                 println("c numericalSemantics=${mpsNumericalSemantics(source.semantics)}")
+                println("c optimalityTolerance=${mpsOptimalityTolerance(source.semantics)}")
                 val state = MpsOutputState(
                     source.semantics.declared.undeclaredIntegers != source.semantics.effective.undeclaredIntegers ||
                         source.semantics.declared.undeclaredReals != source.semantics.effective.undeclaredReals,
@@ -206,15 +207,9 @@ internal class MpsOutput(
                 else -> "s SATISFIABLE"
             }
 
-        Verdict.UNBOUNDED -> when {
-            exactSourceWitness() != false -> "s UNBOUNDED"
-            best != null -> "s SATISFIABLE"
-            else -> "s UNKNOWN"
-        }
-
         Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
 
-        Verdict.UNKNOWN -> "s UNKNOWN"
+        Verdict.UNBOUNDED, Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
     override fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> {
@@ -306,7 +301,7 @@ internal class MpsOutput(
             else -> null
         }
         val numerical = if (source.numericalClaims && source.conclusion in setOf(
-                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE,
+                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE, LinearSourceConclusion.UNBOUNDED,
             )) "MPS numerical status under configured tolerances" else null
         return listOfNotNull(declaration, numerical, qualification, witness, cause)
             .joinToString("; ").ifEmpty { null }

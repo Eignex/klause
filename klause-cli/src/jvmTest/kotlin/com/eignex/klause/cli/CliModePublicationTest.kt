@@ -295,8 +295,8 @@ class CliModePublicationTest {
     fun `ordinary mixed linear CLI should preserve an integer recession claim`() {
         val source = File.createTempFile("linear-cli-integer-ray", ".smt2").apply {
             writeText(
-                "(declare-const i Int) (declare-const x Real) " +
-                    "(assert (= x (to_real i))) (minimize (+ 5 i)) (check-sat)",
+                "(set-option :produce-models true) (declare-const i Int) (declare-const x Real) " +
+                    "(assert (= x (to_real i))) (minimize (+ 5 i)) (check-sat) (get-model)",
             )
             deleteOnExit()
         }

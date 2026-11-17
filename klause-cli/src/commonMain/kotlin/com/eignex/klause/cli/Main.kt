@@ -6,10 +6,10 @@ import com.eignex.klause.formats.opb.OpbLoweringException
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.PipelineConfigException
 import com.eignex.klause.solver.result.UnsoundnessException
-import com.eignex.util.platform.startHeapPeakSampler
 import com.eignex.util.process.exitProcess
 import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
+import com.eignex.util.runtime.diagnostics.startHeapPeakSampler
 
 /*
  * CLI entry point: parse shared and mode flags, select a mode by --format or extension
@@ -109,6 +109,7 @@ private fun run(args: Array<String>) {
     // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
     if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
     common.resetInvocationStatistics()
+    if (session.runCommands(path, common)) return
     val loadStart = nowMillis()
     val solvable = session.load(path, common)
     common.loadElapsedMs = nowMillis() - loadStart

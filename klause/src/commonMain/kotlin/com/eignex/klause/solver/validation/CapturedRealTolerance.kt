@@ -17,6 +17,7 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SourceTolerance
@@ -85,6 +86,23 @@ internal fun capturedSourceSlack(
     val scale = if (boundMagnitude > magnitude) boundMagnitude else magnitude
     val scaled = relative * scale
     return if (absolute > scaled) absolute else scaled
+}
+
+// Whether two evaluations `value` and `optimum` of one point's objective agree within the gap of `policy`:
+// `abs(value - optimum) <= max(absolute, relative * scale)`, where `scale` is the sum of the point's absolute objective
+// term activities. A missing or zero policy requires equal values. The gap proves no bound of its own.
+internal fun withinOptimalityGap(
+    policy: OptimalityTolerance?,
+    value: BigFraction,
+    optimum: BigFraction,
+    scale: BigFraction,
+): Boolean {
+    val difference = (value - optimum).magnitude()
+    if (difference.isZero) return true
+    if (policy == null || policy.isExact) return false
+    val absolute = BigFraction.of(policy.absolute.numerator, policy.absolute.denominator)
+    val relative = BigFraction.of(policy.relative.numerator, policy.relative.denominator)
+    return difference <= absolute || difference <= relative * scale.magnitude()
 }
 
 // The tolerance verdict of a projected source point: every real declaration and every relation over a real

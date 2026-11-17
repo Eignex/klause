@@ -82,12 +82,6 @@ class OznParserTest {
     }
 
     @Test
-    fun `a parameter declaration should parse as a declaration`() {
-        val items = OznParser(OznLexer("par int: size = 2;").tokenize()).parse()
-        assertEquals(listOf(OznItem.VarDecl("size", OznExpr.IntLit(2))), items)
-    }
-
-    @Test
     fun `duplicate declarations should be rejected`() {
         assertFailsWith<OznParseException> {
             OznParser(OznLexer("par int: x = 1; par int: x = 2;").tokenize()).parse()

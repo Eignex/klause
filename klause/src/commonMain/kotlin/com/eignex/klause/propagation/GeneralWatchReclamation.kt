@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.storage.borrowBackingArray
 
 internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPreparation) {
     if (incremental || nativeEngine != null || learned.retiredCount == 0) return
@@ -70,7 +71,7 @@ private fun PropagationState.removeRetiredWatch(
         swapPopWatch(posting, watches.blockersByLit[literal], position)
     } else {
         budget.visit(0L)
-        posting.removeAt(position)
+        posting.removeAtSwap(position)
     }
     return true
 }
@@ -86,7 +87,7 @@ private fun PropagationState.trimWatchPosting(
 
 private fun PropagationState.trimPostingArray(posting: IntArrayList, budget: ReclamationPreparation) {
     val size = posting.size.coerceAtLeast(1).toLong()
-    if (posting.backingData.size <= size) return
+    if (posting.borrowBackingArray().size <= size) return
     val work = 5L + size * 2L
     val scratch = size * Int.SIZE_BYTES
     if (!budget.supports(work, scratch)) {

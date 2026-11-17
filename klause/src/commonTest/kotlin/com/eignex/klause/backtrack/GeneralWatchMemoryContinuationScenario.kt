@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.SharingMemoryStatus
+import com.eignex.util.collections.storage.borrowBackingArray
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -17,7 +18,7 @@ internal fun generalWatchMemoryContinuationScenario(permanentCount: Int) {
     repeat(64) { session.addLearnedClause(Clause(intArrayOf(4, 6)), 9) }
     repeat(8) { session.maintainCapWindow(0, 32_768L, 4096L, { false }) { false } }
     val state = session.explanationState
-    val posting = state.watches.byLit[4].backingData.size
+    val posting = state.watches.byLit[4].borrowBackingArray().size
     val reason = assertNotNull(session.boolReasonClause(1)).toList()
     val generation = session.learnedRetirementGeneration
     assertEquals(SharingMemoryStatus.PARTIAL, session.sharingMemory().status)
@@ -31,7 +32,7 @@ internal fun generalWatchMemoryContinuationScenario(permanentCount: Int) {
         assertTrue(session.work - before <= 32_768L)
     }
 
-    assertTrue(state.watches.byLit[4].backingData.size < posting)
+    assertTrue(state.watches.byLit[4].borrowBackingArray().size < posting)
     assertEquals(0, state.watches.byLit[4].size)
     assertEquals(permanentCount + 1, session.activeLearnedClauseCount)
     assertEquals(generation, session.learnedRetirementGeneration)

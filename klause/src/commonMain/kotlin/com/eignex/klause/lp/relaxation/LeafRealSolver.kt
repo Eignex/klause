@@ -18,6 +18,7 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyDoubleArray
@@ -66,6 +67,7 @@ internal class LeafRealSolver(
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
             claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
+            acceptFloatInfeasibility = toleranceCheck.permitsToleranceOptimum(),
         )
         return relaxation.leafResult(certified, problem, objective, sample, sink)
             .checkedEncoding(encoded, sample, cancellation)
@@ -97,6 +99,7 @@ internal class LeafRealSolver(
                 },
                 floatOffset = relaxation.objectiveConstant.toDouble(),
                 claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
+                acceptFloatInfeasibility = toleranceCheck.permitsToleranceOptimum(),
             ).use { cursor ->
                 var step = cursor.advance(shouldPause = { shouldPause(cursor.work) })
                 while (step is LpSolveStep.Paused) {

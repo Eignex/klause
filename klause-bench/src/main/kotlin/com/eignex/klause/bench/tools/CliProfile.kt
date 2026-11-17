@@ -13,6 +13,11 @@ import java.util.Locale
 internal object CliProfile {
     private const val CLI_CALLER_DEPTH = 3
     private const val MODEL_CALLER_DEPTH = 4
+
+    // A top-level function's frame names its file facade, so a file move silently changes this name.
+    internal const val EXACT_LIRA_SOURCE_PREPARATION =
+        "com.eignex.klause.theory.qflra.PreparedExactLiraSourceKt.sharedExactLiraSource"
+
     private val timedEvents = setOf("jdk.GarbageCollection", "jdk.GCPhasePause", "jdk.ThreadPark",
         "jdk.ThreadSleep", "jdk.JavaMonitorEnter", "jdk.JavaMonitorWait", "jdk.Compilation",
         "jdk.SafepointBegin", "jdk.ExecuteVMOperation")
@@ -44,7 +49,7 @@ internal object CliProfile {
             "com.eignex.klause.lp.LpProbeSolver.probe",
         ),
         "source preparation entry" to listOf(
-            "com.eignex.klause.theory.qflra.QfLiraSolverKt.sharedExactLiraSource",
+            EXACT_LIRA_SOURCE_PREPARATION,
             "com.eignex.klause.solver.pipeline.PreparedSearchComponents.prepareSource",
         ),
     )
@@ -60,6 +65,7 @@ internal object CliProfile {
         val cpuContexts = HashMap<String, Long>()
         val allocationContexts = HashMap<String, Long>()
         val cpuPolynomialCheckpoints = HashMap<String, Long>()
+        val cpuClockCallers = HashMap<String, Long>()
         val nativeCallers = HashMap<String, Long>()
         val eventCounts = HashMap<String, Long>()
         val runtimeMaxMillis = HashMap<String, Long>()
@@ -84,6 +90,12 @@ internal object CliProfile {
                         cpuContexts.merge(cliContextCallers(event), 1L, Long::plus)
                         val stack = event.stackTrace?.frames.orEmpty()
                             .map { "${it.method.type.name}.${it.method.name}" }
+                        if (stack.firstOrNull()?.let {
+                                it.startsWith("kotlin.time.") || it.startsWith("java.util.concurrent.TimeUnit.")
+                            } == true) {
+                            val suffix = if (event.stackTrace?.isTruncated == true) " [capture truncated]" else ""
+                            cpuClockCallers.merge(stack.take(32).joinToString(" <- ") + suffix, 1L, Long::plus)
+                        }
                         cpuPolynomialCheckpoints.merge(cliPolynomialCheckpointCallers(stack), 1L, Long::plus)
                     }
                     "jdk.ObjectAllocationSample" -> {
@@ -102,6 +114,8 @@ internal object CliProfile {
         printTable("$label: native-method samples by captured callers", nativeCallers, 60, output)
         printTable("$label: CPU samples by phase (stack attribution)", phases, 40, output)
         printTable("$label: CPU self-samples", cpu, 60, output)
+        printTable("$label: clock conversion samples with callers (at most 32 frames)",
+            cpuClockCallers, Int.MAX_VALUE, output)
         printTable("$label: CPU samples by captured callers", cpuCallers, 60, output)
         printTable("$label: CPU samples by captured polynomial checkpoint callers",
             cpuPolynomialCheckpoints, Int.MAX_VALUE, output)
@@ -203,7 +217,7 @@ internal object CliProfile {
             methods.any {
                 it.contains("PreparedSearchComponents.<init>") ||
                     it.contains("PreparedSearchComponents.prepareSource") ||
-                    it.contains("QfLiraSolverKt.sharedExactLiraSource") ||
+                    it.contains(EXACT_LIRA_SOURCE_PREPARATION) ||
                     it.contains("ComponentPlanKt.componentPlan") ||
                     it.contains("PreparedSourcePlanKt.prepareExecutionPlan")
             } -> "shared source preparation"

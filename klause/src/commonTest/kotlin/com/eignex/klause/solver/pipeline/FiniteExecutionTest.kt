@@ -12,15 +12,19 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.theory.SourceToleranceSearch
@@ -35,6 +39,62 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
+    @Test
+    fun `finite portfolio conversion should preserve a local search root proof`() {
+        for (optimize in listOf(false, true)) {
+            val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+            val objective = if (optimize) LinearObjective(boolWeights = longArrayOf(1)) else null
+            val scenario = PortfolioScenario(1, 1, if (optimize) Kind.COP else Kind.CSP,
+                EngineMix.LOCAL_SEARCH, seed = 17L, lpCeiling = LpConfig.OFF)
+
+            val verdict = FinitePipeline.portfolioExecutor(problem.bake(), scenario, objective, null, null, null)
+                .use { executor ->
+                    if (optimize) executor.minimize().finitePortfolioVerdict()
+                    else executor.solve().finitePortfolioVerdict()
+                }
+
+            assertEquals(FiniteExecutionVerdict.UNSAT, verdict, "optimize=$optimize")
+        }
+    }
+
+    @Test
+    fun `a local search portfolio should preserve a root refutation without presolve`() {
+        for (optimize in listOf(false, true)) {
+            val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+            val shape = FiniteSolveShape(problem, optimize, false, null,
+                if (optimize) LinearObjective(boolWeights = longArrayOf(1)) else null, null, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
+                shape, FiniteEngine.LOCAL_SEARCH, presolveConfig = PresolveConfig.NONE,
+                randomSeed = 17L,
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict, "optimize=$optimize")
+            assertEquals(0.0, completed.stats.ls.moves.sum)
+            assertNull(completed.terminationReason)
+        }
+    }
+
+    @Test
+    fun `an unfinished finite search should retain its fixed work stop`() {
+        for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
+            val shape = FiniteSolveShape(Problem.of(2, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(0, 2)))), false, false, null, null, null, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
+                shape, engine, presolveConfig = PresolveConfig.NONE,
+                randomSeed = 17L, nodeBudget = NodeBudget(0L),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNKNOWN, completed.verdict, "$engine")
+            assertEquals(TerminationReason.BudgetExhausted, completed.terminationReason, "$engine")
+        }
+    }
+
     // Binary64 `0.01 * 200` exceeds the declared bound `2.0` by `3/72057594037927936`.
     private fun roundedBound(declarations: String, constraints: String) = """
         var 0.0..2.0: y;
@@ -55,6 +115,7 @@ class FiniteExecutionTest {
         constraints: String = "",
         source: String = roundedBound(declarations, constraints),
         floatPoints: Boolean = true,
+        presolve: PresolveConfig = PresolveConfig.NONE,
     ): FiniteSolveVerdict {
         val program = parseFlatZinc(source, semanticOverrides = overrides)
         val maximize = program.sourceProgram.solve is SolveDirective.Maximize
@@ -63,7 +124,7 @@ class FiniteExecutionTest {
             if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE, engine,
             objective = objective, maximize = maximize))
         val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), engine,
-            presolveConfig = PresolveConfig.NONE, cancellation = ExecutionControl.after(1.seconds),
+            presolveConfig = presolve, cancellation = ExecutionControl.after(1.seconds),
             toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem))
 
         val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample, {}))
@@ -177,6 +238,174 @@ class FiniteExecutionTest {
                 .replace("solve satisfy;", "solve minimize z;"))
 
         assertEquals(FiniteSolveVerdict.OPTIMAL, verdict)
+    }
+
+    // An absolute value over an operand in [-2.0, 3.0] beside a row every k leaves slack: each leaf has the optimum.
+    private fun absObjective(direction: String) = """
+        var 1..2: k;
+        var 1.0..2.0: kf;
+        var -2.0..3.0: x;
+        var 0.0..5.0: y;
+        constraint int2float(k, kf);
+        constraint float_lin_le([1.0, -1.0], [x, kf], 2.0);
+        constraint float_abs(x, y);
+        solve $direction;
+    """.trimIndent()
+
+    // Exact optima in the minimized frame the source objective reads: a maximum of 3.0 is -3.0.
+    private val absOptima = mapOf("minimize y" to 0.0, "maximize y" to -3.0, "minimize x" to -2.0, "maximize x" to -3.0)
+
+    private val numerical = SemanticOverrides()
+    private val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
+
+    // The backtracking verdict and the source objective at the last point it publishes for [source].
+    private fun outcome(
+        overrides: SemanticOverrides,
+        source: String,
+        presolve: PresolveConfig = PresolveConfig.NONE,
+        floatPoints: Boolean = true,
+    ): Pair<FiniteSolveVerdict, Double?> {
+        val samples = ArrayList<Sample>()
+        val verdict = solveFlatZinc(overrides, onSample = samples::add, source = source, floatPoints = floatPoints,
+            presolve = presolve)
+        val objective = parseFlatZinc(source).sourceProgram.linearObjective()
+        return verdict to objective?.let { samples.lastOrNull()?.let(objective::evaluate) }
+    }
+
+    @Test
+    fun `backtracking should prove the exact optimum of a real objective over an absolute value within tolerance`() {
+        val reached = absOptima.keys.associateWith { outcome(numerical, absObjective(it)) }
+
+        assertEquals(absOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
+    }
+
+    @Test
+    fun `backtracking should prove the optimum of a real objective over an absolute value exactly`() {
+        val reached = absOptima.keys.associateWith { outcome(exact, absObjective(it)) }
+
+        assertEquals(absOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
+    }
+
+    @Test
+    fun `backtracking should prove the optimum of a real objective over an absolute value under presolve`() {
+        val reached = outcome(numerical, absObjective("maximize y"), PresolveConfig())
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL to -3.0, reached)
+    }
+
+    // `m = max(a, b)` or `m = min(a, b)` with `a` in [0.0, 1.0] and `b` in [0.0, 2.0], beside an integer column.
+    private fun extremum(relation: String, solve: String) = """
+        var 1..2: k;
+        var 0.0..1.0: a;
+        var 0.0..2.0: b;
+        var 0.0..3.0: m;
+        constraint $relation(a, b, m);
+        solve $solve;
+    """.trimIndent()
+
+    // Exact optima in the minimized frame of each extremum direction.
+    private val extremumOptima = mapOf(
+        ("float_max" to "minimize m") to 0.0, ("float_max" to "maximize m") to -2.0,
+        ("float_min" to "minimize m") to 0.0, ("float_min" to "maximize m") to -1.0,
+    )
+
+    @Test
+    fun `backtracking should prove the optimum of a real extremum within tolerance`() {
+        val reached = extremumOptima.keys.associateWith { (relation, solve) ->
+            outcome(numerical, extremum(relation, solve))
+        }
+
+        assertEquals(extremumOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
+    }
+
+    @Test
+    fun `backtracking should prove the optimum of a real extremum under presolve`() {
+        val reached = outcome(numerical, extremum("float_max", "maximize m"), PresolveConfig())
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL to -2.0, reached)
+    }
+
+    @Test
+    fun `the default portfolio should optimize a real extremum without an arm fault`() {
+        val faults = ArrayList<String>()
+        val source = extremum("float_max", "minimize m")
+        val program = parseFlatZinc(source, semanticOverrides = numerical)
+        val objective = program.sourceProgram.linearObjective()
+        val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective = objective))
+        val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), FiniteEngine.MIXED,
+            presolveConfig = PresolveConfig.NONE, cancellation = ExecutionControl.after(1.seconds),
+            onPortfolioFault = { faults += it.toString() })
+
+        val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
+        assertEquals(emptyList<String>(), faults)
+    }
+
+    @Test
+    fun `a real extremum no operand can reach should be refuted`() {
+        val source = extremum("float_max", "satisfy").replace("var 0.0..3.0: m;", "var 2.5..3.0: m;")
+
+        assertEquals(FiniteSolveVerdict.UNSAT, outcome(numerical, source).first)
+    }
+
+    @Test
+    fun `a real extremum over a row that needs the slack should be judged within the declared tolerance`() {
+        val source = roundedBound("var 0.0..1.0: z; var 0.0..2.0: m;", "constraint float_max(y, z, m);")
+
+        assertEquals(FiniteSolveVerdict.SAT, outcome(numerical, source).first)
+    }
+
+    @Test
+    fun `a real objective over an absolute value beyond the declared tolerance should be refuted`() {
+        val source = """
+            var 1..2: k;
+            var -1.0..1.0: a;
+            var 0.0..0.4: b;
+            constraint float_abs(a, b);
+            constraint float_eq(a, -0.5);
+            solve minimize b;
+        """.trimIndent()
+
+        assertEquals(FiniteSolveVerdict.UNSAT, outcome(numerical, source).first)
+    }
+
+    @Test
+    fun `a real objective over strict rows should be optimized over the region satisfaction decides`() {
+        val directions = mapOf("satisfy" to FiniteSolveVerdict.SAT, "maximize x" to FiniteSolveVerdict.OPTIMAL,
+            "minimize x" to FiniteSolveVerdict.OPTIMAL)
+
+        val verdicts = directions.keys.associateWith { solve ->
+            val source = "var 1..2: k; var 0.0..1.0: x; var 0.0..1.0: y; constraint float_lt(x, y); " +
+                "constraint float_le(y, x); solve $solve;"
+            outcome(numerical, source).first
+        }
+
+        assertEquals(directions, verdicts)
+    }
+
+    // Two rows that hold together only within the slack: `x - y <= -2^-25` and `x - y >= -2^-26`. Acceptance refuses
+    // floating points, so the exact LP refutes every leaf and the search within the slack decides it.
+    private fun slackRows(solve: String) = """
+        var 1..2: k;
+        var 0.0..1.0: x;
+        var 0.0..1.0: y;
+        constraint float_lin_le([1.0, -1.0], [x, y], -0.0000000298023223876953125);
+        constraint float_lin_le([-1.0, 1.0], [x, y], 0.00000001490116119384765625);
+        solve $solve;
+    """.trimIndent()
+
+    @Test
+    fun `a real objective should be optimized over the tolerance region the satisfaction search decides`() {
+        val directions = mapOf("satisfy" to FiniteSolveVerdict.SAT, "maximize x" to FiniteSolveVerdict.OPTIMAL,
+            "minimize x" to FiniteSolveVerdict.OPTIMAL)
+
+        val verdicts = directions.keys.associateWith { solve ->
+            outcome(numerical, slackRows(solve), floatPoints = false).first
+        }
+
+        assertEquals(directions, verdicts)
     }
 
     @Test
@@ -781,460 +1010,6 @@ class FiniteExecutionTest {
             val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
 
             assertTrue(completed.stats.portfolio.booleanProof.isEmpty())
-        }
-    }
-
-    @Test
-    fun `initial probe policies should require a containing time deadline`() {
-        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work",
-            "alns-work")) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes(policy)),
-                nodeBudget = NodeBudget(8),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `typed initial probe policies should execute curated integer optimization`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("lp-transfer")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-second")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("family-work")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work")))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                cancellation = ExecutionControl.after(1.seconds),
-                executionOptions = options, nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-        }
-    }
-
-    @Test
-    fun `parsed initial probe policies should execute curated integer optimization`() {
-        for (options in listOf(ExecutionOptions.parse(listOf("portfolio-probes=leader-half")),
-            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
-            ExecutionOptions.parse(listOf("portfolio-probes=family-work")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work")),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work")))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                cancellation = ExecutionControl.after(1.seconds),
-                executionOptions = options, nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-        }
-    }
-
-    @Test
-    fun `initial probe policies should compose with deferred LP starts`() {
-        for (options in listOf(
-            ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second", "portfolio-lp-start=after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-lp-start=after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-lp-start=after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-lp-start=after-probes")))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                cancellation = ExecutionControl.after(1.seconds),
-                executionOptions = options, nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-        }
-    }
-
-    @Test
-    fun `paid heuristic probes should compose with buffered publication`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("family-work"),
-            ExecutionOption.portfolioPublications("segment")),
-            ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-publications=segment")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work"),
-                ExecutionOption.portfolioPublications("segment")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-publications=segment")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work"),
-                ExecutionOption.portfolioPublications("segment")),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-publications=segment")))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                cancellation = ExecutionControl.after(1.seconds),
-                executionOptions = options, nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-        }
-    }
-
-    @Test
-    fun `initial probe policies should reject unknown policies explicit recipes and work schedules`() {
-        for (settings in listOf(listOf("portfolio-probes=never"),
-            listOf("portfolio-probes=leader-half", "arms=2"),
-            listOf("portfolio-probes=leader-half", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=leader-half", "portfolio-work=100"),
-            listOf("portfolio-probes=lp-transfer", "arms=2"),
-            listOf("portfolio-probes=lp-transfer", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=lp-transfer", "portfolio-work=100"),
-            listOf("portfolio-probes=heuristic-second", "arms=2"),
-            listOf("portfolio-probes=heuristic-second", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=heuristic-second", "portfolio-work=100"),
-            listOf("portfolio-probes=family-work", "arms=2"),
-            listOf("portfolio-probes=family-work", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=family-work", "portfolio-work=100"),
-            listOf("portfolio-probes=heuristic-work", "arms=2"),
-            listOf("portfolio-probes=heuristic-work", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=heuristic-work", "portfolio-work=100"),
-            listOf("portfolio-probes=alns-work", "arms=2"),
-            listOf("portfolio-probes=alns-work", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=alns-work", "portfolio-work=100"))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(settings),
-                cancellation = ExecutionControl.after(1.seconds),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `leading probe budgets should reject unsupported operations lanes and engines`() {
-        for ((optimize, cores, engine) in listOf(Triple(false, 1, FiniteEngine.MIXED),
-            Triple(true, 2, FiniteEngine.MIXED), Triple(true, 1, FiniteEngine.BACKTRACK))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, optimize, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
-                cancellation = ExecutionControl.after(1.seconds),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `integer probe policies should reject Boolean sources`() {
-        for (policy in listOf("leader-half", "lp-transfer", "family-work", "heuristic-work",
-            "alns-work")) {
-            val shape = FiniteSolveShape(Problem.of(1, 0, emptyArray(), emptyArray()), true, false, null,
-                LinearObjective(longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes(policy)),
-                cancellation = ExecutionControl.after(1.seconds),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `early heuristic probes should execute Boolean and mixed finite optimization`() {
-        for (intCount in listOf(0, 1)) {
-            val problem = Problem.of(1, intCount, Array(intCount) { IntDomain(0, 1) }, emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(boolWeights = longArrayOf(1), intCoefficients = LongArray(intCount) { 1L }),
-                null, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
-                cancellation = ExecutionControl.after(1.seconds), nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
-        }
-    }
-
-    @Test
-    fun `early heuristic probes should retain the source annotation worker`() {
-        val labels = listOf("ordinary", "heuristic-second").map { policy ->
-            val problem = Problem.of(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(longArrayOf(1), longArrayOf(1)), null, null, searchHints = hints)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=$policy")),
-                cancellation = ExecutionControl.after(1.seconds), nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict)
-            completed.stats.portfolio.arms.map { it.label }
-        }
-
-        assertTrue("bt/annotation" in labels[0])
-        assertEquals(labels[0], labels[1])
-    }
-
-    @Test
-    fun `proof coverage controls should retain the source annotation worker`() {
-        val labels = listOf(emptyList(), listOf("portfolio-proof-workers=complete"),
-            listOf("portfolio-proof-workers=retained"), listOf("portfolio-proof-share=0.75")).map { settings ->
-            val problem = Problem.of(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(longArrayOf(1), longArrayOf(1)), null, null, searchHints = hints)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(settings), nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict)
-            completed.stats.portfolio.arms.map { it.label }
-        }
-
-        assertTrue("bt/annotation" in labels[0])
-        labels.drop(1).forEach { assertEquals(labels[0], it) }
-    }
-
-    @Test
-    fun `typed and parsed proof worker scopes should execute curated optimization`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProofWorkers("complete")),
-            ExecutionOptions.parse(listOf("portfolio-proof-workers=complete")),
-            ExecutionOptions.parse(listOf("portfolio-proof-workers=retained")))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = options, nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertEquals(true, result.completeSearchAdmitted)
-        }
-    }
-
-    @Test
-    fun `proof worker scopes should reject unknown policies and explicit recipes`() {
-        for (settings in listOf(listOf("portfolio-proof-workers=never"),
-            listOf("portfolio-proof-workers=complete", "arms=2"),
-            listOf("portfolio-proof-workers=complete", "bt-arm=satOptimized"),
-            listOf("portfolio-proof-workers=retained", "var-selector=vsids"))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(settings),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `complete proof coverage should reject unsupported operations lanes and engines`() {
-        for ((optimize, cores, engine) in listOf(Triple(false, 1, FiniteEngine.MIXED),
-            Triple(true, 2, FiniteEngine.MIXED), Triple(true, 1, FiniteEngine.LOCAL_SEARCH))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, optimize, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofWorkers("complete")),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `typed and parsed deferred LP controls should execute a curated finite integer optimization`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
-            ExecutionOptions.parse(listOf("portfolio-lp-start=after-probes")))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = options, nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertEquals(true, result.completeSearchAdmitted)
-        }
-    }
-
-    @Test
-    fun `deferred LP controls should reject unknown policies and explicit recipe ownership`() {
-        for (settings in listOf(listOf("portfolio-lp-start=never"),
-            listOf("portfolio-lp-start=after-probes", "arms=2"),
-            listOf("portfolio-lp-start=after-probes", "bt-arm=satOptimized"))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(settings),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `deferred LP controls should reject unsupported operations lanes and engines`() {
-        for ((optimize, cores, engine) in listOf(Triple(false, 1, FiniteEngine.MIXED),
-            Triple(true, 2, FiniteEngine.MIXED), Triple(true, 1, FiniteEngine.BACKTRACK))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, optimize, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `deferred LP controls should reject Boolean sources`() {
-        val shape = FiniteSolveShape(Problem.of(1, 0, emptyArray(), emptyArray()), true, false, null,
-            LinearObjective(longArrayOf(1)), 0, null)
-        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-            shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-            executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
-        )
-
-        assertFailsWith<PipelineConfigException> {
-            FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-        }
-    }
-
-    @Test
-    fun `typed and parsed proof shares should execute a curated finite optimization`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
-            ExecutionOptions.parse(listOf("portfolio-proof-share=0.75")))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val objective = LinearObjective(intCoefficients = longArrayOf(1))
-            val shape = FiniteSolveShape(problem, true, false, null, objective, 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
-                executionOptions = options, nodeBudget = NodeBudget(8),
-            )
-
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-
-            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertEquals(true, result.completeSearchAdmitted)
-        }
-    }
-
-    @Test
-    fun `proof share should reject values outside the existing floor and full allocation`() {
-        for (share in listOf(-1.0, 0.49, 1.01, Double.NaN, Double.POSITIVE_INFINITY)) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(share)),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `proof share should reject explicit recipe ownership`() {
-        for (selection in listOf("bt-arm=satOptimized", "arms=1", "var-selector=vsids")) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions.parse(listOf("portfolio-proof-share=0.75", selection)),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
-        }
-    }
-
-    @Test
-    fun `proof share should reject satisfaction parallel and heuristic execution`() {
-        for ((optimize, cores, engine) in listOf(Triple(false, 1, FiniteEngine.MIXED),
-            Triple(true, 2, FiniteEngine.MIXED), Triple(true, 1, FiniteEngine.LOCAL_SEARCH))) {
-            val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-            val shape = FiniteSolveShape(problem, optimize, false, null,
-                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
-                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
-            )
-
-            assertFailsWith<PipelineConfigException> {
-                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
-            }
         }
     }
 

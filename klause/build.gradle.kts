@@ -7,6 +7,7 @@ eignexBuild { jvmToolchain.set(25) }
 
 tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
     testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
+    testLogging.info.events = testLogging.info.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
     testLogging.showStandardStreams = true
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
 }
@@ -33,7 +34,7 @@ eignexPublish {
 // local build/check and CI use the same target set. The release builds every target via -Ptargets.full.
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
-val skemaPin = "0.4.0"
+val skemaPin = "0.4.1-20261116.152019-3"
 
 kotlin {
     jvm()
@@ -46,17 +47,17 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api("com.eignex:util:0.0.1-20261116.114943-24")
+            api("com.eignex:util:0.0.1-ci.43969094073.1-20261116.222329-1")
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:$skemaPin") {
                 version { strictly(skemaPin) }
             }
-            implementation("com.eignex:koblas:0.1.1-20261105.140327-312") {
-                version { strictly("0.1.1-20261105.140327-312") }
+            implementation("com.eignex:koblas:0.1.1-20261116.224320-351") {
+                version { strictly("0.1.1-20261116.224320-351") }
             }
-            implementation("com.eignex:kumulant:0.3.4-20261105.142345-130")
-            implementation("com.eignex:kpermute:1.3.0")
+            implementation("com.eignex:kumulant:0.3.4-20261116.231003-146")
+            implementation("com.eignex:kpermute:1.3.1-20261116.152032-8")
         }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")

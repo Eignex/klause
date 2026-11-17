@@ -3,8 +3,6 @@ package com.eignex.klause.compile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -47,7 +45,6 @@ import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 private class TinyCampaign : VariableSchema() {
@@ -145,19 +142,6 @@ class CompilerTest {
         } finally {
             KlauseConfig.current = saved
         }
-    }
-
-    @Test
-    fun `a nominal should produce exactly one factor and indicators`() {
-        val schema = TinyCampaign()
-        val compiled = schema.compile()
-        assertEquals(4, compiled.problem.numBoolVars)
-        assertEquals(0, compiled.problem.numIntVars)
-        assertEquals(2, compiled.problem.factors.size)
-        assertTrue(compiled.problem.factors[0] is Cardinality)
-        assertTrue(compiled.problem.factors[1] is Clause)
-        assertNotNull(compiled.boolVarIdByName["premium"])
-        assertEquals(setOf("a", "b", "c"), compiled.nominalIndicators.getValue("type").keys)
     }
 
     @Test

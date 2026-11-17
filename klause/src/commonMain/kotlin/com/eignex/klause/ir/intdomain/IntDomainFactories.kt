@@ -3,8 +3,8 @@ package com.eignex.klause.ir.intdomain
 import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.defaultDomainStorageSettings
-import com.eignex.util.collections.Bits
 import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.storage.PackedBits
 
 /**
  * Build a domain from a non-empty sorted-distinct survivor array. Picks the most compact rep:
@@ -27,7 +27,7 @@ internal fun intDomainFromSurvivors(
     if (!spanHuge && span <= storage.bitsetThreshold) {
         val spanI = span.toInt()
         val bits = LongArray((spanI + 63) ushr 6)
-        for (i in 0 until s) Bits.set(bits, (sv[i] - newMin).toInt())
+        for (i in 0 until s) PackedBits.set(bits, (sv[i] - newMin).toInt())
         return BitsetDomain(newMin, newMax, bits, newMin, storage)
     }
     var r = 1
@@ -53,7 +53,7 @@ internal fun intDomainFromSurvivors(
     val words = (span + 63) ushr 6
     if (!spanHuge && 2 * words <= s) {
         val bits = LongArray(words.toInt())
-        for (i in 0 until s) Bits.set(bits, (sv[i] - newMin).toInt())
+        for (i in 0 until s) PackedBits.set(bits, (sv[i] - newMin).toInt())
         return BitsetDomain(newMin, newMax, bits, newMin, storage)
     }
     return SurvivorsDomain(newMin, newMax, sv, storage)
@@ -87,7 +87,7 @@ internal fun intDomainFromRuns(
         val bits = LongArray((spanI + 63) ushr 6)
         k = 0
         while (k < runs.size) {
-            Bits.fillRange(bits, (runs[k] - newMin).toInt(), (runs[k + 1] - newMin + 1).toInt())
+            PackedBits.fillRange(bits, (runs[k] - newMin).toInt(), (runs[k + 1] - newMin + 1).toInt())
             k += 2
         }
         return BitsetDomain(newMin, newMax, bits, newMin, storage)
@@ -101,7 +101,7 @@ internal fun intDomainFromRuns(
         val bits = LongArray(words.toInt())
         k = 0
         while (k < runs.size) {
-            Bits.fillRange(bits, (runs[k] - newMin).toInt(), (runs[k + 1] - newMin + 1).toInt())
+            PackedBits.fillRange(bits, (runs[k] - newMin).toInt(), (runs[k + 1] - newMin + 1).toInt())
             k += 2
         }
         return BitsetDomain(newMin, newMax, bits, newMin, storage)

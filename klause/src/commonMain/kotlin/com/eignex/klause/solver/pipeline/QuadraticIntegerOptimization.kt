@@ -562,10 +562,7 @@ internal class QuadraticIntegerOptimization(
             assignment.bools,
             if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() }
             else longArrayOf(),
-            DoubleArray(reals.size) { id ->
-                val value = reals[id]
-                value.rational?.toDouble() ?: (value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2)
-            }, exactInts = integers, algebraicReals = reals,
+            DoubleArray(reals.size) { reals[it].guideDouble }, exactInts = integers, algebraicReals = reals,
         )
         return QuadraticIncumbent(sample, objective.evaluateExact(sample, algebraic))
     }

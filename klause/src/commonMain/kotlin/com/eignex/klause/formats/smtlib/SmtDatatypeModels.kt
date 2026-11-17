@@ -18,6 +18,13 @@ internal interface SmtSortCardinalities {
     fun cardinality(sort: SmtSort, cap: Int): Int?
 }
 
+internal fun SmtDatatypes.modelPoint(sort: SmtSort, second: Boolean, values: SmtModelValues): SmtValue? {
+    val registry = snapshot(values.cancellation, values::checkpoint)
+    if (registry.instance(sort) == null) return null
+    val count = if (second) 2 else 1
+    return SmtDatatypeTermGenerator(registry, count, values).values(sort).getOrNull(count - 1)
+}
+
 internal fun SmtDatatypes.cardinality(sort: SmtSort, cap: Int, cancellation: ExecutionControl): Int? {
     fun checkpoint(units: Long = 1) {
         cancellation.charge(units)
@@ -212,6 +219,7 @@ internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, limi
         while (pending.isNotEmpty()) {
             step()
             val (current, finish) = pending.removeLast()
+            current.checkpointStructure(step)
             if (current in cache) continue
             val instance = registry.instance(current)
             if (!finish) {
@@ -437,6 +445,7 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
         while (pending.isNotEmpty()) {
             values.checkpoint()
             val (key, finish) = pending.removeLast()
+            key.first.checkpointStructure { values.checkpoint() }
             if (key in cache) continue
             val (current, level) = key
             val instance = registry.instance(current)

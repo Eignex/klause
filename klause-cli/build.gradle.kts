@@ -63,13 +63,13 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation("com.eignex:util:0.0.1-20261116.114943-24")
+            implementation("com.eignex:util:0.0.1-ci.43969094073.1-20261116.222329-1")
             implementation(project(":klause"))
             // KMP logger for `-v` progress output (custom stderr writer).
             implementation("co.touchlab:kermit:2.1.0")
             // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to
             // render them as %%%mzn-stat lines.
-            implementation("com.eignex:kumulant:0.3.4-20261105.142345-130")
+            implementation("com.eignex:kumulant:0.3.4-20261116.231003-146")
         }
     }
 }

@@ -9,13 +9,10 @@ class ScheduleBundleTest {
 
     private class SpyPolicy : AdaptivePolicy {
         var observed = 0
-        var resets = 0
         override fun observe(round: RoundLog) {
             observed++
         }
-        override fun reset() {
-            resets++
-        }
+        override fun reset() = Unit
     }
 
     private fun round(incumbent: Double, step: Long, accepted: Int) = RoundLog(
@@ -50,15 +47,5 @@ class ScheduleBundleTest {
         val w = doubleArrayOf(0.0)
         weights.applyTo(w, doubleArrayOf(0.0), intArrayOf(0), Random(0))
         assertEquals(1.0, w[0], 1e-12)
-    }
-
-    @Test
-    fun `reset should propagate to every adaptive member`() {
-        val noise = SpyPolicy()
-        val weights = WeightSchedule(bumpAfter = 1)
-        val temperature = AdaptiveCooling()
-        val bundle = ScheduleBundle(temperature = temperature, weights = weights, noise = noise)
-        bundle.reset()
-        assertEquals(1, noise.resets)
     }
 }

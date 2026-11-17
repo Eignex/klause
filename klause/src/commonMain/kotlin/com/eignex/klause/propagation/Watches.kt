@@ -23,7 +23,7 @@ internal fun PropagationState.moveBoolWatcher(factorId: Int, oldLit: Int, newLit
         if (posting != null) {
             val position = posting.indexOf(factorId)
             if (position >= 0) {
-                posting.removeAt(position)
+                posting.removeAtSwap(position)
                 rewindWatchCleanup(problem.numBoolVars * 2 + index, position)
             }
         }

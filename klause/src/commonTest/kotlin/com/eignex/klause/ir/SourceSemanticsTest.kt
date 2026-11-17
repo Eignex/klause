@@ -136,6 +136,7 @@ class SourceSemanticsTest {
             SemanticOverrides(undeclaredReals = BoundsOverride()),
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
             SemanticOverrides(pinAbsentOptionalValues = false),
+            SemanticOverrides(optimalityTolerance = OptimalityTolerance()),
         )
 
         for (replacement in replacements) {
@@ -193,5 +194,33 @@ class SourceSemanticsTest {
 
         assertEquals(false, resolved.effective.pinAbsentOptionalValues)
         assertTrue(resolved.hasOverrides)
+    }
+
+    @Test
+    fun `an exact feasibility tolerance should resolve an exact optimality gap`() {
+        val declared = SourceSemantics(
+            SourceFormat.MPS,
+            feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000))),
+            optimalityTolerance = OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10_000))),
+        )
+
+        val resolved = declared.resolve(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+
+        assertEquals(OptimalityTolerance(), resolved.effective.optimalityTolerance)
+    }
+
+    @Test
+    fun `a positive optimality gap beside exact feasibility should be rejected`() {
+        val declared = SourceSemantics(
+            SourceFormat.MPS,
+            feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000))),
+            optimalityTolerance = OptimalityTolerance(),
+        )
+        val overrides = SemanticOverrides(
+            feasibilityTolerance = SourceTolerance(),
+            optimalityTolerance = OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10_000))),
+        )
+
+        assertFailsWith<IllegalArgumentException> { declared.resolve(overrides) }
     }
 }

@@ -1,10 +1,10 @@
-# 7. Presolve and validation
+# 7. Presolve preparation
 
 Presolve fixes variables, rewrites relations and tightens bounds before search.
 Each reduction declares the preservation guarantee required by satisfaction,
 optimization, enumeration or counting, and retains source reconstruction. Preparation
 charges work to the [containing allowance](06-sessions.md#resource-allowances).
-[Source validation](#source-witness-validation) checks coordinates that no engine
+[Source validation](08-presolve-reductions.md#source-witness-validation) checks coordinates that no engine
 enforced before publication.
 
 ## Pipeline
@@ -14,64 +14,59 @@ before the root bake and catches cheap refutations, such as a gcd-indivisible
 equality, before propagation would narrow a wide domain one step per round. The
 root bake then establishes the propagation fixpoint of the root model; optional
 failed-literal and singleton arc consistency tiers extend it from the presolve lane,
-so the engine never depends on presolve. Finite rounds follow under one
-bounded-fixpoint scheduler shared with the source lane: a pass above the cheapest
-tier reruns only after other passes changed at least 1% of the model and met its
-observed cost/yield threshold. Charged analysis and rebuild work, divided by the
+so the engine never depends on presolve. Finite rounds follow.
+
+Source and finite rounds share one bounded-fixpoint scheduler. A pass above the
+cheapest tier reruns only after other passes changed at least 1% of the model and met
+its observed cost/yield threshold: charged analysis and rebuild work, divided by the
 pass's entry weight (unit weight for self-metered passes) and retained yield,
-estimates the intervening changes needed
-before another analysis. Yield is the largest of net occurrences removed, factors
-removed, reported columns narrowed or columns fixed, with a floor of one. Distinct
-new Boolean unit pins count as fixed columns; existing units and finite root fixings
-do not. Empty and interrupted calls retain their cost; only completed misses can
-park a pass. Parity elimination tracks revisions of XOR and integral equality rows,
-participating Boolean pins and odd-coefficient integer ranges in both lanes. A
-relevant revision releases its completed miss; unrelated factor, pin and range
-changes retain parking. Tracking reads changed factors and participating columns,
-charges the same phase allowance and stops on its cancellation. Coefficient
-strengthening also parks a completed miss until an implied integral equality,
-a complete integer or Boolean row, or a participating integer inequality endpoint
-changes.
-Opt-in row sparsification wakes on complete integral row changes; domains, pins and
-objectives alone do not change its premises. Each lane owns its block revisions,
-retracts dropped occurrences and releases columns when their last inequality disappears.
-The state is bounded by live participating columns and dies with the lane. Interrupted
-tracking discards its state and publishes no revision. Both wakeups retain the
-containing allowance and existing cost/yield backoff; a changed revision establishes
-eligibility, not an obligation to spend. Other parked analyses retain their completed
-misses for the schedule. These signals are
-deterministic spending heuristics, not predictions or proofs of search
-savings. Unmetered calls use the 1% change threshold without adding accounting
-scans. Cancellation and phase allowances still bound optional work. Presolve and
-an LP-relaxation harvest iterate to a joint fixpoint for at most four rounds, the
-harvest rerunning only when it tightened something. Automatic harvest skips clausal
-satisfaction unless rewrites expose cardinalities with stronger LP rows;
-propagator-only symmetry does not change that eligibility. Explicit `+lp-harvest`,
-nonclausal sources and optimization keep harvest eligibility.
-[Wide-integer pre-bake bounds](#pre-bake-lp-bounds) use a separate safety gate.
+estimates the intervening changes needed before another analysis. Yield is the
+largest of net occurrences removed, factors removed, reported columns narrowed or
+columns fixed, with a floor of one; distinct new Boolean unit pins count as fixed
+columns, existing units and finite root fixings do not. Empty and interrupted calls
+keep their cost, and only completed misses can park a pass. Unmetered calls use the
+1% threshold without accounting scans.
+
+Three passes track the premises of a completed miss instead, in both lanes, and wake
+when a relevant revision changes while unrelated factor, pin and range changes keep
+them parked: parity elimination watches XOR and integral equality rows, participating
+Boolean pins and odd-coefficient integer ranges; coefficient strengthening watches
+implied integral equalities, complete integer or Boolean rows and participating
+integer inequality endpoints; opt-in row sparsification watches complete integral
+rows only. Tracking reads changed factors and participating columns, charges the
+phase allowance, stops on its cancellation, is bounded by live participating columns
+and dies with its lane; interrupted tracking discards its state and publishes no
+revision. A changed revision establishes eligibility, not an obligation to spend, and
+other parked analyses keep their completed misses. These signals are deterministic
+spending heuristics, not predictions or proofs of search savings, and cancellation
+and phase allowances still bound optional work.
+
+Presolve and an LP-relaxation harvest iterate to a joint fixpoint for at most four
+rounds, the harvest rerunning only when it tightened something. Automatic harvest
+skips clausal satisfaction unless rewrites expose cardinalities with stronger LP rows,
+and propagator-only symmetry does not change that eligibility; explicit
+`+lp-harvest`, nonclausal sources and optimization keep it.
+[Wide-integer pre-bake bounds](08-presolve-reductions.md#pre-bake-lp-bounds) use a separate safety gate.
 
 The finite invocation carries its source-template policy through pre-bake LP checks,
-harvest and the consuming workers. Disabling templates keeps those LP calls and their
-allowances, but skips template capture and use.
-LP harvest eagerly prepares compatible immutable source-row and exact-bound templates
-for its later engine consumer. The selected projections carry these definitions
-across finite rebuilds. Unchanged definitions retain their
-buffers; changed bounds, rows, objectives and component joins replace the affected
-component snapshots. Namespace remaps and semantic-scope changes require fresh
-bindings. The later model-facing LP consumers instantiate their own mutable owners
-from these definitions; see [LP preparation](17-linear-programming.md#exact-source-row-projections).
-A no-op preparation preserves the canonical model handle. Compatible projections
-share the completed immutable finite-template seed for the later engine bake. That bake rebinds the
-index to its own source and checks its current bounds before reuse.
-Template construction spends the same containing allowance, and unfinished preparation
-publishes no reusable state. Template reuse changes assembly work, not pass admission,
-probe selection, reconstruction guarantees or source authority.
+harvest and the consuming workers; disabling templates keeps those LP calls and their
+allowances but skips template capture and use. Harvest eagerly prepares compatible
+immutable source-row and exact-bound templates, and the selected projections carry
+them across finite rebuilds: unchanged definitions keep their buffers, changed
+bounds, rows, objectives and component joins replace the affected component
+snapshots, and namespace remaps and semantic-scope changes require fresh bindings.
+Later LP consumers instantiate their own mutable owners from these definitions; see
+[LP preparation](20-linear-programming.md#exact-source-row-projections). A no-op
+preparation keeps the canonical model handle, and the later engine bake rebinds the
+shared finite-template seed to its own source and checks its current bounds before
+reuse. Template construction spends the same allowance, unfinished preparation
+publishes no reusable state, and reuse changes assembly work only, not pass
+admission, probe selection, reconstruction guarantees or source authority.
 
 The round-boundary diminishing-return check counts live factors plus integer-domain
-endpoint spans. Incremental and rebuilt hosts use the same nonnegative measure,
-saturating spans and totals at `Long.MAX_VALUE`; saturation can hide reductions.
-The default abort fraction is 0.001. This structural heuristic supplies no runtime
-guarantee.
+endpoint spans, saturating at `Long.MAX_VALUE` in incremental and rebuilt hosts
+alike, so saturation can hide reductions. A round below the abort fraction (0.001 by
+default) ends iteration; this structural heuristic supplies no runtime guarantee.
 
 | Family | Passes |
 |---|---|
@@ -85,75 +80,68 @@ guarantee.
 `PresolveEmphasis` selects elective cost tiers: `off` disables them, `conservative`
 applies the cheap tier once, `default` iterates cheap and moderate tiers to a
 fixpoint and `aggressive` adds exhaustive probing, all within 16 rounds. Passes can
-be enabled or disabled by name, but a pass that would break the query's required guarantee stays
-disabled. Explicitly enabling a problem pass under `off` gives both schedules the
-default round cap; an explicit zero round cap still suppresses those schedules.
-Planned: component presolve reduces and solves each independent component separately.
+be enabled or disabled by name, but a pass that would break the query's required
+guarantee stays disabled. Explicitly enabling a problem pass under `off` gives both
+schedules the default round cap; an explicit zero round cap still suppresses them.
 
 ### Rewrite representation controls
 
-`AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
-tries the smallest rewrite payload among an equality's unit pivots first. It sums
-the current incident factors' `structuralKeyWeight`,
-excluding the definition, through the maintained occurrence index. Ties retain
-declaration order. Scoring charges and polls the phase allowance and never builds
-factor keys or speculative replacements. The ordinary admissibility, domain,
-objective and reconstruction checks apply to the preferred pivot; a rejected pivot
-falls back to the first admitted declaration-order pivot. An equality without an
-admitted pivot performs no payload scoring. This opt-in estimate
-describes construction size; active downstream search still determines total cost.
-The same policy can fold an asserted integer definition through word-sized
-`ReifiedLinear` consumers. The replacement retains the channel's Boolean output
-and comparison in both directions; conditional equalities never supply asserted
-pivots. Coefficient checks, the per-row absorption cap and carried domain bounds
-apply to these consumers as they do to unconditional rows. Single-partner unit
-translations and sign reversals also retain native `ComparisonClause`
-disjunctions, translating every affected bound and reversing inequality direction
-for negative scale. Unrepresentable bounds decline the pivot. Clause analysis
-charges and polls the same allowance without allocating prospective factors.
-Other pivot policies retain their consumer admission.
+Affine elimination orders pivots by estimated fill (Markowitz) by default.
+`AffinePivotOrder.REWRITE_COST` keeps that order between definitions but tries an
+equality's unit pivots by smallest rewrite payload: the sum of the current incident
+factors' `structuralKeyWeight`, excluding the definition, read through the maintained
+occurrence index, with ties in declaration order. Scoring charges and polls the phase
+allowance and never builds factor keys or speculative replacements. The ordinary
+admissibility, domain, objective and reconstruction checks apply to the preferred
+pivot, a rejected pivot falls back to the first admitted declaration-order pivot, and
+an equality without an admitted pivot is not scored. The estimate describes
+construction size; downstream search still determines total cost.
 
-`PresolveConfig.preserveStructure` is an opt-in performance control for affine and
-structural reduction. Structured factors are all factors except plain `Linear`
-and `Clause`; binary partition rows have equal nonzero coefficients and right-hand
-side over declared integer bounds within `0..1`. Affine elimination protects every
-integer coordinate of these factors, including aliases and exact objective
-translations. Structural reduction retains these factors. Unrelated linear
-reductions remain eligible. These controls do not change correctness admission,
-query guarantees or source reconstruction, and do not suppress other passes.
-Protection discovery charges and polls the phase allowance; an incomplete discovery
-publishes no affine elimination.
+The same policy can fold an asserted integer definition through word-sized
+`ReifiedLinear` consumers, keeping the channel's Boolean output and comparison in
+both directions; conditional equalities never supply asserted pivots, and coefficient
+checks, the per-row absorption cap and carried domain bounds apply as for
+unconditional rows. Single-partner unit translations and sign reversals also keep
+native `ComparisonClause` disjunctions, translating every affected bound and reversing
+the inequality for a negative scale; an unrepresentable bound declines the pivot.
+Other pivot policies keep their consumer admission.
+
+`PresolveConfig.preserveStructure` is an opt-in performance control. Structured
+factors are all factors except plain `Linear` and `Clause`; binary partition rows
+have equal nonzero coefficients and right-hand side over declared integer bounds
+within `0..1`. Affine elimination protects every integer coordinate of these factors,
+including aliases and exact objective translations, and structural reduction keeps
+them; unrelated linear reductions stay eligible. Protection discovery charges and
+polls the phase allowance, and an incomplete discovery publishes no affine
+elimination.
 
 `structuralImpactLimit` enables a bounded delta view for affine, structural and
-extensional reductions. Support counts cover discrete Boolean and integer inputs.
-Each factor, support entry, declared row term and affine
-reconstruction dependency visits and charges the containing phase allowance.
-The cap is per productive invocation, including both sides and reconstruction;
-zero disables all diagnostic scans. Counts describe removed and added factors,
-structured factors, binary partition rows, mixed Boolean/integer factors, Table
-cells, support width, integral declared linear nonzeros and equality definition
-inputs. Table cells use their stored array length without scanning the payload.
-Non-integral or wide declared rows are explicitly uncounted. Affine reconstruction
-reports definitions, input edges and maximum recovery depth, with scratch space
-bounded by the visit cap. A partial view carries `Complete=0`; a diagnostic stop
-retains the already completed sound delta. Its visits join the invocation's work.
-Counters are sparse: an absent counter is zero only in a complete view; an absent
-view is unobserved, and a partial view cannot establish a zero count.
+extensional reductions; zero disables all its scans. Its visits, capped per
+productive invocation including reconstruction, charge the containing phase
+allowance. It counts removed and added factors, structured factors, binary partition
+rows, mixed Boolean/integer factors, Table cells, support width, integral declared
+linear nonzeros and equality definition inputs (non-integral or wide rows are
+explicitly uncounted), and reports affine reconstruction definitions, input edges and
+recovery depth. A partial view carries `Complete=0`, and a diagnostic stop keeps the
+already completed sound delta. An absent counter is zero only in a complete view; an
+absent view is unobserved, and a partial view cannot establish a zero count.
 
-Mixed-factor incidence is a channel proxy; support width is a potential explanation
-scope; equality inputs and reconstruction depth describe potential definition-cone
-changes. They do not establish a worker's installed channels, actual reasons,
-maintained local-search sweep or emitted LP nonzeros. Those consumers retain their
-own admission and runtime statistics. A smaller representation alone does not
-qualify a default policy change.
+These counts are proxies: mixed-factor incidence for channels, support width
+for explanation scope, equality inputs and depth for definition cones. They
+do not establish a worker's installed channels, actual reasons, local-search
+sweep or emitted LP nonzeros. Neither `preserveStructure` nor the impact view
+changes correctness admission, query guarantees or source reconstruction, or
+suppresses other passes. A smaller representation alone does not qualify a default
+policy change.
 
 ## Guarantees and source mappings
 
 `PresolvePass.guarantees` separates equisatisfiability, objective preservation,
 witness reconstruction, bijection and complete coverage by reconstructed source
-assignments. Objective preservation requires protecting objective columns or carrying
-an exact replacement objective with the factor delta. A satisfiability reduction can keep an optimum while losing source
-multiplicity, so successful reconstruction does not establish a bijection.
+assignments. Objective preservation requires protecting objective columns or
+carrying an exact replacement objective with the factor delta. A satisfiability
+reduction can keep an optimum while losing source multiplicity, so successful
+reconstruction does not establish a bijection.
 
 `SourceMapping` binds reconstruction to the actual source and reduced objects;
 composition requires one stage's target to be the next stage's source. Matching
@@ -191,8 +179,8 @@ preparation and protection-only objectives retain objective-column protection.
 mandatory integral equalities and unit pivots without rewriting the model or its
 objective. It combines coefficients and offsets in the same normalized objective
 units, declining checked overflow,
-open columns, approximate semantics and cyclic expansion. One attempt permits at
-most 4096 integer slots, 256 surviving terms, depth 16 and 32768 charged visits.
+open columns, approximate semantics and cyclic expansion. Each attempt is bounded
+in integer slots, surviving terms, depth and charged visits.
 Breadth-first selection assigns each defining row one pivot before expansion, so
 shared partners cannot reverse a row selected for another output.
 Conditional rows supply no definition authority. A failed or interrupted attempt
@@ -201,14 +189,14 @@ Default single-core mixed placement optimization can prepare a second finite vie
 with objective columns protected when affine substitution removed an objective
 coordinate. This elective preparation spends the remaining preparation allowance;
 its effort joins the invocation totals. The rewritten model retains complete-search
-ownership. The [portfolio](12-portfolio.md) uses the protected view only for checked
+ownership. The [portfolio](14-portfolio.md) uses the protected view only for checked
 local-search proposals over a compatible discrete namespace.
 Finite holes and projected hints follow the same reconstruction as factor substitution.
 Independent source evaluation checks the composed adjustment against reconstructed
 witnesses. A mapping never issues a proof certificate. Optional
 `SourceMapping.captureSolve`, `captureMinimize` and `justification` retain reduced
 evidence and typed obligations for
-[original-source derivations](13-evidence.md); a transformed terminal cannot gain
+[original-source derivations](16-evidence.md); a transformed terminal cannot gain
 original admission from a reduced label, and original-source witness checking
 remains required.
 
@@ -227,266 +215,155 @@ These results carry diagnostics only, with no search publication or terminal.
 
 ### Private worker qualification
 
-`rootRebuildCaptureVisits` enables a bounded propositional opportunity view inside
-root simplification. Zero disables it. The view accepts only a baked Boolean clause
-model at an unconditional, consistent fixpoint. Assumptions, scoped assertions,
-conditional cutoffs and unfinished propagation supply no global authority. It compares
-the baked root with the current root over the identical canonical factor objects,
-separating newly fixed columns and stable-ID clause removal/shortening from newly
-eligible elimination candidates. For an unfixed column with positive/negative
-occurrence counts `p` and `n`, the diagnostic requires `0 < p + n` and
-`p * n <= p + n`. It counts only candidates that failed that bound at the baked
-root. This is a sufficient clause-count proxy for a single elimination, not a
-resolvent construction, literal-growth bound, admission decision or prediction of
-search savings. Objective preservation, other pass families and learned-clause
-remapping require separate qualification. Learned clauses are excluded from this
-canonical-source proxy; retaining them can increase elimination and import costs.
-
-The capture shares root-class and containing inprocessing work, cancellation and
-overspend debt. A scan charges initialization, factor/literal/column visits and
-disposal; it withholds all candidate totals on an incomplete view. Four temporary
-arrays use `18 * columns` modeled primitive bytes, excluding headers and allocator
-overhead, with columns bounded by one tenth of the visit cap. No array survives
-the call. Repeated complete views are observations, not distinct opportunities.
-An unsupported or partial observation cannot establish absence of opportunities.
-
-Qualification of a replacement worker requires the following authority and ownership
-contract. The diagnostic itself creates no replacement or publication authority.
+A private rebuild lets a single-core clausal satisfaction worker continue on a
+reduced private copy of its source while the canonical worker keeps its state.
+`rootRebuildCaptureVisits` first enables a bounded propositional opportunity view
+inside root simplification; zero disables it. The view accepts only a baked Boolean
+clause model at an unconditional, consistent fixpoint, since assumptions, scoped
+assertions, conditional cutoffs and unfinished propagation supply no global
+authority. Over the identical canonical factor objects it separates newly fixed
+columns and clause removal or shortening from newly eligible elimination
+candidates: an unfixed column with positive and negative occurrence counts `p` and
+`n` qualifies when `0 < p + n` and `p * n <= p + n`, counted only if it failed that
+bound at the baked root. This is a sufficient clause-count proxy for one elimination,
+not a resolvent construction, admission decision or prediction of search savings;
+learned clauses are excluded from it. The capture shares root-class and containing
+inprocessing work, cancellation and debt, keeps no array beyond the call, and an
+incomplete view withholds all candidate totals. An unsupported or partial
+observation cannot establish absence of opportunities, and the view itself creates
+no replacement or publication authority.
 
 Direct backtrack parameters default to zero private work. Ordinary single-core mixed
-clausal satisfaction enables one automatic private trial within the source-size bounds
-below. Explicit work settings, worker counts, recipes, heuristic edits and source
-annotations retain their selected policy; enumeration, optimization and an explicit
-Boolean proof-task request do not activate it.
-The automatic source default owns a 4,194,304-byte modeled private grant, separate from
-canonical learned-memory scratch. An explicit `private-rebuild-bytes` sets that private
-grant; otherwise an explicit learned-memory scratch setting also bounds the private
-trial. Direct parameters use `privateRebuildBytes`, falling back to
-`learnedMemoryScratchBytes` when null.
+clausal satisfaction enables one automatic private trial within fixed source-size
+bounds; explicit work settings, worker counts, recipes, heuristic edits and source
+annotations keep their selected policy, and enumeration, optimization and an
+explicit Boolean proof-task request do not activate it. The automatic default owns a
+fixed modeled private byte grant separate from canonical learned-memory scratch:
+`private-rebuild-bytes` sets it, otherwise an explicit learned-memory scratch setting
+also bounds the trial; direct parameters use `privateRebuildBytes`, falling back to
+`learnedMemoryScratchBytes`. `privateRebuildWork=-1` selects that automatic parity
+admission with a fixed cumulative work grant: its first unconditional root performs
+one funded source scan, and admission requires a completed basis of rank at least
+128 covering at least half the source clauses (mixed views also need 16 free
+coordinates). A miss keeps canonical traversal without root-pin elimination or
+learned-equivalence retries. Zero disables trials, and positive values fund bounded
+manual trials.
 
-An explicit `privateRebuildWork=-1`
-selects automatic parity admission with a cumulative 4,194,304-work grant and the
-configured scratch grant. It considers only Boolean satisfaction sources with
-128–2,000 columns and 512–32,768 factors. Its first unconditional root performs one
-funded source scan; admission requires a completed basis of rank at least 128 and
-coverage of at least half the source clauses. Mixed views additionally require at
-least 16 free coordinates; complete affine views retain their rank and coverage
-admission. A miss retains canonical traversal
-without root-pin BVE or learned-equivalence retries. Explicit zero disables this
-mode; positive work settings retain their bounded manual trials.
+A trial starts at an unconditional consistent root: it pauses canonical traversal,
+simplifies a private copy with global pins and applies bounded source reductions with
+typed reconstruction. The new baked model has a fresh identity, mappings compose
+through the pinned, eliminated and baked objects, and column slots stay stable.
+Unchanged immutable clauses are kept by reference and changed rows are copied, so
+plain-Boolean classification is preserved; each baked model owns its projection,
+watches and search state. A consumer opens only after an actual elimination, newly
+proved parity pins or a completely covered affine view. Assumptions, external
+components, arithmetic and LP-enabled workers keep their canonical traversal, and
+enumeration and optimization never use a trial.
 
-`privateRebuildWork` funds bounded private Boolean satisfaction trials. An
-unconditional consistent root pauses its canonical traversal, simplifies a private
-copy with global pins and applies bounded source reductions with typed reconstruction.
-The new baked model has a fresh identity; mappings compose through the pinned,
-eliminated and baked objects. Column slots remain stable. A consumer opens after an actual elimination, newly proved parity pins or a completely covered affine view. Assumptions, external components, arithmetic and LP-enabled
-workers retain their canonical traversal. Enumeration and optimization do not use
-this trial.
+A trial follows global root pins beyond the baked root and the last attempted view,
+or owned learned binary equivalences. An unchanged root performs no elimination and
+keeps its completed miss, and an insufficient grant skips the root-pin scan. All
+attempts share one cumulative preparation, trial and checking allowance. Root-pin
+elimination admits only a non-growing raw resolution shape, measured with saturated
+occurrence counts and parent literal volumes; tautology and duplicate savings can
+make other pivots useful, so a refusal establishes no absence of opportunities.
+Refused columns stay protected for that view, and elimination is restricted to the
+initially admitted columns, so an unrelated declined pivot cannot consume the
+allowance. When one column is admitted, the pass works on its complete
+incident-clause neighbourhood, which commutes with the untouched rows, and transports
+dropped local factor indices back to the full source; an incomplete scan publishes no
+view. Elimination receives half the allowance left after source and neighbourhood
+preparation; its local cap keeps complete earlier pivots, and cancellation of the
+containing call declines the generation. Baking, opening and canonical checks share
+the remainder, and reconstruction charges the larger of the source-entry model and a
+bound covering every composed sample copy and eliminated-clause replay.
 
-Source preparation retains unchanged immutable clauses by reference and copies
-shortened or substituted rows. Column counts stay identical, preserving the clauses' plain-Boolean
-classification. Each new baked model owns its projection, watches and search state;
-the shared factor input carries no mutable search state.
+#### Parity views
 
-A trial follows global root pins beyond the baked root and the last attempted
-view, or owned learned binary implications proving two unfixed variables equal or complementary.
-An unchanged root performs no BVE. The root-pin scan charges its full
-column visit count and records its time; an insufficient grant skips the scan.
-An unchanged root trail retains a completed miss. All attempts share one
-cumulative preparation, trial and checking allowance. Root-pin trials use a bounded admission scan that
-uses saturated occurrence counts and parent literal volumes over the residual
-clauses. It admits a non-growing raw resolution shape: a single parent on one
-side satisfying `n * (w - 2) <= w`, or two parents on each side with total width
-at most eight. Tautology and
-duplicate savings can admit other useful pivots, so a proxy refusal establishes
-no absence of opportunities. Width and per-pivot budgets still apply. Temporary
-arrays own `24 * columns` primitive bytes inside the declared admission model;
-initialization, disposal and visits consume the containing allowance.
-The scan retains a protected-column set for every refused shape inside that
-model. BVE restricts this trial to the initially admitted columns, so an unrelated
-declined pivot cannot consume its resolution allowance. Later opportunities among
-protected columns wait for a fresh root view. This selection is a heuristic, not
-an exhaustive elimination pass.
+A bounded source scan recognizes two- and three-column parity equations from their
+complete two- and four-clause Boolean encodings, over a global pin snapshot captured
+before grouping and bound to the immutable source identity; satisfied clauses are
+omitted and false literals removed from their keys. Each remaining clause excludes
+one assignment, and the complete parity class of exclusions entails the opposite
+parity equation. A preparation-only GF(2) matrix substitutes the captured pins and
+eliminates forward from higher source slots, then back-substitutes over its free
+coordinates. A pivot is globally forced only when its complete free-coordinate
+dependency cancels, and pins are emitted only after complete elimination; incomplete
+clause groups, duplicate exclusions and partial matrix work grant none, and a
+derived contradiction supplies no source refutation authority.  Complete absence
+of encoded rows parks the scan; a completed miss can retry after canonical global
+pins grow. The private model installs proved values as unit clauses and composes
+its reconstruction over the fixed source view; canonical search state stays
+unchanged. Closing or declining releases the snapshot with its generation.
 
-A bounded source scan can recognize two- and three-column parity equations from
-their complete two- and four-clause Boolean encodings. It captures the global pin
-snapshot before grouping clauses, omits satisfied clauses and removes globally
-false literals from their keys. Source column IDs remain unchanged. The same snapshot
-conditions the matrix and reconstruction. Each remaining clause excludes one assignment;
-the complete parity class of exclusions entails the opposite parity equation.
-A preparation-only GF(2) matrix substitutes the canonical global pins and uses
-forward elimination from higher source slots followed by affine back substitution
-over its free coordinates. Private column-to-row bitsets select pivots and restrict
-elimination to rows containing the pivot. Row swaps and XOR updates maintain that
-index; its primitive words, reference slots, initialization and visits spend the
-same modeled-byte and work grants. The index is discarded with discovery.
-This ordering favors earlier slots as free coordinates.
-A pivot is globally forced only when its complete free-coordinate dependency
-cancels. Additional Boolean pins are emitted only after complete elimination.
-Incomplete clause groups, duplicate exclusions and partial matrix work grant no
-additional pins. A derived contradiction supplies no source
-refutation authority.
+When every source clause belongs to a complete parity encoding, is tautological or is
+satisfied by captured global facts, the rebuilt model can replace the encoded
+equations with their free-coordinate view. A private pivot slot is fixed to a
+placeholder with no canonical literal authority, and reconstruction evaluates the
+owned affine basis from the free coordinates, preserving every source solution. The
+complete coverage proof is required before any encoded clause is dropped, and
+canonical learned clauses are withheld because their pivot literals lack a supported
+projection.
 
-The immutable source identity binds the captured pin snapshot. Its table,
-matrix and snapshot allocation, initialization, probes, elimination and publication
-consume the private work and modeled-memory grants. A dimension-only lower bound
-on source entries and table storage can refuse an unfunded source before allocation.
-Complete absence of encoded
-rows parks the immutable-source scan; a completed miss for new pins may retry
-after canonical global pins grow. The private model installs the proved values
-as unit clauses and composes its reconstruction over the fixed source view.
-Canonical search state stays unchanged. A changed fixed view can open a consumer
-without an additional BVE pivot; its pins are counted separately from eliminated
-columns. Closing or declining releases the captured snapshot with its generation.
+A mixed source instead keeps its uncovered clauses and replaces only proved parity
+encodings with short source equations and an independent reduced XOR basis, choosing
+per pivot the shorter of the triangular system row and its free-coordinate expansion
+so that local unit propagation survives. Coverage records each original clause's
+excluded assignment, so extra exclusions in an otherwise complete group remain
+constraints. Each replacement row has at most 64 coordinates; wider rows decline
+the row view. A funded mixed consumer owns a residual affine expression for every
+source coordinate: each independent assigned fact eliminates one free coordinate,
+zero residuals imply source values and contradictory values supply conflicts.
+Reasons have at most 64 literals, and wider pin reasons withhold the deduction.
+Undo or an interrupted update invalidates the cache, which rebuilds from the
+immutable seed and current assignments; the seed is shared, while each session
+owns its matrix and observations, and all updates spend propagation work. An
+unfunded joint view keeps the per-row system. Unlike the affine view, the mixed
+view keeps original coordinate meanings, including its live pivots, so it can keep
+supported canonical warm clauses through the fixed-value projection. For small
+spans the consumer branches on free coordinates by its own conflict activity,
+through a filtered view that preserves source IDs; pivots keep their meanings
+and propagation decides them, and larger spans keep the configured selector.
 
-When each source clause belongs to a complete parity encoding, is tautological or
-is satisfied by captured global root facts, the rebuilt model can replace the encoded equations
-with their free-coordinate view. Source column slots remain stable; a private
-pivot slot is fixed to a placeholder and has no canonical literal authority.
-Reconstruction evaluates the owned affine basis from the private free-coordinate
-values, preserving every source solution rather than choosing a source constant.
-The coverage scan charges every additional literal check. Reconstruction retains
-the captured global values that justify satisfied clauses. The complete coverage
-proof is required before dropping any encoded clause.
-Uncovered clauses prevent the placeholder view. Canonical learned clauses are
-withheld from the affine view because their pivot literals lack a supported
-projection. The containing grants cover the basis and reconstruction; every
-consumer point still reconstructs and checks the complete canonical source.
+#### Learned transfer
 
-A mixed source can retain its uncovered clauses and replace only proved parity
-encodings with their short source equations and an independent reduced XOR basis.
-A complete triangular basis retains the forward-eliminated matrix and its original
-right-hand sides. For each pivot the mixed view selects the shorter bounded equation
-from that system or its free-coordinate expansion. Distinct pivots and dependencies
-on lower coordinates keep the selected system complete, while short expanded rows
-retain their early deductions. Comparison, row choices, snapshot references and
-right-hand sides debit the containing work and byte grants.
-The source equations retain local unit propagation that expansion over free coordinates
-can weaken. Their compact captured encodings and materialized rows spend the same
-private byte and work grants. Coverage records each original
-clause's excluded assignment, so extra exclusions in an otherwise complete group
-remain constraints. Each replacement row has at most 64 distinct coordinates;
-unsupported widths decline the row view. Row arrays, coefficient projections and
-fresh worker indexes share the containing work and modeled-memory grants.
-A funded mixed consumer owns a residual affine expression for every source coordinate.
-Each independent assigned source fact eliminates one free coordinate from all expressions
-that contain it. The state owns flat coefficient and reason buffers with cached nonzero-word
-counts. Zero residuals imply source values; contradictory assigned values supply conflicts.
-Independent assigned facts supply clause reasons with at most 64 literals; wider pin reasons
-withhold the deduction. Undo or an interrupted update invalidates the cache, which rebuilds
-from the immutable seed and current assignments. Expression updates and checks spend the
-containing propagation-work grant.
-The immutable seed owns its snapshot, while each session owns its matrix and
-primitive observations. Buffer initialization and every scan, reduction and reason
-visit debit propagation work. A fresh session exposes its live propagation counter
-before its root fixpoint, so work during consumer opening shares the same private
-and containing stop conditions. Stopped opening work remains charged once. Modeled seed, matrix, observation and watch storage
-share the private byte grant after selector reservation; an unfunded joint view
-retains the per-row system. Retirement copies primitive observations before releasing
-the private state.
-The mixed view preserves original coordinate meanings, including its live pivots,
-and can retain supported canonical warm clauses through the fixed-value projection.
-Its reduced rows and covered clauses are counted separately from eliminated columns.
-For source spans fitting two scans inside the normalized per-decision charge, the
-private consumer prefers free coordinates with its own VSIDS conflict activity.
-A filtered branching view preserves source IDs and passes conflict and unassign
-notifications to that private heuristic. When no free coordinate needs a decision,
-source-order fallback retains every remaining pivot decision. Pivots retain their
-original meanings and propagation still decides their values. The membership mask
-and activity heap spend the modeled byte grant; their initialization spends opening
-work before allocation. A grant that funds the generation without that extra storage
-retains source-ordered free-coordinate selection. Fresh consumers own fresh activity.
-Larger spans retain the configured selector.
+A learned binary that closes a reciprocal source binary, or two owned binaries, can
+prove two unfixed columns equal or complementary. Only non-permanent global learning
+from the canonical worker qualifies; the capture binds its exact source object, owns
+its clauses and rechecks that both columns remain unfixed, and its consequences stay
+valid after the canonical entries are reclaimed. A signed substitution replaces the
+higher-numbered column by the retained one with `CopyLiteral` reconstruction, and an
+interrupted substitution publishes no view. Discovery is bounded per root
+observation, remembers a bounded history of attempted relations, and retries only
+after learned counts or compaction revisions change; exhausted scans establish no
+absence of other equivalences.
 
-A learned binary can close a reciprocal source binary, or two owned binaries can
-supply the pair. Only non-permanent global learning from the canonical worker
-qualifies. Discovery charges retained slot visits and skips logically retired entries
-before reading their literals. The capture binds its exact source object and owns its clauses; preparation
-rechecks that its columns remain unfixed. Global consequences remain valid after
-their canonical learned entries are reclaimed. The pinned source retains both
-owned premises. A signed substitution replaces their higher-numbered column with
-the retained column at the captured polarity and records `CopyLiteral` reconstruction.
-The premise objects must belong to that exact pinned source. Unchanged clauses
-retain their immutable buffers; affected clauses own normalized copies. Factor and
-literal visits, replacement construction and delta ownership consume the local
-pass allowance. An interrupted substitution publishes no changed view. Warm
-consequences follow the same signed reconstruction without changing canonical coordinates. Discovery visits recent learning first, scanning at most 128 eligible binaries and
-32,768 work units per root observation, inside the cumulative trial allowance.
-Reciprocal matching uses a temporary fixed-capacity key table and one source walk
-for the retained learned keys. Table initialization and probes consume discovery work.
-Changed learned counts or compaction revisions permit another scan. A fixed history
-remembers at most 32 attempted relations; its storage and 16 KiB discovery scratch
-consume the existing byte grant. Exhausted scans establish no absence of other
-equivalences.
+Unused elimination allowance can copy the canonical worker's non-permanent global
+learned clauses over Boolean source columns into the private model, after global pins
+remove satisfied clauses and false literals. A clause mentioning an eliminated column
+follows equivalent-literal substitutions and the actual elimination parents in order:
+a pure pivot's satisfying value lifts every projected model, and other pivots resolve
+with one shortest opposite-polarity parent, so each result is entailed by the projected
+source. Each input yields at most one bounded-width clause over retained columns;
+a tautological or wider resolvent withholds only that input, and an empty consequence
+declines the generation without source refutation authority. Copies own their
+buffers, share no learned-store indexes or exchange cursors, survive canonical
+forgetting, and an exhausted transfer grant keeps the completed subset.
 
-When one column is admitted, the pass indexes its complete incident-clause
-neighborhood. Outside rows contain no pivot literal and remain unchanged; resolving
-the pivot commutes with those rows. The neighborhood keeps canonical column slots
-and transports every dropped local factor index back to its captured full source.
-An incomplete scan publishes no view. Multiple admitted columns retain the full
-database path. Neighborhood scanning and index transport debit preparation, while
-the kernel retains its local pass cap.
+#### Private worker contract
 
-BVE receives half the allowance remaining after source and neighborhood preparation. Its local cap
-retains complete earlier pivots when later analysis stops; cancellation of the
-containing call declines the generation. Baking, opening and canonical checks
-share the remaining containing allowance.
-Private baking adapts the root engine's construction and propagation meter into
-that allowance; those visits join preparation work rather than remaining on an
-unobserved temporary root state.
-Opening reserves another construction visit count for the fresh consumer before
-allocating its state. Reconstruction charges the larger of the source-entry model
-and a bound covering all composed sample copies and eliminated-clause replay.
-The latter uses the actual reconstruction descriptors; repeated elimination can
-retain more replay literals than one source view contains.
-Mapping composition separately charges its descriptor copies during preparation,
-including trials that produce no witness. The descriptors add their modeled
-primitive/reference storage before composition and copied-learning admission.
-
-Unused BVE allowance can copy globally learned clauses into the private model.
-Only this canonical worker's non-permanent clauses over Boolean source columns
-qualify. Global pins remove satisfied clauses and false literals. A clause that
-mentions an eliminated column can follow equivalent-literal substitutions and actual BVE parent descriptors in
-elimination order. A pure pivot's satisfying value lifts every projected model,
-so substituting it preserves learned consequences. Other pivots use one shortest
-opposite-polarity source parent to derive a resolvent; each such consequence is
-entailed by the projected source. The transfer produces at most one clause per
-learned input and admits at most 64 literals per intermediate clause. A tautological
-or wider selected resolvent withholds that input, without excluding other useful
-translations. Every result contains only retained columns. An empty consequence
-declines the generation and grants no source refutation authority.
-
-Parent indexing, literal visits and normalization consume the transfer allowance.
-Final clause-input normalization reserves work from the resulting literal count
-before constructing its owned factor, including when resolution widens the input.
-Projection reserves 16 KiB of modeled scratch inside the remaining private byte
-grant; its temporary buffers are released after transfer. This reservation joins
-the conservative private peak model, including when a projection copies nothing.
-Each copied consequence owns its literal buffer and consumes the same
-work and modeled-memory grants; an exhausted local transfer grant retains the
-completed subset. The mapping composes through the enriched model's exact identity.
-These copies preserve consequences without sharing learned-store indexes or
-exchange cursors and survive canonical forgetting. Their work and time are
-preparation subsets; private baking and propagation include the added clauses.
-
-The private worker owns fresh watches, learning and search state. Canonical exchange
-cursors and pooled incumbent guidance stay with the retained canonical worker;
+The private worker owns fresh watches, learning and search state; canonical exchange
+cursors and pooled incumbent guidance stay with the retained canonical worker, and
 unsupported translations never attach to the private model. Every private witness
-reconstructs and completes a canonical clause check before publication. Partial
-checks retain their cursor across slices. Private refutations grant no canonical
-proof authority and resume the retained traversal. Declines and exhausted trials
-also resume it. Closing releases the private consumer, reconstruction and cursors
-after its final drains. Preparation, trial, reconstruction and checks consume the
-original containing deadline/work; cooperative overspend carries to later slices.
-Discovery and preparation debit the private coordinator's ledger. The canonical
-state's propagation and inprocessing counters retain its own engine visits.
-Converted private work joins consumer work in the containing slice budget and overspend debt.
-Retired consumers retain their converted decision and propagation work separately;
-the charged-work total includes preparation, trials and canonical checks.
-The scratch allowance gates a declared private buffer/reference-slot admission model;
-it excludes object headers, the canonical worker and allocator overhead. Physical
-overlap memory and total cost require separate measurement. Zero disables this
-unqualified trial policy.
+reconstructs and completes a canonical clause check before publication, with partial
+checks keeping their cursor across slices. Private refutations grant no canonical
+proof authority and, like declines and exhausted trials, resume the retained
+traversal. Closing releases the private consumer, reconstruction and cursors after
+their final drains. Preparation, trials, reconstruction and checks spend the original
+containing deadline and work, cooperative overspend carries to later slices, and the
+charged-work total includes all of them. The scratch allowance gates a declared
+private buffer and reference-slot model that excludes object headers, the canonical
+worker and allocator overhead.
 
 - A canonical source handle, its source scope, semantics and exact objective define
   publication identity. Only globally justified facts enter an updated source view;
@@ -503,7 +380,7 @@ unqualified trial policy.
   units decline import. Duplicate suppression and import cursors belong to their
   generation. A retained incumbent is checked in canonical coordinates and projected
   only through a supported inverse; failure leaves it advisory.
-- Immutable LP templates retain P3's namespace, raw/finite, scope, row, bound,
+- Immutable LP templates keep their namespace, raw/finite, scope, row, bound,
   objective and component compatibility checks. Mutable bases, factors, propagation
   queues, watches and search cursors belong to one worker. No live shared SAT arena
   is eliminated or remapped. Lost bases, cuts, phases, learned state and continuations
@@ -523,11 +400,10 @@ unqualified trial policy.
   retains them. Replacement requires bounded cancellable reclamation preparation and
   safe publication or an explicit defer/decline when the protected floor prevents it.
 
-The cost decision requires compatible actual consumers and the complete lifecycle,
-including reconstruction/checking, worker reopening, lost warm state, overlapping
-memory and obsolete-generation cleanup. Missing costs remain unobserved. A smaller
-model, template hit or successful scan establishes neither net benefit nor permission
-to enable rebuilding.
+A smaller model, template hit or successful scan establishes neither net benefit nor
+permission to enable rebuilding: the cost includes reconstruction and checking,
+worker reopening, lost warm state, overlapping memory and obsolete-generation
+cleanup, and missing costs remain unobserved.
 
 ### Finite reconstruction
 
@@ -613,7 +489,7 @@ Operations under containing controls preserve their cancellation token and forwa
 native charges unchanged, recording `nativeWork` separately from phase units.
 Observation neither reprices that work against the elective allowance nor renews
 it; the temporary recorder restores the containing meter on exit. The
-[CLI statistics](20-cli.md#statistics) expose bounded lane/pass/outcome and
+[CLI statistics](24-cli.md#statistics) expose bounded lane/pass/outcome and
 preparation-stage summaries of this ledger, including preparation-only requests.
 
 Stop observation reuses a directly observed token only for its owning budget and
@@ -621,440 +497,6 @@ records interruption on the active invocation at polling time. Composed tokens k
 their added predicates even when their meter is shared. The source pipeline binds
 the elective phase allowance; required encoder selection keeps the containing token.
 
-## Selected reductions
-
-The passes listed under [Pipeline](#pipeline) share the guarantees above. Candidate
-and term visits charge and poll the pass token under bounded scans. Interruption
-retains completed sound reductions and discards unfinished analysis. The following
-families describe the premises and preservation guarantees of those reductions.
-Both lanes poll after entry charging and meter factor, column, term, signature
-and rewrite visits. Bound fusion, duplicate-column and subsumption scans accumulate
-those charges and poll at bounded checkpoints. Native allowance-backed scans reserve
-credit before advancing and settle used credit at publication and exit. Standalone
-scans poll immediately at entry and before publishing.
-Duplicate-column aggregation, bound fusion and source duplicate/domination
-indexing discard unfinished transactions. Structural reduction
-retains only fully collected factor rewrites and their bound tightenings; factor
-hooks and structural-key construction remain atomic.
-
-### Linear reductions
-
-Coefficient strengthening divides an integral row by its coefficient gcd and rounds
-the bound inward; an indivisible equality refutes the source. Bounded integer
-inequalities can also clamp coefficient magnitudes against the complementary cover
-threshold. Magnitudes, shifts, widths and activities use checked arithmetic; an
-overflow declines the lift and retains any completed gcd reduction. Activity and
-clamp eligibility are scanned without term-sized scratch; output arrays are allocated
-only when a nonfixed coefficient exceeds the threshold. Diophantine tightening
-restricts each coordinate of `sum(a_i * x_i) = b` to its implied residue class,
-narrowing bounds and, in finite state, carving off-class values.
-
-Dependent-equality removal uses fraction-free elimination over unconditional exact
-integer, real and mixed equalities and refutes rationally inconsistent blocks. Tagged
-source coordinates keep the namespaces disjoint. Integral constants retain arbitrary
-width; finite binary64 constants are read as exact rationals and their denominators
-are cleared. Nonzero source feasibility tolerance excludes the pass wherever the slack can
-relax a row: always for a source without a float interpretation, and for a source that types
-its floats once it has a real coordinate. It drops only factors whose
-whole meaning is one redundant equality; conjunctions and relaxations can supply
-premises but remain intact. Binary partition equations retain their propagation and
-branching structure, including scaled equations equivalent to `sum(x_i) = 1` over
-declared integer bounds within zero and one. They still supply elimination premises.
-Guarded or disjunctive rows are excluded. Rows admit at most 4096 terms and 4096-bit
-constants, with at most 262144 entries across the block. Sparse elimination bounds
-row fill, total entries and intermediate product bit lengths by the same limits;
-an exceeded bound discards the unfinished elimination. Candidate and term visits
-charge the phase allowance. Interrupted elimination publishes no deduction.
-
-Sub-sum aggregation contracts a defining equality's partner terms to its output
-variable, retaining the equality. A unit pivot and two distinct integer partners
-are required; models with fewer than three integer columns skip entry analysis.
-Rarest-partner incidence and row widths bound
-candidate scans by indexed size and an absolute work cap.
-
-Opt-in `+sparsify` subtracts retained unconditional integer equalities from complete
-single-row factors, accepting only fewer nonzero terms. Positive target scaling
-preserves the comparison; no domain, objective or variable elimination is involved.
-Overlap incidence, width, ratio and checked coefficient-growth limits bound attempts.
-If every term cancels, a zero term represents the constant comparison.
-Both row-rewrite passes discard unfinished attempts and keep completed replacements
-with their unchanged equality premises.
-
-Bound fusion combines matching sides into an equality or refutes crossing bounds.
-These reductions preserve the solution set. Affine singleton elimination and
-singleton inequality projection require reconstruction; projection stays off for
-solution-set-sensitive queries.
-Unrepresentable affine constants, partner coefficients or carried-bound arithmetic
-retain the source definition. A residue projection whose numerator exceeds the
-signed word retains its equality, since division can still yield a representable
-source value. Partner spans must fit the bounded scan without subtraction overflow.
-Singleton projection meters occurrence construction, row specialization, candidate
-and rewrite scans through the invocation token in both lanes. It polls at bounded
-strides and before publishing each row with its reconstruction; an interrupted
-occurrence index supplies no projection, and completed rows survive a later stop.
-
-### Structural reductions
-
-Opt-in finite `+tuple-packing` replaces positive ground Tables partitioning one
-plain AllDifferent by Boolean placement choices. Each Table chooses exactly one
-distinct row; each occupied value has capacity one across all choices. When the
-value universe equals the scope size, every capacity row requires exact coverage.
-Rows with repeated occupied values or entries outside established root domains
-are excluded. Two groups requiring the same value refute the packing even when
-every scalar coordinate retains support. Cardinality propagation, Boolean branching
-and the ordinary core LP projection consume the shared incidence rows.
-
-The substitution requires exclusive coordinate ownership by the partition's Tables
-and AllDifferent, with stated bounds and no objective use, optional positions,
-exceptions or repeated roles. Other uses retain the original factors. Original
-integer slots are pinned; typed reconstruction reads their selected tuple before
-truncating fresh Boolean
-coordinates. Deduplicated rows give one Boolean extension per source assignment,
-preserving solution multiplicity. Admission caps a scope at 4,096 coordinates,
-retained choices at 65,536, tuple cells at 262,144 and construction at 1,048,576
-charged visits. Interrupted construction publishes no partial substitution.
-
-Opt-in `+extensional` preserves shared tuples across ground Tables and MDDs. Table
-semijoins retain rows with a matching tuple on at least two shared columns. MDD
-composition intersects the diagram with a trie of the table's shared-column
-projection, in diagram order, retaining its edge weights and cost coordinate.
-Private table columns stay in the original table. The composed diagram uses ordinary
-MDD filtering and explanations; every restriction follows from unconditional source
-factors, independently of transient domains. Repeated roles and interval tables
-decline this mechanism.
-
-Three ground Tables can also transmit a cycle through columns outside a target
-Table. Each neighbor is indexed by its target columns and the remaining shared
-columns. A target row survives exactly when the two neighbor support sets
-intersect. This streams the completed three-relation join projected back into
-the target, without materializing joined rows or adding search-time state.
-Surviving target rows retain every private column and duplicate occurrence;
-other factors, including AllDifferent over private indices, remain constraints.
-Omitted columns outside the three Tables overapproximate their wider cluster:
-a surviving row certifies support only in these three relations, never source
-satisfiability. Assumptions and transient domains supply no premises.
-
-A call attempts at most 64 cyclic projections, each with 262,144 visits and
-65,536 stored key/support cells, including one cell per set entry. Scope selection,
-indexing, support intersections and row copies share the call allowance. Incomplete
-projections publish nothing. Ordinary Table propagation, explanations and undo
-consume completed restrictions; there is no retained cluster propagator.
-
-Each attempt admits scopes up to 64, tables up to 262,144 cells and diagrams up to
-65,536 states and 131,072 records. Product states and records have the same caps;
-an attempt has 2,097,152 visits, and a call has 8,388,608 visits and 1,048,576 retained
-cells. A metered variable-occurrence index selects overlapping tables. Visits charge
-and poll the invocation token; declined payloads incur no payload-wide entry charge.
-An unfinished intersection
-publishes nothing, while completed replacements survive a later interruption.
-Dead product states are removed before publication; a diagram already satisfying
-the projection stays unchanged, preventing repeated root products.
-
-Structural reduction calls each factor's `structuralReduce` hook under current
-domains; source execution restricts this to closed integer columns. Both lanes skip
-the final `Clause` type's unchanged hook before visiting its columns, retaining the
-factor-level charge and cancellation poll. Other factor types retain their hooks.
-Ground tables with at most 4096 tuples allocate survivor storage on the first rejected tuple,
-copying the retained prefix once; unchanged tables keep their tuple payload.
-Redundancy and subsumption use indexes maintained across rounds. Duplicate removal and index
-retraction identify stable factor occurrences, so repeated references to one immutable
-factor retain one representative. Clique-implied subsumption admits
-only unconditional positive Boolean knapsacks and derives activity bounds from
-retained clauses/cardinalities, so a dropped row cannot justify its own removal.
-Strict-subset domination uses checked arithmetic for extra activity and scaled
-bounds; an overflowing attempt supplies no reduction. Its independent `subsume-subset`
-observation excludes cheap duplicate drops. Equal support widths skip comparisons;
-an anchor-incidence index selects smaller rows. Source and finite rounds retain
-completed comparisons and resume interrupted scans. Changed rows or activities
-invalidate affected comparisons; unrelated changes leave them cached.
-Normalized rows are kept per factor occurrence across calls. Each call admits widths
-up to 128 and at most 65,536 normalization and comparison visits, retaining at most
-65,536 failed pairs; upkeep linear in the current rows and candidates is charged
-outside that cap, so bounded calls over an unchanged model reach their comparisons.
-Completed drops survive interruption.
-
-Comparison-clause folding combines sole-use reified indicators into one comparison
-disjunction. It requires both Boolean and integer columns before entry accounting;
-unrelated real or open columns do not exclude integer comparisons. Finite preparation
-leaves a clause reified in its source and finite rounds when
-[binary-column substitution](#binary-integer-channels) would convert a 0/1 column one
-of its comparisons reads: that comparison is a Boolean literal of the column, which
-substitution keeps in the clause lane for search and learning, while the folded clause
-would hold the column in the integer lane. Comparisons over columns substitution
-cannot convert still fold. Explicit `+comparison-clause` folds every clause; open
-preparation substitutes no columns and always folds them.
-Reconstruction restores their truth after integer reconstruction and
-before source checking, and excludes them from direct search/definition hints.
-Duplicate-column merging replaces matching linear columns by their representable
-sum; an unrepresentable sum declines the merge, and a call that declines every
-merge leaves the model unchanged. Reconstruction computes the feasible split
-interval and difference exactly, including at extreme source endpoints, and undoes
-successive folds last first.
-Dual fixing selects a bound when neither occurrences
-nor the objective prefer the opposite direction. These change the solution set.
-
-Boolean cover dominance extends dual fixing: a positive-cost unfixed Boolean read
-only by positive unconditional cover clauses can be pinned false if a strictly
-cheaper nonnegative-cost column covers every one of its clauses. Other readers,
-unit pins and finite root fixings exclude either column. Bounded incidence indexing
-and exact subset checks select replacements; incomplete indexing publishes nothing.
-Strictly decreasing costs make replacement chains acyclic, preserving an optimum.
-Like dual fixing, this rule is excluded from complete-coverage queries.
-
-Opt-in finite `+table-substitution` excludes an integer value when a strictly
-cheaper value preserves every complete tuple of every reader. Only unconditional
-ground Tables with distinct coordinate roles qualify; channels, posted breaks and
-other readers exclude the coordinate. Both values belong to the captured root
-domain, including its holes and opening pins. Exact linear coefficients determine
-strict descent by ordering values, avoiding product or difference overflow.
-Every excluded value reaches a retained cheaper replacement through an acyclic
-chain. Substitutions preserve all other coordinates and the optimum; identity
-reconstruction keeps source witness checking and objective units unchanged.
-
-This restriction belongs only to the captured optimization model, objective and
-assumptions. Fresh objectives or pins require fresh preparation. It supplies no
-source-feasibility nogood and stays disabled for feasibility and complete-coverage
-queries, including counting, enumeration and sampling. Admission permits 4,096
-integer columns, candidate spans of 64 integers, Table scopes of 64 and payloads of
-65,536 cells. At most 65,536 reader entries and 262,144 charged visits cover
-occurrence construction, candidate pairs, tuple-cell comparisons and domain copies.
-An unfinished call publishes no exclusion; its work remains charged.
-
-### Boolean reductions
-
-Opt-in `+clause-subsume` removes a clause implied by a retained subset and shortens
-clauses by self-subsuming resolution. It indexes clean Boolean clauses of width at
-most eight, with separate candidate and literal visit caps. Completed edits remain
-equivalent against the live database, preserving every assignment and objective,
-including arithmetic-shared columns; counting needs no reconstruction.
-
-Implication harvesting probes live, unfixed Boolean candidates; an empty set builds
-no probe root. Mutual-implication cycles merge representatives and transitive binary
-clauses drop. Interrupted reachability restores candidate edges, and unfinished SCC
-discovery publishes no merges.
-
-Bounded variable elimination resolves an objective-free Boolean occurring only in
-clean clauses when neither distinct clause count nor literal volume grows. Each
-pivot is bounded to 4,096 pairs, width 64 and 65,536 visits; an unfinished pivot
-publishes nothing. A completed empty resolvent immediately refutes the model in
-either lane without materializing an empty factor, even if later work is cancelled.
-Blocked-clause elimination removes clauses whose resolvents on one literal are all
-tautologies. Each clause attempt is capped at 65,536 visits across candidates,
-opposite occurrences and literals; each visit charges and polls the pass token.
-Incomplete blocking checks keep their clauses, while completed removals retain
-their repairs. Both passes need witness reconstruction and can change source
-multiplicity. Their shared database construction charges and polls column,
-factor, literal and occurrence-index visits; interrupted construction publishes no
-database or rewrite. BVE also meters its stable initial degree ordering before
-attempting a pivot. Source and finite calls use the same pass token and work units.
-
-At-most-one merging replaces pairwise exclusions with a cardinality when at least
-two factors drop. Default clausal optimization retains exclusions for native SAT
-propagation and learning; `+amo-clique` or aggressive emphasis permits conversion.
-XOR unit derivation uses bounded GF(2) elimination and emits only forced values and
-refutations. Source units and established finite root pins substitute into signed
-parity rows before elimination, alongside fixed integer values. Constant odd rows
-refute even when no columns remain; interrupted collection or elimination publishes
-no deductions, and established pins are not emitted again.
-
-### Symmetry and probing
-
-Metered default finite satisfaction preparation runs one bounded integer-probing
-pilot before the finite rounds. Unmetered callers leave it unfunded. Its private
-incremental root retains completed exclusions across probes. The first 128 calls
-are funded; each failed probe funds another 32. Probes and repairs share this credit
-within the configured per-column and total caps, with a work stop at one eighth of
-remaining phase work or 50 million units, whichever is smaller. Bounds precede
-interior values. A completed refutation remains terminal; incomplete coverage
-records interruption. Explicit
-integer-probe overrides select the exhaustive tiers or disable the pilot.
-
-Symmetry breaking verifies candidate transpositions by remapping every factor, then
-orders verified orbits while protecting objective columns. Value precedence breaks
-value symmetry. Both lanes hold unread integer and Boolean columns fixed, including
-columns retained only for reconstruction. Value-orbit discovery ignores unread
-domains, and value pins and precedence chains use only columns with live factor
-readers. Value orbits intersecting an active objective column's domain stay fixed.
-Active-column scans charge and poll the pass token; an interrupted scan
-posts no break. Both passes stay off for solution-set-sensitive queries.
-
-The opt-in finite `objective-symmetry` pass runs before `symmetry` and admits
-variable permutations under the exact current replacement objective. Candidate
-colors combine root domains or Boolean fixings with signed objective coefficients;
-verification checks those declarations, every coefficient and the complete factor
-multiset. Constant offsets are invariant. Scalar orders additionally require each
-adjacent single transposition to pass verification, so a lockstep matrix orbit
-receives only the existing generator lex and stabilizer propagation. Value symmetry
-still protects objective domains. Protection-only contexts, real coordinates,
-source symmetry annotations and solution-sensitive operations decline this pass;
-pure local-search plans disable it. Default admission retains objective-column
-protection. Discovery and verification share the preparation allowance.
-
-Boolean probing retains failed-literal units and bounds implied by both polarities;
-integer and open-range probing extend this to bounds and holes. Compilation, incidence,
-row and graph visits charge and poll the pass token. An interruption retains completed
-unconditional deductions and retracts the active hypothetical branch. Candidate,
-entry and representation limits bound optional analysis, not solve time.
-Open-range probing caches its invocation meter and charges every visit exactly.
-Full cancellation polls occur at entry, root-row and hypothetical-branch boundaries,
-and within scans every 64 visits or 4,096 work units. An interrupted scan can spend
-at most one polling stride beyond a stop; hypothetical retraction always completes.
-Finite SAC ordering shares one lazy propagator-filtered integer incidence index per
-ordering call; fixed columns require no incidence. Interior-hole candidates follow
-present domain successors in ascending order, skipping accumulated exclusions without
-enumerating numeric gaps or materializing wide domains.
-
-Source probing and symmetry defer to finite preparation for closed discrete-only
-models. With real columns they may run in the source lane even when integer
-columns are closed or absent; generator lex and value-precedence chains remain
-finite-owned.
-
-### Pre-bake LP bounds
-
-The finite pipeline runs pre-bake LP bound tightening when a factor couples two
-nonfixed integer columns whose spans exceed the large-span threshold, or couples a
-wide integer column to a continuous one. It queries at most 64 columns, widest
-first, and every accepted tightening requires an LP bound
-([numerical or exact](17-linear-programming.md#numerical-and-exact-deductions)).
-
-### Binary integer channels
-
-Binary-column substitution turns single-variable reified relations over a 0/1
-integer into Boolean equivalences when every reader supports the replacement,
-reusing an existing channel literal where one exists. General reified rows,
-value-reading globals keep their integers. Exact finite optimization first exposes
-0/1 integer costs as a Boolean objective, reusing signed comparison literals or
-adding exact equality channels. Fixed costs enter the constant when representable; signed coefficients coalesce
-exactly. A fresh positive channel retains the source coefficient when signed reuse
-or a constant shift exceeds the objective's storage width. Mixed
-integer readers retain their columns and channels. Substituted values are
-reconstructed from their literals, preserving original costs and source coordinates.
-The rewrite-cost policy also projects binary costs within a mixed integer
-objective when existing signed channels carry them exactly. It retains nonbinary
-costs and any binary cost whose channel reuse would overflow, protecting their
-integer columns from substitution. This mixed view adds no Boolean channels and
-does not carry the pure binary-objective LP admission marker.
-Continuous models, approximate semantics and solution-set-sensitive invocations
-retain their objective form.
-
-## Source routing and encoder selection
-
-Routing attempts bound closure before declining nonlinear composition. Proved bounds
-preserve declared holes and factor identities; surviving open sides remain
-arithmetic-owned and unrelated finite globals retain their finite owner.
-Invocation-local pins never become permanent source bounds.
-
-Optional passes and bound closing run under the presolve phase token, while required
-component installation runs under the containing invocation token. Exhausting the
-phase can forgo reductions, but never skips a required encoder or turns an uncovered
-source into a supported fragment. Source rewrites reselect encoders against the new
-canonical factors; original value sets, reconstruction and assertion premises stay
-authoritative after selection.
-
-An unchanged source can reuse its captured open component plan only with the
-identical model object and factor-projection binding. A certified source deletion
-can retain built-in descriptors and completed immutable linear or difference rows
-through an ordered retained-factor mapping. Declarations, source coordinates,
-semantics, settings and implied flags must agree, and reconstruction must be empty.
-Ownership and complete-fragment admission are rebuilt against the reduced source;
-retained rows receive its factor attribution while sharing immutable variable
-metadata and condition snapshots. Private real auxiliaries, conditioned rows,
-custom providers, changed dependencies, different bindings and resource
-declines require fresh preparation. Selection, row preparation and ownership have
-separate preparation observations. Each execution opens private search state.
-
-Factor-backed polynomial execution runs the same source-safe schedule before
-rebuilding polynomial ownership and encodings. Its typed source mapping reconstructs
-Boolean and integer coordinates before original-source checking and publication,
-including streamed optimization incumbents. Native formulas without a canonical
-factor view keep their native preparation; disabling presolve is accepted on every
-route, while individual reductions require their input representation.
-Original-source checking after reconstruction spends the containing arithmetic
-allowance and retains an already checked publication if later work stops.
-
-## Source witness validation
-
-`solver.validation` checks coordinates that no engine enforced against original source
-obligations: caller-supplied starting points, relations an engine cannot propagate or
-score, transformed float-grid points and arithmetic completions. Integer search trusts
-its own propagation and does not re-derive its leaves. A rejection refutes only the
-point, and an interrupted check is indeterminate.
-
-### Finite points
-
-`FinitePointCheck` makes the full Boolean and finite integer point the private root of
-a disposable propagation state and checks the selected original-source relations.
-Caller pins and deduced restrictions are checked on the point itself. Built-in
-propagators and occurrence indexes are shared across a checker's points. Prepared
-custom providers keep their selected factories and required original checks.
-Pure Boolean clause points use native clause propagation when the selected
-factories permit it, without constructing the general watcher index.
-Cancellation or an unavailable required check returns indeterminate, and every exit
-reports its propagation work to the caller.
-
-Local search checks the relations it cannot score this way before publishing a
-zero-violation candidate. A baked source with closed domains reuses one baked view of
-those relations; open declarations and values outside the declared domains get
-singleton domains for each candidate, so the relations alone decide it.
-Exact point checking also validates integer absolute-value and distinctness
-relations on authoritative arbitrary-width values. `AllDifferent` compares every
-present position, preserving presence-literal polarity and exempt values, and
-missing coordinates reject the point.
-
-### Open and real coordinates
-
-`verifyOpenWitness` checks discrete coverage, declared integer bounds and value sets,
-then every original relation touching a real coordinate, then projects the remaining
-discrete relations into a singleton-domain finite check. An unavailable real checker
-stays indeterminate. It invents no bounds for open declarations, and
-arbitrary-width integers go to their exact theory checker instead.
-
-`verifyRealCoordinates` checks authoritative rational coordinates against source
-bounds and supported exact relations, including strict and reified rows. Missing
-coordinates or a factor without a complete checker stay indeterminate; algebraic,
-symbolic and wide-integer checks belong to their specialized owners. Visits are
-charged to the caller, and rational powers compare normalized numerators and
-denominators, using bit-length bounds to refute impossible equalities before
-allocating.
-
-Finite real domains compare their captured binary64 literals as exact rationals. An
-isolated algebraic root matches a rational member when the literal lies inside its
-isolating interval and zeroes its defining polynomial, without opening a polynomial
-solver.
-
-### Projected and tolerance-qualified witnesses
-
-`verifyProjectedSourceWitness` combines original relation checking with integer
-declarations and a private composed fixpoint over captured descriptors. A caller
-callback can add a restriction but cannot replace relation coverage. Exact policy
-uses the full original real graph. Nonzero tolerance reads every relation over a real
-coordinate as [FlatZinc floats](04-finite-formats.md#flatzinc-floats) describe: rows
-and residual readings hold within the slack, while strict rows, disequalities and rows
-whose reifying Boolean is false hold exactly. A private-grid relation cannot
-certify its own original real relation; see
-[private float projections](02-model.md#private-float-projections).
-
-`finiteWitnessVerifier` combines the finite point check with exact real checking or
-the caller's explicit tolerance policy, checking pins and deduced bounds directly on
-the completed point. A tolerance callback requires complete finite real coordinates
-and does not change exact evidence semantics. See
-[model ownership](02-model.md#published-assignments-and-objectives) for coordinate
-lifetimes.
-
-Original linear checks use rational rows and declaration bounds before normalization.
-Relative slack keeps cancelling terms separate; integrality is exact. Accepted
-points record whether nominal relations also hold. Tolerance acceptance transfers
-no nominal proof and carries a separate floating-completion permission, withheld at
-zero tolerance. [MPS semantics](05-arithmetic-formats.md#tolerance-publication)
-defines the publication policy.
-
-### Dependencies
-
-The shared services depend on source and factor descriptions, propagation, neutral
-sample and verification contracts, exact rational arithmetic and model-facing exact
-row views. They do not depend on pipeline, portfolio, backtracking, local-search,
-evidence orchestration or concrete theories.
-
 ---
 
-Previous: [6. Sessions and resources](06-sessions.md) · [Contents](README.md) · Next: [8. Search and propagation](08-search.md)
+Previous: [6. Sessions and resources](06-sessions.md) · [Contents](README.md) · Next: [8. Presolve reductions and validation](08-presolve-reductions.md)

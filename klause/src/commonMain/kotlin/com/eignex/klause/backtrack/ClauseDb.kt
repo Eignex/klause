@@ -12,6 +12,8 @@ import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.storage.borrowBackingArray
+import com.eignex.util.collections.storage.primitiveCapacityBytes
 
 /** Reduce the learned-clause database at a restart without discarding permanent or glue clauses. */
 internal fun forgetIfOverCap(
@@ -95,11 +97,11 @@ internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
             sample.step()
             sample.owned(row, row.size.toLong() * Int.SIZE_BYTES, protected)
         }
-        val lbdData = lbds.backingData
-        val originData = origins.backingData
+        val lbdData = lbds.borrowBackingArray()
+        val originData = origins.borrowBackingArray()
         sample.owned(lbdData, lbdData.size.toLong() * Int.SIZE_BYTES, protected)
         sample.owned(originData, originData.size.toLong() * Int.SIZE_BYTES, protected)
-        sample.owned(dropped, dropped.allocatedBytes, protected)
+        sample.owned(dropped, dropped.primitiveCapacityBytes, protected)
     }
 
     override fun reset() {

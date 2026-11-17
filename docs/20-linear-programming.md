@@ -1,0 +1,693 @@
+# 20. Linear programming
+
+Finite relaxations, mixed-integer models and [linear theories](18-linear-arithmetic.md)
+share one floating revised simplex. Open theories always certify its results exactly;
+finite search and presolve accept them within tolerances for sources that declare a
+positive feasibility tolerance ([numerical and exact deductions](21-lp-engine.md#numerical-and-exact-deductions)). Model-facing
+adapters assemble source-aware rows; the engine solves and certifies them; consumers
+interpret the result in source coordinates. Shared search owns integer and Boolean alternatives.
+LP feasibility alone establishes no integrality.
+
+## Boundaries
+
+```text
+CP / COP, mixed-integer models, open theories, shared search
+                         |
+           model adapters, LpPropagator, effort policy
+                         |
+         exact model, bound trail, float solve, certification
+                         |
+       simplex.basis, simplex.exact, lp.lattice, util
+```
+
+[RevisedSimplex](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/RevisedSimplex.kt)
+is the floating implementation and
+[ProductionLpEngineFactory](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpEngineFactory.kt)
+the default factory. Production and unscaled rollback factories share construction
+with immutable scaling options; each constructed solver owns its numerical state.
+`ComponentLpSolver` composes independent blocks for solving and certification.
+`lp.engine` depends only on `util`, `simplex.exact`, `lp.lattice` and
+`simplex.basis`; model assembly, factors, propagation, presolve and search stay
+outside it, and consumers use interfaces and factories. See
+[system boundaries](01-introduction.md#system-architecture).
+
+Component discovery uses Util's dense disjoint set over structural columns sharing
+a row. Blocks retain first-seen column order; columns in no row stay outside child
+layouts and use their bounds directly.
+
+`lp.lattice` is a leaf over `util`, owning exact integer matrix reductions and
+triangular-block bounds. Its sparse fraction-free elimination polls cancellation
+between row combinations and after bounded chunks of support entries, charging
+only visited work. An interrupted reduction returns no rows, pivots, dependency
+indices or inconsistency claim.
+
+## Exact source row projections
+
+Native exact linear rows keep their rational source meaning independently of
+finite filtering and numerical emission. Compact coefficients use the integer LP
+builder; wider coefficients use an exact positive row normalization whose rational
+entries remain certificate authority beside the floating projection. A
+normalization that cannot project to finite nonzero floating values declines.
+
+Exact-linear preparation keeps templates for every source row and original column.
+Unconditional rows are installed up front; guarded, Boolean-dependent and
+disjunctive rows materialize when asserted, and a row enabled by an integer
+indicator records both bound premises and retires when the pin retracts. Bounds
+retract with the search scope while definitions stay available to siblings. These
+definitions supply no witness authority: publication checks the original rows.
+
+Compatible discrete preparation views retain immutable source-row templates and exact
+integer endpoint metadata through their selected projections. Compact rows retain
+canonical integer memberships and reusable coefficient buffers, reading primitive
+source constants at their declared width. Each build maps source coordinates into
+its own columns; the numerical builder copies coefficients into its private rows.
+Guarded rows read the current pin on every emission. Bounds, premises and numerical
+owners belong to the current build.
+Templates retain neither a basis nor a checked claim.
+Admission counts one row for an unconditional `Linear` factor; its coefficients
+are domain independent for fixed-layout planning.
+Within a feasibility-pump invocation, admitted preparation can retain its completed
+root assembly for later distance objectives. Reuse requires a compact discrete
+layout without auxiliary columns or row premises, cheaper objective mapping than
+completed construction, and a combined 262,144-unit storage ceiling. The invocation
+keeps its source and propagated root fixed. Shared finite domain tables require
+contiguous input domains and retain a bounded endpoint snapshot; changed bounds
+or holes retire the assembly before another objective consumes it. Stable source
+declarations need no repeated domain scan. Each objective gets private costs and
+a fresh numerical solver; preparation, declined mapping and interrupted work spend
+the same LP allowance. Pinning still realizes each proposal through propagation.
+Exact bound columns materialize only when an import needs them. Each endpoint
+definition retains one completed normalized column; changing an open upper side
+replaces the cached column without linking prior versions. Preparation reserves
+pending construction work and retained storage inside its existing ceilings;
+actual construction charges the consuming import. An already exact import retains
+its matching column directly, without constructing a duplicate definition.
+Completed and interrupted template preparation and import work also debit the owning
+LP allowance. Import reports its actual charges before publishing authority and
+rechecks cancellation after that debit.
+Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
+complete match against the current normalized column, including its origin, tag,
+integrality and both bound sides.
+
+Factor identity preserves a row definition; row rewrites replace it. Factor
+memberships retain their source integer and Boolean arrays without rebuilding a
+tagged list. Component construction folds repeated factor roles, and integer and
+Boolean coordinates remain distinct even when their numeric IDs coincide. Component
+snapshots retain their row definitions, exact endpoints, stated bound sides and
+objective coefficients. Unchanged row incidence retains the component partition.
+Bound or objective changes replace affected snapshots;
+joining rows replace merged components and retain unrelated ones. Explicit namespace
+remaps, changed dimensions or semantics and source-to-finite transitions reject the
+prior binding. A foreign source cannot use a prepared template index. Continuous,
+custom and unsupported projections retain their ordinary emission paths.
+
+Ordinary unchanged preparation validates ordered factor identities, integer endpoints,
+stated bound sides, the objective constant and every component cost before sharing
+the completed collections. Source-factor order indexes rows directly, and the
+integer-bound map indexes exact endpoints without component lookup maps.
+Component references retain the cost-coordinate
+order. A failed match uses selective reconstruction; a source revision alone cannot
+authorize reuse. The new source binding owns no predecessor snapshot, so repeated
+compatible preparations retain no generation chain.
+
+Earned selective reuse is the default source-preparation policy. Admitted
+preparation validates row identity and exact bound sides before retaining selective
+metadata and enabling pump assembly reuse. Node engines own their numerical
+component partitions. Ordinary node, primal and shaving consumers
+carry disabled, object, complete-index and admitted controls through
+objective-specific engines and standalone sparse admission. `LpPlan.sourcePreparation`
+selects this policy, and an explicit `LpConfig.sourcePreparation` overrides it
+without enabling numerical techniques. The finite pipeline carries the same choice
+through pre-bake LP checks and harvest before constructing the engine. Admitted construction
+first completes its LP without speculative metadata and marks the existing
+namespace token. A later completed consumer can allocate a 16-unit source-scoped
+record and accumulate construction work. The marker carries no work credit or
+numerical state. A preparation attempt spends
+no more inspection work than those completed builds supplied. Deferred exact columns
+debit the consuming LP when materialized; their potential storage remains within the
+262,144-unit ceiling. A failed attempt requires further completed construction
+before retrying; its inspection and replacement record still spend the current
+allowance. Admission work supplies no additional solver grant. Numerical recipe and
+repair eligibility ignore the preparation choice in an otherwise unchanged default
+plan. It neither creates an LP owner nor disables an LP-free proof path.
+Component-owned and admitted sparse-trial engines keep their explicit preparation
+route. LP harvest also eagerly prepares definitions for its later engine bake.
+Admitted ordinary consumers compile unary integer bound conditions into source rows.
+The stated source root bounds and the constructed column bounds must both imply a
+condition before the row is omitted. An open required side or a widened constructed
+bound keeps its row. Row and bound changes use the current source binding. Each
+check spends the current allowance. Regional, gated
+and component-owned root layouts retain their row definitions. A later consumer
+that can omit bound rows compiles missing conditions within its allowance, retaining
+unrelated row and endpoint definitions. Interrupted compilation preserves the last
+complete snapshot; repeated consumers reuse the completed conditions. Numerical owners and
+source row maps are assembled independently for the emitted rows.
+A selected view whose handoff checked
+ordered factor identities carries the same immutable layout token, so subsequent
+template preparations need no duplicate row scan. Other rewrites and explicit
+namespace remaps carry fresh tokens and validate their actual factor identities.
+Bound changes replace their exact objects and retain unrelated row and bound definitions.
+This mode retains no duplicate component partition or component-bound maps; numerical
+consumers assemble those definitions in their own layout. Template component observations
+therefore describe only the ordinary mode. Switching back to that mode constructs its
+partition before complete-index reuse. The selective mode's source definitions carry no objective authority:
+every assembly reads costs and the objective constant from its current objective,
+so changing that objective requires no source-template cost scan or replacement.
+Every templated mode can adopt compact integer bound columns during construction after
+checking the normalized origin, width, stated sides, integrality and source tag.
+Fixed-layout imports and retained source-fragment imports create no temporary exact
+column for a matching template. IEEE and retained exact-state imports keep the
+full exact-column compatibility check.
+An identical stable source-domain table authorizes endpoint metadata reuse without
+a repeated scan. Shared domain arrays require endpoint checks, including raw views
+carrying a finite session's table; model identity or type alone supplies no such proof.
+The ordinary mode retains its complete-match check. Both modes publish only completed immutable
+snapshots within the same containing allowance and storage cap. Admission records
+share those source/finite publication slots and keep no predecessor. Their capture
+and replacement debit the containing allowance before publication; cancellation
+withholds the record and the next consumer. Construction funding has its own phase
+observation and supplies neither a checked result nor source-acceptance authority.
+
+Template construction polls and charges the containing token, including failed
+attempts, and caps visits and retained storage at 262,144 modeled units each.
+An incomplete attempt publishes no snapshot. Compatible views share one atomic
+publication slot per source/finite scope, including temporary presolve bakes.
+`lp.relaxation.LpPreparationCache` owns retention, admission, construction funding
+and the inheritance mechanism; a selected factor projection carries its cache and
+decides which derivations inherit it.
+Engine views and unremapped projections inherit the namespace and slots, and only
+a view with checked ordered factor identities keeps the row-layout token. Appended,
+replaced or remapped selections start a fresh cache, so their factors never meet a
+predecessor's templates. Preparation and
+actual row/bound emission have separate observations in the existing LP phase ledger;
+they do not establish numerical result reuse or certified deduction consumption.
+Template observations accumulate fixed scalar totals per owning sink; immutable
+phase maps materialize at snapshot, retaining declined preparation work and observed
+zero emissions without a map allocation per consumer.
+Sparse-trial assembly uses the same source templates and keeps its own admission,
+factorization and certification allowances.
+
+Element hulls share an index-value selector across properties of the same integer
+index. Constant properties use one joint distribution, preserving their choice
+correlations; variable entries keep their bounded big-M links. Admission enumerates
+at most 1024 root choices within each array's index range, excluding root holes,
+and charges shared columns once against the aggregate LP size guard. Open source
+index bounds decline the hull. Selector presence follows live index membership;
+source definitions identify the index and value independently of the emitting
+factor or its array offset. Retained factor emissions reuse those definitions and
+may retain duplicate channel rows. Their row estimate remains conservative.
+Automatic admission treats all properties sharing an index as one candidate,
+declines incomplete groups and admits the smallest complete groups within the
+existing aggregate size budget. The ordinary small-hull threshold applies per
+group. Each engine applies its selected indexes to retained rebuilds; changing the
+objective resolves the caller's admission intent again. Root pruning removes a
+complete index group together.
+
+The objective-cone relaxation follows integer, Boolean and real objective support
+through supported linear and Boolean factors. Ordinary, exact and continuous rows
+extend the same closure; pinned real atoms and integer indicators retain their
+activation premises when emitted. Integer big-M reifications and optional hull
+families stay outside this projection. Disconnected rows are omitted, while a
+connected dominant component remains subject to the ordinary size and work guards.
+
+## Numerical authority
+
+The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
+integrality, origins, source premises, ordered basis and nonbasic statuses determine
+the problem. Floating factors, values and reduced costs are revision-keyed working
+state; pricing weights and progress traces are heuristic history and supply no
+admission, allowance or certificate authority.
+
+The model uses `[A | I] x = b` with bounded structural and logical columns.
+`ExactLpModel` supports arbitrary bounds and origins; re-centering changes bounds,
+RHS and objective constant together. Compact Long inputs keep authority beyond
+`2^53`, wider data uses rationals, and a Double input denotes its exact IEEE value.
+Projection to Double must not infer fixedness from equal rounded endpoints. The
+engine supports missing bound sides and FREE statuses. MPS decimal authority is
+separate; see [MPS semantics](05-arithmetic-formats.md).
+
+`LpModel` is the normalized form the floating simplex consumes: lower bounds shifted
+to zero, `>=` rows negated and logical columns appended over a Long core, with an
+optional binary64 view for real data and an optional exact working state.
+`authoritativeModel` imports it into `ExactLpModel`, keeping IEEE input bits.
+`ExactLpModel.toIntegerModel` goes the other way only for consistent, integral,
+non-strict data with zero lower sides, unit objective scale, no external objective
+constant and Long values carrying no IEEE provenance; LP capture uses that integer
+form.
+
+## Consumers, explanations and cuts
+
+Consumers decide when to request certified bounds, fixings, conflicts or witnesses
+and how to apply and retract them. Their policy stays outside the engine. Floating
+values used as guidance in this chapter (rounding targets, value preferences, source
+coordinates, scores, orderings, estimates and observations) supply no bound,
+witness, refutation or certificate authority, train no history unless stated, and
+leave ordinary search every alternative they reorder. The only floating authority
+is the numerical deduction mode and the source-tolerance acceptance of a leaf
+optimum ([numerical and exact deductions](21-lp-engine.md#numerical-and-exact-deductions)).
+
+The trivial objective bound caches Boolean contributions only with no retained
+decisions. Its baseline contains permanent root facts; later pins and backtracks
+update a reversible penalty. Before installation is safe, each read scans the
+current assignment. A propagator's effective reason level does not establish that
+the search is at its root.
+
+Finite tuple-packing substitution exposes placement selectors as ordinary Boolean
+columns. Per-Table choice rows and shared occupied-value capacities use the core
+cardinality projection, independently of scalar Table hull admission. Native source
+reconstruction recovers the selected tuples; an LP point alone supplies no witness.
+
+### Bounding and explanations
+
+[LpPropagator](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/LpPropagator.kt)
+maps source decisions to bound assertions, retracts through the trail and supplies
+bounds, fixings and Farkas conflicts under an effort governor. Farkas
+explanations cite the selected bound witnesses and all contributing row premises;
+every learned literal is false at the conflict and implied by the cited antecedents.
+One integer or disjunction leaf cannot refute its sibling branches.
+
+The bounding callback passes the final node relaxation's primal and dual point to
+finite search hints after cut re-solves. Only an optimal result supplies an
+objective sample; an unfinished cut solve keeps the preceding point, and cancellation
+withholds publication. [Finite guidance](09-search.md#finite-lp-directional-guidance)
+owns selection and history lifetime.
+
+An exact state appending one bound copies only the changed side; tightening can
+introduce a conflict only at that column, so the state combines it with the
+predecessor's first conflict without a scan. A node query that pivots but stops on
+work before returning a point grows the adaptive request within its ceiling and
+remaining allowance; numerical stops, zero-pivot stops and infeasibility candidates
+give no growth feedback.
+
+For mixed models, exact node bounding uses the
+[mixed deduction operations](21-lp-engine.md#mixed-deduction-operations); numerical bounding skips them.
+It keeps the strongest objective bound and applies only integral consequences
+with complete explanations. For a bound `L`, reduced cost `d(j)` and cutoff `U`, a
+fixing allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
+Objective changes retract dependent bounds, cuts and clauses, or restore an
+objective-independent region.
+
+The explicit `+sparse-trial` LP option selects a bounded root trial for compact
+closed unconditional linear sources; emphasis levels leave it disabled. Admission
+bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
+scalar width and row-intersection fill risk on the same source-root boxes as the
+retained layout. Custom emitters decline because they reserve no source size. The
+trial uses the ordinary bound, fixing and conflict consumers with their exact checks;
+cuts and expanded hulls stay outside its allowance, and admitted roots enable the
+ordinary root primal consumers. The initial root bound and later root propagation
+share one scoped numerical owner, and handoff requires matching source identities
+and root scopes. The owner advances its floating cursor in adaptive work quanta; a
+pause publishes nothing and authority edits discard the cursor. Completed floating
+results enter the exact bound check within a 16 MiB checking reservation;
+exhaustion, cancellation or refusal withholds the root bound.
+
+Sparse-trial preparation is capped at eight million modeled work units; root and
+node LP work stop at 150 million units or the containing invocation's smaller
+allowance, and tighter caller deadlines and work shares remain in force. Bounded
+atomic numerical operations can finish past a work boundary; the ledger keeps their
+actual cost.
+The two-GiB modeled storage envelope covers source authority, sparse owners,
+scratch and factor construction. Each sparse factor attempt reserves entries
+before writing and stops at two million entries or eight million work units;
+declines publish no factors or rank claim. Sparse admission never changes the dense
+exact-continuation caps.
+
+Completed root points can guide rounding under the same objective identity, within a
+one-MiB guidance cap. Rounding pins through propagation with nearest targets, and
+retained-root plans also try upward and downward targets; an interrupted pin restores
+the last complete fixpoint. A completed point can instead transfer to ordinary integer
+value ordering when its source coordinates and objective still match; source real
+variables, an unfinished or masked auxiliary proposal and disabled LP branching
+withhold it. A masked guide carries an availability mask over its known columns;
+unknown columns keep their ordinary domain choices.
+Before the first incumbent, an integer-only traversal can visit the declared factor
+components of undetermined columns contiguously, known fractional coordinates first.
+A ready component guide defers simplex node queries until the first incumbent while
+inherited checked bounds, combinatorial bounds and CP checks stay active. Completed
+component assignments survive restarts and guide replacement as private value
+preferences; guide replacement, restart and reseed discard the component ordering,
+and target reset, reseed and engine close release the preferences.
+
+### Immutable component ownership
+
+The explicit `lp-component-ownership=true` setting lets finite node bounding retain
+one numerical owner per independent row-coupled block. Each child keeps its basis
+and exact result authority; empty structural rows form one logical-only child that
+retains feasibility, strict sides and logical costs. Bound, cost, row activation and
+premise changes invalidate only affected children, and unchanged children reuse
+optimal floating results and checked bounds under the same certification policy.
+Query work and pivot allowances cover the whole collection, including failed
+children; reuse adds no charge. Prepared root cuts belong to the initial layout. An
+ordinary component root uses the same scoped owner for its initial bound and later
+node queries; when no owner exists, preparation partitions source and cuts together,
+and a declined live append falls back to the ordinary owner. Finite basis entry
+limits are divided among the blocks.
+
+Child bounds stay exact rationals until their sum, isolated-column contributions and
+the objective constant, scale and sense are combined; rounding applies to that
+aggregate, and bound support lifts every contributing row and side to the current
+parent state. Floating child optima alone supply no global optimum or conflict
+authority. Completed integer components can retain node deductions at the parent's
+common dual-rounding scale, within eight MiB of the shared 16 MiB checking envelope;
+mixed columns, non-unit objective scaling and unsupported certificates use the
+whole-model route, and the independent safe objective check stays in the decision.
+
+After a work or pivot stop, completed blocks contribute checked dual bounds and
+unfinished blocks freshly checked zero-dual box bounds; a missing minimizing side
+declines the aggregate. That bound supplies no point, cut tableau or attainment
+claim. Root consumers verify a lifted dual candidate with zero multipliers on blocks
+without a result before projection. Node consumers may prune against the existing
+cutoff, but publish no branching coordinates or directional history from a partial
+aggregate. Returned child coordinates can feed a masked rounding guide.
+
+The same setting dispatches root tableau separation to the owning block. Lifted cuts
+keep every row multiplier, bound substitution, integrality premise and source
+address for the ordinary source mapper and cut pool. Rows confined to existing
+blocks replace only those children; cross-block rows, new columns and other
+structural edits retire the collection for the ordinary owner. Callers that need one
+retained basis keep the monolithic constructor.
+
+### Cuts
+
+The internal `composeBooleanBranches` traversal option, disabled by default,
+augments partial-row feasibility queries with common real consequences of the two
+alternatives of one unresolved source Boolean, combining at most two rows per
+alternative with exact positive weights. Equal coefficient vectors keep the weaker
+right side, and strictness survives only when both alternatives establish it. Each
+consequence imports a `BooleanSplit` proof, so mutually exclusive guards are
+discharged by exhaustive coverage rather than activated together. The partial LP
+consumes only source-checked consequences, and its final refutation rechecks
+dormant premises with their original guards and pins. No consequence becomes an
+original premise or witness authority.
+
+Cuts aggregate exact source rows and apply their rounding rule's bound and
+integrality checks. Local cuts keep their substitutions and premises and are
+revalidated after pop or remap. A cut pool can retain a mapping's arithmetic
+validation and a projected column layout for an immutable source definition within
+its 262,144-unit ceiling, but every mapping still checks the current namespace,
+assumptions, guards, column geometry and any derived proof, and a projection retains
+no source map, witness or numerical result. Selection considers efficacy,
+parallelism, orthogonality, age and row caps; separators check actual column
+integrality, so continuous columns decline. Root harvesting caps retained cuts at
+the original row count, and root and node separation keep their round, depth, pool
+and work allowances. The [portfolio](15-portfolio-scheduling.md#roles-and-the-mixed-roster)
+decides when the aggressive LP emphasis is seated.
+
+Cut family identity follows portable proofs and retained rows without contributing
+to proof authority or deduplication. Observations separate construction, mapping
+refusal, admission, selection, tightness, retirement and retraction; a tight or
+selected row establishes no deduction, and certificate support is counted only when
+a checked deduction is consumed. Per-family solve and certificate costs are
+inclusive: families sharing a solve overlap each other and the ordinary LP totals.
+Terminal results take their final statistics snapshot after releasing numerical
+owners; rebindable handles stay live until their caller retires them.
+
+Typed route accumulators own engine costs, including failed attempts and disjoint
+resume deltas. Compatibility totals are snapshots of those owners; node visits and
+node bounding solves retain separate denominators. A pause records cost without
+another engine pass. Component costs retain their consumer attribution so only
+standalone-owned components join the standalone allowance. Certifier route outcomes
+own their attempt totals; worker snapshots add independent observations.
+
+Numerical frontier traversal separates source cuts through its adapter, outside
+`lp.engine`; `source-cuts=false` disables it. Single-row Chvatal–Gomory rounding
+normalizes an integer-only activity by its exact coefficient gcd and keeps a cut
+only when rounding tightens the right side. Mixed rounding normalizes the integer
+activity and cites an unconditional source bound for every continuous term,
+preferring the side that keeps a negative residual; missing sides and integral
+shifted right sides decline. Cut definitions and source-row ownership stay in the
+retained template. Every query rechecks active cuts against the exact numeric source
+context under one shared proof allowance; inactive Boolean guards or integer pins
+disable their rows and dependent cuts, and a cut with several source owners needs
+every owner active. Unverified cuts remain inactive, and a query with inactive rows
+keeps the identity row layout unless it retains masked cuts. Certificates cite the
+nested rounding derivation, and final source checking repeats Boolean substitution
+independently.
+
+Point selection admits at most one additional checked cut per usable point and
+waits for its completed query before scanning again. Only a strictly stronger
+checked bound, a checked incumbent or terminal evidence enables the next scan
+immediately; an unchanged or unavailable bound, an unfinished round or a scan
+without an addition starts a seven-query discovery cooldown. Unselected candidates
+retire after four completed scans without an addition, and installed rows expire
+after four consecutive slack scoring scans; a tight scan resets the count.
+Retirement only weakens the relaxation. A query's cut mask names the cut rows it
+activates; managed current masks and fully checked selected families keep
+unselected and retired rows as inactive numerical rows with free logical columns
+and zero multipliers, so a compatible owner survives additions and retirement.
+Completed base bounds survive a paused or declined separation round. A new template
+first runs the ordinary checked recipe; a completed point can add one selection
+round, and a successful round retains its checked mask. Scores combine normalized
+violation, inverse square-root support and objective parallelism and guide
+selection only. `source-point-cuts=true` opts the retained frontier into
+this point-based separation; the ordinary default activates all accepted source cuts.
+The containing source request owns these separation, selection and advisory
+branching settings, binds them to its admitted numerical companions and removes them
+from finite worker recipe options.
+
+Explicit aggregation combines two to four source rows with positive exact weights
+and normalizes the integer activity by its gcd; complete continuous cancellation
+permits integer rounding, otherwise mixed rounding cites an active bound for each
+remaining continuous coordinate. `source-aggregate-cuts=true`, disabled by default,
+adds a template policy that pairs rows of opposite sign on a shared continuous
+coordinate, with at least one integer-activity row, and retains at most 64
+proposals. A nonseparating mixed-row seed can continue greedily along one
+opposite-sign continuous incidence path through at most four original rows.
+Pure-integer points also try half rounding, two-row combinations and half scaling
+whose odd coefficients cite established endpoint premises. An established
+invocation bound can stand in for a missing stated endpoint only as a typed
+assumption that every cut verification resolves in the current scope; retracting it
+withholds the cut. Slack and scope ordering choose premises only. Every candidate
+keeps its owners and nested derivation and needs source verification before
+admission.
+
+### Root preparation
+
+Finite satisfaction and optimization share root hull pruning and cut harvesting;
+objective shaving and incumbent-relative fixings are optimization work. Root
+preparation runs once under its containing time and work allowance; a cancelled
+phase contributes only completed deductions. Root rounding and pumping propose
+discrete assignments pinned through the arm's own propagation; a relaxation point
+supplies a target, never witness authority. Interrupted rounding keeps its layout,
+basis and completed coordinates for later slices without another solve. An
+original-objective probe can reuse a prepared root owner while its exact model and
+root scope stay current, spending the smallest remaining primal, root and worker
+grant.
+
+An integer guide with known fractional coordinates can prepare a private probe over
+independent integer components, trying nearest, upward and downward targets per
+component. A failed direction retracts only that component's pins. When all three
+decline, a bounded private repair revisits earlier pins in the component with an
+owned frame stack; conflict levels that map to its frames can guide retreat, and
+foreign levels keep chronological retreat. Exhausting choices or allowance supplies
+no infeasibility authority, and no partial assignment is a witness. A restart keeps
+one generation of the engine's owned coordinate buffers for replay as soft
+preferences, without a numerical query.
+
+Retained discrete root layouts prepare in private chunks before the first numerical
+consultation. A paused builder keeps only its source-root assembly buffers; no partial
+layout, point or certificate is visible. Completion prepares the layout, private
+exact state and numerical owner before the consultation's numerical clock starts,
+and the consultation adopts that owner only while its source-root model, exact state
+and root scope remain current. Containing cancellation or spent cumulative funding
+retires the builder. Incumbent validation can retire pending construction, and engine
+closure releases its private buffers.
+
+The internal root-only policy gives source projection and owner construction the
+remaining cumulative LP allowance while each floating query keeps its adaptive
+allowance. The internal checkpointed policy keeps one numerical operation across
+consultations of unchanged exact authority, retaining scaling, phase, artificial
+bounds and basis; changed bounds, objective, rows or trail scope discard the cursor.
+Sparse source preparation transposes emitted support into exact CSC once per
+admission, which neither authorizes ordinary admission nor bounds basis fill;
+`SparseSourceLpPolicy` carries the preparation, floating, consultation and
+certificate allowances, and retained MIP callers fund consultations through
+`SourceLpFunding`, where caller cancellation closes the owner and exhaustion is an
+incomplete result.
+
+Identity row layouts are the default. An explicit unconditional-equality policy
+(equality packing) combines adjacent closed, exactly opposing inequalities into one
+row with a fixed logical column; a cut mask that suspends rows through packing needs
+matching activity on both packed sides. The emitted multiplier's sign selects the
+original inequality when lifting row weights. Conditional templates retain their
+identity layout even when their guards currently hold: a later sibling can retract
+either side. Source lifting and ordinary evidence checking still decide whether the
+bound is usable.
+
+An admitted sparse root query can copy nonzero row multipliers from its suspended
+owner as a dual proposal without a basis solve; only the exact check against the
+unchanged root model establishes a bound. Dual-only certification runs under its own
+input, arithmetic and allocation limits. A refused candidate enters bounded rational
+reconstruction: a retained basis proposes duals by peeling singleton equations and
+variables and solving residual components with rational factors, and a
+dimension-limited component proposes a subset of dual coordinates for the open basic
+directions whose residuals need absent sides. Continued fractions are the last
+proposal. Every proposal must pass the complete exact reduced-cost and bound-side
+check; basis-derived bounds need both rational and exact-basis policy acceptance.
+Accepted bounds keep their row multipliers for source lifting. A completed
+infeasibility candidate enters bounded Farkas reconstruction the same way; the exact
+ray check yields row multipliers and bound-side support, and source lifting restores
+extracted sides before checking.
+Only that checked derivation closes a traversal leaf or repair query.
+
+`source-refutation-reuse=true` enables a traversal-owned index of checked source
+refutations. Cited coordinate sides select candidates; full scope implication and a
+fresh source import check authorize closing a matching leaf before its numerical
+query. Only refutations enter the index, and the original source, objective,
+invocation window and Boolean substitution stay bound to each entry.
+`source-refutation-propagation=true` adds integral unit-prefix deductions: the only
+eligible case is a single missing inclusive bound on a source integer with an
+integral endpoint, and the augmented scope's import check proves the excluded
+sibling. `source-refutation-resolution=true` adds bounded pairwise resolution over
+named integral predicates, checking each resolvent through a source integer-split
+derivation. The index bounds entries, proof storage and support traversal, evicts
+its oldest entry and charges cumulative source funding; reaching its separate
+allocation limit clears it and leaves ordinary traversal running. Unknown or
+cancelled checks close nothing.
+
+### Leaf completion
+
+A leaf relaxation and solve run under the search's cancellation and a work limit
+sized from the model, so a stopped leaf is indeterminate and a decided one keeps its
+verdict.
+For a positive-tolerance source, a request permitting tolerance acceptance can reject
+the leaf through `floatFarkasRay`, using the same numerical check as node pruning.
+The result carries numerical refutation separately from exact conflicts and certificates;
+an empty numerical ray rejects only the current leaf and supplies no learned clause.
+Fresh, retained and resumable leaf solves share this policy. Exact-only acceptance
+and exact repair requests require exact evidence.
+
+Finite optimization keeps a pinned real-leaf request across portfolio slices.
+The discrete assignment, assembled row authority, source encoding and required
+certification remain owned by that request. Numerical pauses preserve the live
+solve; a completed floating solve can wait for certification in a later slice.
+Source encoding and relaxation assembly are atomic preparation of the request.
+Neither pause consumes the discrete model or records an indeterminate region.
+Reseeding and shared objective-floor imports are deferred while completion is
+pending, and explicit rebind or close discards its numerical owners before changing
+the traversal. An exact repair query disables tolerance-optimum acceptance and
+compares the certified completion's exact objective with its rational strict
+cutoff. Missing exact coordinates or an unrepresentable result leave coverage
+incomplete; neither a rounded tie nor a declined candidate closes the cutoff.
+
+Mixed witness recovery can submit a connected real residual to `SourceLp` after
+fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates
+are consumed, and a failed guess supplies no conflict or bound. Real array selection
+emits index-range rows on every build, and a fixed index adds its equality with both
+index premises. In every case the original source rows decide publication.
+
+## Bound trail and warm state
+
+[LpBoundTrail](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpBoundTrail.kt)
+intersects assertions exactly and keeps a source premise for each accepted side.
+Batches publish witnesses only for a committed prefix; crossed bounds cite both
+sides, and pop restores bounds and deactivates scoped rows.
+Exact trail edits do not require a floating projection. An incompatible projection
+retires the floating owner, while crossed sides are certified directly against the
+exact state and acceptance policy. A later projectable state can prepare a fresh owner.
+
+A nonbasic bound change updates the basic values by `-B^-1 A(j) delta(x(j))`; pop
+reseats nonbasics and recomputes `x(B) = B^-1 (b - N x(N))`. Compatible edits and
+pops retain factors; missing sides require status and dual-feasibility repair, and
+objective edits invalidate dependent proofs.
+[LpScopedSolver](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpScopedSolver.kt)
+and [CpLpAdapter](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/CpLpAdapter.kt)
+hold bound trails, active-row identity and verification caches.
+
+Rows have stable identities. Deactivation removes slack bounds, strictness and
+integrality, and is rejected while surviving assertions need the row; global
+source-valid cuts can survive pop. Appends and compaction prepare a fresh
+fixed-dimension owner with warm headings and publish it before retiring the donor;
+live factors are never resized. A projection that cannot import exact authority
+declines without a partial layout: node bounding withholds deductions and leaf
+completion returns indeterminate.
+
+Checked packages retain accepted bounds and witnesses under the same exact state
+and production acceptance policy. Immutable exact-state identity admits reuse
+without serializing the matrix; mutable working models need a complete bounded value
+key, and a distinct exact state invalidates the package even when it shares source
+definitions. A weaker checked bound cannot satisfy an attainment request. Exact
+continuation keeps cumulative import and feasibility work; an unfinished import
+requires the same authority, ordered headings and statuses. A fixed-width overflow
+promotes the last complete tableau to arbitrary precision, keeping imported columns,
+basis order, statuses and strict-side infinitesimals. A ready feasibility tableau can
+rebind compatible bounds, with publication checked against the current source.
+Refinement admits one unseeded and one exact-point-seeded attempt per state, limits
+and claim; repeated failures supply no infeasibility authority.
+
+An optional per-context query observer runs after a session or scoped query adopts
+its exact model and before numerical work, borrowing the working model and copying
+what it keeps within the containing allowance. Capture encoding bounds values and
+bytes and withholds the whole payload on exhaustion. Observation grants no witness,
+bound or proof authority, and ordinary contexts allocate no query records.
+
+### Linear authority sessions
+
+Numerical source traversal retains a `LinearAuthoritySession` per invocation.
+Its fixed matrix has free structural columns; extracted source sides are asserted
+as one checked batch in a replaceable scope, retaining witness IDs and assertion
+depth, and child and sibling queries retract that scope while keeping compatible
+factors. A declined batch retires the owner without publishing guidance.
+Conditional rows stay in the matrix with their logical sides suspended while their
+pins are unestablished. Objective edits invalidate dependent certificates and changed
+structural authority replaces the owner. A completed owner can append up to 64
+checked cut rows when every existing column, row and objective value and its metadata
+are unchanged; equality-packing changes fall back to replacement. Each query lifts
+multipliers through its own source-side mapping and checks the derivation in its
+source scope. Neighborhood invocations can borrow a retained authority, leaving its
+cleanup and cumulative funding with the owner. Floating source coordinates are
+guidance and supply no witness or proof authority.
+
+`LinearAuthority.advance` runs the shared sparse preparation, floating and
+bound-certificate policy through that scoped owner. One admitted operation survives
+unchanged consultations; changed scope, sides or active rows revoke its admission
+and cursor. A funding stop at an iteration boundary keeps the cursor and reports its
+limiting resource, and a promoted allowance can resume it. Completed coordinates
+propose exhaustive integer splits, including fractional source-bound endpoints, and
+opposed coordinate sides refute a branch through checked source combinations.
+Integral-looking points need an original-source witness check. A rejected integral
+proposal keeps its exact integer assignment and completes connected continuous
+residuals with the source LP owner, strict rows strict and inactive premises
+excluded; every recovered point needs a fresh witness check. After that check, the
+authority can refine the continuous objective with the discrete coordinates fixed,
+accepting only an exact strict improvement that passes a fresh check; a fixed-pin
+solve supplies no global bound or refutation. Residuals too large for exact input
+admission use a sparse feasibility query whose completed coordinates go through
+rational reconstruction and primal-only exact basis verification, publishing no dual
+bound or conflict; recovery declines supply neither a conflict nor exhaustion
+authority.
+
+`solver.pipeline.SourceNumericalFeedback` delivers completed queries to decision
+consumers. Latest-query consumers own one bounded slot; prefix consumers and
+inspection observers share a bounded archive of the first queries. A record exposes
+exact-valued relaxation coordinates, generating cut masks, active source rows and
+scoped checked bounds or refutations. Such coordinates can contain numerical
+residuals and require full source checking before publication. A consumer names the
+projection it reads,
+so a withheld field is explicit rather than unavailable. Compatibility requires the
+same source premises, semantics, objective and query restrictions; a cutoff
+attribution requires its actual strict objective premise. Cancellation, pauses,
+missing or oversized queries and funding exhaustion stay explicit outcomes. The
+opt-in `source-cut-branching=true` consumer orders frontier integer splits by
+near-tight installed cut supports; both alternatives remain in coverage and feedback
+never prunes.
+
+## Selected factor relaxation providers
+
+`RelaxationProjectionProvider` selects emitters from immutable factor data; a
+descriptor declares whether it supplies a sound relaxation, and `NONE` emits no
+rows. A custom emitter must preserve every source solution and is rebuilt against
+live domains, which disables retained layouts. A sound relaxation supplies bounds
+and refutations, not feasibility: real leaf completion keeps the original built-in
+source rows, and omitting a row never removes its constraint from the witness check.
+Circuit arcs, Boolean RLT rows and scheduling families use only factors that keep
+their built-in descriptors.
+
+Regular and MDD projections share layered-flow row buffers and emission; each provider
+owns arc enumeration, auxiliary identities and preparation admission. GCC and NValue
+share per-variable one-hot selectors and value channels while retaining their own
+count relations, exceptions and column roles.
+
+---
+
+Previous: [19. Nonlinear arithmetic](19-nonlinear-arithmetic.md) · [Contents](README.md) · Next: [21. Simplex and LP certification](21-lp-engine.md)

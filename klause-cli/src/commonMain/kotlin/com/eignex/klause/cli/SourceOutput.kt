@@ -8,12 +8,13 @@ import com.eignex.util.numbers.BIG_ONE
 internal fun OutputProtocol.sourceQualified(
     semantics: EffectiveSourceSemantics?,
     comment: String,
+    emit: (String) -> Unit = ::println,
 ): OutputProtocol {
     if (semantics == null || !semantics.hasOverrides) return this
     val delegate = this
     return object : OutputProtocol by delegate {
         override fun begin(optimize: Boolean, maximize: Boolean) {
-            println("$comment klause-source-semantics: ${sourcePolicyText(semantics)}")
+            emit("$comment klause-source-semantics: ${sourcePolicyText(semantics)}")
             delegate.begin(optimize, maximize)
         }
     }
@@ -46,6 +47,10 @@ private fun sourcePolicyText(semantics: EffectiveSourceSemantics): String = buil
     source.feasibilityTolerance?.let {
         add("absolute-tolerance=${it.absolute.policyText()}")
         add("relative-tolerance=${it.relative.policyText()}")
+    }
+    source.optimalityTolerance?.let {
+        add("absolute-optimality-tolerance=${it.absolute.policyText()}")
+        add("relative-optimality-tolerance=${it.relative.policyText()}")
     }
     source.pinAbsentOptionalValues?.let { add("pin-absent-optional-values=$it") }
 }.joinToString(" ")

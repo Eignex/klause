@@ -1502,6 +1502,17 @@ abstract interface com.eignex.klause.formats.smtlib/SmtModelValues { // com.eign
     open fun exactReal(kotlin/String): com.eignex.klause.arithmetic.real/ExactRealValue? // com.eignex.klause.formats.smtlib/SmtModelValues.exactReal|exactReal(kotlin.String){}[0]
 }
 
+abstract interface com.eignex.klause.formats.smtlib/SmtSessionModel { // com.eignex.klause.formats.smtlib/SmtSessionModel|null[0]
+    abstract fun evaluate(com.eignex.klause.formats.smtlib/SExpr): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionModel.evaluate|evaluate(com.eignex.klause.formats.smtlib.SExpr){}[0]
+    abstract fun render(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionModel.render|render(){}[0]
+    open fun abstractValues(): kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.smtlib/SmtSort> // com.eignex.klause.formats.smtlib/SmtSessionModel.abstractValues|abstractValues(){}[0]
+    open fun withRecursiveDefinitions(kotlin.collections/List<com.eignex.klause.formats.smtlib/SExpr>): com.eignex.klause.formats.smtlib/SmtSessionModel? // com.eignex.klause.formats.smtlib/SmtSessionModel.withRecursiveDefinitions|withRecursiveDefinitions(kotlin.collections.List<com.eignex.klause.formats.smtlib.SExpr>){}[0]
+}
+
+abstract interface com.eignex.klause.formats.smtlib/SmtSessionSink : kotlin/AutoCloseable { // com.eignex.klause.formats.smtlib/SmtSessionSink|null[0]
+    abstract fun write(kotlin/String) // com.eignex.klause.formats.smtlib/SmtSessionSink.write|write(kotlin.String){}[0]
+}
+
 abstract interface com.eignex.klause.ir/Factor { // com.eignex.klause.ir/Factor|null[0]
     abstract val variables // com.eignex.klause.ir/Factor.variables|{}variables[0]
         abstract fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.ir/Factor.variables.<get-variables>|<get-variables>(){}[0]
@@ -9017,6 +9028,39 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem : com.eignex.klause.i
     final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibProblem.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.formats.smtlib/SmtLibSession : kotlin/AutoCloseable { // com.eignex.klause.formats.smtlib/SmtLibSession|null[0]
+    constructor <init>(kotlin/Function1<kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionResult>, kotlin/Function1<kotlin/String, kotlin/Unit>, com.eignex.klause.util/ExecutionControl = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ..., kotlin/Function1<kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionSink> = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Function2<kotlin.collections/List<com.eignex.klause.formats.smtlib/SExpr>, com.eignex.klause.util/ExecutionControl, kotlin/Unit> = ...) // com.eignex.klause.formats.smtlib/SmtLibSession.<init>|<init>(kotlin.Function1<kotlin.String,com.eignex.klause.formats.smtlib.SmtSessionResult>;kotlin.Function1<kotlin.String,kotlin.Unit>;com.eignex.klause.util.ExecutionControl;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Function1<kotlin.String,com.eignex.klause.formats.smtlib.SmtSessionSink>;kotlin.String;kotlin.String;kotlin.Function2<kotlin.collections.List<com.eignex.klause.formats.smtlib.SExpr>,com.eignex.klause.util.ExecutionControl,kotlin.Unit>){}[0]
+
+    final fun close() // com.eignex.klause.formats.smtlib/SmtLibSession.close|close(){}[0]
+    final fun comment(kotlin/String) // com.eignex.klause.formats.smtlib/SmtLibSession.comment|comment(kotlin.String){}[0]
+    final fun diagnose(kotlin/String) // com.eignex.klause.formats.smtlib/SmtLibSession.diagnose|diagnose(kotlin.String){}[0]
+    final fun execute(com.eignex.klause.formats.smtlib/SExpr): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibSession.execute|execute(com.eignex.klause.formats.smtlib.SExpr){}[0]
+    final fun execute(com.eignex.klause.formats.smtlib/SExprReader) // com.eignex.klause.formats.smtlib/SmtLibSession.execute|execute(com.eignex.klause.formats.smtlib.SExprReader){}[0]
+    final fun interrupt(kotlin/String) // com.eignex.klause.formats.smtlib/SmtLibSession.interrupt|interrupt(kotlin.String){}[0]
+}
+
+final class com.eignex.klause.formats.smtlib/SmtSessionResult { // com.eignex.klause.formats.smtlib/SmtSessionResult|null[0]
+    constructor <init>(kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionModel? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ...) // com.eignex.klause.formats.smtlib/SmtSessionResult.<init>|<init>(kotlin.String;com.eignex.klause.formats.smtlib.SmtSessionModel?;kotlin.String?;kotlin.collections.List<kotlin.String>){}[0]
+
+    final val model // com.eignex.klause.formats.smtlib/SmtSessionResult.model|{}model[0]
+        final fun <get-model>(): com.eignex.klause.formats.smtlib/SmtSessionModel? // com.eignex.klause.formats.smtlib/SmtSessionResult.model.<get-model>|<get-model>(){}[0]
+    final val observations // com.eignex.klause.formats.smtlib/SmtSessionResult.observations|{}observations[0]
+        final fun <get-observations>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.formats.smtlib/SmtSessionResult.observations.<get-observations>|<get-observations>(){}[0]
+    final val reasonUnknown // com.eignex.klause.formats.smtlib/SmtSessionResult.reasonUnknown|{}reasonUnknown[0]
+        final fun <get-reasonUnknown>(): kotlin/String? // com.eignex.klause.formats.smtlib/SmtSessionResult.reasonUnknown.<get-reasonUnknown>|<get-reasonUnknown>(){}[0]
+    final val status // com.eignex.klause.formats.smtlib/SmtSessionResult.status|{}status[0]
+        final fun <get-status>(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionResult.status.<get-status>|<get-status>(){}[0]
+
+    final fun component1(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionResult.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.formats.smtlib/SmtSessionModel? // com.eignex.klause.formats.smtlib/SmtSessionResult.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.eignex.klause.formats.smtlib/SmtSessionResult.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<kotlin/String> // com.eignex.klause.formats.smtlib/SmtSessionResult.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., com.eignex.klause.formats.smtlib/SmtSessionModel? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ...): com.eignex.klause.formats.smtlib/SmtSessionResult // com.eignex.klause.formats.smtlib/SmtSessionResult.copy|copy(kotlin.String;com.eignex.klause.formats.smtlib.SmtSessionModel?;kotlin.String?;kotlin.collections.List<kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtSessionResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtSessionResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionResult.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.formats.smtlib/SmtSourceBinding { // com.eignex.klause.formats.smtlib/SmtSourceBinding|null[0]
     constructor <init>(com.eignex.klause.formats.smtlib/SmtSourceDeclaration, com.eignex.klause.formats.smtlib/SmtReconstruction, kotlin/String = ...) // com.eignex.klause.formats.smtlib/SmtSourceBinding.<init>|<init>(com.eignex.klause.formats.smtlib.SmtSourceDeclaration;com.eignex.klause.formats.smtlib.SmtReconstruction;kotlin.String){}[0]
 
@@ -9379,6 +9423,24 @@ final class com.eignex.klause.ir/NonlinearIntegerProblem : com.eignex.klause.ir/
         final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/NonlinearIntegerProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
 }
 
+final class com.eignex.klause.ir/OptimalityTolerance { // com.eignex.klause.ir/OptimalityTolerance|null[0]
+    constructor <init>(com.eignex.klause.ir/SemanticRational = ..., com.eignex.klause.ir/SemanticRational = ...) // com.eignex.klause.ir/OptimalityTolerance.<init>|<init>(com.eignex.klause.ir.SemanticRational;com.eignex.klause.ir.SemanticRational){}[0]
+
+    final val absolute // com.eignex.klause.ir/OptimalityTolerance.absolute|{}absolute[0]
+        final fun <get-absolute>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/OptimalityTolerance.absolute.<get-absolute>|<get-absolute>(){}[0]
+    final val isExact // com.eignex.klause.ir/OptimalityTolerance.isExact|{}isExact[0]
+        final fun <get-isExact>(): kotlin/Boolean // com.eignex.klause.ir/OptimalityTolerance.isExact.<get-isExact>|<get-isExact>(){}[0]
+    final val relative // com.eignex.klause.ir/OptimalityTolerance.relative|{}relative[0]
+        final fun <get-relative>(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/OptimalityTolerance.relative.<get-relative>|<get-relative>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/OptimalityTolerance.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/SemanticRational // com.eignex.klause.ir/OptimalityTolerance.component2|component2(){}[0]
+    final fun copy(com.eignex.klause.ir/SemanticRational = ..., com.eignex.klause.ir/SemanticRational = ...): com.eignex.klause.ir/OptimalityTolerance // com.eignex.klause.ir/OptimalityTolerance.copy|copy(com.eignex.klause.ir.SemanticRational;com.eignex.klause.ir.SemanticRational){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/OptimalityTolerance.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/OptimalityTolerance.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/OptimalityTolerance.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.ir/PolynomialRealProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/PolynomialRealProblem|null[0]
     final val boolVarNames // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
@@ -9542,12 +9604,14 @@ final class com.eignex.klause.ir/SearchHints { // com.eignex.klause.ir/SearchHin
 }
 
 final class com.eignex.klause.ir/SemanticOverrides { // com.eignex.klause.ir/SemanticOverrides|null[0]
-    constructor <init>(com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/BoundsOverride<kotlin/Long>? = ..., com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...) // com.eignex.klause.ir/SemanticOverrides.<init>|<init>(com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.BoundsOverride<kotlin.Long>?;com.eignex.klause.ir.BoundsOverride<com.eignex.klause.ir.SemanticRational>?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+    constructor <init>(com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/BoundsOverride<kotlin/Long>? = ..., com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ..., com.eignex.klause.ir/OptimalityTolerance? = ...) // com.eignex.klause.ir/SemanticOverrides.<init>|<init>(com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.BoundsOverride<kotlin.Long>?;com.eignex.klause.ir.BoundsOverride<com.eignex.klause.ir.SemanticRational>?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?;com.eignex.klause.ir.OptimalityTolerance?){}[0]
 
     final val feasibilityTolerance // com.eignex.klause.ir/SemanticOverrides.feasibilityTolerance|{}feasibilityTolerance[0]
         final fun <get-feasibilityTolerance>(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SemanticOverrides.feasibilityTolerance.<get-feasibilityTolerance>|<get-feasibilityTolerance>(){}[0]
     final val floats // com.eignex.klause.ir/SemanticOverrides.floats|{}floats[0]
         final fun <get-floats>(): com.eignex.klause.ir/FloatSemantics? // com.eignex.klause.ir/SemanticOverrides.floats.<get-floats>|<get-floats>(){}[0]
+    final val optimalityTolerance // com.eignex.klause.ir/SemanticOverrides.optimalityTolerance|{}optimalityTolerance[0]
+        final fun <get-optimalityTolerance>(): com.eignex.klause.ir/OptimalityTolerance? // com.eignex.klause.ir/SemanticOverrides.optimalityTolerance.<get-optimalityTolerance>|<get-optimalityTolerance>(){}[0]
     final val pinAbsentOptionalValues // com.eignex.klause.ir/SemanticOverrides.pinAbsentOptionalValues|{}pinAbsentOptionalValues[0]
         final fun <get-pinAbsentOptionalValues>(): kotlin/Boolean? // com.eignex.klause.ir/SemanticOverrides.pinAbsentOptionalValues.<get-pinAbsentOptionalValues>|<get-pinAbsentOptionalValues>(){}[0]
     final val undeclaredIntegers // com.eignex.klause.ir/SemanticOverrides.undeclaredIntegers|{}undeclaredIntegers[0]
@@ -9560,7 +9624,8 @@ final class com.eignex.klause.ir/SemanticOverrides { // com.eignex.klause.ir/Sem
     final fun component3(): com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? // com.eignex.klause.ir/SemanticOverrides.component3|component3(){}[0]
     final fun component4(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SemanticOverrides.component4|component4(){}[0]
     final fun component5(): kotlin/Boolean? // com.eignex.klause.ir/SemanticOverrides.component5|component5(){}[0]
-    final fun copy(com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/BoundsOverride<kotlin/Long>? = ..., com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...): com.eignex.klause.ir/SemanticOverrides // com.eignex.klause.ir/SemanticOverrides.copy|copy(com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.BoundsOverride<kotlin.Long>?;com.eignex.klause.ir.BoundsOverride<com.eignex.klause.ir.SemanticRational>?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+    final fun component6(): com.eignex.klause.ir/OptimalityTolerance? // com.eignex.klause.ir/SemanticOverrides.component6|component6(){}[0]
+    final fun copy(com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/BoundsOverride<kotlin/Long>? = ..., com.eignex.klause.ir/BoundsOverride<com.eignex.klause.ir/SemanticRational>? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ..., com.eignex.klause.ir/OptimalityTolerance? = ...): com.eignex.klause.ir/SemanticOverrides // com.eignex.klause.ir/SemanticOverrides.copy|copy(com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.BoundsOverride<kotlin.Long>?;com.eignex.klause.ir.BoundsOverride<com.eignex.klause.ir.SemanticRational>?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?;com.eignex.klause.ir.OptimalityTolerance?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SemanticOverrides.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SemanticOverrides.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.ir/SemanticOverrides.toString|toString(){}[0]
@@ -9604,7 +9669,7 @@ final class com.eignex.klause.ir/SourceIntDomains { // com.eignex.klause.ir/Sour
 }
 
 final class com.eignex.klause.ir/SourceSemantics { // com.eignex.klause.ir/SourceSemantics|null[0]
-    constructor <init>(com.eignex.klause.ir/SourceFormat, com.eignex.klause.ir/NumericAuthority = ..., com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/UndeclaredIntegerBounds? = ..., com.eignex.klause.ir/UndeclaredRealBounds? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...) // com.eignex.klause.ir/SourceSemantics.<init>|<init>(com.eignex.klause.ir.SourceFormat;com.eignex.klause.ir.NumericAuthority;com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.UndeclaredIntegerBounds?;com.eignex.klause.ir.UndeclaredRealBounds?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+    constructor <init>(com.eignex.klause.ir/SourceFormat, com.eignex.klause.ir/NumericAuthority = ..., com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/UndeclaredIntegerBounds? = ..., com.eignex.klause.ir/UndeclaredRealBounds? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ..., com.eignex.klause.ir/OptimalityTolerance? = ...) // com.eignex.klause.ir/SourceSemantics.<init>|<init>(com.eignex.klause.ir.SourceFormat;com.eignex.klause.ir.NumericAuthority;com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.UndeclaredIntegerBounds?;com.eignex.klause.ir.UndeclaredRealBounds?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?;com.eignex.klause.ir.OptimalityTolerance?){}[0]
 
     final val feasibilityTolerance // com.eignex.klause.ir/SourceSemantics.feasibilityTolerance|{}feasibilityTolerance[0]
         final fun <get-feasibilityTolerance>(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SourceSemantics.feasibilityTolerance.<get-feasibilityTolerance>|<get-feasibilityTolerance>(){}[0]
@@ -9614,6 +9679,8 @@ final class com.eignex.klause.ir/SourceSemantics { // com.eignex.klause.ir/Sourc
         final fun <get-format>(): com.eignex.klause.ir/SourceFormat // com.eignex.klause.ir/SourceSemantics.format.<get-format>|<get-format>(){}[0]
     final val numericAuthority // com.eignex.klause.ir/SourceSemantics.numericAuthority|{}numericAuthority[0]
         final fun <get-numericAuthority>(): com.eignex.klause.ir/NumericAuthority // com.eignex.klause.ir/SourceSemantics.numericAuthority.<get-numericAuthority>|<get-numericAuthority>(){}[0]
+    final val optimalityTolerance // com.eignex.klause.ir/SourceSemantics.optimalityTolerance|{}optimalityTolerance[0]
+        final fun <get-optimalityTolerance>(): com.eignex.klause.ir/OptimalityTolerance? // com.eignex.klause.ir/SourceSemantics.optimalityTolerance.<get-optimalityTolerance>|<get-optimalityTolerance>(){}[0]
     final val pinAbsentOptionalValues // com.eignex.klause.ir/SourceSemantics.pinAbsentOptionalValues|{}pinAbsentOptionalValues[0]
         final fun <get-pinAbsentOptionalValues>(): kotlin/Boolean? // com.eignex.klause.ir/SourceSemantics.pinAbsentOptionalValues.<get-pinAbsentOptionalValues>|<get-pinAbsentOptionalValues>(){}[0]
     final val undeclaredIntegers // com.eignex.klause.ir/SourceSemantics.undeclaredIntegers|{}undeclaredIntegers[0]
@@ -9628,7 +9695,8 @@ final class com.eignex.klause.ir/SourceSemantics { // com.eignex.klause.ir/Sourc
     final fun component5(): com.eignex.klause.ir/UndeclaredRealBounds? // com.eignex.klause.ir/SourceSemantics.component5|component5(){}[0]
     final fun component6(): com.eignex.klause.ir/SourceTolerance? // com.eignex.klause.ir/SourceSemantics.component6|component6(){}[0]
     final fun component7(): kotlin/Boolean? // com.eignex.klause.ir/SourceSemantics.component7|component7(){}[0]
-    final fun copy(com.eignex.klause.ir/SourceFormat = ..., com.eignex.klause.ir/NumericAuthority = ..., com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/UndeclaredIntegerBounds? = ..., com.eignex.klause.ir/UndeclaredRealBounds? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ...): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.ir/SourceSemantics.copy|copy(com.eignex.klause.ir.SourceFormat;com.eignex.klause.ir.NumericAuthority;com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.UndeclaredIntegerBounds?;com.eignex.klause.ir.UndeclaredRealBounds?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?){}[0]
+    final fun component8(): com.eignex.klause.ir/OptimalityTolerance? // com.eignex.klause.ir/SourceSemantics.component8|component8(){}[0]
+    final fun copy(com.eignex.klause.ir/SourceFormat = ..., com.eignex.klause.ir/NumericAuthority = ..., com.eignex.klause.ir/FloatSemantics? = ..., com.eignex.klause.ir/UndeclaredIntegerBounds? = ..., com.eignex.klause.ir/UndeclaredRealBounds? = ..., com.eignex.klause.ir/SourceTolerance? = ..., kotlin/Boolean? = ..., com.eignex.klause.ir/OptimalityTolerance? = ...): com.eignex.klause.ir/SourceSemantics // com.eignex.klause.ir/SourceSemantics.copy|copy(com.eignex.klause.ir.SourceFormat;com.eignex.klause.ir.NumericAuthority;com.eignex.klause.ir.FloatSemantics?;com.eignex.klause.ir.UndeclaredIntegerBounds?;com.eignex.klause.ir.UndeclaredRealBounds?;com.eignex.klause.ir.SourceTolerance?;kotlin.Boolean?;com.eignex.klause.ir.OptimalityTolerance?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SourceSemantics.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SourceSemantics.hashCode|hashCode(){}[0]
     final fun resolve(com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/SourceSemantics.resolve|resolve(com.eignex.klause.ir.SemanticOverrides){}[0]
@@ -18759,6 +18827,7 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
     final fun hammingDistanceTo(com.eignex.klause.solver/Sample): kotlin/Int // com.eignex.klause.solver/Sample.hammingDistanceTo|hammingDistanceTo(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver/Sample.hashCode|hashCode(){}[0]
     final fun intValue(kotlin/Int): kotlin/Long // com.eignex.klause.solver/Sample.intValue|intValue(kotlin.Int){}[0]
+    final fun undeterminedReals(): kotlin.collections/List<kotlin/Int> // com.eignex.klause.solver/Sample.undeterminedReals|undeterminedReals(){}[0]
 }
 
 final class com.eignex.klause.solver/SourceStrategy { // com.eignex.klause.solver/SourceStrategy|null[0]
@@ -19268,6 +19337,8 @@ sealed class com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eigne
             final fun <get-solutions>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.solutions.<get-solutions>|<get-solutions>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats.<get-stats>|<get-stats>(){}[0]
+        final val terminationReason // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.terminationReason|{}terminationReason[0]
+            final fun <get-terminationReason>(): com.eignex.klause.solver.result/TerminationReason? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.terminationReason.<get-terminationReason>|<get-terminationReason>(){}[0]
         final val unboundedDirection // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection|{}unboundedDirection[0]
             final fun <get-unboundedDirection>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction>? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection.<get-unboundedDirection>|<get-unboundedDirection>(){}[0]
         final val verdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict|{}verdict[0]
@@ -19852,6 +19923,9 @@ final fun (com.eignex.klause.formats.flatzinc/FlatZincSearchHints).com.eignex.kl
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toLinearSourceProblem(com.eignex.klause.ir/SemanticOverrides = ..., com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.ir/LinearSourceProblem? // com.eignex.klause.formats.mps/toLinearSourceProblem|toLinearSourceProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.SemanticOverrides;com.eignex.klause.util.ExecutionControl){}[0]
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
 final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.formats.opb/toProblem(com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
+final fun (com.eignex.klause.formats.smtlib/SExpr).com.eignex.klause.formats.smtlib/smtText(): kotlin/String // com.eignex.klause.formats.smtlib/smtText|smtText@com.eignex.klause.formats.smtlib.SExpr(){}[0]
+final fun (com.eignex.klause.formats.smtlib/SmtLibProblem).com.eignex.klause.formats.smtlib/reconstructSessionModel(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.formats.smtlib/SmtSessionModel // com.eignex.klause.formats.smtlib/reconstructSessionModel|reconstructSessionModel@com.eignex.klause.formats.smtlib.SmtLibProblem(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.util.ExecutionControl){}[0]
+final fun (com.eignex.klause.formats.smtlib/SmtLibProblem).com.eignex.klause.formats.smtlib/reconstructSessionModel(com.eignex.klause.solver/Sample, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.formats.smtlib/SmtSessionModel // com.eignex.klause.formats.smtlib/reconstructSessionModel|reconstructSessionModel@com.eignex.klause.formats.smtlib.SmtLibProblem(com.eignex.klause.solver.Sample;com.eignex.klause.util.ExecutionControl){}[0]
 final fun (com.eignex.klause.formats.smtlib/SmtSort).com.eignex.klause.formats.smtlib/toSmtLib(): kotlin/String // com.eignex.klause.formats.smtlib/toSmtLib|toSmtLib@com.eignex.klause.formats.smtlib.SmtSort(){}[0]
 final fun (com.eignex.klause.formats.smtlib/SmtSourceModel).com.eignex.klause.formats.smtlib/toSmtLib(): kotlin/String // com.eignex.klause.formats.smtlib/toSmtLib|toSmtLib@com.eignex.klause.formats.smtlib.SmtSourceModel(){}[0]
 final fun (com.eignex.klause.formats.smtlib/SmtValue).com.eignex.klause.formats.smtlib/toSmtLib(): kotlin/String // com.eignex.klause.formats.smtlib/toSmtLib|toSmtLib@com.eignex.klause.formats.smtlib.SmtValue(){}[0]
@@ -20070,6 +20144,7 @@ final fun com.eignex.klause.formats.smtlib/smtAlgebraicTerm(com.eignex.klause.ar
 final fun com.eignex.klause.formats.smtlib/smtRealTerm(kotlin/String): kotlin/String // com.eignex.klause.formats.smtlib/smtRealTerm|smtRealTerm(kotlin.String){}[0]
 final fun com.eignex.klause.formats.smtlib/smtRootTerm(kotlin.collections/List<com.eignex.util.numbers/BigFraction>, kotlin/Int, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtRootTerm|smtRootTerm(kotlin.collections.List<com.eignex.util.numbers.BigFraction>;kotlin.Int;com.eignex.klause.util.ExecutionControl){}[0]
 final fun com.eignex.klause.formats.smtlib/smtSymbolicTerm(com.eignex.klause.arithmetic.real/ExactRealValue, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtSymbolicTerm|smtSymbolicTerm(com.eignex.klause.arithmetic.real.ExactRealValue;com.eignex.klause.util.ExecutionControl){}[0]
+final fun com.eignex.klause.formats.smtlib/solveSmtRecursiveSession(kotlin/String, kotlin/Function1<kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionResult>, com.eignex.klause.util/ExecutionControl = ..., kotlin/Int = ...): com.eignex.klause.formats.smtlib/SmtSessionResult // com.eignex.klause.formats.smtlib/solveSmtRecursiveSession|solveSmtRecursiveSession(kotlin.String;kotlin.Function1<kotlin.String,com.eignex.klause.formats.smtlib.SmtSessionResult>;com.eignex.klause.util.ExecutionControl;kotlin.Int){}[0]
 final fun com.eignex.klause.formats.xcsp3/parseXml(kotlin/String): com.eignex.klause.formats.xcsp3/XmlElement // com.eignex.klause.formats.xcsp3/parseXml|parseXml(kotlin.String){}[0]
 final fun com.eignex.klause.ir/constsOf(kotlin/IntArray): com.eignex.klause.ir/LongConstList // com.eignex.klause.ir/constsOf|constsOf(kotlin.IntArray){}[0]
 final fun com.eignex.klause.ir/constsOf(kotlin/LongArray): com.eignex.klause.ir/LongConstList // com.eignex.klause.ir/constsOf|constsOf(kotlin.LongArray){}[0]

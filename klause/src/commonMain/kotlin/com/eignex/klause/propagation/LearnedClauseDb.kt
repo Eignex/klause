@@ -5,6 +5,7 @@ import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.OriginCounts
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.storage.borrowBackingArray
 
 /**
  * Learned-constraint database for [PropagationState]: the constraints learned during search plus the
@@ -82,7 +83,7 @@ internal class LearnedClauseDb(
         if (isPermanent) {
             if (kind == LearnedKind.Clause) permanentClauseCount++ else permanentArithmeticCount++
         } else {
-            if (capCandidates.size == capCandidates.backingData.size) work += capCandidates.size * 3L
+            if (capCandidates.size == capCandidates.borrowBackingArray().size) work += capCandidates.size * 3L
             capCandidates.add(index)
         }
         return work

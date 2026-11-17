@@ -35,6 +35,38 @@ import kotlin.time.TestTimeSource
 
 class PortfolioLifecycleTest {
     @Test
+    fun `satisfaction reduction should preserve recorded unknown reasons`() {
+        for (reason in TerminationReason.entries) {
+            val result = PortfolioReduction.verdict(listOf(SolveResult.Unknown(reason)))
+
+            assertEquals(reason, assertIs<SolveResult.Unknown>(result).reason)
+        }
+    }
+
+    @Test
+    fun `retired satisfaction arms should preserve a declined reason`() {
+        for (reason in listOf(TerminationReason.Unsupported, TerminationReason.RepresentationDeclined)) {
+            val workers = listOf(TerminationReason.BudgetExhausted, reason).mapIndexed { index, stop ->
+                val handle = object : ResumableSolve {
+                    override val isDone: Boolean get() = true
+                    override val stats: SolveStats get() = SolveStats.EMPTY
+                    override val work: Long get() = 0L
+                    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long) =
+                        SolveResult.Unknown(stop)
+                    override fun close() = Unit
+                }
+                PortfolioWorker.ofSolve("worker-$index", index, resumable = { handle }) { _, _ ->
+                    error("the retained handle must run")
+                }
+            }
+
+            val result = Portfolio.thompson(workers).use { it.solve() }
+
+            assertEquals(reason, assertIs<SolveResult.Unknown>(result).reason)
+        }
+    }
+
+    @Test
     fun `unsettled optimization should retain a declined arm reason without a limit`() {
         for (reason in listOf(TerminationReason.Unsupported, TerminationReason.RepresentationDeclined)) {
             val workers = listOf(TerminationReason.BudgetExhausted, reason).mapIndexed { index, stop ->

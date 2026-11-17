@@ -28,8 +28,106 @@ internal interface ToleranceRealSearch {
         context: LpSolveContext,
     ): ToleranceSearchResult
 
+    // The minimization of `sum(costs(r) * x(r))` over the real coordinates of [discrete] under the same reading of
+    // every relation, or null when the source has a relation the search cannot state.
+    fun optimize(discrete: Sample, costs: List<BigFraction>, context: LpSolveContext): RealCompletionOptimization?
+
     // The same search read from a frame that [lift] maps onto this one; real coordinates keep their indices.
     fun reconstructedBy(lift: (Sample) -> Sample): ToleranceRealSearch
+}
+
+// A minimization over the real coordinates of a fixed discrete point, run in rounds that each end at a point that
+// beats the previous one. A caller pauses it between rounds and resumes it with the next call.
+internal interface RealCompletionOptimization {
+    // Work charged so far, across every call.
+    val work: Long
+
+    // Runs rounds until the optimization ends, or until [shouldPause] holds or [workLimit] units have been charged by
+    // this call; a positive limit is checked between rounds, and every call runs at least one round.
+    fun advance(
+        cancellation: ExecutionControl,
+        workLimit: Long = 0L,
+        shouldPause: () -> Boolean = { false },
+    ): RealOptimizationStep
+}
+
+internal sealed interface RealOptimizationStep {
+    data object Paused : RealOptimizationStep
+    class Completed(val result: RealOptimizationResult) : RealOptimizationStep
+}
+
+// What a [RealCompletionOptimization] decides. Points hold every relation exactly, or within the source tolerance when
+// [withinTolerance].
+internal sealed interface RealOptimizationResult {
+    val withinTolerance: Boolean
+
+    // A point attaining the minimum.
+    class Optimum(
+        val reals: List<BigFraction>,
+        val value: BigFraction,
+        override val withinTolerance: Boolean,
+    ) : RealOptimizationResult
+
+    // A point and a direction of the reals along which the point stays feasible and the objective descends.
+    class Unbounded(
+        val reals: List<BigFraction>,
+        val direction: List<BigFraction>,
+        override val withinTolerance: Boolean,
+    ) : RealOptimizationResult
+
+    // No point holds every relation.
+    class Refuted(override val withinTolerance: Boolean) : RealOptimizationResult
+
+    // The minimum was not decided: a stop, a declining encoder, or an infimum the model does not attain. [incumbent]
+    // is the best point found, when there is one. A complete search that refuted everything below [infimum] states it:
+    // the model attains no value at or below it, and attains values arbitrarily close above it.
+    class Undecided(
+        val incumbent: List<BigFraction>?,
+        override val withinTolerance: Boolean,
+        val infimum: BigFraction? = null,
+    ) : RealOptimizationResult
+}
+
+// [exact], and the optimization [widened] gives in its place when [exact] refutes the point or cannot state it, as
+// when it is absent. An exact optimum strains no relation, so it stands wherever one exists; null when neither is.
+internal fun exactFirst(
+    exact: RealCompletionOptimization?,
+    widened: () -> RealCompletionOptimization?,
+): RealCompletionOptimization? = if (exact == null) widened() else ExactFirstOptimization(exact, widened)
+
+private class ExactFirstOptimization(
+    private var active: RealCompletionOptimization,
+    private var widened: (() -> RealCompletionOptimization?)?,
+) : RealCompletionOptimization {
+    private var settled = 0L
+
+    override val work: Long get() = settled + active.work
+
+    override fun advance(
+        cancellation: ExecutionControl,
+        workLimit: Long,
+        shouldPause: () -> Boolean,
+    ): RealOptimizationStep {
+        val start = work
+        while (true) {
+            val remaining = if (workLimit == 0L) 0L else (workLimit - (work - start)).coerceAtLeast(1L)
+            val step = active.advance(cancellation, remaining, shouldPause)
+            val result = (step as? RealOptimizationStep.Completed)?.result ?: return step
+            val stated = result !is RealOptimizationResult.Refuted &&
+                (result !is RealOptimizationResult.Undecided || result.incumbent != null || cancellation())
+            val fallback = widened.takeUnless { stated } ?: return step
+            widened = null
+            val next = fallback() ?: return step
+            settled += active.work
+            active = next
+            if (shouldPause() || (workLimit > 0L && work - start >= workLimit)) return RealOptimizationStep.Paused
+        }
+    }
+}
+
+// A finite objective's coefficients over [count] real coordinates as exact costs, or null when one is not finite.
+internal fun exactRealCosts(coefficients: DoubleArray, count: Int): List<BigFraction>? = List(count) { real ->
+    if (real < coefficients.size) BigFraction.ofDouble(coefficients[real]) ?: return null else BigFraction.ZERO
 }
 
 internal sealed interface ToleranceSearchResult {

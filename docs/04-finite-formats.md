@@ -143,7 +143,7 @@ onto `v`. Top-level intension equalities with `min` or `max` also retain the
 declared result in either orientation, unless it occurs within the operands.
 The frontend records which auxiliaries, selection results and affine
 outputs are functionally defined, so
-[local search](10-local-search.md#maintained-literal-channels) can derive them
+[local search](12-local-search.md#maintained-literal-channels) can derive them
 from their inputs instead of searching them. `Xcsp3Problem.definitionHints` adds
 [typed relations](02-model.md#source-definition-hints) for materialized affine
 terms, declared `binPacking` loads, extremum results and the shared indicators,
@@ -269,7 +269,7 @@ before adding its own breaks; the factors stay enforced for every consumer.
 `FlatZincProgram.definitionHints` retains `defines_var` targets and their relation
 data in compiled source coordinates, with constants, aliases, repeated roles and
 polarity. Unrecognized orientations remain reference hints. Parsing does not order
-a definition graph; [definition materialization](10-local-search.md#source-definition-materialization)
+a definition graph; [definition materialization](12-local-search.md#source-definition-materialization)
 does that on request. Source constraints enforce every relation independently of
 these annotations.
 
@@ -339,7 +339,7 @@ Supported float operations retain exact relations: strict and reified comparison
 `RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling and
 products. Finite float choices become `RealFiniteDomain` memberships, products with
 a finite operand keep `ContinuousProduct` with the declared values, and
-unrestricted products go to [polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic). Linear
+unrestricted products go to [polynomial completion](19-nonlinear-arithmetic.md#polynomial-real-arithmetic). Linear
 consumers install alternatives privately; an LP relaxation alone never establishes
 membership or a product.
 
@@ -359,7 +359,7 @@ component needs one, reports no optimum and refutes only that way. Grid relation
 `GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
 
 The original arm is numerical under the declared tolerance. Finite LP deductions are
-[numerical](17-linear-programming.md#numerical-and-exact-deductions), and a real
+[numerical](21-lp-engine.md#numerical-and-exact-deductions), and a real
 completion needs no exact certificate when every real declaration and every relation
 over a real coordinate holds within the slack. Rows measure it as
 [MPS rows do](05-arithmetic-formats.md#tolerance-publication). On the finite lane and
@@ -401,13 +401,36 @@ nothing, and keeps no LP lemma from that refutation. Minimization completes its 
 the same way when the objective reads no real coordinate; in every mode, a leaf with an
 absolute value, finite membership or choice product that the leaf LP leaves undecided
 is completed by the exact search. Local-search and ALNS workers
-[complete candidates](11-neighborhoods.md#continuous-candidate-completion) the same way.
-A leaf whose objective reads a real coordinate completes through the leaf LP alone, so
-its refusals and refutations are those of the float point and the exact LP. Projected
+[complete candidates](13-neighborhoods.md#continuous-candidate-completion) the same way.
+
+A leaf whose objective reads a real coordinate keeps the leaf LP's optimum when the LP
+certifies it. The LP states only the envelope of an absolute value, an extremum, a finite membership
+or a choice product, and the closure of a disjunction, disequality or strict row, so its
+optimum can lie off the relation; such a leaf, one with an
+uncertified completion, and in numerical mode one the exact LP refutes, is minimized by
+the same search extended with the objective. Each round asks the search for a point
+below the incumbent, stated as the strict row `c * x < incumbent`, so the search refutes
+every partial choice whose relaxation cannot beat it. The disjunct each relation takes
+at that point, and the side of each disequality, leave a polyhedron inside the search
+model, and the exact LP over it gives the next incumbent. A refutation proves the
+incumbent optimal, or the leaf infeasible when there is none. A polyhedron whose strict
+row keeps it from its infimum contributes that infimum as the row `c * x <= infimum`, so
+another polyhedron that attains it still decides the leaf. A refuted infimum is the
+leaf's floor: its point stands as an incumbent, and the run reports an optimum only
+when its best is at or below every such floor. The exact encoding is minimized first, and an exact optimum stands in
+every mode, since it strains no relation. In numerical mode the model within the slack
+is minimized when the exact one refutes the leaf or cannot state it, and its optimum is
+reported at its point; a ray of that model's polyhedron proves the objective unbounded
+when its point holds within the absolute slack and no relation's residual grows along
+it. The rounds are leaf search work: the minimize path charges them to its slice and
+pauses between rounds, resuming the pending leaf; a round itself runs to completion, so
+a leaf with many choice combinations can overrun its slice and repay the excess from the
+slices that follow. A stopped round decides nothing, and a refutation that finishes as
+the stop fires is not trusted. Projected
 grid witnesses are checked against the same readings.
 
 A source without integer columns takes the finite lane under a positive tolerance and
-the [linear theory](15-linear-arithmetic.md) at zero tolerance; an MPS source takes the
+the [linear theory](18-linear-arithmetic.md) at zero tolerance; an MPS source takes the
 finite lane in both modes. On the finite lane its Booleans and clauses are searched by
 Boolean backtracking with a real completion at each leaf. Such a source stays with the
 linear theory when it states an open set over reals (a disequality, a reified row,
@@ -416,15 +439,18 @@ since leaf completion attains no supremum, and when all solutions are requested.
 finite lane, for sources with integer columns too, states each unconditional strict row
 as its closed row, so every engine on the original source decides the row acceptance
 reads, and a local-search or ALNS run on a grid publishes only grid points acceptance
-admits. An optimum against it is attained. In a source with integer columns, a reified non-strict row
-takes the finite lane and its false side holds exactly there. A source the finite lane
-cannot complete, such as one with an extremum or an open integer, routes to the linear
-theory and is decided exactly, its strict rows included. A real product without finite
+admits. An optimum against it is attained. It also leaves each real minimum and
+maximum inert during search and enforces it at the leaf: the leaf completion chooses
+the selected operand, within the slack where acceptance reads it. In a source with
+integer columns, a reified non-strict row takes the finite lane and its false side
+holds exactly there. A source the finite lane cannot complete, such as one with an open
+integer or, under `--exact`, an extremum, routes to the linear theory and is decided
+exactly, its strict rows included. A real product without finite
 choices or a power above one routes to the polynomial theory, which states each
 unconditional strict row as its closed row in both of its formulas and decides the
 exact formula first: its witness,
 optimum or unboundedness stands. Only an exact refutation hands the remaining budget to a
-[widened formula](16-nonlinear-arithmetic.md#tolerance-widened-formulas), which reads the
+[widened formula](19-nonlinear-arithmetic.md#tolerance-widened-formulas), which reads the
 slack where acceptance does with the slack acceptance grants at a zero bound; a relation
 whose result is also one of its operands, such as `float_times(x, z, z)`, stays exact
 there although acceptance reads it within the slack. A widened witness is published only
@@ -457,8 +483,12 @@ Exact coordinates are emitted as `% klause-exact:` comments beside
 MiniZinc-compatible decimal assignments. Rational coordinates retain their fraction;
 irrational coordinates use `root(index;[c0,c1,...])`, naming the selected real root
 of the rational polynomial in ascending coefficient order. Decimal assignments are
-display approximations; an irrational display uses the midpoint of its captured
-isolating interval. The fraction or root description retains source authority.
+display approximations: each prints its nearest binary64 value, an algebraic one once
+its [narrowed interval](22-exact-arithmetic.md#binary64-values-of-algebraic-scalars)
+settles it. `% klause-float-rounding: x = undetermined` marks a coordinate whose
+narrowing ran out of allowance, printed as its interval's rounded midpoint, and
+`overflow` one past binary64, printed as the largest finite value of its sign. The
+fraction or root description retains source authority.
 A completion accepted within tolerance carries binary64 coordinates only, so its
 block has decimal assignments and no exact comments.
 Mixed exact/grid witnesses add

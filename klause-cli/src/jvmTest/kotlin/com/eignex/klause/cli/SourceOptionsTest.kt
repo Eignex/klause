@@ -8,6 +8,7 @@ import com.eignex.klause.formats.opb.opbSemantics
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.formats.xcsp3.xcsp3Semantics
 import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
@@ -123,6 +124,35 @@ class SourceOptionsTest {
     }
 
     @Test
+    fun `one optimality tolerance replacement should preserve the other effective component`() {
+        for ((flag, absolute) in listOf(
+            "--source-absolute-optimality-tolerance" to true, "--source-relative-optimality-tolerance" to false,
+        )) {
+            val common = CommonOptions()
+            parseArgs(arrayOf(flag, "1/10"), commonFlagSpecs(common)) {}
+
+            common.sourceOverrides(mpsSemantics)
+
+            val gap = assertNotNull(common.sourceSemantics?.effective?.optimalityTolerance)
+            val defaults = assertNotNull(mpsSemantics.optimalityTolerance)
+            val tenth = SemanticRational.of(bigIntOf(1), bigIntOf(10))
+            assertEquals(if (absolute) tenth else defaults.absolute, gap.absolute)
+            assertEquals(if (absolute) defaults.relative else tenth, gap.relative)
+            assertEquals(mpsSemantics.feasibilityTolerance, common.sourceSemantics?.effective?.feasibilityTolerance)
+        }
+    }
+
+    @Test
+    fun `a zero feasibility tolerance flag should make the optimality gap exact`() {
+        val common = CommonOptions()
+        parseArgs(arrayOf("--source-absolute-tolerance", "0"), commonFlagSpecs(common)) {}
+
+        common.sourceOverrides(mpsSemantics)
+
+        assertEquals(OptimalityTolerance(), common.sourceSemantics?.effective?.optimalityTolerance)
+    }
+
+    @Test
     fun `exact source controls should accept an explicit zero tolerance component`() {
         val common = CommonOptions()
         parseArgs(arrayOf("--exact", "--source-absolute-tolerance", "0"), commonFlagSpecs(common)) {}
@@ -137,6 +167,7 @@ class SourceOptionsTest {
         for ((declared, args) in listOf(
             flatZincSemantics to arrayOf("--exact", "--float-buckets", "2"),
             mpsSemantics to arrayOf("--exact", "--source-relative-tolerance", "1/10"),
+            mpsSemantics to arrayOf("--exact", "--source-relative-optimality-tolerance", "1/10"),
             flatZincSemantics to arrayOf("--float-semantics", "continuous", "--float-grid-lo", "0"),
         )) {
             val common = CommonOptions()
@@ -154,6 +185,8 @@ class SourceOptionsTest {
             OpbMode to arrayOf("--unbounded-int-lo", "1"),
             Xcsp3Mode to arrayOf("--unbounded-int-lo", "1"),
             SmtLibMode to arrayOf("--source-relative-tolerance", "0"),
+            SmtLibMode to arrayOf("--source-relative-optimality-tolerance", "0"),
+            MiniZincMode to arrayOf("--source-relative-optimality-tolerance", "0"),
             MiniZincMode to arrayOf("--pin-absent-optional-values", "false"),
             MpsMode to arrayOf("--pin-absent-optional-values", "false"),
         )

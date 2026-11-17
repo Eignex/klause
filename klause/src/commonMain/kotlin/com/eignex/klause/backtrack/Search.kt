@@ -1,18 +1,9 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.selector.SolutionGuided
-import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.values
-import com.eignex.klause.lp.bounding.LpEngine
-import com.eignex.klause.lp.bounding.LpParams
-import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
-import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
@@ -26,21 +17,14 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.projectSeedCore
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
-import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.search.BooleanBranching
-import com.eignex.klause.solver.search.BranchingConflict
-import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchAtomRegistry
-import com.eignex.klause.solver.search.SearchBranchAttemptObserver
-import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
@@ -63,23 +47,11 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SearchTraversalPolicy
-import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.solver.search.completedSearchSample
-import com.eignex.klause.solver.validation.ToleranceRealSearch
-import com.eignex.klause.solver.validation.ToleranceSearchResult
-import com.eignex.klause.solver.validation.permitsToleranceOptimum
-import com.eignex.klause.solver.validation.toleranceSearch
-import com.eignex.klause.solver.validation.verifyRealCoordinates
-import com.eignex.klause.theory.AbsRealCompletion
-import com.eignex.klause.theory.requiresRealCompletionSearch
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntHashSet
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 /** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
  *  levels. Returns `null` when the input was empty (no assumption layer to
@@ -126,8 +98,9 @@ internal sealed interface SearchOutcome {
          *  certified feasible or infeasible (see `LpEngine.leafCertify`), so the tree is not provably
          *  all-infeasible — the terminal verdict must be `unknown`, not UNSAT. */
         val indeterminate: Boolean = false,
+        val stopCause: SearchStopCause? = null,
     ) : SearchOutcome
-    data object BudgetCapped : SearchOutcome
+    data class BudgetCapped(val stopCause: SearchStopCause? = null) : SearchOutcome
 }
 
 /** Lazy shared-session outcomes for satisfaction, enumeration, and sampling. */
@@ -332,7 +305,9 @@ internal class CpSatisfactionTraversal(
                             null
                         }
                         is ComponentResult.Conflict -> SearchOutcome.Exhausted()
-                        ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+                        ComponentResult.Indeterminate -> SearchOutcome.Exhausted(
+                            indeterminate = true, stopCause = session.executionControls.stopCause,
+                        )
                     }
                     if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
                 }
@@ -397,7 +372,9 @@ internal class CpSatisfactionTraversal(
                     null
                 }
                 is ComponentResult.Conflict -> exhausted
-                ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+                ComponentResult.Indeterminate -> SearchOutcome.Exhausted(
+                    indeterminate = true, stopCause = session.executionControls.stopCause,
+                )
             }
         }
         traversal.resetScope()
@@ -443,7 +420,9 @@ internal class CpSatisfactionTraversal(
                         null
                     }
                     is ComponentResult.Conflict -> SearchOutcome.Exhausted()
-                    ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+                    ComponentResult.Indeterminate -> SearchOutcome.Exhausted(
+                        indeterminate = true, stopCause = session.executionControls.stopCause,
+                    )
                 }
                 if (rootOutcome == null) {
                     run = session.openRun(problem.numBoolVars, traversal).also {
@@ -478,23 +457,26 @@ internal class CpSatisfactionTraversal(
             }
 
             SearchRunEvent.Indeterminate.Component -> {
+                val cause = run?.componentStop?.stopCause ?: learningSession?.executionControls?.stopCause
                 finishQuery()
-                if (params.cancellation()) SearchOutcome.BudgetCapped else SearchOutcome.Exhausted(indeterminate = true)
+                SearchOutcome.Exhausted(indeterminate = true, stopCause = cause)
             }
 
             SearchRunEvent.Paused -> if (slice != null) {
                 if (!traversal.clauseExchangeEnded) params.clauseExchange?.onSearchPause(cp.session)
                 null
             } else {
+                val cause = learningSession?.executionControls?.stopCause
                 finishQuery()
-                SearchOutcome.BudgetCapped
+                SearchOutcome.BudgetCapped(cause)
             }
 
             SearchRunEvent.Indeterminate.Budget,
             SearchRunEvent.Indeterminate.Cancelled,
             -> {
+                val cause = learningSession?.executionControls?.stopCause
                 finishQuery()
-                SearchOutcome.BudgetCapped
+                SearchOutcome.BudgetCapped(cause)
             }
         }
     }
@@ -534,12 +516,6 @@ internal class CpSatisfactionTraversal(
             traversal.releaseRetainedState()
         }
     }
-}
-
-private interface LpSearchResource : AutoCloseable {
-    fun releasePersistentSolvers()
-
-    fun totalSolveWork(): Long
 }
 
 @Suppress("TooGenericExceptionCaught") // all owned resources must be attempted even when release fails
@@ -715,517 +691,6 @@ private class CpSatisfactionTraversalPolicy(
         params.clauseExchange?.onSearchEnd(session)
         return if (slice?.pauses() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
     }
-}
-
-/**
- * The columns a one-model search over [session] completes at leaves, or null when it decides every column.
- *
- * These are the columns no factor declares and [objective] gives no term. Only CP factors declare what they
- * read, while a [BacktrackParams.componentFactory] component may read any column through the shared trail,
- * so a search with such components decides every column.
- */
-internal fun BacktrackParams.leafColumns(
-    session: PropagationSession,
-    objective: LinearObjective? = null,
-): LeafColumns? {
-    val unread = (if (componentFactory == null) session.projection.unreadColumns else null) ?: return null
-    return if (objective == null) unread
-    else unread.withoutTerms(objective.boolWeightValues, objective.intCoefficientValues)
-}
-
-internal class BacktrackBrancher(
-    private val session: PropagationSession,
-    params: BacktrackParams,
-    private val sink: SolveStatsSink?,
-    private val restart: RestartSchedule,
-    private val branching: BacktrackBranching = BacktrackBranching.Selectors,
-    private val nativeConflict: () -> PropagationResult.Unsat? = { null },
-    leafColumns: LeafColumns? = null,
-) : SearchBrancher,
-    SearchBranchAttemptObserver {
-    // Node count from which the next restart may count root fixings. The count visits every variable, so it runs
-    // at most once per that many nodes: one visit per node, amortized.
-    private var nextRootCount = 0L
-    private val variables = params.variableSelector.fresh()
-    private val values = params.valueSelector.fresh()
-    private val phase = PhaseSaving(session.problem.numBoolVars, session.problem.numIntVars, params)
-    private val rng = Random(params.randomSeed ?: Random.Default.nextLong())
-    private val onEvent = params.onEvent
-    private val branchObserver = params.branchObserver
-    private var restartCount = 0L
-
-    // A replayed point leads every value order, restarts included, until a decision it led conflicts.
-    private var hint: Sample? = null
-    private val hinted = HashSet<SearchDecision>()
-
-    init {
-        session.completeAtLeaves(leafColumns)
-        variables.onSessionCreated(session)
-        if (params.phaseSaving || params.targetPhasing) {
-            session.retractingListener = { phase.capture(it, session) }
-        }
-        if (variables.tracksUnassign) {
-            val numBool = session.problem.numBoolVars
-            session.unassignListener = { encoded ->
-                variables.onUnassign(if (encoded < numBool) VarRef.Bool(encoded) else VarRef.IntVar(encoded - numBool))
-            }
-        }
-    }
-
-    override fun nextBranch(context: SearchContext): List<SearchDecision>? {
-        val variable = branching.pick(session)
-            ?.takeIf(::isOpen)
-            ?: variables.pick(session, rng)
-            ?: return null
-        if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
-        branching.onBranch(variable)
-        val preferred = branching.orderValues(
-            variable,
-            phase.applyPhase(variable, values.values(session, variable, rng), rng),
-        )
-        val replayed = hint?.let { hintedValue(variable, it) }
-        val ordered = if (replayed == null) preferred else sequenceOf(replayed) + preferred.filter { it != replayed }
-        val alternatives = when (variable) {
-            is VarRef.Bool -> ordered.map { value ->
-                require(value == 0L || value == 1L) { "Boolean selector produced $value" }
-                SearchDecision.Bool(Lit.make(variable.varId, value != 0L))
-            }.toList()
-
-            // A probing selector offers nothing once it has refuted every value, so the node is dead. Null
-            // would claim every column is fixed and surface the open domains' minima as a model.
-            is VarRef.IntVar -> ordered.firstOrNull()?.let { splitIntAlternatives(session, variable, it) }
-                ?: emptyList()
-        }
-        if (replayed != null) alternatives.firstOrNull()?.let(hinted::add)
-        if (session.probeCancelled) {
-            session.probeCancelled = false
-            context.requestCancellationPoll()
-        }
-        return alternatives
-    }
-
-    private fun isOpen(variable: VarRef): Boolean = when (variable) {
-        is VarRef.Bool -> session.needsBoolDecision(variable.varId)
-        is VarRef.IntVar -> session.needsIntDecision(variable.varId)
-    }
-
-    private fun hintedValue(variable: VarRef, point: Sample): Long? = when (variable) {
-        is VarRef.Bool -> if (point.boolValue(variable.varId)) 1L else 0L
-        is VarRef.IntVar -> point.intValue(variable.varId).takeIf { it in session.intDomain(variable.varId) }
-    }
-
-    private fun clearHint() {
-        hint = null
-        hinted.clear()
-    }
-
-    override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-        branchObserver?.onAttempt(decision, context)
-        branchObserver.observeGuidance(PooledGuidanceKind.ATTEMPT) {
-            PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, hint != null,
-                decision = decision.guidanceText(), level = context.decisionLevel)
-        }
-    }
-
-    override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
-        branching.onCommit(decision, decisionLevel)
-        branchObserver?.onCommit(decision, decisionLevel)
-        branchObserver.observeGuidance(PooledGuidanceKind.COMMIT) {
-            PooledGuidanceObservation(PooledGuidanceKind.COMMIT, hint != null,
-                decision = decision.guidanceText(), level = decisionLevel)
-        }
-        val (variable, value) = decision.asSelectorDecision() ?: return
-        variables.onCommit(variable)
-        values.onCommit(variable, value)
-        phase.capture(variable, session)
-        phase.captureTargetIfDeeper(session, decisionLevel)
-        sink?.search?.observeNode(decisionLevel)
-    }
-
-    override fun onConflict(decision: SearchDecision?) {
-        sink?.search?.observeFail()
-        // A prune without a decision, or a refuted hinted decision, shows the replayed point cannot lead further.
-        if (decision == null || decision in hinted) clearHint()
-        val (variable, value) = decision?.asSelectorDecision() ?: return
-        val conflict = nativeConflict()
-        if (conflict == null) variables.onConflict(variable) else variables.onConflict(variable, conflict)
-        values.onConflict(variable, value)
-        phase.onConflictTick()
-    }
-
-    fun onCascadeConflict(conflict: PropagationResult.Unsat) {
-        sink?.search?.observeFail()
-        clearHint()
-        variables.onConflict(null, BranchingConflict(conflict.conflictBools, conflict.conflictInts))
-        phase.onConflictTick()
-    }
-
-    fun onPropagation(implied: PropagationResult.Implied) {
-        variables.onPropagation(implied)
-        val count = implied.numBools + implied.numInts + implied.intMinKeys.size + implied.intMaxKeys.size +
-            implied.intHoleVarIds.size + implied.intSetKeys.size
-        sink?.search?.observePropagation(count.toLong())
-    }
-
-    override fun onLearnedConflict(conflict: com.eignex.klause.solver.search.SearchLearnedConflict) {
-        sink?.search?.observeLearned(conflict.guardLiterals, conflict.lbd)
-    }
-
-    override fun onRestart(decisions: Long) {
-        branching.onRestart()
-        variables.onRestart()
-        values.onRestart()
-        sink?.search?.observeRestart()
-        sink?.search?.let { search ->
-            if (search.nodeCount >= nextRootCount) {
-                search.observeRootFixed(session.fixedVariableCount())
-                nextRootCount = search.nodeCount + session.problem.numBoolVars + session.problem.numIntVars
-            }
-        }
-        onEvent?.invoke(SearchEvent.Restart(++restartCount, decisions))
-    }
-
-    fun onSolution(sample: Sample) {
-        branchObserver.observeGuidance(PooledGuidanceKind.LOCAL) {
-            PooledGuidanceObservation(PooledGuidanceKind.LOCAL, hint != null)
-        }
-        clearHint()
-        variables.onSolution(sample)
-        values.onSolution(sample)
-        phase.onSolution(sample)
-    }
-
-    fun importPooledSolution(sample: Sample, guideValues: Boolean = false, replay: Boolean = false) {
-        if (guideValues && values is SolutionGuided) values.onSolution(sample)
-        if (replay && sample.numBoolVars == session.problem.numBoolVars &&
-            sample.numIntVars == session.problem.numIntVars
-        ) {
-            hint = sample
-            hinted.clear()
-        }
-        phase.onSolution(sample)
-    }
-}
-
-internal fun splitIntAlternatives(
-    session: PropagationSession,
-    variable: VarRef.IntVar,
-    preferred: Long,
-): List<SearchDecision> {
-    val domain = session.intDomain(variable.varId)
-    check(domain.min < domain.max) { "selector chose fixed integer ${variable.varId}" }
-    val split = when {
-        (domain.spanOrNull() == null) && preferred > domain.min && preferred < domain.max -> preferred
-        (domain.spanOrNull() == null) -> boundsMidpoint(domain)
-        preferred >= domain.max -> domain.max - 1
-        else -> maxOf(preferred, domain.min)
-    }
-    val lower = SearchDecision.IntAtMost(variable.varId, split)
-    val upper = SearchDecision.IntAtLeast(variable.varId, split + 1)
-    return if (preferred <= split) listOf(lower, upper) else listOf(upper, lower)
-}
-
-/** Optional search-only branch guidance layered over the configured selectors. */
-internal interface BacktrackBranching {
-    fun onBranch(variable: VarRef) {}
-
-    fun onCommit(decision: SearchDecision, depth: Int) {}
-
-    fun onRestart() {}
-
-    fun pick(session: PropagationSession): VarRef? = null
-
-    fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> = values
-
-    data object Selectors : BacktrackBranching
-}
-
-private fun SearchDecision.asSelectorDecision(): Pair<VarRef, Long>? = when (this) {
-    is SearchDecision.Bool -> VarRef.Bool(literal ushr 1) to if (literal and 1 == 0) 1L else 0L
-    is SearchDecision.IntAtMost -> VarRef.IntVar(variable) to upper
-    is SearchDecision.IntAtLeast -> VarRef.IntVar(variable) to lower
-    is SearchDecision.IntEqual -> VarRef.IntVar(variable) to value
-    is SearchDecision.Theory -> null
-}
-
-private sealed interface BacktrackCompletion {
-    val lpResource: LpSearchResource? get() = null
-
-    fun addTo(components: MutableList<SearchComponent>)
-
-    fun sample(model: com.eignex.klause.solver.search.AssembledSearchModel, cp: CpSearchComponent): Sample
-
-    data object Discrete : BacktrackCompletion {
-        override fun addTo(components: MutableList<SearchComponent>) = Unit
-
-        override fun sample(
-            model: com.eignex.klause.solver.search.AssembledSearchModel,
-            cp: CpSearchComponent,
-        ): Sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp.assignmentKey))
-    }
-
-    class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {
-        override val lpResource: LpSearchResource get() = component
-
-        override fun addTo(components: MutableList<SearchComponent>) {
-            components += component
-        }
-
-        override fun sample(
-            model: com.eignex.klause.solver.search.AssembledSearchModel,
-            cp: CpSearchComponent,
-        ): Sample = component.sample()
-    }
-
-    companion object {
-        fun of(
-            problem: Problem,
-            cp: CpSearchComponent,
-            params: BacktrackParams,
-            sink: SolveStatsSink?,
-            solveContext: LpSolveContext,
-        ): BacktrackCompletion = if (problem.numRealVars == 0) {
-            Discrete
-        } else {
-            ResidualReal(ResidualRealComponent(problem, cp, params, sink, solveContext))
-        }
-    }
-}
-
-/**
- * The LP relaxation as a satisfaction-path participant: refute a node whose relaxation is infeasible.
- *
- * The optimize path reaches the relaxation through [ResumableMinimize], which owns an [LpEngine] to bound
- * against an incumbent. A satisfaction search has no incumbent and no objective to bound, but that is not
- * the only thing a relaxation decides — an infeasible one refutes its node whatever the objective is, and
- * on real models that is where most of the pruning comes from. Without this component the relaxation is
- * unreachable on a model with no objective, however the arm is configured.
- *
- * The engine is handed a zero objective, so the bound arms it also carries can never prune: the
- * lower bound of a zero objective is zero and the bound to beat is infinite. Root cut harvesting,
- * hull pruning and variable shaving are objective-independent; node pruning uses infeasibility.
- */
-private class LpFeasibilityComponent(
-    problem: Problem,
-    private val cp: CpSearchComponent,
-    private val params: BacktrackParams,
-    sink: SolveStatsSink?,
-    solveContext: LpSolveContext,
-) : LpSearchResource {
-    private var preparationToken: ExecutionControl? = null
-    private val cancellation = cancelledWhen(
-        { params.cancellation.deadline() }, { params.cancellation.workScheduled() },
-        { params.cancellation.stopPolling },
-    ) {
-        params.cancellation() || preparationToken?.invoke() == true
-    }
-    val engine = LpEngine(
-        problem,
-        LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
-        LpParams(
-            lpPlan = params.lpPlan,
-            lpConfig = params.lpConfig,
-            cancellation = cancellation,
-            solveBudgetMillis = params.solveBudgetMillis,
-            randomSeed = params.randomSeed,
-            zeroObjectivePricing = params.zeroObjectivePricing,
-        ),
-        sink ?: SolveStatsSink(backend = "backtrack"),
-        solveContext,
-    )
-
-    val component: SearchComponent = engine.propagator.also { engine.cpAdapter.attach(cp.session, feasibility = true) }
-
-    val preparesRoot: Boolean
-        get() {
-            val plan = engine.params.lpPlan
-            return plan.pruneHulls || plan.variableShaving ||
-                (plan.rootCutHarvest && (engine.lpSeparators.isNotEmpty() || plan.gomoryEnabled || plan.mirEnabled))
-        }
-
-    fun prepareRoot(): Boolean {
-        val plan = engine.params.lpPlan
-        val remaining = params.cancellation.deadline()?.let {
-            (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds
-        } ?: params.solveBudgetMillis
-        val millis = remaining?.let { minOf((it * plan.rootBudgetFraction).toLong(), plan.rootBudgetMillis) }
-            ?: plan.rootBudgetMillis
-        val before = engine.totalSolveWork()
-        val token = params.cancellation or ExecutionControl {
-            (plan.rootMaxWork > 0L && engine.totalSolveWork() - before >= plan.rootMaxWork) ||
-                engine.lpWorkAllowanceSpent()
-        } or if (plan.rootBudgetFraction > 0.0 && !params.cancellation.workScheduled()) {
-            ExecutionControl.after(millis.coerceAtLeast(0L).milliseconds)
-        } else {
-            ExecutionControl.Never
-        }
-        preparationToken = token
-        try {
-            engine.harvestRootRelaxation(token)
-            if (plan.variableShaving) {
-                for (bound in engine.shaveVariableBounds(token)) {
-                    if (cp.session.implyIntAtLeast(bound.varId, bound.lo) is PropagationResult.Unsat ||
-                        cp.session.implyIntAtMost(bound.varId, bound.hi) is PropagationResult.Unsat
-                    ) return true
-                }
-            }
-            return false
-        } finally {
-            preparationToken = null
-            engine.cpAdapter.reset()
-        }
-    }
-
-    override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
-
-    override fun totalSolveWork(): Long = engine.totalSolveWork()
-
-    override fun close() = engine.close()
-}
-
-private class ResidualRealComponent(
-    private val problem: Problem,
-    private val cp: CpSearchComponent,
-    params: BacktrackParams,
-    sink: SolveStatsSink?,
-    solveContext: LpSolveContext,
-) : SearchComponent,
-    LpSearchResource {
-    private val toleranceCheck = params.toleranceCheck
-    private val absCompletion = if (problem.requiresRealCompletionSearch()) AbsRealCompletion(problem) else null
-
-    // The source's search within its tolerance, present when acceptance admits tolerance points.
-    private val toleranceSearch = toleranceCheck.toleranceSearch()
-    private val floatCompletion = toleranceCheck.permitsToleranceOptimum()
-    private val solveContext = solveContext
-    private var absWork = 0L
-    private val engine = LpEngine(
-        problem,
-        LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
-        LpParams(
-            lpPlan = params.lpPlan.copy(bounding = true, learn = true, realResidual = true),
-            lpConfig = params.lpConfig,
-            cancellation = params.cancellation,
-            solveBudgetMillis = params.solveBudgetMillis,
-            randomSeed = params.randomSeed,
-            zeroObjectivePricing = params.zeroObjectivePricing,
-        ),
-        sink ?: SolveStatsSink(backend = "backtrack"),
-        solveContext,
-    )
-    private var completed: Sample? = null
-
-    private fun discrete(): Sample = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
-        LongArray(problem.numIntVars) { cp.session.intDomain(it).min })
-
-    override fun check(context: SearchContext): ComponentCheck {
-        completed = null
-        if (context.cancelled()) return ComponentCheck.Indeterminate
-        absCompletion?.let { completion ->
-            if (toleranceCheck != null && floatCompletion) {
-                engine.leafFloatCompletion(cp.session, toleranceCheck)?.let { sample ->
-                    completed = sample
-                    return ComponentCheck.Feasible
-                }
-                if (context.cancelled()) return ComponentCheck.Indeterminate
-            }
-            val discrete = discrete()
-            val stop = context.executionControls.cancellation
-            // Within tolerance the search over the source decides the leaf; a witness then gives way to an exact
-            // completion of the leaf when one exists, which strains no relation.
-            val tolerant = toleranceSearch?.let { search ->
-                when (val decided = withinTolerance(search, discrete, context)) {
-                    ToleranceLeaf.Refuted -> return ComponentCheck.Infeasible()
-                    ToleranceLeaf.Undecided -> return ComponentCheck.Indeterminate
-                    ToleranceLeaf.Unavailable -> null
-                    is ToleranceLeaf.Completed -> decided.sample
-                }
-            }
-            val checked = completion.complete(discrete, stop, context.executionControls, solveContext)
-            absWork += checked.work
-            val exact = (checked.result as? AbsRealCompletion.Result.Witness)?.let { result ->
-                discrete.copy(reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() },
-                    exactReals = result.reals,
-                ).takeIf { verifyRealCoordinates(problem, it, stop) is Verification.Accepted }
-            }
-            (exact ?: tolerant)?.let { sample ->
-                completed = sample
-                return ComponentCheck.Feasible
-            }
-            return if (checked.result == AbsRealCompletion.Result.Refuted && tolerant == null) {
-                ComponentCheck.Infeasible()
-            } else ComponentCheck.Indeterminate
-        }
-        val result = engine.leafCertify(cp.session, toleranceCheck, poolRefutation = toleranceSearch == null)
-        return when (result.verdict) {
-            LpVerdict.FEASIBLE,
-            LpVerdict.ATTAINED_OPTIMUM,
-            LpVerdict.TOLERANCE_OPTIMUM,
-            LpVerdict.UNBOUNDED,
-            -> {
-                val sample = Sample(
-                    BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
-                    LongArray(problem.numIntVars) { cp.session.intDomain(it).min },
-                    result.reals,
-                    result.exactReals,
-                )
-                val tolerated = result.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck?.invoke(sample) == true
-                if ((problem as? BakedProblem)?.factorProjections?.requiresRealSourceCheck == true && !tolerated &&
-                    verifyRealCoordinates(problem, sample) !is Verification.Accepted
-                ) ComponentCheck.Indeterminate
-                else ComponentCheck.Feasible.also { completed = sample }
-            }
-
-            // A refused float point and an exact refutation leave the decision to the search within tolerance.
-            LpVerdict.INFEASIBLE, LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
-                val unsearched = if (result.verdict == LpVerdict.INFEASIBLE) ComponentCheck.Infeasible()
-                else ComponentCheck.Indeterminate
-                val search = toleranceSearch ?: return unsearched
-                when (val decided = withinTolerance(search, discrete(), context)) {
-                    ToleranceLeaf.Refuted -> ComponentCheck.Infeasible()
-                    ToleranceLeaf.Undecided -> ComponentCheck.Indeterminate
-                    ToleranceLeaf.Unavailable -> unsearched
-                    is ToleranceLeaf.Completed -> ComponentCheck.Feasible.also { completed = decided.sample }
-                }
-            }
-        }
-    }
-
-    private sealed interface ToleranceLeaf {
-        data object Refuted : ToleranceLeaf
-        data object Undecided : ToleranceLeaf
-        data object Unavailable : ToleranceLeaf
-        class Completed(val sample: Sample) : ToleranceLeaf
-    }
-
-    // The leaf decided by the search within tolerance. A source the search cannot state, or a witness acceptance
-    // refuses, leaves the leaf its verdict without the search.
-    private fun withinTolerance(search: ToleranceRealSearch, discrete: Sample, context: SearchContext): ToleranceLeaf {
-        val stop = context.executionControls.cancellation
-        val found = search.complete(discrete, stop, context.executionControls, solveContext)
-        absWork += found.work
-        return when (found) {
-            is ToleranceSearchResult.Refuted -> ToleranceLeaf.Refuted
-            is ToleranceSearchResult.Undecided -> ToleranceLeaf.Undecided
-            ToleranceSearchResult.Unavailable -> ToleranceLeaf.Unavailable
-            is ToleranceSearchResult.Witness -> discrete.copy(
-                reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() }, exactReals = found.reals,
-            ).takeIf { toleranceCheck?.invoke(it) == true }?.let(ToleranceLeaf::Completed)
-                ?: if (stop()) ToleranceLeaf.Undecided else ToleranceLeaf.Unavailable
-        }
-    }
-
-    override fun retract(decisionLevel: Int) {
-        completed = null
-    }
-
-    fun sample(): Sample = requireNotNull(completed)
-
-    override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
-
-    override fun totalSolveWork(): Long = engine.totalSolveWork() + absWork
-
-    override fun close() = engine.close()
 }
 
 /** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */
