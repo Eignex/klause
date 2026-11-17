@@ -44,6 +44,13 @@ Committed entries take precedence over cached mirror indexes; stored-form entrie
 A collection without a committed index falls back to the mirror's index.
 Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
 
+The SMT catalog uses the [2025 non-incremental SMT-LIB release](https://zenodo.org/records/15493090)
+for arithmetic, bitvectors, free functions, arrays, datatypes and their quantifier-free combinations.
+Select a logic with `suite=smtlib-qfbv` (likewise `smtlib-qfuf`, `smtlib-qfdt` and the combined logics).
+`set=smt-ground-v1` selects the frozen ground-theory additions to `set=sweep`.
+The `reference`, `reference-cvc5` and `klause-reference*` recipes include these collections;
+their per-suite caps and reference-verdict filters apply independently.
+
 `lab/source-identity.json` accepts `cases` containing at most eight selected
 single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.

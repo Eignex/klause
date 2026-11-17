@@ -1,8 +1,10 @@
 package com.eignex.klause.bench.lab
 
+import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchProtocol
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
@@ -12,8 +14,27 @@ import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class LabSelectionsTest {
+    @ParameterizedTest
+    @ValueSource(strings = [
+        "reference", "reference-cvc5", "klause-reference", "klause-reference-ls",
+        "klause-reference-bt", "klause-reference-parallel",
+    ])
+    fun `reference recipes include every ground SMT sweep suite`(name: String) {
+        val recipe = BenchProtocol.json.parseToJsonElement(Files.readString(Path.of("lab/recipes/$name.json")))
+            .jsonObject.getValue("bench").jsonObject
+        val parameters = recipe.getValue("request").jsonObject.getValue("parameters").jsonObject
+        val selections = BenchProtocol.json.parseToJsonElement(parameters.getValue("selections").jsonPrimitive.content)
+            .jsonArray.map { it.jsonObject.getValue("suite").jsonPrimitive.content }.toSet()
+        val filters = recipe.getValue("referenceFilters").jsonObject
+        val suites = ProblemSets.load(listOf("smt-ground-v1")).map { it.suite }.toSet()
+
+        assertTrue(selections.containsAll(suites))
+        assertTrue(filters.keys.containsAll(suites))
+    }
+
     @Test
     fun `independent catalog selections retain their order and selectors`() {
         val settings = LabSettings(mapOf("selections" to """[{"suite":"a","max":"2"},{"set":"frozen"}]"""))

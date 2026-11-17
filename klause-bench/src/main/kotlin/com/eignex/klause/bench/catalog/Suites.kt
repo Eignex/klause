@@ -404,7 +404,14 @@ internal object Suites {
                     format = Format.WCNF,
                 )
             },
-        )
+        ) + ExternalCollections.smtlibGround.map { (logic, collection) ->
+            archiveSuite(
+                "smtlib-${logic.lowercase().replace("_", "")}",
+                "SMT-LIB $logic non-incremental set (fetched; 1/family by default)",
+                collection,
+                "non-incremental/$logic",
+            )
+        }
     }
 
     /**
