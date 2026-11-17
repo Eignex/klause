@@ -44,6 +44,7 @@ internal object MiniZincMode : CliMode {
         private var oznPath: String? = null
         private var outputObjective = false
         private var completeAssignment = false
+        private var floatSource = false
         private var floatApproximation = false
         private var gridEnumeration = false
         private var sourceSemantics: EffectiveSourceSemantics? = null
@@ -81,6 +82,7 @@ internal object MiniZincMode : CliMode {
             }
             val original = program.sourceProgram
             sourceSemantics = original.semantics
+            floatSource = original.floatVarsByName.isNotEmpty()
             cliLogger(common.verbose).v {
                 "parsed $path: bools=${original.problem.numBoolVars} ints=${original.problem.numIntVars} " +
                     "factors=${original.problem.numFactors}"
@@ -176,7 +178,7 @@ internal object MiniZincMode : CliMode {
         }
 
         override fun output(common: CommonOptions): OutputProtocol =
-            MiniZincOutput(floatApproximation, sourceSemantics, gridEnumeration)
+            MiniZincOutput(floatApproximation, sourceSemantics, gridEnumeration, floatSource)
     }
 }
 
@@ -185,6 +187,7 @@ internal class MiniZincOutput(
     private val floatApproximation: Boolean = false,
     private val sourceSemantics: EffectiveSourceSemantics? = null,
     private val gridEnumeration: Boolean = false,
+    private val floatSource: Boolean = false,
 ) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
     private val integerScopeChanged = sourceSemantics?.let {
@@ -311,6 +314,7 @@ internal class MiniZincOutput(
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
         println("%%%mzn-stat: solutions=$solutions")
+        if (floatSource) println("%%%mzn-stat: floatApproximation=$floatApproximation")
         // Presolve summary is backend-independent (presolve runs before any engine), so emit it here.
         printStatPairs("%%%mzn-stat:", presolveStatPairs(stats))
         if (stats.run.backend.isNotEmpty()) {

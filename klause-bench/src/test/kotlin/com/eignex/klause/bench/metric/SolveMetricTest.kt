@@ -46,6 +46,28 @@ class SolveMetricTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = ["false", "true", ""])
+    fun `a solve should record the float approximation the solver reported`(reported: String) {
+        val (record, _) = SolveMetric.solve(
+            entry(),
+            SolverInvocation.Settings(),
+            Budget(),
+            "now",
+            "fixture",
+            installedBuild = { null },
+            invoke = { _, _, _, _ ->
+                SolverInvocation.Result(
+                    null, null, null, proven = false,
+                    stats = reported.takeIf { it.isNotEmpty() }?.let { mapOf("floatApproximation" to it) }.orEmpty(),
+                    rawOutput = "", command = "cli",
+                )
+            },
+        )
+
+        assertEquals(reported.takeIf { it.isNotEmpty() }, record.stats["floatApproximation"])
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `best incumbent should compare the full signed objective range`(maximize: Boolean) {
         val attribution = listOf(

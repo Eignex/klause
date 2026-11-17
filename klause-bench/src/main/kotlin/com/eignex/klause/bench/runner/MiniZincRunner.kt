@@ -41,8 +41,6 @@ internal class MiniZincRunner(
             maximize = program.solve is SolveDirective.Maximize,
             lsObjective = executionProgram.localSearchObjective,
             definitionalSweep = executionProgram.definitionalSweep,
-            hasFloats = program.floatVarsByName.isNotEmpty(),
-            floatApproximation = program.floatVarsByName.values.any { !it.lpOnly },
             searchParams = program.searchHints?.toSearchHints()?.toBacktrackParams(
                 program.problem.numBoolVars,
                 program.problem.numIntVars,

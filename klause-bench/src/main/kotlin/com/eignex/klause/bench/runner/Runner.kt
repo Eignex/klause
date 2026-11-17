@@ -35,8 +35,6 @@ internal class ResolvedProblem(
      *  budget/seed/restart config into this so benchmark runs honour the model author's
      *  intended search the same way the CLI does. */
     val searchParams: BacktrackParams? = null,
-    val hasFloats: Boolean = false,
-    val floatApproximation: Boolean = false,
     deferredObjective: Lazy<LinearObjective?>? = null,
     internal val optimizes: Boolean = objective != null,
 ) {

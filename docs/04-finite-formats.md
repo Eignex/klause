@@ -498,7 +498,9 @@ point's binary64 value and approximation reason. With a selected finite grid,
 optimum or a grid enumeration, and `=====UNSATISFIABLE=====` follows only a refutation
 of the integer and Boolean relations. The
 `% klause-float-claim:` comment marks the private grid, and
-`% klause-grid-verdict:` retains the native grid verdict as a comment. Optimization
+`% klause-grid-verdict:` retains the native grid verdict as a comment. With `-s`, a
+source declaring float variables also reports `floatApproximation=true` or `false`
+as a statistic, stating whether this run selected the grid. Optimization
 keeps its accepted incumbent without an optimum marker; a search without an
 accepted point remains UNKNOWN.
 Caller declaration-range overrides still withhold default-source completion claims.
