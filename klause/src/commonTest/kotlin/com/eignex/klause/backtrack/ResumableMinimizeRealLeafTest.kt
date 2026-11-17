@@ -3,15 +3,19 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpCertificationPolicy
@@ -777,6 +781,47 @@ class ResumableMinimizeRealLeafTest {
             assertEquals(fixture.opened, fixture.closed)
             assertEquals(fixture.persistentOpened, fixture.persistentClosed)
         }
+    }
+
+    // `minimize k` over `k + v >= 1` with `k` in `[0, 1]` and `v` in `[0, bound]`, within a slack of 1/1024.
+    private fun integralGap(bound: Double) = Problem(
+        0, 1, arrayOf(IntDomain(0, 1)),
+        arrayOf<Factor>(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0)),
+        numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(bound),
+        semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+            feasibilityTolerance = dyadicSlack).resolve(),
+    )
+
+    private fun minimizeUnstated(source: Problem, objective: LinearObjective): MinimizeResult =
+        BacktrackSolver(source.bake(), LpSolveContext.finite(numerical = true)).minimize(objective,
+            BacktrackParams(randomSeed = 0L, toleranceCheck = unstatedAcceptance(source)))
+
+    @Test
+    fun `an integral objective leaf only the slack admits should leave the optimum unproved without a search`() {
+        val result = minimizeUnstated(integralGap(0.9995), LinearObjective(intCoefficients = longArrayOf(1L)))
+
+        assertEquals(1.0, assertIs<MinimizeResult.BestFound>(result).objective)
+    }
+
+    @Test
+    fun `an integral objective leaf infeasible beyond the slack should be refuted without a search`() {
+        val result = minimizeUnstated(integralGap(0.99), LinearObjective(intCoefficients = longArrayOf(1L)))
+
+        assertEquals(1.0, assertIs<MinimizeResult.Optimal>(result).objective)
+    }
+
+    @Test
+    fun `an exact optimum under a tolerance the search cannot state should stand without an optimality proof`() {
+        // `r1 = abs(x)`, `r2 = abs(w)` and `x + w = 0`: the leaf LP misses the optimum 0 of `r1 - r2`.
+        val source = tolerantReals(
+            arrayOf(RealAbs(0, 2), RealAbs(1, 3),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 0.0)),
+            doubleArrayOf(-1.0, -1.0, 0.0, 0.0), doubleArrayOf(1.0, 1.0, 1.0, 1.0),
+        )
+
+        val result = minimizeUnstated(source, LinearObjective(realCoefficients = doubleArrayOf(0.0, 0.0, 1.0, -1.0)))
+
+        assertEquals(0.0, assertIs<MinimizeResult.BestFound>(result).objective)
     }
 }
 

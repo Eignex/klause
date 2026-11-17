@@ -21,6 +21,7 @@ import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.ToleranceRealSearch
 import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
+import com.eignex.klause.solver.validation.readingSourceSlack
 import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
@@ -120,7 +121,7 @@ internal class LpFeasibilityComponent(
             zeroObjectivePricing = params.zeroObjectivePricing,
         ),
         sink ?: SolveStatsSink(backend = "backtrack"),
-        solveContext,
+        solveContext.readingSourceSlack(problem, params.toleranceCheck),
     )
 
     val component: SearchComponent = engine.propagator.also { engine.cpAdapter.attach(cp.session, feasibility = true) }
@@ -200,7 +201,7 @@ private class ResidualRealComponent(
             zeroObjectivePricing = params.zeroObjectivePricing,
         ),
         sink ?: SolveStatsSink(backend = "backtrack"),
-        solveContext,
+        solveContext.readingSourceSlack(problem, toleranceCheck),
     )
     private var completed: Sample? = null
 
@@ -220,14 +221,18 @@ private class ResidualRealComponent(
             }
             val discrete = discrete()
             val stop = context.executionControls.cancellation
-            // Within tolerance the search over the source decides the leaf; a witness then gives way to an exact
-            // completion of the leaf when one exists, which strains no relation.
-            val tolerant = toleranceSearch?.let { search ->
+            // Within tolerance the search over the source decides the leaf. Where it cannot, an exact completion is
+            // still a point within tolerance, but an exact refutation decides nothing about the region within the
+            // slack.
+            toleranceSearch?.let { search ->
                 when (val decided = withinTolerance(search, discrete, context)) {
                     ToleranceLeaf.Refuted -> return ComponentCheck.Infeasible()
                     ToleranceLeaf.Undecided -> return ComponentCheck.Indeterminate
-                    ToleranceLeaf.Unavailable -> null
-                    is ToleranceLeaf.Completed -> decided.sample
+                    ToleranceLeaf.Unavailable -> Unit
+                    is ToleranceLeaf.Completed -> {
+                        completed = decided.sample
+                        return ComponentCheck.Feasible
+                    }
                 }
             }
             val checked = completion.complete(discrete, stop, context.executionControls, solveContext)
@@ -237,13 +242,17 @@ private class ResidualRealComponent(
                     exactReals = result.reals,
                 ).takeIf { verifyRealCoordinates(problem, it, stop) is Verification.Accepted }
             }
-            (exact ?: tolerant)?.let { sample ->
+            exact?.let { sample ->
                 completed = sample
                 return ComponentCheck.Feasible
             }
-            return if (checked.result == AbsRealCompletion.Result.Refuted && tolerant == null) {
-                ComponentCheck.Infeasible()
-            } else ComponentCheck.Indeterminate
+            if (checked.result == AbsRealCompletion.Result.Refuted && toleranceSearch == null) {
+                return ComponentCheck.Infeasible()
+            }
+            // The relaxation refuted over every side widened by the slack holds no point within tolerance either.
+            val refuted = toleranceSearch != null &&
+                engine.leafCertify(cp.session, toleranceCheck, poolRefutation = false).refutesWithinSlack
+            return if (refuted) ComponentCheck.Infeasible() else ComponentCheck.Indeterminate
         }
         val result = engine.leafCertify(cp.session, toleranceCheck, poolRefutation = toleranceSearch == null)
         return when (result.verdict) {
@@ -265,15 +274,17 @@ private class ResidualRealComponent(
                 else ComponentCheck.Feasible.also { completed = sample }
             }
 
-            // A refused float point and an exact refutation leave the decision to the search within tolerance.
+            // A refutation over the sides widened by the slack holds within the tolerance. A refused float point and
+            // any other LP refutation leave the decision to the search within tolerance, and that refutation decides
+            // nothing about the region within the slack where the search cannot run.
             LpVerdict.INFEASIBLE, LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
-                val unsearched = if (result.verdict == LpVerdict.INFEASIBLE) ComponentCheck.Infeasible()
-                else ComponentCheck.Indeterminate
-                val search = toleranceSearch ?: return unsearched
+                if (result.refutesWithinSlack) return ComponentCheck.Infeasible()
+                val search = toleranceSearch ?: return if (result.verdict == LpVerdict.INFEASIBLE) {
+                    ComponentCheck.Infeasible()
+                } else ComponentCheck.Indeterminate
                 when (val decided = withinTolerance(search, discrete(), context)) {
                     ToleranceLeaf.Refuted -> ComponentCheck.Infeasible()
-                    ToleranceLeaf.Undecided -> ComponentCheck.Indeterminate
-                    ToleranceLeaf.Unavailable -> unsearched
+                    ToleranceLeaf.Undecided, ToleranceLeaf.Unavailable -> ComponentCheck.Indeterminate
                     is ToleranceLeaf.Completed -> ComponentCheck.Feasible.also { completed = decided.sample }
                 }
             }
@@ -288,7 +299,7 @@ private class ResidualRealComponent(
     }
 
     // The leaf decided by the search within tolerance. A source the search cannot state, or a witness acceptance
-    // refuses, leaves the leaf its verdict without the search.
+    // refuses, is unavailable: it decides nothing.
     private fun withinTolerance(search: ToleranceRealSearch, discrete: Sample, context: SearchContext): ToleranceLeaf {
         val stop = context.executionControls.cancellation
         val found = search.complete(discrete, stop, context.executionControls, solveContext)

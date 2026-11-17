@@ -399,24 +399,30 @@ absolute slack for a residual row. An unconditional strict row states its closed
 every component, and components that hold exactly keep their exact encodings for their
 other relations. A witness of the search lies within what acceptance admits, and a refutation
 shows that no point holds every relation within that slack, so the leaf verdict stays
-feasible or infeasible. A source with a real product without finite choices, a power
-above one, or a kept relation no linear encoder enforces has no such search, and its
-leaves keep the verdicts of the float point and the exact completion. Where the leaf
-needs a search for an absolute value, finite membership or choice product, a witness
-gives way to an exact completion when one exists, which strains no relation. A leaf of
-linear rows reaches the search when its exact completion refutes it or decides
-nothing, and keeps no LP lemma from that refutation. Minimization completes its leaves
-the same way when the objective reads no real coordinate; in every mode, a leaf with an
+feasible or infeasible. Numerical LP refutations, at nodes and leaves alike, move every
+row and column side they read outward by the slack first (`LpBoundSlack`), so they refute
+only a region infeasible by more than the slack, and such a refutation decides the leaf
+and keeps its lemma. A leaf of linear rows that the LP leaves undecided, or refutes only
+on the exact sides, reaches the search. A source with a real product without finite
+choices, a power above one, or a kept relation no linear encoder enforces has no such
+search. Its leaves take an exact completion as a witness, since an exact point holds
+every relation within the slack, and are refuted only by the widened LP; a leaf neither
+decides ends undecided, as does one whose search ends without a decision or finds a point
+acceptance refuses. Minimization completes its leaves the same way when the objective
+reads no real coordinate. At zero tolerance a leaf with an
 absolute value, finite membership or choice product that the leaf LP leaves undecided
-is completed by the exact search. Local-search and ALNS workers
+is completed by the exact search, whose refutation stands. Local-search and ALNS workers
 [complete candidates](13-neighborhoods.md#continuous-candidate-completion) the same way.
 
 A leaf whose objective reads a real coordinate keeps the leaf LP's optimum when the LP
-certifies it. The LP states only the envelope of an absolute value, an extremum, a finite membership
-or a choice product, and the closure of a disjunction, disequality or strict row, so its
-optimum can lie off the relation; such a leaf, one with an
-uncertified completion, and in numerical mode one the exact LP refutes, is minimized by
-the same search extended with the objective. Each round asks the search for a point
+certifies it. Numerical mode takes the fast decision wherever one exists: a leaf the
+float LP settles reports the float vertex of the stated rows that acceptance admits,
+and only a leaf the LP cannot settle reports the optimum within the slack. The LP states
+only the envelope of an absolute value, an extremum, a finite
+membership or a choice product, and the closure of a disjunction, disequality or strict
+row, so its optimum can lie off the relation; such a leaf, one with an uncertified
+completion, and in numerical mode one the LP refutes, is minimized by the same search
+extended with the objective. Each round asks the search for a point
 below the incumbent, stated as the strict row `c * x < incumbent`, so the search refutes
 every partial choice whose relaxation cannot beat it. The disjunct each relation takes
 at that point, and the side of each disequality, leave a polyhedron inside the search
@@ -425,12 +431,21 @@ incumbent optimal, or the leaf infeasible when there is none. A polyhedron whose
 row keeps it from its infimum contributes that infimum as the row `c * x <= infimum`, so
 another polyhedron that attains it still decides the leaf. A refuted infimum is the
 leaf's floor: its point stands as an incumbent, and the run reports an optimum only
-when its best is at or below every such floor. The exact encoding is minimized first, and an exact optimum stands in
-every mode, since it strains no relation. In numerical mode the model within the slack
-is minimized when the exact one refutes the leaf or cannot state it, and its optimum is
-reported at its point; a ray of that model's polyhedron proves the objective unbounded
-when its point holds within the absolute slack and no relation's residual grows along
-it. The rounds are leaf search work: the minimize path charges them to its slice and
+when its best is at or below every such floor. Under a positive tolerance the model
+within the slack is minimized directly, and its optimum is reported at its point; a
+ray of that model's polyhedron proves the objective unbounded when its point holds
+within the absolute slack and no relation's residual grows along it. Where that model
+cannot state the source, the exact model is minimized in its place: its points stand
+as incumbents without an optimality proof and its refutation decides nothing. The node
+bounds that prune and propagate against these optima move every side they price by the
+slack too, lowering the bound by the reduced cost times the slack. That is the widening
+the source gives a row, declaration or column that the relaxation states as the source
+does. A relaxation row that combines source rows, such as a presolve aggregate, a cut,
+the bound a row implies for an open side or the chord of an envelope, moves by the sum
+of its multipliers times the slack under the tolerance yet is widened by one slack, so a
+subtree whose improvement lies within the remaining `(sum - 1) * slack` times that row's
+dual can still be pruned or refuted, and its verdict then depends on visiting order. The
+rounds are leaf search work: the minimize path charges them to its slice and
 pauses between rounds, resuming the pending leaf; a round itself runs to completion, so
 a leaf with many choice combinations can overrun its slice and repay the excess from the
 slices that follow. A stopped round decides nothing, and a refutation that finishes as

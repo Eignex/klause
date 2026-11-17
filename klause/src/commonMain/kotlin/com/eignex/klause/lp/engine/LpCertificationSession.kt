@@ -62,7 +62,8 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         acceptFloatInfeasibility: Boolean,
     ): CertifiedLpResult {
         if (context.numericalDeductions && acceptFloatInfeasibility) {
-            numericalLpRefutation(model, solver, result, cancellation, observer)?.let { return it }
+            numericalLpRefutation(model, solver, result, cancellation, observer, context.refutationSlack)
+                ?.let { return it }
         }
         // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
         if ((claim == LpClaim.ATTAINED_OPTIMUM || claim == LpClaim.FEASIBLE_COMPLETION) &&
@@ -121,17 +122,19 @@ internal fun numericalLpRefutation(
     result: FloatLpResult?,
     cancellation: ExecutionControl,
     observer: LpCertificationObserver?,
+    slack: LpBoundSlack = LpBoundSlack.NONE,
 ): CertifiedLpResult? {
     if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null })
     if (result != null || (model.exactState != null && solver.solvedExactState !== model.exactState)) return null
     val ray = solver.infeasibleRay ?: return null
     val timer = LpPhaseTimer(observer, LpSolvePhase.FLOAT_REFUTATION)
-    val checked = floatFarkasRay(model, ray)
+    val checked = floatFarkasRay(model, ray, slack)
     val stopped = cancellation()
     timer.finish(if (stopped) "CANCELLED" else if (checked != null) "ACCEPTED" else "REFUSED")
     if (stopped) return CertifiedLpResult(null, null, null, null, null, false, { null })
     return checked?.let {
-        CertifiedLpResult(null, null, null, null, null, false, { null }, floatInfeasibility = it)
+        CertifiedLpResult(null, null, null, null, null, false, { null }, floatInfeasibility = it,
+            refutesWithinSlack = slack != LpBoundSlack.NONE)
     }
 }
 

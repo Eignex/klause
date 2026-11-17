@@ -283,7 +283,10 @@ private fun LpEngine.checkRetainedRootBound(
     limits: ReconstructionLimits,
     cancellation: ExecutionControl,
 ): BigFraction? {
-    if (numericalDeductions) return FloatDeductionCertificate.of(model, duals)?.lowerBound?.let(BigFraction::ofDouble)
+    if (numericalDeductions) {
+        return FloatDeductionCertificate.of(model, duals, slack = solveContext.boundSlack)?.lowerBound
+            ?.let(BigFraction::ofDouble)
+    }
     val observer = rootCertificationObserver()
     val integer = if (model.exactState != null) {
         certifyLpIntegerBoundOnly(model, duals, limits, cancellation, observer, solveContext.certificationPolicy)

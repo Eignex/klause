@@ -400,7 +400,8 @@ internal fun LpRelaxation.leafResult(
         return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) {
-        return LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray(), refutingFactors = factorsOf(certified))
+        return LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray(), refutingFactors = factorsOf(certified),
+            refutesWithinSlack = certified.refutesWithinSlack)
     }
     val exact = exactLeafResult(certified, problem, objective, sample)
     return if (exact.verdict in setOf(LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND)) {
@@ -526,6 +527,9 @@ internal class LeafRealResult(
     // The value of the real part of the objective that the leaf approaches but does not attain, when its search
     // proved that; no point of the leaf reaches it.
     val unattainedInfimum: BigFraction? = null,
+    // On [LpVerdict.INFEASIBLE], whether the refutation holds with every side widened by the solve's refutation slack,
+    // so no point within the source tolerance completes the leaf either.
+    val refutesWithinSlack: Boolean = false,
 )
 
 internal fun LeafRealResult.checkedEncoding(

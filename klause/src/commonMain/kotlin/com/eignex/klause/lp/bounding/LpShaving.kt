@@ -342,7 +342,7 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: ExecutionControl): Boolean {
         }
         if (result != null) return@use false
         val floatRay = simplex.infeasibleRay ?: return@use false
-        if (numericalDeductions) return@use floatFarkasRay(model, floatRay) != null
+        if (numericalDeductions) return@use floatFarkasRay(model, floatRay, solveContext.refutationSlack) != null
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.EXACT_FARKAS,
             integerFarkasRay(model, floatRay, observer = rootCertificationObserver()),

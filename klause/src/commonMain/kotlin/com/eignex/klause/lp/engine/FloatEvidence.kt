@@ -602,23 +602,30 @@ internal class FloatDeductionCertificate private constructor(
         /**
          * The certificate [y] supports on [model], or null when a reduced cost beyond its rounding meets a side no row
          * bounds. [observer] sees the outcome as a node deduction phase; [node] shares the binary64 view and row bounds
-         * with the other certificates priced on the same model.
+         * with the other certificates priced on the same model. Each priced side, a row's included, moves by [slack]
+         * against the bound, so the bound holds over the model with every side widened by it.
          */
         fun of(
             model: LpModel,
             y: DoubleArray,
             observer: LpCertificationObserver? = null,
             node: FloatNodeView = FloatNodeView(model),
+            slack: LpBoundSlack = LpBoundSlack.NONE,
         ): FloatDeductionCertificate? {
             val timer = LpPhaseTimer(observer, LpSolvePhase.NODE_DEDUCTION)
             val declined = arrayOf("INPUT")
-            return build(node, y, declined).also {
+            return build(node, y, declined, slack).also {
                 timer.finish(if (it != null) "FLOAT_COMPLETE" else "FLOAT_${declined[0]}")
             }
         }
 
         @Suppress("ReturnCount", "CyclomaticComplexMethod", "LongMethod")
-        private fun build(node: FloatNodeView, y: DoubleArray, declined: Array<String>): FloatDeductionCertificate? {
+        private fun build(
+            node: FloatNodeView,
+            y: DoubleArray,
+            declined: Array<String>,
+            slack: LpBoundSlack,
+        ): FloatDeductionCertificate? {
             val model = node.model
             if (y.size != model.m || !node.finite) return null
             val view = node.evidence
@@ -637,6 +644,7 @@ internal class FloatDeductionCertificate private constructor(
             val citedRows = BooleanArray(view.m)
             val rows = node.rows
             val cache = IntArray(2 * view.m) { NONE_CITED }
+            val moved = SideSlack(view, slack)
 
             // An open side is priced at the tightest bound one row implies; that row and each side the implied bound
             // reads are cited.
@@ -659,7 +667,7 @@ internal class FloatDeductionCertificate private constructor(
                     val side = if (boxed.isFinite()) boxed else implied(j, d > 0.0) ?: return null
                     value += d * side
                     magnitude += abs(d * side)
-                    margin += error * abs(side)
+                    margin += error * abs(side) + abs(d) * moved.at(j, side)
                     if (boxed.isFinite()) reduced[j] = d / scale
                     continue
                 }
@@ -667,7 +675,8 @@ internal class FloatDeductionCertificate private constructor(
                 // takes the reduced cost as the zero it equals within that rounding: the numerical acceptance.
                 val low = if (lower.isFinite()) lower else implied(j, true) ?: 0.0
                 val high = if (upper.isFinite()) upper else implied(j, false) ?: 0.0
-                margin += (abs(d) + error) * max(abs(low), abs(high))
+                val extent = max(abs(low), abs(high))
+                margin += (abs(d) + error) * (extent + moved.at(j, extent))
                 sides[j] = (sides[j].toInt() or finiteSides(view, j)).toByte()
             }
             margin += (view.numVars + view.m + 4) * UNIT_ROUNDOFF * magnitude
@@ -678,6 +687,27 @@ internal class FloatDeductionCertificate private constructor(
             if (!lowerBound.isFinite()) return null
             return FloatDeductionCertificate(model, duals, reduced, sides, citedRows, lowerBound)
         }
+    }
+}
+
+// How far a side of column [j] moves under [slack]. A relative slack reads a magnitude no smaller than the side's
+// before the lower-bound shift: a column side plus its origin, and a row's right-hand side plus each shifted term, so
+// it never falls short of the slack the source bound admits.
+internal class SideSlack(private val view: FloatEvidenceModel, private val slack: LpBoundSlack) {
+    private val rows by lazy(LazyThreadSafetyMode.NONE) {
+        val magnitudes = DoubleArray(view.m) { abs(view.rhs(it)) }
+        for (j in 0 until view.n) {
+            val origin = view.origin(j)
+            if (origin != 0.0) view.forEachInColumn(j) { row, a -> magnitudes[row] += abs(a * origin) }
+        }
+        magnitudes
+    }
+
+    fun at(j: Int, side: Double): Double = when {
+        slack.absolute == 0.0 && slack.relative == 0.0 -> 0.0
+        slack.relative == 0.0 -> slack.absolute
+        j >= view.n -> slack.at(rows[j - view.n])
+        else -> slack.at(abs(side) + abs(view.origin(j)))
     }
 }
 
@@ -729,10 +759,11 @@ private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<
  * the column cancels: first in binary64, then exactly on the integral ray, slacks first. The integral ray is checked
  * again against the box alone, each column at the side the exact sign of its combination meets, which is the side an
  * infeasibility clause cites; when it fails, the empty ray refutes without a citable combination. The numerical
- * counterpart of [certifyLpFarkas].
+ * counterpart of [certifyLpFarkas]. Every finite side, a row's slack included, moves outward by [slack] first, so the
+ * ray refutes only a model infeasible by more than it.
  */
 @Suppress("ReturnCount")
-internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
+internal fun floatFarkasRay(model: LpModel, ray: DoubleArray, slack: LpBoundSlack = LpBoundSlack.NONE): LongArray? {
     if (ray.size != model.m || !model.finiteExactInput()) return null
     var largest = 0.0
     for (value in ray) {
@@ -743,13 +774,14 @@ internal fun floatFarkasRay(model: LpModel, ray: DoubleArray): LongArray? {
     val view = FloatEvidenceModel(model)
     val rows = lazy { RowView(view) }
     val normalized = DoubleArray(ray.size) { ray[it] / largest }
-    val sign = farkasSign(view, normalized, rows) ?: return null
+    val moved = SideSlack(view, slack)
+    val sign = farkasSign(view, normalized, rows, moved) ?: return null
     val oriented = DoubleArray(ray.size) { sign * normalized[it] }
     val open = openColumns(view)
     foldOpenColumns(view, oriented, rows, open)
     val rounded = roundDuals(model, oriented)?.mult ?: return LongArray(0)
     val folded = foldExactly(model, view, rows, rounded, open) ?: return LongArray(0)
-    return folded.takeIf { refutesInBox(model, view, it) } ?: LongArray(0)
+    return folded.takeIf { refutesInBox(model, view, it, moved) } ?: LongArray(0)
 }
 
 // Columns with an open side, slacks first: folding a structural column back into a cancelled slack's row would undo it.
@@ -816,7 +848,12 @@ private fun foldExactly(
 // Whether the integral [ray] refutes the box with the Farkas margin, each column taken at the side the exact sign of
 // its combination meets; a nonzero combination meeting an open side refutes nothing.
 @Suppress("ReturnCount")
-internal fun refutesInBox(model: LpModel, view: FloatEvidenceModel, ray: LongArray): Boolean {
+internal fun refutesInBox(
+    model: LpModel,
+    view: FloatEvidenceModel,
+    ray: LongArray,
+    moved: SideSlack = SideSlack(view, LpBoundSlack.NONE),
+): Boolean {
     var activity = 0.0
     var magnitude = 0.0
     for (i in 0 until view.m) {
@@ -843,8 +880,9 @@ internal fun refutesInBox(model: LpModel, view: FloatEvidenceModel, ray: LongArr
         val sign = exact?.signum() ?: if (r > 0.0) 1 else -1
         if (sign == 0) continue
         if (exact != null) r = exact.toDouble()
-        val side = if (sign > 0) view.upper(j) else view.lower(j)
-        if (!side.isFinite()) return false
+        val boxed = if (sign > 0) view.upper(j) else view.lower(j)
+        if (!boxed.isFinite()) return false
+        val side = if (sign > 0) boxed + moved.at(j, boxed) else boxed - moved.at(j, boxed)
         most += r * side
         magnitude += abs(r * side)
     }
@@ -861,7 +899,7 @@ private fun exactCombination(model: LpModel, ray: LongArray, j: Int): BigFractio
 // +1 when ρ·rhs exceeds every ρ·A·z in the box by the margin, -1 when it falls below every one, else null; open sides
 // take their implied bounds from [rows].
 @Suppress("ReturnCount", "CyclomaticComplexMethod")
-private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>): Int? {
+private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<RowView>, moved: SideSlack): Int? {
     var activity = 0.0
     var magnitude = 0.0
     for (i in 0 until view.m) {
@@ -881,6 +919,8 @@ private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<Ro
             lower = low
             upper = high
         }
+        lower -= moved.at(j, lower)
+        upper += moved.at(j, upper)
         val high = r * (if (r > 0.0) upper else lower)
         val low = r * (if (r > 0.0) lower else upper)
         most += high

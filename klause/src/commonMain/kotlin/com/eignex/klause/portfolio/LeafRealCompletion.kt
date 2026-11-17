@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
@@ -21,9 +22,10 @@ import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.RealOptimizationResult
 import com.eignex.klause.solver.validation.RealOptimizationStep
 import com.eignex.klause.solver.validation.ToleranceSearchResult
-import com.eignex.klause.solver.validation.exactFirst
 import com.eignex.klause.solver.validation.exactRealCosts
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
+import com.eignex.klause.solver.validation.readingSourceSlack
+import com.eignex.klause.solver.validation.toleranceFirst
 import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
@@ -47,7 +49,8 @@ internal class LeafRealCompletion(
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val context: LpSolveContext = LpSolveContext.finite(
         problem.semantics.effective.feasibilityTolerance?.isExact == false,
-    ).copy(sparsePointRecovery = !toleranceCheck.permitsToleranceOptimum()),
+    ).copy(sparsePointRecovery = !toleranceCheck.permitsToleranceOptimum())
+        .readingSourceSlack(problem, toleranceCheck),
 ) : CandidateCompletion {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
@@ -80,9 +83,11 @@ internal class LeafRealCompletion(
             ?: return absCompletion?.let { exactSearch(it, candidate, cancellation, 0L) }
                 ?: linearCompletion(candidate, cancellation)
         // A source that accepts points within its tolerance offers the floating completion first, as a backtrack
-        // leaf does; a refused point leaves the decision to the search within tolerance.
-        val floating = linearCompletion(candidate, cancellation)
-        if (floating is Completion.Witness || cancellation()) return floating
+        // leaf does; a refused point leaves the decision to the search within tolerance, and an LP refutation decides
+        // only when it holds over every side widened by the slack.
+        var widened = false
+        val floating = linearCompletion(candidate, cancellation) { widened = it.refutesWithinSlack }
+        if (floating is Completion.Witness || cancellation() || widened) return floating
         val found = search.complete(candidate, cancellation, null, context)
         val work = floating.work + movesFor(found.work.toDouble())
         return when (found) {
@@ -91,34 +96,42 @@ internal class LeafRealCompletion(
                 (floating as? Completion.Refuted)?.factors?.takeIf { it.isNotEmpty() } ?: realFactors, work,
             )
             is ToleranceSearchResult.Undecided -> Completion.Undecided(work)
-            // Without the search the candidate keeps the verdict of its floating and exact completions.
-            ToleranceSearchResult.Unavailable ->
-                absCompletion?.let { exactSearch(it, candidate, cancellation, work) } ?: floating
+            ToleranceSearchResult.Unavailable -> beyondTolerance(candidate, cancellation, work)
             is ToleranceSearchResult.Witness -> {
                 val tolerant = candidate.copy(reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() },
                     exactReals = found.reals)
                 if (cancellation()) return Completion.Undecided(work)
-                if (toleranceCheck?.invoke(tolerant) != true) {
-                    return absCompletion?.let { exactSearch(it, candidate, cancellation, work) } ?: floating
-                }
-                // An exact completion strains no relation, so it is preferred where the search finds one.
-                val exact = absCompletion?.let { exactSearch(it, candidate, cancellation, work) }
-                exact as? Completion.Witness ?: Completion.Witness(tolerant, exact?.work ?: work)
+                if (toleranceCheck?.invoke(tolerant) == true) Completion.Witness(tolerant, work)
+                else beyondTolerance(candidate, cancellation, work)
             }
         }
     }
 
+    // Where the search within tolerance cannot decide the candidate, an exact completion is still a point within
+    // tolerance, but neither an exact refutation nor one of the LP short of the sides widened by the slack refutes the
+    // candidate.
+    private fun beyondTolerance(candidate: Sample, cancellation: ExecutionControl, spent: Long): Completion {
+        val exact = absCompletion?.let { exactSearch(it, candidate, cancellation, spent) }
+        return exact as? Completion.Witness ?: Completion.Undecided(exact?.work ?: spent)
+    }
+
     // A candidate whose objective reads a real coordinate takes the LP optimum when the LP certifies one, as a
-    // backtrack leaf does, and is otherwise minimized over the choices of its real relations: exactly first, and within
-    // the tolerance where acceptance reads it when the exact optimization refutes the point or cannot state it. An
-    // exact LP refutation stands in exact mode.
+    // backtrack leaf does, and is otherwise minimized over the choices of its real relations: within the tolerance
+    // where acceptance reads it, and exactly otherwise. Under a tolerance neither an exact optimization, which runs
+    // only where the search within it cannot, nor an LP refutation short of the sides widened by the slack refutes the
+    // candidate.
     private fun optimizedCompletion(candidate: Sample, cancellation: ExecutionControl): Completion {
-        var verdict: LpVerdict? = null
-        val linear = linearCompletion(candidate, cancellation) { verdict = it }
-        if (cancellation() || (linear is Completion.Witness && verdict != LpVerdict.FEASIBLE)) return linear
-        val costs = realCosts ?: return linear
-        val exact = choiceSearch?.takeIf { linear !is Completion.Refuted }?.optimize(candidate, costs, context)
-        val optimization = exactFirst(exact) { toleranceSearch?.optimize(candidate, costs, context) } ?: return linear
+        var leaf: LeafRealResult? = null
+        val linear = linearCompletion(candidate, cancellation) { leaf = it }
+        val decided = (linear is Completion.Witness && leaf?.verdict != LpVerdict.FEASIBLE) ||
+            leaf?.refutesWithinSlack == true
+        if (cancellation() || decided) return linear
+        val numerical = toleranceSearch != null
+        val unrefuted = if (numerical && linear is Completion.Refuted) Completion.Undecided(linear.work) else linear
+        val costs = realCosts ?: return unrefuted
+        val optimization = toleranceFirst(toleranceSearch?.optimize(candidate, costs, context)) {
+            choiceSearch?.takeIf { linear !is Completion.Refuted }?.optimize(candidate, costs, context)
+        } ?: return unrefuted
         val step = optimization.advance(cancellation)
         val work = linear.work + movesFor(optimization.work.toDouble())
         // A completion the optimization does not improve on keeps the LP's point.
@@ -134,7 +147,7 @@ internal class LeafRealCompletion(
         }?.let { Completion.Witness(it, work) }
         return when (result) {
             // The LP's proof names the rows the candidate's discrete part cannot satisfy, when it gave one.
-            is RealOptimizationResult.Refuted -> Completion.Refuted(
+            is RealOptimizationResult.Refuted -> if (numerical && !result.withinTolerance) kept else Completion.Refuted(
                 (linear as? Completion.Refuted)?.factors?.takeIf { it.isNotEmpty() } ?: realFactors, work,
             )
             is RealOptimizationResult.Optimum -> witness(result.reals) ?: kept
@@ -166,7 +179,7 @@ internal class LeafRealCompletion(
     private fun linearCompletion(
         candidate: Sample,
         cancellation: ExecutionControl,
-        observeVerdict: (LpVerdict) -> Unit = {},
+        observeLeaf: (LeafRealResult) -> Unit = {},
     ): Completion {
         val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
@@ -184,7 +197,7 @@ internal class LeafRealCompletion(
         val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
         val work = movesFor(stats.standaloneWorkOps.sum + stats.componentWorkOps.sum + pointWork)
         observeLp?.invoke(real.verdict, stats)
-        observeVerdict(real.verdict)
+        observeLeaf(real)
         if (cancellation()) return Completion.Undecided(work)
         return when (real.verdict) {
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
