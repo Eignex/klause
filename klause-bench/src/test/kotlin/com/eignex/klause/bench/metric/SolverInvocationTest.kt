@@ -712,10 +712,16 @@ class SolverInvocationTest {
     @ValueSource(strings = ["unsat", "unknown", "sat"])
     fun `the latest SMT response replaces earlier feasibility and optimization claims`(status: String) {
         val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
-            startProcess = { SolverInvocationFakeProcess("".byteInputStream(),
-                stdout = "; objective=7\nsat\n; optimizationStatus=optimal\n$status\n") })
+            startProcess = {
+                SolverInvocationFakeProcess("".byteInputStream(),
+                    stdout = "; objective=7\nsat\n; optimizationStatus=optimal\n$status\n")
+            })
 
-        assertEquals(when (status) { "sat" -> true; "unsat" -> false; else -> null }, result.feasible)
+        assertEquals(when (status) {
+            "sat" -> true
+            "unsat" -> false
+            else -> null
+        }, result.feasible)
         assertEquals(status == "unsat", result.proven)
         assertNull(result.objective)
         assertNull(result.exactObjective)
