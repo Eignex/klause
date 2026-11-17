@@ -1,0 +1,11 @@
+# Self-authored single-query QF source and model controls.
+smtlib-core/packet-array
+smtlib-core/wide-array-function
+smtlib-core/real-function-congruence
+smtlib-core/datatype-cycle
+smtlib-core/euclidean-negative
+smtlib-core/euclidean-conflict
+smtlib-core/mixed-floor
+smtlib-core/zero-division
+smtlib-core/wide-divisibility
+smtlib-core/integer-powers

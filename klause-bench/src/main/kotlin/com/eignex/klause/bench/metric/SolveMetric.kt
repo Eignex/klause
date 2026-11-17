@@ -232,7 +232,15 @@ internal object SolveMetric {
                 null
             }
             val r = timings.measure("harnessInvocationMs") { invoke(entry, settings, budget, optimize) }
-            val (witness, witnessStats) = if (r.feasible == true) {
+            val unavailable = when {
+                r.stats["smtModelRequest"] == "unsupported" -> r.stats["smtModelRequestReason"]
+                entry.ref.format == Format.SMTLIB && (r.stats["smtQueryResponses"]?.toIntOrNull() ?: 0) > 1 ->
+                    "multiple SMT queries require sequence-aware source validation"
+                else -> null
+            }
+            val (witness, witnessStats) = if (unavailable != null) {
+                null to mapOf("finalWitnessUnavailable" to unavailable)
+            } else if (r.feasible == true) {
                 timings.measure("harnessWitnessMs") {
                     witness(entry.ref, r.rawOutput) { ref, raw ->
                         timings.measure("harnessOutputMappingMs") { modelOutput(ref, raw) }

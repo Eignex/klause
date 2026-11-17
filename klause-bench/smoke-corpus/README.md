@@ -10,7 +10,7 @@ declaration. See [corpus management](../README.md#corpus-and-build-identity).
 | `dimacs` | SATLIB-style small random 3-SAT samples; self-authored pigeonhole, implication-chain, bipartite-colouring and weighted MaxSAT cases |
 | `opb` | Self-authored set-cover/cardinality; academic PB/MaxSAT competition samples `sporttournament06.opb` and `queens4-soft.wbo` |
 | `schema` | Self-authored campaign and roster schemas; regenerate campaign with `:klause-bench:dumpSchema` |
-| `smtlib` | Self-authored linear integer/real satisfaction, optimization, infeasibility, disjunction and exact-rational cases |
+| `smtlib` | Self-authored linear arithmetic and combined QF satisfaction, optimization, infeasibility, exact-rational, wide-word, datatype and total-division cases |
 | `xcsp3` | Self-authored magic-series, sum optimization, pair-cover cost, magic-square and graph-colouring cases |
 | `extensional-overlap` | Self-authored Apache-2.0 table/MDD shared-tuple contradiction and reconvergence controls |
 | `mps` | Self-authored integer and continuous optimization, equality feasibility, infeasibility, unboundedness and open decimal witness controls |
@@ -37,6 +37,17 @@ binary covering blocks with weights `(2,3,3)`, right side 4 and unit costs. A si
 column cannot cover a block, while any pair can, giving exact integer optima 4 and
 6. Their direct additive objectives preserve the independent LP blocks; fractional
 relaxations allow tableau cuts and repeated scoped node-bound controls.
+
+## Quantifier-free source controls
+
+`set=smt-qf-witness-v1` selects ten self-authored Apache-2.0 single-query sources
+from `smtlib`. They combine arrays, datatypes, 129-bit function arguments and exact
+arithmetic, with paired Euclidean quotient controls, finite-tree cycle rejection,
+independent division-by-zero choices, wide divisibility and integer exponent
+conventions. Seven are satisfiable and three are unsatisfiable by the stated
+source laws. These expectations are not executed verification. Integer `**`
+requires the SMT-LIB 2.7 Ints revision; a reference tool without that revision
+must report unsupported coverage rather than supplying contrary evidence.
 
 ## Polynomial-real SMT fixtures
 

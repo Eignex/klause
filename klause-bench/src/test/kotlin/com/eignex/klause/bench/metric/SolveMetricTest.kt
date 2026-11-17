@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincIdentityEvidence
@@ -13,6 +14,7 @@ import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -20,6 +22,32 @@ import kotlin.test.assertNull
 
 class SolveMetricTest {
     private val ref = ProblemRef("fam/inst", Format.MINIZINC, corpus("absent.mzn"), Category.CSP, Expected.Unknown)
+
+    @ParameterizedTest
+    @ValueSource(strings = ["unsupported", "multiple"])
+    fun `uncheckable SMT invocations retain their verdict without a validation witness`(kind: String) {
+        val root = Files.createTempDirectory("smt-record-test").toFile()
+        val source = root.resolve("input.smt2").apply { writeText("(check-sat)\n") }
+        val ref = ProblemRef("smt", Format.SMTLIB, ProblemSource.Prepared(source), Category.CSP, Expected.Unknown)
+        val entry = ResolvedProblem(ref, lazy { error("source parsing must stay lazy") }, optimizes = false)
+        try {
+            val (record, _) = SolveMetric.solve(entry, SolverInvocation.Settings(completeAssignment = true),
+                Budget(1000), "now", "fixture", installedBuild = { null }, invoke = { _, _, _, _ ->
+                    SolverInvocation.Result(true, null, null, proven = false,
+                        stats = if (kind == "unsupported")
+                            mapOf("smtModelRequest" to "unsupported", "smtModelRequestReason" to "conflicting option")
+                        else mapOf("smtQueryResponses" to "2"),
+                        rawOutput = "sat\n(\n)\n", command = "fixture")
+                })
+
+            assertEquals(true, record.feasible)
+            assertNull(record.finalWitness)
+            assertNotNull(record.stats["finalWitnessUnavailable"])
+            assertEquals(sha256(source.readBytes()), record.sourceHashes["model"])
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
