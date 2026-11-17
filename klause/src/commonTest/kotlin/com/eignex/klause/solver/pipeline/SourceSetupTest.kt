@@ -217,6 +217,29 @@ class SourceSetupTest {
     }
 
     @Test
+    fun `a FlatZinc real extremum should take the finite lane only under a positive tolerance`() {
+        val sources = mapOf(
+            "real" to "var 0.0..1.0: a; var 0.0..2.0: b; var 0.0..3.0: m; constraint float_max(a, b, m); " +
+                "solve satisfy;",
+            "with integers" to "var 1..2: k; var 0.0..1.0: a; var 0.0..2.0: b; var 0.0..3.0: m; " +
+                "constraint float_min(a, b, m); solve satisfy;",
+        )
+        val modes = mapOf("numerical" to SemanticOverrides(),
+            "exact" to SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+
+        val routes = sources.flatMap { (name, source) ->
+            modes.map { (mode, overrides) ->
+                val program = parseFlatZinc(source, semanticOverrides = overrides)
+                "$mode $name" to SourceSetup.prepare(SourceSetupRequest(program.sourceAttachment(),
+                    ExecutionOperation.SATISFY, FiniteEngine.FIXED)).route::class.simpleName
+            }
+        }.toMap()
+
+        assertEquals(mapOf("numerical real" to "Finite", "exact real" to "OpenTheory",
+            "numerical with integers" to "Finite", "exact with integers" to "OpenTheory"), routes)
+    }
+
+    @Test
     fun `maximization should retain source units while finite execution minimizes its negation`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(3), constant = 7)

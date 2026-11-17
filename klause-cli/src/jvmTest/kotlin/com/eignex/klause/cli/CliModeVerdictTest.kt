@@ -160,6 +160,17 @@ class CliModeVerdictTest {
         }
     }
 
+    @Test
+    fun `the exact flag should refute a FlatZinc float maximum over a bound that only tolerance admits`() {
+        val model = "var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; var 0.0..1.0: z; " +
+            "var 0.0..2.0: m; constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); " +
+            "constraint float_max(y,z,m); solve satisfy;"
+
+        val terminals = strictGapTerminals(model)
+
+        assertEquals(mapOf("default" to "==========", "exact" to "=====UNSATISFIABLE====="), terminals)
+    }
+
     // The CLI output of a FlatZinc [model] solved single-threaded under [args], by the backtrack engine unless `-e`
     // names another.
     private fun solveFlatZinc(model: String, vararg args: String): String {

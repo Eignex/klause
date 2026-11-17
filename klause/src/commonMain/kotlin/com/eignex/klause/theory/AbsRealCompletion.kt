@@ -2,6 +2,7 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -212,10 +213,11 @@ internal class SourceToleranceSearch private constructor(
         SourceToleranceSearch(completion, realCount) { this.lift(lift(it)) }
 }
 
-// Whether a fixed discrete point needs a search to complete the reals: an absolute value, a finite membership or a
-// product with unguarded finite choices states a disjunction that no single linear relaxation decides.
+// Whether a fixed discrete point needs a search to complete the reals: an absolute value, a finite membership, a
+// leaf-enforced extremum or a product with unguarded finite choices states a disjunction that no single linear
+// relaxation decides.
 internal fun Problem.requiresRealCompletionSearch(): Boolean = factors.any {
-    it is RealAbs || it is RealFiniteDomain ||
+    it is RealAbs || it is RealFiniteDomain || (it is RealArrayMinMax && it.leafEnforced) ||
         (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
 }
 
