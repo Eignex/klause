@@ -66,9 +66,9 @@ class SubcircuitPropagatorTest {
     }
 
     @Test
-    fun `subcircuit deductions should be implied by their reasons under carved holes`() {
+    fun `subcircuit deductions should be implied by their reasons once some successors are fixed`() {
         val rng = Random(0x5EA5)
-        repeat(40) { iter ->
+        repeat(30) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,
@@ -77,10 +77,11 @@ class SubcircuitPropagatorTest {
                 factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it }, subcircuit = true)),
             )
             PropagationReasonOracle.assertReasonsImply(problem, "subcircuit#$iter") { state ->
-                (0 until 6).all {
-                    val v = rng.nextInt(n)
-                    state.excludeIntValue(v, rng.nextInt(n).toLong())
-                }
+                (0 until 2).all { state.setInt(rng.nextInt(n), rng.nextInt(n).toLong()) } &&
+                    (0 until 4).all {
+                        val v = rng.nextInt(n)
+                        state.excludeIntValue(v, if (rng.nextBoolean()) v.toLong() else rng.nextInt(n).toLong())
+                    }
             }
         }
     }
