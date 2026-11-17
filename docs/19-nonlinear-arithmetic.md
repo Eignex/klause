@@ -250,10 +250,9 @@ Rejected heuristic candidates never establish a global refutation.
 
 #### Tolerance-widened formulas
 
-A factor source routed here decides its exact formula first, presolve included, and an
-exact witness, optimum or unboundedness is final. When that formula is refuted and the
-source declares a positive feasibility tolerance, `PolynomialTolerance` lowers the
-unpresolved source again, widened along the readings of
+A factor source routed here whose acceptance reads a positive slack is decided on its
+widened formula, and its exact formula decides nothing. `PolynomialTolerance`
+lowers the unpresolved source widened along the readings of
 [source acceptance](04-finite-formats.md#flatzinc-floats) by the slack acceptance grants
 at a zero bound. In each tolerance component an active non-strict row becomes a band of
 that slack around its right-hand side, while a false activator keeps the exact
@@ -266,16 +265,29 @@ Reified strict rows, disequalities, distinctness, the other relations of exact c
 and a relation whose result is also an operand stay exact. Presolve
 does not run on the widened source, because its reductions are exact, and the root
 objective bound from the declared box is withheld. SMT-LIB and linear sources, quadratic
-objectives and a zero tolerance never widen.
+objectives, a zero tolerance and a source whose acceptance reads every relation exactly
+decide the exact formula, presolve included. A tolerance with only a relative part grants
+no slack at a zero bound and states no widening; the exact formula then lies inside the
+tolerance model, so its witnesses and unboundedness stand, while its refutation is
+reported as unknown and its optimum as the best point found, without a bound.
 
-The procedure decides the widened formula exactly in what remains of the invocation's
-budget. Bands replace row equalities and fixed declarations by full-dimensional regions
-that equational reduction cannot eliminate, so projection and lifting grow, and widened
-points lie on band boundaries. A widened witness is published at the nearest floats of
-its coordinates, and only when those floats pass the source acceptance. When every point
-found rounds outside it, a band shrunk by 2^-8 of the slack supplies the point; its
-optimum is published as the best point found. A widened refutation is the verdict. A
-widened decision that reaches a limit, or publishes no point, keeps the exact refutation.
+The procedure decides the widened formula exactly within the invocation's budget. Bands
+replace row equalities and fixed declarations by full-dimensional regions that equational
+reduction cannot eliminate, so projection and lifting grow, and widened points lie on band
+boundaries. The exact formula, presolved, first searches for a witness in a quarter of
+the remaining deadline and work allowance, or a fixed allowance when neither bounds the
+invocation. An exact point holds every relation and so is a point of the tolerance model:
+an exact witness is the verdict, and exact incumbents are points the widened run must
+improve on, published in one improving sequence with its own. An exact refutation or
+optimum is discarded. A widened refutation is the verdict, and a limit leaves the source
+unknown, with the best point found, if any. A widened witness is published at the nearest floats of its coordinates, and only when
+those floats pass the source acceptance. An optimum reports the objective of the floats
+it prints, and is optimal when that value agrees with the widened optimum within the
+optimality gap; otherwise it is the best point found, bounded by that optimum. When every
+point found rounds outside acceptance, a band shrunk by 2^-8 of the slack supplies the
+point; its optimum is the best point found, bounded by the full band's optimum. A shrunken
+band refutes nothing beyond itself: if it holds no point, the source holds within the
+tolerance only at points whose floats acceptance refuses, and the result is unknown.
 
 #### Conditioned theory service
 

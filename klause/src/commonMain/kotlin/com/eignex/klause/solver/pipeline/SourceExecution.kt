@@ -14,7 +14,6 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
-import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.includingStop
@@ -544,27 +543,45 @@ private fun executeCapturedSource(
             }
             val params = request.polynomial.boundTo(invocation)
             val objective = invocation.workingLinearObjective
-            val source = original.prepareSource(
+            val sense = if (invocation.maximizeSourceObjective) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
+            fun presolved(bound: PolynomialTheoryParams) = original.prepareSource(
                 request.presolveConfig ?: PresolveConfig.DEFAULT,
                 objective?.let { if (invocation.maximizeSourceObjective) it.negated() else it },
-                request.presolveCancellation.includingStop( params.cancellation ).includingStop( params.timeout),
-                invocation.cancellation.includingStop( params.cancellation ).includingStop( params.timeout),
+                request.presolveCancellation.includingStop(bound.cancellation).includingStop(bound.timeout),
+                invocation.cancellation.includingStop(bound.cancellation).includingStop(bound.timeout),
                 request.presolveBudget,
             )
-            val sense = if (invocation.maximizeSourceObjective) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
-            // The exact formula decides first; only its refutation hands a declared tolerance the widened formula.
-            val widens = invocation.linearSource == null
+            // A source whose acceptance reads a slack has one reading, its widened formula. The exact formula only
+            // searches for a witness in a share of the budget, since an exact point is a tolerance point.
+            val reading = if (invocation.linearSource == null) {
+                PolynomialToleranceReading.of(original.resolvedModel().source)
+            } else PolynomialToleranceReading.EXACT
+            if (reading == PolynomialToleranceReading.WIDENED) {
+                val probe = params.exactProbe()
+                val source = presolved(probe)
+                val exact = if (source.infeasible) null else {
+                    original.afterSourcePreparation(source, probe.cancellation.includingStop(probe.timeout))
+                }
+                val result = if (objective == null) {
+                    val witness = exact?.let { OpenTheoryPipeline.execute(it, probe, engine, request.cores) }
+                    SourceExecutionResult.Polynomial(invocation,
+                        original.executeWidened(params, engine, request.cores, witness))
+                } else {
+                    SourceExecutionResult.Quadratic(invocation, original.optimizeWidened(objective, params, engine,
+                        sense, request.cores, callbacks.onQuadraticIncumbent) { observe ->
+                        exact?.let { OpenTheoryPipeline.optimize(it, objective, probe, engine, sense, request.cores,
+                            observe) }
+                    })
+                }
+                return result.also { it.preparationStats = source.stats }
+            }
+            val inside = reading == PolynomialToleranceReading.INSIDE
+            val source = presolved(params)
             if (source.infeasible) {
-                val widened = when {
-                    !widens -> null
-                    objective == null -> original.executeWidened(params, engine, request.cores,
-                        PolynomialTheoryStats())?.let { SourceExecutionResult.Polynomial(invocation, it) }
-                    else -> original.optimizeWidened(objective, params, engine, sense, request.cores, 0L,
-                        callbacks.onQuadraticIncumbent)?.let { SourceExecutionResult.Quadratic(invocation, it) }
-                }
-                return (widened ?: SourceExecutionResult.Refuted(invocation)).also {
-                    it.preparationStats = source.stats
-                }
+                val refuted = if (inside) {
+                    SourceExecutionResult.Declined(invocation, TerminationReason.RepresentationDeclined)
+                } else SourceExecutionResult.Refuted(invocation)
+                return refuted.also { it.preparationStats = source.stats }
             }
             val prepared = original.afterSourcePreparation(source, params.cancellation.includingStop( params.timeout))
                 ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
@@ -572,10 +589,7 @@ private fun executeCapturedSource(
                 }
             val result = if (objective == null) {
                 val exact = OpenTheoryPipeline.execute(prepared, params, engine, request.cores)
-                val widened = if (widens && exact.result is OpenTheoryResult.Unsat) {
-                    original.executeWidened(params, engine, request.cores, exact.stats)
-                } else null
-                SourceExecutionResult.Polynomial(invocation, widened ?: exact)
+                SourceExecutionResult.Polynomial(invocation, if (inside) exact.insideTolerance() else exact)
             } else {
                 val exact = OpenTheoryPipeline.optimize(
                     prepared,
@@ -586,11 +600,7 @@ private fun executeCapturedSource(
                     request.cores,
                     callbacks.onQuadraticIncumbent,
                 )
-                val widened = if (widens && exact.result is QuadraticOptimizationResult.Infeasible) {
-                    original.optimizeWidened(objective, params, engine, sense, request.cores, exact.nativeWork,
-                        callbacks.onQuadraticIncumbent)
-                } else null
-                SourceExecutionResult.Quadratic(invocation, widened ?: exact)
+                SourceExecutionResult.Quadratic(invocation, if (inside) exact.insideTolerance() else exact)
             }
             result.also { it.preparationStats = source.stats }
         }

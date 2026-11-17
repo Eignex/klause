@@ -5,8 +5,10 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.util.ExecutionControl
@@ -15,6 +17,7 @@ import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -76,11 +79,11 @@ class PolynomialToleranceTest {
             sample)
 
     @Test
-    fun `an exactly feasible product should publish an exact point by default`() {
+    fun `an exactly feasible product should publish an exact point at zero tolerance`() {
         val source = product("2.5")
 
         val point = assertIs<OpenTheoryResult.Sat>(
-            assertIs<SourceExecutionResult.Polynomial>(execute(source)).result.result).assignment
+            assertIs<SourceExecutionResult.Polynomial>(execute(source, exact)).result.result).assignment
 
         val (x, w, z) = List(3) { assertNotNull(assertNotNull(point.algebraicRealValue(it)).rational) }
         assertEquals(z, x * w)
@@ -149,34 +152,58 @@ class PolynomialToleranceTest {
     }
 
     @Test
-    fun `a widened decision stopped at its limit should keep the exact refutation`() {
+    fun `a widened decision stopped at its limit should leave the source undecided`() {
         val params = PolynomialTheoryParams(maximumWork = WIDENING_LIMIT)
 
         val result = assertIs<SourceExecutionResult.Polynomial>(execute(withinTolerance.getValue("product"),
             params = params))
 
-        assertIs<OpenTheoryResult.Unsat>(result.result.result)
+        assertIs<OpenTheoryResult.Unknown>(result.result.result)
     }
 
-    private val leastSquare = power("10.0").replace("solve satisfy;", "solve minimize y;")
+    @Test
+    fun `an exact refutation under a tolerance without an absolute part should leave the source undecided`() {
+        val relative = SemanticOverrides(feasibilityTolerance = SourceTolerance(
+            relative = SemanticRational.of(bigIntOf(1L), bigIntOf(1_000_000L))))
+
+        assertNotEquals("Unsat", verdict(withinTolerance.getValue("product"), relative))
+    }
+
+    private val leastRoot = power("10.0").replace("solve satisfy;", "solve minimize x;")
+
+    private fun optimum(source: String, overrides: SemanticOverrides = SemanticOverrides()): QuadraticIncumbent =
+        assertIs<QuadraticOptimizationResult.WithIncumbent>(
+            assertIs<SourceExecutionResult.Quadratic>(execute(source, overrides)).result.result).incumbent
 
     @Test
-    fun `an exactly feasible minimization should report the exact optimum by default`() {
-        val result = assertIs<SourceExecutionResult.Quadratic>(execute(leastSquare))
+    fun `a minimization should report the exact optimum at zero tolerance`() {
+        val result = assertIs<SourceExecutionResult.Quadratic>(execute(leastRoot, exact))
 
         val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result.result)
         assertEquals(BigFraction.ONE, optimum.incumbent.value.rational)
     }
 
     @Test
-    fun `an exactly infeasible minimization should attain the optimum within the tolerance`() {
-        val slack = BigFraction.of(bigIntOf(1L), bigIntOf(10_000_000L))
+    fun `a minimization should report the optimum within the tolerance by default`() {
+        val value = assertNotNull(optimum(leastRoot).value.rational)
 
+        assertTrue(value < BigFraction.ONE && value >= BigFraction.ONE - SLACK)
+    }
+
+    @Test
+    fun `a minimization satisfiable only within the tolerance should attain its optimum by default`() {
         val result = assertIs<SourceExecutionResult.Quadratic>(execute(
             power("0.99999995").replace("solve satisfy;", "solve minimize x;")))
 
         val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result.result)
-        assertEquals(BigFraction.ONE - slack, optimum.incumbent.value.rational)
+        assertTrue(assertNotNull(optimum.incumbent.value.rational) >= BigFraction.ONE - SLACK)
+    }
+
+    @Test
+    fun `a widened optimum should report the objective of the floats it prints`() {
+        val incumbent = optimum(leastRoot)
+
+        assertEquals(BigFraction.ofDouble(incumbent.sample.approximateRealValue(0)), incumbent.value.rational)
     }
 
     @Test
@@ -199,7 +226,9 @@ class PolynomialToleranceTest {
     }
 
     private companion object {
-        // Enough native work for the exact refutation of the product, not for its widened decision.
-        const val WIDENING_LIMIT = 100_000L
+        // Less native work than the widened refutation of the product takes.
+        const val WIDENING_LIMIT = 20_000L
+
+        val SLACK: BigFraction = BigFraction.of(bigIntOf(1L), bigIntOf(10_000_000L))
     }
 }

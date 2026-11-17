@@ -470,17 +470,16 @@ holds exactly there. A source the finite lane cannot complete, such as one with 
 integer or, under `--exact`, an extremum, routes to the linear theory and is decided
 exactly, its strict rows included. A real product without finite
 choices or a power above one routes to the polynomial theory, which states each
-unconditional strict row as its closed row in both of its formulas and decides the
-exact formula first: its witness,
-optimum or unboundedness stands. Only an exact refutation hands the remaining budget to a
-[widened formula](19-nonlinear-arithmetic.md#tolerance-widened-formulas), which reads the
-slack where acceptance does with the slack acceptance grants at a zero bound; a relation
-whose result is also one of its operands, such as `float_times(x, z, z)`, stays exact
-there although acceptance reads it within the slack. A widened witness is published only
-when its printed floats pass acceptance, and a widened refutation is the verdict. When the
-widened decision reaches a limit, or finds no point whose floats acceptance admits, the
-exact refutation stands; that refutation is not proved under the tolerance. Completed
-search reports its optimum or refutation under this numerical policy.
+unconditional strict row as its closed row. Under a positive tolerance it decides one
+formula, the [widened formula](19-nonlinear-arithmetic.md#tolerance-widened-formulas),
+which reads the slack where acceptance does with the slack acceptance grants at a zero
+bound; a relation whose result is also one of its operands, such as
+`float_times(x, z, z)`, stays exact there although acceptance reads it within the slack.
+A bounded search for an exact witness comes first, since an exact point is also a
+tolerance point; an exact refutation decides nothing. A widened witness is published only
+when its printed floats pass acceptance, an optimum reports the objective of those
+floats, a widened refutation is the verdict, and a limit leaves the source unknown. Completed search reports its optimum or refutation under this
+numerical policy.
 
 `--exact` zeroes the tolerance, so completion and LP certification are exact. It
 preserves continuous variables and open bounds, routes linear
