@@ -29,13 +29,11 @@ class UniGenTest {
 
     @Test
     fun `accurate sampling on a hashed instance should return valid distinct models`() {
-        // 64 models is the smallest power of two above the un-hashed cell band.
+        // 64 models is the smallest power of two above the un-hashed cell band, and the default count
+        // threshold still counts them exactly, so only the draws hash.
         val p = unconstrained(6)
         val samples = BacktrackSolver(p.bake())
-            .samples(
-                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 3L, countEpsilon = 2.0, countDelta = 0.99),
-                BacktrackParams(),
-            )
+            .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 3L), BacktrackParams())
             .take(6).toList()
         assertTrue(samples.size == 6)
         val distinct = samples.map { projectionKey(it, 6) }.toHashSet().size
