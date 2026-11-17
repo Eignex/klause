@@ -59,6 +59,7 @@ internal object MpsMode : CliMode {
                     start.elapsedNow().inWholeMilliseconds,
                 )
                 println("c numericalSemantics=${mpsNumericalSemantics(source.semantics)}")
+                println("c optimalityTolerance=${mpsOptimalityTolerance(source.semantics)}")
                 val state = MpsOutputState(
                     source.semantics.declared.undeclaredIntegers != source.semantics.effective.undeclaredIntegers ||
                         source.semantics.declared.undeclaredReals != source.semantics.effective.undeclaredReals,
