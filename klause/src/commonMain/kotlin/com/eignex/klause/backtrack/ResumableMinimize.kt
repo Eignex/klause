@@ -165,6 +165,10 @@ internal class ResumableMinimize(
     // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
     private var sawIndeterminateLeaf = false
 
+    // The least objective value a leaf approached without attaining. An incumbent at or below it is optimal over those
+    // leaves; one above it is not.
+    private var unattainedFloor: BigFraction? = null
+
     // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
     // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
     // cancellation and the Hamming/recent-window knobs are fixed here; the per-slice deadline is re-armed in
@@ -382,9 +386,14 @@ internal class ResumableMinimize(
         }
         if (!undecided) return real
         val context = solver.lpSolveContext
+        // Within tolerance an exact refutation of the LP decides nothing, so a search that cannot run leaves the leaf
+        // undecided rather than refuted.
         val optimization = pendingOptimization ?: exactFirst(
             choiceSearch?.takeIf { real.verdict != LpVerdict.INFEASIBLE }?.optimize(sample, costs, context),
-        ) { tolerance?.optimize(sample, costs, context) }?.also { pendingOptimization = it } ?: return real
+        ) { tolerance?.optimize(sample, costs, context) }?.also { pendingOptimization = it }
+            ?: return if (real.verdict == LpVerdict.INFEASIBLE) {
+                LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
+            } else real
         val stop = runEndToken()
         val before = optimization.work
         val step = if (pausable) {
@@ -411,10 +420,10 @@ internal class ResumableMinimize(
 
         // A point without an optimality proof completes the leaf without deciding it; a point within tolerance keeps
         // its exact coordinates, which acceptance read.
-        fun incomplete(point: Sample) = if (result.withinTolerance) {
+        fun incomplete(point: Sample, infimum: BigFraction? = null) = if (result.withinTolerance) {
             LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf(), uncertifiedReals = point.reals,
-                uncertifiedExactReals = point.exactReals)
-        } else LeafRealResult(LpVerdict.FEASIBLE, point.reals, point.exactReals)
+                uncertifiedExactReals = point.exactReals, unattainedInfimum = infimum)
+        } else LeafRealResult(LpVerdict.FEASIBLE, point.reals, point.exactReals, unattainedInfimum = infimum)
 
         // An exact refutation of the LP decides nothing about the region within the slack.
         val unresolved = if (real.verdict != LpVerdict.INFEASIBLE) {
@@ -438,8 +447,8 @@ internal class ResumableMinimize(
                     else -> incomplete(point)
                 }
             }
-            is RealOptimizationResult.Undecided ->
-                result.incumbent?.let(::completed)?.takeIf(::accepted)?.let(::incomplete) ?: unresolved
+            is RealOptimizationResult.Undecided -> result.incumbent?.let(::completed)?.takeIf(::accepted)
+                ?.let { incomplete(it, result.infimum) } ?: unresolved
         }
     }
 
@@ -922,6 +931,7 @@ internal class ResumableMinimize(
         pendingIncumbent = null
         unboundedLeaf = null
         sawIndeterminateLeaf = false
+        unattainedFloor = null
     }
 
     /** Advance the search to the next reportable [StepEvent].
@@ -1044,15 +1054,25 @@ internal class ResumableMinimize(
 
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
         val reason = (run.componentStop?.stopCause ?: searchSession.executionControls.stopCause).terminationReason()
-        if (sawIndeterminateLeaf) observeIncomplete(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf)
+        val b = incumbents.current()
+        // A leaf's unattained infimum below the incumbent leaves better values open.
+        val floorBelow = unattainedFloor?.let { floor ->
+            val best = b?.objective?.exact
+            when {
+                b == null -> true
+                best != null -> floor < best
+                else -> floor.toDouble() < b.objective.display
+            }
+        } == true
+        val unresolved = sawIndeterminateLeaf || floorBelow
+        if (unresolved) observeIncomplete(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf)
         sink.stop()
         val stats = sink.snapshot()
-        val b = incumbents.current()
         return when {
-            b != null && sawIndeterminateLeaf ->
+            b != null && unresolved ->
                 MinimizeResult.BestFound(b.assignment, b.objective.display, reason, stats)
 
-            sawIndeterminateLeaf -> MinimizeResult.Unknown(reason, stats)
+            unresolved -> MinimizeResult.Unknown(reason, stats)
 
             externalShared && b != null ->
                 MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.SearchExhausted, stats)
@@ -1606,6 +1626,7 @@ internal class ResumableMinimize(
                 val real = searchedLeaf(sample, if (pausable) {
                     advanceRealLeaf(sample) ?: return SearchModelDisposition.Pause
                 } else completeLeaf(sample, runEndToken())) ?: return SearchModelDisposition.Pause
+                real.unattainedInfimum?.let { return infimumLeaf(sample, real, it) }
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 
@@ -1664,6 +1685,24 @@ internal class ResumableMinimize(
 
                 else -> SearchModelDisposition.Surface
             }
+        }
+
+        // A leaf whose objective approaches [infimum] without attaining it. Its point stands as an incumbent, and the
+        // leaf is passed over without a nogood: values between the infimum and its point stay open, so the leaf's
+        // floor in objective units bounds what the terminal may claim instead of the run-wide indeterminate flag.
+        private fun infimumLeaf(sample: Sample, real: LeafRealResult, infimum: BigFraction): SearchModelDisposition {
+            val discrete = sample.copy(reals = DoubleArray(problem.numRealVars),
+                exactReals = List(problem.numRealVars) { BigFraction.ZERO })
+            val floor = objective.evaluateExact(discrete) + infimum
+            unattainedFloor = unattainedFloor?.let { if (floor < it) floor else it } ?: floor
+            val point = real.exactReals?.let { sample.copy(reals = real.reals, exactReals = it) }
+                ?: real.uncertifiedReals?.let { sample.copy(reals = it, exactReals = real.uncertifiedExactReals) }
+                    ?.takeIf { params.toleranceCheck?.invoke(it) == true }
+            if (pausable && params.cancellation()) return SearchModelDisposition.Pause
+            pendingRealResult = null
+            pendingOptimization = null
+            pendingIncumbent = point?.let { recordIfImproving(it, objective.evaluate(it)) }
+            return SearchModelDisposition.Skip
         }
     }
 

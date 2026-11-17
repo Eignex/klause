@@ -523,6 +523,9 @@ internal class LeafRealResult(
     val uncertifiedReals: DoubleArray? = null,
     // The exact coordinates [uncertifiedReals] rounds, when the proposal has them; the check reads these.
     val uncertifiedExactReals: List<BigFraction>? = null,
+    // The value of the real part of the objective that the leaf approaches but does not attain, when its search
+    // proved that; no point of the leaf reaches it.
+    val unattainedInfimum: BigFraction? = null,
 )
 
 internal fun LeafRealResult.checkedEncoding(

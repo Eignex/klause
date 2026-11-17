@@ -16,7 +16,7 @@ internal fun cancelledWhen(
 
 internal fun ExecutionControl.workScheduled(): Boolean = workScheduled
 
-/** This control, with every unit it is charged also reported to [record]. */
+// This control, with every unit it is charged also reported to [record], for a caller that meters its own share.
 internal fun ExecutionControl.counting(record: (Long) -> Unit): ExecutionControl {
     val containing = this
     return object : ExecutionControl() {

@@ -19,12 +19,14 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpRefinementLimits
+import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.exactComparison
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.Sample
@@ -119,7 +121,7 @@ internal class RealLeafOptimization(
             AbsRealCompletion.Result.Refuted -> if (!cancellation()) {
                 decide(
                     when {
-                        floor != null -> undecided()
+                        floor != null -> RealOptimizationResult.Undecided(incumbent ?: nearest, tolerant, floor)
                         attained != null -> RealOptimizationResult.Optimum(checkNotNull(incumbent), attained, tolerant)
                         else -> RealOptimizationResult.Refuted(tolerant)
                     },
@@ -203,10 +205,16 @@ internal class RealLeafOptimization(
         cancellation: ExecutionControl,
     ): CellOptimum {
         val lp = cellModel(rows, columns, bounds, cancellation) ?: return CellOptimum.Undecided
-        val certified = solveAndCertify(lp, cancellation = cancellation, context = context,
-            observer = Metered(cancellation), refinementLimits = CELL_REFINEMENT, claim = LpClaim.ATTAINED_OPTIMUM)
+        val certified = LpScopedSolver(LpExactState(lp), cancellation, context).use { solver ->
+            try {
+                solver.solve(token = cancellation, observer = Metered(cancellation), refinementLimits = CELL_REFINEMENT,
+                    continuationLimits = CELL_CONTINUATION, fullContinuation = true, claim = LpClaim.ATTAINED_OPTIMUM)
+            } finally {
+                cancellation.charge(solver.lastMetrics.workOps + solver.lastMetrics.preparationOps)
+            }
+        }
+        if (certified == null || cancellation()) return CellOptimum.Undecided
         cancellation.charge((certified.refinement?.work ?: 0L) + (certified.reconstruction?.work ?: 0L))
-        if (cancellation()) return CellOptimum.Undecided
         return when (certified.verdict) {
             LpVerdict.ATTAINED_OPTIMUM -> {
                 val optimum = certified.exactPrimal?.take(columns) ?: return CellOptimum.Undecided
@@ -340,8 +348,8 @@ internal class RealLeafOptimization(
 
         override fun observeExactInput(accepted: Boolean) = Unit
 
-        override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) =
-            cancellation.charge(metrics.workOps + metrics.preparationOps)
+        // The solve's own work is read from the solver once it returns.
+        override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
 
         override fun observeBasisVerification(metrics: ExactBasisMetrics) = cancellation.charge(metrics.work)
 
@@ -349,8 +357,9 @@ internal class RealLeafOptimization(
     }
 }
 
-// A polyhedron's LP refines under the caller's stop and charges it, without a ceiling of its own: an optimum left
-// uncertified for want of refinement would end the leaf undecided.
+// A polyhedron's LP refines and then continues exactly, under the caller's stop and charged to it. Refinement keeps
+// the engine's round maximum, but the exact continuation after it is the complete exact simplex with no limit of its
+// own, so only the stop leaves an optimum uncertified.
 private val CELL_REFINEMENT = LpRefinementLimits(
     maxRounds = 64,
     maxCoordinates = Int.MAX_VALUE,
@@ -358,5 +367,15 @@ private val CELL_REFINEMENT = LpRefinementLimits(
     maxBits = Int.MAX_VALUE,
     maxWork = Long.MAX_VALUE,
     maxAllocation = Long.MAX_VALUE,
+    maxPivots = Int.MAX_VALUE,
+)
+
+private val CELL_CONTINUATION = ExactContinuationLimits(
+    maxColumns = Int.MAX_VALUE,
+    maxCells = Int.MAX_VALUE,
+    maxBits = Int.MAX_VALUE,
+    maxWork = Long.MAX_VALUE,
+    maxAllocation = Long.MAX_VALUE,
+    maxImportPivots = Int.MAX_VALUE,
     maxPivots = Int.MAX_VALUE,
 )

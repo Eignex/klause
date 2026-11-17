@@ -52,13 +52,11 @@ internal fun Problem.provesUnbounded(objective: LinearObjective, point: Sample, 
     }
 }
 
-/**
- * Whether [point] and [direction] prove [objective] unbounded below over this problem under the tolerance reading
- * of [policy]. [point] must hold every relation within the absolute slack alone, and moving along [direction] must
- * never grow a relation's residual: a row's activity moves only toward its bound side, an absolute value keeps the
- * sign its operand has along the whole ray, a finite membership does not move. Every point of the ray then holds
- * within the slack, whose absolute part does not shrink. A relation this check cannot read is read exactly.
- */
+// Whether [point] and [direction] prove [objective] unbounded below over this problem under the tolerance reading of
+// [policy]. [point] must hold every relation within the absolute slack alone, and moving along [direction] must never
+// grow a relation's residual: a row's activity moves only toward its bound side, an absolute value keeps the sign its
+// operand has along the whole ray, a finite membership does not move. Every point of the ray then holds within the
+// slack, whose absolute part does not shrink. A relation this check cannot read is read exactly.
 internal fun Problem.provesUnboundedWithinTolerance(
     objective: LinearObjective,
     point: Sample,
