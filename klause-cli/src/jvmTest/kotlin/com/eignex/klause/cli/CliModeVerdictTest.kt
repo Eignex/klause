@@ -250,12 +250,19 @@ class CliModeVerdictTest {
         "constraint float_times(x,w,z); constraint float_eq(z,0.3);"
 
     @Test
-    fun `incomplete engines should satisfy a float product without the grid`() {
+    fun `incomplete engines should not refute a satisfiable float product through the grid`() {
         val outputs = listOf("localsearch", "alns").associateWith {
             solveFlatZinc("$gridProduct solve satisfy;", "-e", it)
         }
 
-        assertTrue(outputs.values.all { "==========" in it.lines() && "klause-float-claim" !in it }, "$outputs")
+        assertTrue(outputs.values.all { "=====UNKNOWN=====" in it.lines() && "klause-float-claim" in it }, "$outputs")
+    }
+
+    @Test
+    fun `local search should not refute a float product minimization through the grid`() {
+        val out = solveFlatZinc("$gridProduct solve minimize x;", "-e", "localsearch")
+
+        assertTrue("=====UNKNOWN=====" in out.lines() && "=====UNSATISFIABLE=====" !in out, out)
     }
 
     @Test

@@ -319,4 +319,36 @@ class SourceRoutingPolicyTest {
 
         assertEquals(incompleteEngines.associateWith { false }, kept)
     }
+
+    @Test
+    fun `a polynomial route should not keep local search or ALNS on the original source`() {
+        val program = parseFlatZinc("var 0.0..2.0: x; var 0.0..2.0: w; var 0.0..4.0: z; " +
+            "constraint float_times(x, w, z); constraint float_eq(z, 0.3); solve satisfy;")
+
+        val decisions = incompleteEngines.associateWith { engine ->
+            val selection = SourceSetup.selectRoute(SourceSetupRequest(program.sourceAttachment(),
+                ExecutionOperation.SATISFY, engine))
+            SourceSetup.executionKind(selection.route, selection.source) to
+                SourceSetup.preservesOriginalIncompleteArm(selection)
+        }
+
+        assertEquals(incompleteEngines.associateWith { SourceExecutionKind.POLYNOMIAL to false }, decisions)
+    }
+
+    @Test
+    fun `a heuristic route should not keep an admitted local search or ALNS arm on the original source`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 1)))
+        val arms = mapOf(FiniteEngine.LOCAL_SEARCH to ExecutionStrategy.LOCAL_SEARCH,
+            FiniteEngine.ALNS to ExecutionStrategy.ALNS)
+
+        val decisions = arms.mapValues { (engine, arm) ->
+            val selection = SourceRouteSelection(SourceSetupRequest(SourceAttachment(source),
+                ExecutionOperation.SATISFY, engine), SourceProblemRoute.UnsupportedOpen(null, source),
+                ExecutionControl.Never)
+            (arm in assertNotNull(selection.admission).arms) to SourceSetup.preservesOriginalIncompleteArm(selection)
+        }
+
+        assertEquals(arms.mapValues { true to false }, decisions)
+    }
 }

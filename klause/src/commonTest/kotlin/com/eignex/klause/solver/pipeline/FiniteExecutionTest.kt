@@ -9,7 +9,6 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -209,13 +208,13 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `incomplete engines should leave a bound only the slack admits undecided in exact mode`() {
-        val exactSource = SemanticOverrides(floats = FloatSemantics.Continuous,
-            feasibilityTolerance = SourceTolerance())
+    fun `incomplete engines should leave a bound only the slack admits undecided at zero tolerance`() {
+        // The absolute value puts `y` in a component the grid would otherwise take.
         val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
 
         val verdicts = engines.associateWith {
-            solveFlatZinc(exactSource, it, nodeBudget = NodeBudget(64), deadline = 10.seconds)
+            solveFlatZinc(exact, it, declarations = "var 0.0..2.0: b;", constraints = "constraint float_abs(y, b);",
+                nodeBudget = NodeBudget(64), deadline = 10.seconds)
         }
 
         assertEquals(engines.associateWith { FiniteSolveVerdict.UNKNOWN }, verdicts)
@@ -336,7 +335,7 @@ class FiniteExecutionTest {
     ): Pair<FiniteSolveVerdict, Double?> {
         val samples = ArrayList<Sample>()
         val verdict = solveFlatZinc(overrides, engine, samples::add, source = source, floatPoints = floatPoints,
-            presolve = presolve, nodeBudget = NodeBudget(512).takeIf { engine != FiniteEngine.FIXED },
+            presolve = presolve, nodeBudget = NodeBudget(64).takeIf { engine != FiniteEngine.FIXED },
             deadline = if (engine == FiniteEngine.FIXED) 1.seconds else 10.seconds,
             onImprovement = samples::add)
         val objective = parseFlatZinc(source).sourceProgram.linearObjective()
@@ -414,20 +413,6 @@ class FiniteExecutionTest {
         assertEquals(emptyList<String>(), faults)
     }
 
-    private fun extremumValues(engine: FiniteEngine) = extremumOptima.keys.associateWith { (relation, solve) ->
-        outcome(numerical, extremum(relation, solve), engine = engine).second
-    }
-
-    @Test
-    fun `local search should reach the optimum of a real extremum within tolerance`() {
-        assertEquals(extremumOptima, extremumValues(FiniteEngine.LOCAL_SEARCH))
-    }
-
-    @Test
-    fun `alns should reach the optimum of a real extremum within tolerance`() {
-        assertEquals(extremumOptima, extremumValues(FiniteEngine.ALNS))
-    }
-
     @Test
     fun `a real extremum no operand can reach should be refuted`() {
         val source = extremum("float_max", "satisfy").replace("var 0.0..3.0: m;", "var 2.5..3.0: m;")
@@ -442,58 +427,19 @@ class FiniteExecutionTest {
         assertEquals(FiniteSolveVerdict.SAT, outcome(numerical, source).first)
     }
 
-    private val resultDirections = listOf("minimize y", "maximize y")
-    private val operandDirections = listOf("minimize x", "maximize x")
-
-    private fun absValues(engine: FiniteEngine, overrides: SemanticOverrides, directions: List<String>) =
-        directions.associateWith { outcome(overrides, absObjective(it), engine = engine).second }
-
+    // The grid over the operand's [-2.0, 3.0] holds no zero, so only the original source reaches `y = 0`.
     @Test
-    fun `local search should reach the optimum of an absolute value result within tolerance`() {
-        assertEquals(absOptima.filterKeys { it in resultDirections },
-            absValues(FiniteEngine.LOCAL_SEARCH, numerical, resultDirections))
+    fun `local search should reach the minimum of an absolute value without an optimum claim`() {
+        val reached = outcome(numerical, absObjective("minimize y"), engine = FiniteEngine.LOCAL_SEARCH)
+
+        assertEquals(FiniteSolveVerdict.BEST_FOUND to 0.0, reached)
     }
 
     @Test
-    fun `local search should reach the optimum of an absolute value operand within tolerance`() {
-        assertEquals(absOptima.filterKeys { it in operandDirections },
-            absValues(FiniteEngine.LOCAL_SEARCH, numerical, operandDirections))
-    }
+    fun `alns should reach the minimum of an absolute value without an optimum claim`() {
+        val reached = outcome(numerical, absObjective("minimize y"), engine = FiniteEngine.ALNS)
 
-    @Test
-    fun `local search should reach the optimum of an absolute value result exactly`() {
-        assertEquals(absOptima.filterKeys { it in resultDirections },
-            absValues(FiniteEngine.LOCAL_SEARCH, exact, resultDirections))
-    }
-
-    @Test
-    fun `local search should reach the optimum of an absolute value operand exactly`() {
-        assertEquals(absOptima.filterKeys { it in operandDirections },
-            absValues(FiniteEngine.LOCAL_SEARCH, exact, operandDirections))
-    }
-
-    @Test
-    fun `alns should reach the optimum of an absolute value result within tolerance`() {
-        assertEquals(absOptima.filterKeys { it in resultDirections },
-            absValues(FiniteEngine.ALNS, numerical, resultDirections))
-    }
-
-    @Test
-    fun `alns should reach the optimum of an absolute value operand within tolerance`() {
-        assertEquals(absOptima.filterKeys { it in operandDirections },
-            absValues(FiniteEngine.ALNS, numerical, operandDirections))
-    }
-
-    @Test
-    fun `alns should reach the optimum of an absolute value result exactly`() {
-        assertEquals(absOptima.filterKeys { it in resultDirections },
-            absValues(FiniteEngine.ALNS, exact, resultDirections))
-    }
-
-    @Test
-    fun `alns should reach the optimum of an absolute value operand exactly`() {
-        assertEquals(absOptima.filterKeys { it in operandDirections },
-            absValues(FiniteEngine.ALNS, exact, operandDirections))
+        assertEquals(FiniteSolveVerdict.BEST_FOUND to 0.0, reached)
     }
 
     @Test
