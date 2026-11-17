@@ -217,7 +217,7 @@ samples independently of `portfolio-work`. `sharing-memory-work` caps charged
 visits per sample (default 32,768); `sharing-memory-scratch` caps deduplication
 entries (default 4,096). Both accept zero. Samples report complete, partial or
 stale status; only complete current samples can support byte accounting. See
-[portfolios](14-portfolio.md#shared-channels) for ownership and aliasing.
+[portfolios](14-portfolio.md#memory-observation) for ownership and aliasing.
 
 `sharing-memory-bytes` optionally limits each shared learned-clause pool's modeled
 payload and index bytes, including private ALNS repair pools. It accepts zero,

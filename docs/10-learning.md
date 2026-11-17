@@ -208,7 +208,7 @@ use, not proof coverage or independent validation.
 
 Opt-in sharing observations report clause payload, allocated index capacity and
 copied trail-reason payload, through the charged, cancellable, bounded observation
-described under [sharing accounting](14-portfolio.md#shared-channels). Observation
+described under [sharing accounting](14-portfolio.md#memory-observation). Observation
 never invokes retirement or materializes a reason. An owner-aware aggregate counts
 each primitive payload or allocated index once, including aliased reasons, and prices
 modeled references at eight bytes per slot; completeness covers the enumerated owners,
