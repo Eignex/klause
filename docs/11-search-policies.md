@@ -62,18 +62,19 @@ keeps learned cursor positions, checking cached candidates for liveness before u
 completed scan waits for changed input; appended learned clauses extend its range,
 and new permanent root facts or learned compaction invalidate it.
 
-A shortened source clause enters as a permanent session-local replacement before its
-watches retire; immutable source text stays available for reasons, and the session
-owns the unfinished source-watch retirement until a funded slice completes it or the
-session closes. A shortened learned clause keeps its imported origin. Its selection
-captures a stable [retirement handle](10-learning.md#native-sat-lane) before the
-replacement is admitted, an unfunded capture admits no replacement, and the pass
-stages one selection at a time; retirement is authorized only after replacement
-propagation and required peer publication complete, and a satisfied clause uses the
-same publication boundary for its premises. Attaching a shortened binary installs
-both implication directions and evaluates facts already assigned at the root; there
-is no separate binary graph. Satisfied source watches retire without changing
-variable IDs.
+A shortened source clause enters as a permanent session-local replacement before
+its watches retire; immutable source text stays available for reasons, and the
+session owns the unfinished source-watch retirement until a funded slice completes
+it or the session closes, and a funded slice retires those watches before admitting
+another source replacement. A shortened learned clause keeps its imported origin.
+Its selection captures a stable [retirement handle](10-learning.md#native-sat-lane)
+before the replacement is admitted, an unfunded capture admits no replacement,
+and the pass stages one selection at a time; retirement is authorized only after
+replacement propagation and required peer publication complete, and a satisfied
+clause uses the same publication boundary for its premises. Attaching a shortened
+binary installs both implication directions and evaluates facts already assigned
+at the root; there is no separate binary graph. Satisfied source watches retire
+without changing variable IDs.
 
 Failed-literal probing rotates through a bounded set of source Boolean and existing
 integer-bound literals, unfixed integer endpoints (including columns without atoms)
@@ -143,7 +144,7 @@ needing none; buffer release keeps that clock and reseeding renews it. Probe,
 maintenance, publication and cleanup work cannot fund the next slice. Required
 attachment and publication, and funded continuations of retained candidates,
 source-watch retirement and selected requests, run ahead of these optional gates;
-a continuation receives one root-class grant and starts no new scan.  Class rotation
+a continuation receives one root-class grant and starts no new scan. Class rotation
 keeps a cheap pass from taking every slice. Triggers, cooldown and warmup are off
 by default, and the additional ceilings are unlimited unless configured.
 
