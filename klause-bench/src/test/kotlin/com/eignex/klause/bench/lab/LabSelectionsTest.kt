@@ -18,6 +18,22 @@ import kotlin.test.assertTrue
 
 class LabSelectionsTest {
     @ParameterizedTest
+    @ValueSource(strings = ["klause-reference", "klause-reference-ls", "klause-reference-bt", "klause-reference-parallel"])
+    fun `bounded reference recipes give SMT and CSP COP comparable budgets`(name: String) {
+        val recipe = BenchProtocol.json.parseToJsonElement(Files.readString(Path.of("lab/recipes/$name.json")))
+            .jsonObject.getValue("bench").jsonObject
+        val parameters = recipe.getValue("request").jsonObject.getValue("parameters").jsonObject
+        val selections = BenchProtocol.json.parseToJsonElement(parameters.getValue("selections").jsonPrimitive.content)
+            .jsonArray.map { it.jsonObject }
+        fun limit(suites: (String) -> Boolean) = selections.filter { suites(it.getValue("suite").jsonPrimitive.content) }
+            .sumOf { it.getValue("max").jsonPrimitive.content.toInt() }
+        val smt = limit { it.startsWith("smtlib-") }
+        val cp = limit { it in setOf("hakank", "mzn-bench-compatible-v1", "xcsp3-cop", "xcsp3-csp") }
+
+        assertTrue(smt in (cp * 9 / 10)..(cp * 11 / 10), "$name: SMT=$smt CSP/COP=$cp")
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = [
         "reference", "reference-cvc5", "klause-reference", "klause-reference-ls",
         "klause-reference-bt", "klause-reference-parallel",

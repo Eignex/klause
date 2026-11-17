@@ -53,7 +53,7 @@ internal object MakeSets {
     private val SUITE_SHARE = mapOf("hakank" to 0.15)
 
     /** Sets made of others: `linear` is open-domain integers with linear reals as well. */
-    private val UNIONS = mapOf("linear" to listOf("open-int", "linear-real"), "sweep" to SETS + "smt-ground-v1")
+    private val UNIONS = mapOf("linear" to listOf("open-int", "linear-real"), "sweep" to SETS + "smt-ground-sweep-v1")
 
     /**
      * Difficulty tiers by the reference's time to prove. A set takes [EASY_SHARE] easy, [HARD] hard and medium for the

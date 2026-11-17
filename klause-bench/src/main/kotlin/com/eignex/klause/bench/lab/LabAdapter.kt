@@ -7,6 +7,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.HarnessTimings
 import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.InstanceClassifier
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
@@ -89,6 +90,13 @@ internal object KlauseLabSuite : BenchSuite {
         return resolved.flatMap { (selected, inputs) ->
             val ref = selected.ref
             val trees = LabInputs.treeHashes(inputs, compilerTrees)
+            val collection = collectionOf(ref)
+            val features = if (ref.format == Format.SMTLIB && collection.startsWith("smtlib-qf_")) {
+                val logic = collection.removePrefix("smtlib-").uppercase()
+                mapOf("logic" to logic, "themes" to InstanceClassifier.smtThemes(logic).sorted().joinToString(","))
+            } else {
+                emptyMap()
+            }
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""
                 settings.seeds.flatMap { seed ->
@@ -100,7 +108,7 @@ internal object KlauseLabSuite : BenchSuite {
                                 settings.caseParameters(engine, seed, control),
                                 settings.resources(),
                                 inputs = inputs,
-                                attributes = trees + mapOf(
+                                attributes = trees + features + mapOf(
                                     "suite" to selected.suite,
                                     "comparisonKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat$suffix",
                                     "pairKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat",
@@ -108,7 +116,7 @@ internal object KlauseLabSuite : BenchSuite {
                                     "seed" to seed.toString(),
                                     "budgetMs" to settings.timeout.toString(),
                                     "problem" to ref.name,
-                                    "collection" to collectionOf(ref),
+                                    "collection" to collection,
                                     "family" to (ref.family ?: ref.name.substringBefore('/')),
                                     "format" to ref.format.name,
                                     "category" to ref.category.name,
