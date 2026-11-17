@@ -1,12 +1,5 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.LinearIndicator
-import com.eignex.klause.factor.arithmetic.RealAbs
-import com.eignex.klause.factor.arithmetic.RealArrayMinMax
-import com.eignex.klause.factor.arithmetic.RealFiniteDomain
-import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -98,12 +91,7 @@ class PreparedFactorProjections internal constructor(
 
     internal val requiresRealSourceCheck: Boolean = problem.factors.indices.any { id ->
         problem.factors[id].variables.reals.isNotEmpty() &&
-            (problem.factors[id] is Distinct || problem.factors[id] is RealAbs ||
-                (problem.factors[id] as? RealArrayMinMax)?.leafEnforced == true ||
-                problem.factors[id] is ContinuousProduct ||
-                problem.factors[id] is RealFiniteDomain ||
-                problem.factors[id] is ExactLinear || problem.factors[id] is LinearIndicator ||
-                propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id))
+            (declarations[id].propagationCheck != AssignmentCheckCapability.EXACT || !usesBuiltInRelaxation(id))
     }
 
     /** Retain selection only for the identical canonical source; rewrites select against their own factors. */
@@ -215,6 +203,12 @@ class PreparedFactorProjections internal constructor(
 
     internal fun requiresOriginalCheck(factorId: Int): Boolean = propagation[factorId]?.builtIn == false &&
         propagation[factorId]?.assignmentCheck != AssignmentCheckCapability.EXACT
+
+    internal fun hasCompleteFiniteCheck(factorId: Int): Boolean =
+        declarations[factorId].propagationCheck == AssignmentCheckCapability.EXACT ||
+            (requiresOriginalCheck(factorId) && problem.factors[factorId].variables.reals.isEmpty() &&
+                problem.factors[factorId].defaultExecutionCapabilities().propagationCheck ==
+                AssignmentCheckCapability.EXACT)
 
     internal fun propagator(factorId: Int, preparation: FactorProjectionPreparation?): Propagator =
         checkNotNull(propagation[factorId]) { "unsupported propagation route for factor $factorId" }

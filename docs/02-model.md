@@ -280,6 +280,8 @@ refutes the source's integer and Boolean relations alone. See [source checking](
 
 Preparation selects the primary owner of every coordinate and factor before opening
 engine state. Participation can overlap; primary ownership cannot.
+Preparation requires exactly one primary owner for every canonical factor and
+rejects foreign factor indices before constructing operation admission.
 `SourceAttachment` retains the original model and semantics;
 [source setup](23-api.md#source-setup) binds the operation and prepares execution.
 Interrupted preparation exports no partial plan.
@@ -350,29 +352,47 @@ temporaries have one acyclic definition and are stripped before publication.
 `PreparedFactorProjections.capabilities(factorId)` exposes the captured deduction,
 assignment-check, scoring and relaxation roles. `encoder(factorId, target)` exposes
 whole-relation representation and its required pins. Read these alongside the
-plan's component owners and `capabilities.admission`, rather than treating any
+plan's `factorOwner(factorId)` and `capabilities.admission`, rather than treating any
 single role as a supported-model flag.
 
 | Relation | Native finite enforcement | Complete linear encoding | Complete polynomial encoding |
 |---|---|---|---|
+| `Clause`, `Cardinality`, `PseudoBoolean`, `ReifiedPseudoBoolean` | Yes | Yes | Yes |
+| `ReifiedCardinality`, `Xor`, `GaussianXor` | Yes; Gaussian rows can have inert scoring beside source checks | No | No |
+| `Linear`, `ExactLinear`, `LinearIndicator`, reified linear rows | Integer forms; continuous forms need source completion | Yes | Yes |
 | `AllDifferent`, `Distinct` | Yes for finite coordinates | Yes | Yes |
+| `Increasing`, `ComparisonClause` | Yes | Yes | Yes |
 | Integer `Product` | Yes | None unless a source reduction makes it affine | Yes |
-| `Abs`, element and extrema relations | Integer forms | Yes | Yes |
-| `DivMod` | Yes | Literal or conditioned divisor | Yes |
+| `RealProduct` | Continuous completion required | Conditioned integer operand | Yes |
+| `ContinuousProduct` | Continuous completion required | Declared finite operand choices | Yes |
+| `Abs`, `AffineAbs`, `GridAbs`, element and extrema relations | Integer forms; real forms need completion | Yes | Yes |
+| `GridProduct`, `GridPower` | Yes | At most 4,096 input combinations | At most 4,096 input combinations |
+| `DivMod`, `WideDivMod` | Yes | Literal or conditioned divisor; wide affine division has a literal divisor | Yes |
 | `Power` | Integer form | Affine exponent or conditioned integer base | Yes |
-| `Cumulative`, `Diffn`, `Circuit`, `Table`, `Regular`, `Mdd`, `GlobalCardinality`, `NValue` | Yes | No complete built-in encoding | No complete built-in encoding |
+| `RealFiniteDomain` | Empty membership refutes; other cases need completion | Yes | Yes |
+| `ExactRealEquality` | No finite projection | No | Algebraic values; symbolic values need function completion |
+| `Cumulative`, `Diffn`, `Circuit`, `Table`, `Regular`, `Mdd`, `GlobalCardinality`, `NValue` | Yes | No | No |
+| `AllDifferentTuples`, `Inverse`, `SymmetricAllDifferent`, `ValuePrecede`, `Sort`, `LexLess` | Yes | No | No |
+| `SymmetryHandling` | Restricts finite representatives | No | No |
 
 Descriptors retain variant-specific restrictions; the table describes relation
 families. Both polynomial and function completion can keep finite globals native.
 Whole-source open-integer polynomial conversion instead needs an encoder for
 every factor. A finite function peer requires bounded integer declarations;
 unsupported factors retain their original index in the preparation decline.
+The source-factor vocabulary and its variant fixtures are exercised against
+affine, polynomial and function peers by `PreparedFactorSupportTest`, including
+whole-source open-integer admission and operation surfaces. Encoder availability
+alone does not bypass installation or a finite completion's numerical gates.
 
 `PropagationProblem(problem, selection)` and `LocalSearchProblem(problem, selection,
 domains)` open mechanisms from that capture, and `problem.bake(providers)` binds
 them to the finite projection for one invocation. Missing deduction never
 authorizes an assignment: original factors are checked at complete points where a
 complete check exists, and execution stays unknown otherwise.
+Admission and pinned original-factor checking share the selected complete-check
+rule. A real factor without an exact propagation check requires source validation
+after LP completion; this follows its captured role rather than a factor-class list.
 
 ### Search state ownership
 

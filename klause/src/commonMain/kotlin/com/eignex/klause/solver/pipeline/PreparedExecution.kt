@@ -97,6 +97,7 @@ internal class PreparedSourceStructure(
     val integerCoordinates = integerCoordinates.toList()
     val realCoordinates = realCoordinates.toList()
     val operations = operations.toSet()
+    private val factorOwners = IntArray(execution.model?.numFactors ?: 0) { -1 }
     val finiteFactorProjections: PreparedFactorProjections? = execution.polynomial?.let { polynomial ->
         factorProjections?.projected(
             polynomial.completion.finite,
@@ -107,6 +108,17 @@ internal class PreparedSourceStructure(
     init {
         require(this.integerCoordinates.size == sourceIntCount && this.realCoordinates.size == sourceRealCount)
         execution.model?.let { factorProjections?.requireSource(it) }
+        this.components.forEachIndexed { owner, component ->
+            for (factor in component.factorIndices) {
+                require(factor in factorOwners.indices) { "factor ownership is outside the canonical model" }
+                require(factorOwners[factor] == -1) { "factor $factor has multiple primary owners" }
+                factorOwners[factor] = owner
+            }
+            require(component.participatingFactorIndices.all { it in factorOwners.indices }) {
+                "factor participation is outside the canonical model"
+            }
+        }
+        require(factorOwners.all { it >= 0 }) { "every canonical factor requires a primary owner" }
         when (execution) {
             is PreparedExecution.NonlinearInteger -> {
                 val projection = execution.projection
@@ -131,6 +143,11 @@ internal class PreparedSourceStructure(
 
             else -> Unit
         }
+    }
+
+    fun factorOwner(index: Int): ExecutionComponentDescriptor {
+        require(index in factorOwners.indices) { "factor index is outside the canonical model" }
+        return components[factorOwners[index]]
     }
 }
 

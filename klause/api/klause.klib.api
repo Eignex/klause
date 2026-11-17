@@ -15825,6 +15825,7 @@ final class com.eignex.klause.solver.pipeline/PreparedSourcePlan { // com.eignex
 
     final fun belongsTo(kotlin/Any): kotlin/Boolean // com.eignex.klause.solver.pipeline/PreparedSourcePlan.belongsTo|belongsTo(kotlin.Any){}[0]
     final fun booleanCoordinate(kotlin/Int): kotlin/Int // com.eignex.klause.solver.pipeline/PreparedSourcePlan.booleanCoordinate|booleanCoordinate(kotlin.Int){}[0]
+    final fun factorOwner(kotlin/Int): com.eignex.klause.solver.pipeline/ExecutionComponentDescriptor // com.eignex.klause.solver.pipeline/PreparedSourcePlan.factorOwner|factorOwner(kotlin.Int){}[0]
     final fun finiteIntegerCoordinate(kotlin/Int): kotlin/Int? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.finiteIntegerCoordinate|finiteIntegerCoordinate(kotlin.Int){}[0]
     final fun integerCoordinate(kotlin/Int): kotlin/Int // com.eignex.klause.solver.pipeline/PreparedSourcePlan.integerCoordinate|integerCoordinate(kotlin.Int){}[0]
     final fun polynomialIntegerCoordinate(kotlin/Int): kotlin/Int? // com.eignex.klause.solver.pipeline/PreparedSourcePlan.polynomialIntegerCoordinate|polynomialIntegerCoordinate(kotlin.Int){}[0]

@@ -18,7 +18,6 @@ import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.ScoringCapability
-import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.EncoderSupport
@@ -102,13 +101,13 @@ internal fun Problem.finiteComponentContract(
     fun completeCheck(index: Int): Boolean {
         val factor = this.factors[index]
         val selected = capabilities(index)
-        if (selected.propagationCheck == AssignmentCheckCapability.EXACT) return true
+        if (projections?.hasCompleteFiniteCheck(index) == true ||
+            selected.propagationCheck == AssignmentCheckCapability.EXACT) return true
         if (sourceCompletion && (ownership?.factorEncoded(index) == true || index in enforcingFactors)) return true
         if (factor.variables.reals.isNotEmpty()) {
             return selected.propagationCheck == AssignmentCheckCapability.SOURCE_CERTIFICATION && sourceCompletion
         }
-        return projections?.requiresOriginalCheck(index) == true &&
-            factor.defaultExecutionCapabilities().propagationCheck == AssignmentCheckCapability.EXACT
+        return false
     }
     fun scoreCheck(index: Int): Boolean = when (capabilities(index).assignmentCheck) {
         AssignmentCheckCapability.EXACT, AssignmentCheckCapability.REDUNDANT -> true

@@ -2,9 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.ExecutionControl
 
@@ -17,9 +15,7 @@ internal class SelectedProjectionChecks(
         id !in enforcingPeers && selection.requiresOriginalCheck(id) && source.factors[id].variables.reals.isEmpty() &&
             source.factors[id] !is ObjectiveBoundFactor
     }
-    private val available = factors.all {
-        source.factors[it].defaultExecutionCapabilities().propagationCheck == AssignmentCheckCapability.EXACT
-    }
+    private val available = factors.all(selection::hasCompleteFiniteCheck)
     private val original = if (factors.isEmpty() || !available) null else
         source.withFactors(Array(factors.size) { source.factors[factors[it]] })
 

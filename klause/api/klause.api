@@ -13804,6 +13804,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourceInvocation {
 public final class com/eignex/klause/solver/pipeline/PreparedSourcePlan {
 	public final fun belongsTo (Ljava/lang/Object;)Z
 	public final fun booleanCoordinate (I)I
+	public final fun factorOwner (I)Lcom/eignex/klause/solver/pipeline/ExecutionComponentDescriptor;
 	public final fun finiteIntegerCoordinate (I)Ljava/lang/Integer;
 	public final fun getCapabilities ()Lcom/eignex/klause/solver/pipeline/ExecutionCapabilities;
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;

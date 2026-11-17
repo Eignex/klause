@@ -98,6 +98,12 @@ native, every integer needs finite bounds, and function composition admits only
 satisfaction. Ineligible factors and interrupted construction supply explicit
 preparation declines; no auxiliary appears in published source coordinates.
 
+`plan.factorOwner(factorId)` returns the selected primary component in the
+canonical `plan.model` factor namespace. Its participating factors and the captured
+projection roles describe optional overlap. Inspect `plan.capabilities.admission`
+for the requested engine and operation before opening execution: even a declined
+plan retains its intended owners for diagnosis.
+
 `PreparedSourceInvocation` retains the selected route, source plan, operation
 admission and any private grid. Setup finishes route and grid selection before
 returning it, so an invocation never changes its execution view. With a private
