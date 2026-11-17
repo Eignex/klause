@@ -97,6 +97,12 @@ internal interface ReseedGuard {
     val incumbentTrialPending: Boolean get() = false
 }
 
+// A complete search whose exhaustion proves only its optimality-gap cutoff once it bounded a node against that cutoff
+// below the incumbent.
+internal interface GapBoundedSearch {
+    val appliedOptimalityGap: Boolean
+}
+
 internal interface SliceWorkAccounting {
     val repaidWork: Long?
 }

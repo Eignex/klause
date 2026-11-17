@@ -122,21 +122,27 @@ data class SourceTolerance(
 }
 
 /**
- * Optimality gap within which two evaluations of one point's objective agree: a source value `v` and a native
- * value `p` agree when `abs(v - p) <= max(absolute, relative * scale)`, where `scale` is the sum of the absolute
- * objective term activities at that point, constant excluded. It decides whether a point is reported as the optimum
- * the solver proved there; it bounds no search, makes no unproved bound an optimum and makes no other point optimal.
- * Zero in both components requires equal values, and a zero feasibility tolerance makes the effective gap zero.
+ * Source optimality gap `max(absolute, relative * scale)`, with two uses.
+ *
+ * Optimization ends when a proved objective bound `b` lies within the gap of the incumbent value `z`:
+ * `abs(z - b) <= max(absolute, relative * abs(z))` in source units, whatever the objective direction, and the
+ * incumbent is reported optimal together with `b`. Two evaluations of one point's objective agree when
+ * `abs(v - p) <= max(absolute, relative * scale)`, where `scale` is the sum of the absolute objective term
+ * activities at that point, constant excluded. Zero in both components requires a closed bound and equal values,
+ * and a zero feasibility tolerance makes the effective gap zero.
  */
 data class OptimalityTolerance(
     /** Minimum permitted objective difference in source units. */
     val absolute: SemanticRational = SemanticRational.ZERO,
-    /** Permitted objective difference relative to the objective term magnitudes at the point. */
+    /** Permitted objective difference relative to the incumbent magnitude, below one. */
     val relative: SemanticRational = SemanticRational.ZERO,
 ) {
     init {
         require(absolute.numerator.signum() >= 0) { "absolute optimality tolerance must be nonnegative" }
         require(relative.numerator.signum() >= 0) { "relative optimality tolerance must be nonnegative" }
+        // Below one, the least bound that closes the gap rises with the incumbent, so a search that tightens its
+        // cutoff as the incumbent improves never needs a bound an earlier cutoff did not prove.
+        require(relative < SemanticRational.ONE) { "relative optimality tolerance must be below one" }
     }
 
     /** Whether objective values must be equal: both components are zero. */

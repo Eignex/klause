@@ -14,6 +14,7 @@ import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.provesUnbounded
 import com.eignex.klause.lp.relaxation.provesUnboundedWithinTolerance
 import com.eignex.klause.portfolio.ArmFault
+import com.eignex.klause.presolve.ObjectiveAdjustment
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.RebuildStep
@@ -22,6 +23,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
@@ -312,6 +314,11 @@ sealed class FiniteSolveOutcome {
          * variable id, along which [bestSample] stays feasible and the objective strictly decreases.
          */
         val unboundedDirection: List<BigFraction>? = null,
+        /**
+         * On [FiniteSolveVerdict.OPTIMAL] within the optimality gap, the proved source-model bound below the objective
+         * of [bestSample] in minimization direction; null for an exact optimum.
+         */
+        val gapBound: BigFraction? = null,
     ) : FiniteSolveOutcome() {
         private var recordedReason: TerminationReason? = null
 
@@ -546,6 +553,9 @@ internal fun FinitePipeline.solve(
             sourceControls = request.sourceControls,
             numericalCompanionParams = numericalCompanions,
             objectiveCoordinates = objectiveCoordinates,
+            optimalityGap = if (gridPublication == null && request.shape.optimize) {
+                invocation?.let { sourceOptimalityGap(it, preparation) }
+            } else null,
         ),
         FiniteExecutionCallbacks(
             onSample = { sample ->
@@ -571,12 +581,31 @@ internal fun FinitePipeline.solve(
         preparation,
         preparationElapsed,
         execution.reconstructed(preparation.reconstruct, request.shape.finiteProblem, request.shape.linearObjective)
-            .toSolveOutcome().withPresolve(preparation.presolve),
+            .toSolveOutcome(preparation.sourceMapping?.objectiveAdjustment).withPresolve(preparation.presolve),
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceResult,
         (execution as? FiniteExecutionResult.Completed)?.nativeSourceMinimum,
         (execution as? FiniteExecutionResult.Completed)?.completeSearchAdmitted,
         (execution as? FiniteExecutionResult.Completed)?.nativeObjectiveBound,
     )
+}
+
+// The source's optimality gap over the prepared objective: a working value reads in source units through the presolve
+// adjustment and the linear source's objective scale. Null when the source closes bounds exactly or presolve does
+// not preserve the objective's source value, and without a discrete coordinate, where the one leaf's relaxation
+// decides the optimum and leaves no node for the gap to bound.
+private fun sourceOptimalityGap(
+    invocation: PreparedSourceInvocation,
+    preparation: FinitePipelinePreparation,
+): OptimalityGap? {
+    val tolerance = invocation.source.semantics.effective.optimalityTolerance?.takeUnless { it.isExact } ?: return null
+    val objective = preparation.objective ?: return null
+    if (preparation.problem.numIntVars == 0 && preparation.problem.numBoolVars == 0) return null
+    val mapping = preparation.sourceMapping
+    if (mapping != null && (!mapping.guarantees.objective || !mapping.guarantees.reconstructability)) return null
+    val adjustment = mapping?.objectiveAdjustment ?: ObjectiveAdjustment()
+    val perSourceUnit = (invocation.linearSource?.view?.objectiveScale ?: BigFraction.ONE).reciprocal()
+    return OptimalityGap(tolerance, adjustment.scale * perSourceUnit, adjustment.offset * perSourceUnit,
+        integral = objective.realCoefficientValues.all { it == 0.0 })
 }
 
 private fun FiniteSolveRequest.preparationRequest(
@@ -644,18 +673,21 @@ private fun FiniteSolveRequest.admitsObjectiveCoordinates(preparation: FinitePip
     return recipes.pool == null && !recipes.dryRunSolver && options[ExecutionOption.backtrackArmsByLabel] == null
 }
 
-private fun FiniteExecutionResult.toSolveOutcome(): FiniteSolveOutcome = when (this) {
-    is FiniteExecutionResult.DryRun -> FiniteSolveOutcome.DryRun(heading, lines)
+// A working gap bound reads in source-model units through the presolve [adjustment].
+private fun FiniteExecutionResult.toSolveOutcome(adjustment: ObjectiveAdjustment? = null): FiniteSolveOutcome =
+    when (this) {
+        is FiniteExecutionResult.DryRun -> FiniteSolveOutcome.DryRun(heading, lines)
 
-    is FiniteExecutionResult.Completed -> FiniteSolveOutcome.Completed(
-        FiniteSolveVerdict.valueOf(verdict.name),
-        stats,
-        solutions,
-        bestSample,
-        elapsedMs,
-        unboundedDirection,
-    ).withTerminationReason(terminationReason)
-}
+        is FiniteExecutionResult.Completed -> FiniteSolveOutcome.Completed(
+            FiniteSolveVerdict.valueOf(verdict.name),
+            stats,
+            solutions,
+            bestSample,
+            elapsedMs,
+            unboundedDirection,
+            gapBound?.let(BigFraction::ofDouble)?.let { adjustment?.sourceValue(it) ?: it },
+        ).withTerminationReason(terminationReason)
+    }
 
 private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSolveOutcome = when (this) {
     is FiniteSolveOutcome.Completed -> FiniteSolveOutcome.Completed(
@@ -665,6 +697,7 @@ private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSol
         bestSample,
         elapsedMs,
         unboundedDirection,
+        gapBound,
     ).withTerminationReason(terminationReason)
 
     else -> this
@@ -706,6 +739,7 @@ private fun FiniteExecutionResult.reconstructed(
             elapsedMs,
             direction,
             terminationReason = terminationReason,
+            gapBound = gapBound,
         )
     }
 }

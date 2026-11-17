@@ -33,6 +33,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.conditionedRoot
+import com.eignex.klause.solver.GapBoundedSearch
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -148,7 +149,7 @@ internal class ResumableMinimize(
     preparationBudget: SliceBudget? = null,
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
-) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
+) : ResumableSearch, ReseedGuard, SliceWorkAccounting, GapBoundedSearch {
     override var repaidWork: Long = 0L
         private set
     private val hasPreparation = preparationBudget != null
@@ -168,6 +169,14 @@ internal class ResumableMinimize(
     // The least objective value a leaf approached without attaining. An incumbent at or below it is optimal over those
     // leaves; one above it is not.
     private var unattainedFloor: BigFraction? = null
+
+    // The root LP relaxation's proved objective bound; it raises the bound an optimality-gap terminal reports.
+    private var provedRootBound = Double.NEGATIVE_INFINITY
+
+    // Whether a node was bounded against an optimality-gap cutoff below the incumbent, so that exhaustion proves only
+    // that cutoff rather than the incumbent itself.
+    override var appliedOptimalityGap = false
+        private set
 
     // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
     // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
@@ -1079,7 +1088,10 @@ internal class ResumableMinimize(
 
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
-            b != null -> MinimizeResult.Optimal(b.assignment, b.objective.display, stats)
+            b != null -> MinimizeResult.Optimal(b.assignment, b.objective.display, stats,
+                gapBound = if (appliedOptimalityGap && provedRootBound < b.objective.display) {
+                    params.optimalityGap?.exhaustedBound(bestObj, provedRootBound)
+                } else null)
 
             else -> MinimizeResult.Infeasible(core, stats)
         }
@@ -1456,6 +1468,7 @@ internal class ResumableMinimize(
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
         // NaN (no LP structure) carries no information and the sink ignores it.
         if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
+        if (rootBound > provedRootBound) provedRootBound = rootBound
         return true
     }
 
@@ -1579,8 +1592,11 @@ internal class ResumableMinimize(
                     lpEngine.linearBoundDominates(session, effectiveBound)
                 if (dominated) return SearchNodeDisposition.Prune
             }
-            // Persistent LP fixings may use only a cutoff that survives every later repair.
-            val lpBound = if (rebindable) externalBound else effectiveBound
+            // Persistent LP fixings may use only a cutoff that survives every later repair. Elsewhere a node whose
+            // bound lies within the optimality gap of the incumbent holds no point the search must still find.
+            val lpBound = if (rebindable) externalBound
+            else params.optimalityGap?.cutoff(effectiveBound) ?: effectiveBound
+            val gapFixesBefore = if (lpBound < effectiveBound) sink.lp.fixed.read().sum else Double.NaN
             lpHints?.beginNode(context.decisionLevel, lpBound)
             if (restartRootTargetsPending && context.decisionLevel == 0 && incumbents.current() == null) {
                 restartRootTargetsPending = false
@@ -1594,6 +1610,10 @@ internal class ResumableMinimize(
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
                 singleObj?.ascending ?: true, deferSimplex = deferSimplex)
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
+            // A prune or a fixing against the gap cutoff may have removed points the incumbent's own cutoff keeps.
+            if (!gapFixesBefore.isNaN() && (pruned || sink.lp.fixed.read().sum > gapFixesBefore)) {
+                appliedOptimalityGap = true
+            }
             if (!pruned) {
                 return SearchNodeDisposition.Expand
             }

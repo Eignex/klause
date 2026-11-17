@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
@@ -24,6 +25,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.time.Duration
 
 @RunWith(Parameterized::class)
 class LinearSourceOutcomeTest(private val exact: Boolean) {
@@ -322,5 +324,50 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         assertEquals(LinearSourceConclusion.UNSATISFIABLE, outcome.conclusion)
         assertEquals(!exact, outcome.numericalClaims)
         assertEquals(exact, outcome.claimsCoverTolerance)
+    }
+
+    @Test
+    fun `a finite optimum closed to within the gap should be optimal with its bound only under a positive gap`() {
+        val bound = BigFraction.of(bigIntOf(14_999), bigIntOf(10_000))
+
+        val outcome = finiteGapOutcome(bound, maximize = false)
+
+        assertEquals(numericalOnly, outcome.conclusion)
+        assertEquals(bound.takeIf { !exact }, outcome.gapBound)
+    }
+
+    @Test
+    fun `a maximized gap optimum should report its proved bound above the incumbent`() {
+        val bound = BigFraction.of(bigIntOf(15_001), bigIntOf(10_000))
+
+        val outcome = finiteGapOutcome(bound, maximize = true)
+
+        assertEquals(numericalOnly, outcome.conclusion)
+        assertEquals(bound.takeIf { !exact }, outcome.gapBound)
+    }
+
+    @Test
+    fun `a finite bound beyond the gap should not make the incumbent optimal`() {
+        val outcome = finiteGapOutcome(BigFraction.of(bigIntOf(149), bigIntOf(100)), maximize = false)
+
+        assertEquals(LinearSourceConclusion.SATISFIABLE, outcome.conclusion)
+        assertEquals(null, outcome.gapBound)
+    }
+
+    // The finite lane claims an optimum at x = 3/2 that its search closed only to `bound`, in source units.
+    private fun finiteGapOutcome(bound: BigFraction, maximize: Boolean): LinearSourceOutcome {
+        val sense = if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
+        val source = LinearSourceProblem(listOf(real("x", BigFraction.ONE, BigFraction.ofLong(2))), emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)), sense = sense), semantics())
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, maximize = maximize))
+        val value = BigFraction.of(bigIntOf(3), bigIntOf(2))
+        val completed = FiniteSolveOutcome.Completed(FiniteSolveVerdict.OPTIMAL, SolveStats.EMPTY, 1L,
+            realSample(listOf(value, value)), 0L, gapBound = if (maximize) bound.negated() else bound)
+        val preparation = FinitePipelinePreparation(Problem(0, 0, emptyArray(), emptyArray()), null, { it }, null)
+        val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, _ ->
+            SourceExecutionResult.Finite(invocation, FiniteSolveResult(preparation, Duration.ZERO, completed))
+        }
+        return assertNotNull(result.linearSource)
     }
 }

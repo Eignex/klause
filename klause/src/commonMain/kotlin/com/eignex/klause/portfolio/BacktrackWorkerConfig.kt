@@ -23,6 +23,7 @@ import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.search.SearchContext
@@ -44,28 +45,36 @@ internal class BacktrackWorkerConfig(
     private val onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     private val onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     private val numericalLp: Boolean = false,
+    private val optimalityGap: OptimalityGap? = null,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance, numericalLp)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance, numericalLp,
+            optimalityGap)
 
     fun withNumericalLp(): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance, true)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance, true,
+            optimalityGap)
+
+    fun withOptimalityGap(gap: OptimalityGap): BacktrackWorkerConfig =
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance,
+            numericalLp, gap)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement,
-            onLpQuery, onGuidance, numericalLp)
+            onLpQuery, onGuidance, numericalLp, optimalityGap)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance, numericalLp)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance, numericalLp,
+            optimalityGap)
 
     fun withLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer, onGuidance,
-            numericalLp)
+            numericalLp, optimalityGap)
 
     fun withGuidanceObserver(observer: (String, PooledGuidanceObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer,
-            numericalLp)
+            numericalLp, optimalityGap)
 
     override val label: String get() = recipe.label
 
@@ -94,7 +103,9 @@ internal class BacktrackWorkerConfig(
         val workerLabel = "bt/${recipe.label}"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
-        params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
+        // The gap is in the portfolio's objective units, which only a worker on the pooled model shares.
+        params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck,
+            optimalityGap = optimalityGap?.takeIf { objective != null && matchedPools?.identity != null })
         onGuidance?.let { observe ->
             val previous = params.branchObserver
             params = params.copy(branchObserver = object : PooledGuidanceObserver {
@@ -240,6 +251,7 @@ internal class BacktrackWorkerConfig(
             it.sharedPools = matchedPools
             it.sharing = sharing
             it.sharingMeter = meter
+            it.optimalityGap = params.optimalityGap
         }
         return worker
     }

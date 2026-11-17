@@ -2,10 +2,12 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Term
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.objective.closesGap
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
@@ -64,6 +66,12 @@ class LinearSourceOutcome internal constructor(
     val objectiveScale: BigFraction,
     /** Native nominal-source global bound; independent proof validation is separate. */
     val nativeObjectiveBound: LinearSourceBound? = null,
+    /**
+     * Proved original-unit objective bound of an [LinearSourceConclusion.OPTIMAL] [incumbent] that lies within the
+     * source optimality gap of it, a lower bound when minimizing and an upper bound when maximizing; null for an
+     * exact optimum or another conclusion.
+     */
+    val gapBound: BigFraction? = null,
 ) {
     /** Whether terminal statuses use numerical tolerance policy rather than exact source certification. */
     val numericalClaims: Boolean get() = source.semantics.effective.feasibilityTolerance?.isExact == false
@@ -205,6 +213,8 @@ internal fun executeLinearSource(
     var native = LinearSourceConclusion.UNKNOWN
     var nativeOptimalValue: BigFraction? = null
     var nativeOptimum: LinearSourceWitness? = null
+    // A native optimum's proved gap bound in original units, minimization direction; null for an exact optimum.
+    var nativeGapBound: BigFraction? = null
     var unboundedBaseExact = false
     var unboundedSourceRay = false
     val numerical = prepared.view.source.semantics.effective.feasibilityTolerance?.isExact == false
@@ -249,6 +259,7 @@ internal fun executeLinearSource(
                 FiniteSolveVerdict.OPTIMAL -> {
                     nativeOptimum = point
                     nativeOptimalValue = completed.bestSample?.let { prepared.objective?.evaluateExact(it) }
+                    nativeGapBound = completed.gapBound?.let { it * prepared.view.objectiveScale.reciprocal() }
                     LinearSourceConclusion.OPTIMAL
                 }
 
@@ -369,6 +380,13 @@ internal fun executeLinearSource(
             prepared.matchesNativeObjective(it, nativeOptimalValue, samePoint, stop)
         } == true
     } == true
+    val sourceMaximizes = prepared.view.source.objective?.sense == ObjectiveSense.MAXIMIZE
+    // A gap optimum stands only when its proved bound closes the gap of the reported source point in original units.
+    val gapClosed = nativeGapBound?.let { bound ->
+        val value = incumbent?.objective ?: return@let false
+        prepared.view.source.semantics.effective.optimalityTolerance
+            .closesGap(if (sourceMaximizes) value.negated() else value, bound)
+    } ?: true
     val conclusion = when {
         acceptedOptimal -> LinearSourceConclusion.OPTIMAL
 
@@ -377,7 +395,7 @@ internal fun executeLinearSource(
 
         invocation.operation != ExecutionOperation.OPTIMIZE && incumbent != null -> LinearSourceConclusion.SATISFIABLE
 
-        native == LinearSourceConclusion.OPTIMAL && nativeClaimsUnrestricted && nativeOptimalAttained &&
+        native == LinearSourceConclusion.OPTIMAL && nativeClaimsUnrestricted && nativeOptimalAttained && gapClosed &&
             (numerical || (equivalent && incumbent?.exact == true)) -> native
 
         native == LinearSourceConclusion.LIMIT && equivalent -> native
@@ -397,11 +415,13 @@ internal fun executeLinearSource(
         }
         else -> null
     }
+    val gapBound = nativeGapBound?.takeIf { conclusion == LinearSourceConclusion.OPTIMAL && !acceptedOptimal }
+        ?.let { if (sourceMaximizes) it.negated() else it }
     val snapshot = LinearSourceOutcome(
         prepared.view.source, incumbent, native, conclusion,
         prepared.view.exact, prepared.view.constraintsExact, prepared.claimsCoverTolerance,
         prepared.acceptedObjectiveBound,
-        nativeClaimsUnrestricted, prepared.view.objectiveScale, bound,
+        nativeClaimsUnrestricted, prepared.view.objectiveScale, bound, gapBound,
     )
     return when (result) {
         is SourceExecutionResult.Prepared -> result

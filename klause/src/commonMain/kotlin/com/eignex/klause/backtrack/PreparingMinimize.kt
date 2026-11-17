@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.propagation.PropagationPreparation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.solver.GapBoundedSearch
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.SliceWorkAccounting
@@ -22,7 +23,7 @@ internal class PreparingMinimize(
     private val solver: BacktrackSolver,
     private val objective: LinearObjective,
     private val params: BacktrackParams,
-) : ResumableSearch, ReseedGuard, SliceWorkAccounting {
+) : ResumableSearch, ReseedGuard, SliceWorkAccounting, GapBoundedSearch {
     override var repaidWork: Long = 0L
         private set
     private var globalToken = params.cancellation
@@ -58,6 +59,7 @@ internal class PreparingMinimize(
 
     override val canReseed: Boolean get() = !preparationPending && search?.canReseed != false
     override val canContinuePreparation: Boolean get() = search?.canContinuePreparation == true
+    override val appliedOptimalityGap: Boolean get() = search?.appliedOptimalityGap == true
 
     override val isDone: Boolean get() = terminal != null || search?.isDone == true
     override val preparationPending: Boolean get() = !closed && (search?.preparationPending ?: true)

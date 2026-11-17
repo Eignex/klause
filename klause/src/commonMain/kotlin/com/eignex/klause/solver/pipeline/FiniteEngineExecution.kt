@@ -34,6 +34,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
@@ -104,6 +105,8 @@ internal class FiniteExecutionRequest(
     val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    /** Source optimality gap over [objective]; see [BacktrackParams.optimalityGap]. */
+    val optimalityGap: OptimalityGap? = null,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -145,6 +148,8 @@ internal sealed class FiniteExecutionResult {
         val nativeSourceResult: SolveResult? = null,
         val nativeSourceMinimum: MinimizeResult? = null,
         val terminationReason: TerminationReason? = null,
+        /** On [FiniteExecutionVerdict.OPTIMAL] within the optimality gap, the proved working objective bound. */
+        val gapBound: Double? = null,
     ) : FiniteExecutionResult() {
         var completeSearchAdmitted: Boolean? = null
         var nativeObjectiveBound: FiniteObjectiveBound? = null
@@ -244,7 +249,7 @@ private fun executeSourceMinimum(
     val result = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
             objective, controls.params.copy(cancellation = controls.cancellation.includingStop( request.cancellation),
-                toleranceCheck = request.toleranceCheck,
+                toleranceCheck = request.toleranceCheck, optimalityGap = request.optimalityGap,
             )
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
@@ -271,6 +276,7 @@ private fun executeSourceMinimum(
         start.elapsedNow().inWholeMilliseconds,
         (result as? MinimizeResult.Unbounded)?.direction,
         nativeSourceMinimum = result,
+        gapBound = (result as? MinimizeResult.Optimal)?.gapBound,
         terminationReason = result.incompleteReason(),
     )
 }
@@ -298,7 +304,7 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
     val solver = BacktrackSolver(request.problem, request.lpSolveContext)
     if (plan.dryRun) return FiniteExecutionResult.DryRun("solver dry-run:", solver.describe(plan.params).lines())
 
-    val params = plan.params.copy(toleranceCheck = request.toleranceCheck)
+    val params = plan.params.copy(toleranceCheck = request.toleranceCheck, optimalityGap = request.optimalityGap)
     val start = TimeSource.Monotonic.markNow()
     return if (request.optimize) {
         executeFixedOptimize(solver, params, requireNotNull(request.objective), callbacks, start)
@@ -427,6 +433,7 @@ private fun executeFixedOptimize(
                         solutions = solutions,
                         bestSample = step.sample,
                         elapsedMs = start.elapsedNow().inWholeMilliseconds,
+                        gapBound = step.gapBound,
                     )
                 }
                 if (step is MinimizeResult.Unbounded) {
@@ -594,7 +601,8 @@ private fun executePortfolio(
     }
     val profile = ProblemProfile.of(request.problem, request.optimize)
     val baseScenario = clausalDefaultScenario(
-        plan.scenario.copy(numericalLp = request.lpSolveContext.numericalDeductions),
+        plan.scenario.copy(numericalLp = request.lpSolveContext.numericalDeductions,
+            optimalityGap = request.optimalityGap),
         profile,
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
@@ -723,6 +731,7 @@ private fun executePortfolioOptimize(
         elapsedMs = start.elapsedNow().inWholeMilliseconds,
         unboundedDirection = (result as? MinimizeResult.Unbounded)?.direction,
         terminationReason = result.incompleteReason(),
+        gapBound = (result as? MinimizeResult.Optimal)?.gapBound,
     )
 }
 

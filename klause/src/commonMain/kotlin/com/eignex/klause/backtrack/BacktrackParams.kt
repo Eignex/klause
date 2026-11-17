@@ -27,6 +27,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.forInvocation
 import com.eignex.klause.solver.incumbent.IncumbentSource
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
@@ -365,6 +366,13 @@ data class BacktrackParams(
      * that publication grants no completion certificate or nominal exact coordinates.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
+    /**
+     * Gap within which minimization ends: nodes are pruned against its cutoff of the incumbent, and an exhausted
+     * search reports the incumbent optimal with the bound it proved
+     * ([com.eignex.klause.solver.result.MinimizeResult.Optimal.gapBound]). `null`
+     * closes the bound completely. A repairing search ignores it.
+     */
+    val optimalityGap: OptimalityGap? = null,
     /** Cooperative cancellation predicate; see [ExecutionControl]. */
     val cancellation: ExecutionControl = ExecutionControl.Never,
     /** Per-call fire floor before propagation polls [cancellation]; see [PROPAGATION_CANCEL_FLOOR].

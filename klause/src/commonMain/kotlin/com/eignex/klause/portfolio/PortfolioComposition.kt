@@ -13,6 +13,7 @@ import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SearchEvent
 
 /** Whether the problem is a constraint *optimization* (an objective to minimise) or a pure
@@ -168,6 +169,8 @@ data class PortfolioScenario(
     val rootMaintenance: Boolean = true,
     /** Whether the backtrack arms' LP deductions accept float results within tolerances. */
     val numericalLp: Boolean = false,
+    /** Gap within which the backtrack arms and the run end minimization; see [BacktrackParams.optimalityGap]. */
+    val optimalityGap: OptimalityGap? = null,
 ) {
     init {
         require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
@@ -295,6 +298,9 @@ internal object PortfolioComposition {
         return arms.map { arm ->
             val numerical = arm.config.let {
                 if (scenario.numericalLp && it is BacktrackWorkerConfig) it.withNumericalLp() else it
+            }.let {
+                val gap = scenario.optimalityGap
+                if (gap != null && it is BacktrackWorkerConfig) it.withOptimalityGap(gap) else it
             }
             val checked = if (check == null) numerical else when (numerical) {
                 is BacktrackWorkerConfig -> numerical.withToleranceCheck(check)
