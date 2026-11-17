@@ -28,7 +28,7 @@ chapters afterwards. User documentation lives at
 12. [Local search](12-local-search.md): strategies, moves, preparation and definitions.
 13. [Neighborhoods and restarts](13-neighborhoods.md): scoring, global neighborhoods, completion and restarts.
 14. [Portfolios](14-portfolio.md): invocations, admission, witnesses and shared channels.
-15. [Portfolio scheduling and workers](15-portfolio-scheduling.md): slice allocation, preparation revisits and worker recipes.
+15. [Portfolio scheduling and workers](15-portfolio-scheduling.md): slice allocation, preparation revisits, numerical companions and worker recipes.
 16. [Original-source derivations](16-evidence.md): typed claims checked against the original source.
 
 ## Part IV — Theories
