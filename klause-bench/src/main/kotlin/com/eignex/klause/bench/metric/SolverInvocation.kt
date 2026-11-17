@@ -689,7 +689,6 @@ internal object SolverInvocation {
     // SMT-LIB output stream (klause-cli's `.smt2` front-end).
     private const val SMT_SAT = "sat"
     private const val SMT_UNSAT = "unsat"
-    private const val SMT_UNKNOWN = "unknown"
     private const val SMT_COMMENT_PREFIX = "; "
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
