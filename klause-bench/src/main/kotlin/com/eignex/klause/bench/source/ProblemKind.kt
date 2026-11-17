@@ -14,6 +14,9 @@ internal object ProblemKind {
     fun isCop(ref: ProblemRef): Boolean = when (ref.format) {
         Format.DIMACS, Format.JSON_SCHEMA, Format.IN_CODE -> false
         Format.WCNF -> true
+        Format.SMTLIB -> runCatching {
+            SmtObjective.read(CorpusFetcher.resolve(ref.source)) != null
+        }.getOrDefault(false)
 
         else -> {
             val text = runCatching { CorpusFiles.readText(CorpusFetcher.resolve(ref.source)) }.getOrNull()
@@ -21,7 +24,6 @@ internal object ProblemKind {
                 text == null -> false
                 ref.format == Format.MINIZINC -> hasSolveObjective(text)
                 ref.format == Format.OPB -> OPB_OBJECTIVE.containsMatchIn(text)
-                ref.format == Format.SMTLIB -> SMT_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.XCSP3 -> XCSP_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.MPS -> mpsHasObjective(text)
                 else -> false
@@ -45,6 +47,5 @@ internal object ProblemKind {
 
     private val SOLVE_OBJECTIVE = Regex("""\bsolve\b[^;]*\b(?:minimize|maximize)\b""")
     private val OPB_OBJECTIVE = Regex("""(?m)^\s*(?:min|max):""")
-    private val SMT_OBJECTIVE = Regex("""\((?:minimize|maximize)\b""")
     private val XCSP_OBJECTIVE = Regex("""<objective|type\s*=\s*"COP"""")
 }
