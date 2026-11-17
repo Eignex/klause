@@ -410,6 +410,18 @@ internal fun FinitePipeline.solve(
                 .withTerminationReason(request.interruptedReason()),
         )
     }
+    val sourcePlan = request.shape.preparedPlan
+    if (request.shape.sourceInvocation != null && !request.prepareOnly &&
+        sourcePlan.decline != PreparedPlanDecline.RESOURCE &&
+        !sourcePlan.capabilities.admission(request.engine, request.operation).runnable
+    ) {
+        return result(
+            FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
+            Duration.ZERO,
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L)
+                .withTerminationReason(TerminationReason.Unsupported),
+        )
+    }
     val preparationStart = TimeSource.Monotonic.markNow()
     var preparation = prepare(request.preparationRequest(stop))
     var preparationElapsed = preparationStart.elapsedNow()

@@ -29,7 +29,7 @@ class PropagationProblem private constructor(
     }
 
     internal fun bakeRetainedView(view: Problem, factorIndices: IntArray,
-        cancellation: ExecutionControl): BakedProblem {
+        cancellation: ExecutionControl): BakedProblem? {
         require(view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
             view.numRealVars == problem.numRealVars && factorIndices.size == view.numFactors &&
             factorIndices.indices.all { index ->
@@ -38,7 +38,8 @@ class PropagationProblem private constructor(
             }
         ) { "retained propagation view differs from its original coordinates or factors" }
         val captured = selection ?: problem.selectedFactorProjections()
-        return view.bake(captured.projected(view, factorIndices), cancellation)
+        val checks = captured.projected(view, factorIndices).forOriginalPointCheck() ?: return null
+        return view.bake(checks, cancellation)
     }
 
     /** Whether this projection can use the packed native-SAT propagation lane. */

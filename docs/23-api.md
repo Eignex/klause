@@ -104,6 +104,15 @@ projection roles describe optional overlap. Inspect `plan.capabilities.admission
 for the requested engine and operation before opening execution: even a declined
 plan retains its intended owners for diagnosis.
 
+An admission decline names its canonical `factorIndex` when one relation prevents
+execution. Arithmetic declines can also expose `encoding`: an immutable
+`EncoderFailure` with its target, original cause, missing integer fixings and
+missing or contradicted Boolean pins. Model-wide declaration failures and resource
+stops need no factor attribution. A decline is diagnostic, never a refutation.
+Source-backed finite invocation checks the captured operation admission before opening preparation
+or workers; a missing required projection returns unsupported. Preparation-only
+requests retain their diagnostic surface.
+
 `PreparedSourceInvocation` retains the selected route, source plan, operation
 admission and any private grid. Setup finishes route and grid selection before
 returning it, so an invocation never changes its execution view. With a private

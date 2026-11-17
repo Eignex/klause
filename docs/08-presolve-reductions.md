@@ -389,6 +389,10 @@ then every original relation touching a real coordinate, then projects the remai
 discrete relations into a singleton-domain finite check. An unavailable real checker
 stays indeterminate. It invents no bounds for open declarations, and
 arbitrary-width integers go to their exact theory checker instead.
+When the arithmetic route has no selected finite propagator, a private point check
+can use a built-in original relation with exact pinned-check authority. This does
+not install a finite search route. A missing complete original checker remains
+indeterminate, without opening an unavailable propagator.
 
 `verifyRealCoordinates` checks authoritative rational coordinates against source
 bounds and supported exact relations, including strict and reified rows. Missing

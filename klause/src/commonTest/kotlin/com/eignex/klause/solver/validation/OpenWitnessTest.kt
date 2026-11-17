@@ -25,6 +25,40 @@ import kotlin.test.assertIs
 
 class OpenWitnessTest {
     @Test
+    fun `an exact original point check should accept a witness without a selected finite propagator`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf(Product(0, 1, 2)))
+        val selected = FactorProjectionProviders(propagation = PropagationProjectionProvider { null }).prepare(source)
+
+        val checked = verifyOpenWitness(source, Sample(booleanArrayOf(), longArrayOf(2, 3, 6)),
+            ExecutionControl.Never, PropagationProblem(source, selected))
+
+        assertIs<Verification.Accepted<*, *>>(checked)
+    }
+
+    @Test
+    fun `an exact original point check should reject a witness without a selected finite propagator`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf(Product(0, 1, 2)))
+        val selected = FactorProjectionProviders(propagation = PropagationProjectionProvider { null }).prepare(source)
+
+        val checked = verifyOpenWitness(source, Sample(booleanArrayOf(), longArrayOf(2, 3, 5)),
+            ExecutionControl.Never, PropagationProblem(source, selected))
+
+        assertIs<Verification.Rejected>(checked)
+    }
+
+    @Test
+    fun `a missing original point checker should remain indeterminate without a selected propagator`() {
+        val relation = object : Factor by Product(0, 1, 2) {}
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf(relation))
+        val selected = FactorProjectionProviders(propagation = PropagationProjectionProvider { null }).prepare(source)
+
+        val checked = verifyOpenWitness(source, Sample(booleanArrayOf(), longArrayOf(2, 3, 6)),
+            ExecutionControl.Never, PropagationProblem(source, selected))
+
+        assertIs<Verification.Indeterminate>(checked)
+    }
+
+    @Test
     fun `real min max points should be checked before discrete propagation`() {
         for (maximum in listOf(false, true)) {
             val source = Problem(0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), maximum)),

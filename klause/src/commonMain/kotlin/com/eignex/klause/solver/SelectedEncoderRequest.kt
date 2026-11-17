@@ -4,6 +4,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.conditionedLinearSupported
@@ -27,7 +28,13 @@ internal class SelectedEncoderRequest private constructor(
     val fixedBooleans: Map<SourceBoolId, Boolean>,
     val cancellation: ExecutionControl,
     val completeFiniteConditions: Boolean,
+    private val onFailure: (EncoderFailure) -> Unit,
 ) {
+    internal fun reportFailure(reason: EncoderDecline, index: Int? = null) {
+        val encoder = index?.let { selection.capturedEncoder(it, target) }
+        onFailure(encoderFailure(target, reason, index, encoder, fixedIntegers, fixedBooleans))
+    }
+
     companion object {
         @Suppress("LongMethod", "CyclomaticComplexMethod")
         fun prepare(
@@ -39,12 +46,15 @@ internal class SelectedEncoderRequest private constructor(
             cancellation: ExecutionControl,
             completeFiniteConditions: Boolean,
             onDecline: (EncoderDecline) -> Unit,
+            onFailure: (EncoderFailure) -> Unit,
         ): SelectedEncoderRequest? {
             val stop = cancellation.encodingPreparationScope()
             val polling = stop.bindStopControl()
             val accounting = stop.accounting
             val admission = stop.admission
-            fun decline(reason: EncoderDecline): SelectedEncoderRequest? {
+            fun decline(reason: EncoderDecline, index: Int? = null): SelectedEncoderRequest? {
+                onFailure(encoderFailure(target, reason, index, index?.let { selection.capturedEncoder(it, target) },
+                    fixedIntegers, fixedBooleans))
                 onDecline(reason)
                 return null
             }
@@ -71,29 +81,30 @@ internal class SelectedEncoderRequest private constructor(
             for (index in indices) {
                 if (stopped()) return decline(EncoderDecline.RESOURCE)
                 require(index in source.factors.indices && seen.add(index)) { "invalid selected factor scope" }
-                val encoder = selection.capturedEncoder(index, target) ?: return decline(EncoderDecline.UNSUPPORTED)
+                val encoder = selection.capturedEncoder(index, target)
+                    ?: return decline(EncoderDecline.UNSUPPORTED, index)
                 if (!encoder.enforcesSource && encoder.support != EncoderSupport.CONDITIONED) {
-                    return decline(EncoderDecline.UNSUPPORTED)
+                    return decline(EncoderDecline.UNSUPPORTED, index)
                 }
                 for ((id, value) in encoder.requiredBooleans) {
                     if (stopped()) return decline(EncoderDecline.RESOURCE)
                     if (id.index !in 0 until source.numBoolVars || booleans[id] != value) {
-                        return decline(EncoderDecline.CONDITIONS)
+                        return decline(EncoderDecline.CONDITIONS, index)
                     }
                 }
                 var missingInteger = false
                 for (id in encoder.requiredIntegers) {
                     if (stopped()) return decline(EncoderDecline.RESOURCE)
-                    if (id.index !in 0 until source.numIntVars) return decline(EncoderDecline.CONDITIONS)
+                    if (id.index !in 0 until source.numIntVars) return decline(EncoderDecline.CONDITIONS, index)
                     if (id !in integers) missingInteger = true
                 }
                 if (missingInteger) {
                     if (!completeFiniteConditions || target != EncodingTarget.LINEAR) {
-                        return decline(EncoderDecline.CONDITIONS)
+                        return decline(EncoderDecline.CONDITIONS, index)
                     }
                     val covered = selection.conditionedLinearSupported(index, stop)
                     if (stop()) return decline(EncoderDecline.RESOURCE)
-                    if (!covered) return decline(EncoderDecline.CONDITIONS)
+                    if (!covered) return decline(EncoderDecline.CONDITIONS, index)
                 }
                 selectedIndices += index
                 selectedEncoders += encoder
@@ -108,10 +119,25 @@ internal class SelectedEncoderRequest private constructor(
                 booleans,
                 stop,
                 completeFiniteConditions,
+                onFailure,
             )
         }
     }
 }
+
+private fun encoderFailure(
+    target: EncodingTarget,
+    reason: EncoderDecline,
+    index: Int?,
+    encoder: Encoder?,
+    integers: Map<SourceIntId, BigInt>,
+    booleans: Map<SourceBoolId, Boolean>,
+): EncoderFailure = EncoderFailure(target, reason, index,
+    if (reason == EncoderDecline.CONDITIONS) encoder?.requiredIntegers?.filter { it !in integers }.orEmpty()
+    else emptyList(),
+    if (reason == EncoderDecline.CONDITIONS) encoder?.requiredBooleans?.filter { (id, value) ->
+        booleans[id] != value
+    }.orEmpty() else emptyMap())
 
 private fun PreparedFactorProjections.acceptsIntegerCondition(id: SourceIntId, value: BigInt): Boolean {
     if (id.index !in 0 until problem.numIntVars) return false

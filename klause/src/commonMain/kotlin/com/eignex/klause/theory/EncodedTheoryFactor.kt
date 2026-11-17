@@ -50,10 +50,11 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
     onDecline: (EncoderDecline) -> Unit = {},
     completeFiniteConditions: Boolean = false,
+    onFailure: (EncoderFailure) -> Unit = {},
 ): Problem? {
     require(target != EncodingTarget.POLYNOMIAL)
     val request = requestEncoders(target, indices, fixedIntegers, fixedBooleans, cancellation,
-        completeFiniteConditions, onDecline) ?: return null
+        completeFiniteConditions, onFailure, onDecline) ?: return null
     return linearTheoryModel(request, onDecline)
 }
 
@@ -65,6 +66,7 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     require(request.target != EncodingTarget.POLYNOMIAL)
     val stop = request.cancellation.bindStopControl()
     if (stop()) {
+        request.reportFailure(EncoderDecline.RESOURCE)
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
@@ -76,11 +78,15 @@ internal fun PreparedFactorProjections.linearTheoryModel(
         val index = request.indices[position]
         val relations = installSelectedLinearFactor(index, request.target, request.encoders[position],
             request.fixedIntegers, request.fixedBooleans, stop, allocator,
-            onDecline, request.completeFiniteConditions, conditions) ?: return null
+            { reason ->
+                request.reportFailure(reason, index)
+                onDecline(reason)
+            }, request.completeFiniteConditions, conditions) ?: return null
         factors += relations
         repeat(relations.size) { origins += index }
     }
     if (stop()) {
+        request.reportFailure(EncoderDecline.RESOURCE)
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
@@ -103,7 +109,7 @@ internal fun PreparedFactorProjections.installLinearFactor(
     completeFiniteConditions: Boolean = false,
 ): List<EncodedTheoryFactor>? {
     val request = requestEncoders(target, listOf(index), integerPins, booleanPins, cancellation,
-        completeFiniteConditions, onDecline) ?: return null
+        completeFiniteConditions, onDecline = onDecline) ?: return null
     return installSelectedLinearFactor(index, target, request.encoders.single(), request.fixedIntegers,
         request.fixedBooleans, request.cancellation, allocator ?: EncodingRealAllocator(problem.numRealVars),
         onDecline, completeFiniteConditions)

@@ -23,6 +23,7 @@ import com.eignex.klause.solver.validation.marginRow
 import com.eignex.klause.solver.validation.statesStrictMargin
 import com.eignex.klause.solver.validation.strictMargin
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
@@ -76,6 +77,7 @@ internal class SharedPolynomialModel private constructor(
             projections: PreparedFactorProjections,
             cancellation: ExecutionControl,
             widening: PolynomialTolerance? = null,
+            onFailure: (EncoderFailure) -> Unit = {},
             onDecline: (EncoderDecline) -> Unit,
         ): SharedPolynomialModel? {
             projections.requireSource(source)
@@ -130,7 +132,8 @@ internal class SharedPolynomialModel private constructor(
                 }
             }
             val request = projections.requestEncoders(EncodingTarget.POLYNOMIAL,
-                participating.indices.filter { participating[it] }, cancellation = stop, onDecline = onDecline)
+                participating.indices.filter { participating[it] }, cancellation = stop,
+                onFailure = onFailure, onDecline = onDecline)
                 ?: return null
             val lowering = PolynomialRealLowering(source.numRealVars)
             val integerIds = LinkedHashMap<Int, Int>()
@@ -150,9 +153,7 @@ internal class SharedPolynomialModel private constructor(
             for ((index, factor) in source.factors.withIndex()) {
                 if (stopped()) return null
                 stop.charge(1)
-                val finite = factor.variables.reals.isEmpty() &&
-                    projections.capabilities(index).propagation != PropagationCapability.UNSUPPORTED
-                if (finite) kept += index
+                if (projections.hasFinitePeer(index)) kept += index
                 if (!participating[index]) continue
                 val selected = request.encoders[selectedIndex++]
                 val widened = tolerance?.takeIf { it.widens(factor) }
@@ -178,6 +179,7 @@ internal class SharedPolynomialModel private constructor(
                     EncoderDecline.RESOURCE
                 }
                 if (decline != null || encoding.formulas.isEmpty()) {
+                    request.reportFailure(decline ?: EncoderDecline.UNSUPPORTED, index)
                     onDecline(decline ?: EncoderDecline.UNSUPPORTED)
                     return null
                 }
@@ -206,12 +208,7 @@ internal class SharedPolynomialModel private constructor(
             if (stopped()) return null
             return SharedPolynomialModel(
                 source,
-                Problem.of(
-                    source.numBoolVars, source.numIntVars, source.declaredIntDomains,
-                    Array(kept.size) { source.factors[kept[it]] },
-                    source.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
-                    source.hasSymmetryBreaking, settings = source.settings, semantics = source.semantics,
-                ),
+                source.finiteFactorPeer(kept),
                 PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount, fixedReals),
                 integerIds.toMap(),
                 kept.toList(),

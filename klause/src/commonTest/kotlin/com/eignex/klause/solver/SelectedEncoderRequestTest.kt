@@ -12,6 +12,7 @@ import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
@@ -30,6 +31,30 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SelectedEncoderRequestTest {
+    @Test
+    fun `condition failures should retain the canonical subset index and all unmet pins`() {
+        val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)
+        val source = Problem(2, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(row, row))
+        val selected = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
+            Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0), SourceIntId(1)),
+                mapOf(SourceBoolId(0) to true, SourceBoolId(1) to false))
+        }).prepare(source)
+        var failure: EncoderFailure? = null
+
+        val request = selected.requestEncoders(EncodingTarget.POLYNOMIAL, listOf(1),
+            fixedBooleans = mapOf(SourceBoolId(0) to false), onFailure = { failure = it })
+
+        assertNull(request)
+        val diagnosis = assertNotNull(failure)
+        assertEquals(1, diagnosis.factorIndex)
+        assertEquals(listOf(SourceIntId(0), SourceIntId(1)), diagnosis.missingIntegers)
+        assertEquals(mapOf(SourceBoolId(0) to true, SourceBoolId(1) to false), diagnosis.missingBooleans)
+        (diagnosis.missingIntegers as MutableList).clear()
+        (diagnosis.missingBooleans as MutableMap).clear()
+        assertEquals(2, diagnosis.missingIntegers.size)
+        assertEquals(2, diagnosis.missingBooleans.size)
+    }
+
     @Test
     fun `batched preflight should stop at the exact containing work allowance`() {
         val source = Problem(

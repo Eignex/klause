@@ -21,6 +21,7 @@ import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.RetainedLinearEncoding
 import com.eignex.klause.theory.conditionedLinearSupported
@@ -67,6 +68,7 @@ class ComponentPlan internal constructor(
     },
     private val installedFragment: Problem? = null,
     internal val encodingDecline: EncoderDecline? = null,
+    internal val encodingFailure: EncoderFailure? = null,
 ) {
     init {
         factorProjections.requireSource(source)
@@ -247,14 +249,15 @@ class ComponentPlan internal constructor(
         val selection = if (appended) factorProjections.replacedLast(spec)
         else factorProjections.projected(spec, IntArray(spec.numFactors) { it })
         var decline: EncoderDecline? = null
+        var failure: EncoderFailure? = null
         val fragment = if (appended) {
             selection.linearTheoryModel(encodingTarget(), selectedTheoryFactorIndices(), cancellation = cancellation,
-                onDecline = { decline = it }, completeFiniteConditions = true)
+                onDecline = { decline = it }, completeFiniteConditions = true, onFailure = { failure = it })
         } else installedFragment?.let { it.rebindEncoding(spec, it.factors, it.impliedFactorMask) }
         return ComponentPlan(spec, intOwners, factorOwners,
             if (appended && hasTheoryComponent && fragment == null) ProblemPipeline.UNSUPPORTED_OPEN
             else theoryPipeline,
-            unplaceable, selection, encodingFactors, fragment, decline)
+            unplaceable, selection, encodingFactors, fragment, decline, failure)
     }
 
     private fun requireSamePrefix(spec: Problem, count: Int) {
@@ -405,13 +408,15 @@ internal fun Problem.buildComponentPlan(
         else IntVariableOwner.THEORY
     }
     val stop = cancellation.encodingPreparationScope()
+    val failures = LinkedHashMap<EncodingTarget, EncoderFailure>()
     fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? =
         preparationBudget.observePreparation(PresolvePreparationStage.SOURCE_ROWS, PresolveLane.SOURCE, this, stop) {
                 token,
                 _,
             ->
             retained?.model(target, indices, token) ?: projections.requestEncoders(
-                target, indices, cancellation = token, completeFiniteConditions = true, onDecline = onDecline,
+                target, indices, cancellation = token, completeFiniteConditions = true,
+                onFailure = { failures[target] = it }, onDecline = onDecline,
             )?.let {
                 projections.linearTheoryModel(it, onDecline)
             }
@@ -535,6 +540,14 @@ internal fun Problem.buildComponentPlan(
         fragment?.supportsExactLira() == true -> ProblemPipeline.EXACT_LIRA
         else -> ProblemPipeline.UNSUPPORTED_OPEN
     }
+    val culprit = factors.indices.firstOrNull { index ->
+        factorOwners[index] == FactorOwner.CP && (factors[index].variables.reals.isNotEmpty() ||
+            factors[index].intVars.any { intOwners[it] == IntVariableOwner.THEORY })
+    }
+    if (route == ProblemPipeline.UNSUPPORTED_OPEN && culprit != null && !stop() &&
+        failures[target]?.factorIndex != culprit
+    ) projections.requestEncoders(target, listOf(culprit), cancellation = stop, completeFiniteConditions = true,
+        onFailure = { failures[target] = it })
     return ComponentPlan(this, intOwners, factorOwners, route,
         unownedOpenColumn?.let { unplaceable(it, projections, factorOwners) }, projections, encoded,
         when {
@@ -545,7 +558,8 @@ internal fun Problem.buildComponentPlan(
         if (route != ProblemPipeline.UNSUPPORTED_OPEN) null
         else if (preparationStopped || stop() || linearDecline == EncoderDecline.RESOURCE ||
             differenceDecline == EncoderDecline.RESOURCE) EncoderDecline.RESOURCE
-        else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline)
+        else linearDecline ?: differenceDecline ?: fullLinearDecline ?: fullDifferenceDecline,
+        if (route == ProblemPipeline.UNSUPPORTED_OPEN) failures[target] else null)
 }
 
 /**

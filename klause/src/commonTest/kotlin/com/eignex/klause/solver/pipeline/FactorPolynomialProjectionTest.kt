@@ -234,7 +234,7 @@ class FactorPolynomialProjectionTest {
             val declines = ArrayList<EncoderDecline>()
 
             val projection = source.integerPolynomialProjection(source, providers.prepare(source),
-                ExecutionControl.Never, declines::add)
+                ExecutionControl.Never, onDecline = declines::add)
 
             assertNull(projection)
             assertEquals(0, installs)
@@ -261,7 +261,7 @@ class FactorPolynomialProjectionTest {
             val declines = ArrayList<EncoderDecline>()
 
             val projection = source.integerPolynomialProjection(source, providers.prepare(source),
-                ExecutionControl.Never, declines::add)
+                ExecutionControl.Never, onDecline = declines::add)
 
             assertEquals(if (fixed) 1 else 0, installs)
             if (fixed) assertEquals(mapOf(SourceIntId(0) to bigIntOf(2)),
@@ -290,7 +290,8 @@ class FactorPolynomialProjectionTest {
         })
         val declines = ArrayList<EncoderDecline>()
 
-        val projection = source.integerPolynomialProjection(source, providers.prepare(source), stop, declines::add)
+        val projection = source.integerPolynomialProjection(source, providers.prepare(source), stop,
+            onDecline = declines::add)
 
         assertNull(projection)
         assertEquals(listOf(EncoderDecline.RESOURCE), declines)

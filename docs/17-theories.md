@@ -72,6 +72,13 @@ of its complete integer and Boolean conditions. The snapshot owns its maps, and
 attribution access returns defensive copies. Sharing conditions preserves every
 premise without copying the entire assignment for each installed factor.
 
+Encoding failures retain the consumer language, original decline and canonical
+factor index. Condition failures also capture missing integer fixings and Boolean
+pins, including contradicted pins. Preflight and installation use the same source
+namespace; no supported prefix or partially emitted relation survives a decline.
+Declaration-wide failures and containing stops can have no individual factor.
+These diagnoses carry no infeasibility authority.
+
 ## Shared composition contract
 
 [Prepared ownership](02-model.md#factor-projection-selection) lets propagation and
@@ -84,6 +91,11 @@ composition. Real-valued factors need complete encodings in the shared arithmeti
 scope; a relaxation is insufficient. Function completion pins all finite Boolean
 and integer choices, and a checked witness must agree with them. An undecided
 required completion withholds exhaustion even when the finite search is exhausted.
+
+Polynomial and function preparation share finite-peer eligibility and assembly.
+The peer preserves original declarations, semantics, settings, factor order and
+implied-factor marks; its selected mechanisms follow the canonical factor mapping.
+Numerical finite-real prerequisites remain with their completion contract.
 
 [Shared search](09-search.md) owns decisions, levels and retraction. Neutral
 `SourceBoundAtom` predicates mean the same thing in every adapter; multiple

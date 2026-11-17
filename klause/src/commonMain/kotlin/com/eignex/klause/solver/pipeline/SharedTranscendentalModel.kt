@@ -14,9 +14,9 @@ import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.functionFormula
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.ExecutionControl
@@ -40,13 +40,12 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
     val source = requireNotNull(factorModel)
     projections.requireSource(source)
     val stop = cancellation.encodingPreparationScope()
-    val finiteIndices = source.factors.indices.filter {
-        source.factors[it].variables.reals.isEmpty() &&
-            projections.capabilities(it).propagation != PropagationCapability.UNSUPPORTED
-    }
+    val finiteIndices = source.factors.indices.filter { projections.hasFinitePeer(it) }
     val finiteSet = finiteIndices.toSet()
     val encoded = source.factors.indices.filter { it !in finiteSet }
     var failedFactor: Int? = null
+    var encodingFailure: EncoderFailure? = null
+    var activeFactor: Int? = null
     var decline: PreparedPlanDecline? = when {
         (0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) } ->
             PreparedPlanDecline.OPEN_FINITE_INTEGER
@@ -59,13 +58,13 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
         if (decline == null) {
             val scope = encoded.filter { source.factors[it] !is ExactRealEquality }
             val request = projections.requestEncoders(EncodingTarget.POLYNOMIAL, scope,
-                cancellation = stop, onDecline = {
+                cancellation = stop, onFailure = {
+                    encodingFailure = it
+                    failedFactor = it.factorIndex
+                }, onDecline = {
                     decline = if (it == EncoderDecline.RESOURCE) PreparedPlanDecline.RESOURCE
                     else PreparedPlanDecline.POLYNOMIAL_ENCODING
                 })
-            if (request == null) {
-                failedFactor = scope.firstOrNull { !projections.encoder(it, EncodingTarget.POLYNOMIAL).enforcesSource }
-            }
             val selected = request?.let { scope.zip(it.encoders).toMap() }.orEmpty()
             val lowering = PolynomialRealLowering(numericCount)
             val formulas = ArrayList<PolynomialRealFormula>()
@@ -73,6 +72,7 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
             val attributions = ArrayList<EncodingAttribution>()
             for (index in encoded) {
                 if (decline != null) break
+                activeFactor = index
                 stop.polynomialSourceCheckpoint(1)
                 val factor = source.factors[index]
                 if (factor is ExactRealEquality) {
@@ -86,6 +86,7 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
                     { integerCoordinates[it] }, { realCoordinates[it] })
                 val refused = selected.getValue(index).install(source.factors[index], context)
                 if (refused != null || context.formulas.isEmpty()) {
+                    request.reportFailure(refused ?: EncoderDecline.UNSUPPORTED, index)
                     failedFactor = index
                     decline = if (refused == EncoderDecline.RESOURCE) {
                         PreparedPlanDecline.RESOURCE
@@ -95,6 +96,7 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
                 formulas += context.formulas
                 attributions += context.attribution()
             }
+            activeFactor = null
             if (decline == null) {
                 fun bound(id: Int, value: Double, relation: PolynomialRelation) {
                     require(!value.isNaN()) { "NaN real declaration bound" }
@@ -113,24 +115,20 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
                 }
                 val formula = TranscendentalFormula.And(functionFormulas +
                     lowering.formula(formulas).functionFormula(stop))
-                val finite = Problem.of(source.numBoolVars, source.numIntVars, source.declaredIntDomains,
-                    Array(finiteIndices.size) { source.factors[finiteIndices[it]] },
-                    source.impliedFactorMask?.let { mask ->
-                        BooleanArray(finiteIndices.size) { mask[finiteIndices[it]] }
-                    },
-                    source.hasSymmetryBreaking, settings = source.settings, semantics = source.semantics)
+                val finite = source.finiteFactorPeer(finiteIndices)
                 completion = SharedTranscendentalModel(source,
                     withFormula(formula, lowering.realCount - numericCount), finite, projections, finiteIndices,
                     attributions.toList())
             }
         }
     } catch (_: PolynomialSourceInterrupted) {
+        failedFactor = activeFactor
+        encodingFailure = EncoderFailure(EncodingTarget.POLYNOMIAL, EncoderDecline.RESOURCE, activeFactor)
         decline = PreparedPlanDecline.RESOURCE
     }
     val support = if (completion == null) {
-        val unavailable = ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(),
-            listOf(ExecutionDecline(ExecutionDeclineCause.PREPARATION, "transcendental", failedFactor, decline)))
-        ComponentExecutionContract(unavailable, unavailable)
+        unavailableContract(ExecutionDeclineCause.PREPARATION, "transcendental", decline,
+            encodingFailure, failedFactor)
     } else transcendentalExecutionContract()
     val execution = if (completion == null) PreparedExecution.Declined(source, requireNotNull(decline))
     else PreparedExecution.Transcendental(this, completion)

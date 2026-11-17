@@ -18,6 +18,7 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.conditionedLinearSupported
 import com.eignex.klause.util.ExecutionControl
@@ -430,6 +431,7 @@ internal fun Problem.prepareExecutionPlan(
                         ExecutionDeclineCause.PREPARATION,
                         "interrupted-preparation",
                         PreparedPlanDecline.RESOURCE,
+                        ownership.encodingFailure,
                     ),
                 ),
             ),
@@ -479,10 +481,12 @@ internal fun Problem.preparedWithComponents(
         ProblemPipeline.FINITE_CP -> if (finiteRealCompletionSupported(ownership.factorProjections)) {
             checkedCompletionContract(ProcedureCompleteness.DECISION)
         } else {
-            unavailableContract(ExecutionDeclineCause.SOURCE_COMPLETION, "finite-real")
+            unavailableContract(ExecutionDeclineCause.SOURCE_COMPLETION, "finite-real",
+                factorIndex = factors.indices.firstOrNull { !finiteRealFactorSupported(it, ownership.factorProjections) })
         }
 
-        ProblemPipeline.UNSUPPORTED_OPEN -> unplacedArithmeticContract(ownership.factorProjections)
+        ProblemPipeline.UNSUPPORTED_OPEN ->
+            unplacedArithmeticContract(ownership.factorProjections, ownership.encodingFailure)
     }
     val completionNeeded = ownership.hasTheoryComponent || numRealVars != 0
     val completeSource = !completionNeeded || completion.support(ExecutionStrategy.COMPLETE).runnable
@@ -546,8 +550,10 @@ internal fun Problem.preparePolynomialExecutionPlan(
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
     var encodingDecline: EncoderDecline? = null
+    var encodingFailure: EncoderFailure? = null
     if (openInteger && sourceFormula == null && original is Problem) {
-        val projection = integerPolynomialProjection(original, projections, cancellation) { encodingDecline = it }
+        val projection = integerPolynomialProjection(original, projections, cancellation,
+            onFailure = { encodingFailure = it }) { encodingDecline = it }
         if (projection != null) {
             val plan = projection.prepareExecutionPlan()
             if (!cancellation()) return objective?.let { plan.withObjective(it, maximize) } ?: plan
@@ -557,7 +563,8 @@ internal fun Problem.preparePolynomialExecutionPlan(
     val polynomial = if (openInteger) {
         null
     } else {
-        SharedPolynomialModel.lower(this, sourceFormula, projections, cancellation, widening) { encodingDecline = it }
+        SharedPolynomialModel.lower(this, sourceFormula, projections, cancellation, widening,
+            onFailure = { encodingFailure = it }) { encodingDecline = it }
     }
     val cause = when {
         cancellation() || encodingDecline == EncoderDecline.RESOURCE -> PreparedPlanDecline.RESOURCE
@@ -614,7 +621,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
             execution = if (polynomial != null) {
                 checkedCompletionContract(ProcedureCompleteness.DECISION)
             } else {
-                unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause)
+                unavailableContract(ExecutionDeclineCause.PREPARATION, "polynomial-real", cause, encodingFailure)
             },
             participatingFactorIndices = polynomial?.encodingAttributions?.map { it.sourceFactorIndex }.orEmpty(),
         ),

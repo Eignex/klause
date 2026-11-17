@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.theory.EncoderFailure
+
 /** Source operation whose installed execution surface is inspected. */
 enum class ExecutionOperation {
     /** Find one source witness or decide infeasibility. */
@@ -109,6 +111,8 @@ class ExecutionDecline internal constructor(
     val factorIndex: Int? = null,
     /** Original preparation decline, without a resource reinterpretation. */
     val preparation: PreparedPlanDecline? = null,
+    /** Captured encoder failure, including unmet invocation conditions when available. */
+    val encoding: EncoderFailure? = null,
 )
 
 /** Immutable admission of one source operation and strategy. */

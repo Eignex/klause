@@ -12,6 +12,7 @@ import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.ExecutionControl
@@ -45,10 +46,12 @@ internal fun Problem.integerPolynomialProjection(
     original: Problem,
     projections: PreparedFactorProjections,
     cancellation: ExecutionControl,
+    onFailure: (EncoderFailure) -> Unit = {},
     onDecline: (EncoderDecline) -> Unit,
 ): FactorPolynomialProjection? {
     projections.requireSource(this)
     val stop = cancellation.encodingPreparationScope()
+    var activeFactor: Int? = null
     fun checkpoint() {
         stop.charge(1)
         if (stop()) throw PolynomialSourceInterrupted()
@@ -68,13 +71,15 @@ internal fun Problem.integerPolynomialProjection(
         }
         // There is no finite peer: every original relation must belong to this selected scope.
         val request = projections.requestEncoders(EncodingTarget.POLYNOMIAL, factors.indices.toList(),
-            fixedIntegers = fixedIntegers, cancellation = stop, onDecline = onDecline) ?: return null
+            fixedIntegers = fixedIntegers, cancellation = stop, onFailure = onFailure, onDecline = onDecline)
+            ?: return null
         val lowering = PolynomialRealLowering(numIntVars + numRealVars)
         val formulas = ArrayList<PolynomialRealFormula>()
         val attributions = ArrayList<EncodingAttribution>()
         fun integer(id: Int) = PolynomialExpression.Variable(SourceRealId(id))
         fun real(id: Int) = PolynomialExpression.Variable(SourceRealId(numIntVars + id))
         for ((position, index) in request.indices.withIndex()) {
+            activeFactor = index
             checkpoint()
             val factor = factors[index]
             val encoding = PolynomialEncodingContext(index, factor, lowering, request.cancellation,
@@ -82,12 +87,14 @@ internal fun Problem.integerPolynomialProjection(
                 fixedIntegers = request.fixedIntegers, fixedBooleans = request.fixedBooleans)
             val decline = request.encoders[position].install(factor, encoding)
             if (decline != null || encoding.formulas.isEmpty()) {
+                request.reportFailure(decline ?: EncoderDecline.UNSUPPORTED, index)
                 onDecline(decline ?: EncoderDecline.UNSUPPORTED)
                 return null
             }
             formulas += encoding.formulas
             attributions += encoding.attribution()
         }
+        activeFactor = null
         fun bound(expression: PolynomialExpression, relation: PolynomialRelation, value: Long) {
             checkpoint()
             formulas += PolynomialRealFormula.Atom(expression, relation,
@@ -145,6 +152,7 @@ internal fun Problem.integerPolynomialProjection(
         checkpoint()
         return FactorPolynomialProjection(original, this, native, projections, attributions)
     } catch (_: PolynomialSourceInterrupted) {
+        onFailure(EncoderFailure(EncodingTarget.POLYNOMIAL, EncoderDecline.RESOURCE, activeFactor))
         onDecline(EncoderDecline.RESOURCE)
         return null
     }

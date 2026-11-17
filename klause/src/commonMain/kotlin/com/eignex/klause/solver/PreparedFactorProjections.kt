@@ -15,12 +15,14 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.relaxation.LpPreparationCache
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.SelectedProjectionChecks
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
@@ -61,11 +63,12 @@ class PreparedFactorProjections internal constructor(
         fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
         cancellation: ExecutionControl = ExecutionControl.Never,
         completeFiniteConditions: Boolean = false,
+        onFailure: (EncoderFailure) -> Unit = {},
         onDecline: (EncoderDecline) -> Unit = {},
     ): SelectedEncoderRequest? {
         require(target in encoders) { "consumer target was not captured for this source" }
         return SelectedEncoderRequest.prepare(this, target, indices, fixedIntegers, fixedBooleans,
-            cancellation, completeFiniteConditions, onDecline)
+            cancellation, completeFiniteConditions, onDecline, onFailure)
     }
 
     private val declarations = Array(problem.numFactors) { id ->
@@ -203,6 +206,18 @@ class PreparedFactorProjections internal constructor(
 
     internal fun requiresOriginalCheck(factorId: Int): Boolean = propagation[factorId]?.builtIn == false &&
         propagation[factorId]?.assignmentCheck != AssignmentCheckCapability.EXACT
+
+    internal fun forOriginalPointCheck(): PreparedFactorProjections? {
+        if (declarations.none { it.propagation == PropagationCapability.UNSUPPORTED }) return this
+        val checks = propagation.copyOf()
+        for (index in checks.indices) {
+            if (declarations[index].propagation != PropagationCapability.UNSUPPORTED) continue
+            val original = BuiltInPropagationProjectionProvider.select(problem.factors[index])
+            if (original?.assignmentCheck != AssignmentCheckCapability.EXACT) return null
+            checks[index] = original
+        }
+        return PreparedFactorProjections(problem, providers, checks, scoring, relaxation, encoders)
+    }
 
     internal fun hasCompleteFiniteCheck(factorId: Int): Boolean =
         declarations[factorId].propagationCheck == AssignmentCheckCapability.EXACT ||

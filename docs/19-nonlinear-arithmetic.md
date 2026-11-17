@@ -23,6 +23,8 @@ Library setup can also project a factor model into this execution when it contai
 open integer declarations and every factor has a complete selected polynomial
 encoding. The projection emits declared endpoints and membership holes exactly and
 creates no finite CP domains for open integers; unsupported scopes decline.
+An encoding decline retains the failing canonical factor and unmet conditions,
+including when another relation in the whole-source scope caused route selection.
 An open integer read by a nonlinear factor requires arithmetic ownership even
 when that factor also has finite propagation. Polynomial route selection uses that
 demand and the captured encoder; a real-valued relation is not required to select it.

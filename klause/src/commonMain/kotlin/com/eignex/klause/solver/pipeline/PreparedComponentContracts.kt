@@ -21,6 +21,7 @@ import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncoderFailure
 import com.eignex.klause.theory.EncodingTarget
 
 internal val witnessAuthority = setOf(ExecutionClaimAuthority.WITNESS)
@@ -28,11 +29,14 @@ internal val completeAuthority = ExecutionClaimAuthority.entries.toSet()
 internal val sourceOperations = setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
 internal val finiteOperations = ExecutionOperation.entries.toSet()
 
-internal fun Problem.unplacedArithmeticContract(projections: PreparedFactorProjections? = null):
+internal fun Problem.unplacedArithmeticContract(
+    projections: PreparedFactorProjections? = null,
+    encoding: EncoderFailure? = null,
+):
     ComponentExecutionContract {
     val missing = ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(), listOf(ExecutionDecline(
         ExecutionDeclineCause.SOURCE_COMPLETION, "unplaced-arithmetic",
-        preparation = PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT)))
+        encoding?.factorIndex, PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT, encoding)))
     val checkedDiscrete = numRealVars == 0 && factors.indices.all { index ->
         (projections?.capabilities(index) ?: factors[index].executionCapabilities()).assignmentCheck in setOf(
             AssignmentCheckCapability.EXACT, AssignmentCheckCapability.REDUNDANT)
@@ -46,9 +50,11 @@ internal fun unavailableContract(
     cause: ExecutionDeclineCause,
     semantics: String,
     preparation: PreparedPlanDecline? = null,
+    encoding: EncoderFailure? = null,
+    factorIndex: Int? = encoding?.factorIndex,
 ): ComponentExecutionContract {
     val support = ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(),
-        listOf(ExecutionDecline(cause, semantics, preparation = preparation)))
+        listOf(ExecutionDecline(cause, semantics, factorIndex, preparation, encoding)))
     return ComponentExecutionContract(support, support)
 }
 
@@ -120,20 +126,21 @@ internal fun Problem.finiteComponentContract(
     fun refusal(cause: ExecutionDeclineCause, index: Int? = null): ComponentStrategySupport =
         ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(),
             listOf(ExecutionDecline(cause, "finite", index)))
-    val incompleteProjection = integers.any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) } ||
-        factors.any { index ->
+    val unboundedFactor = factors.firstOrNull { index ->
             this.factors[index].intVars.any { column ->
                 !intBounds.hasLower(column) || !intBounds.hasUpper(column) ||
                     ownership?.intOwner(column) == IntVariableOwner.THEORY
             }
-        }
+    }
+    val incompleteProjection = integers.any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) } ||
+        unboundedFactor != null
     val unsupportedPropagation = factors.firstOrNull {
         capabilities(it).propagation == PropagationCapability.UNSUPPORTED
     }
     val missingCheck = factors.firstOrNull { !completeCheck(it) }
     val missingScoreCheck = factors.firstOrNull { !scoreCheck(it) }
     val complete = when {
-        incompleteProjection -> refusal(ExecutionDeclineCause.FINITE_PROJECTION)
+        incompleteProjection -> refusal(ExecutionDeclineCause.FINITE_PROJECTION, unboundedFactor)
         unsupportedPropagation != null -> refusal(ExecutionDeclineCause.FINITE_PROJECTION, unsupportedPropagation)
         missingCheck != null -> refusal(ExecutionDeclineCause.SOURCE_COMPLETION, missingCheck)
         else -> ComponentStrategySupport(ProcedureCompleteness.DECISION, completeAuthority)
