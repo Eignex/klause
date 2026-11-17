@@ -319,6 +319,31 @@ class FiniteExecutionTest {
     }
 
     @Test
+    fun `backtracking should prove the optimum of a real extremum under presolve`() {
+        val reached = outcome(numerical, extremum("float_max", "maximize m"), PresolveConfig())
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL to -2.0, reached)
+    }
+
+    @Test
+    fun `the default portfolio should optimize a real extremum without an arm fault`() {
+        val faults = ArrayList<String>()
+        val source = extremum("float_max", "minimize m")
+        val program = parseFlatZinc(source, semanticOverrides = numerical)
+        val objective = program.sourceProgram.linearObjective()
+        val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective = objective))
+        val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), FiniteEngine.MIXED,
+            presolveConfig = PresolveConfig.NONE, cancellation = ExecutionControl.after(1.seconds),
+            onPortfolioFault = { faults += it.toString() })
+
+        val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
+        assertEquals(emptyList<String>(), faults)
+    }
+
+    @Test
     fun `a real extremum no operand can reach should be refuted`() {
         val source = extremum("float_max", "satisfy").replace("var 0.0..3.0: m;", "var 2.5..3.0: m;")
 

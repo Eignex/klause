@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
@@ -55,7 +56,8 @@ internal class LeafRealCompletion(
 
     // The source's search within its tolerance, present when acceptance admits tolerance points.
     private val toleranceSearch = toleranceCheck.toleranceSearch()
-    private val absCompletion = if (problem.factors.any { it is RealAbs } ||
+    private val absCompletion = if (
+        problem.factors.any { it is RealAbs || (it as? RealArrayMinMax)?.leafEnforced == true } ||
         (toleranceSearch != null && problem.requiresRealCompletionSearch())
     ) AbsRealCompletion(problem) else null
     private val realFactors = problem.factors.indices.filter { problem.factors[it].variables.reals.isNotEmpty() }
