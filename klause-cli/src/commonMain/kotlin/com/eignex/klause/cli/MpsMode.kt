@@ -247,9 +247,11 @@ internal class MpsOutput(
                 return listOf("optimizationStatus=$status")
             }
             if (source.nativeConclusion != LinearSourceConclusion.OPTIMAL) return emptyList()
-            val status = if (source.nominalSourceExact && source.incumbent?.exact == true && nativeOptimumExact) {
-                "attained-optimum"
-            } else "tolerance-optimum"
+            val status = when {
+                source.nativeGapBound != null -> "gap-optimum"
+                source.nominalSourceExact && source.incumbent?.exact == true && nativeOptimumExact -> "attained-optimum"
+                else -> "tolerance-optimum"
+            }
             return listOf("${source.nativeScope()}OptimizationStatus=$status")
         }
         if (verdict != Verdict.OPTIMAL || best == null) return emptyList()

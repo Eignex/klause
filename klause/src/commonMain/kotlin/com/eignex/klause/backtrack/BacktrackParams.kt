@@ -369,8 +369,9 @@ data class BacktrackParams(
     /**
      * Gap within which minimization ends: nodes are pruned against its cutoff of the incumbent, and an exhausted
      * search reports the incumbent optimal with the bound it proved
-     * ([com.eignex.klause.solver.result.MinimizeResult.Optimal.gapBound]). `null`
-     * closes the bound completely. A repairing search ignores it.
+     * ([com.eignex.klause.solver.result.MinimizeResult.Optimal.gapBound]), the only signal that the optimum is not
+     * exact. `null` closes the bound completely. A repairing search ignores it, and a problem whose source declares
+     * an exact tolerance rejects it.
      */
     val optimalityGap: OptimalityGap? = null,
     /** Cooperative cancellation predicate; see [ExecutionControl]. */

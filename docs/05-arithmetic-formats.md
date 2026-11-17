@@ -111,9 +111,11 @@ adjustment, and applies it only to a model with a discrete coordinate, whose sea
 has nodes to bound. A native optimum within the gap carries its proved bound, and
 the source outcome reports it optimal only when that bound, in original units,
 closes the gap of the reported source point; `LinearSourceOutcome.gapBound` keeps
-the bound. Such a result prints `OPTIMUM FOUND`, `optimizationStatus=gap-optimum`
+the bound, and `nativeGapBound` keeps a native gap optimum's bound whether or not the
+source confirms it. Such a result prints `OPTIMUM FOUND`, `optimizationStatus=gap-optimum`
 and the bound as `objectiveBoundDirection`, `objectiveBound` and
-`objectiveBoundStrict=false`. A gap optimum states only what the run proved, so it
+`objectiveBoundStrict=false`; an unconfirmed native gap optimum prints its scoped
+native status as `gap-optimum`. A gap optimum states only what the run proved, so it
 may also be exact. The open linear, polynomial and quadratic routes close their
 bounds exactly.
 

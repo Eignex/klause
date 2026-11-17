@@ -152,6 +152,14 @@ internal class ResumableMinimize(
 ) : ResumableSearch, ReseedGuard, SliceWorkAccounting, GapBoundedSearch {
     override var repaidWork: Long = 0L
         private set
+
+    init {
+        val source = problem.semantics.effective
+        require(params0.optimalityGap == null ||
+            (source.optimalityTolerance?.isExact != true && source.feasibilityTolerance?.isExact != true)) {
+            "an exact source closes its objective bound exactly"
+        }
+    }
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
         get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && !rootLayoutPending &&
@@ -173,9 +181,15 @@ internal class ResumableMinimize(
     // The root LP relaxation's proved objective bound; it raises the bound an optimality-gap terminal reports.
     private var provedRootBound = Double.NEGATIVE_INFINITY
 
-    // Whether a node was bounded against an optimality-gap cutoff below the incumbent, so that exhaustion proves only
-    // that cutoff rather than the incumbent itself.
+    // Whether a prune relied on an optimality-gap cutoff below the incumbent's own, and the least such cutoff: every
+    // point the search left unseen, and every fact it derived from such a prune, holds only below that cutoff.
     override var appliedOptimalityGap = false
+        private set
+    override var gapFloor = Double.POSITIVE_INFINITY
+        private set
+
+    // What exhaustion proved: no point lies below it outside what the search visited.
+    override var exhaustionBound = Double.NEGATIVE_INFINITY
         private set
 
     // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
@@ -564,7 +578,7 @@ internal class ResumableMinimize(
 
     // Built lazily so it binds the engine's session (created inside the engine's constructor). Its first
     // use is the first-run boundExchange work, well after construction.
-    private val boundExchange by lazy { PortfolioBoundExchange(problem, session, params, singleObj) }
+    private val boundExchange by lazy { PortfolioBoundExchange(problem, session, params, singleObj) { gapFloor } }
 
     /** Terminal verdict once the search completes; null while still pending. */
     private var done: MinimizeResult? = null
@@ -1077,6 +1091,10 @@ internal class ResumableMinimize(
         if (unresolved) observeIncomplete(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf)
         sink.stop()
         val stats = sink.snapshot()
+        // Every exact prune read a cutoff no lower than the current external or local one; gap prunes read gapFloor.
+        val external = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
+        if (!unresolved && !external.isNaN()) exhaustionBound = minOf(gapFloor, external, bestObj)
+        val known = maxOf(exhaustionBound, minOf(provedRootBound, gapFloor))
         return when {
             b != null && unresolved ->
                 MinimizeResult.BestFound(b.assignment, b.objective.display, reason, stats)
@@ -1089,9 +1107,7 @@ internal class ResumableMinimize(
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
             b != null -> MinimizeResult.Optimal(b.assignment, b.objective.display, stats,
-                gapBound = if (appliedOptimalityGap && provedRootBound < b.objective.display) {
-                    params.optimalityGap?.exhaustedBound(bestObj, provedRootBound)
-                } else null)
+                gapBound = if (known < b.objective.display) params.optimalityGap?.exhaustedBound(bestObj, known) else null)
 
             else -> MinimizeResult.Infeasible(core, stats)
         }
@@ -1596,7 +1612,8 @@ internal class ResumableMinimize(
             // bound lies within the optimality gap of the incumbent holds no point the search must still find.
             val lpBound = if (rebindable) externalBound
             else params.optimalityGap?.cutoff(effectiveBound) ?: effectiveBound
-            val gapFixesBefore = if (lpBound < effectiveBound) sink.lp.fixed.read().sum else Double.NaN
+            val gapCutoff = lpBound < effectiveBound
+            lpEngine.fixingCutoff = if (gapCutoff) effectiveBound else Double.NaN
             lpHints?.beginNode(context.decisionLevel, lpBound)
             if (restartRootTargetsPending && context.decisionLevel == 0 && incumbents.current() == null) {
                 restartRootTargetsPending = false
@@ -1609,10 +1626,14 @@ internal class ResumableMinimize(
             }
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
                 singleObj?.ascending ?: true, deferSimplex = deferSimplex)
+            lpEngine.fixingCutoff = Double.NaN
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
-            // A prune or a fixing against the gap cutoff may have removed points the incumbent's own cutoff keeps.
-            if (!gapFixesBefore.isNaN() && (pruned || sink.lp.fixed.read().sum > gapFixesBefore)) {
+            // Fixings read the incumbent's own cutoff, so only a prune whose bound stays below that cutoff relies on
+            // the gap; it and everything learned from it hold only for points below the gap cutoff.
+            val gap = params.optimalityGap
+            if (gapCutoff && pruned && gap != null && gap.proved(lpEngine.lastPruneBound) < effectiveBound) {
                 appliedOptimalityGap = true
+                if (lpBound < gapFloor) gapFloor = lpBound
             }
             if (!pruned) {
                 return SearchNodeDisposition.Expand

@@ -60,6 +60,8 @@ internal class PreparingMinimize(
     override val canReseed: Boolean get() = !preparationPending && search?.canReseed != false
     override val canContinuePreparation: Boolean get() = search?.canContinuePreparation == true
     override val appliedOptimalityGap: Boolean get() = search?.appliedOptimalityGap == true
+    override val gapFloor: Double get() = search?.gapFloor ?: Double.POSITIVE_INFINITY
+    override val exhaustionBound: Double get() = search?.exhaustionBound ?: Double.NaN
 
     override val isDone: Boolean get() = terminal != null || search?.isDone == true
     override val preparationPending: Boolean get() = !closed && (search?.preparationPending ?: true)

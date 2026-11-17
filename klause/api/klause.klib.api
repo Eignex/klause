@@ -15378,6 +15378,8 @@ final class com.eignex.klause.solver.pipeline/LinearSourceOutcome { // com.eigne
         final fun <get-nativeClaimsUnrestricted>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeClaimsUnrestricted.<get-nativeClaimsUnrestricted>|<get-nativeClaimsUnrestricted>(){}[0]
     final val nativeConclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeConclusion|{}nativeConclusion[0]
         final fun <get-nativeConclusion>(): com.eignex.klause.solver.pipeline/LinearSourceConclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeConclusion.<get-nativeConclusion>|<get-nativeConclusion>(){}[0]
+    final val nativeGapBound // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeGapBound|{}nativeGapBound[0]
+        final fun <get-nativeGapBound>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeGapBound.<get-nativeGapBound>|<get-nativeGapBound>(){}[0]
     final val nativeObjectiveBound // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeObjectiveBound|{}nativeObjectiveBound[0]
         final fun <get-nativeObjectiveBound>(): com.eignex.klause.solver.pipeline/LinearSourceBound? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nativeObjectiveBound.<get-nativeObjectiveBound>|<get-nativeObjectiveBound>(){}[0]
     final val nominalConstraintsExact // com.eignex.klause.solver.pipeline/LinearSourceOutcome.nominalConstraintsExact|{}nominalConstraintsExact[0]

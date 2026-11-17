@@ -126,7 +126,7 @@ class SourceResultCapture private constructor(
             is MinimizeResult.BestFound -> checkNotNull(witness)
             is MinimizeResult.Unknown -> return result
         }
-        val proof = derivation ?: when (claim) {
+        val proof = derivation?.takeUnless { result is MinimizeResult.Optimal && !exactOptimum } ?: when (claim) {
             is SourceClaim.Witness -> SourceDerivation.SourceWitness
             is SourceClaim.Ray -> SourceDerivation.SourceRay
             else -> SourceDerivation.Unavailable("objective bound or complete traversal derivation not captured")

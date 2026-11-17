@@ -69,6 +69,14 @@ class OptimalityGapTest {
     }
 
     @Test
+    fun `an integral objective whose gap admits no integer below the incumbent should keep the incumbent as cutoff`() {
+        val gap = OptimalityGap(mps, integral = true)
+
+        assertEquals(100.0, gap.cutoff(100.0))
+        assertNull(gap.exhaustedBound(100.0))
+    }
+
+    @Test
     fun `an exhausted search should report the cutoff bound unless a known bound reaches the incumbent`() {
         val gap = OptimalityGap(mps, integral = true)
 

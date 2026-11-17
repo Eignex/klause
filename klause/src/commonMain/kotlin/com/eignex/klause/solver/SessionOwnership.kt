@@ -38,8 +38,11 @@ private class HandleOwnership<T : Any>(private val source: AutoCloseable, privat
 }
 
 private open class OwnedSearch(protected val source: ResumableSearch, release: () -> Unit) :
-    ResumableSearch by source, ReseedGuard, SliceWorkAccounting {
+    ResumableSearch by source, ReseedGuard, SliceWorkAccounting, GapBoundedSearch {
     override val repaidWork: Long? get() = (source as? SliceWorkAccounting)?.repaidWork
+    override val appliedOptimalityGap: Boolean get() = (source as? GapBoundedSearch)?.appliedOptimalityGap == true
+    override val gapFloor: Double get() = (source as? GapBoundedSearch)?.gapFloor ?: Double.POSITIVE_INFINITY
+    override val exhaustionBound: Double get() = (source as? GapBoundedSearch)?.exhaustionBound ?: Double.NaN
     override val canReseed: Boolean get() = (source as? ReseedGuard)?.canReseed != false
     override val canContinuePreparation: Boolean get() = (source as? ReseedGuard)?.canContinuePreparation == true
     override val incumbentTrialPending: Boolean get() = (source as? ReseedGuard)?.incumbentTrialPending == true

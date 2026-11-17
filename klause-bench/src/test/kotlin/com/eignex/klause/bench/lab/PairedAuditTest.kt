@@ -127,6 +127,15 @@ class PairedAuditTest {
     }
 
     @Test
+    fun `an optimum proved within the optimality gap is counted apart from an exact one`() {
+        val (base, candidate) = row()
+
+        val report = audit(listOf(base, candidate.with("record.optimalityBound", "9")))
+
+        assertEquals(mapOf("proven-gap-optimum" to 1), report.outcomes.getValue("candidate").native)
+    }
+
+    @Test
     fun `checked witnesses and native proofs are counted apart`() {
         val (base, candidate) = row()
 
