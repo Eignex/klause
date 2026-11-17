@@ -193,6 +193,16 @@ class CliModeVerdictTest {
     private val strictGapRows = "var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; var 0.0..1.0: p; " +
         "constraint float_lt(x,y); constraint float_lin_lt([1.0,-1.0],[y,x],0.0000015);"
 
+    @Test
+    fun `single variable float rows should preserve feasibility slack`() {
+        val source = "var 0.0..1.0: z :: output_var; constraint float_eq(z,0.3); " +
+            "constraint float_le(z,0.29999995); solve satisfy;"
+
+        val terminals = strictGapTerminals(source)
+
+        assertEquals(mapOf("default" to "==========", "exact" to "=====UNSATISFIABLE====="), terminals)
+    }
+
     private fun strictGapTerminals(model: String) =
         mapOf("default" to emptyArray<String>(), "exact" to arrayOf("--exact")).mapValues { (_, args) ->
             solveFlatZinc(model, *args).lines().first { it == "==========" || it == "=====UNSATISFIABLE=====" }

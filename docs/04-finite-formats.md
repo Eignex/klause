@@ -349,6 +349,10 @@ unrestricted products go to [polynomial completion](19-nonlinear-arithmetic.md#p
 consumers install alternatives privately; an LP relaxation alone never establishes
 membership or a product.
 
+At zero feasibility tolerance, affine float images can also derive exact integer
+predicates. A positive tolerance keeps the real comparison without that substitution:
+the defining float rows admit slack, so their affine image need not be exact.
+
 The [FlatZinc transcendental builtins](https://docs.minizinc.dev/en/stable/lib-flatzinc-float.html)
 `float_exp`, `float_ln`, `float_log2`, `float_log10`, `float_sin`, `float_cos`,
 `float_tan`, `float_asin`, `float_acos`, `float_atan`, `float_sinh`, `float_cosh`,
