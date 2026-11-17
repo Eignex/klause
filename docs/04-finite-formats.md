@@ -379,10 +379,13 @@ The original arm is numerical under the declared tolerance. Finite LP deductions
 completion needs no exact certificate when every real declaration and every relation
 over a real coordinate holds within the slack. Rows measure it as
 [MPS rows do](05-arithmetic-formats.md#tolerance-publication). On the finite lane and
-the polynomial route an unconditional strict row `a·x < b` is the closed row `a·x <= b - absolute`, which reads
-no slack: a point on its boundary `a·x = b` is refused, and a zero absolute slack keeps
-the row strict. The gap is measured in the units of the row as written, so
-`2x - 2y < 0` keeps `y - x >= absolute / 2`. A reified strict row, a disequality and a
+the polynomial route an unconditional strict row `a·x < b` is the closed row `a·x <= b - 1e-6`, which reads
+no slack. This fixed margin applies to every positive feasibility tolerance, including
+a relative-only tolerance; zero tolerance keeps the row strict. The gap is measured in
+the units of the row as written, so `2x - 2y < 0` keeps `y - x >= 5e-7`.
+A declared slack at or above the margin can absorb this separation through a neighbouring
+non-strict row: `x < y` beside `y <= x` can then be satisfiable. The strict row itself
+keeps the full margin without widening. A reified strict row, a disequality and a
 row whose reifying Boolean is false hold exactly. A finite
 membership admits a value within the slack of a member, measured as a bound. Absolute
 value, minimum, maximum, selection, an integer times a real, a real product and a power
@@ -465,7 +468,7 @@ the [linear theory](18-linear-arithmetic.md) at zero tolerance; an MPS source ta
 finite lane in both modes. On the finite lane its Booleans and clauses are searched by
 Boolean backtracking with a real completion at each leaf. Such a source stays with the
 linear theory when it states an open set over reals (a disequality, a reified row,
-whose false side is a strict complement, or a strict row without an absolute slack),
+whose false side is a strict complement, or a strict row at zero tolerance),
 since leaf completion attains no supremum, and when all solutions are requested. The
 finite lane, for sources with integer columns too, states each unconditional strict row
 as its closed row, so every engine on the original source decides the row acceptance

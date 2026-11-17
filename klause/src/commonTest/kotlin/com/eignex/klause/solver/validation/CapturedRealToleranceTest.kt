@@ -25,6 +25,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
@@ -81,27 +82,40 @@ class CapturedRealToleranceTest {
     }
 
     @Test
-    fun `a strict row should keep the absolute slack as its gap without reading the slack`() {
+    fun `a strict row should keep a fixed margin without reading the feasibility slack`() {
         val accepts = assertNotNull(
             capturedRealAcceptance(source(row(LinearOp.LE, 0.25, strict = true)), ExecutionControl.Never),
         )
-        val points = listOf(0.25, 0.2, 0.15, 0.1)
+        val points = listOf(0.25, 0.2499995, 0.249998, 0.2)
 
         val accepted = points.associateWith { accepts(point(it)) }
 
-        assertEquals(mapOf(0.25 to false, 0.2 to false, 0.15 to true, 0.1 to true), accepted)
+        assertEquals(mapOf(0.25 to false, 0.2499995 to false, 0.249998 to true, 0.2 to true), accepted)
     }
 
     @Test
-    fun `a strict row should hold exactly without an absolute slack`() {
+    fun `a strict row should keep the fixed margin under a relative only tolerance`() {
         val relative = SourceTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10)))
         val accepts = assertNotNull(capturedRealAcceptance(
             source(row(LinearOp.LE, 0.25, strict = true), tolerance = relative), ExecutionControl.Never))
-        val points = listOf(0.25, 0.2)
+        val points = listOf(0.25, 0.2499995, 0.2)
 
         val accepted = points.associateWith { accepts(point(it)) }
 
-        assertEquals(mapOf(0.25 to false, 0.2 to true), accepted)
+        assertEquals(mapOf(0.25 to false, 0.2499995 to false, 0.2 to true), accepted)
+    }
+
+    @Test
+    fun `a strict row should keep exact strictness at zero tolerance`() {
+        val policy = SourceTolerance()
+        val model = source(row(LinearOp.LE, 0.25, strict = true), tolerance = policy)
+        val points = listOf(0.25, 0.2499995)
+
+        val accepted = points.associateWith {
+            verifyCapturedRealTolerance(model, point(it), policy, ExecutionControl.Never) is Verification.Accepted
+        }
+
+        assertEquals(mapOf(0.25 to false, 0.2499995 to true), accepted)
     }
 
     @Test

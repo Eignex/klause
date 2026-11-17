@@ -45,10 +45,11 @@ import com.eignex.util.numbers.toLongExact
 internal fun Factor.hasCapturedLinearTolerance(): Boolean =
     this is Linear || this is ExactLinear || this is LinearIndicator
 
-// The gap a strict row keeps under [this] policy: its absolute slack. Zero, which keeps the row strict, when no
-// absolute slack applies.
+private val STRICT_REAL_MARGIN = BigFraction.of(BIG_ONE, bigIntOf(1_000_000))
+
+// A positive tolerance uses MiniZinc's float_lt_EPS margin independently of its feasibility slack.
 internal fun SourceTolerance?.strictMargin(): BigFraction =
-    if (this == null) BigFraction.ZERO else BigFraction.of(absolute.numerator, absolute.denominator)
+    if (this == null || isExact) BigFraction.ZERO else STRICT_REAL_MARGIN
 
 // Whether this relation is an unconditional strict row over real coordinates that a positive [margin] states as the
 // closed row `a·x <= b - margin`. That row reads no slack, so a point on the boundary `a·x = b` stays refused.
@@ -139,7 +140,7 @@ internal fun capturedRealAcceptance(source: Problem, cancellation: ExecutionCont
 //
 // Rows read the slack as MPS rows do: an active non-strict row holds within `max(absolute, relative *
 // max(abs(bound), sum(abs(a(i) * x(i)))))`. An unconditional strict row `a·x < b` over real coordinates holds as the
-// closed row `a·x <= b - absolute`, exactly and in every component. A strict row under an activator, a disequality and
+// closed row `a·x <= b - 1e-6`, exactly and in every component. A strict row under an activator, a disequality and
 // a row whose activator is false hold exactly. A finite membership admits a value within the slack of a member,
 // measured as a declaration bound.
 // Absolute value, minimum and maximum, selection over variables, an integer times a real, a real product and a

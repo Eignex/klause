@@ -260,7 +260,7 @@ complement. A relation stated as `r = f(x)` keeps its exact encoding over a priv
 and adds `abs(r - r') <= slack`; a product with finite choices also moves its selecting
 operand, and a membership its variable. Declarations widen by the same slack and leave
 the fixed-coordinate substitution. In both formulas and every component, an unconditional
-strict row is the closed row acceptance reads, `a·x <= b - absolute`, without a band.
+strict row is the closed row acceptance reads, `a·x <= b - 1e-6`, without a band.
 Reified strict rows, disequalities, distinctness, the other relations of exact components
 and a relation whose result is also an operand stay exact. Presolve
 does not run on the widened source, because its reductions are exact, and the root
