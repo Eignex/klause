@@ -115,7 +115,9 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
                     lowering.formula(formulas).functionFormula(stop))
                 val finite = Problem.of(source.numBoolVars, source.numIntVars, source.declaredIntDomains,
                     Array(finiteIndices.size) { source.factors[finiteIndices[it]] },
-                    source.impliedFactorMask?.let { mask -> BooleanArray(finiteIndices.size) { mask[finiteIndices[it]] } },
+                    source.impliedFactorMask?.let { mask ->
+                        BooleanArray(finiteIndices.size) { mask[finiteIndices[it]] }
+                    },
                     source.hasSymmetryBreaking, settings = source.settings, semantics = source.semantics)
                 completion = SharedTranscendentalModel(source,
                     withFormula(formula, lowering.realCount - numericCount), finite, projections, finiteIndices,
@@ -130,8 +132,9 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
             listOf(ExecutionDecline(ExecutionDeclineCause.PREPARATION, "transcendental", failedFactor, decline)))
         ComponentExecutionContract(unavailable, unavailable)
     } else transcendentalExecutionContract()
-    return PreparedSourcePlan(this, if (completion == null) PreparedExecution.Declined(source, requireNotNull(decline))
-        else PreparedExecution.Transcendental(this, completion), listOf(
+    val execution = if (completion == null) PreparedExecution.Declined(source, requireNotNull(decline))
+    else PreparedExecution.Transcendental(this, completion)
+    return PreparedSourcePlan(this, execution, listOf(
             ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteIndices,
                 (0 until source.numIntVars).toList(), emptyList(), (0 until source.numBoolVars).toList(),
                 source.finiteComponentContract(finiteIndices, (0 until source.numIntVars).toList(), null,

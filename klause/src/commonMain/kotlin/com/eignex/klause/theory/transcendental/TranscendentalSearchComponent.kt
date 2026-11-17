@@ -65,8 +65,9 @@ internal class TranscendentalSearchComponent(
 
     override fun check(context: SearchContext): ComponentCheck = when (evaluate(context)) {
         is TranscendentalCheckResult.Witness -> if ((0 until source.boolCount).all { context.boolValue(it) != null } &&
-            finiteIntegers.keys.all { context.intLowerBound(it) != null &&
-                context.intLowerBound(it) == context.intUpperBound(it) }) {
+            finiteIntegers.keys.all {
+                context.intLowerBound(it) != null && context.intLowerBound(it) == context.intUpperBound(it)
+            }) {
             ComponentCheck.Feasible
         } else ComponentCheck.Indeterminate
         TranscendentalCheckResult.Refuted -> ComponentCheck.Infeasible()
@@ -107,8 +108,10 @@ internal class TranscendentalSearchComponent(
     private fun evaluate(context: SearchContext): TranscendentalCheckResult {
         if (context.cancelled()) return TranscendentalCheckResult.Unknown
         val current = condition(context)
-        if (signature?.let { it.rational == current.rational && it.lowerStrict == current.lowerStrict &&
-                it.upperStrict == current.upperStrict } == true) outcome?.let { return it }
+        if (signature?.let {
+                it.rational == current.rational && it.lowerStrict == current.lowerStrict &&
+                    it.upperStrict == current.upperStrict
+            } == true) outcome?.let { return it }
         if (root.rational.bools.any { (id, value) -> context.boolValue(id)?.let { it != value } == true }) {
             return TranscendentalCheckResult.Refuted.also { outcome = it }
         }
