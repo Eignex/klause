@@ -261,7 +261,9 @@ larger encodings decline while native filtering and scoring remain.
 `FloatSemantics.Grid` permits a private finite or heuristic projection without
 selecting one. A requesting consumer selects that view during setup, after route
 selection and before the invocation is returned;
-[FlatZinc](04-finite-formats.md#flatzinc-floats) defines its automatic fallback.
+[FlatZinc](04-finite-formats.md#flatzinc-floats) defines its automatic fallback, and a
+compiled schema falls back to the grid whenever the original source admits no
+complete arm.
 Original declarations, relations and objective remain on the attachment, and private
 helpers stay distinct. Unsupported factors or stops decline only the view.
 

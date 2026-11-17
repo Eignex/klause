@@ -330,10 +330,15 @@ arbitrary real functions remain unsupported. The advertised predicate list lives
 
 Canonical compilation retains original real declarations and exact real relations;
 `FlatZincProgram.sourceProgram` and `sourceAttachment()` expose that frame without
-a grid. A grid policy only permits a private view. Automatic execution prefers an
-admitted original complete arm and runs the grid view only when none exists. The
-`problem` getter and `prepareFiniteCompatibility` request the finite compatibility
-view explicitly.
+a grid. A grid policy only permits a private view. Automatic execution keeps the
+original source when the requested engine's arm runs there: an admitted complete arm,
+or for `-e ls` and `-e alns` an admitted local-search or ALNS arm, which completes
+reals under the source tolerance as the default portfolio's incomplete
+arms do. It runs the grid view only when no such arm exists, when the route is
+heuristic (an open model whose objective the linear theory cannot minimize, or one
+without a complete route), and for an enumeration other than complete finite
+search. The `problem` getter and `prepareFiniteCompatibility` request the finite
+compatibility view explicitly.
 
 Supported float operations retain exact relations: strict and reified comparisons,
 `RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling and
@@ -354,8 +359,9 @@ enumeration decide nothing about the source: the source verdict is unknown, or
 satisfiable or best-found when a point was accepted, and an enumeration never
 claims that it listed every solution. The source's integer and Boolean relations
 hold exactly, so a root refutation of those relations alone is a source refutation.
-A pure local-search or ALNS engine has no complete arm, so it uses the grid whenever a
-component needs one, reports no optimum and refutes only that way. Grid relations (`GridArrayMinMax`, `GridAbs`,
+A local-search or ALNS engine on the original source publishes source points without
+an optimum or enumeration completeness claim. Its enumeration takes the grid and lists
+the accepted grid points. Grid relations (`GridArrayMinMax`, `GridAbs`,
 `GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
 
 The original arm is numerical under the declared tolerance. Finite LP deductions are

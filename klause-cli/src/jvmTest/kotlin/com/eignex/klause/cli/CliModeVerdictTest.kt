@@ -250,22 +250,22 @@ class CliModeVerdictTest {
         "constraint float_times(x,w,z); constraint float_eq(z,0.3);"
 
     @Test
-    fun `incomplete engines should not refute a satisfiable float product through the grid`() {
+    fun `incomplete engines should satisfy a float product without the grid`() {
         val outputs = listOf("localsearch", "alns").associateWith {
             solveFlatZinc("$gridProduct solve satisfy;", "-e", it)
         }
 
-        assertTrue(outputs.values.all { "=====UNKNOWN=====" in it.lines() && "klause-float-claim" in it }, "$outputs")
+        assertTrue(outputs.values.all { "==========" in it.lines() && "klause-float-claim" !in it }, "$outputs")
     }
 
     @Test
-    fun `local search should not refute satisfiable float models through the grid`() {
-        val models = listOf("$gridProduct solve minimize x;",
-            "var 0.0..1.0: x; constraint float_lin_eq([3.0],[x],1.0); solve satisfy;")
+    fun `incomplete engines should satisfy a float equality the grid misses`() {
+        val outputs = listOf("localsearch", "alns").associateWith {
+            solveFlatZinc("var 0.0..1.0: x :: output_var; constraint float_lin_eq([3.0],[x],1.0); solve satisfy;",
+                "-e", it).lines()
+        }
 
-        val outputs = models.map { solveFlatZinc(it, "-e", "localsearch") }
-
-        assertTrue(outputs.all { "=====UNKNOWN=====" in it.lines() && "=====UNSATISFIABLE=====" !in it }, "$outputs")
+        assertTrue(outputs.values.all { "x = 0.3333333333333333;" in it && "==========" in it }, "$outputs")
     }
 
     @Test
@@ -273,7 +273,15 @@ class CliModeVerdictTest {
         val out = solveFlatZinc("var 1..1: a; var 1..1: b; var 0.0..1.0: x; constraint int_ne(a,b); " +
             "constraint float_le(x,0.5); solve satisfy;", "-e", "localsearch")
 
-        assertTrue("=====UNSATISFIABLE=====" in out.lines() && "klause-float-claim" in out, out)
+        assertTrue("=====UNSATISFIABLE=====" in out.lines(), out)
+    }
+
+    @Test
+    fun `local search should enumerate float sources on the grid without a completeness marker`() {
+        val out = solveFlatZinc("var 0..1: k :: output_var; var 0.0..1.0: x :: output_var; " +
+            "constraint float_le(x,0.5); solve satisfy;", "-e", "localsearch", "-a")
+
+        assertTrue("----------" in out.lines() && "==========" !in out.lines() && "klause-float-claim" in out, out)
     }
 
     @Test

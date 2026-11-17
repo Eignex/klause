@@ -9,6 +9,7 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -36,6 +37,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
@@ -116,6 +118,9 @@ class FiniteExecutionTest {
         source: String = roundedBound(declarations, constraints),
         floatPoints: Boolean = true,
         presolve: PresolveConfig = PresolveConfig.NONE,
+        nodeBudget: NodeBudget? = null,
+        deadline: Duration = 1.seconds,
+        onImprovement: (Sample) -> Unit = {},
     ): FiniteSolveVerdict {
         val program = parseFlatZinc(source, semanticOverrides = overrides)
         val maximize = program.sourceProgram.solve is SolveDirective.Maximize
@@ -124,10 +129,11 @@ class FiniteExecutionTest {
             if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE, engine,
             objective = objective, maximize = maximize))
         val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), engine,
-            presolveConfig = presolve, cancellation = ExecutionControl.after(1.seconds),
-            toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem))
+            presolveConfig = presolve, cancellation = ExecutionControl.after(deadline),
+            toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem),
+            nodeBudget = nodeBudget)
 
-        val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample, {}))
+        val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample) { onImprovement(it.sample) })
 
         return assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict
     }
@@ -152,6 +158,67 @@ class FiniteExecutionTest {
             assertEquals(FiniteSolveVerdict.SAT, verdict, "$engine")
             assertNull(samples.last().exactReals, "$engine")
         }
+    }
+
+    // Float equalities a grid of step 1/1023 misses, with the value each source solution takes.
+    private val floatEqualities = mapOf(
+        "var 0.0..1.0: x; constraint float_eq(x, 0.5); solve satisfy;" to 0.5,
+        "var 0.0..1.0: x; constraint float_lin_eq([3.0], [x], 1.0); solve satisfy;" to 1.0 / 3,
+    )
+
+    private fun setup(source: String, engine: FiniteEngine, operation: ExecutionOperation): PreparedSourceInvocation {
+        val program = parseFlatZinc(source)
+        return program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(), operation, engine))
+    }
+
+    @Test
+    fun `incomplete engines should search float sources without a private grid`() {
+        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
+
+        val grids = engines.associateWith { engine ->
+            floatEqualities.keys.map { setup(it, engine, ExecutionOperation.SATISFY).floatProjection }
+        }
+
+        assertEquals(engines.associateWith { listOf(null, null) }, grids)
+    }
+
+    @Test
+    fun `incomplete engines should enumerate float sources on the private grid`() {
+        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
+
+        val grids = engines.associateWith { engine ->
+            floatEqualities.keys.map { setup(it, engine, ExecutionOperation.ENUMERATE).floatProjection != null }
+        }
+
+        assertEquals(engines.associateWith { listOf(true, true) }, grids)
+    }
+
+    @Test
+    fun `incomplete engines should satisfy a float equality the grid misses`() {
+        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
+
+        val values = engines.associateWith { engine ->
+            floatEqualities.keys.map { source ->
+                val samples = ArrayList<Sample>()
+                solveFlatZinc(SemanticOverrides(), engine, samples::add, source = source, deadline = 10.seconds) to
+                    samples.last().approximateRealValue(0)
+            }
+        }
+
+        assertEquals(engines.associateWith { floatEqualities.values.map { FiniteSolveVerdict.SAT to it } }, values)
+    }
+
+    @Test
+    fun `incomplete engines should leave a bound only the slack admits undecided in exact mode`() {
+        val exactSource = SemanticOverrides(floats = FloatSemantics.Continuous,
+            feasibilityTolerance = SourceTolerance())
+        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
+
+        val verdicts = engines.associateWith {
+            solveFlatZinc(exactSource, it, nodeBudget = NodeBudget(64), deadline = 10.seconds)
+        }
+
+        assertEquals(engines.associateWith { FiniteSolveVerdict.UNKNOWN }, verdicts)
     }
 
     private val unrelatedNonlinear = listOf(
@@ -258,16 +325,20 @@ class FiniteExecutionTest {
     private val numerical = SemanticOverrides()
     private val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
 
-    // The backtracking verdict and the source objective at the last point it publishes for [source].
+    // The verdict and the source objective at the last point [engine] publishes for [source]. Incomplete engines run a
+    // short move budget, which completes candidates without exhausting the search; their deadline only caps a cold run.
     private fun outcome(
         overrides: SemanticOverrides,
         source: String,
         presolve: PresolveConfig = PresolveConfig.NONE,
         floatPoints: Boolean = true,
+        engine: FiniteEngine = FiniteEngine.FIXED,
     ): Pair<FiniteSolveVerdict, Double?> {
         val samples = ArrayList<Sample>()
-        val verdict = solveFlatZinc(overrides, onSample = samples::add, source = source, floatPoints = floatPoints,
-            presolve = presolve)
+        val verdict = solveFlatZinc(overrides, engine, samples::add, source = source, floatPoints = floatPoints,
+            presolve = presolve, nodeBudget = NodeBudget(512).takeIf { engine != FiniteEngine.FIXED },
+            deadline = if (engine == FiniteEngine.FIXED) 1.seconds else 10.seconds,
+            onImprovement = samples::add)
         val objective = parseFlatZinc(source).sourceProgram.linearObjective()
         return verdict to objective?.let { samples.lastOrNull()?.let(objective::evaluate) }
     }
@@ -343,6 +414,20 @@ class FiniteExecutionTest {
         assertEquals(emptyList<String>(), faults)
     }
 
+    private fun extremumValues(engine: FiniteEngine) = extremumOptima.keys.associateWith { (relation, solve) ->
+        outcome(numerical, extremum(relation, solve), engine = engine).second
+    }
+
+    @Test
+    fun `local search should reach the optimum of a real extremum within tolerance`() {
+        assertEquals(extremumOptima, extremumValues(FiniteEngine.LOCAL_SEARCH))
+    }
+
+    @Test
+    fun `alns should reach the optimum of a real extremum within tolerance`() {
+        assertEquals(extremumOptima, extremumValues(FiniteEngine.ALNS))
+    }
+
     @Test
     fun `a real extremum no operand can reach should be refuted`() {
         val source = extremum("float_max", "satisfy").replace("var 0.0..3.0: m;", "var 2.5..3.0: m;")
@@ -355,6 +440,60 @@ class FiniteExecutionTest {
         val source = roundedBound("var 0.0..1.0: z; var 0.0..2.0: m;", "constraint float_max(y, z, m);")
 
         assertEquals(FiniteSolveVerdict.SAT, outcome(numerical, source).first)
+    }
+
+    private val resultDirections = listOf("minimize y", "maximize y")
+    private val operandDirections = listOf("minimize x", "maximize x")
+
+    private fun absValues(engine: FiniteEngine, overrides: SemanticOverrides, directions: List<String>) =
+        directions.associateWith { outcome(overrides, absObjective(it), engine = engine).second }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value result within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, numerical, resultDirections))
+    }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value operand within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, numerical, operandDirections))
+    }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value result exactly`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, exact, resultDirections))
+    }
+
+    @Test
+    fun `local search should reach the optimum of an absolute value operand exactly`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.LOCAL_SEARCH, exact, operandDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value result within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.ALNS, numerical, resultDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value operand within tolerance`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.ALNS, numerical, operandDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value result exactly`() {
+        assertEquals(absOptima.filterKeys { it in resultDirections },
+            absValues(FiniteEngine.ALNS, exact, resultDirections))
+    }
+
+    @Test
+    fun `alns should reach the optimum of an absolute value operand exactly`() {
+        assertEquals(absOptima.filterKeys { it in operandDirections },
+            absValues(FiniteEngine.ALNS, exact, operandDirections))
     }
 
     @Test
@@ -480,13 +619,15 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `incomplete engines should leave a strict row gap of the absolute slack unknown on the grid`() {
-        // The default grid step 1/1023 holds no gap of exactly 1/1024, and a grid result is no source verdict.
+    fun `incomplete engines should accept a strict row gap of exactly the absolute slack`() {
+        // The default grid step 1/1023 holds no gap of exactly 1/1024; the original source holds one.
         val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
 
-        val verdicts = engines.associateWith { solveFlatZinc(dyadicSlack, it, source = strictRows("0.001953125")) }
+        val verdicts = engines.associateWith {
+            solveFlatZinc(dyadicSlack, it, source = strictRows("0.001953125"), deadline = 10.seconds)
+        }
 
-        assertEquals(engines.associateWith { FiniteSolveVerdict.UNKNOWN }, verdicts)
+        assertEquals(engines.associateWith { FiniteSolveVerdict.SAT }, verdicts)
     }
 
     @Test
