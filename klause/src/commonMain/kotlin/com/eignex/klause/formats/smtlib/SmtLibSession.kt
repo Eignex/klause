@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -213,15 +214,24 @@ class SmtLibSession(
         } catch (error: IllegalArgumentException) {
             restore(saved)
             channels.regular(smtSessionError(error.message ?: "invalid command"))
+        } catch (error: PolynomialSourceInterrupted) {
+            restore(saved)
+            val cancellationError = CancellationException("SMT command processing interrupted")
+            cancellationError.addSuppressed(error)
+            interrupted(commandName, cancellationError)
         } catch (error: CancellationException) {
             restore(saved)
-            if (commandName in setOf("check-sat", "check-sat-assuming")) {
-                result = SmtSessionResult("unknown", reasonUnknown = "interrupted")
-                channels.regular("unknown")
-                exited = true
-            } else throw error
+            interrupted(commandName, error)
         }
         return !exited
+    }
+
+    private fun interrupted(commandName: String?, error: CancellationException) {
+        if (commandName in setOf("check-sat", "check-sat-assuming")) {
+            result = SmtSessionResult("unknown", reasonUnknown = "interrupted")
+            channels.regular("unknown")
+            exited = true
+        } else throw error
     }
 
     private fun commands(): List<SExpr> = buildList {

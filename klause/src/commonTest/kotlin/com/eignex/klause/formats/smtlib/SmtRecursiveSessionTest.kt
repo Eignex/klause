@@ -43,6 +43,20 @@ class SmtRecursiveSessionTest {
     }
 
     @Test
+    fun `recursive matches retain parametric nullary constructor ranks`() {
+        val source = """
+            (declare-datatype Option (par (T) ((none) (some (value T)))))
+            (define-fun-rec f ((n Int) (d (Option Int))) Bool
+                (match d ((none (not (f 0 (as none (Option Int))))) ((some x) true))))
+            (check-sat)
+        """.trimIndent()
+
+        val result = solveSmtRecursiveSession(source, ::solve)
+
+        assertEquals("unsat", result.status)
+    }
+
+    @Test
     fun `nested match bindings and annotations preserve recursive call arguments`() {
         val source = """
             (declare-datatype D ((a) (box (value Int))))

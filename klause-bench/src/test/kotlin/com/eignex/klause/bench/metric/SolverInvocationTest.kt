@@ -708,6 +708,45 @@ class SolverInvocationTest {
         assertTrue(r.proven)
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = ["unsat", "unknown", "sat"])
+    fun `the latest SMT response replaces earlier feasibility and optimization claims`(status: String) {
+        val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+            startProcess = {
+                SolverInvocationFakeProcess("".byteInputStream(),
+                    stdout = "; objective=7\nsat\n; optimizationStatus=optimal\n$status\n")
+            })
+
+        assertEquals(when (status) {
+            "sat" -> true
+            "unsat" -> false
+            else -> null
+        }, result.feasible)
+        assertEquals(status == "unsat", result.proven)
+        assertNull(result.objective)
+        assertNull(result.exactObjective)
+        assertEquals("2", result.stats["smtQueryResponses"])
+        assertNull(result.stats["optimizationStatus"])
+        assertNull(result.stats["objective"])
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["x\nunsat\ny", "x\n; objective=7\n; optimizationStatus=optimal\ny",
+        "x\runsat\ry", "x\r\n; objective=7\r\n; optimizationStatus=optimal\r\ny"])
+    fun `quoted SMT model names cannot fabricate verdicts or optimization observations`(name: String) {
+        val model = "((define-fun |$name| () Int 3))"
+        val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+            startProcess = { SolverInvocationFakeProcess("".byteInputStream(), stdout = "sat\n$model\n") })
+
+        assertEquals(true, result.feasible)
+        assertFalse(result.proven)
+        assertNull(result.objective)
+        assertNull(result.stats["optimizationStatus"])
+        assertEquals("1", result.stats["smtQueryResponses"])
+        assertEquals("sat\n$model\n", result.rawOutput)
+        assertEquals(model, SolveEvidence.finalWitness(Format.SMTLIB, result.rawOutput))
+    }
+
     @Test
     fun `competition objectives should parse decimal exponent and large finite fractions`() {
         val huge = "1" + "0".repeat(400)

@@ -55,6 +55,7 @@ internal class TranscendentalArithmetic(
 
     fun divide(left: BigFraction, right: BigFraction): BigFraction = execution.operation {
         prepare(left, right)
+        if (right == BigFraction.ONE) return@operation left
         return@operation left * right.reciprocal()
     }
 

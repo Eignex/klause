@@ -128,6 +128,7 @@ class SExprReader(private val reader: CharReader) {
     }
 
     private fun validToken(token: String): Boolean {
+        if (token.length == 1 && token[0] in '0'..'9') return true
         if (token.startsWith('|') || token.startsWith('"')) return true
         if (token.startsWith("#b")) return token.length > 2 && token.drop(2).all { it in "01" }
         if (token.startsWith("#x")) return token.length > 2 && token.drop(2).all {

@@ -136,58 +136,21 @@ internal object SolveEvidence {
     }
 
     private fun finalSmtModel(raw: String): String? {
-        var modelStart = -1
-        var modelLength = 0
-        var modelHasCr = false
         var witnessStart = -1
         var witnessEnd = 0
-        var witnessLength = 0
-        var witnessHasCr = false
-        var lineStart = 0
-        var precedingCr = false
-        var nextLf = raw.indexOf('\n')
-        var nextCr = raw.indexOf('\r')
-        while (lineStart <= raw.length) {
-            val lineEnd = when {
-                nextLf < 0 -> if (nextCr < 0) raw.length else nextCr
-                nextCr < 0 -> nextLf
-                else -> minOf(nextLf, nextCr)
+        var sat = false
+        val scanner = SmtResponseScanner(status = { status ->
+            sat = status == "sat"
+            witnessStart = -1
+        }, model = { start, end ->
+            if (sat) {
+                witnessStart = if (end - start <= MAX_WITNESS_CHARS) start else -1
+                witnessEnd = end
             }
-            val marker = if (lineEnd - lineStart == 1) raw[lineStart] else null
-            if (marker == '(') {
-                modelStart = lineStart
-                modelLength = 1
-                modelHasCr = false
-            } else if (modelStart >= 0) {
-                modelLength += lineEnd - lineStart + 1
-                modelHasCr = modelHasCr || precedingCr
-                if (marker == ')') {
-                    witnessStart = modelStart
-                    witnessEnd = lineEnd
-                    witnessLength = modelLength
-                    witnessHasCr = modelHasCr
-                    modelStart = -1
-                }
-            }
-            if (lineEnd == raw.length) break
-            precedingCr = raw[lineEnd] == '\r'
-            lineStart = lineEnd + if (precedingCr && raw.getOrNull(lineEnd + 1) == '\n') 2 else 1
-            if (nextLf >= 0 && nextLf < lineStart) nextLf = raw.indexOf('\n', lineStart)
-            if (nextCr >= 0 && nextCr < lineStart) nextCr = raw.indexOf('\r', lineStart)
-        }
-        if (witnessStart < 0 || witnessLength > MAX_WITNESS_CHARS) return null
-        if (!witnessHasCr) return raw.substring(witnessStart, witnessEnd)
-        return buildString(witnessLength) {
-            var copied = witnessStart
-            var cr = raw.indexOf('\r', copied)
-            while (cr >= 0 && cr < witnessEnd) {
-                append(raw, copied, cr)
-                append('\n')
-                copied = cr + 1
-                if (copied < witnessEnd && raw[copied] == '\n') copied++
-                cr = raw.indexOf('\r', copied)
-            }
-            append(raw, copied, witnessEnd)
-        }
+        })
+        scanner.feed(raw)
+        scanner.finish()
+        if (witnessStart < 0) return null
+        return raw.substring(witnessStart, witnessEnd)
     }
 }

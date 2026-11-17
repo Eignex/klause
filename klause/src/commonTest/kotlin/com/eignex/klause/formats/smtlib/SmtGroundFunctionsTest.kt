@@ -188,6 +188,24 @@ class SmtGroundFunctionsTest {
     }
 
     @Test
+    fun `integer coordinates retain real ranks in function arguments`() {
+        val parsed = SmtLib.parse("""
+            (declare-const n Int)
+            (declare-fun f (Real) Bool)
+            (assert (= n 3))
+            (assert (f n))
+        """.trimIndent())
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
+        val values = parsed.reconstructModel(assignment).values.associate { it.first.name to it.second }
+
+        val function = assertIs<SmtValue.Function>(values.getValue("f"))
+        assertEquals(SmtValue.Integer("3"), values.getValue("n"))
+        assertEquals(listOf(SmtSort.Real), function.parameters)
+        assertEquals(listOf(SmtValue.Real("3.0")) to SmtValue.Boolean(true), function.entries.single())
+    }
+
+    @Test
     fun `congruence uses exact arithmetic equality of arguments`() {
         val parsed = SmtLib.parse("""
             (declare-fun f (Real Int Bool) Int)

@@ -743,7 +743,7 @@ internal object Suites {
         vendored("roster", Category.ASSIGNMENT, Expected.Sat)
     }
 
-    private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA and QF_LRA instances") {
+    private val smtlibCore = suite("smtlib-core", "Curated quantifier-free SMT-LIB instances") {
         format = Format.SMTLIB
         license = "internal"
         vendored("lia-basic", Category.CSP, Expected.Sat)
@@ -761,6 +761,13 @@ internal object Suites {
         vendored("lia-disjunction", Category.CSP, Expected.Sat)
         vendored("lra-rational", Category.CSP, Expected.Sat)
         vendored("lia-wide-span", Category.CSP, Expected.Sat)
+        for (name in listOf("packet-array", "wide-array-function", "euclidean-negative", "mixed-floor",
+            "zero-division", "wide-divisibility", "integer-powers")) {
+            vendored(name, Category.CSP, Expected.Sat, license = "Apache-2.0")
+        }
+        for (name in listOf("real-function-congruence", "datatype-cycle", "euclidean-conflict")) {
+            vendored(name, Category.UNSAT, Expected.Unsat, license = "Apache-2.0")
+        }
     }
 
     /** XCSP3 family key: the series prefix before the first `-`. Competition instance names encode

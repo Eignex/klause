@@ -220,8 +220,9 @@ Retained query evaluation records source result ranks in one typed traversal per
 query or specialized definition body. Selected conditional and match branches
 retain their common rank before enclosing polymorphic function lookup; lookup
 selects the instantiated source rank before inspecting its fixed interpretation.
-Each ground application receives a private result and captured
-arguments. Pairwise congruence requires equal results whenever evaluated arguments
+Each ground application receives a private result and typed argument coordinates.
+Named coordinates at the selected source parameter rank are reused directly;
+other arguments receive fresh typed captures. Pairwise congruence requires equal results whenever evaluated arguments
 are equal, including exact arithmetic arguments. Only free sort identities receive
 finite representative domains; interpreted arithmetic domains remain open. Model
 recipes restore original ranks, typed domain values, function entries and total
@@ -307,7 +308,9 @@ in `get-option`.
 
 Each command validates syntax, declaration order and expression sorts before it
 changes the session. Protocol errors preserve the previous assertion context and
-checked model. `get-assertions` preserves original annotations. Regular and
+checked model. Preparation and normalization share the command's execution control;
+interruption restores its context and a stopped query reports `unknown` without a model.
+`get-assertions` preserves original annotations. Regular and
 diagnostic channels route independently to stdout, stderr or append-file sinks;
 switching destinations closes the previous owned sink, and reset restores both defaults.
 
@@ -317,7 +320,10 @@ The scope infers each named body's sort and registers its typed definition in on
 operation; the containing command still validates its own lexical context.
 Explicit binding entry and exit frames share counted lexical names, keeping live
 scope storage linear in nested bindings; annotation and closedness walks charge
-the same execution control.
+the same execution control. The annotation walk reuses list cursors; both walks carry
+unbound atoms directly. The annotation walk also carries singleton binding names directly.
+The typed scope walk reuses evaluation cursors across single-binding `let` values and
+bodies, with continuations retaining the enclosing lexical scope.
 Literal tokens are classified before canonical term-name lookup. Qualified
 function names, sorts and indexes do not capture surrounding term binders.
 `define-const` abbreviates a nullary `define-fun`. Named definitions share the
@@ -332,7 +338,8 @@ query error without replacing the retained model.
 
 Recursive command-session definitions use necessary ground equations for
 refutation. Initial instances use false or zero literals for Boolean, integer,
-real and bit-vector arguments, and fresh constants for other sorts. A satisfying
+real and bit-vector arguments, and qualified nullary constructors at their resolved
+datatype rank when available. Other non-scalar sorts retain fresh constants. A satisfying
 result requires either a total interpretation whose equations pass a counterexample
 check, or a checked integer ranking that proves all recursive calls decrease for
 arbitrary inputs, followed by evaluation of the source assertions.

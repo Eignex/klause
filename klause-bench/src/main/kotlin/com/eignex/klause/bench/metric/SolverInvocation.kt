@@ -12,6 +12,7 @@ import com.eignex.klause.bench.source.SourceStaging
 import com.eignex.klause.bench.tools.CliProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
 import java.io.InterruptedIOException
@@ -96,6 +97,9 @@ internal object SolverInvocation {
         }
         return withSourceInput(file, budget, staging = settings.sourceStaging,
             observeHarness = if (settings.observeSourceHarness) ({ SourceHarnessObservation.start() }) else null,
+            prepareInput = if (settings.completeAssignment && entry.ref.format == Format.SMTLIB) {
+                { input, checkpoint, solve -> SmtModelInput.withInput(input, checkpoint, solve) }
+            } else null,
         ) { plain, remaining ->
             val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
             try {
@@ -119,6 +123,7 @@ internal object SolverInvocation {
         staging: SourceStaging = SourceStaging.CACHE,
         decoderIdentity: ((() -> Unit) -> Map<String, String>) = { SourceDecoder.capture(it) },
         observeHarness: (() -> SourceHarnessObservation)? = null,
+        prepareInput: ((File, () -> Unit, (File) -> Result) -> Result)? = null,
         solve: (File, Budget) -> Result,
     ): Result {
         val start = nanoTime()
@@ -150,15 +155,17 @@ internal object SolverInvocation {
                     }
                     return result
                 }
+                fun prepareSource(input: File): Result =
+                    prepareInput?.invoke(input, ::checkActive, ::invokeSource) ?: invokeSource(input)
                 if (cliDecodesInput) {
                     checkActive()
                     decoder = decoderIdentity(::checkActive)
-                    invokeSource(file)
+                    result = prepareSource(file)
                 } else {
                     CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
                         stagingDirectory = stagingDirectory ?: CorpusFiles.stagingRoot,
                         nanoTime = nanoTime, onCleanupStart = observation?.let { { it.cleanupStarted() } },
-                        block = ::invokeSource)
+                        block = ::prepareSource).also { result = it }
                 }
             }
         }.exceptionOrNull()
@@ -377,6 +384,7 @@ internal object SolverInvocation {
         var unsat = false
         var anySolution = false
         var smtSat = false
+        var smtResponses = 0
 
         fun recordObjective(text: String): Boolean {
             val value = ExactObjective.parse(text) ?: return false
@@ -401,14 +409,34 @@ internal object SolverInvocation {
         }
         fun recordStat(kv: String) = kv.split('=', limit = 2)
             .takeIf { it.size == 2 }?.let { stats[it[0].trim()] = it[1].trim() }
+        fun smtResponse(status: String) {
+            if (smtResponses++ > 0) {
+                objective = null
+                exactObjective = null
+                for (key in SMT_QUERY_RESULT_KEYS) stats.remove(key)
+                timeToBestMs = null
+                timeToFirstFeasibleMs = null
+            }
+            anySolution = status == SMT_SAT
+            smtSat = anySolution
+            unsat = status == SMT_UNSAT
+            if (anySolution) markFeasible()
+        }
+        val smtScanner = SmtResponseScanner(status = ::smtResponse)
         try {
-            process.inputStream.bufferedReader().forEachLine { rawLine ->
+            forEachOutputLine(process.inputStream.bufferedReader(), dialect) { rawLine, ending ->
                 stdoutCapture?.apply {
-                    appendLine(rawLine)
+                    append(rawLine)
+                    append(ending)
                     flush()
                 }
-                raw.appendLine(rawLine)
+                raw.append(rawLine).append(ending)
                 val line = rawLine.trim()
+                val smtTopLevel = smtScanner.atTopLevel
+                if (dialect == Dialect.SMT_LIB) {
+                    smtScanner.feed(rawLine)
+                    smtScanner.feed(ending)
+                }
                 when (dialect) {
                     Dialect.MINIZINC -> when (line) {
                         SOLUTION_SEPARATOR -> markIncumbent()
@@ -477,31 +505,21 @@ internal object SolverInvocation {
                     }
 
                     Dialect.SMT_LIB -> when {
-                        line == SMT_SAT -> {
-                            smtSat = true
-                            markFeasible()
-                        }
-
-                        line == SMT_UNSAT -> {
-                            unsat = true
-                            proven = true
-                        }
-
-                        line == SMT_UNKNOWN -> Unit
-
                         // `; <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
-                        line.startsWith(SMT_COMMENT_PREFIX) -> {
+                        smtTopLevel && line.startsWith(SMT_COMMENT_PREFIX) -> {
                             val kv = line.removePrefix(SMT_COMMENT_PREFIX).trim()
                             recordStat(kv)
                             if (kv.substringBefore('=').trim() == "objective") {
                                 exactObjective = null
                                 objective = null
-                                if (recordObjective(kv.substringAfter('=', "").trim())) markIncumbent()
+                                if (recordObjective(kv.substringAfter('=', "").trim()) &&
+                                    (smtResponses == 0 || smtSat)) markIncumbent()
                             }
                         }
                     }
                 }
             }
+            if (dialect == Dialect.SMT_LIB) smtScanner.finish()
         } catch (failure: IOException) {
             outputFailure = failure
         } finally {
@@ -537,6 +555,7 @@ internal object SolverInvocation {
         killed.get()?.let { stats["killed"] = it }
         outputFailure?.let { stats["outputCaptureFailure"] = StderrCapture.describe(it) }
         stats["exit"] = exit?.toString() ?: "unavailable"
+        if (dialect == Dialect.SMT_LIB) stats["smtQueryResponses"] = smtResponses.toString()
         diagnostics.quarantines?.let { stats[QUARANTINED] = it }
         if (cmd.first().substringAfterLast('/') == "klause-cli") {
             System.getenv("KLAUSE_LAB_PROFILE_DIR")?.let { directory ->
@@ -583,6 +602,41 @@ internal object SolverInvocation {
 
     internal fun parsePbObjective(text: String): Double? = ExactObjective.parse(text)?.approximate()
 
+    private fun forEachOutputLine(reader: BufferedReader, dialect: Dialect, consume: (String, String) -> Unit) {
+        if (dialect != Dialect.SMT_LIB) {
+            reader.forEachLine { consume(it, "\n") }
+            return
+        }
+        val line = StringBuilder()
+        val buffer = CharArray(8192)
+        var carriageReturn = false
+        fun emit(ending: String) {
+            consume(line.toString(), ending)
+            line.setLength(0)
+        }
+        while (true) {
+            val size = reader.read(buffer)
+            if (size < 0) break
+            for (index in 0 until size) {
+                val char = buffer[index]
+                if (carriageReturn) {
+                    carriageReturn = false
+                    if (char == '\n') {
+                        emit("\r\n")
+                        continue
+                    }
+                    emit("\r")
+                }
+                when (char) {
+                    '\r' -> carriageReturn = true
+                    '\n' -> emit("\n")
+                    else -> line.append(char)
+                }
+            }
+        }
+        if (carriageReturn) emit("\r") else if (line.isNotEmpty()) emit("")
+    }
+
     /** Parse a `%%%klause-arm:` body. `label`, `objective` (an exact integer or rational value), and
      *  `time` are required — a line missing or malformed on any of those is unusable and the whole
      *  entry is dropped. `continuousObjective` is optional (the whole objective when a continuous
@@ -619,6 +673,9 @@ internal object SolverInvocation {
         "lpDeductionAuthority", "numericalObjectiveTolerance", "numericalObjectiveBoundDirection",
         "numericalObjectiveBound", "numericalRelativeGap", "optimizationStatus",
     )
+    private val SMT_QUERY_RESULT_KEYS = LINEAR_RESULT_KEYS + setOf(
+        "objective", "objectiveBound", "objectiveBoundDirection", "objectiveBoundStrict",
+    )
     private const val ARM_PREFIX = "%%%klause-arm:"
 
     // XCSP3 competition output stream (klause-cli's `.xml` front-end).
@@ -632,7 +689,6 @@ internal object SolverInvocation {
     // SMT-LIB output stream (klause-cli's `.smt2` front-end).
     private const val SMT_SAT = "sat"
     private const val SMT_UNSAT = "unsat"
-    private const val SMT_UNKNOWN = "unknown"
     private const val SMT_COMMENT_PREFIX = "; "
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L

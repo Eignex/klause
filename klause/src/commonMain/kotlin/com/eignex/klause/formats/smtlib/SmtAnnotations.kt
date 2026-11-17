@@ -19,26 +19,39 @@ internal fun normalizeSmtSourceCommands(
             accept(command)
             continue
         }
-        val work = ArrayDeque<AnnotationWork>()
+        val work = ArrayDeque<Any>()
         val values = ArrayDeque<SExpr>()
         val bound = AnnotationBindings(cancellation)
         work += AnnotationFrame(command, false)
         while (work.isNotEmpty()) {
             cancellation.polynomialSourceCheckpoint(1)
             val next = work.removeLast()
+            if (next is SExpr.Atom) {
+                values += next
+                continue
+            }
+            if (next is String) {
+                bound.leave(next)
+                continue
+            }
             if (next is AnnotationExit) {
                 bound.leave(next.bindings)
                 continue
             }
             val frame = next as AnnotationFrame
-            if (frame.bindings.isNotEmpty()) {
-                bound.enter(frame.bindings)
-                work += AnnotationExit(frame.bindings)
+            if (!frame.combine) {
+                if (frame.singleBinding != null) {
+                    bound.enter(frame.singleBinding)
+                    work += frame.singleBinding
+                } else if (frame.bindings.isNotEmpty()) {
+                    bound.enter(frame.bindings)
+                    work += AnnotationExit(frame.bindings)
+                }
             }
-            val (node, combine) = frame
+            val node = frame.node
             when (node) {
                 is SExpr.Atom -> values += node
-                is SExpr.SList -> if (combine) {
+                is SExpr.SList -> if (frame.combine) {
                     var changed: MutableList<SExpr>? = null
                     for (index in node.items.indices.reversed()) {
                         val child = values.removeLast()
@@ -76,14 +89,19 @@ internal fun normalizeSmtSourceCommands(
                         values += body
                     } else values += combined
                 } else {
-                    work += AnnotationFrame(node, true)
+                    frame.combine = true
+                    work += frame
                     val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+                    val bindingExpression = when (head) {
+                        "let" -> node.items.getOrNull(1)
+                        "define-fun", "define-fun-rec" -> node.items.getOrNull(2)
+                        else -> null
+                    }
+                    val singleName = if (frame.pattern == null) annotationSingleBindingName(bindingExpression) else null
                     val localNames = frame.pattern?.let {
                         smtPatternVariables(it, scope.datatypes.operatorNames)
-                    } ?: when (head) {
-                        "let" -> annotationBindingNames(node.items.getOrNull(1))
-                        "define-fun", "define-fun-rec" -> annotationBindingNames(node.items.getOrNull(2))
-                        else -> emptySet()
+                    } ?: if (singleName != null || bindingExpression == null) emptySet() else {
+                        annotationBindingNames(bindingExpression)
                     }
                     for (index in node.items.indices.reversed()) {
                         val bodyIndex = when {
@@ -93,8 +111,13 @@ internal fun normalizeSmtSourceCommands(
                         }
                         val child = node.items[index]
                         val pattern = if (frame.matchCases) (child as? SExpr.SList)?.items?.firstOrNull() else null
-                        work += AnnotationFrame(child, false, if (index == bodyIndex) localNames else emptySet(),
-                            matchCases = head == "match" && index == 2, pattern = pattern)
+                        val bindings = if (index == bodyIndex) localNames else emptySet()
+                        val singleBinding = if (index == bodyIndex) singleName else null
+                        work += if (child is SExpr.Atom && bindings.isEmpty() && singleBinding == null) child else {
+                            AnnotationFrame(child, false, bindings,
+                                matchCases = head == "match" && index == 2, pattern = pattern,
+                                singleBinding = singleBinding)
+                        }
                     }
                 }
             }
@@ -110,42 +133,60 @@ internal fun normalizeSmtSourceCommands(
     return normalized
 }
 
-private sealed interface AnnotationWork
-
-private data class AnnotationFrame(
-    val node: SExpr, val combine: Boolean, val bindings: Set<String> = emptySet(),
+private class AnnotationFrame(
+    val node: SExpr, var combine: Boolean, val bindings: Set<String> = emptySet(),
     val matchCases: Boolean = false, val pattern: SExpr? = null,
-) : AnnotationWork
+    val singleBinding: String? = null,
+)
 
-private data class AnnotationExit(val bindings: Set<String>) : AnnotationWork
+private class AnnotationExit(val bindings: Set<String>)
 
 private class AnnotationBindings(private val cancellation: ExecutionControl) {
     private val counts = HashMap<String, Int>()
     val isEmpty: Boolean get() = counts.isEmpty()
 
     fun enter(names: Set<String>) {
-        for (name in names) {
-            cancellation.polynomialSourceCheckpoint(1)
-            counts[name] = (counts[name] ?: 0) + 1
-        }
+        for (name in names) enter(name)
+    }
+
+    fun enter(name: String) {
+        cancellation.polynomialSourceCheckpoint(1)
+        counts[name] = (counts[name] ?: 0) + 1
     }
 
     fun leave(names: Set<String>) {
-        for (name in names) {
-            cancellation.polynomialSourceCheckpoint(1)
-            val count = counts.getValue(name)
-            if (count == 1) counts.remove(name) else counts[name] = count - 1
-        }
+        for (name in names) leave(name)
+    }
+
+    fun leave(name: String) {
+        cancellation.polynomialSourceCheckpoint(1)
+        val count = counts.getValue(name)
+        if (count == 1) counts.remove(name) else counts[name] = count - 1
     }
 
     operator fun contains(name: String): Boolean = name in counts
 }
 
-private fun annotationBindingNames(expression: SExpr?): Set<String> =
-    (expression as? SExpr.SList)?.items.orEmpty().mapNotNull {
+private fun annotationSingleBindingName(expression: SExpr?): String? {
+    val bindings = (expression as? SExpr.SList)?.items ?: return null
+    if (bindings.size != 1) return null
+    val binding = bindings[0] as? SExpr.SList ?: return null
+    val name = (binding.items.firstOrNull() as? SExpr.Atom)?.text ?: return null
+    return smtSessionSymbol(name)
+}
+
+private fun annotationBindingNames(expression: SExpr?): Set<String> {
+    val bindings = (expression as? SExpr.SList)?.items.orEmpty()
+    if (bindings.size == 1) {
+        val binding = bindings[0] as? SExpr.SList ?: return emptySet()
+        val name = (binding.items.firstOrNull() as? SExpr.Atom)?.text ?: return emptySet()
+        return setOf(smtSessionSymbol(name))
+    }
+    return bindings.mapNotNull {
         val name = ((it as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
         name?.let(::smtSessionSymbol)
     }.toSet()
+}
 
 private fun freeAnnotationSymbols(
     root: SExpr,
@@ -155,7 +196,7 @@ private fun freeAnnotationSymbols(
     val symbols = HashSet<String>()
     val constructors = scope.datatypes.operatorNames
     val bound = AnnotationBindings(cancellation)
-    val work = ArrayDeque<AnnotationWork>()
+    val work = ArrayDeque<Any>()
     work += AnnotationFrame(root, false)
     while (work.isNotEmpty()) {
         cancellation.polynomialSourceCheckpoint(1)
@@ -164,12 +205,14 @@ private fun freeAnnotationSymbols(
             bound.leave(next.bindings)
             continue
         }
-        val frame = next as AnnotationFrame
-        if (frame.bindings.isNotEmpty()) {
-            bound.enter(frame.bindings)
-            work += AnnotationExit(frame.bindings)
+        val node = if (next is SExpr.Atom) next else {
+            val frame = next as AnnotationFrame
+            if (frame.bindings.isNotEmpty()) {
+                bound.enter(frame.bindings)
+                work += AnnotationExit(frame.bindings)
+            }
+            frame.node
         }
-        val node = frame.node
         when (node) {
             is SExpr.Atom -> if (scope.literalSort(node.text) == null) {
                 smtSessionSymbol(node.text).takeUnless { it in bound }?.let(symbols::add)
@@ -183,7 +226,7 @@ private fun freeAnnotationSymbols(
                     }.toSet()
                     work += AnnotationFrame(node.items[2], false, names)
                     for (binding in bindings.asReversed()) {
-                        binding.items.getOrNull(1)?.let { work += AnnotationFrame(it, false) }
+                        binding.items.getOrNull(1)?.let { work += annotationVisit(it) }
                     }
                 } else if (head == "match" && node.items.size == 3) {
                     for (case in (node.items[2] as? SExpr.SList)?.items.orEmpty().asReversed()) {
@@ -193,17 +236,19 @@ private fun freeAnnotationSymbols(
                                 smtPatternVariables(pair.items[0], constructors))
                         }
                     }
-                    work += AnnotationFrame(node.items[1], false)
+                    work += annotationVisit(node.items[1])
                 } else if (head == "!") {
-                    node.items.getOrNull(1)?.let { work += AnnotationFrame(it, false) }
+                    node.items.getOrNull(1)?.let { work += annotationVisit(it) }
                 } else if (head == "as" || head == "_") {
                     continue
-                } else node.items.asReversed().forEach { work += AnnotationFrame(it, false) }
+                } else node.items.asReversed().forEach { work += annotationVisit(it) }
             }
         }
     }
     return symbols
 }
+
+private fun annotationVisit(node: SExpr): Any = if (node is SExpr.Atom) node else AnnotationFrame(node, false)
 
 internal fun smtPatternVariables(pattern: SExpr, constructors: Set<String>): Set<String> = when (pattern) {
     is SExpr.Atom -> setOf(smtSessionSymbol(pattern.text)).filterNot { it in constructors }.toSet()

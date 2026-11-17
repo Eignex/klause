@@ -734,6 +734,17 @@ Compressed file inputs are staged with the corpus decoder by default.
 `sourcePreparationMs` is deducted from the CLI deadline, and
 `sourceInvocationMs` includes preparation, invocation and staged-file retirement.
 CLI delivery streams compressed input during the invocation instead.
+For SMT input, `complete-assignment=true` stages a single-query protocol wrapper
+requesting model production and one model immediately after `check-sat`. Original
+commands and source hashes remain unchanged. For augmented inputs,
+`compiledInputHashes.smtOriginal` and
+`smtEffective` identify the decoded original and invoked bytes. Augmentation reads
+at most 16 MiB under the source allowance. Conflicting options, incremental or
+ambiguous streams and CLI-decoded compressed inputs run unchanged with an explicit
+`smtModelRequest=unsupported` reason and no validation witness. Multiple-query
+results retain the last response but supply no single-source validation witness.
+The lab checks retained models against original inputs; model requests do not
+constitute independent validation. `smtModelRetirementMs` records wrapper cleanup.
 `elapsedMs` and process witness times retain their subprocess scope. A spent
 preparation allowance supplies no solver verdict. Plain source digests and frozen
 compressed input identities remain available for independent checking.

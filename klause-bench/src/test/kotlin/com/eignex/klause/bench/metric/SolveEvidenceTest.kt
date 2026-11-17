@@ -130,7 +130,8 @@ class SolveEvidenceTest {
 
     @Test
     fun `model free SMT results should carry no witness`() {
-        for (raw in listOf("", "unsat\n", "unknown\n", "sat\n", "; objective=7\n; optimizationStatus=optimal\n")) {
+        for (raw in listOf("", "unsat\n", "unknown\n", "sat\n", "; objective=7\n; optimizationStatus=optimal\n",
+            "sat\n(error \"model production is disabled\")\n")) {
             assertNull(SolveEvidence.finalWitness(Format.SMTLIB, raw), raw)
         }
     }
@@ -152,6 +153,30 @@ class SolveEvidenceTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = ["()", "((define-fun x () Int 3))",
+        "((define-fun-rec f ((x Int)) Int (ite (= x 0) 0 (f (- x 1)))))",
+        "((define-funs-rec ((f ((x Int)) Int)) (x)))"])
+    fun `single line SMT model responses retain the current renderer shape`(model: String) {
+        assertEquals(model, SolveEvidence.finalWitness(Format.SMTLIB, "sat\n$model\n"))
+    }
+
+    @Test
+    fun `SMT model strings and quoted symbols cannot terminate responses or change verdicts`() {
+        val model = "((define-fun |x\nunsat\ny| () String \"parenthesis ) \"\"quoted\"\" ; (\"))"
+
+        assertEquals(model, SolveEvidence.finalWitness(Format.SMTLIB, "; ignored (\nsat\n$model\n"))
+        assertNull(SolveEvidence.finalWitness(Format.SMTLIB, "sat\n(error \"no model ) (\")\n"))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["sat", "unsat", "unknown"])
+    fun `a later SMT response invalidates an earlier model`(status: String) {
+        val raw = "sat\n(\n  (define-fun x () Int 1)\n)\n$status\n(error \"no current model\")\n"
+
+        assertNull(SolveEvidence.finalWitness(Format.SMTLIB, raw))
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["LF", "CR", "CRLF"])
     fun `SMT line endings should preserve blank lines in the last complete model`(ending: String) {
         val separator = when (ending) {
@@ -166,25 +191,27 @@ class SolveEvidenceTest {
 
         val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
 
-        assertEquals("(\n\n\n  (define-fun |wide é𝄞| () Int 2)\n\n)", witness)
+        assertEquals(listOf("(", "", "", "  (define-fun |wide é𝄞| () Int 2)", "", ")")
+            .joinToString(separator), witness)
     }
 
     @Test
-    fun `a restarted SMT model should discard its incomplete prefix`() {
+    fun `an unterminated SMT response cannot expose its nested list as a model`() {
         val raw = "sat\n(\n  discarded\n(\n  (define-fun x () Int 2)\n)\n"
 
         val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
 
-        assertEquals("(\n  (define-fun x () Int 2)\n)", witness)
+        assertNull(witness)
     }
 
     @Test
-    fun `SMT model delimiters should require standalone lines`() {
-        val raw = "sat\n (\n)\n(\n( \n )\n) \n)\n"
+    fun `SMT models retain formatting independently of physical line boundaries`() {
+        val model = "(\n  (define-fun x () Int 3) )"
+        val raw = "sat\n ()\n  $model\n"
 
         val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
 
-        assertEquals("(\n( \n )\n) \n)", witness)
+        assertEquals(model, witness)
     }
 
     @Test
