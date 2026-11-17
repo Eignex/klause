@@ -118,7 +118,6 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         assertEquals(LinearSourceConclusion.SATISFIABLE, assertNotNull(result.linearSource).conclusion)
     }
 
-
     @Test
     fun `a rounding difference at a large optimum should agree within the numerical gap`() {
         val billion = BigFraction.ofLong(1_000_000_000)
@@ -255,7 +254,6 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         }
         return assertNotNull(result.linearSource).conclusion
     }
-
 
     @Test
     fun `a source better incumbent should retain numerical optimality at a tied native cost`() {
