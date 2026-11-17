@@ -13,6 +13,11 @@ import java.util.Locale
 internal object CliProfile {
     private const val CLI_CALLER_DEPTH = 3
     private const val MODEL_CALLER_DEPTH = 4
+
+    // A top-level function's frame names its file facade, so a file move silently changes this name.
+    internal const val EXACT_LIRA_SOURCE_PREPARATION =
+        "com.eignex.klause.theory.qflra.PreparedExactLiraSourceKt.sharedExactLiraSource"
+
     private val timedEvents = setOf("jdk.GarbageCollection", "jdk.GCPhasePause", "jdk.ThreadPark",
         "jdk.ThreadSleep", "jdk.JavaMonitorEnter", "jdk.JavaMonitorWait", "jdk.Compilation",
         "jdk.SafepointBegin", "jdk.ExecuteVMOperation")
@@ -44,7 +49,7 @@ internal object CliProfile {
             "com.eignex.klause.lp.LpProbeSolver.probe",
         ),
         "source preparation entry" to listOf(
-            "com.eignex.klause.theory.qflra.QfLiraSolverKt.sharedExactLiraSource",
+            EXACT_LIRA_SOURCE_PREPARATION,
             "com.eignex.klause.solver.pipeline.PreparedSearchComponents.prepareSource",
         ),
     )
@@ -212,7 +217,7 @@ internal object CliProfile {
             methods.any {
                 it.contains("PreparedSearchComponents.<init>") ||
                     it.contains("PreparedSearchComponents.prepareSource") ||
-                    it.contains("QfLiraSolverKt.sharedExactLiraSource") ||
+                    it.contains(EXACT_LIRA_SOURCE_PREPARATION) ||
                     it.contains("ComponentPlanKt.componentPlan") ||
                     it.contains("PreparedSourcePlanKt.prepareExecutionPlan")
             } -> "shared source preparation"
