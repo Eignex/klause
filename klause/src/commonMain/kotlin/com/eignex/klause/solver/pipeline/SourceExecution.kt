@@ -571,8 +571,9 @@ private fun executeCapturedSource(
                 } else {
                     SourceExecutionResult.Quadratic(invocation, original.optimizeWidened(objective, params, engine,
                         sense, request.cores, callbacks.onQuadraticIncumbent) { observe ->
-                        exact?.let { OpenTheoryPipeline.optimize(it, objective, probe, engine, sense, request.cores,
-                            observe) }
+                        exact?.let {
+                            OpenTheoryPipeline.optimize(it, objective, probe, engine, sense, request.cores, observe)
+                        }
                     }.since(started))
                 }
                 return result.also { it.preparationStats = source.stats }
