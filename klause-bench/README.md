@@ -604,6 +604,10 @@ WCNF subprocess operation metadata selects minimization without building a secon
 weighted model in the harness. In-process consumers build the model and its exact
 penalty objective together on first access. The CLI parses and validates its original
 source; original-source hashing and the containing source allowance still apply.
+SMT subprocess metadata scans top-level objective commands with bounded storage,
+without lowering a second model in the harness. Comments, strings and quoted symbols
+do not declare objectives. In-process consumers parse the model and exact objective
+on first access; CLI parsing and lowering spend the source invocation's allowance.
 `lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
 single-model `BenchCase` templates for DIMACS, WCNF, MPS or OPB. Each template retains its
 packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning

@@ -6,6 +6,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.SmtObjective
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -14,8 +16,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 /**
  * A resolved catalog [ProblemRef] with a lazily materialized [Problem]. Subprocess solves
  * pass the file directly to the CLI; only in-process consumers request the model, so
- * their finite-domain restrictions do not filter subprocess inputs. A format with a
- * fixed operation can also defer its exact objective until an in-process consumer reads it.
+ * their finite-domain restrictions do not filter subprocess inputs. Operation metadata
+ * can defer its exact objective until an in-process consumer reads it.
  */
 internal class ResolvedProblem(
     internal val ref: ProblemRef,
@@ -80,6 +82,13 @@ internal object InProcessRunner : Runner {
         val format = Formats[ref.format]
         require(format.inProcess) { "${ref.name}: format ${ref.format} is not in-process; use its dedicated runner" }
         val file = CorpusFetcher.resolve(src)
+        if (ref.format == Format.SMTLIB) {
+            val sense = SmtObjective.read(file)
+            val ingested by lazy { format.ingest(file) }
+            return ResolvedProblem(ref, lazy { ingested.problem },
+                deferredObjective = lazy { ingested.objective }, optimizes = sense != null,
+                maximize = sense == ObjectiveSense.MAXIMIZE)
+        }
         if (ref.format == Format.WCNF) {
             val ingested by lazy { format.ingest(file) }
             return ResolvedProblem(ref, lazy { ingested.problem },
