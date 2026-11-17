@@ -89,6 +89,15 @@ without integer columns from a numerical source, keep finite execution. Native s
 with explicit `ProblemSettings` and keep their exact formula and objective. Hints are
 described under [source definition materialization](12-local-search.md#source-definition-materialization).
 
+`functions.withFactors(problem)` composes a `TranscendentalProblem` with native
+relations sharing its declaration-ordered Boolean, integer and real IDs. Attach the
+returned source with `SourceAttachment(combined, problem.settings)` and use ordinary
+source setup. `combined.prepareExecutionPlan(providers, cancellation)` inspects
+factor roles, owners and strategy admission before execution. Finite globals remain
+native, every integer needs finite bounds, and function composition admits only
+satisfaction. Ineligible factors and interrupted construction supply explicit
+preparation declines; no auxiliary appears in published source coordinates.
+
 `PreparedSourceInvocation` retains the selected route, source plan, operation
 admission and any private grid. Setup finishes route and grid selection before
 returning it, so an invocation never changes its execution view. With a private

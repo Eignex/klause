@@ -576,6 +576,30 @@ are candidate restrictions, and their failures have neighborhood authority only.
 `TranscendentalTheoryRequest` implements `ExactTheorySatisfactionRequest`, so
 frontends consume the dispatcher without selecting a concrete theory.
 
+#### Native finite composition
+
+`TranscendentalProblem.withFactors` attaches a factor model in the same original
+Boolean, integer and real declaration order. `SharedTranscendentalModel` retains
+finite factors and their selected projections, and installs complete polynomial
+encodings for the remaining real-valued relations in the function formula.
+`ExactRealEquality` contributes its authoritative symbolic value directly. Private
+selection coordinates belong to completion and are excluded from the witness.
+Preparation checks the full encoding scope before installing its relations.
+
+All integer declarations in this composition require finite bounds. Native global
+propagators need no arithmetic encoding. Backtracking combines them with
+`TranscendentalSearchComponent`, whose query conditions follow propagated bounds
+and retraction. A feasible leaf requires fixed native integers and Booleans.
+Local search checks the native point and pins every discrete coordinate before
+function completion; ALNS uses those same checks in finite repair and improvement.
+Each portfolio worker owns its service, with the containing native allowance shared
+across workers. Candidate refutations cannot establish a global refutation.
+
+Function composition supports satisfaction only. Unsupported real factors carry
+their canonical factor index in the decline; open finite-peer integers and resource
+interruption have separate preparation causes. Native formula execution without a
+finite peer retains its unrestricted integer semantics.
+
 ### Results and proof authority
 
 Exact SAT requires a complete original-source witness. Exact UNSAT requires a
@@ -601,8 +625,9 @@ allowance and LS/ALNS split the remainder. Complete slices pause at traversal
 checkpoints; native queries are atomic and can overrun a segment. Interruption
 cannot produce partial certificates.
 
-The route returns UNKNOWN/Unsupported for deduction scopes, extra CP components,
+The route returns UNKNOWN/Unsupported for caller-supplied deduction scopes, extra CP components,
 finite tolerance acceptance and active finite event or incumbent-exchange hooks.
+Those extension restrictions do not exclude the prepared native finite peer.
 
 ### Implementation
 

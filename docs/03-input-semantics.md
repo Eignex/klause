@@ -73,7 +73,7 @@ The format chapters define source-specific admission and strategy limits.
 | [Linear mixed arithmetic](18-linear-arithmetic.md#linear-mixed-arithmetic) | Exact linear checks with integer branching | Relaxation feasibility alone does not establish integrality |
 | [Nonlinear integer arithmetic](19-nonlinear-arithmetic.md) | Exact integer candidates and repairs; quadratic optimization by integer branching | Incomplete; exhausted allowances yield UNKNOWN |
 | [Polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Exact conditioned completion with backtracking, local search, ALNS and portfolios | Finite factors and exact quadratic objectives compose |
-| [Transcendental real arithmetic](19-nonlinear-arithmetic.md#transcendental-real-arithmetic) | Exact function checks through shared traversal and LS/ALNS | Incomplete; unsupported equality certification yields UNKNOWN |
+| [Transcendental real arithmetic](19-nonlinear-arithmetic.md#transcendental-real-arithmetic) | Exact function completion beside native finite factors, shared traversal and LS/ALNS | Incomplete; undecided completion yields UNKNOWN; no optimization |
 | [Quadratic optimization](19-nonlinear-arithmetic.md#quadratic-objectives) | Checked convex bounds, objective-image completion and integer splits | Nonconvex or unresolved branches withhold global claims |
 
 A relaxation supplies deductions, not support for omitted source constraints.

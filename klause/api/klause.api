@@ -4891,11 +4891,13 @@ public final class com/eignex/klause/ir/Term {
 
 public final class com/eignex/klause/ir/TranscendentalProblem : com/eignex/klause/ir/SourceSemanticsOwner {
 	public final fun getBoolVarNames ()Ljava/util/Map;
+	public final fun getFactorModel ()Lcom/eignex/klause/ir/Problem;
 	public final fun getHasObjective ()Z
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getObjectiveSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getRealVarNames ()Ljava/util/Map;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
+	public final fun withFactors (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/ir/TranscendentalProblem;
 }
 
 public final class com/eignex/klause/ir/UndeclaredIntegerBounds {
@@ -11280,6 +11282,24 @@ public final class com/eignex/klause/solver/ExactRealSampleCheckKt {
 	public static synthetic fun checkExactRealSample$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/util/ExecutionControl;ILjava/lang/Object;)Ljava/lang/Boolean;
 }
 
+public final class com/eignex/klause/solver/FactorExecutionCapabilities {
+	public final fun component1 ()Lcom/eignex/klause/solver/PropagationCapability;
+	public final fun component2 ()Lcom/eignex/klause/solver/AssignmentCheckCapability;
+	public final fun component3 ()Lcom/eignex/klause/solver/AssignmentCheckCapability;
+	public final fun component4 ()Lcom/eignex/klause/solver/ScoringCapability;
+	public final fun component5 ()Lcom/eignex/klause/solver/RelaxationCapability;
+	public final fun component6 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignmentCheck ()Lcom/eignex/klause/solver/AssignmentCheckCapability;
+	public final fun getInertReason ()Ljava/lang/String;
+	public final fun getPropagation ()Lcom/eignex/klause/solver/PropagationCapability;
+	public final fun getPropagationCheck ()Lcom/eignex/klause/solver/AssignmentCheckCapability;
+	public final fun getRelaxation ()Lcom/eignex/klause/solver/RelaxationCapability;
+	public final fun getScoring ()Lcom/eignex/klause/solver/ScoringCapability;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/FactorProjectionProviders {
 	public static final field Companion Lcom/eignex/klause/solver/FactorProjectionProviders$Companion;
 	public fun <init> ()V
@@ -11322,6 +11342,7 @@ public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
 }
 
 public final class com/eignex/klause/solver/PreparedFactorProjections {
+	public final fun capabilities (I)Lcom/eignex/klause/solver/FactorExecutionCapabilities;
 	public final fun encoder-yJKIlq4 (ILjava/lang/String;)Lcom/eignex/klause/theory/Encoder;
 	public final fun forProblem (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/PreparedFactorProjections;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
@@ -13760,6 +13781,7 @@ public final class com/eignex/klause/solver/pipeline/PreparedExecutionKind : jav
 }
 
 public final class com/eignex/klause/solver/pipeline/PreparedPlanDecline : java/lang/Enum {
+	public static final field OPEN_FINITE_INTEGER Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field OPEN_POLYNOMIAL_INTEGER Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field POLYNOMIAL_ENCODING Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 	public static final field RESOURCE Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
@@ -13818,10 +13840,12 @@ public final class com/eignex/klause/solver/pipeline/PreparedSourcePlanKt {
 	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZ)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static final fun prepareExecutionPlan (Lcom/eignex/klause/ir/TranscendentalProblem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/ExecutionControl;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZZLcom/eignex/klause/util/ExecutionControl;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
+	public static synthetic fun prepareExecutionPlan$default (Lcom/eignex/klause/ir/TranscendentalProblem;Lcom/eignex/klause/solver/FactorProjectionProviders;Lcom/eignex/klause/util/ExecutionControl;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 }
 
 public final class com/eignex/klause/solver/pipeline/ProblemPipeline : java/lang/Enum {
@@ -14327,6 +14351,7 @@ public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryParams 
 
 public final class com/eignex/klause/solver/pipeline/TranscendentalTheoryRequest : com/eignex/klause/solver/pipeline/ExactTheorySatisfactionRequest {
 	public fun execute (Lcom/eignex/klause/solver/pipeline/PolynomialTheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;I)Lcom/eignex/klause/solver/pipeline/PolynomialTheoryExecution;
+	public final fun getPreparedPlan ()Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;
 	public final fun getProblem ()Lcom/eignex/klause/ir/TranscendentalProblem;
 }
 

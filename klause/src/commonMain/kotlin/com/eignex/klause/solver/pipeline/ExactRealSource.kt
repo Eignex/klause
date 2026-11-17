@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.ir.*
 import com.eignex.klause.theory.*
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
@@ -37,6 +38,13 @@ internal fun Problem.exactRealSource(
     stop: ExecutionControl,
 ): TranscendentalProblem? {
     val source = this
+    if (source.hasFiniteIntegerRanges()) {
+        return TranscendentalProblem(TranscendentalFormula.Constant(true),
+            (0 until source.numIntVars).associate { "ints.$it" to it },
+            (0 until source.numRealVars).associate { "reals.$it" to (source.numIntVars + it) },
+            (0 until source.numBoolVars).associate { "bools.$it" to it },
+            semantics = source.semantics).withFactors(source)
+    }
     fun checkpoint() {
         stop.charge(1)
         if (stop()) unavailable()

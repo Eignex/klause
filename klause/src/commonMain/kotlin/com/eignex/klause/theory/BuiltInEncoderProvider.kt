@@ -11,6 +11,7 @@ import com.eignex.klause.factor.arithmetic.GridArithmetic
 import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
@@ -116,6 +117,14 @@ object BuiltInEncoderProvider : EncoderProvider {
         factor is ContinuousProduct -> continuousProductEncoder(factor, target)
         factor is RealFiniteDomain -> realFiniteDomainEncoder(target)
         target == EncodingTarget.POLYNOMIAL && factor is RealProduct -> mixedProduct
+        target == EncodingTarget.POLYNOMIAL && factor is Product -> Encoder(EncoderSupport.DIRECT) { view, encoding ->
+            view as Product
+            encoding.polynomial(PolynomialRealFormula.Atom(
+                PolynomialExpression.Product(listOf(encoding.integer(SourceIntId(view.a)),
+                    encoding.integer(SourceIntId(view.b)))), PolynomialRelation.EQ,
+                encoding.integer(SourceIntId(view.result))))
+            null
+        }
         target == EncodingTarget.LINEAR && factor is RealProduct -> conditionedProduct(factor)
         factor.exactTheoryOwnable && (target != EncodingTarget.DIFFERENCE ||
             (factor.variables.reals.isEmpty() && differenceSupported(factor))) -> when {

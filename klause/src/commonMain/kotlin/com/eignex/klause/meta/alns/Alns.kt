@@ -17,6 +17,7 @@ import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
@@ -313,6 +314,7 @@ internal class Alns(
         ): MinimizeResult.BestFound {
             check(!closed) { "the ALNS neighborhood search is closed" }
             currentCancellation = params.cancellation
+            var initializationInterrupted = false
             if (!repairOpened && !params.cancellation()) {
                 val started = TimeSource.Monotonic.markNow()
                 try {
@@ -323,10 +325,14 @@ internal class Alns(
                     }
                     telemetry.repairCpNodes += repairSearch?.stats?.search?.nodes?.sum?.toLong() ?: 0L
                     repairOpened = true
+                } catch (failure: SearchInitializationCancelled) {
+                    telemetry.repairCpNodes += failure.stats.search.nodes.sum.toLong()
+                    initializationInterrupted = true
                 } finally {
                     telemetry.repairNanos += started.elapsedNow().inWholeNanoseconds
                 }
             }
+            if (initializationInterrupted) return result()
             val instructionBudget = params.maxInstructions
             var instructionsUsed = 0L
             val nodeBudget = params.nodeBudget

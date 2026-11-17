@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
@@ -105,6 +106,9 @@ enum class PreparedPlanDecline {
 
     /** An open source column or factor has no complete owner. */
     UNOWNED_SOURCE_COMPONENT,
+
+    /** A native finite peer requires proved bounds on every integer declaration. */
+    OPEN_FINITE_INTEGER,
 }
 
 /**
@@ -295,7 +299,9 @@ class PreparedSourcePlan private constructor(
                 null -> null
             }
 
-            is PreparedExecution.NonlinearInteger, is PreparedExecution.Transcendental -> null
+            is PreparedExecution.Transcendental -> sourceId.takeIf { selected.completion != null }
+
+            is PreparedExecution.NonlinearInteger -> null
         }
     }
 
@@ -675,6 +681,13 @@ fun NonlinearIntegerProblem.prepareExecutionPlan(): PreparedSourcePlan = Prepare
     integerCoordinates = integerCoordinates,
     realCoordinates = realCoordinates,
 )
+
+/** Prepare native finite relations beside exact, incomplete function completion. */
+fun TranscendentalProblem.prepareExecutionPlan(
+    providers: FactorProjectionProviders = FactorProjectionProviders.Default,
+    cancellation: ExecutionControl = ExecutionControl.Never,
+): PreparedSourcePlan = factorModel?.let { prepareFactorCompletion(providers.prepare(it), cancellation) }
+    ?: prepareTranscendentalExecutionPlan()
 
 internal fun PreparedSourcePlan.retainingLinearSource(binding: PreparedSourcePlan): PreparedSourcePlan =
     binding.bindLinearSource(this)

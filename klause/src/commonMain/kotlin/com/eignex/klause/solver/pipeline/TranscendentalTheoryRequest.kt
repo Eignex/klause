@@ -11,6 +11,8 @@ import com.eignex.util.numbers.BigFraction
 class TranscendentalTheoryRequest internal constructor(
     /** Immutable source declarations, formula and exact function semantics. */
     val problem: TranscendentalProblem,
+    /** Captured native-factor ownership and operation admission. */
+    val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(),
 ) : ExactTheorySatisfactionRequest {
     override fun execute(params: PolynomialTheoryParams, engine: FiniteEngine, cores: Int): PolynomialTheoryExecution {
         require(cores > 0)
@@ -95,13 +97,18 @@ fun OpenTheoryPipeline.execute(
     cores: Int,
 ): TranscendentalTheoryExecution {
     require(cores > 0)
-    return (if (request.problem.hasObjective || !params.supportsInvocation(engine)) {
+    val completion = (request.preparedPlan.execution as? PreparedExecution.Transcendental)?.completion
+    val admission = request.preparedPlan.capabilities.admission(engine)
+    return (if (request.problem.hasObjective || !admission.runnable || !params.supportsInvocation(engine)) {
         TranscendentalTheoryExecution(
-            OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY), 0, false,
+            OpenTheoryResult.Unknown(if (request.preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
+                TerminationReason.BudgetExhausted
+            } else TerminationReason.Unsupported, SolveStats.EMPTY), 0, false,
         )
     } else if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
         TranscendentalPortfolioInvocation(request, params, engine, cores).execute()
-    } else TranscendentalWorkerAdapter(request.problem, params, engine).use { it.execute() })
+    } else TranscendentalWorkerAdapter(completion?.problem ?: request.problem, params, engine,
+        composition = completion).use { it.execute() })
         .withSourceSemantics(request.problem.semantics)
 }
 
