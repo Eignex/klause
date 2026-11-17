@@ -5,19 +5,19 @@ This chapter describes the reductions and the source checks required before publ
 
 ## Selected reductions
 
-The passes listed under [Pipeline](07-presolve.md#pipeline) share the guarantees above. Candidate
-and term visits charge and poll the pass token under bounded scans. Interruption
-retains completed sound reductions and discards unfinished analysis. The following
-families describe the premises and preservation guarantees of those reductions.
-Both lanes poll after entry charging and meter factor, column, term, signature
-and rewrite visits. Bound fusion, duplicate-column and subsumption scans accumulate
-those charges and poll at bounded checkpoints. Native allowance-backed scans reserve
-credit before advancing and settle used credit at publication and exit. Standalone
-scans poll immediately at entry and before publishing.
-Duplicate-column aggregation, bound fusion and source duplicate/domination
-indexing discard unfinished transactions. Structural reduction
-retains only fully collected factor rewrites and their bound tightenings; factor
-hooks and structural-key construction remain atomic.
+The passes listed under [Pipeline](07-presolve.md#pipeline) declare the
+[preservation guarantees](07-presolve.md#guarantees-and-source-mappings) they keep;
+the families below describe their premises. In both lanes a pass polls
+after entry charging and meters factor, column, term, signature and rewrite visits
+against the pass token, within fixed size and visit limits. Bound fusion,
+duplicate-column and subsumption scans accumulate charges and poll at bounded
+checkpoints; native allowance-backed scans reserve credit before advancing and settle
+used credit at publication and exit; standalone scans poll at entry and before
+publishing. Interruption keeps completed sound reductions and discards unfinished
+analysis: duplicate-column aggregation, bound fusion and source duplicate/domination
+indexing discard unfinished transactions, and structural reduction keeps only fully
+collected factor rewrites and their bound tightenings, with factor hooks and
+structural-key construction atomic.
 
 ### Linear reductions
 
@@ -42,10 +42,10 @@ whole meaning is one redundant equality; conjunctions and relaxations can supply
 premises but remain intact. Binary partition equations retain their propagation and
 branching structure, including scaled equations equivalent to `sum(x_i) = 1` over
 declared integer bounds within zero and one. They still supply elimination premises.
-Guarded or disjunctive rows are excluded. Rows admit at most 4096 terms and 4096-bit
-constants, with at most 262144 entries across the block. Sparse elimination bounds
-row fill, total entries and intermediate product bit lengths by the same limits;
-an exceeded bound discards the unfinished elimination. Candidate and term visits
+Guarded or disjunctive rows are excluded. Row width, constant bit length and block
+entries are bounded, and sparse elimination bounds row fill, total entries and
+intermediate product bit lengths by the same limits; an exceeded bound discards the
+unfinished elimination. Candidate and term visits
 charge the phase allowance. Interrupted elimination publishes no deduction.
 
 Sub-sum aggregation contracts a defining equality's partner terms to its output
@@ -92,9 +92,9 @@ exceptions or repeated roles. Other uses retain the original factors. Original
 integer slots are pinned; typed reconstruction reads their selected tuple before
 truncating fresh Boolean
 coordinates. Deduplicated rows give one Boolean extension per source assignment,
-preserving solution multiplicity. Admission caps a scope at 4,096 coordinates,
-retained choices at 65,536, tuple cells at 262,144 and construction at 1,048,576
-charged visits. Interrupted construction publishes no partial substitution.
+preserving solution multiplicity. Admission bounds scope size, retained choices,
+tuple cells and charged construction visits, and interrupted construction publishes
+no partial substitution.
 
 Opt-in `+extensional` preserves shared tuples across ground Tables and MDDs. Table
 semijoins retain rows with a matching tuple on at least two shared columns. MDD
@@ -116,16 +116,15 @@ Omitted columns outside the three Tables overapproximate their wider cluster:
 a surviving row certifies support only in these three relations, never source
 satisfiability. Assumptions and transient domains supply no premises.
 
-A call attempts at most 64 cyclic projections, each with 262,144 visits and
-65,536 stored key/support cells, including one cell per set entry. Scope selection,
-indexing, support intersections and row copies share the call allowance. Incomplete
-projections publish nothing. Ordinary Table propagation, explanations and undo
-consume completed restrictions; there is no retained cluster propagator.
+A call attempts a bounded number of cyclic projections, each with bounded visits and
+stored key/support cells. Scope selection, indexing, support intersections and row
+copies share the call allowance. Incomplete projections publish nothing. Ordinary
+Table propagation, explanations and undo consume completed restrictions; there is no
+retained cluster propagator.
 
-Each attempt admits scopes up to 64, tables up to 262,144 cells and diagrams up to
-65,536 states and 131,072 records. Product states and records have the same caps;
-an attempt has 2,097,152 visits, and a call has 8,388,608 visits and 1,048,576 retained
-cells. A metered variable-occurrence index selects overlapping tables. Visits charge
+Each composition attempt bounds scope width, table cells, diagram and product states
+and records, and visits, and each call bounds total visits and retained cells. A
+metered variable-occurrence index selects overlapping tables. Visits charge
 and poll the invocation token; declined payloads incur no payload-wide entry charge.
 An unfinished intersection
 publishes nothing, while completed replacements survive a later interruption.
@@ -136,7 +135,7 @@ Structural reduction calls each factor's `structuralReduce` hook under current
 domains; source execution restricts this to closed integer columns. Both lanes skip
 the final `Clause` type's unchanged hook before visiting its columns, retaining the
 factor-level charge and cancellation poll. Other factor types retain their hooks.
-Ground tables with at most 4096 tuples allocate survivor storage on the first rejected tuple,
+Small ground tables allocate survivor storage on the first rejected tuple,
 copying the retained prefix once; unchanged tables keep their tuple payload.
 Redundancy and subsumption use indexes maintained across rounds. Duplicate removal and index
 retraction identify stable factor occurrences, so repeated references to one immutable
@@ -149,10 +148,10 @@ observation excludes cheap duplicate drops. Equal support widths skip comparison
 an anchor-incidence index selects smaller rows. Source and finite rounds retain
 completed comparisons and resume interrupted scans. Changed rows or activities
 invalidate affected comparisons; unrelated changes leave them cached.
-Normalized rows are kept per factor occurrence across calls. Each call admits widths
-up to 128 and at most 65,536 normalization and comparison visits, retaining at most
-65,536 failed pairs; upkeep linear in the current rows and candidates is charged
-outside that cap, so bounded calls over an unchanged model reach their comparisons.
+Normalized rows are kept per factor occurrence across calls. Each call bounds row
+width, normalization and comparison visits and retained failed pairs; upkeep linear in
+the current rows and candidates is charged outside that cap, so bounded calls over an
+unchanged model reach their comparisons.
 Completed drops survive interruption.
 
 Comparison-clause folding combines sole-use reified indicators into one comparison
@@ -196,11 +195,11 @@ reconstruction keeps source witness checking and objective units unchanged.
 This restriction belongs only to the captured optimization model, objective and
 assumptions. Fresh objectives or pins require fresh preparation. It supplies no
 source-feasibility nogood and stays disabled for feasibility and complete-coverage
-queries, including counting, enumeration and sampling. Admission permits 4,096
-integer columns, candidate spans of 64 integers, Table scopes of 64 and payloads of
-65,536 cells. At most 65,536 reader entries and 262,144 charged visits cover
-occurrence construction, candidate pairs, tuple-cell comparisons and domain copies.
-An unfinished call publishes no exclusion; its work remains charged.
+queries, including counting, enumeration and sampling. Admission bounds integer
+columns, candidate spans, Table scopes and payloads, and a bounded reader-entry and
+visit allowance covers occurrence construction, candidate pairs, tuple-cell
+comparisons and domain copies. An unfinished call publishes no exclusion; its work
+remains charged.
 
 ### Boolean reductions
 
@@ -217,11 +216,11 @@ discovery publishes no merges.
 
 Bounded variable elimination resolves an objective-free Boolean occurring only in
 clean clauses when neither distinct clause count nor literal volume grows. Each
-pivot is bounded to 4,096 pairs, width 64 and 65,536 visits; an unfinished pivot
-publishes nothing. A completed empty resolvent immediately refutes the model in
+pivot is bounded in resolvent pairs, width and visits; an unfinished pivot publishes
+nothing. A completed empty resolvent immediately refutes the model in
 either lane without materializing an empty factor, even if later work is cancelled.
 Blocked-clause elimination removes clauses whose resolvents on one literal are all
-tautologies. Each clause attempt is capped at 65,536 visits across candidates,
+tautologies. Each clause attempt has a bounded visit count across candidates,
 opposite occurrences and literals; each visit charges and polls the pass token.
 Incomplete blocking checks keep their clauses, while completed removals retain
 their repairs. Both passes need witness reconstruction and can change source
@@ -243,10 +242,10 @@ no deductions, and established pins are not emitted again.
 
 Metered default finite satisfaction preparation runs one bounded integer-probing
 pilot before the finite rounds. Unmetered callers leave it unfunded. Its private
-incremental root retains completed exclusions across probes. The first 128 calls
-are funded; each failed probe funds another 32. Probes and repairs share this credit
-within the configured per-column and total caps, with a work stop at one eighth of
-remaining phase work or 50 million units, whichever is smaller. Bounds precede
+incremental root retains completed exclusions across probes. A fixed initial credit
+funds the first calls and each failed probe earns more; probes and repairs share this
+credit within the configured per-column and total caps, and the pilot stops at a fixed
+fraction of the remaining phase work, itself capped. Bounds precede
 interior values. A completed refutation remains terminal; incomplete coverage
 records interruption. Explicit
 integer-probe overrides select the exhaustive tiers or disable the pilot.
@@ -279,8 +278,8 @@ unconditional deductions and retracts the active hypothetical branch. Candidate,
 entry and representation limits bound optional analysis, not solve time.
 Open-range probing caches its invocation meter and charges every visit exactly.
 Full cancellation polls occur at entry, root-row and hypothetical-branch boundaries,
-and within scans every 64 visits or 4,096 work units. An interrupted scan can spend
-at most one polling stride beyond a stop; hypothetical retraction always completes.
+and within scans at a fixed visit or work stride. An interrupted scan can spend at
+most one polling stride beyond a stop; hypothetical retraction always completes.
 Finite SAC ordering shares one lazy propagator-filtered integer incidence index per
 ordering call; fixed columns require no incidence. Interior-hole candidates follow
 present domain successors in ascending order, skipping accumulated exclusions without
