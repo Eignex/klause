@@ -59,9 +59,11 @@ Installation follows four rules:
 
 A linear consumer can complete an integer-conditioned encoder by covering every
 value of its required finite declarations, keeping the integer guards on each
-relation; the cover is capped at 4096 cases. Within one planning call, a completed
-full-source linear or difference installation can also supply the other target's
-fragment, sharing immutable relations but never mutable state.
+relation; the cover is capped at 4096 cases. A completed linear or difference
+installation can supply another linear consumer inside its prepared source scope.
+Conditioned queries retain admitted difference relations when the linear kernel
+accepts them, without requiring a second source encoder. Consumers share immutable
+relations and attribution, while every opening owns fresh mutable state.
 
 Participation and completeness are separate. A batch service can be sound and
 incomplete; `TheoryCheck.Cancelled` leaves the fragment undecided, and an
