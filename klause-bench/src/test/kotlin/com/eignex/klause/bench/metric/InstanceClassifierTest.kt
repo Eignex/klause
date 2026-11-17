@@ -1,11 +1,45 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class InstanceClassifierTest {
+    @ParameterizedTest
+    @CsvSource(
+        "QF_ABV, arrays bitvectors",
+        "QF_ALIA, arrays open-int",
+        "QF_ANIA, arrays nonlinear-int open-int",
+        "QF_AUFBV, arrays bitvectors free-functions",
+        "QF_AUFLIA, arrays free-functions open-int",
+        "QF_AUFNIA, arrays free-functions nonlinear-int open-int",
+        "QF_AX, arrays",
+        "QF_BV, bitvectors",
+        "QF_DT, datatypes",
+        "QF_NIA, nonlinear-int open-int",
+        "QF_NIRA, nonlinear-int nonlinear-real open-int",
+        "QF_UF, free-functions",
+        "QF_UFBV, bitvectors free-functions",
+        "QF_UFBVDT, bitvectors datatypes free-functions",
+        "QF_UFDT, datatypes free-functions",
+        "QF_UFDTLIA, datatypes free-functions open-int",
+        "QF_UFDTLIRA, datatypes free-functions linear-real open-int",
+        "QF_UFDTNIA, datatypes free-functions nonlinear-int open-int",
+        "QF_UFIDL, free-functions open-int",
+        "QF_UFLIA, free-functions open-int",
+        "QF_UFLRA, free-functions linear-real",
+        "QF_UFNIA, free-functions nonlinear-int open-int",
+        "QF_UFNRA, free-functions nonlinear-real",
+    )
+    fun `ground SMT logics expose each declared theory theme`(logic: String, expected: String) {
+        val features = InstanceClassifier.fromSource(Format.SMTLIB, "(set-logic $logic)\n(assert true)")
+
+        assertEquals(expected.split(' ').toSet(), features.themes)
+    }
+
     @Test
     fun `a minizinc model with a global constraint should classify as global`() {
         val f = InstanceClassifier.fromSource(Format.MINIZINC, "var 1..9: x;\nconstraint all_different([x]);")

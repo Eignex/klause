@@ -54,6 +54,7 @@ internal object InstanceClassifier {
      * - `linear-real`: real-valued variables in linear constraints (SMT-LIB QF_LRA/QF_RDL/QF_LIRA, MPS continuous
      *   columns, MiniZinc `var float`).
      * - `nonlinear-real`: real-valued variables under polynomial constraints (SMT-LIB QF_NRA).
+     * - `nonlinear-int`, `arrays`, `bitvectors`, `datatypes`, `free-functions`: declared SMT theories.
      * - `mip`: an MPS model with integer columns.
      * - `scheduling`, `routing`, `packing`: a cumulative/disjunctive/no-overlap, circuit, or bin-packing/knapsack/
      *   diffn global.
@@ -63,7 +64,7 @@ internal object InstanceClassifier {
     val THEMES =
         listOf(
             "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing", "globals", "sat",
-            "maxsat", "pb",
+            "maxsat", "pb", "nonlinear-int", "arrays", "bitvectors", "datatypes", "free-functions",
         )
 
     /** The themes a specific global gives; `globals` is for an instance with globals but none of these. */
@@ -115,11 +116,7 @@ internal object InstanceClassifier {
                 if (features.numGlobal > 0 && none { it in STRUCTURED }) add("globals")
             }
 
-            Format.SMTLIB -> {
-                if (features.logic in setOf("QF_LIA", "QF_IDL", "QF_LIRA")) add("open-int")
-                if (features.logic in setOf("QF_LRA", "QF_RDL", "QF_LIRA")) add("linear-real")
-                if (features.logic == "QF_NRA") add("nonlinear-real")
-            }
+            Format.SMTLIB -> addAll(smtThemes(features.logic))
 
             Format.MPS -> {
                 if (features.logic == "MIP") add("mip")
@@ -134,6 +131,19 @@ internal object InstanceClassifier {
 
             else -> Unit
         }
+    }
+
+    fun smtThemes(logic: String): Set<String> = buildSet {
+        if (!logic.startsWith("QF_")) return@buildSet
+        val theory = logic.removePrefix("QF_")
+        if (listOf("LIA", "IDL", "LIRA", "NIA", "NIRA").any(theory::endsWith)) add("open-int")
+        if (listOf("LRA", "RDL", "LIRA").any(theory::endsWith)) add("linear-real")
+        if (listOf("NIA", "NIRA").any(theory::endsWith)) add("nonlinear-int")
+        if (listOf("NRA", "NIRA").any(theory::endsWith)) add("nonlinear-real")
+        if (theory.startsWith("A") && theory != "ALL") add("arrays")
+        if ("BV" in theory) add("bitvectors")
+        if ("DT" in theory) add("datatypes")
+        if ("UF" in theory) add("free-functions")
     }
 
     /** Whether an MPS model's COLUMNS section names a column outside every `INTORG`…`INTEND` marker pair. */

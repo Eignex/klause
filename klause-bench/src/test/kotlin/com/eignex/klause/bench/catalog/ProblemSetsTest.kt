@@ -81,12 +81,23 @@ class ProblemSetsTest {
     }
 
     @Test
+    fun `sweep balances SMT with CSP and COP while retaining every ground logic`() {
+        val sweep = ProblemSets.load(listOf("sweep"), File("sets"))
+        val ground = ProblemSets.load(listOf("smt-ground-v1"), File("sets"))
+        val smt = sweep.filter { it.suite.startsWith("smtlib-") }
+        val cp = sweep.filter { it.suite in setOf("hakank", "mzn-bench", "xcsp3-cop", "xcsp3-csp") }
+
+        assertEquals(cp.size, smt.size)
+        assertTrue(smt.map { it.suite }.containsAll(ground.map { it.suite }))
+    }
+
+    @Test
     fun `sweep should hold every thematic problem once`() {
         val root = File("sets")
         val sweep = ProblemSets.load(listOf("sweep"), root)
         val focused = listOf(
             "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing",
-            "globals", "sat", "maxsat", "pb", "smt-ground-v1",
+            "globals", "sat", "maxsat", "pb", "smt-ground-sweep-v1",
         )
         val expected = focused.flatMap { ProblemSets.load(listOf(it), root) }
         assertEquals(
