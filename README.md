@@ -56,7 +56,7 @@ Specialised solvers are mature and usually faster on problems squarely in their 
 
 - On large MIPs, hard SAT instances or SMT benchmarks, established solvers are usually much faster.
 - Nonlinear integer and transcendental arithmetic are incomplete: Klause can find solutions but may stop with an unknown result instead of a proof. Nonconvex quadratic objectives get no global optimality claim when a branch stays unresolved.
-- SMT-LIB support covers quantifier-free arithmetic only. Bit-vectors, arrays, strings, quantifiers, uninterpreted functions and incremental solving are rejected.
+- SMT-LIB support covers the first-order quantifier-free language, including bitvectors, free sorts and functions, extensional arrays, algebraic datatypes and command sessions. Floating point, strings and regular expressions, term quantifiers and higher-order maps are excluded. Optional proof, core and unsat-assumption production is unsupported.
 - Klause cannot yet export proof files for an independent checker.
 - Not every kind of model has every search style yet; local search and portfolio coverage still have gaps.
 
