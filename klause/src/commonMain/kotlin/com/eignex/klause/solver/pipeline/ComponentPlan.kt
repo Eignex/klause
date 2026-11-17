@@ -302,6 +302,16 @@ class ComponentPlan internal constructor(
             installedFragment != null
         ) return this
         if (spec.numIntVars == 0 && spec.numRealVars == 0 && !retainEmptyTheory) return this
+        if (theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY && installedFragment != null) {
+            val route = when {
+                installedFragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
+                installedFragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
+                else -> null
+            }
+            if (route != null) return ComponentPlan(spec, intOwners, factorOwners, route,
+                factorProjections = factorProjections, encodingFactors = encodingFactors,
+                installedFragment = installedFragment)
+        }
         val selected = spec.componentPlan(factorProjections, cancellation = cancellation)
         if (selected.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN) return null
         val fragment = factorProjections.linearTheoryModel(EncodingTarget.LINEAR,
