@@ -42,9 +42,10 @@ axis edits); it cannot construct an automatic pool. A comma-separated list expan
 each selected recipe into fresh slots in that order. Functional guidance is the
 default. Canonical guidance keeps linear grading and proposals; geometric guidance
 keeps linear grading with qualified, bounded cone-leaf proposals, and an unsupported
-cone runs canonically and reports a decline. Every variant uses the same baked model,
-source identity and solution exchange, and grants no bound, terminal, pool or
-warm-start authority beyond the worker's source contract.
+cone runs canonically and reports a decline. Reseeding opens a fresh search that
+revalidates its live objective, invariant network and conditions. Every variant uses
+the same baked model, source identity and solution exchange, and grants no bound,
+terminal, pool or warm-start authority beyond the worker's source contract.
 
 ### Protected-coordinate view
 
@@ -142,7 +143,8 @@ Checks run outside the schedule lock; installation runs under it, so concurrent 
 report improvements in installation order and never report one a peer already beat.
 Because re-deriving an assignment can cost more than finding it, an arm's best
 pending candidate waits until checking has taken at most a fifth of the arm's time,
-and whatever still waits is checked when the segment ends.
+and whatever still waits is checked when the segment ends. The work diagnostic
+schedule checks every candidate as it arrives.
 
 Open theory execution publishes `SourceIncumbentPublication` after
 installation, carrying the source sample, exact original-direction `SourceValue` and
@@ -175,17 +177,18 @@ witness checker. A pure local-search pool has no shared pools; learned clauses a
 exchanged only when at least two backtrack workers exist, and cuts only when the
 scenario opts in.
 
-In curated single-core mixed finite integer optimization without real columns and
-with a containing deadline, `portfolio-publications=segment` coalesces private
-local-search offers within one query: the worker retains one immutable candidate,
-ranked by its canonical objective, and offers it at the query boundary. Failed
-queries discard the pending offer and expiration before installation withholds
-it; no candidate queue or rejected-point history survives the query. Direct
-public exchange offers, private-coordinate workers and ALNS keep their immediate
-publication paths. Explicit pools, annotations, parallel execution and the work
-diagnostic schedule reject the policy; the default is `immediate`. Query time
-includes the deferred offer, which the LS publication phase and incumbent sharing
-time also report; these overlapping measures must not be added.
+In curated single-core mixed finite integer optimization without Boolean or
+real columns and with a containing deadline, `portfolio-publications=segment`
+coalesces private local-search offers within one query: the worker retains one
+immutable candidate, ranked by its canonical objective, and offers it at the
+query boundary. Failed queries discard the pending offer and expiration before
+installation withholds it; no candidate queue or rejected-point history survives
+the query. Direct public exchange offers, private-coordinate workers and ALNS
+keep their immediate publication paths. Explicit pools, annotations, parallel
+execution and the work diagnostic schedule reject the policy; the default is
+`immediate`. Query time includes the deferred offer, which the LS publication
+phase and incumbent sharing time also report; these overlapping measures must
+not be added.
 
 #### Clause pool
 
@@ -227,7 +230,7 @@ every comparison, probe, copy and allocation before making it; a cancelled or
 exhausted preparation leaves the current generation intact, and publication swaps
 the prepared store without remapping consumers. A limit too small for a share
 declines that publication, and unfinished preparation defers safely; neither
-requires a restart.  Existing key capacity stays protected with its retained
+requires a restart. Existing key capacity stays protected with its retained
 session, including across reseeding. An import or export the filter cannot fund
 is declined and counted separately from duplicates, and a full filter keeps its
 keys across generations, so the retained native store never receives repeated
@@ -285,7 +288,7 @@ establishes a verdict.
 ### Theory-backed workers
 
 Workers that need arithmetic completion share the same source scope and require that
-check before publishing a witness. A neighbourhood refutation or failed candidate
+check before publishing a witness. A neighborhood refutation or failed candidate
 check cannot establish global infeasibility. Complete workers retain proof authority;
 heuristic workers retain witness authority. [Theory contracts](17-theories.md) define
 the completion routes and their invocation lifetimes.

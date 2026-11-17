@@ -10,20 +10,21 @@ workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
 Every worker belongs to a family: backtrack (complete search), local search, or
-large-neighbourhood search around the incumbent. A local-search or LNS worker's
-whole state is visible, so a segment without progress is evidence against its family;
-a backtrack worker can approach a proof while showing nothing, so its silence is not.
-The policy first draws a family by Thompson sampling, so a family's share of time does
-not grow with its arm count, and then an arm of that family by discounted Thompson
-sampling over the arms' rewards. Family priors come from the model's class: complete
-search leads on pseudo-Boolean, continuous and open models, local search on finite-CP
-satisfaction, and clausal, mixed-integer and finite-CP optimization models start
-even. Priors stay fixed while evidence fades with a short half-life, so a plateaued
-local search hands time to complete search and wins it back when it improves. Before
-the first incumbent only observable progress counts as family evidence, an LNS
-worker still bootstrapping competes inside local search while other LNS workers wait
-unless nothing else is eligible, and a backtrack family draw runs its least-worked
-arm.
+large-neighborhood search around the incumbent. A local-search or LNS worker's
+whole state is visible, so a segment without progress is evidence against its
+family; a backtrack worker can approach a proof while showing nothing, so its
+silence is not.  The policy first draws a family by Thompson sampling, so a
+family's share of time does not grow with its arm count, and then an arm of that
+family by discounted Thompson sampling over the arms' rewards. Family priors come
+from the model's class: complete search leads on pseudo-Boolean, continuous and
+open models, local search on finite-CP satisfaction, and clausal, mixed-integer and
+finite-CP optimization models start even. Priors stay fixed while evidence fades
+with a short half-life, so a plateaued local search hands time to complete search
+and wins it back when it improves. Before the first incumbent a backtrack segment
+supplies no family evidence, while an observable family is credited for progress
+and charged for a working segment without it; an LNS worker still bootstrapping
+competes inside local search while other LNS workers wait unless nothing else is
+eligible, and a backtrack family draw runs its least-worked arm.
 
 A segment's reward comes from a per-arm ledger of progress signals: first
 feasibility, incumbent improvement, objective floor raises, root fixings, short
@@ -32,8 +33,9 @@ clauses, cuts and bounds. Each signal an arm can earn is scored as its rate per 
 of work against the rate of the rest of the pool, so a long segment does not score
 higher for being long and signals in unrelated units need no weights. Credit an arm
 earns while idle, from peers using what it shared, settles at the next segment of
-any arm. The first incumbent starts a new phase: pooled rates reset, and the arm
-policy keeps a `phase-retention` share of its evidence (a quarter by default).
+any arm. The first incumbent starts a new phase, at invocation start when an
+incumbent already exists: pooled rates and unsettled credit reset, and the arm policy
+keeps a `phase-retention` share of its evidence (a quarter by default).
 
 Each selection takes the first applicable rule: an early core trial, then the
 initial probes (each eligible arm runs one base slice, in order), then owed minimum
@@ -47,12 +49,13 @@ arm runs on its own lane for the whole solve.
 ### Slice accounting and coverage
 
 The counted schedule starts at 5000 node equivalents, grows by 1.5 after an ordinary
-scheduled segment, and caps at 150000. Growth belongs to the shared schedule, rather
-than to each arm. Initial probes and preparation revisits use the base allowance and
-do not grow the schedule. Counted segments also keep an elapsed-time cap, and a
-segment takes at most half the remaining time divided among the families (a probe,
-its probe-weighted share of half). The finite CLI exposes `slice-work`,
-`slice-max-work` and `slice-growth` and reports the effective settings.
+scheduled segment, and caps at 150000. Growth belongs to the shared schedule,
+rather than to each arm. Initial probes and preparation revisits use the base
+allowance and do not grow the schedule. Counted segments also keep an elapsed-time
+cap, and a segment takes at most half the remaining time divided by the number
+of distinct declared families in the pool (a probe, its probe-weighted share of
+half). The finite CLI exposes `slice-work`, `slice-max-work` and `slice-growth`
+and reports the effective settings.
 
 Backtrack arms charge decisions, propagation visits and LP work to their scheduler
 at the [slice prices](06-sessions.md#resource-allowances); the solve-wide
@@ -134,16 +137,18 @@ order at the base allowance until they enter search or terminate; no revisit del
 an unadmitted sibling.
 
 Before the first witness, family selection rewards observable progress toward
-feasibility. Shared clauses, root fixings and objective floors stay credited but earn
-no extra turns, because deduction throughput does not predict the first witness;
-violation reductions can, and a working heuristic segment without progress supplies
-plateau feedback. Preparation and zero-work pauses supply no failure signal.
+feasibility. Shared clauses, root fixings and objective floors stay credited
+but earn no extra turns, because deduction throughput does not predict the first
+witness; violation reductions can, and a working heuristic segment without progress
+supplies plateau feedback. Preparation and zero-work pauses supply no failure signal.
 
 Complete workers keep an elapsed coverage floor until the first witness or
-refutation: together they are owed one family share of active time, with one base
-time allowance of lag, and below-floor workers run before ordinary selection. No
-fixed time is promised to a worker, and because coverage depends on elapsed time, a
-single lane and seed do not make the schedule reproducible.
+refutation: together they are owed one family share, the total active time
+less one base time allowance of lag, divided by the number of families among
+the active workers, counting local search and LNS as one. Below-floor workers
+run before ordinary selection. No fixed time is promised to a worker, and
+because coverage depends on elapsed time, a single lane and seed do not make
+the schedule reproducible.
 
 ### Retained proof coverage
 
@@ -371,7 +376,7 @@ startup path. Pool membership supplies no proof authority.
 
 A finite portfolio over a linear source can seat two numerical companions beside its
 finite workers: a numerical frontier that traverses the LP relaxation, placed first,
-and a joint-repair local search over integer neighbourhoods with residual LP
+and a joint-repair local search over integer neighborhoods with residual LP
 completion, placed last. The leading frontier does not shift the finite workers'
 seed positions. `FiniteCompanionArms` owns companion admission, construction, arm
 order, preparation telemetry and scheduler shares; the finite portfolio only seats
@@ -495,28 +500,29 @@ point through the captured presolve mapping, check the original declarations and
 rows, and compare the original objective with the adjusted working value; these
 advisory seeds need exact original feasibility even where ordinary finite witness
 admission permits source tolerance. Original-source witness and exact objective
-checks precede incumbent admission, cutoff use or neighbourhood centering.
+checks precede incumbent admission, cutoff use or neighborhood centering.
 
 Each companion keeps at most sixteen recovery attempts without eviction, identified
 by the full source restrictions, rows, coordinates, objective, interpretation,
 checker, seed values and coordinate frame. Failed unchanged attempts stay declined,
-and paused recovery keeps its progress under the same cumulative allowance. The pair
-can reuse at most sixteen successful completions under the same identity; each
-belongs to its producing owner and is removed when that owner closes, only immutable
-coordinate snapshots cross workers, and consumers keep their own witness and
+and paused recovery keeps its progress under the same cumulative allowance. The
+pair can reuse at most sixteen successful completions under the same identity;
+each belongs to its producing owner and is removed when that owner closes, only
+immutable coordinate snapshots cross workers while producer certificates and
+failed or pending work stay private, and consumers keep their own witness and
 objective checks. Preparation, recovery, checking, lookups and retained allocation
 spend the consuming companion's existing LP funding, and closure releases its
-residual owners. Unsupported symbolic payloads, integers outside the recovery scalar
-limit and keys beyond the remaining allocation are refused before retention.
+residual owners. Unsupported symbolic payloads, integers outside the recovery
+scalar limit and keys beyond the remaining allocation are refused before retention.
 
 Sharing completions grants no work, lifetime, bound or terminal authority. The
 control changes neither worker admission nor lifetimes.
 
 With completion enabled, a checked pooled center starts joint repair in a small
-connected integer neighbourhood that frees at most two integers, without a root
+connected integer neighborhood that frees at most two integers, without a root
 relaxation; the all-pinned rounded-root bootstrap serves a center without that
 handoff. Before a checked center exists, root repair can keep the ordinary
-pre-selection relaxation point for advisory centering and neighbourhood order,
+pre-selection relaxation point for advisory centering and neighborhood order,
 separately from point-selected bounds. Before the first proposal, a newer exact
 pooled point (never an advisory one) can replace the center and tighten the cutoff,
 keeping pins on unchanged discrete coordinates without another residual completion.
@@ -607,7 +613,7 @@ twice seats its two best arms; a role no eligible arm covers seats none.
   cannot close a trivial optimum, and its first solution ends a satisfaction run.
 - Every model needs LP bounding, seated when its relaxation offers an LP recipe
   something to enable under the `--lp` ceiling.
-- Optimization needs neighbourhood improvement and objective cores. The core worker
+- Optimization needs neighborhood improvement and objective cores. The core worker
   is eligible when every objective term is Boolean, including exact views of 0/1
   integer costs, and the model has no continuous columns.
 - A source annotation needs selector diversity, and its own search order ranks first
@@ -703,7 +709,7 @@ native workers without root facts or known binary clauses scan new learned binar
 before admitting global probes. Pseudo-Boolean pools set `root-probe-general-gate`,
 which admits one initial global batch, then prioritizes new short learned clauses
 when general workers have no root facts or binary hints; an empty completed
-neighbourhood probe prioritizes its opposite polarity inside the same grants. These
+neighborhood probe prioritizes its opposite polarity inside the same grants. These
 allowances stay inside each worker's containing slice, and
 `inprocessing-probe-interval=0` follows the shared root trigger instead of that
 spacing. `root-maintenance=false` keeps stock root defaults without changing
