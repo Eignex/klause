@@ -283,16 +283,18 @@ bound covering every composed sample copy and eliminated-clause replay.
 A bounded source scan recognizes two- and three-column parity equations from their
 complete two- and four-clause Boolean encodings, over a global pin snapshot captured
 before grouping and bound to the immutable source identity; satisfied clauses are
-omitted and false literals removed from their keys. A preparation-only GF(2) matrix
-substitutes the captured pins and eliminates forward from higher source slots, then
-back-substitutes over its free coordinates. A pivot is globally forced only when its
-complete free-coordinate dependency cancels, and pins are emitted only after complete
-elimination; incomplete clause groups, duplicate exclusions and partial matrix work
-grant none, and a derived contradiction supplies no source refutation authority.
-Complete absence of encoded rows parks the scan; a completed miss can retry after
-canonical global pins grow. The private model installs proved values as unit clauses
-and composes its reconstruction over the fixed source view; canonical search state
-stays unchanged. Closing or declining releases the snapshot with its generation.
+omitted and false literals removed from their keys. Each remaining clause excludes
+one assignment, and the complete parity class of exclusions entails the opposite
+parity equation. A preparation-only GF(2) matrix substitutes the captured pins and
+eliminates forward from higher source slots, then back-substitutes over its free
+coordinates. A pivot is globally forced only when its complete free-coordinate
+dependency cancels, and pins are emitted only after complete elimination; incomplete
+clause groups, duplicate exclusions and partial matrix work grant none, and a
+derived contradiction supplies no source refutation authority.  Complete absence
+of encoded rows parks the scan; a completed miss can retry after canonical global
+pins grow. The private model installs proved values as unit clauses and composes
+its reconstruction over the fixed source view; canonical search state stays
+unchanged. Closing or declining releases the snapshot with its generation.
 
 When every source clause belongs to a complete parity encoding, is tautological or is
 satisfied by captured global facts, the rebuilt model can replace the encoded
@@ -308,18 +310,20 @@ encodings with short source equations and an independent reduced XOR basis, choo
 per pivot the shorter of the triangular system row and its free-coordinate expansion
 so that local unit propagation survives. Coverage records each original clause's
 excluded assignment, so extra exclusions in an otherwise complete group remain
-constraints. Each replacement row has at most 64 coordinates; wider rows decline the
-row view. A funded mixed consumer owns a residual affine expression for every source
-coordinate: each independent assigned fact eliminates one free coordinate, zero
-residuals imply source values and contradictory values supply conflicts. Reasons have
-at most 64 literals, and wider pin reasons withhold the deduction. Undo or an
-interrupted update invalidates the cache, which rebuilds from the immutable seed and
-current assignments; the seed is shared, while each session owns its matrix and
-observations, and all updates spend propagation work. An unfunded joint view keeps
-the per-row system. For small spans the consumer branches on free coordinates by its
-own conflict activity, through a filtered view that preserves source IDs; pivots keep
-their meanings and propagation decides them, and larger spans keep the configured
-selector.
+constraints. Each replacement row has at most 64 coordinates; wider rows decline
+the row view. A funded mixed consumer owns a residual affine expression for every
+source coordinate: each independent assigned fact eliminates one free coordinate,
+zero residuals imply source values and contradictory values supply conflicts.
+Reasons have at most 64 literals, and wider pin reasons withhold the deduction.
+Undo or an interrupted update invalidates the cache, which rebuilds from the
+immutable seed and current assignments; the seed is shared, while each session
+owns its matrix and observations, and all updates spend propagation work. An
+unfunded joint view keeps the per-row system. Unlike the affine view, the mixed
+view keeps original coordinate meanings, including its live pivots, so it can keep
+supported canonical warm clauses through the fixed-value projection. For small
+spans the consumer branches on free coordinates by its own conflict activity,
+through a filtered view that preserves source IDs; pivots keep their meanings
+and propagation decides them, and larger spans keep the configured selector.
 
 #### Learned transfer
 
