@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.provesUnbounded
+import com.eignex.klause.lp.relaxation.provesUnboundedWithinTolerance
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -671,8 +672,8 @@ private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSol
 
 /**
  * This result over the source [problem]. An unbounded verdict stands only if its witness and ray, lifted through
- * [reconstruct], still prove [objective] unbounded over [problem]; otherwise the witness remains a feasible
- * assignment with no optimality proof.
+ * [reconstruct], still prove [objective] unbounded over [problem], exactly or within its declared tolerance; otherwise
+ * the witness remains a feasible assignment with no optimality proof.
  */
 private fun FiniteExecutionResult.reconstructed(
     reconstruct: (Sample) -> Sample,
@@ -684,7 +685,12 @@ private fun FiniteExecutionResult.reconstructed(
     is FiniteExecutionResult.Completed -> {
         val point = bestSample?.let(reconstruct)
         val direction = if (verdict == FiniteExecutionVerdict.UNBOUNDED && point != null && objective != null) {
-            liftedDirection(reconstruct, point)?.takeIf { problem.provesUnbounded(objective, point, it) }
+            liftedDirection(reconstruct, point)?.takeIf { direction ->
+                problem.provesUnbounded(objective, point, direction) ||
+                    problem.semantics.effective.feasibilityTolerance?.let { policy ->
+                        problem.provesUnboundedWithinTolerance(objective, point, direction, policy)
+                    } == true
+            }
         } else {
             null
         }

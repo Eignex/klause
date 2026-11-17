@@ -204,7 +204,10 @@ otherwise it needs exact certification. A source whose acceptance admits toleran
 points selects numerical completion for every local-search and ALNS worker, including
 a model whose discrete coordinates are all fixed. Without a continuous objective
 term, numerical completion offers the float point first and then searches the leaf
-within the tolerance as a backtrack leaf does; see
+within the tolerance as a backtrack leaf does. With one, the candidate takes the LP
+optimum when the LP certifies it, and is otherwise minimized over the choices of its
+real relations as a backtrack leaf is, so both reach the same value at one discrete
+point; see
 [FlatZinc floats](04-finite-formats.md#flatzinc-floats). A refutation names the rows
 the LP proof combined when it gave one.
 Exact completion uses bounded point
