@@ -60,6 +60,50 @@ import kotlin.test.assertTrue
 
 class PreparedSourcePlanTest {
     @Test
+    fun `preparation should reject a missing factor owner`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val plan = source.prepareExecutionPlan(preferFinite = true)
+
+        assertFailsWith<IllegalArgumentException> {
+            PreparedSourcePlan(source, plan.execution, emptyList(), 1, 0, 0)
+        }
+    }
+
+    @Test
+    fun `preparation should reject duplicate primary factor owners`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val plan = source.prepareExecutionPlan(preferFinite = true)
+
+        assertFailsWith<IllegalArgumentException> {
+            PreparedSourcePlan(source, plan.execution, plan.components + plan.factorOwner(0), 1, 0, 0)
+        }
+    }
+
+    @Test
+    fun `preparation should reject factor ownership outside the canonical model`() {
+        val source = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0))))
+        val plan = source.prepareExecutionPlan(preferFinite = true)
+        val foreign = ExecutionComponentDescriptor("foreign", ComponentResponsibility.FINITE,
+            listOf(1), emptyList(), emptyList())
+
+        assertFailsWith<IllegalArgumentException> {
+            PreparedSourcePlan(source, plan.execution, listOf(foreign), 1, 0, 0)
+        }
+    }
+
+    @Test
+    fun `operation binding should retain the canonical enforcing owner`() {
+        val source = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf(AllDifferent(intArrayOf(0, 1))))
+        val plan = source.prepareExecutionPlan(preferFinite = true)
+
+        val bound = plan.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
+
+        assertSame(plan.factorOwner(0), bound.factorOwner(0))
+        assertEquals(ComponentResponsibility.FINITE, bound.factorOwner(0).responsibility)
+    }
+
+    @Test
     fun `declined open polynomial composition should keep its finite source projection`() {
         val domain = IntDomain(0, 2).excludeValue(1)
         val source = Problem(

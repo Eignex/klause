@@ -207,6 +207,9 @@ class PreparedSourcePlan private constructor(
     val factorProjections: PreparedFactorProjections? get() = preparation.factorProjections
     internal val finiteFactorProjections: PreparedFactorProjections? get() = preparation.finiteFactorProjections
 
+    /** Selected primary owner of a canonical [model] factor; operation admission determines whether it can run. */
+    fun factorOwner(factorIndex: Int): ExecutionComponentDescriptor = preparation.factorOwner(factorIndex)
+
     /** Operation and strategy admission derived from this plan's installed component contracts. */
     val capabilities: ExecutionCapabilities = ExecutionCapabilities(
         preparation.components,
