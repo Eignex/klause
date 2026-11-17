@@ -89,10 +89,13 @@ at portfolio minimization; subprocess observation time also includes preparation
 Attribution grants no additional witness or proof authority.
 
 Every prepared MPS invocation emits `c numericalSemantics=` with a versioned JSON
-declaration of the captured declared and effective policy, including rational
-feasibility and optimality tolerance components, numeric authority, default bounds and
-exact integrality and objective evaluation. It is emitted even without overrides or statistics. This
-declaration identifies the source contract; it grants no witness or proof authority.
+declaration of the captured declared and effective policy: rational feasibility
+tolerance components, numeric authority, default bounds and exact integrality and
+objective evaluation. Each policy object carries exactly those keys, so a reader can
+refuse a declaration it does not know. `c optimalityTolerance=` follows with the
+declared and effective optimality gap. Both lines are emitted even without overrides
+or statistics. They identify the source contract and grant no witness or proof
+authority.
 
 Frontend solve paths keep a `PreparedSourceInvocation` and consume
 `SourceExecutionResult` from `SourceSetup.execute` without selecting another solver
