@@ -53,8 +53,7 @@ MPS, SMT-LIB and exact FlatZinc.
 `-e` selects complete traversal, local search, ALNS or a mixed portfolio over the
 selected route. Supported linear and polynomial sources keep the same constraints
 and objective across those strategies, and FlatZinc floats keep the original source
-for each strategy whose arm runs there (see
-[FlatZinc floats](04-finite-formats.md#flatzinc-floats)). SMT-LIB can fall back to open local search
+except where [FlatZinc floats](04-finite-formats.md#flatzinc-floats) selects a private grid. SMT-LIB can fall back to open local search
 for an unsupported fragment, supplying witnesses without a completeness claim;
 exact FlatZinc declines unsupported open fragments. MPS keeps finite search for
 bounded integer choices and the exact linear theory for surviving open integers (see

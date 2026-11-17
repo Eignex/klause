@@ -13,16 +13,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
-class MiniZincModeRoutingTest(private val engine: String, private val sourceText: String) {
+class MiniZincModeRoutingTest(
+    private val engine: String,
+    private val enumerate: Boolean,
+    private val sourceText: String,
+) {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
-        fun sources(): List<Array<String>> = listOf(
-            arrayOf("cp", "var int: n; var int: m; var float: r; constraint int2float(n,r); " +
+        fun sources(): List<Array<Any>> = listOf(
+            arrayOf("cp", false, "var int: n; var int: m; var float: r; constraint int2float(n,r); " +
                 "constraint int_lin_le([2,3],[n,m],4); " +
                 "constraint int_lin_le([-3,-2],[n,m],0); " +
                 "constraint int_lin_le([1,-1],[n,m],1); solve satisfy;"),
-            arrayOf("ls", "var 0.0..2.0: x; constraint float_le(x,1.0); solve satisfy;"),
+            arrayOf("ls", true, "var 0.0..2.0: x; constraint float_le(x,1.0); solve satisfy;"),
         )
     }
 
@@ -32,8 +36,7 @@ class MiniZincModeRoutingTest(private val engine: String, private val sourceText
         try {
             val common = CommonOptions().apply {
                 this.engine = this@MiniZincModeRoutingTest.engine
-                // Local-search enumeration loads the private grid.
-                allSolutions = this.engine == "ls"
+                allSolutions = enumerate
                 semanticOverrides = SemanticOverrides(
                     undeclaredIntegers = BoundsOverride(BoundOverride.Open, BoundOverride.Open),
                 )

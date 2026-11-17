@@ -263,7 +263,7 @@ selecting one. A requesting consumer selects that view during setup, after route
 selection and before the invocation is returned;
 [FlatZinc](04-finite-formats.md#flatzinc-floats) defines its automatic fallback, and a
 compiled schema falls back to the grid whenever the original source admits no
-complete arm.
+complete arm for the requested engine.
 Original declarations, relations and objective remain on the attachment, and private
 helpers stay distinct. Unsupported factors or stops decline only the view.
 

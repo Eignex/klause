@@ -328,7 +328,7 @@ class MiniZincModeTest(private val direction: String) {
     }
 
     @Test
-    fun `local search loading should optimize a float objective on the original real source`() {
+    fun `local search loading should keep a float objective on the original real source`() {
         val source = File.createTempFile("source-float-flatzinc", ".fzn").apply {
             writeText("var 0.0..2.0: x; constraint float_le(x,1.0); solve $direction x;")
         }
