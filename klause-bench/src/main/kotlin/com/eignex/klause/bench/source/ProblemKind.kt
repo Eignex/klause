@@ -14,7 +14,9 @@ internal object ProblemKind {
     fun isCop(ref: ProblemRef): Boolean = when (ref.format) {
         Format.DIMACS, Format.JSON_SCHEMA, Format.IN_CODE -> false
         Format.WCNF -> true
-        Format.SMTLIB -> runCatching { SmtObjective.read(CorpusFetcher.resolve(ref.source)) != null }.getOrDefault(false)
+        Format.SMTLIB -> runCatching {
+            SmtObjective.read(CorpusFetcher.resolve(ref.source)) != null
+        }.getOrDefault(false)
 
         else -> {
             val text = runCatching { CorpusFiles.readText(CorpusFetcher.resolve(ref.source)) }.getOrNull()
