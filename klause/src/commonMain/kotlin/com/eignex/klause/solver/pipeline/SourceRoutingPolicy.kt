@@ -49,11 +49,10 @@ internal fun SourceSetup.preservesOriginalCompleteArm(selection: SourceRouteSele
 
 // On the finite route a local-search or ALNS engine completes reals at each leaf within the source tolerance, as the
 // default portfolio's incomplete arms do, and refutes only through presolve and root propagation, so its satisfaction
-// and optimization keep the source over an automatic grid. Other routes run their own incomplete strategies with
-// their own refutation paths: a polynomial route that stops its widened run falls back to an exact source decision,
-// which refutes a point only the tolerance admits. They keep the grid, and so does a heuristic route, whose open
-// local search has no finite leaf completion either. Enumeration lists no complete solution set and keeps the grid,
-// whose accepted points are published without a completeness marker.
+// and optimization keep the source over an automatic grid. Other routes run their own incomplete strategies, which
+// have no finite leaf completion to publish through: a polynomial route and a heuristic route keep the grid.
+// Enumeration lists no complete solution set and keeps the grid, whose accepted points are published without a
+// completeness marker.
 internal fun SourceSetup.preservesOriginalIncompleteArm(selection: SourceRouteSelection): Boolean {
     val arm = when (selection.request.engine) {
         FiniteEngine.LOCAL_SEARCH -> ExecutionStrategy.LOCAL_SEARCH
