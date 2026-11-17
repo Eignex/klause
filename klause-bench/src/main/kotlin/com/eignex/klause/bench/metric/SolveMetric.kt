@@ -232,12 +232,6 @@ internal object SolveMetric {
                 null
             }
             val r = timings.measure("harnessInvocationMs") { invoke(entry, settings, budget, optimize) }
-            // A float model Klause searches on a grid is marked: its points are checked, its grid proves nothing.
-            val approximation = if (entry.hasFloats) {
-                mapOf("floatApproximation" to entry.floatApproximation.toString())
-            } else {
-                emptyMap()
-            }
             val (witness, witnessStats) = if (r.feasible == true) {
                 timings.measure("harnessWitnessMs") {
                     witness(entry.ref, r.rawOutput) { ref, raw ->
@@ -249,7 +243,7 @@ internal object SolveMetric {
             }
             record(entry, settings, budget, kind, timestamp, sha, r).let { reported ->
                 reported.copy(
-                    stats = reported.stats + approximation + witnessStats,
+                    stats = reported.stats + witnessStats,
                     compilerIdentity = compiler,
                     sourceHashes = sourceHashes,
                     finalWitness = witness,

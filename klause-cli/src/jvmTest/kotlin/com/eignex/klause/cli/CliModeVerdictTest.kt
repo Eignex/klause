@@ -291,6 +291,17 @@ class CliModeVerdictTest {
     }
 
     @Test
+    fun `statistics should state whether a float source selected the private grid`() {
+        val stats = listOf("mixed", "localsearch").associateWith { engine ->
+            solveFlatZinc("$gridProduct solve satisfy;", "-s", "-e", engine).lines()
+                .filter { it.startsWith("%%%mzn-stat: floatApproximation=") }
+        }
+
+        assertEquals(mapOf("mixed" to listOf("%%%mzn-stat: floatApproximation=false"),
+            "localsearch" to listOf("%%%mzn-stat: floatApproximation=true")), stats)
+    }
+
+    @Test
     fun `a grid enumeration should list accepted points without a completeness marker`() {
         val out = captureStdout {
             MiniZincOutput(floatApproximation = true, gridEnumeration = true).apply {
