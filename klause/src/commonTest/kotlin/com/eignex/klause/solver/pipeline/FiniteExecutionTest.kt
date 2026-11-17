@@ -293,6 +293,45 @@ class FiniteExecutionTest {
         assertEquals(FiniteSolveVerdict.OPTIMAL to -3.0, reached)
     }
 
+    // `m = max(a, b)` or `m = min(a, b)` with `a` in [0.0, 1.0] and `b` in [0.0, 2.0], beside an integer column.
+    private fun extremum(relation: String, solve: String) = """
+        var 1..2: k;
+        var 0.0..1.0: a;
+        var 0.0..2.0: b;
+        var 0.0..3.0: m;
+        constraint $relation(a, b, m);
+        solve $solve;
+    """.trimIndent()
+
+    // Exact optima in the minimized frame of each extremum direction.
+    private val extremumOptima = mapOf(
+        ("float_max" to "minimize m") to 0.0, ("float_max" to "maximize m") to -2.0,
+        ("float_min" to "minimize m") to 0.0, ("float_min" to "maximize m") to -1.0,
+    )
+
+    @Test
+    fun `backtracking should prove the optimum of a real extremum within tolerance`() {
+        val reached = extremumOptima.keys.associateWith { (relation, solve) ->
+            outcome(numerical, extremum(relation, solve))
+        }
+
+        assertEquals(extremumOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
+    }
+
+    @Test
+    fun `a real extremum no operand can reach should be refuted`() {
+        val source = extremum("float_max", "satisfy").replace("var 0.0..3.0: m;", "var 2.5..3.0: m;")
+
+        assertEquals(FiniteSolveVerdict.UNSAT, outcome(numerical, source).first)
+    }
+
+    @Test
+    fun `a real extremum over a row that needs the slack should be judged within the declared tolerance`() {
+        val source = roundedBound("var 0.0..1.0: z; var 0.0..2.0: m;", "constraint float_max(y, z, m);")
+
+        assertEquals(FiniteSolveVerdict.SAT, outcome(numerical, source).first)
+    }
+
     @Test
     fun `a real objective over an absolute value beyond the declared tolerance should be refuted`() {
         val source = """

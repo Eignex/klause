@@ -404,7 +404,7 @@ is completed by the exact search. Local-search and ALNS workers
 [complete candidates](13-neighborhoods.md#continuous-candidate-completion) the same way.
 
 A leaf whose objective reads a real coordinate keeps the leaf LP's optimum when the LP
-certifies it. The LP states only the envelope of an absolute value, a finite membership
+certifies it. The LP states only the envelope of an absolute value, an extremum, a finite membership
 or a choice product, and the closure of a disjunction, disequality or strict row, so its
 optimum can lie off the relation; such a leaf, one with an
 uncertified completion, and in numerical mode one the exact LP refutes, is minimized by
@@ -439,10 +439,13 @@ since leaf completion attains no supremum, and when all solutions are requested.
 finite lane, for sources with integer columns too, states each unconditional strict row
 as its closed row, so every engine on the original source decides the row acceptance
 reads, and a local-search or ALNS run on a grid publishes only grid points acceptance
-admits. An optimum against it is attained. In a source with integer columns, a reified non-strict row
-takes the finite lane and its false side holds exactly there. A source the finite lane
-cannot complete, such as one with an extremum or an open integer, routes to the linear
-theory and is decided exactly, its strict rows included. A real product without finite
+admits. An optimum against it is attained. It also leaves each real minimum and
+maximum inert during search and enforces it at the leaf: the leaf completion chooses
+the selected operand, within the slack where acceptance reads it. In a source with
+integer columns, a reified non-strict row takes the finite lane and its false side
+holds exactly there. A source the finite lane cannot complete, such as one with an open
+integer or, under `--exact`, an extremum, routes to the linear theory and is decided
+exactly, its strict rows included. A real product without finite
 choices or a power above one routes to the polynomial theory, which states each
 unconditional strict row as its closed row in both of its formulas and decides the
 exact formula first: its witness,

@@ -178,7 +178,9 @@ available alongside arithmetic participation.
 
 `RealArrayMinMax` and `RealElement` are the real-valued counterparts: their implied
 inequalities form a relaxation, and complete encoders also require the selected
-equality. `GridArrayMinMax` filters with exact integer activities and establishes
+equality. A finite view under a positive absolute tolerance marks each
+`RealArrayMinMax` leaf-enforced, which finite search leaves inert; without that mark it
+has no finite propagation. `GridArrayMinMax` filters with exact integer activities and establishes
 nothing outside the declared grid policy.
 
 ### Exact linear source relations

@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -79,6 +80,7 @@ internal fun Problem.finiteRealFactorSupported(index: Int, projections: Prepared
         intBounds.lower(factor.intOperand) >= -9007199254740992L &&
         intBounds.upper(factor.intOperand) <= 9007199254740992L
     return factor is RealAbs || factor is RealElement || factor is RealFiniteDomain ||
+        (factor is RealArrayMinMax && factor.leafEnforced) ||
         (factor is ContinuousProduct &&
             (factor.hasCompleteGuardedLpCompletion() || factor.finiteChoices?.hasGuards == false)) ||
         (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) ||

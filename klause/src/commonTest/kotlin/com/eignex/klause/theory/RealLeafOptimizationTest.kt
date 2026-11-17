@@ -7,6 +7,7 @@ import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.FloatSemantics
@@ -177,6 +178,30 @@ class RealLeafOptimizationTest {
                 assertEquals(optimum, objective.evaluate(point), "${costs.toList()} $tolerance")
             }
         }
+    }
+
+    // `m = max(a, b)` or `m = min(a, b)`, leaf-enforced, with `a` in `[0, 1]`, `b` in `[0, 2]`, within a tenth.
+    private fun extremum(max: Boolean) = Problem(
+        0, 0, emptyArray(), arrayOf(RealArrayMinMax(2, intArrayOf(0, 1), max).leafEnforcedCopy()),
+        numRealVars = 3, realLower = doubleArrayOf(0.0, 0.0, 0.0), realUpper = doubleArrayOf(1.0, 2.0, 3.0),
+        semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+            feasibilityTolerance = tenth).resolve(),
+    )
+
+    @Test
+    fun `candidate completion should reach the exact optimum of a leaf enforced extremum in each direction`() {
+        val optima = mapOf((true to 1.0) to 0.0, (true to -1.0) to -2.0, (false to 1.0) to 0.0, (false to -1.0) to -1.0)
+
+        val reached = optima.keys.associateWith { (max, sign) ->
+            val source = extremum(max)
+            val accepts = checkNotNull(capturedRealAcceptance(source, ExecutionControl.Never))
+            val acceptance = FiniteSourceAcceptance(accepts, true, search = SourceToleranceSearch(source, tenth))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(0.0, 0.0, sign))
+            val completed = LeafRealCompletion(source, objective, acceptance).complete(leaf, ExecutionControl.Never)
+            objective.evaluate(assertIs<Completion.Witness>(completed).sample)
+        }
+
+        assertEquals(optima, reached)
     }
 
     @Test

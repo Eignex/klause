@@ -152,7 +152,8 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is RealAbs -> RealAbsInvariant(operand, result)
     is RealFiniteDomain -> NoInvariant
-    is RealArrayMinMax -> RealArrayMinMaxInvariant(this)
+    // A leaf-enforced extremum is inert in search: the candidate completion states it and checks every point.
+    is RealArrayMinMax -> if (leafEnforced) NoInvariant else RealArrayMinMaxInvariant(this)
 
     is RealProduct -> RealProductInvariant(intOperand, realOperand, result)
 

@@ -148,6 +148,7 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
     }
 
     is RealAbs -> NoPropagator
+    is RealArrayMinMax -> if (leafEnforced) NoPropagator else error("extremum without leaf enforcement")
 
     is RealFiniteDomain -> if (size == 0) EmptyRealDomainPropagator else NoPropagator
 

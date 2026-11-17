@@ -12,7 +12,12 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 
-/** Exact real minimum or maximum, enforced by a selected complete arithmetic consumer. */
+/**
+ * Exact real minimum or maximum, enforced by a selected complete arithmetic consumer.
+ *
+ * A finite view that reads its source within a positive absolute tolerance marks the relation leaf-enforced: finite
+ * search leaves it inert, and every leaf completes its reals within the tolerance.
+ */
 class RealArrayMinMax(
     /** Result coordinate in the source real namespace. */
     val result: Int,
@@ -26,10 +31,19 @@ class RealArrayMinMax(
         require(result >= 0 && xs.all { it >= 0 })
     }
 
+    // Whether finite search leaves this relation inert for leaf completion to enforce within the tolerance.
+    internal var leafEnforced: Boolean = false
+        private set
+
+    // This relation marked for leaf completion.
+    internal fun leafEnforcedCopy(): RealArrayMinMax =
+        RealArrayMinMax(result, xs, max).also { it.leafEnforced = true }
+
     override val variables: VarList = RealVars((intArrayOf(result) + xs).distinct().toIntArray())
 
     override fun remap(mapping: VarRemap): Factor =
         RealArrayMinMax(mapping.real(result), IntArray(xs.size) { mapping.real(xs[it]) }, max)
+            .also { it.leafEnforced = leafEnforced }
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REAL_ARRAY_MIN_MAX, ::buildKey)
 
@@ -41,6 +55,7 @@ class RealArrayMinMax(
     private fun buildKey(sink: KeySink) {
         sink.realVar(result)
         sink.bool(max)
+        sink.bool(leafEnforced)
         sink.int(xs.size)
         for (operand in xs) sink.realVar(operand)
     }
