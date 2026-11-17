@@ -20,8 +20,8 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncoderFailure
+import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 
 internal val witnessAuthority = setOf(ExecutionClaimAuthority.WITNESS)
@@ -127,10 +127,10 @@ internal fun Problem.finiteComponentContract(
         ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(),
             listOf(ExecutionDecline(cause, "finite", index)))
     val unboundedFactor = factors.firstOrNull { index ->
-            this.factors[index].intVars.any { column ->
-                !intBounds.hasLower(column) || !intBounds.hasUpper(column) ||
-                    ownership?.intOwner(column) == IntVariableOwner.THEORY
-            }
+        this.factors[index].intVars.any { column ->
+            !intBounds.hasLower(column) || !intBounds.hasUpper(column) ||
+                ownership?.intOwner(column) == IntVariableOwner.THEORY
+        }
     }
     val incompleteProjection = integers.any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) } ||
         unboundedFactor != null

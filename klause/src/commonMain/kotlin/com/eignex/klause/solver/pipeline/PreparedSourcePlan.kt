@@ -482,7 +482,9 @@ internal fun Problem.preparedWithComponents(
             checkedCompletionContract(ProcedureCompleteness.DECISION)
         } else {
             unavailableContract(ExecutionDeclineCause.SOURCE_COMPLETION, "finite-real",
-                factorIndex = factors.indices.firstOrNull { !finiteRealFactorSupported(it, ownership.factorProjections) })
+                factorIndex = factors.indices.firstOrNull {
+                    !finiteRealFactorSupported(it, ownership.factorProjections)
+                })
         }
 
         ProblemPipeline.UNSUPPORTED_OPEN ->
