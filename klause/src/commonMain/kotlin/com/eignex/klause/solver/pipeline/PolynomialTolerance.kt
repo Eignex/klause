@@ -34,6 +34,7 @@ import com.eignex.klause.util.includingStop
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 // The tolerance a widened polynomial encoding of [source] states. Each declaration and relation that
@@ -318,6 +319,24 @@ internal fun PolynomialTheoryRequest.optimizeWidened(
     }
     return concluded(TerminationReason.RepresentationDeclined)
 }
+
+private fun SolveStats.since(started: TimeMark): SolveStats =
+    copy(run = run.copy(wallMs = started.elapsedNow().inWholeMilliseconds))
+
+// This decision with its wall time spanning everything since [started]: presolve, the exact witness search and every
+// band run, of which the result's own statistics cover only the last.
+internal fun PolynomialTheoryExecution.since(started: TimeMark): PolynomialTheoryExecution = copy(
+    result = when (val decided = result) {
+        is OpenTheoryResult.Sat -> decided.copy(stats = decided.stats.since(started))
+        is OpenTheoryResult.Unsat -> decided.copy(stats = decided.stats.since(started))
+        is OpenTheoryResult.Unknown -> decided.copy(stats = decided.stats.since(started))
+    },
+)
+
+internal fun QuadraticOptimizationExecution.since(started: TimeMark): QuadraticOptimizationExecution =
+    copy(result = result.withPortfolioStats(result.stats.since(started))).also {
+        it.retainPublication(acceptedIncumbent)
+    }
 
 private fun PolynomialTheoryStats.plus(other: PolynomialTheoryStats): PolynomialTheoryStats = copy(
     projectedPolynomials = projectedPolynomials + other.projectedPolynomials,

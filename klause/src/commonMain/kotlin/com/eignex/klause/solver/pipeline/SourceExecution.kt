@@ -18,6 +18,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.includingStop
 import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /** Installed execution family, after source routing and operation admission. */
 enum class SourceExecutionKind {
@@ -557,6 +558,7 @@ private fun executeCapturedSource(
                 PolynomialToleranceReading.of(original.resolvedModel().source)
             } else PolynomialToleranceReading.EXACT
             if (reading == PolynomialToleranceReading.WIDENED) {
+                val started = TimeSource.Monotonic.markNow()
                 val probe = params.exactProbe()
                 val source = presolved(probe)
                 val exact = if (source.infeasible) null else {
@@ -565,13 +567,13 @@ private fun executeCapturedSource(
                 val result = if (objective == null) {
                     val witness = exact?.let { OpenTheoryPipeline.execute(it, probe, engine, request.cores) }
                     SourceExecutionResult.Polynomial(invocation,
-                        original.executeWidened(params, engine, request.cores, witness))
+                        original.executeWidened(params, engine, request.cores, witness).since(started))
                 } else {
                     SourceExecutionResult.Quadratic(invocation, original.optimizeWidened(objective, params, engine,
                         sense, request.cores, callbacks.onQuadraticIncumbent) { observe ->
                         exact?.let { OpenTheoryPipeline.optimize(it, objective, probe, engine, sense, request.cores,
                             observe) }
-                    })
+                    }.since(started))
                 }
                 return result.also { it.preparationStats = source.stats }
             }
