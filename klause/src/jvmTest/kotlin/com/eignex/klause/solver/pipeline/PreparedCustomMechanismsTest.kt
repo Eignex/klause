@@ -23,6 +23,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.ScoringCapability
+import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
@@ -49,7 +50,7 @@ class PreparedCustomMechanismsTest(
         @Parameterized.Parameters(name = "{0} {1} {2}")
         fun cases(): List<Array<Any>> = listOf("finite", "polynomial", "function").flatMap { route ->
             listOf("native", "no-scoring", "no-relaxation", "no-encoder", "no-propagation", "unsupported-propagation",
-                "inert-propagation", "custom-check", "missing-check").flatMap { mechanisms ->
+                "inert-propagation", "custom-check", "missing-check", "encoder-only").flatMap { mechanisms ->
                 FiniteEngine.entries.map { arrayOf(route, mechanisms, it) }
             }
         }
@@ -58,7 +59,7 @@ class PreparedCustomMechanismsTest(
     @Test
     fun `installed custom mechanisms should agree with execution admission`() {
         val clause = Clause(intArrayOf(0))
-        val relation = if (mechanisms in setOf("custom-check", "missing-check")) {
+        val relation = if (mechanisms in setOf("custom-check", "missing-check", "encoder-only")) {
             object : Factor by clause {}
         } else clause
         val native = arrayOf(relation, AllDifferent(intArrayOf(0, 1), 0, 2))
@@ -68,6 +69,12 @@ class PreparedCustomMechanismsTest(
             realLower = if (route == "polynomial") doubleArrayOf(0.0) else doubleArrayOf(),
             realUpper = if (route == "polynomial") doubleArrayOf(0.0) else doubleArrayOf())
         val providers = when (mechanisms) {
+            "encoder-only" -> FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+                if (factor === relation) {
+                    val selected = BuiltInEncoderProvider.select(clause, target)
+                    Encoder(selected.support) { _, encoding -> selected.install(clause, encoding) }
+                } else BuiltInEncoderProvider.select(factor, target)
+            })
             "no-scoring" -> FactorProjectionProviders(scoring = ScoringProjectionProvider { null })
             "no-relaxation" -> FactorProjectionProviders(relaxation = RelaxationProjectionProvider { null })
             "no-encoder" -> FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
@@ -115,7 +122,9 @@ class PreparedCustomMechanismsTest(
             "$route $mechanisms $engine")
 
         var finiteSample: Sample? = null
-        val execution = SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions()),
+        val controls = ExecutionOptions(ExecutionOption.maxFlips(16L), ExecutionOption.maxInstructions(100000L),
+            ExecutionOption.alnsIterations(4))
+        val execution = SourceSetup.execute(SourceExecutionRequest(invocation, controls),
             SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ finiteSample = it }, {})))
 
         if (!expected) {
