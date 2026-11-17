@@ -358,7 +358,7 @@ replaces its default independently, and explicit source bounds stay authoritativ
 |---|---|
 | `--unbounded-int-lo N` / `--unbounded-int-hi N` | Default integer declaration endpoints; `open` removes an endpoint |
 | `--unbounded-real-lo N` / `--unbounded-real-hi N` | Default real declaration endpoints; `open` removes an endpoint |
-| `--float-semantics continuous\|grid` | Continuous values only, or also a private search grid whose points the source must accept |
+| `--float-semantics continuous\|grid` | Continuous values only, or also a private search grid whose points the source must accept, used where [automatic execution](04-finite-formats.md#flatzinc-floats) falls back to it |
 | `--float-buckets N` / `--float-scale N` | Default grid point count and float-linear coefficient scale |
 | `--float-grid-lo N` / `--float-grid-hi N` | Finite window for unranged grid floats |
 | `--source-absolute-tolerance N` / `--source-relative-tolerance N` | Source feasibility slack components |

@@ -32,6 +32,8 @@ class MiniZincModeRoutingTest(private val engine: String, private val sourceText
         try {
             val common = CommonOptions().apply {
                 this.engine = this@MiniZincModeRoutingTest.engine
+                // Local-search enumeration loads the private grid.
+                allSolutions = this.engine == "ls"
                 semanticOverrides = SemanticOverrides(
                     undeclaredIntegers = BoundsOverride(BoundOverride.Open, BoundOverride.Open),
                 )

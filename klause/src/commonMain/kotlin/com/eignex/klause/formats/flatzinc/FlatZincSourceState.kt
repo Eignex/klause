@@ -15,6 +15,7 @@ import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
+import com.eignex.klause.solver.pipeline.preservesOriginalIncompleteArm
 import com.eignex.klause.solver.projection.FloatGridDefinition
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.result.LpStats
@@ -101,6 +102,9 @@ internal class FlatZincSourceState(
         val stop = selection.cancellation
         if (stop() || original.problem.numRealVars == 0 ||
             original.semantics.effective.floats !is FloatSemantics.Grid
+        ) return null
+        if (purpose == FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY &&
+            SourceSetup.preservesOriginalIncompleteArm(selection)
         ) return null
         if (geometryOwner.isInitialized()) {
             return geometry.definition?.let { SourceSetup.prepareSelectedFloatGrid(selection, it, purpose) }

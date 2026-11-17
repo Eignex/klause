@@ -38,12 +38,31 @@ internal fun Problem.requiresExactObjectiveRoute(objective: LinearObjective?, st
     return lower < -limit || upper > limit
 }
 
+// A complete arm decides the original source, so it keeps the source over an automatic grid. A heuristic route
+// offers no complete arm.
 internal fun SourceSetup.preservesOriginalCompleteArm(selection: SourceRouteSelection): Boolean {
-    val admission = selection.admission ?: return false
-    if (!admission.runnable || ExecutionStrategy.COMPLETE !in admission.arms) return false
-    val kind = executionKind(selection.route, selection.source)
-    if (kind == SourceExecutionKind.HEURISTIC) return false
+    val kind = admittedKind(selection, ExecutionStrategy.COMPLETE) ?: return false
     return selection.operation == ExecutionOperation.SATISFY ||
         selection.operation == ExecutionOperation.OPTIMIZE ||
         (selection.operation == ExecutionOperation.ENUMERATE && kind == SourceExecutionKind.FINITE)
+}
+
+// A local-search or ALNS engine searches the original source with the numerical leaf completion its tolerance
+// admits, as the default portfolio's incomplete arms do, so its satisfaction and optimization keep the source over
+// an automatic grid. Its enumeration lists no complete solution set and keeps the grid, whose accepted points are
+// published without a completeness marker.
+internal fun SourceSetup.preservesOriginalIncompleteArm(selection: SourceRouteSelection): Boolean {
+    val arm = when (selection.request.engine) {
+        FiniteEngine.LOCAL_SEARCH -> ExecutionStrategy.LOCAL_SEARCH
+        FiniteEngine.ALNS -> ExecutionStrategy.ALNS
+        else -> return false
+    }
+    admittedKind(selection, arm) ?: return false
+    return selection.operation == ExecutionOperation.SATISFY || selection.operation == ExecutionOperation.OPTIMIZE
+}
+
+private fun SourceSetup.admittedKind(selection: SourceRouteSelection, arm: ExecutionStrategy): SourceExecutionKind? {
+    val admission = selection.admission ?: return null
+    if (!admission.runnable || arm !in admission.arms) return null
+    return executionKind(selection.route, selection.source).takeUnless { it == SourceExecutionKind.HEURISTIC }
 }

@@ -1,6 +1,9 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -288,5 +291,32 @@ class SourceRoutingPolicyTest {
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(invocation.route)
         assertEquals(1, observations)
         assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
+    }
+
+    private val incompleteEngines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
+
+    private fun keepsIncompleteArm(engine: FiniteEngine, operation: ExecutionOperation): Boolean {
+        val solve = if (operation == ExecutionOperation.OPTIMIZE) "minimize x" else "satisfy"
+        val program = parseFlatZinc("var 0.0..1.0: x; constraint float_eq(x, 0.5); solve $solve;")
+        val objective = program.sourceProgram.linearObjective()
+        val selection = SourceSetup.selectRoute(SourceSetupRequest(program.sourceAttachment(), operation, engine,
+            objective = objective))
+        return SourceSetup.preservesOriginalIncompleteArm(selection)
+    }
+
+    @Test
+    fun `an admitted local search or ALNS arm should keep satisfaction and optimization on the original source`() {
+        val operations = listOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE)
+
+        val kept = incompleteEngines.associateWith { engine -> operations.map { keepsIncompleteArm(engine, it) } }
+
+        assertEquals(incompleteEngines.associateWith { listOf(true, true) }, kept)
+    }
+
+    @Test
+    fun `local search or ALNS enumeration should not keep the original source`() {
+        val kept = incompleteEngines.associateWith { keepsIncompleteArm(it, ExecutionOperation.ENUMERATE) }
+
+        assertEquals(incompleteEngines.associateWith { false }, kept)
     }
 }
