@@ -384,10 +384,13 @@ families. Both polynomial and function completion can keep finite globals native
 Whole-source open-integer polynomial conversion instead needs an encoder for
 every factor. A finite function peer requires bounded integer declarations;
 unsupported factors retain their original index in the preparation decline.
-The source-factor vocabulary and its variant fixtures are exercised against
-affine, polynomial and function peers by `PreparedFactorSupportTest`, including
-whole-source open-integer admission and operation surfaces. Encoder availability
-alone does not bypass installation or a finite completion's numerical gates.
+Finite projected operations use complete cells even under a heuristic caller
+strategy. Polynomial and function snapshots retain their own operation surfaces;
+an encoder does not install counting, enumeration or sampling. Encoder availability
+does not bypass installation or a finite completion's numerical gates.
+Finite real completion distinguishes representable exact rows from wide strict
+rows, and leaf-enforced extrema from unmarked extrema. A complete arithmetic
+encoding can be available while that numerical finite path declines.
 
 `PropagationProblem(problem, selection)` and `LocalSearchProblem(problem, selection,
 domains)` open mechanisms from that capture, and `problem.bake(providers)` binds

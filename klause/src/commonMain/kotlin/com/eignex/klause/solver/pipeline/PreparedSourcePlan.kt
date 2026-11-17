@@ -451,6 +451,7 @@ internal fun Problem.requiresPolynomialCompletion(
             projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
             (
                 factors[index].variables.reals.isNotEmpty() ||
+                    factors[index].intVars.any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) } ||
                     projections.capabilities(index).propagation == PropagationCapability.UNSUPPORTED
                 ) &&
             (!preferFinite || !finiteRealFactorSupported(index, projections))
