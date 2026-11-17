@@ -32,213 +32,138 @@ mode-switching schedule pins the polarity source to its stage instead.
 Inprocessing runs at safe complete roots in bounded round-robin slices over the
 learned database. Vivification strengthens a clause by asserting the negations of its
 literals under propagation; subsumption drops subsumed learned clauses and applies
-self-subsuming resolution. Every pass must preserve the variable set, because portfolio workers share learned
-clauses under stable variable ids and share the native arena read-only; variable
-elimination runs once in [presolve](07-presolve.md) instead. Seeded searches skip
-inprocessing, since derivations under assumption pins would not hold globally.
+self-subsuming resolution. Every pass must preserve the variable set, because
+portfolio workers share learned clauses under stable variable ids and share the
+native arena read-only; variable elimination runs once in [presolve](07-presolve.md)
+instead. Seeded searches skip inprocessing, since derivations under assumption pins
+would not hold globally.
 
-Root simplification examines bounded slices of source and learned Boolean
-clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
-without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
-affected by a new Boolean root fact can be reached through a source-occurrence index
-prepared ahead of traversal or cached by ordinary propagation. This bounded
-neighborhood alternates with the ordinary clause scan,
-retains its pin and occurrence positions across slices, and builds no index
-inside the pass. Pin and occurrence walks admit at most 8,192 entries per slice
-even with an unlimited class grant. Projections without an available index retain
-the ordinary scan. An indexed candidate at the ordinary cursor advances both walks;
-unchanged prefixes are not examined twice. Retired and non-clause source entries
-do not defer the remaining literal window. Once available occurrence walks cover
-every root pin, the ordinary cursor skips the remaining source suffix and continues
-through learned clauses. Missing indexes retain the full source scan. Learned
-compaction invalidates learned candidates while preserving stable source candidates
-and source scan progress at an unchanged root. A changed root restarts the source
-scan after learned compaction. Logical retirement preserves both root passes'
-learned cursor positions; cached learned candidates are checked for liveness before
-their payload is used. The separate physical mapping generation invalidates indices
-after compaction or slot reuse.
-A shortened
-source clause enters as a permanent session-local replacement before its watches
-retire; immutable source text remains available for reasons. The propagation session
-owns unfinished source-watch retirement
-after replacement admission. Pass reset or optional buffer release retains that record;
-a funded slice retires its watches before admitting another source replacement.
-Session close releases it. Satisfied source watches retire without changing variable IDs.
-Learned selections capture a stable retirement handle before replacement admission;
-an unfunded capture retains the candidate and admits no replacement. The root pass
-stages one inactive selection at a time. Replacement propagation and required peer
-publication complete before a funded root slice authorizes retirement. A satisfied
-clause uses the same publication boundary for its premises. Authorized requests stay
-kernel-owned through optional buffer release. Abandoned inactive captures retain a
-small cancellation owner until cancellation is funded or their scope is released.
-Caller metadata and kernel requests share a finite retained allowance bounded by
-the configured memory scratch envelope and any learned-memory soft limit. Existing
-candidate literal buffers remain part of the pass memory observation. The pass
-observes its lifetime controller even without a request; active capture and protected
-continuation handles protect its scalar and reference ownership.
-Learned replacements retain their imported origin. Physical compaction protects live and
-historical reasons and removes obsolete watches; attaching a shortened binary installs
-both implication directions and evaluates facts already assigned at the root. There
-is no separate stale binary graph or whole-graph rebuild.
+### Safe roots
 
-Failed-literal probing alternates a bounded rotating set of source Boolean
-and existing integer-bound literals with coordinates from newly examined learned
-clauses of two to eight literals. The global rotation alternates existing literals
-with unfixed integer endpoints, including columns without existing atoms. Separate
-cursors preserve endpoint progress when the atom registry grows. Each slice
-snapshots both candidate spaces and visits each global candidate at most once;
-scanning creates no atoms. A completed endpoint conflict names only the complementary
-unit it proves; registry and threshold-index growth enter the containing work and debt.
-Equality atoms decline. Bound probes use ordinary single-bound
-decisions and discard implied-result payloads, retaining the same undo and cancellation
-paths. A proved bound enters as a session-local clause over its semantic atom and
-publishes through the original integer coordinate.
-Permanent source replacements supply the same bounded priorities; their clauses and
-ownership remain protected. A priority supplies no consequence without completed propagation.
-The learned cursor advances without replaying an exhausted unchanged neighborhood;
-compaction invalidates its indices. Preparation and retained literal storage share the
-probe class allowance and memory observation. Funded probing precedes cheap root
-simplification so proved facts can refresh binaries in the same safe-root opportunity. Each attempt has a propagation-work ceiling within
-the invocation token. A completed root conflict proves the complementary unit, which is attached and
-propagated through ordinary search. A completed consistent pure-Boolean probe can retain
-one newly implied Boolean literal as a binary clause conditional on its probe literal.
-`rootProbeImplications` controls this capture independently of failed-literal units.
-`rootProbeBinaryGate` restricts Native probing without Boolean root facts or known
-binary clauses to newly examined learned binaries. With no binary clause, one Boolean
-assignment cannot start unit propagation in an unassigned clausal state. A discovered
-live binary enables ordinary rotation for the rest of the scope, including after
-optional buffer release or retirement. General propagation retains ordinary rotation.
-An exhausted unchanged neighborhood does no further scanning, and preparation alone
-does not start the optional probe interval. Scope reset clears the binary hint;
-required consequence publication retains its separate eligibility.
-`rootProbeGeneralGate` applies a separate heuristic to Boolean General states without
-root facts or known binaries. One initial global batch uses the ordinary probe and
-containing grants; later slices examine new learned clauses of two to eight literals
-before admitting global probes. An unfunded slice retains that initial opportunity,
-and optional buffer release preserves its exhaustion until scope reset.
-If a completed learned-neighborhood probe propagates no additional Boolean literal,
-its opposite polarity precedes the next neighborhood candidate under the same batch
-and work ceilings. This optional literal survives an unfunded slice and buffer release;
-scope reset or a root fact or binary hint discards it. A mirrored probe does not
-schedule another mirror.
-General constraints can propagate without a binary,
-so this admission is optional rather than a propagation impossibility test. Integer
-endpoint rotation retains its ordinary policy. A root fact or binary hint reopens
-global rotation; exhausted preparation does not delay new learned candidates by the
-probe interval. Required implication publication keeps its independent eligibility.
-Disabling it skips capture reservations and cancels a retained optional candidate under
-a funded probe visit; the scope admission count remains unchanged.
-Capture is prepaid before propagation and reads at most the final two trail entries.
-After rollback, a funded lookup skips a matching direct binary reason and the bounded
-history prevents repeated admissions. A direct or duplicate final consequence yields
-to the retained earlier consequence without another probe. At most one binary enters
-per completed probe and 64 enter per search scope;
-the 64-key history and pending alternatives share the probe class and retained-memory
-grants. Unfunded admission resumes at a fresh safe root without another probe.
-Optional buffer release drops history and neighborhood arrays while preserving the
-pending alternatives, primitive cursors and admission count. Learned remapping invalidates
-the direct-reason hint, without changing the proved literals. Reseeding discards
-the pending alternatives and resets that count. Admitted binaries use ordinary
-learned ownership, forgetting and required attachment completion.
-Completed root facts are published to shared
-components before traversal resumes. Successful and interrupted probes retract to the
-complete root; interruption supplies no deduction. Speculative retractions preserve
-the saved search phases while retaining ordinary unassignment notifications for
-variable selectors. Clause scans and probes enter the existing inprocessing and
-propagation work counters. Cursors survive suspension and
-reset on reseeding; learned snapshots retain their physical mapping generation.
-
-Both root passes require an unconditional complete decision-level-zero root. Assumptions,
-seed restrictions, permanent objective cutoffs, model blockers and externally implied
-root restrictions withhold these passes. Root premises can therefore be discharged
-without turning a conditional fact into an unconditional clause. The structural
-source replacements themselves introduce no additional scope. Probing and root
-simplification are disabled by default; their batch and per-probe limits are explicit
+Root simplification and failed-literal probing require an unconditional complete
+decision-level-zero root. Assumptions, seed restrictions, permanent objective
+cutoffs, model blockers and externally implied root restrictions withhold both, so
+root premises can be discharged without turning a conditional fact into an
+unconditional clause; the structural source replacements themselves add no scope.
+Both are disabled by default, and their batch and per-probe limits are explicit
 execution settings.
 
-The containing invocation and worker work allowance includes scans, occurrence-index
-preparation, probing, attachment propagation and protected retirement. Scans enter
-the propagation-work ledger; diagnostic probe and visit counts add no second charge.
-Each of the four classes has a separate work ceiling inside the scheduled slice's
-total ceiling. Each pass receives the containing remainder after earlier passes;
-its remaining optional work is the smaller of that remainder and its class grant
-after debt repayment. Zero withholds that class.
-`inprocessingProbeInterval` spaces optional probe slices by non-inprocessing work
-while cheap maintenance keeps its shared root schedule. The first eligible slice
-needs no preceding interval. Probe, maintenance, publication and cleanup work cannot
-fund the next slice; pending funded continuations resume before this optional gate.
-Buffer release preserves the interval clock, and reseeding renews its origin. Completed atomic copying, sorting and
-compaction can overspend; the class and scheduled loop repay their respective debt
-before admitting more work. Separate containing and per-class debt-added and
-debt-repaid counters retain those charges without adding work. Reseeding resets
-cursors without forgiving that debt.
-Time and work cancellation retain no partial probe.
-Attachment and root publication are required cleanup once a consequence is admitted:
-local ceilings stop later optional work and retain the cleanup's overspend as debt.
-The containing invocation still cancels them. An interrupted root attachment keeps
-its queued fixpoint and completes under the next invocation before publishing root
-facts or making a decision. Root publication retains its bounded scan across slices.
-It retains the CP publisher so a consequence reaches peers without creating another
-private decision level in its producer. Passes receive a completion marker after
-consistent publication, or after a slice that requires no publication. Cancellation,
-an indeterminate peer and an unfinished attachment withhold that marker. The marker
-records completion without running another class slice or granting more work.
+Root simplification examines bounded slices of source and learned Boolean clauses
+against permanent root facts; with no Boolean pin it has nothing to satisfy or
+shorten and does not scan. Clauses touched by a new root fact are reached through a
+source-occurrence index, prepared ahead of traversal or cached by ordinary
+propagation, in a bounded neighbourhood walk that alternates with the ordinary scan
+and builds no index inside the pass; projections without an index keep the full
+source scan. Once the occurrence walks cover every root pin, the ordinary cursor skips
+the rest of the source and continues through learned clauses. Positions survive
+slices: learned compaction invalidates learned candidates but keeps source progress
+at an unchanged root, a changed root restarts the source scan, and logical retirement
+keeps learned cursor positions, checking cached candidates for liveness before use. A
+completed scan waits for changed input; appended learned clauses extend its range,
+and new permanent root facts or learned compaction invalidate it.
 
-A completed root scan waits for changed input. Appended learned clauses extend its
-remaining range without replaying unchanged sources; new permanent root facts or
-learned compaction invalidate the completed range. Partial candidates retain their
-position until admission or rejection.
-Root scan positions and residual candidates, probe cursors, vivification replacement
-batches and subsumption preparation survive suspension. The subsumption occurrence
-window retains at most 1,024 clauses
-and 8,192 literals, advances round-robin, and declines a clause exceeding its remaining
-literal space. Compaction invalidates root indices through their mapping generation
-and other pass snapshots through the learned revision, without changing source
-variable IDs. Replacement attachment precedes retirement; active and
-historical reasons retain their ordinary protection.
-The retained-memory observation counts each primitive buffer once by identity,
-including residual capacity, occurrence postings and replacement metadata, and models
-live reference slots separately. These are modeled owners rather than a whole-worker
-heap measurement. Optional preparation can be discarded under memory pressure;
-an interrupted root attachment or pending peer publication protects the retained
-buffers until that consequence is complete. Reseeding and closing detach pass buffers,
-and vivification resets replace their containers so empty capacity is released.
+A shortened source clause enters as a permanent session-local replacement before its
+watches retire; immutable source text stays available for reasons, and the session
+owns the unfinished source-watch retirement until a funded slice completes it or the
+session closes. A shortened learned clause keeps its imported origin. Its selection
+captures a stable [retirement handle](10-learning.md#native-sat-lane) before the
+replacement is admitted, an unfunded capture admits no replacement, and the pass
+stages one selection at a time; retirement is authorized only after replacement
+propagation and required peer publication complete, and a satisfied clause uses the
+same publication boundary for its premises. Attaching a shortened binary installs
+both implication directions and evaluates facts already assigned at the root; there
+is no separate binary graph. Satisfied source watches retire without changing
+variable IDs.
+
+Failed-literal probing rotates through a bounded set of source Boolean and existing
+integer-bound literals, unfixed integer endpoints (including columns without atoms)
+and coordinates from newly examined learned clauses of two to eight literals. Each
+slice snapshots its candidate spaces, visits each global candidate at most once and
+creates no atoms while scanning; equality atoms decline. Bound probes are ordinary
+single-bound decisions with the same undo and cancellation paths. A completed root
+conflict proves the complementary unit, which is attached and propagated through
+ordinary search; a proved bound enters as a session-local clause over its semantic
+atom and publishes through the original integer coordinate. Funded probing precedes
+cheap root simplification so proved facts can refresh binaries in the same
+opportunity, and each attempt has a propagation-work ceiling within the invocation
+token. Successful and interrupted probes retract to the complete root; an interrupted
+probe supplies no deduction, and speculative retraction keeps the saved phases while
+still notifying variable selectors.
+
+`rootProbeImplications` lets a completed consistent pure-Boolean probe keep one newly
+implied Boolean literal as a binary clause conditional on its probe literal,
+independently of failed-literal units. Capture is prepaid, reads only the final trail
+entries, skips a consequence already present as a direct binary reason, and admits at
+most one binary per probe and 64 per search scope through ordinary learned ownership
+and forgetting. Optional buffer release keeps pending alternatives, cursors and that
+count; reseeding discards the alternatives and resets the count.
+`rootProbeBinaryGate` limits native probing in a state without Boolean root facts or
+known binary clauses to newly examined learned binaries, since one Boolean assignment
+cannot start unit propagation there; a discovered live binary reopens ordinary
+rotation for the rest of the scope. `rootProbeGeneralGate` is the corresponding
+heuristic for general Boolean states: one initial global batch, then new short
+learned clauses before global probes, with the opposite polarity of a learned
+neighbourhood probe that implied nothing tried next. General constraints can
+propagate without a binary, so this gate is an optional admission order, not a
+propagation impossibility test. A root fact or binary hint reopens global rotation in
+both gates, and scope reset clears the hints.
+
+Completed root facts are published to shared components before traversal resumes,
+through the CP publisher, so a consequence reaches peers without another private
+decision level in its producer. Attachment and root publication are required cleanup
+once a consequence is admitted: an interrupted root attachment keeps its queued
+fixpoint and completes under the next invocation before root facts are published or a
+decision is made. A pass is marked complete only after consistent publication, or a
+slice that needed none; cancellation, an indeterminate peer and unfinished attachment
+withhold the marker.
+
+### Inprocessing work
+
+The containing invocation and worker allowance pay for scans, occurrence-index
+preparation, probing, attachment propagation and protected retirement, all in the
+propagation-work ledger; diagnostic probe and visit counts add no second charge. Root
+simplification, probing, subsumption and vivification each have a work ceiling inside
+the scheduled slice's total: each pass receives the remainder after earlier passes,
+capped by its class grant after debt repayment, and zero withholds the class. Atomic
+copying, sorting and compaction can overspend, and the class and scheduled loop repay
+their debt before admitting more work; reseeding resets cursors without forgiving
+debt. Required attachment and publication still run when local ceilings stop optional
+work, keeping their overspend as debt, and the containing invocation still cancels
+them. Time and work cancellation keep no partial probe.
 
 Restart cadence remains a trigger. Optional propagation-work intervals and learned
-clause growth also request work at natural roots, without forcing a restart. The
-cooldown requires non-inprocessing work after an attempted slice and applies to
-restart requests too. The growth mark excludes the pass's own attachments, so a
-pass cannot earn its own next opportunity. Optional warmup starts work and growth
-marks at the first eligible complete root and withholds slices until the requested
-non-inprocessing work follows that root. Initialization cannot fund that warmup;
-scope reset renews its origin without forgiving debt. Required attachment and
-publication finish ahead of optional admission. Class rotation
-prevents a cheap pass from always taking the entire offered slice. Work and growth
-triggers, cooldown and warmup are disabled by default; the additional work ceilings are
-unlimited unless configured. Existing general off and SAT preset controls remain.
-Funded root continuation resumes retained candidates, source-watch retirement and
-selected requests before optional trigger gates. It receives one root-class grant
-inside the containing grant and starts no new optional scan. Protected requests
-yield ordinary search after a complete protected cycle; deferred work leaves that
-cycle incomplete. Ownership changes reopen protection checks, while memory
-observation alone supplies no new opportunity. Capture, authorization, cancellation,
-acknowledgement and retirement retain their charged work and class latency.
+clause growth also request work at natural roots without forcing a restart;
+the growth mark excludes a pass's own attachments, and a cooldown requires
+non-inprocessing work after each attempted slice, restart requests included.
+An optional warmup withholds slices until the requested non-inprocessing work
+follows the first eligible complete root; initialization cannot fund it, and
+scope reset renews its origin without forgiving debt. `inprocessingProbeInterval`
+spaces optional probe slices by non-inprocessing work, the first eligible slice
+needing none; buffer release keeps that clock and reseeding renews it. Probe,
+maintenance, publication and cleanup work cannot fund the next slice. Required
+attachment and publication, and funded continuations of retained candidates,
+source-watch retirement and selected requests, run ahead of these optional gates;
+a continuation receives one root-class grant and starts no new scan.  Class rotation
+keeps a cheap pass from taking every slice. Triggers, cooldown and warmup are off
+by default, and the additional ceilings are unlimited unless configured.
+
+Scan positions, residual candidates, probe cursors, vivification batches and
+subsumption preparation survive suspension; the subsumption occurrence window is
+bounded and advances round-robin. Compaction invalidates root indices through their
+mapping generation and other pass snapshots through the learned revision, without
+changing source variable IDs. Pass buffers are counted once by identity in the
+retained-memory observation, as modeled owners rather than a heap measurement.
+Optional preparation can be discarded under memory pressure, but an interrupted root
+attachment or pending peer publication protects its buffers until the consequence
+completes. Reseeding and closing detach pass buffers.
+
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
-applicability. Probe outcomes distinguish a consistent fixpoint, a completed
-refutation and an interrupted attempt; these counters add no second work charge.
-Completed Boolean General probes additionally report empty and productive trails
-and implied pin counts before rollback, excluding the probe decision and existing
-root facts. Mirrored attempts partition into empty, productive, refuted and
-interrupted outcomes; their pin counts are a subset of the General counts.
-Attachment, retirement and continuation work are subsets of class work, which
-overlaps containing propagation work. Root publication has a
-separate containing charge and also cannot earn the next trigger. Per-class, scheduled
-slice, continuation and publication durations keep disjoint latency buckets below
-one, ten, one hundred and one thousand milliseconds, plus a bucket for at least
-one second. These nested spans overlap and provide observations, not a hard pause bound. Learned lifecycle and S4
-family attribution retain their own authority and completeness limits; missing
-attribution does not establish zero usefulness. These observations select no
-adaptive score or default threshold.
+applicability; probe outcomes separate a consistent fixpoint, a completed refutation
+and an interruption. Attachment, retirement and continuation work are subsets of
+class work, which overlaps containing propagation work, and per-class and slice
+latency histograms are observations, not a pause bound. These counters select no
+adaptive score or default threshold, and missing learned-lifecycle or family
+attribution does not establish that a pass was useless.
 
 ## Theory completion
 
@@ -364,22 +289,21 @@ identify a rejection stage; the CLI emits the split only when it accounts for th
 whole refutation total.
 
 `propagations` counts deductions from completed finite fixpoints, excluding decision
-and root pins; `propagationWork` also counts dispatch, watcher, scheduling and reason visits
-across undo. Root figures are subsets of totals. Fixpoint time excludes some counted
-reason scans.
-
-Native CP and shared first-UIP outcomes are reported separately. Non-asserting counts
-identify chronological fallback, while zero does not establish explanation coverage.
-Native learned-constraint counts include integer rows; their terms do not count as
-Boolean learned literals.
-`learningIntegerSessions` counts native sessions with integer-row learning enabled,
-independently of constructed, admitted and consumed objects.
-Missing metrics stay absent, including root theory results that never enter traversal.
-Live solve snapshots include presolve LP work once and retain the observed LP snapshot
-when no aggregation is needed.
-Directional branch events update private per-outcome counters; snapshots copy their
-counts, retaining isolation from later observations.
-`smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
+and root pins; `propagationWork` also counts dispatch, watcher, scheduling and reason
+visits across undo. Root figures are subsets of totals, and fixpoint time excludes
+some counted reason scans. Native CP and shared first-UIP outcomes are reported
+separately: a nonzero non-asserting count points at a reason that did not support
+first-UIP learning and identifies chronological fallback, while zero does not
+establish explanation coverage. Native learned-constraint counts include integer
+rows, whose terms do not count as Boolean learned literals; `learningIntegerSessions`
+counts sessions with integer-row learning enabled, independently of learned objects.
+Missing metrics stay absent, including root theory results that never enter
+traversal. Live solve snapshots include presolve LP work once and keep the observed LP
+snapshot when no aggregation is needed, and directional branch counters are copied
+into snapshots, isolated from later observations. Complete open-theory search adds
+`smtCompleteSearch*` observations of assignment depth, LP checks and stages; they stay
+absent until observed and overlap, so they are not a work total. The CLI also exports
+native CP work and time, with root figures as subsets of the totals.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)
 and [CLI statistics](24-cli.md#statistics) define the exported fields.
 
@@ -394,17 +318,6 @@ and [CLI statistics](24-cli.md#statistics) define the exported fields.
 | `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
 | `openNonAssertingConflicts` | Sound shared conflicts retaining chronological fallback |
 | `openReductionNs` | Total shared reduction selection and watch-rebuild time; zero when the cap is off |
-
-A nonzero non-asserting count points at a component reason that did not support
-first-UIP learning. Zero does not establish complete factor reason coverage. Missing
-metrics remain missing, including root theory refutations that never enter shared
-search.
-
-The CLI also exports native CP work and time (`nativeCpPropagationWork` and related
-fields), where root figures are subsets of the totals. Complete open-theory search
-adds `smtCompleteSearch*` observations of Boolean assignment depth, LP checks and
-stage counters; they stay absent until observed and overlap, so they are not a work
-total. See the [CLI](24-cli.md).
 
 ---
 
