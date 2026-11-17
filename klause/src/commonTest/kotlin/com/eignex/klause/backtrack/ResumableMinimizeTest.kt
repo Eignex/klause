@@ -691,15 +691,49 @@ class ResumableMinimizeTest {
         assertNull(result.gapBound)
     }
 
+    @Test
+    fun `a gap cutoff that moves with each improvement should report a bound that closes the last incumbent`() {
+        val tenth = OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+
+        val result = gapFixtureResult(OptimalityGap(tenth, integral = true), 100L..120L, 120L)
+
+        // The optimum is 100; the search stops at an improved incumbent whose cutoff falls to a node bound.
+        val bound = assertNotNull(result.gapBound)
+        assertTrue(result.objective < 120.0 && bound <= 100.0 && result.objective - bound <= result.objective / 10,
+            "${result.objective} $bound")
+    }
+
+    @Test
+    fun `an incumbent ahead of the external cutoff should bound exhaustion by its own gap cutoff`() {
+        val gap = OptimalityGap(gapFixtureTolerance, integral = true)
+        val problem = Problem(0, 1, arrayOf(IntDomain(999_960L, 2_000_000L)), emptyArray()).bake()
+        val params = BacktrackParams(valueSelector = IndomainMax, optimalityGap = gap,
+            objectiveBoundSupplier = { 1_000_100.0 })
+
+        val bound = ResumableMinimize(
+            BacktrackSolver(problem), LinearObjective(intCoefficients = longArrayOf(1L)), params, pausable = false,
+            initialCandidate = Sample(BooleanArray(0), longArrayOf(1_000_050L)),
+        ).use { search ->
+            assertIs<MinimizeResult.BestFound>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
+            search.exhaustionBound
+        }
+
+        assertEquals(gap.cutoff(1_000_050.0), bound)
+    }
+
     private val gapFixtureTolerance = OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10_000)))
 
-    private fun gapFixtureResult(gap: OptimalityGap?): MinimizeResult.Optimal {
-        val problem = Problem(0, 1, arrayOf(IntDomain(10_000L, 20_000L)), emptyArray()).bake()
+    private fun gapFixtureResult(
+        gap: OptimalityGap?,
+        domain: LongRange = 10_000L..20_000L,
+        start: Long = 10_001L,
+    ): MinimizeResult.Optimal {
+        val problem = Problem(0, 1, arrayOf(IntDomain(domain.first, domain.last)), emptyArray()).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
         val params = BacktrackParams(valueSelector = IndomainMax, optimalityGap = gap)
         return ResumableMinimize(
             BacktrackSolver(problem), objective, params, pausable = false,
-            initialCandidate = Sample(BooleanArray(0), longArrayOf(10_001L)),
+            initialCandidate = Sample(BooleanArray(0), longArrayOf(start)),
         ).use { search ->
             assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
         }

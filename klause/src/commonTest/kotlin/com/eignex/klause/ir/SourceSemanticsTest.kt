@@ -223,4 +223,9 @@ class SourceSemanticsTest {
 
         assertFailsWith<IllegalArgumentException> { declared.resolve(overrides) }
     }
+
+    @Test
+    fun `a relative optimality gap of one or more should be rejected`() {
+        assertFailsWith<IllegalArgumentException> { OptimalityTolerance(relative = SemanticRational.ONE) }
+    }
 }

@@ -60,6 +60,23 @@ class SourceResultCaptureTest {
     }
 
     @Test
+    fun `a gap optimum should capture only its witness`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+        val context = assertNotNull(model.sourceProofContext(scoped, objective))
+        val sample = Sample(booleanArrayOf(), longArrayOf(2))
+        val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("int/0/lower"))
+
+        val result = SourceResultCapture(context).minimize(
+            MinimizeResult.Optimal(sample, 2.0, gapBound = 1.0), objective, "fixture-engine", proof,
+        )
+
+        val evidence = assertNotNull(result.evidence)
+        assertEquals(listOf<SourceClaim>(SourceClaim.Witness(sample)), evidence.derivations.map { it.claim })
+        assertEquals(SourceEvidenceCheck.Checked, evidence.verify(SourceClaim.Witness(sample), context))
+    }
+
+    @Test
     fun `missing objective proof capture should not gain coverage from an optimal result label`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val scoped = scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE))

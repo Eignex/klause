@@ -59,7 +59,12 @@ internal class EvidenceCertificate private constructor(
                 is SolveResult.Unknown -> null
             }
             is CompletedEngineResult.Minimize -> when (val result = completed.result) {
-                is MinimizeResult.Optimal -> when (claim) {
+                // A gap optimum attains nothing: like an exhausted incumbent it supports only its captured cutoff.
+                is MinimizeResult.Optimal -> if (result.gapBound != null) when (claim) {
+                    is SourceClaim.Witness -> SourceClaim.Witness(result.sample)
+                    is SourceClaim.Bound -> completed.cutoff
+                    else -> null
+                } else when (claim) {
                     is SourceClaim.Optimal -> SourceClaim.Optimal(result.sample, claim.value)
                     is SourceClaim.Bound -> {
                         if (claim.strict) return SourceEvidenceCheck.Rejected("attainment excludes a strict bound")

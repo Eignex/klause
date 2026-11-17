@@ -97,10 +97,14 @@ internal interface ReseedGuard {
     val incumbentTrialPending: Boolean get() = false
 }
 
-// A complete search whose exhaustion proves only its optimality-gap cutoff once it bounded a node against that cutoff
-// below the incumbent.
+// A complete minimization that may prune against an optimality-gap cutoff below its incumbent. gapFloor is the least
+// such cutoff a prune relied on (positive infinity when none did): the search's unseen points and every fact it shared
+// hold only below it. exhaustionBound is what its exhaustion proved, negative infinity until it is exhausted, and NaN
+// for a wrapped search that reports none, whose exhaustion proves the cutoff it read.
 internal interface GapBoundedSearch {
     val appliedOptimalityGap: Boolean
+    val gapFloor: Double
+    val exhaustionBound: Double
 }
 
 internal interface SliceWorkAccounting {

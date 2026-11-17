@@ -95,6 +95,9 @@ import kotlin.time.TimeSource
 private const val ROOT_PRIMAL_GUIDANCE_BYTES = 1024L * 1024L
 private const val ROOT_PRIMAL_TARGET_HEADER_BYTES = 64L
 
+// Magnitude below which every Long and the cutoff it is compared to are exact doubles.
+private const val EXACT_LONG_DOUBLE = 9_007_199_254_740_992.0
+
 /** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
  *  instance re-solving it with its kept factorization, and the reusable per-row [enforced] buffer
  *  [LpEngine.gatedResidual] refreshes to the live pins each node. [lastEnforced]/[lastFeasible] memo
@@ -1199,6 +1202,19 @@ internal class LpEngine(
     var lpHints: LpHintSink? = null
     private var lpBackjump: Learned? = null
 
+    // Cutoff that reduced-cost fixing reads in place of a lower pruning cutoff, so fixings never depend on an
+    // optimality gap; NaN fixes against the pruning cutoff.
+    internal var fixingCutoff = Double.NaN
+
+    // A lower bound on every point of the node the last pruneNode call pruned: positive infinity for a prune that read
+    // no objective bound, and the pruning cutoff where the arm records nothing tighter.
+    internal var lastPruneBound = Double.NaN
+        private set
+
+    internal fun recordPruneBound(bound: Double) {
+        lastPruneBound = bound
+    }
+
     // A fixed source layout allows bound-only adoption without rebuilding its factorization.
     private var persistentRelaxer: CpToLpRelaxation? = null
     private var persistentRelaxation: LpRelaxation? = null
@@ -1580,6 +1596,7 @@ internal class LpEngine(
     ): Boolean {
         requireOpen()
         lpBackjump = null
+        lastPruneBound = effectiveBound
         for (b in bounds) {
             if (deferSimplex && b is LpSimplexBound) continue
             if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true
@@ -1590,7 +1607,7 @@ internal class LpEngine(
     internal fun linearBoundDominates(session: PropagationSession, cutoff: Double): Boolean {
         if (cutoff.isNaN() || cutoff == Double.POSITIVE_INFINITY) return false
         if (cutoff == Double.NEGATIVE_INFINITY) return true
-        if (abs(cutoff) < 9_007_199_254_740_992.0) {
+        if (abs(cutoff) < EXACT_LONG_DOUBLE) {
             val lower = linearLowerBound(objective, session)
             return lower != Long.MIN_VALUE && lower >= cutoff
         }
@@ -1625,7 +1642,16 @@ internal class LpEngine(
             effectiveBound: Double,
             objectiveVar: Int,
             objectiveAscending: Boolean,
-        ): Boolean = linearBoundDominates(session, effectiveBound)
+        ): Boolean {
+            if (!effectiveBound.isFinite() || abs(effectiveBound) >= EXACT_LONG_DOUBLE) {
+                return linearBoundDominates(session, effectiveBound)
+            }
+            val lower = linearLowerBound(objective, session)
+            if (lower == Long.MIN_VALUE || lower < effectiveBound) return false
+            // A Long this small converts exactly; a larger one keeps the cutoff as its recorded bound.
+            if (abs(lower.toDouble()) < EXACT_LONG_DOUBLE) lastPruneBound = lower.toDouble()
+            return true
+        }
     }
 
     /** Scheduling-feasibility prune arm (energetic and cumulative-flow — same prune family): every
@@ -1645,6 +1671,7 @@ internal class LpEngine(
             objectiveAscending: Boolean,
         ): Boolean {
             if (++checkCounter % checkEvery != 0 || !bound.isInfeasible(session)) return false
+            lastPruneBound = Double.POSITIVE_INFINITY
             sink.scheduling.observeEnergeticPrune()
             lpNogoods?.let { pool -> bound.explain(session)?.let { pool.add(it) } }
             return true

@@ -50,12 +50,7 @@ class MpsModeNumericalStatusTest(
         val text = bytes.toString(Charsets.UTF_8.name())
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o ${if (maximize) 2 else 1}" in text.lines(), text)
-        // A discrete branch bounded against the gap cutoff proves the optimum only within the gap.
-        val status = when {
-            exact -> "attained-optimum"
-            mixed -> "gap-optimum"
-            else -> "tolerance-optimum"
-        }
+        val status = if (exact) "attained-optimum" else "tolerance-optimum"
         assertTrue("c optimizationStatus=$status" in text.lines(), text)
         assertEquals(!exact, "MPS numerical status under configured tolerances" in text, text)
         assertFalse("tolerance-accepted optimality unproved" in text, text)

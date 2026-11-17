@@ -282,13 +282,16 @@ exhaustion with a checked incumbent establishes attainment. Heuristic and
 improvement-only arms gain no completion authority from exhaustion.
 
 Under an [optimality gap](09-search.md#optimality-gap), backtrack arms on the pooled
-model prune against the gap cutoff of the shared incumbent, and the scheduler records
-that cutoff as the arm's execution bound. A run also ends when the shared objective
-bound, the maximum of the global bounds the arms published, closes the gap of the
-pooled incumbent. The resulting optimum carries the gap bound: the cutoff of the final
-incumbent raised by the exhausting arm's proved bound and the shared bound, or none
-when one of them reaches the incumbent. Incomplete arms and unpublished estimates
-never close the gap.
+model prune against the gap cutoff of the lower of the shared and their own
+incumbent. The scheduler credits an exhausted arm with the bound its search reports
+having proved, never a cutoff recomputed from what the arm last read from the pool,
+which a pending local incumbent may undercut. Shared clauses, cuts, floors and
+variable bounds carry what an arm learned after a gap prune, so the scheduler keeps
+the least gap floor of any arm in the run and reads every proved bound, the shared
+objective bound included, below it. A run also ends when that shared bound closes the
+gap of the pooled incumbent. The resulting optimum carries the gap bound: the cutoff
+of the final incumbent raised by the proved bounds, or none when they reach the
+incumbent. Incomplete arms and unpublished estimates never close the gap.
 
 Finite metadata reports complete search only when a backtrack-family worker permits
 source proofs and is neither auxiliary nor improvement-only; this metadata never

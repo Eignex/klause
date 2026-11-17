@@ -72,6 +72,11 @@ class LinearSourceOutcome internal constructor(
      * exact optimum or another conclusion.
      */
     val gapBound: BigFraction? = null,
+    /**
+     * Proved original-unit bound of a native optimum that holds only within the optimality gap, in the source
+     * direction, whether or not the source outcome confirms it; null for an exact native optimum or none.
+     */
+    val nativeGapBound: BigFraction? = null,
 ) {
     /** Whether terminal statuses use numerical tolerance policy rather than exact source certification. */
     val numericalClaims: Boolean get() = source.semantics.effective.feasibilityTolerance?.isExact == false
@@ -415,13 +420,13 @@ internal fun executeLinearSource(
         }
         else -> null
     }
-    val gapBound = nativeGapBound?.takeIf { conclusion == LinearSourceConclusion.OPTIMAL && !acceptedOptimal }
-        ?.let { if (sourceMaximizes) it.negated() else it }
+    val sourceGapBound = nativeGapBound?.let { if (sourceMaximizes) it.negated() else it }
+    val gapBound = sourceGapBound?.takeIf { conclusion == LinearSourceConclusion.OPTIMAL && !acceptedOptimal }
     val snapshot = LinearSourceOutcome(
         prepared.view.source, incumbent, native, conclusion,
         prepared.view.exact, prepared.view.constraintsExact, prepared.claimsCoverTolerance,
         prepared.acceptedObjectiveBound,
-        nativeClaimsUnrestricted, prepared.view.objectiveScale, bound, gapBound,
+        nativeClaimsUnrestricted, prepared.view.objectiveScale, bound, gapBound, sourceGapBound,
     )
     return when (result) {
         is SourceExecutionResult.Prepared -> result

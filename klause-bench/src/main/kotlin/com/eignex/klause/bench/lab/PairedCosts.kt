@@ -16,6 +16,8 @@ internal object PairedCosts {
             val record = requireNotNull(case.record)
             when {
                 record.feasible == false && record.proven -> "proven-infeasible"
+                record.feasible == true && record.proven && record.kind == "optimize" &&
+                    record.optimalityBound != null -> "proven-gap-optimum"
                 record.feasible == true && record.proven && record.kind == "optimize" -> "proven-optimum"
                 record.feasible == true && PairedRows.terminal(record.proven, record.kind, true) -> "satisfied"
                 record.feasible == true -> "feasible"

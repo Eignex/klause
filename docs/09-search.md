@@ -249,17 +249,25 @@ alternatives; source-bound atoms give arithmetic decisions stable Boolean names.
 objective value `w` to `scale * w + offset` in source units and holds the one rule:
 a proved bound `b` closes the gap of the incumbent `z` when `z - b <= max(absolute,
 relative * abs(z))` there, and an integral working objective rounds `b` up first.
-Node bounding then reads the gap cutoff, the least bound that closes the gap of the
-incumbent or of the external cutoff, instead of the incumbent itself; a node whose
-bound reaches it holds no point outside the gap. With a relative component below one
-the cutoff rises with the incumbent, so a cutoff read earlier proved at least as much.
-An integral objective whose gap admits no integer below the incumbent keeps the
-incumbent as its cutoff. Exhaustion after a prune or fixing against a cutoff below
-the incumbent reports `MinimizeResult.Optimal.gapBound`: the cutoff, raised by the
-root relaxation bound, or null when that bound reaches the incumbent. A search that
-never bounded below its incumbent proves its optimum exactly, and a repairing search
-ignores the gap. The incumbent stays a checked point; the gap changes only which
-bound closes the search.
+Node pruning then reads the gap cutoff, the least bound that closes the gap of the
+lower of the incumbent and the external cutoff, instead of that value itself; a node
+whose bound reaches it holds no point outside the gap. Reduced-cost fixing keeps
+reading the incumbent's own cutoff, so retained root facts never depend on the gap.
+With a relative component below one the cutoff rises with the incumbent, so a cutoff
+read earlier proved at least as much. An integral objective whose gap admits no
+integer below the incumbent keeps the incumbent as its cutoff.
+
+`LpEngine` records the bound of each node it prunes: the node's proved objective
+bound, positive infinity for an infeasibility prune, and the cutoff itself where an
+arm records nothing tighter. Only a prune whose recorded bound stays below the
+incumbent's cutoff relies on the gap. The least gap cutoff such a prune read is the
+search's gap floor: every point it left unseen, every clause learned from such a
+prune and every root floor it publishes holds only below it, so a published floor
+is capped there. Exhaustion proves the lower of the gap floor and the cutoffs in
+force, and reports `MinimizeResult.Optimal.gapBound`, raised by the root relaxation
+bound, or null when the proved bound reaches the incumbent. A repairing search
+ignores the gap, and a source whose tolerance is exact rejects one. The incumbent
+stays a checked point; the gap changes only which bound closes the search.
 
 ### Lazy branch selection
 

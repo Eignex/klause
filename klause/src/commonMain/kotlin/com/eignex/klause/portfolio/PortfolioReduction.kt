@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.VerifiedIncumbent
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -57,6 +58,24 @@ internal object PortfolioReduction {
 
         null -> false
     }
+
+    /**
+     * The bound an exhausted arm proved under an optimality gap: what its search reports having proved, else
+     * [fallback], the gap cutoff of the pool once it holds the arm's incumbents; read below [gapFloor], the least gap
+     * cutoff any arm's shared facts may carry. Never the gap cutoff of an earlier pool read, which a pending local
+     * incumbent may undercut.
+     */
+    fun armExhaustionBound(searchBound: Double?, fallback: Double?, gapFloor: Double): Double? {
+        val own = searchBound?.takeUnless { it.isNaN() } ?: fallback ?: return null
+        return if (own < gapFloor) own else gapFloor
+    }
+
+    /**
+     * The gap bound a clean stop reports for an incumbent of value [incumbent] and rounded-up value [incumbentBound]
+     * given the bound the run [proved]; null when that bound reaches the incumbent, which is then exactly optimal.
+     */
+    fun gapBound(gap: OptimalityGap?, incumbent: Double, incumbentBound: Double, proved: Double): Double? =
+        if (gap == null || proved >= incumbent) null else gap.exhaustedBound(incumbentBound, proved)
 
     /**
      * The four-way optimisation terminal: given the run's verified [incumbent] (null when none was ever

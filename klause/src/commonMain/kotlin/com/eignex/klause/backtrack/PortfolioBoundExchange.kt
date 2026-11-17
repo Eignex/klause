@@ -23,6 +23,8 @@ internal class PortfolioBoundExchange(
     private val session: PropagationSession,
     private val params: BacktrackParams,
     private val singleObj: SingleIntObjective?,
+    // The least optimality-gap cutoff a prune of this arm relied on: root facts hold only below it.
+    private val gapFloor: () -> Double = { Double.POSITIVE_INFINITY },
 ) {
     private var lastPublishedFloor = Double.NEGATIVE_INFINITY
 
@@ -44,7 +46,8 @@ internal class PortfolioBoundExchange(
         val sink = params.objectiveLowerBoundSink ?: return@timed
         val obj = singleObj?.takeIf { it.ascending } ?: return@timed
         if (session.decisionLevel != 0) return@timed
-        val floor = session.intDomain(obj.varId).min.toDouble()
+        // A root floor derived after a gap prune bounds only the points below that prune's cutoff.
+        val floor = minOf(session.intDomain(obj.varId).min.toDouble(), gapFloor())
         if (floor > lastPublishedFloor) {
             lastPublishedFloor = floor
             sink(floor)

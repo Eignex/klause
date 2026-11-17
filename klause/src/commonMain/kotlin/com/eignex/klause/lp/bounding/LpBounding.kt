@@ -46,6 +46,7 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.floorDouble
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.ExecutionControl
@@ -495,6 +496,7 @@ internal fun LpEngine.sparseSafePrune(
         val ray = simplex.infeasibleRay?.let { infeasibilityRay(model, it, sink) }
         if (ray != null) {
             observeCutRayUse(relaxation, ray)
+            recordPruneBound(Double.POSITIVE_INFINITY)
             sink.lp.observeInfeasiblePrune()
             LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             hints?.recordInfeasible()
@@ -680,6 +682,7 @@ internal fun LpEngine.sparseSafePrune(
         if ((integralCutoff != null && full.ceilLong()?.let { it >= integralCutoff } == true) ||
             full >= rationalCutoff
         ) {
+            recordPruneBound(full.floorDouble())
             sink.lp.observePrune()
             observeCutUse(boundRel, cert, "BOUND_PRUNE")
             LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -704,6 +707,7 @@ internal fun LpEngine.sparseSafePrune(
     val sourceRange = sourceObjectiveRange(boundRel)
     val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound, sourceRange) else null
     if (cutoff != null && full >= cutoff) {
+        recordPruneBound(full.floorDouble())
         observeAcceptedCutBoundUse(boundRel, cert, boundRes.duals, cutoff, "BOUND_PRUNE")
         sink.lp.observePrune()
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -757,13 +761,17 @@ internal fun LpEngine.sparseSafePrune(
     }
     // A certified Lagrangian bounds every point below the source cutoff without requiring
     // an attained LP optimum. A declared objective ceiling also bounds feasible points before an incumbent.
+    // Fixings read the incumbent's own cutoff even when the prune reads a lower one, so they hold for every point
+    // that improves the incumbent and never carry an optimality gap into retained root facts.
+    val fixingBound = fixingCutoff.takeUnless { it.isNaN() || !canPrune || it < bound } ?: bound
     if (canFix && cert != null &&
         !cancellation.pollStop() &&
         observeNodeFixing(sink, LpSolvePhase.NODE_PRIMARY_FIXING) {
-            applySparseReducedCostFixing(boundRel, cert, session, bound, sink, objectiveVar,
+            applySparseReducedCostFixing(boundRel, cert, session, fixingBound, sink, objectiveVar,
                 objectiveAscending, learn, cancellation, objectiveCeiling)
         }
     ) {
+        recordPruneBound(fixingBound)
         return LpNodeOutcome(true, null)
     }
     if (canFix && cert != null) for ((index, candidate) in additionalCertificates.withIndex()) {
@@ -771,9 +779,10 @@ internal fun LpEngine.sparseSafePrune(
         val additional = solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, candidate) ?: continue
         val phase = if (index == 0) LpSolvePhase.NODE_SECONDARY_FIXING else LpSolvePhase.NODE_TERTIARY_FIXING
         if (observeNodeFixing(sink, phase) {
-                applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
+                applySparseReducedCostFixing(boundRel, additional, session, fixingBound, sink, objectiveVar,
                     objectiveAscending, learn, cancellation, objectiveCeiling)
             }) {
+            recordPruneBound(fixingBound)
             return LpNodeOutcome(true, null)
         }
     }
@@ -810,6 +819,7 @@ private fun LpEngine.pruneWithComponentBound(
     val full = checked.value + BigFraction.ofLong(relaxation.objectiveConstant)
     val threshold = sourceObjectiveCutoff(relaxation, cutoff, sourceObjectiveRange(relaxation)) ?: return false
     if (full < threshold) return false
+    recordPruneBound(full.floorDouble())
     sink.lp.observePrune()
     LpClaim.BOUND.consumed(charged)
     return true
