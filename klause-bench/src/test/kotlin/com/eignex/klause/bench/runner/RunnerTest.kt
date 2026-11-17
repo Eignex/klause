@@ -6,6 +6,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.formats.dimacs.DimacsFormatException
+import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.ir.ObjectiveSense
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
@@ -39,19 +40,13 @@ class RunnerTest {
     }
 
     @Test
-    fun `SMT in process consumers retain the exact affine objective`(@TempDir root: Path) {
-        val source = root.resolve("source.smt2").toFile().apply {
-            writeText("(declare-const x Int) (assert (and (<= 0 x) (<= x 3))) (maximize x) (check-sat)")
-        }
-        val ref = ProblemRef("bounded", Format.SMTLIB, ProblemSource.Prepared(source),
-            Category.OPTIMIZATION, Expected.Unknown)
+    fun `SMT in process consumers reject malformed source`(@TempDir root: Path) {
+        val source = root.resolve("source.smt2").toFile().apply { writeText("invalid source") }
+        val ref = ProblemRef("malformed", Format.SMTLIB, ProblemSource.Prepared(source),
+            Category.CSP, Expected.Unknown)
         val entry = InProcessRunner.resolve(ref)
 
-        val objective = assertNotNull(entry.objective)
-
-        assertTrue(entry.maximize)
-        assertEquals(1, entry.problem.numIntVars)
-        assertContentEquals(longArrayOf(-1), objective.intCoefficients)
+        assertFailsWith<UnsupportedSmtException> { entry.objective }
     }
 
     @ParameterizedTest
