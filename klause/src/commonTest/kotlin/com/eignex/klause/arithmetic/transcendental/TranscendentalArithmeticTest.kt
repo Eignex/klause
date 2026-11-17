@@ -116,6 +116,21 @@ class TranscendentalArithmeticTest {
     }
 
     @Test
+    fun `division by one admits work before returning a value`() {
+        val arithmetic = TranscendentalArithmetic(maximumWork = 1)
+
+        assertEquals(q(3), arithmetic.divide(q(3), q(1)))
+        assertFailsWith<TranscendentalResourceLimit> { arithmetic.divide(q(3), q(1)) }
+    }
+
+    @Test
+    fun `division by one retains the operand representation guard`() {
+        val arithmetic = TranscendentalArithmetic(maximumBits = 3)
+
+        assertFailsWith<TranscendentalResourceLimit> { arithmetic.divide(q(3), q(1)) }
+    }
+
+    @Test
     fun `representation cap should decline before a large squaring`() {
         val arithmetic = TranscendentalArithmetic(maximumBits = 32)
 

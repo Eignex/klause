@@ -216,7 +216,8 @@ from overlapping endpoints.
 
 `RationalEnclosure` has inclusive exact rational endpoints, and interval arithmetic
 keeps every value of its inputs. Reciprocal rejects intervals containing zero, and
-log requires a strictly positive lower endpoint. The
+log requires a strictly positive lower endpoint. Division by one reuses the immutable
+dividend after the same work and representation admission. The
 [exponential](https://dlmf.nist.gov/4.2.E19), [logarithmic](https://dlmf.nist.gov/4.6.E4),
 [sine and cosine](https://dlmf.nist.gov/4.19) and
 [arctangent](https://dlmf.nist.gov/4.24.E3) series are evaluated in rational

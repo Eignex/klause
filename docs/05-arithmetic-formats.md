@@ -320,7 +320,8 @@ The scope infers each named body's sort and registers its typed definition in on
 operation; the containing command still validates its own lexical context.
 Explicit binding entry and exit frames share counted lexical names, keeping live
 scope storage linear in nested bindings; annotation and closedness walks charge
-the same execution control.
+the same execution control. Their stacks reuse list cursors and carry unbound atoms
+directly.
 Literal tokens are classified before canonical term-name lookup. Qualified
 function names, sorts and indexes do not capture surrounding term binders.
 `define-const` abbreviates a nullary `define-fun`. Named definitions share the
