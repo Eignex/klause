@@ -183,7 +183,8 @@ class PreparedFactorProjections internal constructor(
         require(this.problem === problem) { "projection selection belongs to a different canonical source" }
     }
 
-    internal fun capabilities(factorId: Int): FactorExecutionCapabilities = declarations[factorId]
+    /** Inspect captured roles for a canonical factor; [encoder] reports arithmetic representation separately. */
+    fun capabilities(factorId: Int): FactorExecutionCapabilities = declarations[factorId]
 
     internal fun usesBuiltInPropagation(factorId: Int): Boolean = propagation[factorId]?.builtIn == true
 

@@ -40,7 +40,7 @@ internal sealed interface NativeSourceExecution {
     }
 
     class Functions(val request: TranscendentalTheoryRequest) : NativeSourceExecution {
-        override val preparedPlan: PreparedSourcePlan = request.problem.prepareTranscendentalExecutionPlan()
+        override val preparedPlan: PreparedSourcePlan get() = request.preparedPlan
     }
 }
 
@@ -76,7 +76,8 @@ internal fun prepareNativeSource(
         )
 
         is AttachedSourceFormula.Functions -> NativeSourceExecution.Functions(
-            TranscendentalTheoryRequest(formula.problem),
+            TranscendentalTheoryRequest(formula.problem,
+                formula.problem.prepareExecutionPlan(request.providers, stop).bindObjective(request)),
         )
     }
     return SourceProblemRoute.NativeFormula(execution.takeUnless { stop() })

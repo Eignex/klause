@@ -287,7 +287,7 @@ Interrupted preparation exports no partial plan.
 ### The prepared plan
 
 `Problem.prepareExecutionPlan()` selects immutable ownership and completion data
-before search, attempting sound open-bound closure before final nonlinear
+before search. Source setup attempts sound open-bound closure before final nonlinear
 admission. A relation's encoder support and available finite completion select the
 arithmetic language; a factor class alone does not require polynomial traversal.
 
@@ -323,6 +323,13 @@ They distinguish unsupported routes, deliberate inertness, filtering strength,
 complete checks, heuristic scores and relaxation families, and certify nothing.
 Engine-specific caches belong to the projection that built them.
 
+Every required factor has an enforcing owner. Finite factors can retain native
+propagation and checking beside an arithmetic completion; they need no arithmetic
+encoder merely because another factor uses reals. A heuristic score, inert role or
+sound relaxation never supplies the missing enforcement. Strategy and operation
+admission requires every installed component's checks, independently of filtering
+strength or search guidance.
+
 ### Factor projection selection
 
 `FactorProjectionProviders.prepare(problem)` captures immutable propagation,
@@ -339,6 +346,27 @@ decide which consumer enforces the source. `factorOwner` names the primary
 enforcing path and `factorEncoded` records additional arithmetic participation, so
 one continuous relation cannot promote unrelated finite factors. Private
 temporaries have one acyclic definition and are stripped before publication.
+
+`PreparedFactorProjections.capabilities(factorId)` exposes the captured deduction,
+assignment-check, scoring and relaxation roles. `encoder(factorId, target)` exposes
+whole-relation representation and its required pins. Read these alongside the
+plan's component owners and `capabilities.admission`, rather than treating any
+single role as a supported-model flag.
+
+| Relation | Native finite enforcement | Complete linear encoding | Complete polynomial encoding |
+|---|---|---|---|
+| `AllDifferent`, `Distinct` | Yes for finite coordinates | Yes | Yes |
+| Integer `Product` | Yes | None unless a source reduction makes it affine | Yes |
+| `Abs`, element and extrema relations | Integer forms | Yes | Yes |
+| `DivMod` | Yes | Literal or conditioned divisor | Yes |
+| `Power` | Integer form | Affine exponent or conditioned integer base | Yes |
+| `Cumulative`, `Diffn`, `Circuit`, `Table`, `Regular`, `Mdd`, `GlobalCardinality`, `NValue` | Yes | No complete built-in encoding | No complete built-in encoding |
+
+Descriptors retain variant-specific restrictions; the table describes relation
+families. Both polynomial and function completion can keep finite globals native.
+Whole-source open-integer polynomial conversion instead needs an encoder for
+every factor. A finite function peer requires bounded integer declarations;
+unsupported factors retain their original index in the preparation decline.
 
 `PropagationProblem(problem, selection)` and `LocalSearchProblem(problem, selection,
 domains)` open mechanisms from that capture, and `problem.bake(providers)` binds

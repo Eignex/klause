@@ -79,6 +79,12 @@ encoding consume the same factor while retaining one primary coordinate owner.
 Arithmetic completion waits for authoritative finite choices. Native nonlinear
 snapshots already contain their formulas.
 
+Finite globals remain with their native owner in polynomial and function
+composition. Real-valued factors need complete encodings in the shared arithmetic
+scope; a relaxation is insufficient. Function completion pins all finite Boolean
+and integer choices, and a checked witness must agree with them. An undecided
+required completion withholds exhaustion even when the finite search is exhausted.
+
 [Shared search](09-search.md) owns decisions, levels and retraction. Neutral
 `SourceBoundAtom` predicates mean the same thing in every adapter; multiple
 arithmetic groups use [coordinate agreement](11-search-policies.md#arithmetic-coordinate-agreement)

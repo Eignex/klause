@@ -48,6 +48,7 @@ internal class TranscendentalWorkerAdapter(
     private val params: TranscendentalTheoryParams,
     private val engine: FiniteEngine,
     private val binding: EngineInvocation? = null,
+    private val composition: SharedTranscendentalModel? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val started = TimeSource.Monotonic.markNow()
     private val external = params.timeout.withAccounting(params.cancellation) or params.cancellation
@@ -67,6 +68,9 @@ internal class TranscendentalWorkerAdapter(
     private val root = assumptions()
     private var strategyStats = SolveStats.EMPTY
     private var decisions = 0L
+    private val finiteCompletion: FiniteTranscendentalWorker? by lazy {
+        composition?.let { FiniteTranscendentalWorker(it, service, params, root, stop, ::capture) }
+    }
 
     private fun assumptions(): TranscendentalCondition {
         val backend = when (engine) {
@@ -94,7 +98,14 @@ internal class TranscendentalWorkerAdapter(
 
     fun execute(): TranscendentalTheoryExecution {
         check(!closed) { "transcendental worker is closed" }
-        val result = when (engine) {
+        val result = finiteCompletion?.solve(engine)?.let {
+            strategyStats = it.stats
+            when (it) {
+                is SolveResult.Sat -> OpenTheoryResult.Sat(TranscendentalAssignment(it.assignment), it.stats)
+                is SolveResult.Unsat -> OpenTheoryResult.Unsat(it.stats)
+                is SolveResult.Unknown -> OpenTheoryResult.Unknown(it.reason, it.stats)
+            }
+        } ?: when (engine) {
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> search()
             FiniteEngine.LOCAL_SEARCH -> walk(false)
             FiniteEngine.ALNS -> walk(true)
@@ -123,7 +134,8 @@ internal class TranscendentalWorkerAdapter(
         nativeService = null
     }
 
-    fun worker(arm: Int): PortfolioWorker {
+    fun worker(arm: Int, slot: PortfolioWorkerSlot): PortfolioWorker {
+        finiteCompletion?.let { return it.worker(arm, slot, requireNotNull(binding).model) }
         val worker = if (arm == 0) {
             PortfolioWorker.ofSolve("bt+exact-transcendental", arm, resumable = { completeHandle() }) { global, _ ->
                 completeHandle().use { requireNotNull(it.runSlice(global, Long.MAX_VALUE, -1)) }

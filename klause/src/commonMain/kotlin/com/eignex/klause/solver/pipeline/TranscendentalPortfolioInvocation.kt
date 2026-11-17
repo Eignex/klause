@@ -17,6 +17,12 @@ import com.eignex.klause.util.WorkReservation
 import com.eignex.klause.util.reserveWork
 import com.eignex.kumulant.core.Concurrency
 
+internal fun transcendentalExecutionContract(): ComponentExecutionContract = ComponentExecutionContract(
+    ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH,
+        setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION)),
+    ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
+)
+
 internal fun TranscendentalProblem.prepareTranscendentalExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(
     this, PreparedExecution.Transcendental(this),
     listOf(
@@ -27,13 +33,7 @@ internal fun TranscendentalProblem.prepareTranscendentalExecutionPlan(): Prepare
             integerCoordinates,
             realCoordinates,
             (0 until boolCount).toList(),
-            ComponentExecutionContract(
-                ComponentStrategySupport(
-                    ProcedureCompleteness.WITNESS_SEARCH,
-                    setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION),
-                ),
-                ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
-            ),
+            transcendentalExecutionContract(),
         )
     ),
     boolCount, integerCoordinates.size, realCoordinates.size,
@@ -55,7 +55,8 @@ internal class TranscendentalPortfolioInvocation(
     )
 
     fun execute(): TranscendentalTheoryExecution {
-        val plan = request.problem.prepareTranscendentalExecutionPlan()
+        val plan = request.preparedPlan
+        val completion = (plan.execution as? PreparedExecution.Transcendental)?.completion
         val identity = ModelIdentity.of(request.problem)
         val backend = when (engine) {
             FiniteEngine.BACKTRACK -> params.strategy.backtrack.assumptions
@@ -101,9 +102,10 @@ internal class TranscendentalPortfolioInvocation(
                     1 -> FiniteEngine.LOCAL_SEARCH
                     else -> FiniteEngine.ALNS
                 }
-                val adapter = slot.own(TranscendentalWorkerAdapter(request.problem, controls, selected, binding))
+                val adapter = slot.own(TranscendentalWorkerAdapter(completion?.problem ?: request.problem,
+                    controls, selected, binding, completion))
                 workers += adapter
-                adapter.worker(arm)
+                adapter.worker(arm, slot)
             }
         }
         val budget = params.nodeBudget ?: params.strategy.backtrack.nodeBudget ?: params.strategy.localSearch.nodeBudget

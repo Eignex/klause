@@ -11,17 +11,21 @@ class TranscendentalProblem internal constructor(
     val objectiveSense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     /** Effective source declaration semantics captured before lowering. */
     override val semantics: EffectiveSourceSemantics = defaultIrSemantics,
+    /** Native factor relations sharing these declaration identities, when supplied. */
+    val factorModel: Problem? = null,
+    internal val auxiliaryCount: Int = 0,
 ) : SourceSemanticsOwner {
     private val integers = intVarNames.toMap()
     private val reals = realVarNames.toMap()
     private val booleans = boolVarNames.toMap()
     internal val integerCoordinates: List<Int> = integers.values.toList()
     internal val realCoordinates: List<Int> = reals.values.toList()
-    internal val numericCount: Int = integers.size + reals.size
+    internal val numericCount: Int = integers.size + reals.size + auxiliaryCount
     internal val boolCount: Int = booleans.size
 
     init {
-        require((integers.values + reals.values).toSet() == (0 until numericCount).toSet())
+        require(auxiliaryCount >= 0)
+        require((integers.values + reals.values).toSet() == (0 until integers.size + reals.size).toSet())
         require(booleans.values.toSet() == (0 until boolCount).toSet())
     }
 
@@ -36,4 +40,20 @@ class TranscendentalProblem internal constructor(
 
     /** Whether the source includes an objective whose exact optimization is unsupported by this route. */
     val hasObjective: Boolean get() = objective != null
+
+    /**
+     * Attach native relations using the same declaration-ordered Boolean, integer and real IDs.
+     * Preparation reports unsupported domains or factor roles through ordinary strategy admission.
+     */
+    fun withFactors(problem: Problem): TranscendentalProblem {
+        require(factorModel == null && auxiliaryCount == 0) { "function source already has private composition" }
+        require(problem.numBoolVars == boolCount && problem.numIntVars == integers.size &&
+            problem.numRealVars == reals.size) { "factor and function declaration counts differ" }
+        return TranscendentalProblem(formula, integers, reals, booleans, objective, objectiveSense,
+            semantics, problem)
+    }
+
+    internal fun withFormula(formula: TranscendentalFormula, auxiliaries: Int): TranscendentalProblem =
+        TranscendentalProblem(formula, integers, reals, booleans, objective, objectiveSense, semantics,
+            auxiliaryCount = auxiliaries)
 }

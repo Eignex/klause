@@ -786,6 +786,7 @@ final enum class com.eignex.klause.solver.pipeline/PreparedExecutionKind : kotli
 }
 
 final enum class com.eignex.klause.solver.pipeline/PreparedPlanDecline : kotlin/Enum<com.eignex.klause.solver.pipeline/PreparedPlanDecline> { // com.eignex.klause.solver.pipeline/PreparedPlanDecline|null[0]
+    enum entry OPEN_FINITE_INTEGER // com.eignex.klause.solver.pipeline/PreparedPlanDecline.OPEN_FINITE_INTEGER|null[0]
     enum entry OPEN_POLYNOMIAL_INTEGER // com.eignex.klause.solver.pipeline/PreparedPlanDecline.OPEN_POLYNOMIAL_INTEGER|null[0]
     enum entry POLYNOMIAL_ENCODING // com.eignex.klause.solver.pipeline/PreparedPlanDecline.POLYNOMIAL_ENCODING|null[0]
     enum entry RESOURCE // com.eignex.klause.solver.pipeline/PreparedPlanDecline.RESOURCE|null[0]
@@ -9755,6 +9756,8 @@ final class com.eignex.klause.ir/TaggedLinearRow : com.eignex.klause.ir/LinearRo
 final class com.eignex.klause.ir/TranscendentalProblem : com.eignex.klause.ir/SourceSemanticsOwner { // com.eignex.klause.ir/TranscendentalProblem|null[0]
     final val boolVarNames // com.eignex.klause.ir/TranscendentalProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
+    final val factorModel // com.eignex.klause.ir/TranscendentalProblem.factorModel|{}factorModel[0]
+        final fun <get-factorModel>(): com.eignex.klause.ir/Problem? // com.eignex.klause.ir/TranscendentalProblem.factorModel.<get-factorModel>|<get-factorModel>(){}[0]
     final val hasObjective // com.eignex.klause.ir/TranscendentalProblem.hasObjective|{}hasObjective[0]
         final fun <get-hasObjective>(): kotlin/Boolean // com.eignex.klause.ir/TranscendentalProblem.hasObjective.<get-hasObjective>|<get-hasObjective>(){}[0]
     final val intVarNames // com.eignex.klause.ir/TranscendentalProblem.intVarNames|{}intVarNames[0]
@@ -9765,6 +9768,8 @@ final class com.eignex.klause.ir/TranscendentalProblem : com.eignex.klause.ir/So
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/TranscendentalProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
     final val semantics // com.eignex.klause.ir/TranscendentalProblem.semantics|{}semantics[0]
         final fun <get-semantics>(): com.eignex.klause.ir/EffectiveSourceSemantics // com.eignex.klause.ir/TranscendentalProblem.semantics.<get-semantics>|<get-semantics>(){}[0]
+
+    final fun withFactors(com.eignex.klause.ir/Problem): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.ir/TranscendentalProblem.withFactors|withFactors(com.eignex.klause.ir.Problem){}[0]
 }
 
 final class com.eignex.klause.ir/UndeclaredIntegerBounds { // com.eignex.klause.ir/UndeclaredIntegerBounds|null[0]
@@ -16245,6 +16250,8 @@ final class com.eignex.klause.solver.pipeline/TranscendentalTheoryParams { // co
 }
 
 final class com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest : com.eignex.klause.solver.pipeline/ExactTheorySatisfactionRequest { // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest|null[0]
+    final val preparedPlan // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.preparedPlan|{}preparedPlan[0]
+        final fun <get-preparedPlan>(): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.preparedPlan.<get-preparedPlan>|<get-preparedPlan>(){}[0]
     final val problem // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/TranscendentalProblem // com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
 
@@ -18728,6 +18735,31 @@ final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/As
     final fun snapshot(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Assignment.snapshot|snapshot(){}[0]
 }
 
+final class com.eignex.klause.solver/FactorExecutionCapabilities { // com.eignex.klause.solver/FactorExecutionCapabilities|null[0]
+    final val assignmentCheck // com.eignex.klause.solver/FactorExecutionCapabilities.assignmentCheck|{}assignmentCheck[0]
+        final fun <get-assignmentCheck>(): com.eignex.klause.solver/AssignmentCheckCapability // com.eignex.klause.solver/FactorExecutionCapabilities.assignmentCheck.<get-assignmentCheck>|<get-assignmentCheck>(){}[0]
+    final val inertReason // com.eignex.klause.solver/FactorExecutionCapabilities.inertReason|{}inertReason[0]
+        final fun <get-inertReason>(): kotlin/String? // com.eignex.klause.solver/FactorExecutionCapabilities.inertReason.<get-inertReason>|<get-inertReason>(){}[0]
+    final val propagation // com.eignex.klause.solver/FactorExecutionCapabilities.propagation|{}propagation[0]
+        final fun <get-propagation>(): com.eignex.klause.solver/PropagationCapability // com.eignex.klause.solver/FactorExecutionCapabilities.propagation.<get-propagation>|<get-propagation>(){}[0]
+    final val propagationCheck // com.eignex.klause.solver/FactorExecutionCapabilities.propagationCheck|{}propagationCheck[0]
+        final fun <get-propagationCheck>(): com.eignex.klause.solver/AssignmentCheckCapability // com.eignex.klause.solver/FactorExecutionCapabilities.propagationCheck.<get-propagationCheck>|<get-propagationCheck>(){}[0]
+    final val relaxation // com.eignex.klause.solver/FactorExecutionCapabilities.relaxation|{}relaxation[0]
+        final fun <get-relaxation>(): com.eignex.klause.solver/RelaxationCapability // com.eignex.klause.solver/FactorExecutionCapabilities.relaxation.<get-relaxation>|<get-relaxation>(){}[0]
+    final val scoring // com.eignex.klause.solver/FactorExecutionCapabilities.scoring|{}scoring[0]
+        final fun <get-scoring>(): com.eignex.klause.solver/ScoringCapability // com.eignex.klause.solver/FactorExecutionCapabilities.scoring.<get-scoring>|<get-scoring>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver/PropagationCapability // com.eignex.klause.solver/FactorExecutionCapabilities.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver/AssignmentCheckCapability // com.eignex.klause.solver/FactorExecutionCapabilities.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.solver/AssignmentCheckCapability // com.eignex.klause.solver/FactorExecutionCapabilities.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.solver/ScoringCapability // com.eignex.klause.solver/FactorExecutionCapabilities.component4|component4(){}[0]
+    final fun component5(): com.eignex.klause.solver/RelaxationCapability // com.eignex.klause.solver/FactorExecutionCapabilities.component5|component5(){}[0]
+    final fun component6(): kotlin/String? // com.eignex.klause.solver/FactorExecutionCapabilities.component6|component6(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/FactorExecutionCapabilities.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver/FactorExecutionCapabilities.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver/FactorExecutionCapabilities.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver/FactorProjectionProviders { // com.eignex.klause.solver/FactorProjectionProviders|null[0]
     constructor <init>() // com.eignex.klause.solver/FactorProjectionProviders.<init>|<init>(){}[0]
     constructor <init>(com.eignex.klause.propagation/PropagationProjectionProvider = ..., com.eignex.klause.localsearch/ScoringProjectionProvider = ..., com.eignex.klause.lp/RelaxationProjectionProvider = ...) // com.eignex.klause.solver/FactorProjectionProviders.<init>|<init>(com.eignex.klause.propagation.PropagationProjectionProvider;com.eignex.klause.localsearch.ScoringProjectionProvider;com.eignex.klause.lp.RelaxationProjectionProvider){}[0]
@@ -18758,6 +18790,7 @@ final class com.eignex.klause.solver/PreparedFactorProjections { // com.eignex.k
     final val providers // com.eignex.klause.solver/PreparedFactorProjections.providers|{}providers[0]
         final fun <get-providers>(): com.eignex.klause.solver/FactorProjectionProviders // com.eignex.klause.solver/PreparedFactorProjections.providers.<get-providers>|<get-providers>(){}[0]
 
+    final fun capabilities(kotlin/Int): com.eignex.klause.solver/FactorExecutionCapabilities // com.eignex.klause.solver/PreparedFactorProjections.capabilities|capabilities(kotlin.Int){}[0]
     final fun encoder(kotlin/Int, com.eignex.klause.theory/EncodingTarget): com.eignex.klause.theory/Encoder // com.eignex.klause.solver/PreparedFactorProjections.encoder|encoder(kotlin.Int;com.eignex.klause.theory.EncodingTarget){}[0]
     final fun forProblem(com.eignex.klause.ir/Problem): com.eignex.klause.solver/PreparedFactorProjections // com.eignex.klause.solver/PreparedFactorProjections.forProblem|forProblem(com.eignex.klause.ir.Problem){}[0]
 }
@@ -19970,6 +20003,7 @@ final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver/isClausal(): k
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.theory.qflra/supportsExactLra(): kotlin/Boolean // com.eignex.klause.theory.qflra/supportsExactLra|supportsExactLra@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/SearchHints).com.eignex.klause.backtrack/toBacktrackParams(kotlin/Int, kotlin/Int): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.backtrack/toBacktrackParams|toBacktrackParams@com.eignex.klause.ir.SearchHints(kotlin.Int;kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/TranscendentalProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/TranscendentalTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.TranscendentalProblem(){}[0]
+final fun (com.eignex.klause.ir/TranscendentalProblem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(com.eignex.klause.solver/FactorProjectionProviders = ..., com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.TranscendentalProblem(com.eignex.klause.solver.FactorProjectionProviders;com.eignex.klause.util.ExecutionControl){}[0]
 final fun (com.eignex.klause.lp/RelaxationBuilder).com.eignex.klause.lp/boolColumn(com.eignex.klause.ir/SourceBoolId): com.eignex.klause.lp.engine/LpColumnId? // com.eignex.klause.lp/boolColumn|boolColumn@com.eignex.klause.lp.RelaxationBuilder(com.eignex.klause.ir.SourceBoolId){}[0]
 final fun (com.eignex.klause.lp/RelaxationBuilder).com.eignex.klause.lp/intColumn(com.eignex.klause.propagation/CpIntId): com.eignex.klause.lp.engine/LpColumnId? // com.eignex.klause.lp/intColumn|intColumn@com.eignex.klause.lp.RelaxationBuilder(com.eignex.klause.propagation.CpIntId){}[0]
 final fun (com.eignex.klause.lp/RelaxationBuilder).com.eignex.klause.lp/realColumn(com.eignex.klause.ir/SourceRealId): com.eignex.klause.lp.engine/LpColumnId? // com.eignex.klause.lp/realColumn|realColumn@com.eignex.klause.lp.RelaxationBuilder(com.eignex.klause.ir.SourceRealId){}[0]

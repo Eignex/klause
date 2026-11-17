@@ -46,6 +46,24 @@ import kotlin.test.assertTrue
 
 class FactorPolynomialProjectionTest {
     @Test
+    fun `integer products should enforce their complete relation in open polynomial projection`() {
+        val source = Problem(0, 3, arrayOf(IntDomain(2, 2), IntDomain(3, 3), IntDomain(0, 0)),
+            arrayOf(com.eignex.klause.factor.arithmetic.Product(0, 1, 2)),
+            openIntLo = booleanArrayOf(false, false, true), openIntHi = booleanArrayOf(false, false, true))
+        val projection = assertNotNull(source.integerPolynomialProjection(source,
+            FactorProjectionProviders.Default.prepare(source), ExecutionControl.Never) {})
+        val formula = projection.formula
+
+        PolynomialTheoryService(formula.formula, formula.boolCount, formula.numericCount).invocation().use { query ->
+            val invalid = mapOf(2 to BigFraction.ofLong(5))
+            val valid = mapOf(2 to BigFraction.ofLong(6))
+
+            assertIs<QfNraResult.Unsatisfiable>(query.check(PolynomialCondition(lower = invalid, upper = invalid)))
+            assertIs<QfNraResult.Satisfiable>(query.check(PolynomialCondition(lower = valid, upper = valid)))
+        }
+    }
+
+    @Test
     fun `selected open polynomial execution should retain original identities for every strategy`() {
         val product = ContinuousProduct(0, 0, 1)
         val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), arrayOf(product),

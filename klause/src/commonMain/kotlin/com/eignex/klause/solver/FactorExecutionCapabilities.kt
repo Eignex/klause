@@ -72,12 +72,20 @@ enum class RelaxationCapability {
     SOUND,
 }
 
-internal data class FactorExecutionCapabilities(
+/** Selected factor roles; enforcement still requires the prepared component's complete checks. */
+@ConsistentCopyVisibility
+data class FactorExecutionCapabilities internal constructor(
+    /** Finite deduction participation. */
     val propagation: PropagationCapability,
+    /** Authority of the propagation projection's complete-point check. */
     val propagationCheck: AssignmentCheckCapability,
+    /** Authority of the scoring projection's complete-point check. */
     val assignmentCheck: AssignmentCheckCapability,
+    /** Local-search participation, independent of witness authority. */
     val scoring: ScoringCapability,
+    /** Outer linear relaxation participation, never enforcement. */
     val relaxation: RelaxationCapability,
+    /** Explanation for a deliberately inert role. */
     val inertReason: String? = null,
 )
 

@@ -26,7 +26,8 @@ internal sealed interface PreparedExecution {
     }
     class NonlinearInteger(val source: NonlinearIntegerProblem, val projection: FactorPolynomialProjection? = null) :
         PreparedExecution
-    class Transcendental(val source: TranscendentalProblem) : PreparedExecution
+    class Transcendental(val source: TranscendentalProblem, val completion: SharedTranscendentalModel? = null) :
+        PreparedExecution
     class Declined(val model: Problem, val reason: PreparedPlanDecline, val retained: Factor? = null) :
         PreparedExecution {
         init {
@@ -40,7 +41,7 @@ internal val PreparedExecution.model: Problem? get() = when (this) {
     is PreparedExecution.Polynomial -> completion.source
     is PreparedExecution.Declined -> model
     is PreparedExecution.NonlinearInteger -> projection?.model
-    is PreparedExecution.Transcendental -> null
+    is PreparedExecution.Transcendental -> completion?.source
 }
 
 internal val PreparedExecution.componentPlan: ComponentPlan? get() = finiteLinear?.ownership
@@ -101,7 +102,7 @@ internal class PreparedSourceStructure(
             polynomial.completion.finite,
             polynomial.completion.finiteFactorIndices.toIntArray(),
         )
-    } ?: factorProjections
+    } ?: (execution as? PreparedExecution.Transcendental)?.completion?.finiteProjections ?: factorProjections
 
     init {
         require(this.integerCoordinates.size == sourceIntCount && this.realCoordinates.size == sourceRealCount)

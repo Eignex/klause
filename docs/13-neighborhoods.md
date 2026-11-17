@@ -320,6 +320,10 @@ the restart transition completes or closes.
 
 ### ALNS incumbent acquisition
 
+An interrupted repair initialization retains the checked incumbent and the work
+spent opening the repair. A later slice can retry initialization under its current
+allowance; interruption supplies no refutation or optimality claim.
+
 ALNS alternates destroying part of an incumbent with repairing it. Adjacency
 destruction grows breadth-first through factor occurrences; repair scopes release
 both ends of unit Boolean definitions, and caller pins stay in the repair
