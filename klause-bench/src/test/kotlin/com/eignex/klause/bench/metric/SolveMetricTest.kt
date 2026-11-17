@@ -12,6 +12,7 @@ import com.eignex.klause.bench.runner.MiniZincIdentityFailure
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Files
@@ -93,6 +94,32 @@ class SolveMetricTest {
         )
 
         assertEquals(reported.takeIf { it.isNotEmpty() }, record.stats["floatApproximation"])
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `a proved optimum should carry its bound only when it holds within the optimality gap`(gap: Boolean) {
+        val tolerance = "{\"declared\":{\"absolute\":\"1/10000000\",\"relative\":\"1/10000\"},\"effective\":null}"
+        val status = if (gap) "gap-optimum" else "attained-optimum"
+        val (record, _) = SolveMetric.solve(
+            entry(),
+            SolverInvocation.Settings(),
+            Budget(),
+            "now",
+            "fixture",
+            installedBuild = { null },
+            invoke = { _, _, _, _ ->
+                SolverInvocation.Result(
+                    true, 10.0, null, proven = true,
+                    stats = mapOf("optimalityTolerance" to tolerance, "optimizationStatus" to status,
+                        "objectiveBound" to "9.999"),
+                    rawOutput = "v X=1\n", command = "cli",
+                )
+            },
+        )
+
+        assertEquals(Json.parseToJsonElement(tolerance).jsonObject, record.optimalityTolerance)
+        assertEquals("9.999".takeIf { gap }, record.optimalityBound)
     }
 
     @ParameterizedTest

@@ -80,6 +80,14 @@ internal data class SolveRecord(
     val comparisonControls: Map<String, String> = emptyMap(),
     /** Actual declared and effective MPS policy emitted by the installed CLI; absent on historical records. */
     val numericalSemantics: JsonObject? = null,
+    /** Declared and effective MPS optimality gap emitted by the installed CLI; absent on historical records. */
+    val optimalityTolerance: JsonObject? = null,
+    /**
+     * Proved original-unit objective bound of a [proven] optimum that holds only within the effective
+     * [optimalityTolerance] of [exactObjective]: a lower bound when minimizing, an upper bound when maximizing.
+     * Null for an exact optimum or no optimum.
+     */
+    val optimalityBound: String? = null,
 )
 
 internal object SolveMetric {
@@ -328,6 +336,11 @@ internal object SolveMetric {
             numericalSemantics = r.stats["numericalSemantics"]?.let {
                 runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull()
             },
+            optimalityTolerance = r.stats["optimalityTolerance"]?.let {
+                runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull()
+            },
+            optimalityBound = r.stats["objectiveBound"]
+                ?.takeIf { r.proven && r.stats["optimizationStatus"] == "gap-optimum" },
             timeToBestMs = bestMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
             processTimeToFirstFeasibleMs = processFirstMs,
