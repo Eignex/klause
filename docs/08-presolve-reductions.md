@@ -394,6 +394,16 @@ can use a built-in original relation with exact pinned-check authority. This doe
 not install a finite search route. A missing complete original checker remains
 indeterminate, without opening an unavailable propagator.
 
+Linear execution can validate a point through its captured enforcing components
+when an independent original checker is unavailable. The conditioned query fixes
+every original Boolean, integer and rational real coordinate together; private
+encoding coordinates remain existential and never enter the published point.
+Only complete feasibility accepts the point. Refutation rejects that point alone,
+and interruption remains indeterminate. Neighborhood checks retain their query
+allowance across points; portfolio publication opens private query state under the
+containing cancellation and work controls. An original rejection is never replaced
+by this check.
+
 `verifyRealCoordinates` checks authoritative rational coordinates against source
 bounds and supported exact relations, including strict and reified rows. Missing
 coordinates or a factor without a complete checker stay indeterminate; algebraic,
