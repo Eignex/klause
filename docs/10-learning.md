@@ -240,17 +240,17 @@ maintenance until ownership changes.
 Outside propagation, learned-store maintenance (reduction windows, retired-slot
 and watch cleanup, page and index release, and compaction) runs in bounded steps
 funded from the containing work and scratch grant. Each step is charged before
-it publishes.  A step the grant cannot fund defers with its cursor and the store
+it publishes. A step the grant cannot fund defers with its cursor and the store
 intact, and search continues, above the soft limit if protected state or unfunded
-preparation requires.  Cleanup and page or directory release never remap live
+preparation requires. Cleanup and page or directory release never remap live
 handles; handles change only through compaction, which invalidates or rebuilds
-the reduction windows, heaps, queues and candidate cursors indexed by them.  Full
-native or general compaction runs a cancellable preflight of all arrays, watches,
-reasons, queues and event indexes with a conservative envelope for its indivisible
-publication, defers without mutation on cancellation or an oversized envelope,
-and otherwise remaps the whole generation and trims retained capacity. Work debt
-and bounded steps promise no hard pause latency. Thresholds and default retention
-are separate policy decisions.
+the reduction windows, heaps, queues and candidate cursors indexed by them.
+Full native or general compaction runs a cancellable preflight of all arrays,
+watches, reasons, queues and event indexes with a conservative envelope for its
+indivisible publication, defers without mutation on cancellation or an oversized
+envelope, and otherwise remaps the whole generation and trims retained capacity.
+Work debt and bounded steps promise no hard pause latency. Thresholds and default
+retention are separate policy decisions.
 
 ## Native SAT lane
 
@@ -382,16 +382,16 @@ container or objective context, and only the owning store attaches the typed obj
 Opt-in integer learning gives finite satisfaction, enumeration and optimization
 traversals a session-local shared atom registry that reserves the prepared Boolean
 coordinates before naming integer decisions and their complements. The registry is
-bounded; an exhausted registry stops the traversal as indeterminate. Without names, a
-non-root integer decision cannot supply a shared premise and mapped admission must
-decline. Every native conflict cascade repeats the mapped-target assertion and
-complete premise checks before admitting a typed result; an unavailable mapping keeps
-its clausal fallback, including cascades reached through an LP consequence. Within one
-fixpoint publication, complete conjunctions of active named assertions can share
-bounded proof subgraphs; an unavailable, unnameable or inactive leaf withholds reuse,
-and the memo ends with the publication callback. Fixpoint facts already implied by
-shared integer endpoints keep the shared premise without reconstructing a native
-proof.
+bounded; an exhausted registry stops the traversal as indeterminate. Without names,
+a non-root integer decision cannot supply a shared premise and mapped admission
+must decline. Every native conflict cascade repeats the mapped-target assertion
+and complete premise checks before admitting a typed result; an unavailable
+mapping keeps its clausal fallback, including cascades reached through an LP
+consequence. Within one fixpoint publication, complete conjunctions of active
+named assertions can share bounded proof subgraphs, and conjunctions retain every
+child; an unavailable, unnameable or inactive leaf withholds reuse, and the memo
+ends with the publication callback. Fixpoint facts already implied by shared
+integer endpoints keep the shared premise without reconstructing a native proof.
 
 Rows share the learned store and integer bounds propagation. A successful row
 assertion also keeps its first-UIP clause in the native store; the two constraints
