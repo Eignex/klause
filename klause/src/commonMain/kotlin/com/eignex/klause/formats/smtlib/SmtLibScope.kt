@@ -28,12 +28,12 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
         }
     }
     private sealed interface Frame {
-        class Evaluate(val expression: SExpr, val locals: Locals?) : Frame
+        class Evaluate(var expression: SExpr, var locals: Locals?) : Frame
         class Combine(val head: String, val count: Int, val signature: Signature?,
             val qualification: SmtSort? = null, val indexed: SExpr.SList? = null,
             val tester: Boolean = false) : Frame
         class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
-        class SingleLet(val name: String, val body: SExpr, val locals: Locals?) : Frame
+        class SingleLet(val name: String, val body: SExpr, val locals: Locals?, val cursor: Evaluate) : Frame
         class Match(val cases: SExpr, val locals: Locals?) : Frame
         class MatchResult(val scrutinee: Int, val cases: List<SmtDatatypeCase>) : Frame
         class Record(val expression: SExpr) : Frame
@@ -482,8 +482,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                                 if (pair.items.size != 2) return null
                                 val name = pair.polynomialName(0)
                                 if (theoryFunction(name) || reservedName(name)) return null
-                                work.addLast(Frame.SingleLet(name, node.items[2], frame.locals))
-                                work.addLast(Frame.Evaluate(pair.items[1], frame.locals))
+                                work.addLast(Frame.SingleLet(name, node.items[2], frame.locals, frame))
+                                frame.expression = pair.items[1]
+                                work.addLast(frame)
                                 continue
                             }
                             val names = ArrayList<String>()
@@ -525,8 +526,11 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     val bindings = frame.names.zip(pop(frame.names.size)).toMap()
                     work.addLast(Frame.Evaluate(frame.body, Locals(bindings, frame.locals)))
                 }
-                is Frame.SingleLet -> work.addLast(Frame.Evaluate(frame.body,
-                    Locals(frame.name, values.removeLast(), frame.locals)))
+                is Frame.SingleLet -> {
+                    frame.cursor.expression = frame.body
+                    frame.cursor.locals = Locals(frame.name, values.removeLast(), frame.locals)
+                    work.addLast(frame.cursor)
+                }
                 is Frame.Match -> {
                     val scrutinee = values.removeLast()
                     val type = nodes[scrutinee].sort

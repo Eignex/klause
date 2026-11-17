@@ -48,6 +48,7 @@ class SmtLibScopeTest {
             "(let ((x true) (outer 1)) (let ((|x| 2)) (let ((y x)) (+ y outer))))" to SmtSort.Int,
             "(let ((x true)) (let ((x 2) (y x)) (ite y x 0)))" to SmtSort.Int,
             "(let ((x 1)) (let ((x (= x 1))) x))" to SmtSort.Bool,
+            "(let ((x 1)) (let ((x (let ((y (+ x 1))) y))) (= x 2)))" to SmtSort.Bool,
         )
 
         for ((expression, expected) in expressions) {
