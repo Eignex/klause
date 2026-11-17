@@ -15124,6 +15124,8 @@ final class com.eignex.klause.solver.pipeline/ExecutionDecline { // com.eignex.k
         final fun <get-cause>(): com.eignex.klause.solver.pipeline/ExecutionDeclineCause // com.eignex.klause.solver.pipeline/ExecutionDecline.cause.<get-cause>|<get-cause>(){}[0]
     final val component // com.eignex.klause.solver.pipeline/ExecutionDecline.component|{}component[0]
         final fun <get-component>(): kotlin/String? // com.eignex.klause.solver.pipeline/ExecutionDecline.component.<get-component>|<get-component>(){}[0]
+    final val encoding // com.eignex.klause.solver.pipeline/ExecutionDecline.encoding|{}encoding[0]
+        final fun <get-encoding>(): com.eignex.klause.theory/EncoderFailure? // com.eignex.klause.solver.pipeline/ExecutionDecline.encoding.<get-encoding>|<get-encoding>(){}[0]
     final val factorIndex // com.eignex.klause.solver.pipeline/ExecutionDecline.factorIndex|{}factorIndex[0]
         final fun <get-factorIndex>(): kotlin/Int? // com.eignex.klause.solver.pipeline/ExecutionDecline.factorIndex.<get-factorIndex>|<get-factorIndex>(){}[0]
     final val preparation // com.eignex.klause.solver.pipeline/ExecutionDecline.preparation|{}preparation[0]
@@ -19020,6 +19022,19 @@ final class com.eignex.klause.theory/Encoder { // com.eignex.klause.theory/Encod
         final fun <get-support>(): com.eignex.klause.theory/EncoderSupport // com.eignex.klause.theory/Encoder.support.<get-support>|<get-support>(){}[0]
 
     final fun install(com.eignex.klause.ir/Factor, com.eignex.klause.theory/TheoryEncoding): com.eignex.klause.theory/EncoderDecline? // com.eignex.klause.theory/Encoder.install|install(com.eignex.klause.ir.Factor;com.eignex.klause.theory.TheoryEncoding){}[0]
+}
+
+final class com.eignex.klause.theory/EncoderFailure { // com.eignex.klause.theory/EncoderFailure|null[0]
+    final val cause // com.eignex.klause.theory/EncoderFailure.cause|{}cause[0]
+        final fun <get-cause>(): com.eignex.klause.theory/EncoderDecline // com.eignex.klause.theory/EncoderFailure.cause.<get-cause>|<get-cause>(){}[0]
+    final val factorIndex // com.eignex.klause.theory/EncoderFailure.factorIndex|{}factorIndex[0]
+        final fun <get-factorIndex>(): kotlin/Int? // com.eignex.klause.theory/EncoderFailure.factorIndex.<get-factorIndex>|<get-factorIndex>(){}[0]
+    final val missingBooleans // com.eignex.klause.theory/EncoderFailure.missingBooleans|{}missingBooleans[0]
+        final fun <get-missingBooleans>(): kotlin.collections/Map<com.eignex.klause.ir/SourceBoolId, kotlin/Boolean> // com.eignex.klause.theory/EncoderFailure.missingBooleans.<get-missingBooleans>|<get-missingBooleans>(){}[0]
+    final val missingIntegers // com.eignex.klause.theory/EncoderFailure.missingIntegers|{}missingIntegers[0]
+        final fun <get-missingIntegers>(): kotlin.collections/List<com.eignex.klause.ir/SourceIntId> // com.eignex.klause.theory/EncoderFailure.missingIntegers.<get-missingIntegers>|<get-missingIntegers>(){}[0]
+    final val target // com.eignex.klause.theory/EncoderFailure.target|{}target[0]
+        final fun <get-target>(): com.eignex.klause.theory/EncodingTarget // com.eignex.klause.theory/EncoderFailure.target.<get-target>|<get-target>(){}[0]
 }
 
 final class com.eignex.klause.theory/EncodingAffineExpression { // com.eignex.klause.theory/EncodingAffineExpression|null[0]

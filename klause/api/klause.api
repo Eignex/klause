@@ -12655,6 +12655,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionComponentDescripto
 public final class com/eignex/klause/solver/pipeline/ExecutionDecline {
 	public final fun getCause ()Lcom/eignex/klause/solver/pipeline/ExecutionDeclineCause;
 	public final fun getComponent ()Ljava/lang/String;
+	public final fun getEncoding ()Lcom/eignex/klause/theory/EncoderFailure;
 	public final fun getFactorIndex ()Ljava/lang/Integer;
 	public final fun getPreparation ()Lcom/eignex/klause/solver/pipeline/PreparedPlanDecline;
 }
@@ -17960,6 +17961,15 @@ public final class com/eignex/klause/theory/EncoderDecline : java/lang/Enum {
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/theory/EncoderDecline;
 	public static fun values ()[Lcom/eignex/klause/theory/EncoderDecline;
+}
+
+public final class com/eignex/klause/theory/EncoderFailure {
+	public synthetic fun <init> (Ljava/lang/String;Lcom/eignex/klause/theory/EncoderDecline;Ljava/lang/Integer;Ljava/util/List;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCause ()Lcom/eignex/klause/theory/EncoderDecline;
+	public final fun getFactorIndex ()Ljava/lang/Integer;
+	public final fun getMissingBooleans ()Ljava/util/Map;
+	public final fun getMissingIntegers ()Ljava/util/List;
+	public final fun getTarget-UtreXms ()Ljava/lang/String;
 }
 
 public abstract interface class com/eignex/klause/theory/EncoderProvider {
