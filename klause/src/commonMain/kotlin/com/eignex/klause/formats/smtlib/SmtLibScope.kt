@@ -12,11 +12,16 @@ internal class SmtExpressionIdentity(val expression: SExpr) {
 internal class SmtLibScope(private val cancellation: ExecutionControl,
     private val allowSolverSymbols: Boolean = false) {
     private class Signature(val parameters: List<SmtSort>, val result: SmtSort, val identity: Int)
-    private class Locals(val values: Map<String, Int>, val parent: Locals?) {
+    private class Locals private constructor(val values: Map<String, Int>?, val name: String?, val value: Int,
+        val parent: Locals?) {
+        constructor(values: Map<String, Int>, parent: Locals?) : this(values, null, 0, parent)
+        constructor(name: String, value: Int, parent: Locals?) : this(null, name, value, parent)
+
         fun get(name: String): Int? {
             var scope: Locals? = this
             while (scope != null) {
-                scope.values[name]?.let { return it }
+                if (scope.name == name) return scope.value
+                scope.values?.get(name)?.let { return it }
                 scope = scope.parent
             }
             return null
@@ -521,7 +526,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     work.addLast(Frame.Evaluate(frame.body, Locals(bindings, frame.locals)))
                 }
                 is Frame.SingleLet -> work.addLast(Frame.Evaluate(frame.body,
-                    Locals(mapOf(frame.name to values.removeLast()), frame.locals)))
+                    Locals(frame.name, values.removeLast(), frame.locals)))
                 is Frame.Match -> {
                     val scrutinee = values.removeLast()
                     val type = nodes[scrutinee].sort

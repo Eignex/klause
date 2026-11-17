@@ -8,6 +8,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionKind
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.executionKind
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -38,6 +39,23 @@ class SmtLibScopeTest {
     fun `single let bindings require a symbol and exactly one value`() {
         for (binding in listOf("x", "(x)", "(x true false)", "((x) true)", "(0 true)")) {
             assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(assert (let ($binding) true))") }
+        }
+    }
+
+    @Test
+    fun `single let bindings preserve enclosing and shadowed lexical types`() {
+        val expressions = listOf(
+            "(let ((x true) (outer 1)) (let ((|x| 2)) (let ((y x)) (+ y outer))))" to SmtSort.Int,
+            "(let ((x true)) (let ((x 2) (y x)) (ite y x 0)))" to SmtSort.Int,
+            "(let ((x 1)) (let ((x (= x 1))) x))" to SmtSort.Bool,
+        )
+
+        for ((expression, expected) in expressions) {
+            val scope = SmtLibScope(ExecutionControl.Never)
+
+            val actual = scope.termSort(SExprReader(expression).readAll().single())
+
+            assertEquals(expected, actual)
         }
     }
 
