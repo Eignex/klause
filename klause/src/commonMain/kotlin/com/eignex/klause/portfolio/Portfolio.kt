@@ -695,7 +695,7 @@ class Portfolio(
                 bounded?.gapFloor?.let { if (it < gapFloor) gapFloor = it }
                 gapFloor
             }
-            // A search that reports no proof is credited the gap cutoff of the pool, which already holds its incumbents.
+            // A search reporting no proof is credited the pool's gap cutoff; the pool already holds its incumbents.
             val armBound = if (optimalityGap == null) observedCutoffs[arm]
             else PortfolioReduction.armExhaustionBound(bounded?.exhaustionBound,
                 optimalityGap.cutoff(incumbents.bound()), runGapFloor)
@@ -870,7 +870,8 @@ class Portfolio(
             else -> TerminationReason.Cancelled
         }
         val standing = incumbents.projected()
-        val proved = minOf(maxOf(exhaustionBound, sharedObjectiveBound?.current() ?: Double.NEGATIVE_INFINITY), gapFloor)
+        val shared = sharedObjectiveBound?.current() ?: Double.NEGATIVE_INFINITY
+        val proved = minOf(maxOf(exhaustionBound, shared), gapFloor)
         val gapBound = standing?.let {
             PortfolioReduction.gapBound(optimalityGap, it.objective, incumbents.bound(), proved)
         }
