@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.tolerantReals
+import com.eignex.klause.backtrack.unstatedAcceptance
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.mps.Mps
@@ -288,5 +290,25 @@ class LeafRealCompletionTest {
                 }
             }
         }
+    }
+
+    // `v >= 1` over `v` in `[0, bound]`, within a slack of 1/1024, completed with a search that cannot state it.
+    private fun completeGap(bound: Double): Completion {
+        val source = tolerantReals(
+            arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0)),
+            doubleArrayOf(0.0), doubleArrayOf(bound),
+        )
+        return LeafRealCompletion(source, null, unstatedAcceptance(source))
+            .complete(Sample(BooleanArray(0), LongArray(0)), ExecutionControl.Never)
+    }
+
+    @Test
+    fun `a candidate only the slack admits should stay undecided when the tolerance search cannot run`() {
+        assertIs<Completion.Undecided>(completeGap(0.9995))
+    }
+
+    @Test
+    fun `a candidate infeasible beyond the slack should be refuted when the tolerance search cannot run`() {
+        assertIs<Completion.Refuted>(completeGap(0.99))
     }
 }

@@ -615,13 +615,16 @@ internal fun LpEngine.sparseSafePrune(
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
     val nodeView = if (numericalDeductions) FloatNodeView(boundRel.model) else null
     val numerical = nodeView?.let {
-        FloatDeductionCertificate.of(boundRel.model, boundRes.duals, sink.lp.certificationObserver(LpRoute.NODE), it)
+        FloatDeductionCertificate.of(
+            boundRel.model, boundRes.duals, sink.lp.certificationObserver(LpRoute.NODE), it, solveContext.boundSlack,
+        )
     }
     val cert = if (numericalDeductions) {
         // The objective box and half the LP duals fix columns the LP duals leave free, as the exact alternatives do.
         if (canFix) for (share in doubleArrayOf(0.0, 0.5)) {
             val duals = DoubleArray(boundRes.duals.size) { boundRes.duals[it] * share }
-            FloatDeductionCertificate.of(boundRel.model, duals, node = checkNotNull(nodeView))
+            val node = checkNotNull(nodeView)
+            FloatDeductionCertificate.of(boundRel.model, duals, node = node, slack = solveContext.boundSlack)
                 ?.let(additionalCertificates::add)
         }
         numerical
@@ -954,7 +957,7 @@ internal fun LpEngine.objectiveLowerBound(
     observer: LpCertificationObserver?,
     charged: Boolean = false,
 ): Double? = if (numericalDeductions) {
-    FloatDeductionCertificate.of(model, duals)?.lowerBound
+    FloatDeductionCertificate.of(model, duals, slack = solveContext.boundSlack)?.lowerBound
 } else {
     certifiedTightObjectiveLowerBound(
         if (charged) model.alsoCharged(this) else model, duals, observer, solveContext.certificationPolicy,
@@ -966,7 +969,7 @@ internal fun LpEngine.objectiveLowerBound(
  * empty numerical ray refutes the node without a combination a learned clause can cite.
  */
 internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, sink: SolveStatsSink): LongArray? {
-    if (numericalDeductions) return floatFarkasRay(model, floatRay)
+    if (numericalDeductions) return floatFarkasRay(model, floatRay, solveContext.refutationSlack)
     return solveContext.certificationPolicy.acceptNullable(
         LpCertifier.EXACT_FARKAS,
         certifyLpFarkas(model.alsoCharged(this), floatRay, onRoute = {

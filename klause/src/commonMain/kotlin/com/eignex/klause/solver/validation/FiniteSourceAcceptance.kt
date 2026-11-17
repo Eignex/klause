@@ -1,10 +1,14 @@
 package com.eignex.klause.solver.validation
 
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.lp.engine.LpBoundSlack
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.SearchExecutionControls
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import kotlin.math.nextUp
 
 internal class FiniteSourceAcceptance(
     private val accepts: (Sample) -> Boolean,
@@ -88,16 +92,17 @@ internal sealed interface RealOptimizationResult {
     ) : RealOptimizationResult
 }
 
-// [exact], and the optimization [widened] gives in its place when [exact] refutes the point or cannot state it, as
-// when it is absent. An exact optimum strains no relation, so it stands wherever one exists; null when neither is.
-internal fun exactFirst(
-    exact: RealCompletionOptimization?,
-    widened: () -> RealCompletionOptimization?,
-): RealCompletionOptimization? = if (exact == null) widened() else ExactFirstOptimization(exact, widened)
+// [widened], the optimization within the source tolerance, and [exact] in its place when [widened] is absent or cannot
+// state the point; null when neither is. Under a tolerance only a [widened] result decides the point: a caller reads an
+// exact result there as points without an optimality proof or a refutation.
+internal fun toleranceFirst(
+    widened: RealCompletionOptimization?,
+    exact: () -> RealCompletionOptimization?,
+): RealCompletionOptimization? = if (widened == null) exact() else ToleranceFirstOptimization(widened, exact)
 
-private class ExactFirstOptimization(
+private class ToleranceFirstOptimization(
     private var active: RealCompletionOptimization,
-    private var widened: (() -> RealCompletionOptimization?)?,
+    private var exact: (() -> RealCompletionOptimization?)?,
 ) : RealCompletionOptimization {
     private var settled = 0L
 
@@ -113,16 +118,28 @@ private class ExactFirstOptimization(
             val remaining = if (workLimit == 0L) 0L else (workLimit - (work - start)).coerceAtLeast(1L)
             val step = active.advance(cancellation, remaining, shouldPause)
             val result = (step as? RealOptimizationStep.Completed)?.result ?: return step
-            val stated = result !is RealOptimizationResult.Refuted &&
-                (result !is RealOptimizationResult.Undecided || result.incumbent != null || cancellation())
-            val fallback = widened.takeUnless { stated } ?: return step
-            widened = null
+            val stated = result !is RealOptimizationResult.Undecided || result.incumbent != null ||
+                result.infimum != null || cancellation()
+            val fallback = exact.takeUnless { stated } ?: return step
+            exact = null
             val next = fallback() ?: return step
             settled += active.work
             active = next
             if (shouldPause() || (workLimit > 0L && work - start >= workLimit)) return RealOptimizationStep.Paused
         }
     }
+}
+
+// This context with its numerical refutations and bounds held over every side widened by [problem]'s source slack,
+// where [check] decides points through a search within that tolerance: a node or leaf is then refuted, and a bound
+// prunes or propagates, only beyond the slack the leaves read. Unchanged otherwise.
+internal fun LpSolveContext.readingSourceSlack(problem: Problem, check: ((Sample) -> Boolean)?): LpSolveContext {
+    val policy = problem.semantics.effective.feasibilityTolerance
+    if (!numericalDeductions || policy == null || policy.isExact || check.toleranceSearch() == null) return this
+    fun upper(value: SemanticRational) =
+        BigFraction.of(value.numerator, value.denominator).toDouble().let { if (it == 0.0) it else it.nextUp() }
+    val slack = LpBoundSlack(upper(policy.absolute), upper(policy.relative))
+    return copy(refutationSlack = slack, boundSlack = slack)
 }
 
 // A finite objective's coefficients over [count] real coordinates as exact costs, or null when one is not finite.

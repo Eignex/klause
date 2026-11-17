@@ -321,6 +321,12 @@ class FiniteExecutionTest {
     // Exact optima in the minimized frame the source objective reads: a maximum of 3.0 is -3.0.
     private val absOptima = mapOf("minimize y" to 0.0, "maximize y" to -3.0, "minimize x" to -2.0, "maximize x" to -3.0)
 
+    // Optima by default. The leaf LP certifies the vertex of its envelope in three directions; maximizing `y` leaves
+    // the envelope and is minimized within the absolute slack of 1e-7, by which each declaration and the residual
+    // `abs(y - abs(x))` move, so `y` reaches `abs(x) + 1e-7` with `x` at `3 + 1e-7`.
+    private val absDefaultOptima = mapOf("minimize y" to 0.0, "maximize y" to -3.0000002, "minimize x" to -2.0,
+        "maximize x" to -3.0)
+
     private val numerical = SemanticOverrides()
     private val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
 
@@ -343,10 +349,10 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `backtracking should prove the exact optimum of a real objective over an absolute value within tolerance`() {
-        val reached = absOptima.keys.associateWith { outcome(numerical, absObjective(it)) }
+    fun `backtracking should prove the optimum of a real objective over an absolute value within tolerance`() {
+        val reached = absDefaultOptima.keys.associateWith { outcome(numerical, absObjective(it)) }
 
-        assertEquals(absOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
+        assertEquals(absDefaultOptima.mapValues { FiniteSolveVerdict.OPTIMAL to it.value }, reached)
     }
 
     @Test
@@ -360,7 +366,7 @@ class FiniteExecutionTest {
     fun `backtracking should prove the optimum of a real objective over an absolute value under presolve`() {
         val reached = outcome(numerical, absObjective("maximize y"), PresolveConfig())
 
-        assertEquals(FiniteSolveVerdict.OPTIMAL to -3.0, reached)
+        assertEquals(FiniteSolveVerdict.OPTIMAL to -3.0000002, reached)
     }
 
     // `m = max(a, b)` or `m = min(a, b)` with `a` in [0.0, 1.0] and `b` in [0.0, 2.0], beside an integer column.
@@ -373,9 +379,11 @@ class FiniteExecutionTest {
         solve $solve;
     """.trimIndent()
 
-    // Exact optima in the minimized frame of each extremum direction.
+    // Optima by default in the minimized frame of each extremum direction. The leaf LP certifies three directions;
+    // maximizing a maximum leaves its relaxation and is minimized within the absolute slack, by which each declaration
+    // and the residual of the extremum move.
     private val extremumOptima = mapOf(
-        ("float_max" to "minimize m") to 0.0, ("float_max" to "maximize m") to -2.0,
+        ("float_max" to "minimize m") to 0.0, ("float_max" to "maximize m") to -2.0000002,
         ("float_min" to "minimize m") to 0.0, ("float_min" to "maximize m") to -1.0,
     )
 
@@ -392,7 +400,7 @@ class FiniteExecutionTest {
     fun `backtracking should prove the optimum of a real extremum under presolve`() {
         val reached = outcome(numerical, extremum("float_max", "maximize m"), PresolveConfig())
 
-        assertEquals(FiniteSolveVerdict.OPTIMAL to -2.0, reached)
+        assertEquals(FiniteSolveVerdict.OPTIMAL to -2.0000002, reached)
     }
 
     @Test

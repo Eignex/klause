@@ -122,7 +122,13 @@ bound up. A reduced cost beyond its rounding prices and cites its minimizing sid
 within it prices both sides and cites the finite ones. An open side is priced at the tightest
 bound a single row implies, preferring rows whose validity a reason can cite, and the
 reasons cite that row and each side the implied bound reads; a reduced cost within rounding
-on a side no row bounds counts as zero. It supplies node pruning, objective propagation,
+on a side no row bounds counts as zero. A caller whose leaves read a region wider than the
+rows, as a finite search on a source with a tolerance search does, passes an `LpBoundSlack`
+through `LpSolveContext`, and each priced side, a row's slack included, moves by it against
+the bound. A relative slack reads a magnitude no smaller than the side's before the
+lower-bound shift (a column side plus its origin, a right-hand side plus each shifted term),
+so it never falls short of the slack the source bound admits. It supplies node pruning,
+objective propagation,
 reduced-cost fixing with their reasons, root bounds shared with peers, and shaving; fixing
 also tries the objective box (zero multipliers) and half the duals.
 
@@ -131,8 +137,10 @@ margin exceeds the tolerance times the terms' size, pricing open sides at their 
 bounds. Each implying row is folded into the ray so its open column cancels, in binary64
 and then exactly on the rounded integer ray, slacks first. That ray must pass again against
 the box, each column at the side the exact sign of its combination meets, which is the side
-its clause cites; otherwise the node is refuted without a learned clause. It backs
-infeasibility pruning, leaf refutation, learned conflicts and presolve root infeasibility. Mixed row
+its clause cites; otherwise the node is refuted without a learned clause. A refutation slack in
+`LpSolveContext` moves every side outward first, in both checks, so the ray refutes only a
+model infeasible by more than that slack. It backs infeasibility pruning, leaf refutation,
+learned conflicts and presolve root infeasibility; presolve passes no slack. Mixed row
 projections, strict-row solves and component bounds have no numerical form and are skipped.
 Optimality, infeasibility and bound claims resting on these deductions are numerical. Under
 exact certification every deduction uses the packages below.

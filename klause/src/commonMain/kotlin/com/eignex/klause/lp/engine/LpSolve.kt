@@ -70,6 +70,8 @@ internal class CertifiedLpResult(
     val certificationReused: Boolean = false,
     // Numerical refutation only; an empty ray has no combination a learned clause can cite.
     val floatInfeasibility: LongArray? = null,
+    // Whether [floatInfeasibility] holds with every side widened by the caller's refutation slack.
+    val refutesWithinSlack: Boolean = false,
 ) {
     val verdict: LpVerdict = when {
         floatOptimum != null -> LpVerdict.TOLERANCE_OPTIMUM
@@ -277,7 +279,8 @@ private fun solveProjectedAndCertify(
     }
     if (cancellation()) return@use CertifiedLpResult(null, null, null, null, null, false, { null })
     if (context.numericalDeductions && acceptFloatInfeasibility) {
-        numericalLpRefutation(model, solver, result, cancellation, observer)?.let { return@use it }
+        numericalLpRefutation(model, solver, result, cancellation, observer, context.refutationSlack)
+            ?.let { return@use it }
     }
     var sourceRefused = false
     if (result != null && result.optimal) {

@@ -1468,7 +1468,8 @@ internal class LpEngine(
      * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
      * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
      * active rows' premises) and stashes it for [lastBackjump], unless [poolRefutation] is false: a caller that
-     * decides the leaf within a tolerance the exact rows do not read keeps no such lemma. On [LpVerdict.FEASIBLE] and
+     * decides the leaf within a tolerance the exact rows do not read keeps no such lemma, except from a refutation that
+     * holds over the sides widened by the context's refutation slack. On [LpVerdict.FEASIBLE] and
      * [LpVerdict.ATTAINED_OPTIMUM] the returned reals complete the assignment exactly; on
      * [LpVerdict.TOLERANCE_OPTIMUM] they are the float optimum [toleranceCheck] accepted. The float solve is
      * capped by work sized from the model; a leaf it stops short of a verdict is [LpVerdict.INDETERMINATE].
@@ -1523,8 +1524,9 @@ internal class LpEngine(
                         ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                         ?: activePremiseClause(relaxation, session)
                 }
-                if (clause != null && poolRefutation) lpNogoods?.add(clause)
-                LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray())
+                if (clause != null && (poolRefutation || certified.refutesWithinSlack)) lpNogoods?.add(clause)
+                LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray(),
+                    refutesWithinSlack = certified.refutesWithinSlack)
             }
 
             LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> LeafRealResult(

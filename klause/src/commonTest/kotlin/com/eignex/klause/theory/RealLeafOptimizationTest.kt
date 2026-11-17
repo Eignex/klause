@@ -5,12 +5,15 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.ResumableMinimize
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticRational
@@ -19,6 +22,7 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -125,6 +129,82 @@ class RealLeafOptimizationTest {
         assertEquals(listOf(0.0, 0.0), results.values.map { assertIs<MinimizeResult.Optimal>(it).objective })
     }
 
+    private val dyadic = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(1024)))
+
+    // `minimize v` over `v/16 + 100k >= 100.125`, `v/32 - 100k >= -199.9375` and `v != 2` with `k` and a free `j` in
+    // `[1, 2]`: each `k` states `v >= 2` through one row, the disequality keeps every leaf from the LP's vertex, and
+    // within a slack of 1/1024 the leaves of `k = 1` reach `2 - 16/1024` and those of `k = 2` reach `2 - 32/1024`.
+    private val sensitiveRows = Problem(
+        0, 2, arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
+        arrayOf(
+            Linear(intArrayOf(0), doubleArrayOf(100.0), intArrayOf(0), doubleArrayOf(0.0625), LinearOp.GE, 100.125),
+            Linear(intArrayOf(0), doubleArrayOf(-100.0), intArrayOf(0), doubleArrayOf(0.03125), LinearOp.GE,
+                -199.9375),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.NE, 2.0),
+        ),
+        numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0),
+        semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+            feasibilityTolerance = dyadic).resolve(),
+    )
+
+    @Test
+    fun `node bounds should keep a subtree whose only improvement lies within the slack in either branch order`() {
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+
+        val optima = listOf(IndomainMin, IndomainMax).map { selector ->
+            assertIs<MinimizeResult.Optimal>(tolerantMinimum(sensitiveRows, dyadic, objective, selector)).objective
+        }
+
+        assertEquals(listOf(2.0 - 32.0 / 1024, 2.0 - 32.0 / 1024), optima)
+    }
+
+    // `minimize 5k + v` over `k + v >= 1` with `k` and a free `j` in `[0, 1]` and `v` in `[0, bound]`: `k = 0` needs
+    // `v >= 1 - 1/1024` within a slack of 1/1024, which a bound of 0.9995 admits, past the float LP's own tolerance,
+    // and a bound of 0.99 misses by more than the slack.
+    private fun slackGap(bound: Double) = Problem(
+        0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+        arrayOf(Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0)),
+        numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(bound),
+        semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+            feasibilityTolerance = dyadic).resolve(),
+    )
+
+    // The tolerant minimization of [objective] over [source] under [selector], with node bounds and plain value order.
+    private fun tolerantMinimum(
+        source: Problem,
+        policy: SourceTolerance,
+        objective: LinearObjective,
+        selector: ValueSelector = IndomainMin,
+    ): MinimizeResult {
+        val accepts = checkNotNull(capturedRealAcceptance(source, ExecutionControl.Never))
+        val acceptance = FiniteSourceAcceptance(accepts, true, search = SourceToleranceSearch(source, policy))
+        val params = BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = selector,
+            toleranceCheck = acceptance,
+            lpPlan = LpPlan(bounding = true, branching = false, probe = false, rootCutHarvest = false))
+        return BacktrackSolver(source.bake(), LpSolveContext.finite(numerical = true)).minimize(objective, params)
+    }
+
+    @Test
+    fun `a node infeasible only within the slack should not be refuted in either branch order`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(5L, 0L), realCoefficients = doubleArrayOf(1.0))
+
+        val optima = listOf(IndomainMin, IndomainMax).map { selector ->
+            assertIs<MinimizeResult.Optimal>(tolerantMinimum(slackGap(0.9995), dyadic, objective, selector))
+                .objective
+        }
+
+        assertEquals(listOf(1.0 - 1.0 / 1024, 1.0 - 1.0 / 1024), optima)
+    }
+
+    @Test
+    fun `a node infeasible beyond the slack should be refuted`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(5L, 0L), realCoefficients = doubleArrayOf(1.0))
+
+        val result = tolerantMinimum(slackGap(0.99), dyadic, objective)
+
+        assertEquals(5.0, assertIs<MinimizeResult.Optimal>(result).objective)
+    }
+
     @Test
     fun `minimization should refute a leaf whose relaxation holds but no member does`() {
         val result = BacktrackSolver(membership(0.0, 1.0).bake())
@@ -153,31 +233,39 @@ class RealLeafOptimizationTest {
 
     private val tenth = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10)))
 
-    // Each direction's objective over `(x, y)` and its exact optimum, which stands within tolerance as well.
+    // Each direction's objective over `(x, y)` with its exact optimum and its optimum within a tenth. The LP certifies
+    // the vertex of its envelope in three directions; maximizing `y` leaves the envelope and is minimized within the
+    // tenth, by which each declared bound and the residual `abs(y - abs(x))` move.
     private val magnitudeOptima = listOf(
-        doubleArrayOf(0.0, 1.0) to 0.0,
-        doubleArrayOf(0.0, -1.0) to -3.0,
-        doubleArrayOf(1.0, 0.0) to -2.0,
-        doubleArrayOf(-1.0, 0.0) to -3.0,
+        doubleArrayOf(0.0, 1.0) to (0.0 to 0.0),
+        doubleArrayOf(0.0, -1.0) to (-3.0 to -3.2),
+        doubleArrayOf(1.0, 0.0) to (-2.0 to -2.0),
+        doubleArrayOf(-1.0, 0.0) to (-3.0 to -3.0),
     )
 
-    @Test
-    fun `candidate completion should reach the exact optimum of an absolute value in either mode`() {
-        for ((costs, optimum) in magnitudeOptima) {
-            for (tolerance in listOf(null, tenth)) {
-                val source = magnitude(tolerance)
-                val acceptance = tolerance?.let { policy ->
-                    FiniteSourceAcceptance(checkNotNull(capturedRealAcceptance(source, ExecutionControl.Never)), true,
-                        search = SourceToleranceSearch(source, policy))
-                }
-                val objective = LinearObjective(realCoefficients = costs)
-
-                val completed = LeafRealCompletion(source, objective, acceptance).complete(leaf, ExecutionControl.Never)
-
-                val point = assertIs<Completion.Witness>(completed).sample
-                assertEquals(optimum, objective.evaluate(point), "${costs.toList()} $tolerance")
-            }
+    // The objective candidate completion reaches over [source] under [tolerance].
+    private fun completedObjective(source: Problem, costs: DoubleArray, tolerance: SourceTolerance?): Double {
+        val acceptance = tolerance?.let { policy ->
+            FiniteSourceAcceptance(checkNotNull(capturedRealAcceptance(source, ExecutionControl.Never)), true,
+                search = SourceToleranceSearch(source, policy))
         }
+        val objective = LinearObjective(realCoefficients = costs)
+        val completed = LeafRealCompletion(source, objective, acceptance).complete(leaf, ExecutionControl.Never)
+        return objective.evaluate(assertIs<Completion.Witness>(completed).sample)
+    }
+
+    @Test
+    fun `candidate completion should reach the exact optimum of an absolute value without a tolerance`() {
+        val reached = magnitudeOptima.map { (costs, _) -> completedObjective(magnitude(null), costs, null) }
+
+        assertEquals(magnitudeOptima.map { it.second.first }, reached)
+    }
+
+    @Test
+    fun `candidate completion should reach the optimum of an absolute value within the tolerance`() {
+        val reached = magnitudeOptima.map { (costs, _) -> completedObjective(magnitude(tenth), costs, tenth) }
+
+        assertEquals(magnitudeOptima.map { it.second.second }, reached)
     }
 
     // `m = max(a, b)` or `m = min(a, b)`, leaf-enforced, with `a` in `[0, 1]`, `b` in `[0, 2]`, within a tenth.
@@ -189,8 +277,9 @@ class RealLeafOptimizationTest {
     )
 
     @Test
-    fun `candidate completion should reach the exact optimum of a leaf enforced extremum in each direction`() {
-        val optima = mapOf((true to 1.0) to 0.0, (true to -1.0) to -2.0, (false to 1.0) to 0.0, (false to -1.0) to -1.0)
+    fun `candidate completion should reach the optimum of a leaf enforced extremum within the tolerance`() {
+        val optima =
+            mapOf((true to 1.0) to 0.0, (true to -1.0) to -2.2, (false to 1.0) to 0.0, (false to -1.0) to -1.0)
 
         val reached = optima.keys.associateWith { (max, sign) ->
             val source = extremum(max)

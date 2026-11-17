@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.ExecutionControl
+import kotlin.math.abs
+import kotlin.math.max
 
 /** Entering-column policy for feasibility solves with an exactly zero objective. */
 enum class LpZeroObjectivePricing {
@@ -9,6 +11,19 @@ enum class LpZeroObjectivePricing {
 
     /** Prefer fewer disturbed non-free basics, then source-column sparsity and seeded ties. */
     MIN_BOUND_SUPPORT,
+}
+
+// The amount a relaxation side `s` moves by: `max(absolute, relative * abs(s))`.
+internal data class LpBoundSlack(val absolute: Double, val relative: Double) {
+    init {
+        require(absolute >= 0.0 && relative >= 0.0)
+    }
+
+    fun at(side: Double): Double = max(absolute, relative * abs(side))
+
+    companion object {
+        val NONE = LpBoundSlack(0.0, 0.0)
+    }
 }
 
 /** Construction-time pricing and basis resource policy. Nonzero objectives ignore [zeroObjective]. */
@@ -146,6 +161,13 @@ internal data class LpSolveContext(
      * open theories and source LP optimization keep exact certification.
      */
     val numericalDeductions: Boolean = false,
+    /** How far each side of a relaxation moves in the region the caller decides; numerical bounds hold over it. */
+    val boundSlack: LpBoundSlack = LpBoundSlack.NONE,
+    /**
+     * How far each side of a relaxation moves in the region the caller decides points in; a numerical refutation
+     * holds over it, so it refutes only a model infeasible by more than this slack.
+     */
+    val refutationSlack: LpBoundSlack = LpBoundSlack.NONE,
 ) {
     companion object {
         val Production = LpSolveContext()
