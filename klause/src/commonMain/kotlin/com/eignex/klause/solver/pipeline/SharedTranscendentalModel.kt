@@ -134,14 +134,15 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
     } else transcendentalExecutionContract()
     val execution = if (completion == null) PreparedExecution.Declined(source, requireNotNull(decline))
     else PreparedExecution.Transcendental(this, completion)
-    return PreparedSourcePlan(this, execution, listOf(
-            ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteIndices,
-                (0 until source.numIntVars).toList(), emptyList(), (0 until source.numBoolVars).toList(),
-                source.finiteComponentContract(finiteIndices, (0 until source.numIntVars).toList(), null,
-                    sourceCompletion = completion != null, exactNeighborhood = false, projections = projections)),
-            ExecutionComponentDescriptor("transcendental", ComponentResponsibility.COMPLETION, encoded,
-                emptyList(), (0 until source.numRealVars).toList(), execution = support),
-        ), boolCount, integerCoordinates.size, realCoordinates.size,
+    val components = listOf(
+        ExecutionComponentDescriptor("finite", ComponentResponsibility.FINITE, finiteIndices,
+            (0 until source.numIntVars).toList(), emptyList(), (0 until source.numBoolVars).toList(),
+            source.finiteComponentContract(finiteIndices, (0 until source.numIntVars).toList(), null,
+                sourceCompletion = completion != null, exactNeighborhood = false, projections = projections)),
+        ExecutionComponentDescriptor("transcendental", ComponentResponsibility.COMPLETION, encoded,
+            emptyList(), (0 until source.numRealVars).toList(), execution = support),
+    )
+    return PreparedSourcePlan(this, execution, components, boolCount, integerCoordinates.size, realCoordinates.size,
         integerCoordinates = (0 until source.numIntVars).toList(),
         realCoordinates = (0 until source.numRealVars).toList(),
         operations = setOf(ExecutionOperation.SATISFY), factorProjections = projections)
