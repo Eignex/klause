@@ -75,7 +75,8 @@ class PortfolioOptimalityGapTest {
     ) : ResumableSearch, GapBoundedSearch {
         var slices = 0
         override val appliedOptimalityGap: Boolean get() = gapFloor.isFinite()
-        override val exhaustionBound: Double get() = if (slices > incumbents.size) gapFloor else Double.NEGATIVE_INFINITY
+        override val exhaustionBound: Double
+            get() = if (slices > incumbents.size) gapFloor else Double.NEGATIVE_INFINITY
 
         override fun runSlice(
             global: ExecutionControl,

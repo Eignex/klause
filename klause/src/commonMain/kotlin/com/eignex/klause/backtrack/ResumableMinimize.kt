@@ -1107,7 +1107,9 @@ internal class ResumableMinimize(
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
             b != null -> MinimizeResult.Optimal(b.assignment, b.objective.display, stats,
-                gapBound = if (known < b.objective.display) params.optimalityGap?.exhaustedBound(bestObj, known) else null)
+                gapBound = if (known < b.objective.display) {
+                    params.optimalityGap?.exhaustedBound(bestObj, known)
+                } else null)
 
             else -> MinimizeResult.Infeasible(core, stats)
         }
