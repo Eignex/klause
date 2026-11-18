@@ -385,7 +385,7 @@ class PortfolioIncumbentAcceptanceTest {
             ),
         ).use { search ->
             val result = assertIs<MinimizeResult.Unknown>(search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
-            assertEquals(TerminationReason.Unsupported, result.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, result.reason)
             assertTrue(search.isDone)
         }
         assertTrue(declined)
