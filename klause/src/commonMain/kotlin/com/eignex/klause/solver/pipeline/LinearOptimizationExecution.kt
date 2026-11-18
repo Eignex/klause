@@ -24,7 +24,7 @@ fun OpenTheoryPipeline.optimizeLinear(
         val result = requireNotNull(invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1, onIncumbent))
         invocation.close()
         LinearOptimizationResult(context.scope, result.terminal, result.bound, result.incumbent,
-            result.value, result.reason, invocation.stats, context.semantics)
+            result.value, result.reason, invocation.stats, context.semantics, result.gapClosed)
     }
 }
 
@@ -32,6 +32,8 @@ internal fun LinearOptimizationResult.openOptimum(): OpenTheoryOptimum {
     val sign = if (scope.objective?.sense == ObjectiveSense.MAXIMIZE) BigFraction.MINUS_ONE else BigFraction.ONE
     val sampled = incumbent?.let { OpenTheoryAssignment.Sampled(it) }
     val score = value?.let { it * sign }
+    if (gapClosed) return OpenTheoryOptimum.Optimal(requireNotNull(sampled), requireNotNull(score), stats, this,
+        gapBound = ((requireNotNull(bound).claim as SourceClaim.Bound).value as SourceValue.Rational).value * sign)
     return when (val claim = terminal?.claim) {
         is SourceClaim.Optimal -> OpenTheoryOptimum.Optimal(OpenTheoryAssignment.Sampled(claim.sample),
             (claim.value as SourceValue.Rational).value * sign, stats, this)

@@ -18,6 +18,7 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.LinearOptimizationResult
@@ -31,6 +32,7 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
@@ -55,15 +57,17 @@ sealed interface OpenTheoryOptimum {
     /** Checked original-source linear authority, when this invocation used the affine adapter. */
     val linearResult: LinearOptimizationResult? get() = null
 
-    /** An assignment, and a proof that nothing feasible lies below [value]. */
+    /** An assignment with exact bound closure, or a declared-gap completion carrying [gapBound]. */
     data class Optimal(
-        /** The optimal assignment. */
+        /** The accepted assignment. */
         val assignment: OpenTheoryAssignment,
         /** Its objective value. */
         val value: BigFraction,
         override val stats: SolveStats,
         override val linearResult: LinearOptimizationResult? = null,
         override val semantics: EffectiveSourceSemantics? = linearResult?.semantics,
+        /** Proved minimized bound when completion used the declared gap; null means exact closure. */
+        val gapBound: BigFraction? = null,
     ) : OpenTheoryOptimum
 
     /** The model has no feasible assignment, at any objective value. */
@@ -259,6 +263,7 @@ class OpenTheoryMinimizer internal constructor(
 
         // Whether the current round's row states a bound another arm reached rather than the descent's own.
         private var roundBoundExternal = false
+        private var roundGapBound: BigFraction? = null
         private var verdict: OpenTheoryOptimum? = null
 
         /** Whether the descent has reached its verdict. */
@@ -393,12 +398,16 @@ class OpenTheoryMinimizer internal constructor(
             val external = externalBound()?.takeIf { terms.isNotEmpty() && (own == null || it < own) }
             roundBoundExternal = external != null
             val bound = external ?: own
+            val gapFloor = if (external == null && own != null) source.semantics.effective.optimalityTolerance
+                ?.takeUnless { it.isExact }?.let { OptimalityGap(it).floor(own.asFraction()) } else null
+            val cutoff = gapFloor?.let { ceilDiv(it.num, it.den) } ?: bound
+            roundGapBound = cutoff?.takeIf { own != null && it < own }?.asFraction()
             // The opening round decides the model itself, so the row leaves plan and spec together until a
             // witness gives it a bound to state.
             val (spec, plan) = when {
                 terms.isEmpty() -> opened.base to opened.boundedPlan.forObjectiveRound(opened.base, appended = false)
                 bound == null -> opened.base to opened.boundedPlan.withoutAppendedFactor(opened.base)
-                else -> opened.base.boundedBy(bound - BIG_ONE).let { spec ->
+                else -> opened.base.boundedBy(requireNotNull(cutoff) - BIG_ONE).let { spec ->
                     spec to opened.boundedPlan.forObjectiveRound(spec, appended = true,
                         cancellation = presolveCancellation or params.cancellation or params.timeout or global)
                 }
@@ -486,7 +495,8 @@ class OpenTheoryMinimizer internal constructor(
          */
         private fun proven(stats: SolveStats): OpenTheoryOptimum {
             val standing = incumbents.current() ?: return OpenTheoryOptimum.Infeasible(stats)
-            return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective.asFraction(), stats)
+            return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective.asFraction(), stats,
+                gapBound = roundGapBound)
         }
 
         private fun finish(round: SolveStats): SolveStats {

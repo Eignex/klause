@@ -232,6 +232,17 @@ internal fun executeLinearSource(
         assignment?.let { checked(prepared.check(it, stop)) }
     fun linear(result: com.eignex.klause.solver.result.LinearOptimizationResult) {
         val point = sample(result.incumbent)
+        if (result.gapClosed) {
+            native = LinearSourceConclusion.OPTIMAL
+            nativeOptimum = point
+            nativeOptimalValue = result.value
+            val bound = ((result.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
+            nativeGapBound = bound?.let {
+                (if (result.scope.objective?.sense == ObjectiveSense.MAXIMIZE) it.negated() else it) *
+                    prepared.view.objectiveScale.reciprocal()
+            }
+            return
+        }
         native = when (val claim = result.terminal?.claim) {
             is SourceClaim.Optimal -> {
                 nativeOptimum = point
@@ -307,6 +318,7 @@ internal fun executeLinearSource(
                         is OpenTheoryOptimum.Optimal -> {
                             nativeOptimum = assignment(optimum.assignment)
                             nativeOptimalValue = optimum.value
+                            nativeGapBound = optimum.gapBound?.let { it * prepared.view.objectiveScale.reciprocal() }
                             native = LinearSourceConclusion.OPTIMAL
                         }
 
@@ -346,7 +358,12 @@ internal fun executeLinearSource(
             native = when (optimum) {
                 is QuadraticOptimizationResult.Optimal -> {
                     nativeOptimum = point
-                    nativeOptimalValue = optimum.bound.value.linearRational()
+                    nativeOptimalValue = if (optimum.gapClosed) optimum.incumbent.value.linearRational()
+                    else optimum.bound.value.linearRational()
+                    if (optimum.gapClosed) nativeGapBound = optimum.bound.value.linearRational()?.let {
+                        (if (optimum.sense == ObjectiveSense.MAXIMIZE) it.negated() else it) *
+                            prepared.view.objectiveScale.reciprocal()
+                    }
                     LinearSourceConclusion.OPTIMAL
                 }
 

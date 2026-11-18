@@ -27,7 +27,7 @@ internal fun reportLinearOptimization(
     } ?: true
     val verdict = if (!accepted) {
         if (publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
-    } else when (result.terminal?.claim) {
+    } else if (result.gapClosed) Verdict.OPTIMAL else when (result.terminal?.claim) {
         is SourceClaim.Optimal -> Verdict.OPTIMAL
         is SourceClaim.Limit -> Verdict.BEST_FOUND
         is SourceClaim.Ray, is SourceClaim.Unbounded -> Verdict.UNBOUNDED

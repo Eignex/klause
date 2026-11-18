@@ -126,7 +126,7 @@ sealed interface QuadraticOptimizationResult {
         val incumbent: QuadraticIncumbent
     }
 
-    /** A checked feasible assignment attaining a proved global bound. */
+    /** A checked feasible assignment attaining a proved global bound or satisfying the declared optimality gap. */
     data class Optimal(
         override val incumbent: QuadraticIncumbent,
         /** Matching global bound. */
@@ -136,6 +136,8 @@ sealed interface QuadraticOptimizationResult {
         override val sense: ObjectiveSense,
         override val stats: SolveStats,
         override val evidence: SourceResultEvidence? = null,
+        /** True when [bound] closes the declared gap; [certificate] then certifies that bound, not exact attainment. */
+        val gapClosed: Boolean = false,
     ) : WithIncumbent
 
     /** A proved infimum/supremum that no feasible source assignment attains. */

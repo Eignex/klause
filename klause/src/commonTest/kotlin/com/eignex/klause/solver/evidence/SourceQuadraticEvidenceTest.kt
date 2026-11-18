@@ -4,12 +4,17 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.QuadraticCertificate
@@ -26,6 +31,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class SourceQuadraticEvidenceTest {
     private val variable = QuadraticVariable.Int(SourceIntId(0))
@@ -39,6 +45,30 @@ class SourceQuadraticEvidenceTest {
         SourceRevision("quadratic-original", "klause-ir-exact-v1"),
         objective = SourceObjective("square", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `quadratic gap evidence should establish its witness and bound without exact attainment`() {
+        val source = model.withSourceSemantics(SourceSemantics(SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+            optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve())
+        val context = assertNotNull(source.quadraticSourceProofContext(scope, objective))
+        val arithmetic = AlgebraicArithmetic()
+        val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(1)), arithmetic.rational(BigFraction.ONE))
+        val certificate = QuadraticCertificate.attested(ModelIdentity.of(source, objective), scope, QuadraticClaim.Bound)
+        val result = QuadraticOptimizationResult.Optimal(point,
+            QuadraticObjectiveBound(arithmetic.rational(BigFraction.ZERO), false, certificate), certificate,
+            ObjectiveSense.MINIMIZE, SolveStats.EMPTY, gapClosed = true)
+
+        val captured = assertIs<QuadraticOptimizationResult.Optimal>(SourceResultCapture(context).quadratic(
+            result, "fixture-engine", boundDerivation = SourceQuadraticBoxDerivation))
+
+        assertTrue(captured.gapClosed)
+        assertEquals(SourceEvidenceCheck.Checked, captured.verifySourceEvidence(context))
+        assertTrue(assertNotNull(captured.evidence).derivations.none { it.claim is SourceClaim.Optimal })
+        val changed = captured.copy(incumbent = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(2)),
+            arithmetic.rational(BigFraction.ofLong(4))))
+        assertIs<SourceEvidenceCheck.Rejected>(changed.verifySourceEvidence(context))
+    }
 
     @Test
     fun `an original quadratic interval proof should establish its source bound`() {

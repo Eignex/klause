@@ -6,6 +6,7 @@ import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -242,7 +243,11 @@ private fun minimizePolynomial(
     val scope = PolynomialInvocationScope(
         shared.service, params, concurrent = cores > 1 && engine != FiniteEngine.FIXED,
     )
-    val completed = PolynomialStrategyAdapters(operation, shared, scope, params.strategy, stop, cores)
+    val gap = request.preparedPlan.sourceSemantics?.effective?.optimalityTolerance?.takeUnless { it.isExact }
+    val strategy = if (gap == null) params.strategy else params.strategy.copy(
+        backtrack = params.strategy.backtrack.copy(
+            optimalityGap = OptimalityGap(gap, integral = true)))
+    val completed = PolynomialStrategyAdapters(operation, shared, scope, strategy, stop, cores)
         .minimize(objective, engine)
     val result = when (completed) {
         is MinimizeResult.Optimal -> completed.copy(sample = request.capture(completed.sample))

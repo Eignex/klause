@@ -554,7 +554,8 @@ internal class JointLinearRepair(
                 onNumericalFeedback = if (refutationGuidance) { feedback ->
                     guideRefutation(captured, querySource, feedback)
                 } else null,
-                feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null)
+                feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null,
+                useSourceGap = false)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed
             if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")

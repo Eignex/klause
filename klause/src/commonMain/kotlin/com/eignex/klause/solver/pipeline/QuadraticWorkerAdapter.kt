@@ -19,6 +19,7 @@ import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
+import com.eignex.klause.solver.objective.closesDeclaredGap
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticIncumbent
@@ -173,6 +174,7 @@ internal class QuadraticWorkerAdapter(
         readIncumbent()?.let { accept(it) }
         val stop = params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native
             .polynomial or global
+        if (closeGap(stop)) return
         val cursor = traversal ?: QuadraticTraversalCursor(finite, params.strategy.backtrack.copy(
             assumptions = assumptions, cancellation =
             params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native.polynomial,
@@ -192,6 +194,7 @@ internal class QuadraticWorkerAdapter(
                 is QuadraticBranchResult.Infeasible -> branchProofs += result.proof
                 QuadraticBranchResult.Unknown -> incomplete = true
             }
+            if (terminal == null) closeGap(stop)
             terminal == null
         }
         if (terminal != null) return
@@ -216,6 +219,16 @@ internal class QuadraticWorkerAdapter(
         } else if (stop()) partial() else QuadraticOptimizationResult.UnattainedLimit(
             point, bound, certificate(proofs, QuadraticClaim.UnattainedLimit), sense, stats,
         )
+    }
+
+    private fun closeGap(stop: ExecutionControl): Boolean {
+        val policy = request.preparedPlan.sourceSemantics?.effective?.optimalityTolerance
+        if (policy == null || policy.isExact || stop()) return false
+        val point = incumbent ?: return false
+        val bound = rootBound ?: return false
+        if (!policy.closesDeclaredGap(point.value, bound.value, sense, completion.algebraic) || stop()) return false
+        terminal = QuadraticOptimizationResult.Optimal(point, bound, bound.certificate, sense, stats, gapClosed = true)
+        return true
     }
 
     private fun record(point: QuadraticIncumbent, limit: AlgebraicReal, attained: Boolean, proof: SourceDerivation) {

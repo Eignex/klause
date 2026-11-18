@@ -483,7 +483,8 @@ object OpenTheoryPipeline {
                 params.cancellation.includingStop( params.timeout), Long.MAX_VALUE, -1,
             ) { incumbent -> values?.publish(incumbent.sample, publication) })
             val authority = descent.linearResult
-            val folded = if (authority == null) result.openOptimum(objective) else requireNotNull(values).completed(
+            val folded = if (authority == null) result.openOptimum(objective, descent.objectiveGapBound)
+            else requireNotNull(values).completed(
                 authority, params.cancellation.includingStop( params.timeout),
                 if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
             OpenTheoryExecution.Optimize(folded)

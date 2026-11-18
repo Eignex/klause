@@ -196,6 +196,13 @@ incumbents from bounds and unattained limits. If numerical authority declines,
 exact strict-improvement rounds continue under the same allowance; a checked
 incumbent survives incomplete optimization.
 
+A declared positive optimality gap can complete the traversal once a checked source
+incumbent and a checked global bound satisfy it in original objective units.
+`LinearOptimizationResult.gapClosed` distinguishes that completion from an exact
+terminal claim; its evidence retains the witness and bound separately. Branch-only
+bounds cannot close the invocation. Numerical companions use the portfolio's objective
+scale and offset when comparing the gap. Exact feasibility keeps exact termination.
+
 ### State and resources
 
 Immutable row addresses, forms and Boolean dependencies can be shared by fresh
@@ -313,6 +320,11 @@ an integrality-preserving direction.
 Other objectives without affine authority use exact strict-improvement rounds.
 That fallback supplies no recession certificate or termination guarantee for an
 unbounded objective.
+
+Under a positive optimality policy, improvement rounds refute values below the
+incumbent's gap floor. Integral descent rounds that floor up to the next attainable
+integer. A completed refutation retains the proved floor in
+`OpenTheoryOptimum.Optimal.gapBound`; interrupted rounds prove no closure.
 
 ### State and resources
 

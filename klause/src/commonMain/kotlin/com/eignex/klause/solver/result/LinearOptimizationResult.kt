@@ -27,6 +27,8 @@ class LinearOptimizationResult internal constructor(
     val stats: SolveStats,
     /** Interpretation of the producing source context, independent of claim authority. */
     val semantics: EffectiveSourceSemantics? = null,
+    /** The checked incumbent and [bound] satisfy the declared gap without an exact terminal claim. */
+    val gapClosed: Boolean = false,
 ) {
     /** Inspectable original-source derivations, including retained partial witness and bound data. */
     val evidence: SourceResultEvidence = SourceResultEvidence(scope, buildList {

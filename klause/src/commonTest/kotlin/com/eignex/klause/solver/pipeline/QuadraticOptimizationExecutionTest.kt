@@ -3,18 +3,25 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.NoPropagator
@@ -24,6 +31,7 @@ import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.PropagationCapability
+import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
@@ -39,6 +47,57 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QuadraticOptimizationExecutionTest {
+    @Test
+    fun `a quadratic incumbent should stop at the declared gap against a global box bound`() {
+        for ((sense, engine) in ObjectiveSense.entries.flatMap { sense ->
+            listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED).map { sense to it }
+        }) {
+            val sign = if (sense == ObjectiveSense.MINIMIZE) 1L else -1L
+            val source = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                semantics = SourceSemantics(SourceFormat.IR,
+                    feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+                    optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve())
+            val b = QuadraticVariable.Bool(SourceBoolId(0))
+            val x = QuadraticVariable.Real(SourceRealId(0))
+            val objective = QuadraticObjectiveSpec(listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-sign), b, b),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(sign), x, x)))
+
+            val result = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective,
+                params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(backtrack = BacktrackParams(
+                    valueSelector = IndomainMin))),
+                engine = engine, sense = sense).result
+
+            val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
+            assertTrue(optimum.gapClosed)
+            if (engine == FiniteEngine.BACKTRACK) assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
+            assertEquals(BigFraction.ofLong(-sign), optimum.bound.value.rational)
+            assertEquals(QuadraticClaim.Bound, optimum.certificate.claim)
+        }
+    }
+
+    @Test
+    fun `exact quadratic optimization should explore past a declared positive gap`() {
+        val source = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, feasibilityTolerance = SourceTolerance(),
+                optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve())
+        val b = QuadraticVariable.Bool(SourceBoolId(0))
+        val x = QuadraticVariable.Real(SourceRealId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), b, b),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+
+        val result = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective,
+            engine = FiniteEngine.BACKTRACK).result
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
+        assertEquals(false, optimum.gapClosed)
+        assertEquals(BigFraction.MINUS_ONE, optimum.incumbent.value.rational)
+        assertEquals(BigFraction.MINUS_ONE, optimum.bound.value.rational)
+    }
+
     @Test
     fun `quadratic finite preparation should open the selected source deduction`() {
         val clause = Clause(intArrayOf(0))

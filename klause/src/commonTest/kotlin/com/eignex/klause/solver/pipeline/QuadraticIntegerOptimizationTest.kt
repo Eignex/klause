@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
@@ -11,8 +12,12 @@ import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -27,6 +32,26 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class QuadraticIntegerOptimizationTest {
+    @Test
+    fun `an open integer quadratic should stop against its root relaxation within the declared gap`() {
+        val source = NonlinearIntegerProblem(PolynomialRealFormula.Constant(true), 1, 0,
+            mapOf("i" to 0), emptyMap(), emptyMap(), semantics = SourceSemantics(SourceFormat.IR,
+                feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+                optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve())
+        val i = QuadraticVariable.Int(SourceIntId(0))
+        val objective = QuadraticObjectiveSpec(listOf(
+            QuadraticObjectiveTerm(QuadraticCoefficient.ONE, i, i),
+            QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), i)))
+
+        val result = OpenTheoryPipeline.minimize(source.pipelineRequest(), objective,
+            engine = FiniteEngine.BACKTRACK).result
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result)
+        assertTrue(optimum.gapClosed)
+        assertEquals(BigFraction.ZERO, optimum.incumbent.value.rational)
+        assertEquals(BigFraction.ofLong(-4).reciprocal(), optimum.bound.value.rational)
+    }
+
     @Test
     fun `fractional relaxation should split open integers before proving the optimum`() {
         val source = NonlinearIntegerProblem(

@@ -314,6 +314,15 @@ completion. Finite and open-integer quadratic workers compose
 interruption handling and cleanup. Complete-worker work counters remain specific to
 their traversal; neighborhood preparation converts native work to instructions
 before combining it with the retained cursor's work.
+
+A positive declared optimality gap also permits complete workers to stop with an
+accepted incumbent and a global box or root-relaxation bound. The comparison uses
+exact algebraic values in source objective units and direction. A widened source
+cannot use its original declaration box as a bound. Gap completion sets
+`QuadraticOptimizationResult.Optimal.gapClosed` and retains a bound certificate,
+without claiming exact attainment. Portfolio admission checks the same gap and source
+scope. Finite-objective polynomial traversal applies the gap through the finite
+search's objective policy. Exact feasibility preserves exact completion on both routes.
 Progress events and incumbent statistics round the exact objective with the same
 bounded binary64 narrowing used for published coordinates, independently of the search budget.
 `solvePolynomialObjectiveImage` optimizes over a conditioned source with the same IR, and `tryConvexPolynomialOptimum` admits affine rows with a quadratic

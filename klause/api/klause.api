@@ -13459,17 +13459,19 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasibl
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun component2 ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public final fun component5 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public final fun component6 ()Lcom/eignex/util/numbers/BigFraction;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;Lcom/eignex/util/numbers/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public final fun getGapBound ()Lcom/eignex/util/numbers/BigFraction;
 	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
@@ -14648,6 +14650,7 @@ public final class com/eignex/klause/solver/result/HeuristicStartStats {
 public final class com/eignex/klause/solver/result/LinearOptimizationResult {
 	public final fun getBound ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
 	public final fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun getGapClosed ()Z
 	public final fun getIncumbent ()Lcom/eignex/klause/solver/Sample;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
@@ -15786,20 +15789,22 @@ public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$I
 }
 
 public final class com/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal : com/eignex/klause/solver/result/QuadraticOptimizationResult$WithIncumbent {
-	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
 	public final fun component2 ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
 	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun component5 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component6 ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
-	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;
+	public final fun component7 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;Z)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;Lcom/eignex/klause/solver/result/QuadraticIncumbent;Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;Lcom/eignex/klause/solver/result/QuadraticCertificate;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/evidence/SourceResultEvidence;ZILjava/lang/Object;)Lcom/eignex/klause/solver/result/QuadraticOptimizationResult$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBound ()Lcom/eignex/klause/solver/result/QuadraticObjectiveBound;
 	public final fun getCertificate ()Lcom/eignex/klause/solver/result/QuadraticCertificate;
 	public fun getEvidence ()Lcom/eignex/klause/solver/evidence/SourceResultEvidence;
+	public final fun getGapClosed ()Z
 	public fun getIncumbent ()Lcom/eignex/klause/solver/result/QuadraticIncumbent;
 	public fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;

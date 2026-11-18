@@ -9,7 +9,14 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
@@ -33,6 +40,26 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PolynomialStrategyAdaptersTest {
+    @Test
+    fun `polynomial completion should apply the source gap only under positive feasibility tolerance`() {
+        for (exact in listOf(false, true)) {
+            val source = PolynomialRealProblem(PolynomialRealFormula.Constant(true), 0, 1, 0, 1,
+                emptyMap(), emptyMap(),
+                semantics = SourceSemantics(SourceFormat.IR,
+                    feasibilityTolerance = if (exact) SourceTolerance() else SourceTolerance(SemanticRational.ONE),
+                    optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve())
+            val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(backtrack = BacktrackParams(
+                valueSelector = IndomainMin)))
+
+            val result = OpenTheoryPipeline.minimize(source.pipelineRequest(),
+                LinearObjective(boolWeights = longArrayOf(-1)), params, FiniteEngine.BACKTRACK).result
+
+            val optimum = assertIs<MinimizeResult.Optimal>(result)
+            assertEquals(if (exact) -1.0 else 0.0, optimum.objective)
+            assertEquals(if (exact) null else -1.0, optimum.gapBound)
+        }
+    }
+
     @Test
     fun `ordinary frontend products retain the full damped transition counterexample`() {
         println("full frontend transition: parse entered")

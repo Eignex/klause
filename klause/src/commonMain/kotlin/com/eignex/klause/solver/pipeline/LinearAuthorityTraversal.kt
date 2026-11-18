@@ -28,6 +28,8 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.adjacentIntegerAbove
 import com.eignex.klause.solver.evidence.integerPinBounds
+import com.eignex.klause.solver.objective.OptimalityGap
+import com.eignex.klause.solver.objective.closesDeclaredGap
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomPremise
@@ -74,8 +76,12 @@ internal class LinearAuthorityTraversal(
     composeBooleanBranches: Boolean = false,
     aggregateBranching: Boolean = false,
     private val repairGuidance: LinearRepairGuidance? = null,
+    private val gap: OptimalityGap? = null,
+    private val useSourceGap: Boolean = true,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+    private val gapEnabled = gap != null ||
+        (useSourceGap && source.semantics?.effective?.optimalityTolerance?.isExact == false)
 
     private val aggregateBranches = if (aggregateBranching && !useActiveRows && !composeBooleanBranches &&
         !useRefutationReuse &&
@@ -216,6 +222,17 @@ internal class LinearAuthorityTraversal(
         val checkedValue = ((rootBound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
         if (checkedValue != null && if (minimizes) value <= checkedValue else value >= checkedValue) return
         checked(SourceClaim.Bound(value), coverage.proof)?.let { rootBound = it }
+    }
+
+    fun gapBound(): SourceEvidence? {
+        if (!gapEnabled) return null
+        val value = incumbent()?.second ?: return null
+        val bound = rootBound ?: return null
+        val exact = ((bound.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value ?: return null
+        val closes = gap?.closes(value, exact) ?: (useSourceGap &&
+            source.semantics?.effective?.optimalityTolerance.closesDeclaredGap(value, exact,
+                requireNotNull(source.scope.objective).sense))
+        return bound.takeIf { closes }
     }
 
     override fun initialize(context: SearchContext): ComponentResult {
@@ -380,6 +397,10 @@ internal class LinearAuthorityTraversal(
 
     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
         if (cancellation()) return SearchNodeDisposition.Indeterminate
+        if (gapEnabled) {
+            updateGlobalBound()
+            if (gapBound() != null && !cancellation()) return SearchNodeDisposition.Pause
+        }
         if (pause() || (propagateRefutations && budget.funding?.paused == true)) return SearchNodeDisposition.Pause
         if (current.unit != null) {
             if (propagate(context) !is ComponentResult.Consistent) return SearchNodeDisposition.Indeterminate
@@ -535,6 +556,7 @@ internal class LinearAuthorityTraversal(
         }
         result.incumbent?.let(onIncumbent)
         if (current === root) rootBound = result.bound
+        if (gapBound() != null && !cancellation()) return SearchNodeDisposition.Pause
         if (result.evidence?.claim is SourceClaim.Ray) {
             ray = checked(result.evidence.claim, SourceDerivation.SourceRay)
             return SearchNodeDisposition.Indeterminate
