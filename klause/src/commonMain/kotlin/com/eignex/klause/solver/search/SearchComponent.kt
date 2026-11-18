@@ -281,6 +281,13 @@ sealed interface SearchModelDisposition {
     data object Indeterminate : SearchModelDisposition
 
     /**
+     * Retain this leaf for one retry after traversal exhausts, without excluding its region.
+     *
+     * @property surface Report the current model before continuing chronological traversal.
+     */
+    data class Retry(val surface: Boolean = false) : SearchModelDisposition
+
+    /**
      * Leave this model unresolved and keep traversing by chronological backtracking. Nothing is learned from it,
      * so no nogood that rests on the unresolved check can reach another arm as a proved conflict; the caller keeps
      * its own record that the run can no longer prove exhaustion.

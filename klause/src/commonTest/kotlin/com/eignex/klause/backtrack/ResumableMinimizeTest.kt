@@ -148,7 +148,8 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     )
 
     fun assertVisitedLeaves(ownersReleased: Boolean = true) {
-        assertEquals(if (withIncumbent) 2 else 1, visited)
+        val primaryLeaves = if (withIncumbent) 2 else 1
+        assertTrue(visited in primaryLeaves..2 * primaryLeaves)
         assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
         assertTrue(attempts.any { it.first == (if (withIncumbent) 2 else 1) && it.second })
         assertEquals(if (ownersReleased) opened else 0, closed)
@@ -575,7 +576,7 @@ class ResumableMinimizeTest {
             val first = assertIs<MinimizeResult.Unknown>(
                 search.runSlice(ExecutionControl.Never, 1000L, 100L) {},
             )
-            assertEquals(TerminationReason.Unsupported, first.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, first.reason)
 
             fixture.acceptProof = { _, _ -> true }
             search.rebind(Assumptions.None, 100L)

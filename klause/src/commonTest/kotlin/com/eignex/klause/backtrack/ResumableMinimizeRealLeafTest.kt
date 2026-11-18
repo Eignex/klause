@@ -56,6 +56,57 @@ import kotlin.time.Duration.Companion.seconds
 
 class ResumableMinimizeRealLeafTest {
     @Test
+    fun `repair should retry an unfinished proof after publishing its checked witness`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { leaf, _ -> leaf >= 2 }
+        val params = fixture.params.copy(toleranceCheck = FiniteSourceAcceptance({ it.reals.single() == 0.5 }, false))
+        val offered = ArrayList<Double>()
+
+        ResumableMinimize(fixture.solver, fixture.objective, params, rebindable = true).use { search ->
+            val result = search.runSlice(ExecutionControl.Never, 1000L, 256L) { offered += it.objectiveValue }
+
+            assertEquals(0.5, assertIs<MinimizeResult.Optimal>(result).objective)
+            assertEquals(listOf(0.5), offered)
+            assertEquals(2, fixture.visited)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `retry should certify an unresolved improving real leaf after traversal exhausts`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { leaf, _ -> leaf != 2 }
+        val offered = ArrayList<Double>()
+        val params = fixture.params.copy(improvedSolutionSink = { _, value -> offered += value })
+
+        val result = fixture.solver.minimize(fixture.objective, params)
+
+        assertEquals(0.5, assertIs<MinimizeResult.Optimal>(result).objective)
+        assertEquals(listOf(1.0, 0.5), offered)
+        assertEquals(3, fixture.visited)
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `a real leaf retry should complete under a work-budgeted invocation`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { leaf, _ -> leaf >= 2 }
+        val offered = ArrayList<Double>()
+        fixture.solver.resumable(fixture.objective, fixture.params).use { search ->
+            var slices = 0
+            var result: MinimizeResult? = null
+            while (result == null && slices++ < 128) {
+                result = search.runSlice(ExecutionControl.Never, 1000L, 1L) { offered += it.objectiveValue }
+            }
+
+            assertEquals(0.5, assertIs<MinimizeResult.Optimal>(result).objective)
+            assertEquals(listOf(0.5), offered)
+            assertEquals(2, fixture.visited)
+        }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
     fun `exhausted numerical leaves should report infeasible without exact certificates`() {
         val problem = Problem(
             0, 0, emptyArray(),
@@ -97,7 +148,7 @@ class ResumableMinimizeRealLeafTest {
             assertEquals(1L, sample.ints.single())
             assertEquals(0.5, sample.reals.single())
             assertEquals(listOf(0L, 1L), offered)
-            assertEquals(TerminationReason.Unsupported, result.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, result.reason)
         }
         assertEquals(fixture.opened, fixture.closed)
     }
@@ -129,7 +180,7 @@ class ResumableMinimizeRealLeafTest {
 
             assertEquals(1L, assertNotNull(sibling.sample).ints.single())
             assertEquals(0.5, sibling.sample.reals.single())
-            assertEquals(TerminationReason.Unsupported, sibling.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, sibling.reason)
         }
         assertEquals(fixture.opened, fixture.closed)
     }
@@ -152,7 +203,7 @@ class ResumableMinimizeRealLeafTest {
                         sourceValue + epsilon * BigFraction.ofLong(offset), ExecutionControl.Never)
                     val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
-                    assertEquals(TerminationReason.Unsupported, result.reason)
+                    assertEquals(TerminationReason.RepresentationDeclined, result.reason)
                     if (offset > 0L) {
                         val sample = assertNotNull(result.sample)
                         assertEquals(sourceValue, exactSourceObjective(objective, sample, params.toleranceCheck))
@@ -177,7 +228,7 @@ class ResumableMinimizeRealLeafTest {
                 repair.beginExact(Assumptions.None, 100L, cutoff, ExecutionControl.Never)
                 val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
-                assertEquals(TerminationReason.Unsupported, result.reason)
+                assertEquals(TerminationReason.RepresentationDeclined, result.reason)
                 if (offset > 0L) {
                     val sample = assertNotNull(result.sample)
                     assertEquals(0.5, sample.reals.single())
@@ -199,7 +250,7 @@ class ResumableMinimizeRealLeafTest {
             val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
             assertNull(result.sample)
-            assertEquals(TerminationReason.Unsupported, result.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, result.reason)
         }
         assertEquals(fixture.opened, fixture.closed)
     }
@@ -224,7 +275,7 @@ class ResumableMinimizeRealLeafTest {
                 assertEquals(pin, sample.ints.single())
                 assertEquals((2.0 - pin) / 2.0, sample.reals.single())
                 assertNull(sample.exactReals)
-                assertEquals(TerminationReason.Unsupported, result.reason)
+                assertEquals(TerminationReason.RepresentationDeclined, result.reason)
             }
         }
         assertEquals(fixture.opened, fixture.closed)
@@ -274,7 +325,7 @@ class ResumableMinimizeRealLeafTest {
     }
 
     @Test
-    fun `constant real leaf completion should require its independently accepted bound`() {
+    fun `a constant objective should admit a structural bound after an unfinished leaf proof`() {
         for (acceptBound in listOf(false, true)) {
             val fixture = UnresolvedRealLeafFixture(false)
             val leafCapped = object : LpEngineFactory by ProductionLpEngineFactory {
@@ -307,13 +358,7 @@ class ResumableMinimizeRealLeafTest {
                 .resumable(LinearObjective(), fixture.params)
                 .use { assertNotNull(it.runSlice(ExecutionControl.Never, 1000L, 256L) {}) }
 
-            val sample = if (acceptBound) {
-                assertIs<MinimizeResult.Optimal>(result).sample
-            } else {
-                val incomplete = assertIs<MinimizeResult.BestFound>(result)
-                assertEquals(TerminationReason.RepresentationDeclined, incomplete.reason)
-                incomplete.sample
-            }
+            val sample = assertIs<MinimizeResult.Optimal>(result).sample
             assertEquals(0.5, sample.reals.single())
         }
     }
@@ -434,7 +479,7 @@ class ResumableMinimizeRealLeafTest {
             assertEquals(listOf(0.5), offered)
             assertEquals(1L, result.sample.ints.single())
             assertEquals(0.5, result.sample.reals.single())
-            assertEquals(3, fixture.visited)
+            assertEquals(4, fixture.visited)
             assertEquals(1, fixture.opened)
             assertEquals(0, fixture.closed)
         }
@@ -460,7 +505,7 @@ class ResumableMinimizeRealLeafTest {
             assertNull(search.runSlice(ExecutionControl { true }, 1000L, 256L) {})
             assertEquals(0, fixture.opened)
             val result = assertIs<MinimizeResult.Unknown>(search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
-            assertEquals(TerminationReason.Unsupported, result.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, result.reason)
             fixture.assertVisitedLeaves()
         }
     }
@@ -522,7 +567,7 @@ class ResumableMinimizeRealLeafTest {
             )
             fixture.solver.resumable(fixture.objective, params).use { search ->
                 val result = assertIs<MinimizeResult.Unknown>(search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
-                assertEquals(TerminationReason.Unsupported, result.reason)
+                assertEquals(TerminationReason.RepresentationDeclined, result.reason)
                 fixture.assertVisitedLeaves()
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
@@ -591,7 +636,7 @@ class ResumableMinimizeRealLeafTest {
                         bound = it.objectiveValue
                     },
                 )
-                assertEquals(TerminationReason.Unsupported, result.reason)
+                assertEquals(TerminationReason.RepresentationDeclined, result.reason)
                 fixture.assertIncumbent(result.sample)
                 fixture.assertVisitedLeaves()
                 assertEquals(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf,

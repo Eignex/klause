@@ -29,6 +29,25 @@ import kotlin.test.assertTrue
 @RunWith(Parameterized::class)
 class ResumableSatisfactionRealLeafTest(private val tolerant: Boolean) {
     @Test
+    fun `an undecided satisfaction leaf should complete on retry under a work-budgeted invocation`() {
+        val fixture = UnresolvedRealLeafFixture(false)
+        fixture.acceptProof = { leaf, _ -> leaf >= 2 }
+        val params = fixture.params.copy(toleranceCheck = if (tolerant) ({ fixture.visited >= 2 }) else null)
+        var result: SolveResult? = null
+
+        fixture.solver.resumableSolve(params).use { search ->
+            var slices = 0
+            while (result == null && slices++ < 128) {
+                result = search.runSlice(ExecutionControl.Never, 60_000L, 1L)
+            }
+
+            assertEquals(0.5, assertIs<SolveResult.Sat>(result).assignment.reals.single())
+            assertEquals(2, fixture.visited)
+        }
+        assertEquals(fixture.persistentOpened, fixture.persistentClosed)
+    }
+
+    @Test
     fun `real leaf completion should preserve its assignment and work across slices`() {
         val n = 12
         val problem = Problem(0, 1, arrayOf(IntDomain(0L, 1L)),

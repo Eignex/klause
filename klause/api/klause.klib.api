@@ -5752,6 +5752,19 @@ sealed interface com.eignex.klause.solver.search/SearchModelContinuation { // co
 }
 
 sealed interface com.eignex.klause.solver.search/SearchModelDisposition { // com.eignex.klause.solver.search/SearchModelDisposition|null[0]
+    final class Retry : com.eignex.klause.solver.search/SearchModelDisposition { // com.eignex.klause.solver.search/SearchModelDisposition.Retry|null[0]
+        constructor <init>(kotlin/Boolean = ...) // com.eignex.klause.solver.search/SearchModelDisposition.Retry.<init>|<init>(kotlin.Boolean){}[0]
+
+        final val surface // com.eignex.klause.solver.search/SearchModelDisposition.Retry.surface|{}surface[0]
+            final fun <get-surface>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchModelDisposition.Retry.surface.<get-surface>|<get-surface>(){}[0]
+
+        final fun component1(): kotlin/Boolean // com.eignex.klause.solver.search/SearchModelDisposition.Retry.component1|component1(){}[0]
+        final fun copy(kotlin/Boolean = ...): com.eignex.klause.solver.search/SearchModelDisposition.Retry // com.eignex.klause.solver.search/SearchModelDisposition.Retry.copy|copy(kotlin.Boolean){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchModelDisposition.Retry.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchModelDisposition.Retry.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchModelDisposition.Retry.toString|toString(){}[0]
+    }
+
     final object Continue : com.eignex.klause.solver.search/SearchModelDisposition { // com.eignex.klause.solver.search/SearchModelDisposition.Continue|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchModelDisposition.Continue.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchModelDisposition.Continue.hashCode|hashCode(){}[0]

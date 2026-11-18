@@ -19,6 +19,365 @@ import kotlin.test.assertTrue
 
 class SearchRunTest {
     @Test
+    fun `cancellation before blocking a retry model should preserve pending coverage`() {
+        var checks = 0
+        var cancelled = false
+        val cp = CpSearchComponent(PropagationSession(Problem(1, 0, emptyArray(), emptyArray()).bake()),
+            branching = CpBranching.None)
+        val session = SearchSession(listOf(cp, object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck =
+                if (++checks <= 2) ComponentCheck.Indeterminate else ComponentCheck.Feasible
+        }), cancellation = ExecutionControl { cancelled })
+        session.initialize()
+        val run = session.openRun(1, modelContinuation = SearchModelContinuation.BlockAtRoot,
+            lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Exhausted
+            })
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        cancelled = true
+
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Indeterminate.Component>(result)
+        assertEquals(3, checks)
+    }
+
+    @Test
+    fun `resolved retries should block models shared by overlapping retained prefixes`() {
+        var declined = 0
+        var requestRestart = false
+        var restarted = false
+        var blocked = 0
+        val cp = CpSearchComponent(PropagationSession(Problem(2, 0, emptyArray(), emptyArray()).bake()),
+            branching = CpBranching.None)
+        val checker = object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                if (context.boolValue(0) == false && context.boolValue(1) == false) {
+                    return if (++declined <= 2) ComponentCheck.Indeterminate else ComponentCheck.Feasible
+                }
+                requestRestart = true
+                return ComponentCheck.Infeasible()
+            }
+        }
+        val restart = object : SearchRestartPolicy {
+            override fun shouldRestart(decisionsThisRun: Long): Boolean = requestRestart && !restarted
+            override fun onRestart() {
+                restarted = true
+            }
+        }
+        val branching = object : BooleanBranching {
+            override fun alternatives(context: SearchContext): List<SearchDecision>? {
+                val order = if (restarted) listOf(1, 0) else listOf(0, 1)
+                val variable = order.firstOrNull { context.boolValue(it) == null } ?: return null
+                return listOf(SearchDecision.Bool(Lit.make(variable, false)),
+                    SearchDecision.Bool(Lit.make(variable, true)))
+            }
+        }
+        val session = SearchSession(listOf(cp, checker))
+        session.initialize()
+        val run = session.openRun(2, SearchSolveParams(maxDecisions = 32L, restart = restart),
+            booleanBranching = branching, modelContinuation = SearchModelContinuation.BlockAtRoot,
+            lifecycle = object : SearchRunLifecycle {
+                override fun onModelBlocked(context: SearchContext): SearchRunDisposition {
+                    blocked++
+                    return SearchRunDisposition.Continue
+                }
+            })
+
+        val model = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+        val terminal = run.next()
+
+        assertEquals(false, model.valueOf(SearchBoolValue(0)))
+        assertEquals(false, model.valueOf(SearchBoolValue(1)))
+        assertIs<SearchRunEvent.Exhausted>(terminal)
+        assertEquals(3, declined)
+        assertEquals(1, blocked)
+    }
+
+    @Test
+    fun `rejected replay accounting should not publish a decision commit`() {
+        var recorded = 0
+        var commits = 0
+        val controls = SearchExecutionControlAdapter(accounting = object : SearchExecutionAccounting {
+            override fun recordDecision(decision: SearchDecision): Boolean = ++recorded <= 2
+        })
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Indeterminate
+        }), executionControls = controls)
+        session.initialize()
+        val run = session.openRun(1, observer = object : SearchRunObserver {
+            override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                commits++
+            }
+        })
+
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Indeterminate.Budget>(result)
+        assertEquals(2, commits)
+        assertEquals(3, recorded)
+    }
+
+    @Test
+    fun `a resolved retry should preserve the stop cause of an unresolved sibling`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                if (++checks <= 2 || context.boolValue(0) == false) {
+                    context.executionControls.reportStop(SearchStopCause.OperationAllowance)
+                    return ComponentCheck.Indeterminate
+                }
+                return ComponentCheck.Feasible
+            }
+        }))
+        session.initialize()
+        val run = session.openRun(1)
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Indeterminate.Component>(result)
+        assertEquals(SearchStopCause.OperationAllowance, session.executionControls.stopCause)
+    }
+
+    @Test
+    fun `leaf retries should preserve the conditioned root`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                assertEquals(true, context.boolValue(0))
+                return if (++checks <= 2) ComponentCheck.Indeterminate else ComponentCheck.Infeasible()
+            }
+        }))
+        session.initialize()
+        session.push(SearchDecision.Bool(0))
+
+        val result = session.openConditionedRun(2).next()
+
+        assertIs<SearchRunEvent.Exhausted>(result)
+        assertEquals(4, checks)
+        assertEquals(true, session.boolValue(0))
+        assertEquals(1, session.decisionLevel)
+    }
+
+    @Test
+    fun `retry checks should spend the containing check allowance`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                if (!context.consumeCheck()) return ComponentCheck.Indeterminate
+                checks++
+                return ComponentCheck.Indeterminate
+            }
+        }), maxChecks = 2L)
+        session.initialize()
+
+        val result = session.openRun(1).next()
+
+        assertIs<SearchRunEvent.Indeterminate>(result)
+        assertEquals(2, checks)
+        assertEquals(SearchStopCause.CheckAllowance, session.executionControls.stopCause)
+    }
+
+    @Test
+    fun `cancellation during replay should preserve unresolved coverage despite lifecycle exhaustion`() {
+        var checks = 0
+        var cancelled = false
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                if (checks == 2) {
+                    cancelled = true
+                    return ComponentResult.Indeterminate
+                }
+                return ComponentResult.Consistent
+            }
+
+            override fun check(context: SearchContext): ComponentCheck {
+                checks++
+                return ComponentCheck.Indeterminate
+            }
+        }), cancellation = ExecutionControl { cancelled })
+        session.initialize()
+        val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
+            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Exhausted
+        })
+
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Indeterminate.Component>(result)
+        assertEquals(2, checks)
+    }
+
+    @Test
+    fun `undecided leaves should be retried after their siblings`() {
+        val visited = ArrayList<Boolean>()
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                val value = checkNotNull(context.boolValue(0))
+                visited += value
+                return if (visited.size <= 2) {
+                    context.executionControls.reportStop(SearchStopCause.OperationAllowance)
+                    ComponentCheck.Indeterminate
+                } else ComponentCheck.Feasible
+            }
+        }))
+        session.initialize()
+        val run = session.openRun(1)
+
+        val first = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+        val second = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+        val terminal = run.next()
+
+        assertEquals(listOf(false, true, false, true), visited)
+        assertEquals(false, first.valueOf(SearchBoolValue(0)))
+        assertEquals(true, second.valueOf(SearchBoolValue(0)))
+        assertIs<SearchRunEvent.Exhausted>(terminal)
+        assertNull(session.executionControls.stopCause)
+    }
+
+    @Test
+    fun `refuted retries should establish exhaustion`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck =
+                if (++checks <= 2) ComponentCheck.Indeterminate else ComponentCheck.Infeasible()
+        }))
+        session.initialize()
+
+        val result = session.openRun(1).next()
+
+        assertIs<SearchRunEvent.Exhausted>(result)
+        assertEquals(4, checks)
+    }
+
+    @Test
+    fun `permanent declines should end after one retry pass`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                checks++
+                return ComponentCheck.Indeterminate
+            }
+        }))
+        session.initialize()
+        val run = session.openRun(1)
+
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Indeterminate.Component>(result)
+        assertSame(result, run.next())
+        assertEquals(4, checks)
+    }
+
+    @Test
+    fun `retry replay should spend the remaining decision allowance`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                checks++
+                return ComponentCheck.Indeterminate
+            }
+        }))
+        session.initialize()
+
+        val result = session.openRun(1, SearchSolveParams(maxDecisions = 2L)).next()
+
+        assertIs<SearchRunEvent.Indeterminate.Budget>(result)
+        assertEquals(2, checks)
+        assertEquals(SearchStopCause.DecisionAllowance, session.executionControls.stopCause)
+    }
+
+    @Test
+    fun `retry replay should resume an interrupted assertion without repeating completed leaves`() {
+        var checks = 0
+        var cancelled = false
+        var interrupted = false
+        var commits = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                if (checks == 2 && !interrupted) {
+                    interrupted = true
+                    cancelled = true
+                    return ComponentResult.Indeterminate
+                }
+                return ComponentResult.Consistent
+            }
+
+            override fun check(context: SearchContext): ComponentCheck =
+                if (++checks <= 2) ComponentCheck.Indeterminate else ComponentCheck.Infeasible()
+        }), cancellation = ExecutionControl { cancelled })
+        session.initialize()
+        val run = session.openRun(1,
+            observer = object : SearchRunObserver {
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    commits++
+                }
+            },
+            lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            })
+
+        assertIs<SearchRunEvent.Paused>(run.next())
+        cancelled = false
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Exhausted>(result)
+        assertEquals(4, checks)
+        assertEquals(4, commits)
+    }
+
+    @Test
+    fun `reset should discard retained leaf retries`() {
+        var decline = true
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                checks++
+                return if (decline) ComponentCheck.Indeterminate else ComponentCheck.Infeasible()
+            }
+        }))
+        session.initialize()
+        val run = session.openRun(1)
+        run.pauseBeforeDecision = { decline && checks == 2 }
+        assertIs<SearchRunEvent.Paused>(run.next())
+        session.popTo(0)
+        run.reset()
+        decline = false
+
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Exhausted>(result)
+        assertEquals(4, checks)
+    }
+
+    @Test
+    fun `a deferred incumbent should be surfaced without blocking its unresolved assignment`() {
+        var checks = 0
+        var models = 0
+        val cp = CpSearchComponent(PropagationSession(Problem(0, 0, emptyArray(), emptyArray()).bake()),
+            branching = CpBranching.None)
+        val session = SearchSession(listOf(cp, object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                checks++
+                return ComponentCheck.Feasible
+            }
+        }))
+        session.initialize()
+        val run = session.openRun(0, modelContinuation = SearchModelContinuation.BlockAtRoot,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
+                    if (++models == 1) SearchModelDisposition.Retry(surface = true) else SearchModelDisposition.Continue
+            })
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Exhausted>(result)
+        assertEquals(2, checks)
+        assertEquals(2, models)
+    }
+
+    @Test
     fun `a paused component check should resume before lifecycle or node work`() {
         var checks = 0
         var resumes = 0

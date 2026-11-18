@@ -1045,7 +1045,9 @@ internal class ResumableMinimize(
     }
 
     private fun traversalEvent(): StepEvent {
-        return when (val e = run.next()) {
+        val e = run.next()
+        if (run.hasUnresolvedModels) sawIndeterminateLeaf = true
+        return when (e) {
             is SearchRunEvent.Satisfied -> {
                 unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
                 val incumbent = checkNotNull(pendingIncumbent)
@@ -1679,7 +1681,6 @@ internal class ResumableMinimize(
             context: SearchContext,
         ): SearchModelDisposition {
             val sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp.assignmentKey))
-            // What this leaf left open, apart from the run-wide record in sawIndeterminateLeaf.
             var unresolved = false
             var incomplete = false
             val incumbent = if (problem.numRealVars == 0) {
@@ -1693,7 +1694,6 @@ internal class ResumableMinimize(
                     LpVerdict.INFEASIBLE -> null
 
                     LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
-                        sawIndeterminateLeaf = true
                         val witness = real.uncertifiedReals?.let {
                             sample.copy(reals = it, exactReals = real.uncertifiedExactReals)
                         }
@@ -1704,7 +1704,7 @@ internal class ResumableMinimize(
                             recordIfImproving(checkNotNull(witness),
                                 objective.evaluate(witness)) else
                             null
-                        incomplete = published != null && !rebindable
+                        incomplete = published != null
                         unresolved = published == null
                         published
                     }
@@ -1722,7 +1722,6 @@ internal class ResumableMinimize(
                     -> {
                         // A tolerance optimum completes the leaf on purpose: the source's own semantics accept it.
                         if (real.verdict !in setOf(LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM)) {
-                            sawIndeterminateLeaf = true
                             incomplete = true
                         }
                         val full = sample.copy(reals = real.reals, exactReals = real.exactReals)
@@ -1736,12 +1735,7 @@ internal class ResumableMinimize(
             return when {
                 unboundedLeaf != null -> SearchModelDisposition.Surface
 
-                // A leaf the LP could not decide is passed over rather than ending the arm: the search goes on to
-                // other leaves, and the sticky flag keeps the terminal from claiming exhaustion or an optimum.
-                unresolved -> SearchModelDisposition.Skip
-
-                // Blocking a leaf whose real part is unproved would let its nogood escape as a proved shared conflict.
-                incomplete -> SearchModelDisposition.Indeterminate
+                unresolved || incomplete -> SearchModelDisposition.Retry(surface = incumbent != null)
 
                 incumbent == null -> SearchModelDisposition.Continue
 

@@ -18,6 +18,7 @@ class SearchRun internal constructor(
     private val lifecycle: SearchRunLifecycle,
     private val branchSelection: SearchBranchSelection,
     private val minimumDecisionLevel: Int,
+    private val retryLeaves: Boolean = true,
 ) {
     private val branchObserver = observer as? SearchBranchAttemptObserver
     private val branchSources = if (branchSelection === SearchBranchSelection.Default) {
@@ -57,7 +58,14 @@ class SearchRun internal constructor(
     private var pendingCheck = false
     private var retryingAssertion = false
     private var pendingLearnedPropagation: SearchPendingLearnedPropagation? = null
-    internal val learnedPropagationPending: Boolean get() = pendingLearnedPropagation != null
+    internal val learnedPropagationPending: Boolean
+        get() = pendingLearnedPropagation != null || leafRetries?.propagationPending == true
+    private var leafRetries: SearchLeafRetries? = null
+    private var retryingLeaves = false
+    private var coverageComplete = false
+    private var unresolvedModel = false
+    private var pendingRetryBlock: AssembledSearchModel? = null
+    internal val hasUnresolvedModels: Boolean get() = unresolvedModel || leafRetries?.unresolvedModels == true
 
     /**
      * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
@@ -78,6 +86,114 @@ class SearchRun internal constructor(
 
     /** Advance until the next model or terminal verdict. */
     fun next(): SearchRunEvent {
+        if (!retryingLeaves) {
+            val event = advance()
+            if (!coverageComplete || leafRetries?.pending != true) return event
+            terminal = null
+            retryingLeaves = true
+        }
+        while (true) {
+            terminal?.let {
+                if (recordComponentStops && it == SearchRunEvent.Indeterminate.Component) componentStopReplayed = true
+                return it
+            }
+            pendingRetryBlock?.let { model -> blockRetryModel(model)?.let { return it } }
+            when (val event = checkNotNull(leafRetries).next()) {
+                is SearchRunEvent.Satisfied -> return event
+                SearchRunEvent.Paused -> if (pendingRetryBlock == null) return event
+                SearchRunEvent.Exhausted -> return finish(exhausted())
+                SearchRunEvent.Indeterminate.Component -> {
+                    rememberIndeterminate()
+                    return finish(SearchRunEvent.Indeterminate.Component)
+                }
+                SearchRunEvent.Indeterminate.Budget, SearchRunEvent.Indeterminate.Cancelled -> return finish(event)
+            }
+        }
+    }
+
+    private fun blockRetryModel(model: AssembledSearchModel): SearchRunEvent? {
+        stopBeforeModelBlock()?.let { return it }
+        pendingRetryBlock = null
+        return when (session.blockModelAtRoot(model)) {
+            ComponentResult.Consistent -> {
+                checkNotNull(leafRetries).restartSelected()
+                consumedModel = true
+                lifecycle.onModelBlocked(session).toEvent(SearchComponentStop.Site.ModelBlocked)
+            }
+            is ComponentResult.Conflict -> finish(exhausted())
+            ComponentResult.Indeterminate -> finish(
+                SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.ModelBlock,
+            )
+        }
+    }
+
+    private fun retryModelPolicy(): SearchModelPolicy = object : SearchModelPolicy {
+        override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+            val disposition = modelPolicy.onModel(model, context)
+            if (modelContinuation != SearchModelContinuation.BlockAtRoot ||
+                (disposition != SearchModelDisposition.Surface && disposition != SearchModelDisposition.Continue)
+            ) return disposition
+            pendingRetryBlock = model
+            return if (disposition == SearchModelDisposition.Surface) disposition else SearchModelDisposition.Pause
+        }
+    }
+
+    private fun retainLeaf(model: Boolean = false) {
+        if (!retryLeaves) {
+            unresolvedModel = unresolvedModel || model
+            rememberIndeterminate()
+            return
+        }
+        val retries = leafRetries ?: SearchLeafRetries(
+            session, { queryRoot }, { decisions < params.maxDecisions },
+            committed = { decision ->
+                if (!session.executionControls.recordDecision(decision)) {
+                    false
+                } else {
+                    decisions++
+                    observer.onCommit(decision, session.decisionLevel)
+                    decisionBudget.consume()
+                }
+            },
+            pause = { pauseBeforeDecision() },
+            cancelled = {
+                val disposition = lifecycle.onCancellation(session)
+                if (disposition != SearchRunDisposition.Pause) rememberIndeterminate()
+                disposition.toEvent(SearchComponentStop.Site.ExecutionControl)
+                    ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+            },
+            observer = observer,
+            openRun = {
+                SearchRun(session, params.copy(maxDecisions = (params.maxDecisions - decisions).coerceAtLeast(0L)),
+                    booleanBranching, decisionBudget,
+                    object : SearchBranchAttemptObserver, SearchRunObserver by observer {
+                        override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                            branchObserver?.onAttempt(decision, context)
+                        }
+
+                        override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                            decisions++
+                            observer.onCommit(decision, decisionLevel)
+                        }
+                    },
+                    SearchModelContinuation.Chronological, retryModelPolicy(), nodePolicy,
+                    object : SearchRunLifecycle by lifecycle {
+                        override fun onStart(context: SearchContext): SearchRunDisposition =
+                            SearchRunDisposition.Continue
+                    },
+                    branchSelection, session.decisionLevel, retryLeaves = false).also {
+                    it.pauseBeforeDecision = { pauseBeforeDecision() }
+                    it.fixedCancellationCadence = fixedCancellationCadence
+                }
+            },
+        ).also { leafRetries = it }
+        if (!retries.retain()) {
+            unresolvedModel = unresolvedModel || model
+            rememberIndeterminate()
+        }
+    }
+
+    private fun advance(): SearchRunEvent {
         terminal?.let {
             if (recordComponentStops && it == SearchRunEvent.Indeterminate.Component) componentStopReplayed = true
             return it
@@ -229,11 +345,12 @@ class SearchRun internal constructor(
                     ComponentCheck.Indeterminate -> {
                         val cancelledDisposition = if (session.cancelled()) lifecycle.onCancellation(session) else null
                         if (cancelledDisposition == SearchRunDisposition.Pause) return SearchRunEvent.Paused
-                        rememberIndeterminate()
                         if (cancelledDisposition != null) {
+                            rememberIndeterminate()
                             return cancelledDisposition.toEvent(SearchComponentStop.Site.ExecutionControl)
                                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
                         }
+                        retainLeaf()
                         if (!backtrack()) return stopAfterBacktrack(indeterminate = true)
                     }
                 }
@@ -268,7 +385,7 @@ class SearchRun internal constructor(
     private fun completeModel(model: AssembledSearchModel): SearchRunEvent? {
         pendingModel = null
         resumeAfterSolution = true
-        when (modelPolicy.onModel(model, session)) {
+        when (val disposition = modelPolicy.onModel(model, session)) {
             SearchModelDisposition.Pause -> {
                 resumeAfterSolution = false
                 pendingModel = model
@@ -283,19 +400,21 @@ class SearchRun internal constructor(
                 return finish(SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.ModelPolicy)
             }
 
+            is SearchModelDisposition.Retry -> {
+                retainLeaf(model = true)
+                resumeAfterSolution = false
+                lastModel = null
+                if (disposition.surface) {
+                    pendingAdvance = true
+                    return SearchRunEvent.Satisfied(model)
+                }
+                skipModel()?.let { return it }
+            }
+
             SearchModelDisposition.Skip -> {
                 resumeAfterSolution = false
                 lastModel = null
-                // A model is skipped when its check could not decide it, often because the deadline
-                // cut that check short. Such a check costs far more than the nodes the polling cadence
-                // was tuned on, so a skip polls at once rather than after the cadence's next interval.
-                if (session.cancelled()) {
-                    val event = lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.ExecutionControl)
-                        ?: finish(SearchRunEvent.Indeterminate.Cancelled)
-                    if (event == SearchRunEvent.Paused) pendingAdvance = true
-                    return event
-                }
-                if (!backtrack()) return stopAfterBacktrack()
+                skipModel()?.let { return it }
             }
 
             SearchModelDisposition.Continue -> {
@@ -328,9 +447,24 @@ class SearchRun internal constructor(
         return null
     }
 
+    private fun skipModel(): SearchRunEvent? {
+        // A complete check can cost more than the nodes between cadence polls.
+        if (session.cancelled()) {
+            val event = lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.ExecutionControl)
+                ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+            if (event == SearchRunEvent.Paused) pendingAdvance = true
+            return event
+        }
+        return if (!backtrack()) stopAfterBacktrack() else null
+    }
+
     private fun stopBeforeModelBlock(): SearchRunEvent? {
         if (modelContinuation != SearchModelContinuation.BlockAtRoot || !session.cancelled()) return null
-        return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.ExecutionControl)
+        val disposition = lifecycle.onCancellation(session)
+        if (retryingLeaves && leafRetries?.pending == true && disposition != SearchRunDisposition.Pause) {
+            rememberIndeterminate()
+        }
+        return disposition.toEvent(SearchComponentStop.Site.ExecutionControl)
             ?: finish(SearchRunEvent.Indeterminate.Cancelled)
     }
 
@@ -548,7 +682,7 @@ class SearchRun internal constructor(
         return finish(SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.LearnedConflict)
     }
 
-    private fun exhausted(): SearchRunEvent = if (sawIndeterminate) {
+    private fun exhausted(): SearchRunEvent = if (sawIndeterminate || leafRetries?.unresolved == true) {
         SearchRunEvent.Indeterminate.Component
     } else {
         SearchRunEvent.Exhausted
@@ -565,14 +699,18 @@ class SearchRun internal constructor(
         event: SearchRunEvent,
         site: SearchComponentStop.Site = SearchComponentStop.Site.Coverage,
     ): SearchRunEvent {
+        if (event == SearchRunEvent.Exhausted) coverageComplete = true
         if (event == SearchRunEvent.Indeterminate.Component) {
             val stopCause = session.executionControls.stopCause
             if (stopCause == null) {
-                session.executionControls.reportStop(indeterminateCause ?: SearchStopCause.RepresentationDecline)
+                session.executionControls.reportStop(
+                    indeterminateCause ?: leafRetries?.stopCause ?: SearchStopCause.RepresentationDecline,
+                )
             }
             if (recordComponentStops) {
                 componentStop = SearchComponentStop(
-                    site, stopCause, session.cancelled(), sawIndeterminate, session.decisionLevel,
+                    site, stopCause, session.cancelled(), sawIndeterminate || leafRetries?.unresolved == true,
+                    session.decisionLevel,
                 )
             }
         }
@@ -590,7 +728,10 @@ class SearchRun internal constructor(
         if (pendingCancellation) return cancelledAssertion()
         if (pendingAdvance) return SearchRunEvent.Paused
         // An exhausted frame stack has no pending region for a later slice to resume.
-        if (frames.isEmpty() && !budgetInterrupted) return finish(exhausted())
+        if (frames.isEmpty() && !budgetInterrupted) {
+            coverageComplete = true
+            return finish(exhausted())
+        }
         if (session.cancelled()) {
             return lifecycle.onCancellation(session).toEvent(SearchComponentStop.Site.ExecutionControl)
                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
@@ -631,7 +772,8 @@ class SearchRun internal constructor(
 
     internal fun retainBooleanRoot(literal: Int): Boolean {
         if (modelContinuation != SearchModelContinuation.Chronological || queryRoot != minimumDecisionLevel ||
-            !started || terminal != null || sawIndeterminate || pendingModel != null || lastModel != null ||
+            !started || terminal != null || sawIndeterminate || leafRetries?.pending == true ||
+            pendingModel != null || lastModel != null ||
             consumedModel || pendingCancellation || pendingCheck || retryingAssertion || learnedPropagationPending ||
             budgetInterrupted) return false
         val frame = frames.firstOrNull() ?: return false
@@ -649,6 +791,8 @@ class SearchRun internal constructor(
 
     internal fun releasePendingPropagation() {
         pendingLearnedPropagation = null
+        leafRetries?.clear()
+        pendingRetryBlock = null
     }
 
     /** Reset traversal state after its components have been reseeded at root. */
@@ -659,6 +803,12 @@ class SearchRun internal constructor(
         decisions = 0L
         decisionsSinceRestart = 0L
         sawIndeterminate = false
+        indeterminateCause = null
+        leafRetries?.clear()
+        retryingLeaves = false
+        coverageComplete = false
+        unresolvedModel = false
+        pendingRetryBlock = null
         resumeAfterSolution = false
         lastModel = null
         pendingModel = null
