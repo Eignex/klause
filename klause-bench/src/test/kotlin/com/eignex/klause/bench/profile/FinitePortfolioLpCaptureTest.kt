@@ -155,11 +155,35 @@ class FinitePortfolioLpCaptureTest {
         assertTrue(parameters.none { it.startsWith("source-refutation-center-step=") })
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = [false, true])
-    fun `ordinary joint capture should forward explicit center progress`(enabled: Boolean) {
+    @Test
+    fun `handoff capture should keep ordinary binary admission and the incumbent gate`() {
         val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
-            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary")
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-handoff")
+
+        val parameters = FinitePortfolioLpCapture.parameters(options)
+
+        assertEquals(listOf("companion-integers=false", "companion-active-ms=4000",
+            "companion-after-incumbent=true", "companion-admission=ordinary", "companion-repair=fixed",
+            "source-incumbent-completion=true", "portfolio-progress=false",
+            "portfolio-proof-workers=complete", "portfolio-proof-share=0.5"), parameters)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["joint-ordinary", "joint-handoff"])
+    fun `proposal journals should reject LP snapshots before corpus resolution`(mode: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to mode, "captures" to "1")
+
+        assertFailsWith<IllegalArgumentException> {
+            FinitePortfolioLpCapture.parameters(options)
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("joint-ordinary,false", "joint-ordinary,true", "joint-handoff,false", "joint-handoff,true")
+    fun `joint capture should forward explicit center progress`(mode: String, enabled: Boolean) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to mode)
         val expected = FinitePortfolioLpCapture.parameters(options) + "source-refutation-center-step=$enabled"
 
         val parameters = FinitePortfolioLpCapture.parameters(

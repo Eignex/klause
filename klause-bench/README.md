@@ -82,7 +82,10 @@ no LP snapshots. Observation spends the existing four-second companion lifetime
 and source funding. `result.json` retains capture counters and callback time, which
 is included in containing execution and core capture time. This diagnostic grants
 no production performance or source-verdict authority.
-`source-refutation-center-step=true|false` is accepted only in `joint-ordinary` mode
+`capture-mode=joint-handoff handoff=true` retains the same bounded proposal journal
+with ordinary binary-only admission and the after-incumbent gate enabled. It uses
+fixed repair, complete proof-worker coverage at share 0.5, and quiet logging.
+`source-refutation-center-step=true|false` is accepted in `joint-ordinary` and `joint-handoff` modes
 and forwards the source option to that producer. Omission leaves its default false.
 The existing observation and companion limits apply.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
