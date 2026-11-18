@@ -4,12 +4,26 @@ import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.catalog.corpus
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
+import java.nio.file.Path
 import kotlin.test.Test
-import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ProblemKindTest {
+    companion object {
+        @JvmStatic
+        fun miniZincSources(): List<Arguments> = listOf(
+            Arguments.of("solve :: int_search([x], first_fail, indomain_min, complete)\nminimize objective;", true),
+            Arguments.of("% solve minimize objective;\nsolve satisfy;", false),
+            Arguments.of("constraint solve_count = maximize_calls;\nsolve satisfy;", false),
+        )
+    }
 
     @Test
     fun `weighted maxsat should be COP`() {
@@ -24,25 +38,13 @@ class ProblemKindTest {
         assertTrue(ProblemKind.isCop(ref))
     }
 
-    @Test
-    fun `multi-line solve item with search annotation should be COP`() {
-        val model = """
-            constraint forall(i in 1..n)(x[i] >= 0);
-            solve
-                :: int_search(u ++ [x[i, j] | i in 1..N, j in 1..N],
-                    first_fail, indomain_min, complete)
-                minimize objective;
-        """.trimIndent()
-        assertTrue(ProblemKind.hasSolveObjective(model))
-    }
+    @ParameterizedTest
+    @MethodSource("miniZincSources")
+    fun `MiniZinc classification should read the solve directive`(text: String, cop: Boolean, @TempDir root: Path) {
+        val source = root.resolve("source.mzn").toFile().apply { writeText(text) }
+        val ref = ProblemRef("source", Format.MINIZINC, ProblemSource.Prepared(source),
+            Category.CSP, Expected.Unknown)
 
-    @Test
-    fun `commented-out objective should not be COP`() {
-        assertFalse(ProblemKind.hasSolveObjective("% solve minimize objective;\nsolve satisfy;"))
-    }
-
-    @Test
-    fun `solve-prefixed identifier should not match as a solve item`() {
-        assertFalse(ProblemKind.hasSolveObjective("constraint solve_count = maximize_calls;\nsolve satisfy;"))
+        assertEquals(cop, ProblemKind.isCop(ref))
     }
 }
