@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import org.junit.BeforeClass
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import java.io.File
@@ -13,6 +14,12 @@ import kotlin.test.assertTrue
 @RunWith(Parameterized::class)
 class MpsOptimalityGapTest(private val maximize: Boolean) {
     companion object {
+        @JvmStatic
+        @BeforeClass
+        fun initializeSolver() {
+            MpsOptimalityGapTest(false).triangleCover("--exact")
+        }
+
         @JvmStatic
         @Parameterized.Parameters(name = "maximize={0}")
         fun directions(): List<Boolean> = listOf(false, true)
