@@ -460,7 +460,9 @@ class BacktrackSolver internal constructor(
                 var outcome = checkNotNull(cursor.next())
                 while (outcome is SearchOutcome.Found &&
                     !farEnough(outcome.sample, window, params.minHammingDistance)
-                ) outcome = checkNotNull(cursor.next())
+                ) {
+                    outcome = checkNotNull(cursor.next())
+                }
                 if (outcome is SearchOutcome.Found && params.recentWindow > 0) {
                     if (window.size >= params.recentWindow) window.removeFirst()
                     window.addLast(outcome.sample)
