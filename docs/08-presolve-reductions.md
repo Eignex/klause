@@ -60,7 +60,10 @@ preserves the comparison; no domain, objective or variable elimination is involv
 Overlap incidence, width, ratio and checked coefficient-growth limits bound attempts.
 If every term cancels, a zero term represents the constant comparison.
 Both row-rewrite passes discard unfinished attempts and keep completed replacements
-with their unchanged equality premises.
+with their unchanged equality premises. They retain the original rows when source
+feasibility tolerance relaxes integer relations: a relaxed equality cannot substitute
+for an exact definition, and widening a replacement row does not preserve the independent
+source bands. Typed integer relations remain eligible even in a model with real coordinates.
 
 Bound fusion combines matching sides into an equality or refutes crossing bounds.
 These reductions preserve the solution set. Affine singleton elimination and
