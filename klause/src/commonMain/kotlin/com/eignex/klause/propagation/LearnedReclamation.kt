@@ -118,6 +118,7 @@ internal fun PropagationState.prepareReclamation(
     budget.atomic(baseFactorCount.toLong())
     budget.atomic(count.toLong() * 16L)
     if (selectedRetirements.hasRequests) budget.atomic(selectedRetirements.remapWork)
+    nativeEngine?.prepareReclamationStorage(budget)
     val retained = BooleanArray(count)
     collectLearnedReferences(retained) { budget.visit() }
     budget.atomic(boolReason.size.toLong() + intMinReason.size + intMaxReason.size + undo.size * 3L)

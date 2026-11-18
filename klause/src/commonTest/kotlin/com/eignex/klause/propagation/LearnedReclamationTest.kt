@@ -21,6 +21,27 @@ import kotlin.test.assertTrue
 
 class LearnedReclamationTest {
     @Test
+    fun `a funded native compaction should retry cancellation with its root reason intact`() {
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)), Clause(intArrayOf(1)))), nativeSat = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        val reason = assertNotNull(session.boolReasonClause(1)).toList()
+        repeat(4000) { session.addLearnedClause(Clause(intArrayOf(4, 6)), 9) }
+        val stopAt = session.work + 64L
+
+        val cancelled = session.compactLearnedClauses(20_000_000L, 1_048_576L,
+            { session.work >= stopAt }) { _, _ -> false }
+
+        assertFalse(cancelled)
+        assertEquals(4001, session.learnedClauseCount)
+        assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())
+        assertTrue(session.compactLearnedClauses(20_000_000L, 1_048_576L, { false }) { _, _ -> false })
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(true, session.boolValue(1))
+        assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())
+    }
+
+    @Test
     fun `a short cleanup window should observe a cancellation at its next poll`() {
         var requested = false
         val cancelled = CleanupCancellation { requested }

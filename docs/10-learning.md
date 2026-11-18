@@ -249,6 +249,8 @@ Full native or general compaction runs a cancellable preflight of all arrays,
 watches, reasons, queues and event indexes with a conservative envelope for its
 indivisible publication, defers without mutation on cancellation or an oversized
 envelope, and otherwise remaps the whole generation and trims retained capacity.
+Native storage envelopes are funded before allocating the retention mask or scanning
+clause ownership, so an unfunded fixed envelope defers without a pass over the clauses.
 Work debt and bounded steps promise no hard pause latency. Thresholds and default
 retention are separate policy decisions.
 
