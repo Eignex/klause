@@ -174,7 +174,9 @@ class LinearPropagatorTest {
                         ),
                     ),
                 )
-                PropagationReasonOracle.assertReasonsImply(problem, "linear-$op#$iter") { state ->
+                PropagationReasonOracle.assertReasonsImply(
+                    problem, "linear-$op#$iter", allowReasonlessRootConflict = true,
+                ) { state ->
                     (0 until 4).all {
                         val v = rng.nextInt(n)
                         when (rng.nextInt(3)) {

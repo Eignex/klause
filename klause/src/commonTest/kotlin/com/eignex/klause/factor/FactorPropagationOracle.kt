@@ -188,7 +188,7 @@ object FactorPropagationOracle {
         state.recompute()
     }
 
-    private fun enumerateSat(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): List<Sample> {
+    internal fun enumerateSat(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): List<Sample> {
         val samples = ArrayList<Sample>()
         val assignments = sourceAssignments(problem)
         val state = declaredState(problem)
