@@ -144,7 +144,8 @@ root on a bound becomes a point. A root past the largest finite value settles to
 infinity. A split that makes no progress ends the narrowing.
 
 Narrowing runs only where a binary64 value is published: the FlatZinc writer and
-`solveSample`, and the finished incumbent of every `SourceStrategy.optimize`. Theories
+`solveSample`, quadratic objective progress and statistics, and the finished incumbent of every
+`SourceStrategy.optimize`. Theories
 publish their exact witnesses as captured, with the mean of the converted interval
 endpoints as a search guide for the approximate coordinate. Each publication narrows
 under a private allowance, apart from any search budget and from a token that has

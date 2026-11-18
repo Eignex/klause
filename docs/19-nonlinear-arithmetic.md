@@ -314,6 +314,8 @@ completion. Finite and open-integer quadratic workers compose
 interruption handling and cleanup. Complete-worker work counters remain specific to
 their traversal; neighborhood preparation converts native work to instructions
 before combining it with the retained cursor's work.
+Progress events and incumbent statistics round the exact objective with the same
+bounded binary64 narrowing used for published coordinates, independently of the search budget.
 `solvePolynomialObjectiveImage` optimizes over a conditioned source with the same IR, and `tryConvexPolynomialOptimum` admits affine rows with a quadratic
 objective through the
 [quadratic certificate kernel](22-exact-arithmetic.md#exact-quadratic-certificates).

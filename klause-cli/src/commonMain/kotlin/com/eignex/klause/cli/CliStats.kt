@@ -285,7 +285,7 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     }
     if (solveTimeMs > 0L) out += "lsMovesPerSec" to round4(moves / (solveTimeMs / 1000.0))
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
-    if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
+    if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to stats.ls.incumbentObjective.toString()
     if (stats.ls.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.ls.incumbentViolation)
     stats.ls.bestResidual?.let { residual ->
         out += "lsBestResidualViolation" to residual.cost.toString()
