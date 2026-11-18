@@ -25,6 +25,7 @@ import org.junit.BeforeClass
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -38,6 +39,24 @@ class LinearLpProjectionToleranceTest(private val upper: Boolean) {
         @JvmStatic
         @BeforeClass
         fun initializeRelaxation() = LinearSourceRowToleranceTest.initializeRelaxation()
+    }
+
+    @Test
+    fun `wide rows without a declared rounding sign should withhold tolerance pricing`() {
+        val coefficient = parseBigInt("18446744073709555711")
+        val policy = SourceTolerance(SemanticRational.ONE)
+        val original = Problem(0, 1, arrayOf(IntDomain(-3, 3)), listOf(
+            Linear(intArrayOf(0), arrayOf(if (upper) -coefficient else coefficient),
+                LinearOp.LE, -(coefficient * bigIntOf(3)) - BIG_ONE),
+        ), semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = policy).resolve())
+        val problem = original.withIntDomains(arrayOf(if (upper) IntDomain(-3, 0) else IntDomain(0, 3)))
+        val base = CpToLpRelaxation(problem, null).build(RootDomains(problem))
+        val model = assertNotNull(base.model.authoritativeModel())
+        val row = model.entries(base.intColOf[0]).single().row
+
+        val movement = assertNotNull(model.row(row).slack).at(LpBoundSlack(1.0, 0.0))
+
+        assertEquals(Double.POSITIVE_INFINITY, movement)
     }
 
     @Test

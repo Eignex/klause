@@ -5,6 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.engine.LpRowSlack
+import com.eignex.klause.lp.engine.scaled
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
@@ -172,8 +173,9 @@ private fun LinearRow.wideRowSlack(
         val gap = if (difference < BigFraction.ZERO) difference.negated() else difference
         if (gap.isZero) continue
         gapWeight = (gapWeight + gap.toDouble().nextUp()).nextUp()
-        boundMagnitude = max(boundMagnitude,
-            source.sourceBoundMagnitude(variables[index], upper = !split.isNonNegative(index)))
+        val magnitude = source.sourceSignBoundMagnitude(variables[index], upper = !split.isNonNegative(index))
+            ?: return original.scaled(Double.POSITIVE_INFINITY)
+        boundMagnitude = max(boundMagnitude, magnitude)
     }
     if (gapWeight == 0.0) return original
     // A tolerance crossing of a declared sign bound reverses the coefficient's outward rounding direction.

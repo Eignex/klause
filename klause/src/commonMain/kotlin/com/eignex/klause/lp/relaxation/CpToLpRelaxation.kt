@@ -1350,15 +1350,15 @@ internal class CpToLpRelaxation(
             return if (problem.semantics.relaxesRows(0)) expandedMagnitude(outward) else outward
         }
 
-        override fun sourceBoundMagnitude(intVar: Int, upper: Boolean): Double {
+        override fun sourceSignBoundMagnitude(intVar: Int, upper: Boolean): Double? {
             checkCancellation()
             val bounds = problem.intBounds
             val value = if (upper) {
-                if (!bounds.hasUpper(intVar)) return Double.POSITIVE_INFINITY
-                bounds.upper(intVar)
+                if (!bounds.hasUpper(intVar)) return null
+                bounds.upper(intVar).also { if (it > 0L) return null }
             } else {
-                if (!bounds.hasLower(intVar)) return Double.POSITIVE_INFINITY
-                bounds.lower(intVar)
+                if (!bounds.hasLower(intVar)) return null
+                bounds.lower(intVar).also { if (it < 0L) return null }
             }
             val magnitude = abs(value.toDouble())
             return if (magnitude == 0.0) 0.0 else magnitude.nextUp()

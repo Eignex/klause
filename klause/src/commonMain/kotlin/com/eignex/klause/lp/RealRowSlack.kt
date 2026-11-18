@@ -20,7 +20,7 @@ internal fun RelaxationBuilder.realConstantSlack(result: Int, value: Double): Lp
 internal interface SourceRowSlackBuilder : RelaxationBuilder {
     fun sourceRowSlack(row: LinearRow, includeAbsolute: Boolean = false): LpRowSlack?
     fun sourceIntMagnitude(intVar: Int): Double
-    fun sourceBoundMagnitude(intVar: Int, upper: Boolean): Double
+    fun sourceSignBoundMagnitude(intVar: Int, upper: Boolean): Double?
     fun sourceRow(row: LinearRow, scale: BigFraction, emit: () -> Unit)
 }
 
