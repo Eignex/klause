@@ -163,9 +163,6 @@ internal class SourceNumericalFeedback(
         if (authority.capture === owned) authority.capture = null
     }
 
-    fun refutationSupport(record: SourceNumericalFeedbackResult.Available): SourceNumericalSupportResult =
-        sourceNumericalRefutationSupport(record, funding, cancellation)
-
     // On-demand evaluation is debited to source funding at once; a replaced or released query declines.
     fun violation(
         record: SourceNumericalFeedbackResult.Available,

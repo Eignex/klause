@@ -43,13 +43,6 @@ internal class LpPreparationCache private constructor(
     private fun slot(problem: Problem): AtomicReference<LpPreparationState?> =
         if (problem is BakedProblem) finiteSlot else sourceSlot
 
-    fun storageUnits(problem: Problem): Long = when (val current = slot(problem).load()) {
-        is LpPreparationTemplates -> current.storageUnits
-        is LpPreparationAdmission -> LpPreparationAdmission.STORAGE_UNITS
-        is LpPreparationNamespace -> 1L
-        null -> 0L
-    }
-
     fun prepare(
         selection: PreparedFactorProjections,
         objective: LinearObjective?,
@@ -143,7 +136,3 @@ internal fun PreparedFactorProjections.recordLpConstruction(
     token: ExecutionControl,
     onWork: (Long) -> Unit,
 ): Boolean = lpPreparation.recordConstruction(this, completedUnits, token, onWork)
-
-/** Modeled storage retained by this view's current preparation slot. */
-internal val PreparedFactorProjections.lpPreparationStorageUnits: Long
-    get() = lpPreparation.storageUnits(problem)

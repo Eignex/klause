@@ -165,7 +165,6 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `cutoff refutation support should remain local to the conditioned source`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val cutoff = SourceNumericalCutoff(BigFraction.ofLong(2).reciprocal(), "improve")
         val conditioned = assertNotNull(cutoff.applyTo(source, funding))
         val proof = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
@@ -176,7 +175,8 @@ class SourceNumericalFeedbackTest {
         val query = LinearAuthorityCapturedQuery(0, conditioned, conditioned, listOf(x), emptyList(), emptySet(),
             null, emptyList(), emptyMap(), null, evidence, "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, cutoff))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, cutoff), funding, ExecutionControl.Never)
 
         val support = assertIs<SourceNumericalSupportResult.Available>(projected)
         assertEquals(setOf(x), support.coordinates)
@@ -190,12 +190,12 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `unsupported refutation projection should decline instead of returning an empty support`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val query = LinearAuthorityCapturedQuery(0, source, source, listOf(x), emptyList(), emptySet(),
             null, emptyList(), emptyMap(), null, SourceEvidence(scope, SourceClaim.Refutation,
                 SourceDerivation.SourceWitness), "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         assertEquals(SourceNumericalSupportResult.Reason.Unsupported,
             assertIs<SourceNumericalSupportResult.Unavailable>(projected).reason)
@@ -204,7 +204,6 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `uncited premises should not exhaust refutation support entries`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val unused = SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))
         val dense = SourceProofContext(scope, source.coordinates, source.premises +
             ("upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO))) +
@@ -217,7 +216,8 @@ class SourceNumericalFeedbackTest {
             null, emptyList(), emptyMap(), null, SourceEvidence(scope, SourceClaim.Refutation, proof),
             "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         val support = assertIs<SourceNumericalSupportResult.Available>(projected)
         assertEquals(setOf(x), support.coordinates)
@@ -229,7 +229,6 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `numeric premises and pinned bounds should remain in refutation support`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val pinned = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
         val numeric = SourceProofContext(pinned.scope, source.coordinates, source.premises +
             ("upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO))),
@@ -243,7 +242,8 @@ class SourceNumericalFeedbackTest {
             null, emptyList(), emptyMap(), null, SourceEvidence(pinned.scope, SourceClaim.Refutation, proof),
             "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         val support = assertIs<SourceNumericalSupportResult.Available>(projected)
         assertEquals(setOf(x), support.coordinates)
@@ -255,13 +255,13 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `missing cited premises should leave refutation support unavailable`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val proof = LinearPinnedRefutation(SourceDerivation.Premise("missing"))
         val query = LinearAuthorityCapturedQuery(0, source, source, listOf(x), emptyList(), emptySet(),
             null, emptyList(), emptyMap(), null, SourceEvidence(scope, SourceClaim.Refutation, proof),
             "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         assertEquals(SourceNumericalSupportResult.Reason.Unsupported,
             assertIs<SourceNumericalSupportResult.Unavailable>(projected).reason)
@@ -270,14 +270,14 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `an absent bound side should leave refutation support unavailable`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val pinned = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
         val proof = LinearPinnedRefutation(SourceDerivation.Assumption(x, true))
         val query = LinearAuthorityCapturedQuery(0, pinned, pinned, listOf(x), emptyList(), emptySet(),
             null, emptyList(), emptyMap(), null, SourceEvidence(pinned.scope, SourceClaim.Refutation, proof),
             "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         assertEquals(SourceNumericalSupportResult.Reason.Unsupported,
             assertIs<SourceNumericalSupportResult.Unavailable>(projected).reason)
@@ -286,7 +286,6 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `refutation support traversal should retain its entry limit`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val bounded = SourceProofContext(scope, source.coordinates, source.premises +
             ("upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO))),
             source.objective)
@@ -299,7 +298,8 @@ class SourceNumericalFeedbackTest {
             null, emptyList(), emptyMap(), null, SourceEvidence(scope, SourceClaim.Refutation, proof),
             "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         val unavailable = assertIs<SourceNumericalSupportResult.Unavailable>(projected)
         assertEquals(SourceNumericalSupportResult.Reason.Limit, unavailable.reason)
@@ -309,7 +309,6 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `refutation support traversal should retain its depth limit`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val bounded = SourceProofContext(scope, source.coordinates, source.premises +
             ("upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO))),
             source.objective)
@@ -322,7 +321,8 @@ class SourceNumericalFeedbackTest {
             null, emptyList(), emptyMap(), null, SourceEvidence(scope, SourceClaim.Refutation,
                 LinearPinnedRefutation(proof)), "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         val unavailable = assertIs<SourceNumericalSupportResult.Unavailable>(projected)
         assertEquals(SourceNumericalSupportResult.Reason.Limit, unavailable.reason)
@@ -332,12 +332,12 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `paused numerical grants should not be renewed by support lookup`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never)
         val query = LinearAuthorityCapturedQuery(0, source, source, listOf(x), emptyList(), emptySet(),
             null, emptyList(), emptyMap(), null, SourceEvidence(scope, SourceClaim.Refutation,
                 SourceDerivation.SourceWitness), "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl.Never)
 
         assertEquals(SourceNumericalSupportResult.Reason.Funding,
             assertIs<SourceNumericalSupportResult.Unavailable>(projected).reason)
@@ -348,12 +348,12 @@ class SourceNumericalFeedbackTest {
     @Test
     fun `cancelled support lookup should remain unavailable`() {
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl { true })
         val query = LinearAuthorityCapturedQuery(0, source, source, listOf(x), emptyList(), emptySet(),
             null, emptyList(), emptyMap(), null, SourceEvidence(scope, SourceClaim.Refutation,
                 SourceDerivation.SourceWitness), "checked-refutation")
 
-        val projected = feedback.refutationSupport(SourceNumericalFeedbackResult.Available(query, null))
+        val projected = sourceNumericalRefutationSupport(
+            SourceNumericalFeedbackResult.Available(query, null), funding, ExecutionControl { true })
 
         assertEquals(SourceNumericalSupportResult.Reason.Cancelled,
             assertIs<SourceNumericalSupportResult.Unavailable>(projected).reason)

@@ -60,20 +60,11 @@ partition nor a peer root. Lost probes and task attempts retain charges.
 It runs through an explicit internal entry point; ordinary portfolio selection
 retains its existing policy.
 
-`BooleanCoverageAttribution` retains bounded exact region keys and their first workers.
-It separates repeated entries by one worker, duplicate entries across workers and
-duplicate native refutations. Exact equality gives a lower bound on overlap; entries
-alone prove no completed coverage or saved work. `SearchBranchAttemptObserver` observes
+`SearchBranchAttemptObserver` observes
 a tightening alternative before assertion, including immediate conflicts. Finite
 backtrack exposes it through `BacktrackParams.branchObserver`. Commit callbacks follow
 a consistent push and successful decision accounting; refuted or indeterminate
-assertions supply no commit callback. Its Boolean adapter
-captures all established Boolean values and the attempted literal; callers restrict it
-to pure Boolean models with identity source Boolean coordinates, the complete variable
-count and a matching context.
-Hidden finite or arithmetic branches require another vocabulary. Capture limits mark
-partial observations, and retirement releases retained keys. Literal payload bytes
-exclude collection capacity, headers and all solver state. Observers run inline and
+assertions supply no commit callback. Observers run inline and
 must not mutate the context.
 
 ## Shared component search

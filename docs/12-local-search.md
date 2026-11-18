@@ -440,9 +440,9 @@ and network replacement discards both caches. Reentrant use throws before mutati
 the workspace.
 
 `LocalSearchState.inspectMove` exposes the ordinary reversible probe for explicit
-diagnostic consumers. It captures the candidate assignment, maintained outputs,
-factor grades and objective delta, then restores the committed state and activity.
-It consumes no random values; assignment and degree copies are charged to the
+diagnostic consumers. It captures the candidate assignment, maintained outputs
+and objective delta, then restores the committed state and activity.
+It consumes no random values; assignment copies are charged to the
 caller. Inspection supplies neither source validation nor proof authority.
 
 Boolean-only clause models close native proposals under clause implications before
