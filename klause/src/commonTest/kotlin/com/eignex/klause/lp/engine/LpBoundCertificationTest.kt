@@ -10,6 +10,35 @@ import kotlin.test.assertTrue
 
 class LpBoundCertificationTest {
     @Test
+    fun `dual reconstruction should honor the caller basis envelope`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            List(3) { column ->
+                listOf(column to 2L, (column + 1) % 3 to 1L).sortedBy { it.first }
+                    .map { (row, value) -> ExactLpEntry(row, ExactLpNumber.of(value)) }
+            },
+            List(3) { zero },
+            List(3) { ExactLpColumn(ExactLpBounds()) } +
+                List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(3) { ExactLpRow() },
+            ExactLpObjective(List(3) { ExactLpNumber.of(-1L) } + List(3) { zero }),
+        )).toWorkingModel())
+        val basis = Basis(intArrayOf(0, 1, 2),
+            Array(6) { if (it < 3) VarStatus.BASIC else VarStatus.AT_LOWER })
+        val cases = listOf(
+            ReconstructionLimits(maxBasisDimension = 2) to false,
+            ReconstructionLimits(maxBasisDimension = 3, maxBasisFill = 0) to false,
+            ReconstructionLimits(maxBasisDimension = 3, maxBasisFill = 9) to true,
+        )
+        for ((limits, funded) in cases) {
+            val result = certifyLpBoundOnly(source, DoubleArray(3), limits, basis = basis)
+
+            if (funded) assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
+            else assertNull(result.bound)
+        }
+    }
+
+    @Test
     fun `partial basis repair should restore a newly violated one sided direction`() {
         val size = 129
         val zero = ExactLpNumber.of(0L)

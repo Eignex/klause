@@ -11,6 +11,45 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
+    fun `caller funded cell storage should resume a dimension declined authority`() {
+        val rows = 256
+        val input = ExactContinuationInput(
+            emptyList(), List(rows) { if (it == 0) BigFraction.ONE else BigFraction.ZERO },
+            List(rows) { BigFraction.ZERO }, List(rows) { BigFraction.ZERO },
+            List(rows) { it }, List(rows) { ContinuationStatus.BASIC },
+        )
+        val continuation = ExactContinuation(input)
+
+        val declined = continuation.resume()
+        val completed = continuation.resume(ExactContinuationLimits(maxCells = rows * (rows + 1)))
+
+        assertEquals(ContinuationDecline.DIMENSION, declined.metrics.decline)
+        assertEquals(List(rows) { if (it == 0) BigFraction.ONE else BigFraction.ZERO }, assertNotNull(completed.ray))
+        assertEquals(declined.metrics.work + completed.metrics.work, continuation.usedWork)
+    }
+
+    @Test
+    fun `caller work extensions should retain earlier spent work`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
+            listOf(BigFraction.ZERO, BigFraction.ZERO), listOf(null, BigFraction.ZERO),
+            listOf(1), listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC),
+        )
+        val reference = ExactContinuation(input).resume()
+        val continuation = ExactContinuation(input)
+        val allowance = reference.metrics.work - 1
+
+        val paused = continuation.resume(ExactContinuationLimits(maxWork = allowance))
+        val repeated = continuation.resume(ExactContinuationLimits(maxWork = allowance))
+        val resumed = continuation.resume(ExactContinuationLimits(maxWork = allowance + reference.metrics.work))
+
+        assertEquals(ContinuationDecline.WORK, paused.metrics.decline)
+        assertEquals(ContinuationDecline.WORK, repeated.metrics.decline)
+        assertEquals(reference.values, assertNotNull(resumed.values))
+        assertEquals(paused.metrics.work + repeated.metrics.work + resumed.metrics.work, continuation.usedWork)
+    }
+
+    @Test
     fun `precision selection should preserve cumulative imports under the same ceiling`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val input = ExactContinuationInput(

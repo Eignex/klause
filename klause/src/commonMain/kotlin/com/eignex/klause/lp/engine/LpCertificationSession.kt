@@ -19,15 +19,16 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         cancellation: ExecutionControl,
         observer: LpCertificationObserver?,
         counterResults: LpCounterResults?,
-        refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        refinementLimits: LpRefinementLimits = context.refinementLimits,
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
         acceptFloatInfeasibility: Boolean = false,
+        continuationLimits: ExactContinuationLimits = context.continuationLimits,
     ): CertifiedLpResult {
         val observation = observer?.let { LpClaimObservation(claim, it) }
         return certifyWithin(model, solver, result, cancellation, observation, counterResults,
-            refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility).also {
+            refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility, continuationLimits).also {
             observation?.finish(it, it.certificationReused)
         }
     }
@@ -60,6 +61,7 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         floatOffset: Double,
         claim: LpClaim,
         acceptFloatInfeasibility: Boolean,
+        continuationLimits: ExactContinuationLimits,
     ): CertifiedLpResult {
         if (context.numericalDeductions && acceptFloatInfeasibility) {
             numericalLpRefutation(model, solver, result, cancellation, observer, context.refutationSlack)
@@ -97,11 +99,10 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         val certified = certifyLpResult(
             model, solver, result, cancellation, observer, context.certificationPolicy,
             counterResults ?: checked, continuationCache = continuation, refinement = refinement,
-            continuationLimits = ExactContinuationLimits(
-                startArbitraryPrecision = context.startArbitraryPrecision,
-                preserveOverflowCheckpoint = context.preserveOverflowCheckpoint,
-            ),
+            continuationLimits = continuationLimits,
             sparsePointRecovery = context.sparsePointRecovery, claim = claim,
+            reconstructionLimits = context.reconstructionLimits,
+            basisLimits = context.basisLimits,
         )
         ladderTimer.finish(certified.verdict.name)
         return certified

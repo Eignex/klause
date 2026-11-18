@@ -6,12 +6,14 @@ import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpRefinementLimits
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.strongerThan
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
@@ -28,7 +30,7 @@ internal class LeafRealSolver(
     private val objective: LinearObjective?,
     componentSplit: Boolean = true,
     private val sink: LpStatsSink? = null,
-    context: LpSolveContext = LpSolveContext.Production,
+    private val context: LpSolveContext = LpSolveContext.Production,
     pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
     private val encoders = problem.selectedFactorProjections()
@@ -45,6 +47,8 @@ internal class LeafRealSolver(
         cancellation: ExecutionControl = ExecutionControl.Never,
         toleranceCheck: ((Sample) -> Boolean)? = null,
         workLimit: Long = 0L,
+        refinementLimits: LpRefinementLimits = context.refinementLimits,
+        continuationLimits: ExactContinuationLimits = context.continuationLimits,
     ): LeafRealResult {
         check(!closed) { "real leaf solver is closed" }
         check(activeSolve == null) { "real leaf solver is suspended" }
@@ -68,6 +72,8 @@ internal class LeafRealSolver(
             floatOffset = relaxation.objectiveConstant.toDouble(),
             claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
             acceptFloatInfeasibility = toleranceCheck.permitsToleranceOptimum(),
+            refinementLimits = refinementLimits,
+            continuationLimits = continuationLimits,
         )
         return relaxation.leafResult(certified, problem, objective, sample, sink)
             .checkedEncoding(encoded, sample, cancellation)
@@ -78,6 +84,8 @@ internal class LeafRealSolver(
         sample: Sample,
         cancellation: ExecutionControl = ExecutionControl.Never,
         toleranceCheck: ((Sample) -> Boolean)? = null,
+        refinementLimits: LpRefinementLimits = context.refinementLimits,
+        continuationLimits: ExactContinuationLimits = context.continuationLimits,
     ): LpSolveCursor<LeafRealResult> {
         check(!closed && activeSolve == null) { "real leaf solver is closed or suspended" }
         require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
@@ -100,6 +108,8 @@ internal class LeafRealSolver(
                 floatOffset = relaxation.objectiveConstant.toDouble(),
                 claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
                 acceptFloatInfeasibility = toleranceCheck.permitsToleranceOptimum(),
+                refinementLimits = refinementLimits,
+                continuationLimits = continuationLimits,
             ).use { cursor ->
                 var step = cursor.advance(shouldPause = { shouldPause(cursor.work) })
                 while (step is LpSolveStep.Paused) {

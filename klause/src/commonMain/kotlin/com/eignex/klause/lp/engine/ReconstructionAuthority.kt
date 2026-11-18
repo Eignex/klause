@@ -20,9 +20,12 @@ internal data class ReconstructionLimits(
     val maxWork: Long = 250000L,
     val maxAllocation: Long = 16L * 1024L * 1024L,
     val maxAttempts: Int = 4,
+    val maxBasisDimension: Int = 128,
+    val maxBasisFill: Int = 16384,
 ) {
     init {
         require(maxCoordinates >= 0 && maxEntries >= 0 && maxBits >= 24)
+        require(maxBasisDimension >= 0 && maxBasisFill >= 0)
         require(maxWork >= 0L && maxAllocation >= 0L && maxAttempts in 0..64)
     }
 }
@@ -214,9 +217,10 @@ internal class ReconstructionMeter(
     )
 
     fun basisLimits(): RationalBasisLimits = RationalBasisLimits(
+        dimension = limits.maxBasisDimension,
         work = (limits.maxWork - work) / 2L,
         allocationBytes = (limits.maxAllocation - allocation) / 2L,
-        fill = minOf(limits.maxEntries, 16384),
+        fill = minOf(limits.maxEntries, limits.maxBasisFill),
         bits = limits.maxBits,
     )
 

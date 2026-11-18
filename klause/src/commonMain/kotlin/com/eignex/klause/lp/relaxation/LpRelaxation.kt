@@ -336,7 +336,7 @@ private class SampleDomains(private val sample: Sample) : RelaxationDomains {
  * completion as [LpVerdict.FEASIBLE];
  * [LpVerdict.INFEASIBLE] rejects the leaf by an exact conflict, or by the numerical ray check when the
  * source and [toleranceCheck] permit numerical deductions;
- * [LpVerdict.INDETERMINATE] means neither could be certified within the 128-bit budget, so the leaf's
+ * [LpVerdict.INDETERMINATE] means neither could be certified within the caller's allowances, so the leaf's
  * status is unknown and the terminal verdict must degrade to `unknown` rather than claim UNSAT/SAT.
  *
  * The discrete constraints already hold at a CP-consistent leaf, so their linear rows are satisfiable by
