@@ -22,6 +22,7 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.ExactRelaxationBuilder
@@ -1143,7 +1144,10 @@ internal class CpToLpRelaxation(
             gatedRowList.add(builder.rowCount)
             gatedAuxList.add(f.aux)
             gatedWhenTrueList.add(1)
-            realRow(cols, coeffs, f.op, f.bound, f.strict, intArrayOf(Lit.make(f.aux, true)))
+            val premise = intArrayOf(Lit.make(f.aux, true))
+            val slack = if (f.strict) null else sourceRowSlack(f.linearRows.single())
+            if (slack == null) realRow(cols, coeffs, f.op, f.bound, f.strict, premise)
+            else derivedRealRow(cols, coeffs, f.op, f.bound, slack, premise)
             gatedRowList.add(builder.rowCount)
             gatedAuxList.add(f.aux)
             gatedWhenTrueList.add(0)

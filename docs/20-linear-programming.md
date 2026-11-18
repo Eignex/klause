@@ -241,6 +241,8 @@ without a declaration supporting the rounding direction withholds tolerance pric
 Boolean RLT rows retain the source row's band and coefficient-weighted lower-declaration
 bands. Their auxiliary extension admits widened binary declarations. Integer rows that
 read tolerance require original zero/one declarations rather than an inferred root box.
+Nonstrict gated reified atoms retain their source activity bands with their activating
+literals in the node-invariant residual model.
 
 Retained cuts keep their derived bands in both source and numeric row units. Rational
 projection scales the weights with the coefficients, and prepared projections, component
