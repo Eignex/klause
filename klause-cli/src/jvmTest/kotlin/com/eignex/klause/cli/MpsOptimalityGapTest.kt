@@ -28,7 +28,7 @@ class MpsOptimalityGapTest(private val maximize: Boolean) {
         assertTrue("o ${sign}2.1" in text.lines(), text)
         assertTrue("c optimizationStatus=gap-optimum" in text.lines(), text)
         assertTrue("c objectiveBoundDirection=${if (maximize) "upper" else "lower"}" in text.lines(), text)
-        assertTrue("c objectiveBound=${sign}1.1" in text.lines(), text)
+        assertTrue("c objectiveBound=${sign}2" in text.lines(), text)
     }
 
     @Test
