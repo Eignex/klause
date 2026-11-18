@@ -2,6 +2,7 @@ package com.eignex.klause.solver.validation
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.engine.LpBoundSlack
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.solver.Sample
@@ -134,8 +135,18 @@ private class ToleranceFirstOptimization(
 // where [check] decides points through a search within that tolerance: a node or leaf is then refuted, and a bound
 // prunes or propagates, only beyond the slack the leaves read. Unchanged otherwise.
 internal fun LpSolveContext.readingSourceSlack(problem: Problem, check: ((Sample) -> Boolean)?): LpSolveContext {
-    val policy = problem.semantics.effective.feasibilityTolerance
-    if (!numericalDeductions || policy == null || policy.isExact || check.toleranceSearch() == null) return this
+    if (check.toleranceSearch() == null) return this
+    return withSourceSlack(problem.semantics.effective.feasibilityTolerance)
+}
+
+// Presolve has no completed-point callback; its numerical deductions must still carry the captured source slack.
+internal fun LpSolveContext.readingSourceSlack(problem: Problem): LpSolveContext {
+    if (!problem.semantics.relaxesRows(problem.numRealVars)) return this
+    return withSourceSlack(problem.semantics.effective.feasibilityTolerance)
+}
+
+private fun LpSolveContext.withSourceSlack(policy: SourceTolerance?): LpSolveContext {
+    if (!numericalDeductions || policy == null || policy.isExact) return this
     fun upper(value: SemanticRational) =
         BigFraction.of(value.numerator, value.denominator).toDouble().let { if (it == 0.0) it else it.nextUp() }
     val slack = LpBoundSlack(upper(policy.absolute), upper(policy.relative))

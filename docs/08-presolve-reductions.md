@@ -298,6 +298,12 @@ wide integer column to a continuous one. It queries at most 64 columns, widest
 first, and every accepted tightening requires an LP bound
 ([numerical or exact](21-lp-engine.md#numerical-and-exact-deductions)).
 
+Numerical pre-bake LP checks and the root harvest read the captured source feasibility
+slack when checking refutations and bounds. Their deduction context moves row and
+column sides outward by the same slack as node and leaf LP reasoning, and a root
+refutation must survive that widening. Exact deductions, a zero source tolerance and
+typed integer-only models retain the nominal sides.
+
 ### Binary integer channels
 
 Binary-column substitution turns single-variable reified relations over a 0/1

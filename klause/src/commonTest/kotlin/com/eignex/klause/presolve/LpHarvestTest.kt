@@ -2,9 +2,14 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
@@ -28,6 +33,23 @@ import kotlin.test.assertTrue
 class LpHarvestTest {
     private val shavingParams = LpPlan(bounding = true, variableShaving = true)
     private val objShavingParams = LpPlan(bounding = true, objectiveShaving = true)
+
+    @Test
+    fun `pre bake LP bounds should retain integers admitted by source slack`() {
+        val source = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 2.5),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(
+                SourceFormat.IR, floats = FloatSemantics.Continuous,
+                feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+            ).resolve(),
+        )
+
+        val result = lpRootBoundsReporting(source, LinearObjective(), shavingParams, numericalLp = true)
+
+        assertEquals(0L, result.problem.finiteIntDomain(0).min)
+    }
 
     @Test
     fun `a no op harvest should retain finite templates for the engine bake`() {
@@ -188,6 +210,29 @@ class LpHarvestTest {
             Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
         ),
     )
+
+    @Test
+    fun `numerical harvest should keep typed integer rows exact`() {
+        val problem = coverSystem().withSourceSemantics(SourceSemantics(
+            SourceFormat.IR, floats = FloatSemantics.Continuous,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+        ).resolve()).bake()
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true), numericalLp = true)
+
+        assertTrue(result.report.rootInfeasible)
+    }
+
+    @Test
+    fun `numerical harvest should read slack on untyped decimal rows`() {
+        val problem = coverSystem().withSourceSemantics(SourceSemantics(
+            SourceFormat.MPS, feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+        ).resolve()).bake()
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true), numericalLp = true)
+
+        assertFalse(result.report.rootInfeasible)
+    }
 
     @Test
     fun `harvest should stop when the budget expires inside the simplex`() {
