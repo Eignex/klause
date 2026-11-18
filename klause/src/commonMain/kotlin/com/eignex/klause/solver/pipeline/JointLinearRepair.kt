@@ -156,6 +156,11 @@ internal class JointLinearRepair(
 
     private fun comparisonValue(sample: Sample): BigFraction? {
         if (onComparison == null || comparisonCount >= 64 || stop()) return null
+        return objectiveValue(sample)
+    }
+
+    private fun objectiveValue(sample: Sample): BigFraction? {
+        if (stop()) return null
         if (sample.numBoolVars != model.numBoolVars || sample.numIntVars != model.numIntVars ||
             sample.numRealVars != model.numRealVars || sample.algebraicReals != null || sample.symbolicReals != null ||
             sample.exactReals?.let { it.size != model.numRealVars } == true ||
@@ -177,7 +182,8 @@ internal class JointLinearRepair(
 
     private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff): Sample? {
         val offered = external() ?: return null
-        val raw = comparisonValue(offered)
+        val raw = if (completion != null && offered.exactReals != null && cutoff != null)
+            objectiveValue(offered) else comparisonValue(offered)
         if (completion != null && offered.exactReals != null && cutoff != null && raw != null && raw >= cutoff) {
             compare("external", "not-improving", raw = raw, cutoff = cutoff)
             return null
