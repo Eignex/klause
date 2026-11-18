@@ -4,7 +4,9 @@ import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.lowering.LinearSourceView
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.lp.finiteRelaxationSupported
@@ -21,6 +23,12 @@ internal class PreparedLinearSource(
     val claimsCoverTolerance: Boolean,
     val acceptedObjectiveBound: BigFraction?,
 )
+
+internal fun PreparedLinearSource.workingGapTolerance(): OptimalityTolerance? {
+    val policy = view.source.semantics.effective.optimalityTolerance ?: return null
+    val absolute = BigFraction.of(policy.absolute.numerator, policy.absolute.denominator) * view.objectiveScale
+    return policy.copy(absolute = SemanticRational.of(absolute.num, absolute.den))
+}
 
 internal fun prepareLinearSource(
     request: SourceSetupRequest,

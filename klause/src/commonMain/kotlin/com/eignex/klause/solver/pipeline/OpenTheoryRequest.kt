@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PresolveBudget
@@ -67,6 +68,7 @@ class OpenTheoryRequest internal constructor(
         componentPlan, objective = objective, maximize = maximize,
     ),
     internal val linearContext: SourceProofContext? = null,
+    private val gapToleranceOverride: OptimalityTolerance? = null,
 ) {
     /** Build a request and select its source decomposition. */
     constructor(
@@ -82,6 +84,11 @@ class OpenTheoryRequest internal constructor(
     // so the request's sense is resolved once, here, rather than at each of them.
     internal val minimizedObjective: LinearObjective?
         get() = objective?.let { if (maximize) it.negated() else it }
+
+    internal val gapTolerance: OptimalityTolerance?
+        get() = gapToleranceOverride ?: if (linearContext != null) {
+            linearContext.semantics?.effective?.optimalityTolerance
+        } else preparedPlan.sourceSemantics?.effective?.optimalityTolerance
 
     /** Return this request with the caller's resolved source-preparation policy. */
     fun withPresolve(
@@ -100,11 +107,15 @@ class OpenTheoryRequest internal constructor(
         budget,
         preparedPlan,
         linearContext,
+        gapToleranceOverride,
     )
 
-    internal fun withPreparedPlan(plan: PreparedSourcePlan): OpenTheoryRequest = OpenTheoryRequest(
+    internal fun withPreparedPlan(
+        plan: PreparedSourcePlan,
+        gapTolerance: OptimalityTolerance? = gapToleranceOverride,
+    ): OpenTheoryRequest = OpenTheoryRequest(
         model, objective, maximize, componentPlan, presolveConfig, solutionSetSensitive, presolveCancellation,
-        presolveBudget, plan, linearContext,
+        presolveBudget, plan, linearContext, gapTolerance,
     )
 
     /** Bind the source owner's complete exact affine premises, objective and original-coordinate semantics. */
@@ -118,7 +129,7 @@ class OpenTheoryRequest internal constructor(
         }
         require(context.coordinates == coordinates) { "linear authority requires original source coordinates" }
         return OpenTheoryRequest(model, objective, maximize, componentPlan, presolveConfig, solutionSetSensitive,
-            presolveCancellation, presolveBudget, preparedPlan, context)
+            presolveCancellation, presolveBudget, preparedPlan, context, gapToleranceOverride)
     }
 }
 
@@ -478,7 +489,7 @@ object OpenTheoryPipeline {
             }
         }
         return RationalTheoryDescent(request.model, objective, params, context,
-            publicationInvocation = binding).use { descent ->
+            publicationInvocation = binding, gapTolerance = request.gapTolerance).use { descent ->
             val result = requireNotNull(descent.runSlice(
                 params.cancellation.includingStop( params.timeout), Long.MAX_VALUE, -1,
             ) { incumbent -> values?.publish(incumbent.sample, publication) })
@@ -533,6 +544,7 @@ object OpenTheoryPipeline {
             request.presolveCancellation,
             request.presolveBudget,
             request.preparedPlan.factorProjections,
+            request.gapTolerance,
         )
 }
 

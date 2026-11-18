@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PreparedSource
@@ -22,6 +23,7 @@ class PolynomialTheoryRequest internal constructor(
     val preparedPlan: PreparedSourcePlan = problem.prepareExecutionPlan(),
     internal val sourcePreparation: PreparedSource? = null,
     internal val originalPlan: PreparedSourcePlan = preparedPlan,
+    internal val gapTolerance: OptimalityTolerance? = preparedPlan.sourceSemantics?.effective?.optimalityTolerance,
 ) {
     internal val sharedModel: SharedPolynomialModel?
         get() = preparedPlan.execution.polynomial?.completion
@@ -243,7 +245,7 @@ private fun minimizePolynomial(
     val scope = PolynomialInvocationScope(
         shared.service, params, concurrent = cores > 1 && engine != FiniteEngine.FIXED,
     )
-    val gap = request.preparedPlan.sourceSemantics?.effective?.optimalityTolerance?.takeUnless { it.isExact }
+    val gap = request.gapTolerance?.takeUnless { it.isExact }
     val strategy = if (gap == null) params.strategy else params.strategy.copy(
         backtrack = params.strategy.backtrack.copy(
             optimalityGap = OptimalityGap(gap, integral = true)))

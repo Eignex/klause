@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthority
@@ -70,6 +71,7 @@ internal class LinearAuthorityInvocation(
     repairGuidance: LinearRepairGuidance? = null,
     gap: OptimalityGap? = null,
     useSourceGap: Boolean = true,
+    gapTolerance: OptimalityTolerance? = context.semantics?.effective?.optimalityTolerance,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -145,7 +147,7 @@ internal class LinearAuthorityInvocation(
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
-        gap = gap, useSourceGap = useSourceGap)
+        gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceProofContext
@@ -13,6 +14,7 @@ internal fun LinearOptimizationResult.verifyRuntimeTerminal(
     produced: EngineInvocation,
     original: SourceProofContext,
     cancellation: ExecutionControl,
+    gapTolerance: OptimalityTolerance? = original.semantics?.effective?.optimalityTolerance,
 ): Verification<Unit, Unit> {
     if (!expected.matches(produced)) {
         return Verification.Rejected("linear completion belongs to another runtime invocation")
@@ -39,5 +41,5 @@ internal fun LinearOptimizationResult.verifyRuntimeTerminal(
             is SourceEvidenceCheck.Unavailable -> return Verification.Indeterminate(checked.reason)
         }
     }
-    return verifyTerminal(original, cancellation)
+    return verifyTerminal(original, cancellation, gapTolerance = gapTolerance)
 }

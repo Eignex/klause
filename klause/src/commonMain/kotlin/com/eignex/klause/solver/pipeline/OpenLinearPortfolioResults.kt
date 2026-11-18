@@ -2,6 +2,7 @@
 
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
@@ -29,6 +30,7 @@ internal class OpenLinearPortfolioResults(
     private val incumbents: PortfolioIncumbents<OpenIncumbentValue>,
     private val cancellation: ExecutionControl,
     private val timeout: ExecutionControl = ExecutionControl.Never,
+    private val gapTolerance: OptimalityTolerance? = original.semantics?.effective?.optimalityTolerance,
 ) : PortfolioTerminalCheck {
     private data class Accepted(val result: LinearOptimizationResult, val rayValue: BigFraction?)
     private val accepted = AtomicReference<Accepted?>(null)
@@ -48,7 +50,7 @@ internal class OpenLinearPortfolioResults(
         val claim = completed.terminal?.claim
         if (claim == null && !completed.gapClosed) return null
         val rayValue = (claim as? SourceClaim.Ray)?.let { original.linearValue(it.sample, cancellation) }
-        val mathematical = LinearPortfolioTerminal(binding, original, cancellation) {
+        val mathematical = LinearPortfolioTerminal(binding, original, cancellation, gapTolerance) {
             accepted.store(Accepted(it, rayValue))
         }.check(worker, native) ?: return null
         if (mathematical.verification !is Verification.Accepted) return mathematical
@@ -81,7 +83,7 @@ internal class OpenLinearPortfolioResults(
         val authority = LinearOptimizationResult(original.scope, terminal?.result?.terminal, bound,
             pooled?.assignment, pooled?.objective?.source, reason, result.stats, original.semantics,
             gapClosed = terminal?.result?.gapClosed == true && pooled != null && bound != null &&
-                original.semantics?.effective?.optimalityTolerance.closesDeclaredGap(pooled.objective.source,
+                gapTolerance.closesDeclaredGap(pooled.objective.source,
                     ((bound.claim as SourceClaim.Bound).value as SourceValue.Rational).value,
                     requireNotNull(original.scope.objective).sense))
         val point = pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) }

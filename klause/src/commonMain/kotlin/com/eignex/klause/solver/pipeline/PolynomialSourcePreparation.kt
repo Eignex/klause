@@ -65,7 +65,7 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
         plan.polynomialRequest()
     } else this
     prepared.elapsed += mark.elapsedNow()
-    return PolynomialTheoryRequest(selected.problem, selected.preparedPlan, prepared, preparedPlan)
+    return PolynomialTheoryRequest(selected.problem, selected.preparedPlan, prepared, preparedPlan, gapTolerance)
 }
 
 internal fun PolynomialTheoryRequest.reconstructSource(

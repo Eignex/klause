@@ -57,8 +57,12 @@ class CliModePublicationTest {
         var retained: LinearOptimizationResult? = null
         val output = object : OutputProtocol by SmtLibOutput() {
             override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean = true
-            override fun onLinearResult(result: LinearOptimizationResult) { retained = result }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onLinearResult(result: LinearOptimizationResult) {
+                retained = result
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         reportLinearOptimization(result, { "point" }, output, ArithmeticPublication(output), false, 0L, true)

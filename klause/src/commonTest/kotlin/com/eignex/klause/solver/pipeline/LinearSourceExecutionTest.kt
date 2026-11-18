@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearSourceRow
 import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
@@ -43,6 +44,33 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LinearSourceExecutionTest {
+    @Test
+    fun `a fractional source objective should stop with a loose bound in original units`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO),
+                LinearSourceVariable("y", true, SemanticRational.ZERO)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(1, SemanticRational.ONE)),
+                lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
+            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.of(BIG_ONE, bigIntOf(10))),
+                LinearSourceTerm(1, SemanticRational.of(BIG_ONE, bigIntOf(10))))),
+            SourceSemantics(SourceFormat.MPS,
+                feasibilityTolerance = SourceTolerance(SemanticRational.of(BIG_ONE, bigIntOf(1000))),
+                optimalityTolerance = OptimalityTolerance(SemanticRational.of(BIG_ONE, bigIntOf(10)))).resolve(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
+
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            theory = TheoryParams(sourceCuts = false), presolveConfig = PresolveConfig.NONE))
+
+        val outcome = assertNotNull(result.linearSource)
+        assertEquals(LinearSourceConclusion.OPTIMAL, outcome.conclusion)
+        val value = assertNotNull(outcome.incumbent?.objective)
+        assertEquals(BigFraction.ofLong(10).reciprocal(), value)
+        assertTrue(assertNotNull(outcome.gapBound) < value)
+    }
+
     @Test
     fun `finite companions should retain finite source completion when numerical funding is disabled`() {
         val source = LinearSourceProblem(

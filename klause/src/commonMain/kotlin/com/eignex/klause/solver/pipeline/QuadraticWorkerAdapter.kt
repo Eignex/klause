@@ -222,7 +222,7 @@ internal class QuadraticWorkerAdapter(
     }
 
     private fun closeGap(stop: ExecutionControl): Boolean {
-        val policy = request.preparedPlan.sourceSemantics?.effective?.optimalityTolerance
+        val policy = request.gapTolerance
         if (policy == null || policy.isExact || stop()) return false
         val point = incumbent ?: return false
         val bound = rootBound ?: return false

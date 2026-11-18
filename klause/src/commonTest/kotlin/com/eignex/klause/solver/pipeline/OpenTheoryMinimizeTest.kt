@@ -24,6 +24,23 @@ import kotlin.test.assertTrue
 
 class OpenTheoryMinimizeTest {
     @Test
+    fun `integral descent should apply a gap mapped to its working objective units`() {
+        val parsed = stepped()
+        val source = parsed.model.withSourceSemantics(SourceSemantics(SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+            optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve())
+        val objective = LinearObjective(intCoefficients = LongArray(source.numIntVars).also {
+            it[parsed.intVarNames.getValue("x")] = 1L
+        })
+
+        val result = OpenTheoryMinimizer(source, objective,
+            gapTolerance = OptimalityTolerance(SemanticRational.of(bigIntOf(100)))).minimize()
+
+        val optimum = assertIs<OpenTheoryOptimum.Optimal>(result)
+        assertEquals(BigFraction.ofLong(100), optimum.value - assertNotNull(optimum.gapBound))
+    }
+
+    @Test
     fun `integral descent should retain the refuted objective floor under a positive gap`() {
         val parsed = stepped()
         val source = parsed.model.withSourceSemantics(SourceSemantics(SourceFormat.IR,

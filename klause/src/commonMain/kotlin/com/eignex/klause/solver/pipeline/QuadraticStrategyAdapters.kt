@@ -26,7 +26,7 @@ internal class QuadraticStrategyAdapters(
         val plan = request.preparedPlan.withObjective(objective, sense)
         val invocation = request.preparedPlan.quadraticEngineInvocation(objective, sense, assumptions)
         return QuadraticPortfolioInvocation(plan, objective, sense, params, native, engine, cores,
-            assumptions, invocation)
+            assumptions, invocation, request.gapTolerance)
             .execute(onAccepted = { publication?.accepted(it.objective, it.version) }) { arm, slot, scope, read ->
                 val controls = params.copy(maximumWork = null, cancellation = scope.polynomial,
                     strategy = params.strategy.copy(

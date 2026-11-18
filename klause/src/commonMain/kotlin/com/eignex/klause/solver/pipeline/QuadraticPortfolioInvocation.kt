@@ -7,6 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.portfolio.AcceptedPortfolioIncumbent
 import com.eignex.klause.portfolio.ArmFamily
@@ -47,6 +48,7 @@ internal class QuadraticPortfolioInvocation(
     private val assumptions: Assumptions,
     private val sourceInvocation: QuadraticEngineInvocation? =
         plan.quadraticEngineInvocation(objective, sense, assumptions),
+    private val gapTolerance: OptimalityTolerance? = plan.sourceSemantics?.effective?.optimalityTolerance,
 ) {
     private data class Value(val source: AlgebraicReal, val minimized: AlgebraicReal)
     private val identity = ModelIdentity.of(plan.originalSource, objective)
@@ -189,12 +191,12 @@ internal class QuadraticPortfolioInvocation(
         if (result.gapClosed) {
             certificate(result.certificate, QuadraticClaim.Bound)?.let { return it }
             certificate(result.bound.certificate, QuadraticClaim.Bound)?.let { return it }
-            if (!plan.sourceSemantics?.effective?.optimalityTolerance.closesDeclaredGap(
+            if (!gapTolerance.closesDeclaredGap(
                     result.incumbent.value, result.bound.value, sense, terminalArithmetic)) {
                 return Verification.Rejected("quadratic incumbent does not satisfy the declared gap")
             }
             incumbents.exchange.current()?.let { accepted ->
-                if (!plan.sourceSemantics?.effective?.optimalityTolerance.closesDeclaredGap(
+                if (!gapTolerance.closesDeclaredGap(
                         accepted.objective.source, result.bound.value, sense, terminalArithmetic)) {
                     return Verification.Indeterminate("the accepted quadratic incumbent no longer closes the gap")
                 }
