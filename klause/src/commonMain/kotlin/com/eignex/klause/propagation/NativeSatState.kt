@@ -926,6 +926,25 @@ internal class NativeSatState(private val state: PropagationState) {
         metadata[i, NativeLearnedMetadata.STAGES] = metadata[i, NativeLearnedMetadata.STAGES] or RECENT_USED
     }
 
+    internal fun prepareReclamationStorage(budget: ReclamationPreparation) {
+        learnedPayloads.prepareRemap(budget)
+        metadata.prepareRemap(budget)
+        budget.atomic(1L)
+        defaultCapIndex?.let { budget.atomic(it.resetWork + learnedCount.toLong() * 8L) }
+        for (column in listOf(learnedUnits, rechecks, capCandidates)) {
+            budget.atomic(
+                column.borrowBackingArray().size.toLong(),
+                column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            )
+        }
+        for (entries in watchEntries) {
+            budget.visit()
+            if (entries == null) continue
+            budget.atomic(entries.primitiveBytes + entries.referenceSlots,
+                entries.primitiveBytes + entries.referenceSlots * Long.SIZE_BYTES)
+        }
+    }
+
     internal fun prepareReclamation(
         budget: ReclamationPreparation,
         retained: BooleanArray,
@@ -946,22 +965,6 @@ internal class NativeSatState(private val state: PropagationState) {
             budget.visit()
             val index = rechecks[i] - baseCount
             if (!retiredOf(index) && metadata[index, NativeLearnedMetadata.STAGES] and 1 == 0) retained[index] = true
-        }
-        learnedPayloads.prepareRemap(budget)
-        metadata.prepareRemap(budget)
-        budget.atomic(1L)
-        defaultCapIndex?.let { budget.atomic(it.resetWork + learnedCount.toLong() * 8L) }
-        for (column in listOf(learnedUnits, rechecks, capCandidates)) {
-            budget.atomic(
-                column.borrowBackingArray().size.toLong(),
-                column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
-            )
-        }
-        for (entries in watchEntries) {
-            budget.visit()
-            if (entries == null) continue
-            budget.atomic(entries.primitiveBytes + entries.referenceSlots,
-                entries.primitiveBytes + entries.referenceSlots * Long.SIZE_BYTES)
         }
         budget.ready()
     }
