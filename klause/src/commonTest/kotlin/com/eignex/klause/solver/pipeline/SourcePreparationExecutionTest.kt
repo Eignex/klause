@@ -3,9 +3,9 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
@@ -96,11 +96,10 @@ class SourcePreparationExecutionTest {
         ))
         var points = 0
 
-        assertFailsWith<PipelineConfigException> {
-            SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions()),
-                SourceExecutionCallbacks(onLinearIncumbent = { points++ }))
-        }
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, ExecutionOptions()),
+            SourceExecutionCallbacks(onLinearIncumbent = { points++ }))
 
+        assertEquals(TerminationReason.Unsupported, assertIs<SourceExecutionResult.Declined>(result).reason)
         assertEquals(0, points)
     }
 
