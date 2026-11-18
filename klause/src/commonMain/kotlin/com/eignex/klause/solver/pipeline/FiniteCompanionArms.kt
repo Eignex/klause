@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
@@ -32,6 +33,7 @@ internal class FiniteCompanionArms private constructor(
     private val admission: FiniteCompanionAdmission?,
     private val preparation: FiniteNumericalCompanions.Preparation?,
     private val companions: FiniteNumericalCompanions?,
+    private val gap: OptimalityGap?,
 ) {
     /** Canonical incumbents the finite workers accept from the companions. */
     val incumbents: PortfolioIncumbents<BigFraction>? get() = companions?.incumbents
@@ -52,7 +54,7 @@ internal class FiniteCompanionArms private constructor(
 
     /** Put the numerical arm first and joint repair after the finite workers. */
     fun arrange(plan: PreparedSourcePlan, finite: List<PortfolioArmFactory>): List<PortfolioArmFactory> {
-        val additional = companions?.factories(plan, finite.size).orEmpty()
+        val additional = companions?.factories(plan, finite.size, gap = gap).orEmpty()
         return additional.take(1) + finite + additional.drop(1)
     }
 
@@ -126,7 +128,7 @@ internal class FiniteCompanionArms private constructor(
                     adaptiveRepair = adaptive, onComparison = comparison, onObservation = observation)
             } else preparation?.companions
             eligibility?.let { reportAdmission(it, admission, companions, onEvent) }
-            return FiniteCompanionArms(controls, admission, preparation, companions)
+            return FiniteCompanionArms(controls, admission, preparation, companions, scenario.optimalityGap)
         }
 
         private fun reportAdmission(

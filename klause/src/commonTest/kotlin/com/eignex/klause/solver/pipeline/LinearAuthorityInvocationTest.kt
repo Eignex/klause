@@ -1,6 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
@@ -18,9 +23,13 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.objective.OptimalityGap
+import com.eignex.klause.solver.result.LinearOptimizationResult
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -36,6 +45,65 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `a checked global relaxation bound should close the declared gap before integer branching`() {
+        for (sense in ObjectiveSense.entries) {
+            val sign = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
+            val semantics = SourceSemantics(SourceFormat.IR,
+                feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(1000))),
+                optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve()
+            val source = SourceProofContext(scope.copy(objective = SourceObjective("gap", sense)), setOf(integer),
+                mapOf("lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                    BigFraction.MINUS_ONE))), mapOf(integer to sign), semantics = semantics)
+            val point = Sample(booleanArrayOf(), longArrayOf(1))
+
+            val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), external = { point })
+                .use { it.run { _, _ -> } }
+
+            assertTrue(result.gapClosed)
+            assertNull(result.terminal)
+            assertEquals(sign, result.value)
+            val bound = assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim)
+            assertEquals(sign * BigFraction.ofLong(2).reciprocal(), assertIs<SourceValue.Rational>(bound.value).value)
+            assertEquals(0L, result.stats.openTheory.openTheoryDecisions)
+        }
+    }
+
+    @Test
+    fun `an exact source should finish integer optimization without applying its declared gap`() {
+        val semantics = SourceSemantics(SourceFormat.IR, feasibilityTolerance = SourceTolerance(),
+            optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve()
+        val source = SourceProofContext(scope, setOf(integer),
+            mapOf("lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE))), mapOf(integer to BigFraction.ONE), semantics = semantics)
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false),
+            external = { Sample(booleanArrayOf(), longArrayOf(1)) }).use { it.run { _, _ -> } }
+
+        assertEquals(false, result.gapClosed)
+        assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+        assertEquals(BigFraction.ONE, result.value)
+    }
+
+    @Test
+    fun `a numerical companion should apply the mapped gap in working objective units`() {
+        val source = SourceProofContext(scope, setOf(integer),
+            mapOf("lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE))), mapOf(integer to BigFraction.ONE))
+        val policy = OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+        val gap = OptimalityGap(policy, scale = BigFraction.ofLong(10), offset = BigFraction.ofLong(90))
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), boundOrdered = true,
+            external = { Sample(booleanArrayOf(), longArrayOf(1)) }, gap = gap, useSourceGap = false)
+            .use { it.run { _, _ -> } }
+        val authority = LinearOptimizationResult(source.scope, result.terminal,
+            result.bound, result.incumbent, result.value, result.reason, result.stats, gapClosed = result.gapClosed)
+
+        val completed = finiteNumericalCompletion(authority, source, ExecutionControl.Never, gap)
+
+        assertEquals(0.5, assertIs<MinimizeResult.Optimal>(completed).gapBound)
+        assertEquals(1.0, completed.objective)
+    }
 
     @Test
     fun `a paid root relaxation should supply advisory guidance to its captured context`() {

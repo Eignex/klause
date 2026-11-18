@@ -23,6 +23,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.objective.closesDeclaredGap
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
@@ -185,6 +186,22 @@ internal class QuadraticPortfolioInvocation(
         worker: PortfolioWorker, result: QuadraticOptimizationResult.Optimal,
     ): Verification<Unit, Unit> {
         common(worker, result.sense, result.incumbent)?.let { return it }
+        if (result.gapClosed) {
+            certificate(result.certificate, QuadraticClaim.Bound)?.let { return it }
+            certificate(result.bound.certificate, QuadraticClaim.Bound)?.let { return it }
+            if (!plan.sourceSemantics?.effective?.optimalityTolerance.closesDeclaredGap(
+                    result.incumbent.value, result.bound.value, sense, terminalArithmetic)) {
+                return Verification.Rejected("quadratic incumbent does not satisfy the declared gap")
+            }
+            incumbents.exchange.current()?.let { accepted ->
+                if (!plan.sourceSemantics?.effective?.optimalityTolerance.closesDeclaredGap(
+                        accepted.objective.source, result.bound.value, sense, terminalArithmetic)) {
+                    return Verification.Indeterminate("the accepted quadratic incumbent no longer closes the gap")
+                }
+                attainingIncumbent = QuadraticIncumbent(accepted.assignment, accepted.objective.source)
+            }
+            return bound(result.bound.value, result.bound.strict)
+        }
         certificate(result.certificate, QuadraticClaim.Optimal)?.let { return it }
         certificate(result.bound.certificate, QuadraticClaim.Bound)?.let { return it }
         if (result.bound.strict ||

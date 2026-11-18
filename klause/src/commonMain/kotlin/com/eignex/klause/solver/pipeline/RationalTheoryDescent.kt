@@ -18,11 +18,14 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
+import com.eignex.klause.solver.objective.floorDouble
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -71,6 +74,8 @@ internal class RationalTheoryDescent(
     private var witnessContext: SourceProofContext? = null
     var linearResult: LinearOptimizationResult? = null
         private set
+    var objectiveGapBound: BigFraction? = null
+        private set
     fun linearSnapshot(): LinearOptimizationResult? = linearResult ?: linear?.let { invocation ->
         val result = invocation.snapshot(TerminationReason.BudgetExhausted)
         val captured = requireNotNull(context)
@@ -80,6 +85,7 @@ internal class RationalTheoryDescent(
     private var round: ResumableOpenTheory? = null
     private var incumbent: Sample? = null
     private var value: BigFraction? = null
+    private var roundGapBound: BigFraction? = null
     private var nativeStats = SolveStats.EMPTY
     private var result: MinimizeResult? = null
     private var closed = false
@@ -134,8 +140,18 @@ internal class RationalTheoryDescent(
                 completed.reason,
                 completed.stats,
                 sourceContext.semantics,
+                completed.gapClosed,
             )
             linearResult = authority
+            if (authority.gapClosed) {
+                val bound = ((requireNotNull(authority.bound).claim as SourceClaim.Bound).value as SourceValue.Rational)
+                    .value * sign
+                objectiveGapBound = bound
+                result = MinimizeResult.Optimal(requireNotNull(authority.incumbent),
+                    (requireNotNull(authority.value) * sign).toDouble(), stats, authority.evidence,
+                    gapBound = bound.floorDouble())
+                return result
+            }
             if (authority.terminal == null &&
                 authority.reason == TerminationReason.Unsupported && sourceContext.affineObjectiveAvailable &&
                 sourceContext.linearCoordinatesSupported()
@@ -196,9 +212,12 @@ internal class RationalTheoryDescent(
                     }
                 }
                 val base = if (proofDeclined) conditioned else source
-                val model = value?.let {
+                val model = value?.let { incumbentValue ->
+                    val cutoff = if (proofDeclined) incumbentValue else source.semantics.effective.optimalityTolerance
+                        ?.takeUnless { it.isExact }?.let { OptimalityGap(it).floor(incumbentValue) } ?: incumbentValue
+                    roundGapBound = cutoff.takeIf { it < incumbentValue }
                     base.withFactors(
-                        base.factors + objective.below(it),
+                        base.factors + objective.below(cutoff),
                         base.impliedFactorMask?.let { mask -> mask + false },
                     )
                 } ?: base
@@ -263,7 +282,9 @@ internal class RationalTheoryDescent(
 
                 is OpenTheoryResult.Unsat -> {
                     if (proofDeclined) return finish(TerminationReason.Unsupported)
-                    result = incumbent?.let { MinimizeResult.Optimal(it, requireNotNull(value).toDouble(), stats) }
+                    objectiveGapBound = roundGapBound
+                    result = incumbent?.let { MinimizeResult.Optimal(it, requireNotNull(value).toDouble(), stats,
+                        gapBound = roundGapBound?.floorDouble()) }
                         ?: MinimizeResult.Infeasible(stats = stats)
                     return result
                 }
@@ -434,11 +455,13 @@ internal class RationalTheoryDescent(
     }
 }
 
-internal fun MinimizeResult.openOptimum(objective: LinearObjective): OpenTheoryOptimum = when (this) {
+internal fun MinimizeResult.openOptimum(objective: LinearObjective,
+    exactGapBound: BigFraction? = null): OpenTheoryOptimum = when (this) {
     is MinimizeResult.Optimal -> OpenTheoryOptimum.Optimal(
         OpenTheoryAssignment.Sampled(sample),
         objective.evaluateExact(sample),
         stats,
+        gapBound = exactGapBound ?: gapBound?.let(BigFraction::ofDouble),
     )
 
     is MinimizeResult.BestFound -> OpenTheoryOptimum.Bounded(

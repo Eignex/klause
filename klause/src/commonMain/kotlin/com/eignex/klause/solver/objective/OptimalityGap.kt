@@ -1,7 +1,12 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.ceilDiv
 import kotlin.math.ceil
 import kotlin.math.nextDown
 import kotlin.math.nextUp
@@ -33,6 +38,12 @@ class OptimalityGap(
     // Least working bound within the gap of the working incumbent.
     internal fun floor(incumbent: BigFraction): BigFraction =
         incumbent - tolerance.gapAllowance(scale * incumbent + offset) * scale.reciprocal()
+
+    internal fun closes(incumbent: BigFraction, bound: BigFraction): Boolean =
+        bound <= incumbent && proved(bound) >= floor(incumbent)
+
+    internal fun proved(bound: BigFraction): BigFraction =
+        if (integral) BigFraction.of(ceilDiv(bound.num, bound.den), BIG_ONE) else bound
 
     // What a proved working bound proves about every feasible working value.
     internal fun proved(bound: Double): Double = if (integral) ceil(bound) else bound
@@ -69,6 +80,31 @@ class OptimalityGap(
 // so a missing or zero tolerance requires a closed bound.
 internal fun OptimalityTolerance?.closesGap(incumbent: BigFraction, bound: BigFraction): Boolean =
     bound >= incumbent || (this != null && incumbent - bound <= gapAllowance(incumbent))
+
+// Early completion under a declared positive policy, with both values in original source units.
+internal fun OptimalityTolerance?.closesDeclaredGap(
+    incumbent: BigFraction, bound: BigFraction, sense: ObjectiveSense,
+): Boolean {
+    if (this == null || isExact) return false
+    val distance = if (sense == ObjectiveSense.MINIMIZE) incumbent - bound else bound - incumbent
+    return distance >= BigFraction.ZERO && distance <= gapAllowance(incumbent)
+}
+
+internal fun OptimalityTolerance?.closesDeclaredGap(
+    incumbent: AlgebraicReal, bound: AlgebraicReal, sense: ObjectiveSense, arithmetic: AlgebraicArithmetic,
+): Boolean {
+    if (this == null || isExact) return false
+    val distance = if (sense == ObjectiveSense.MINIMIZE) arithmetic.subtract(incumbent, bound)
+    else arithmetic.subtract(bound, incumbent)
+    val zero = arithmetic.rational(BigFraction.ZERO)
+    if (arithmetic.compare(distance, zero) < 0) return false
+    val magnitude = if (arithmetic.compare(incumbent, zero) < 0) arithmetic.negate(incumbent) else incumbent
+    val floor = arithmetic.rational(BigFraction.of(absolute.numerator, absolute.denominator))
+    val scaled = arithmetic.multiply(arithmetic.rational(BigFraction.of(relative.numerator, relative.denominator)),
+        magnitude)
+    val allowance = if (arithmetic.compare(floor, scaled) >= 0) floor else scaled
+    return arithmetic.compare(distance, allowance) <= 0
+}
 
 // The permitted distance `max(absolute, relative * abs(incumbent))` of a proved bound below the incumbent.
 internal fun OptimalityTolerance.gapAllowance(incumbent: BigFraction): BigFraction {

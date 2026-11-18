@@ -1,6 +1,11 @@
 package com.eignex.klause.solver.evidence
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.closesDeclaredGap
 import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticObjectiveBound
@@ -27,6 +32,11 @@ internal class SourceQuadraticResultCapture(
 
     private fun optimal(result: QuadraticOptimizationResult.Optimal): QuadraticOptimizationResult.Optimal {
         val point = result.incumbent
+        if (result.gapClosed) {
+            val captured = bound(result.bound, point.sample)
+            return result.copy(bound = captured, certificate = captured.certificate,
+                evidence = captured.certificate.evidence)
+        }
         val claim = SourceClaim.Optimal(point.sample, SourceValue.Algebraic(point.value))
         val evidence = completion(claim, point.sample, result.certificate.derivation)
         return QuadraticOptimizationResult.Optimal(
@@ -119,6 +129,28 @@ fun QuadraticOptimizationResult.verifySourceEvidence(
     }
     if (context.scope.objective?.sense != sense) {
         return SourceEvidenceCheck.Rejected("quadratic result has a different source objective direction")
+    }
+    if (this is QuadraticOptimizationResult.Optimal && gapClosed) {
+        val proof = capturedEvidence() ?: return SourceEvidenceCheck.Unavailable("quadratic gap evidence unavailable")
+        for (claim in listOf(SourceClaim.Witness(incumbent.sample),
+            SourceClaim.Bound(SourceValue.Algebraic(bound.value), bound.strict))) {
+            val checked = proof.verify(claim, context, cancellation)
+            if (checked != SourceEvidenceCheck.Checked) return checked
+        }
+        val objectiveCheck = context.semanticsChecker?.objectiveEquals(incumbent.sample,
+            SourceValue.Algebraic(incumbent.value), context.scope, cancellation)
+            ?: return SourceEvidenceCheck.Unavailable("quadratic original-source objective checker unavailable")
+        if (objectiveCheck != SourceEvidenceCheck.Checked) return objectiveCheck
+        return try {
+            if (context.semantics?.effective?.optimalityTolerance.closesDeclaredGap(incumbent.value, bound.value,
+                    sense, AlgebraicArithmetic(PolynomialArithmetic(cancellation))) && !cancellation()) {
+                SourceEvidenceCheck.Checked
+            } else SourceEvidenceCheck.Rejected("quadratic incumbent does not satisfy the declared gap")
+        } catch (_: PolynomialInterrupted) {
+            SourceEvidenceCheck.Unavailable("quadratic gap check interrupted")
+        } catch (_: PolynomialResourceLimit) {
+            SourceEvidenceCheck.Unavailable("quadratic gap check exceeded representation limits")
+        }
     }
     val claim = when (this) {
         is QuadraticOptimizationResult.Optimal -> {

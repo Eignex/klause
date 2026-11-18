@@ -21,6 +21,7 @@ internal class QuadraticIntegerTraversalCursor(
     private val decisionBudget: SearchDecisionBudget,
     private val lifetime: ExecutionControl,
     private val work: () -> Long,
+    private val stopWhen: () -> Boolean = { false },
 ) : AutoCloseable {
     private var global = lifetime
     private val slice = SliceBudget(work, { 0L }, { 0L })
@@ -55,7 +56,7 @@ internal class QuadraticIntegerTraversalCursor(
         }
         if (sliceWork == 0L || sliceMillis == 0L) return null
         if (!slice.begin(sliceMillis, sliceWork)) return null
-        val paused = { slice.expired() }
+        val paused = { slice.expired() || stopWhen() }
         if (!initialized) {
             when (session.initialize()) {
                 is ComponentResult.Conflict -> terminal = if (global()) SearchRunEvent.Indeterminate.Cancelled

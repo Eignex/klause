@@ -29,6 +29,8 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.OptimalityGap
+import com.eignex.klause.solver.objective.floorDouble
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -104,7 +106,8 @@ internal class FiniteNumericalCompanions private constructor(
         LinearIncumbentSharing() else null
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
-    fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true): List<PortfolioArmFactory> {
+    fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true,
+        gap: OptimalityGap? = null): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
         val binding = EngineInvocation(plan, identity, objective)
         fun factory(arm: Int, family: ArmFamily, create: (PortfolioWorkerSlot) -> PortfolioWorker) =
@@ -125,10 +128,10 @@ internal class FiniteNumericalCompanions private constructor(
                 worker = PortfolioWorker.ofMinimize(FiniteCompanionArms.NUMERICAL_TRAVERSAL, firstArm, resumable = {
                     val limits = local(slot)
                     val search = if (admission == null)
-                        numericalSearch(limits, worker, requireNotNull(context), sharePoints)
+                        numericalSearch(limits, worker, requireNotNull(context), sharePoints, gap)
                     else DeferredCompanionSearch({ admission.declineReason }) { global, millis ->
                         admission.contextForStart(global, millis)?.let {
-                            numericalSearch(limits, worker, it, sharePoints)
+                            numericalSearch(limits, worker, it, sharePoints, gap)
                         }
                     }
                     BoundedCompanionSearch(search, "finiteNumericalCompanion",
@@ -217,7 +220,7 @@ internal class FiniteNumericalCompanions private constructor(
     }
 
     private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker,
-        context: SourceProofContext, sharePoints: Boolean): ResumableSearch =
+        context: SourceProofContext, sharePoints: Boolean, gap: OptimalityGap?): ResumableSearch =
         object : ResumableSearch {
             private var readVersion = 0L
             private var importedVersion = 0L
@@ -228,7 +231,8 @@ internal class FiniteNumericalCompanions private constructor(
                 }, onIncumbentUse = {
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
-                incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance)
+                incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance,
+                gap = gap, useSourceGap = false)
             private var result: MinimizeResult? = null
             private var closed = false
             override val isDone: Boolean get() = result != null
@@ -243,8 +247,9 @@ internal class FiniteNumericalCompanions private constructor(
                         TerminationReason.BudgetExhausted, stats))
                 }.also { objectiveBound = search.objectiveBound } ?: return null
                 val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
-                    finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics)
-                result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
+                    finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics,
+                    finished.gapClosed)
+                result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout, gap)
                 return result
             }
 
@@ -301,9 +306,16 @@ internal class FiniteNumericalCompanions private constructor(
 }
 
 internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context: SourceProofContext,
-    cancellation: ExecutionControl): MinimizeResult {
+    cancellation: ExecutionControl, gap: OptimalityGap? = null): MinimizeResult {
     // A verified relaxation proof uses the finite working coordinates and objective.
-    if (result.verifyTerminal(context, cancellation) is Verification.Accepted) {
+    if (result.verifyTerminal(context, cancellation, gap = gap) is Verification.Accepted) {
+        if (result.gapClosed) {
+            val bound = ((requireNotNull(result.bound).claim as SourceClaim.Bound).value as SourceValue.Rational).value
+            val proved = gap?.proved(bound) ?: bound
+            val value = requireNotNull(result.value)
+            return MinimizeResult.Optimal(requireNotNull(result.incumbent), value.toDouble(),
+                result.stats, result.evidence, gapBound = proved.takeIf { it < value }?.floorDouble())
+        }
         when (val claim = result.terminal?.claim) {
             is SourceClaim.Optimal -> return MinimizeResult.Optimal(claim.sample,
                 requireNotNull((claim.value as? SourceValue.Rational)?.value)

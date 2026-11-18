@@ -23,6 +23,7 @@ import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.QuadraticWitnessPublication
+import com.eignex.klause.solver.objective.closesDeclaredGap
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.openPolynomial
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
@@ -302,12 +303,13 @@ internal class QuadraticIntegerOptimization(
                     budget?.allowance?.spend()
                     true
                 }
-            }, stop, ::countedWork).also { traversal = it }
+            }, stop, ::countedWork, { terminal != null || closeGap(stop) }).also { traversal = it }
         }
         val event = cursor.advance(global, millis, work) { node ->
             accept(capture(node.assignment), heuristic = false)
             record(node.value, node.attained, node.proof)
         }
+        if (terminal != null || closeGap(stop)) return
         if (event == SearchRunEvent.Paused) {
             val ray = cursor.outcome as? QuadraticIntegerNode.Unbounded
             if (ray != null) {
@@ -355,7 +357,7 @@ internal class QuadraticIntegerOptimization(
         }
         if (stop() || params.maximumCandidates == 0L) return partial()
         val exhausted = traverse(root, stop, global = true)
-        return completed(exhausted, stop)
+        return terminal ?: completed(exhausted, stop)
     }
 
     private fun completed(exhausted: Boolean, stop: ExecutionControl): QuadraticOptimizationResult {
@@ -385,6 +387,16 @@ internal class QuadraticIntegerOptimization(
             requireNotNull(incumbent), bound, certificate(coverage, QuadraticClaim.UnattainedLimit),
             sense, stats,
         )
+    }
+
+    private fun closeGap(stop: ExecutionControl): Boolean {
+        val policy = plan.sourceSemantics?.effective?.optimalityTolerance
+        if (policy == null || policy.isExact || stop()) return false
+        val point = incumbent ?: return false
+        val bound = rootBound ?: return false
+        if (!policy.closesDeclaredGap(point.value, bound.value, sense, algebraic) || stop()) return false
+        terminal = QuadraticOptimizationResult.Optimal(point, bound, bound.certificate, sense, stats, gapClosed = true)
+        return true
     }
 
     private fun traverse(condition: PolynomialCondition, stop: ExecutionControl, global: Boolean): Boolean {
@@ -421,6 +433,7 @@ internal class QuadraticIntegerOptimization(
                     }
                 }, nodePolicy = component,
             )
+            run.pauseBeforeDecision = { global && closeGap(stop) }
             while (!stop()) {
                 when (val event = run.next()) {
                     is SearchRunEvent.Satisfied -> {

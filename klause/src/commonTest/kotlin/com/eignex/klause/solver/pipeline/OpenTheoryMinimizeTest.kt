@@ -1,6 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.RunStats
@@ -9,6 +14,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -17,6 +23,21 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheoryMinimizeTest {
+    @Test
+    fun `integral descent should retain the refuted objective floor under a positive gap`() {
+        val parsed = stepped()
+        val source = parsed.model.withSourceSemantics(SourceSemantics(SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+            optimalityTolerance = OptimalityTolerance(SemanticRational.of(bigIntOf(100)))).resolve())
+        val objective = LinearObjective(intCoefficients = LongArray(source.numIntVars).also {
+            it[parsed.intVarNames.getValue("x")] = 1L
+        })
+
+        val result = OpenTheoryMinimizer(source, objective).minimize()
+
+        val optimum = assertIs<OpenTheoryOptimum.Optimal>(result)
+        assertEquals(BigFraction.ofLong(100), optimum.value - assertNotNull(optimum.gapBound))
+    }
 
     @Test
     fun `replacing an open objective should start from the unbounded source root`() {

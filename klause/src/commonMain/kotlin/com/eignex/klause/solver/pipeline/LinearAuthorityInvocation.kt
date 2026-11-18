@@ -16,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanBranching
@@ -40,6 +41,7 @@ internal data class LinearInvocationResult(
     val value: BigFraction?,
     val reason: TerminationReason,
     val stats: SolveStats,
+    val gapClosed: Boolean = false,
 )
 
 internal class LinearAuthorityInvocation(
@@ -66,6 +68,8 @@ internal class LinearAuthorityInvocation(
     sharedCompletions: LinearIncumbentSharing? = null,
     incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     repairGuidance: LinearRepairGuidance? = null,
+    gap: OptimalityGap? = null,
+    useSourceGap: Boolean = true,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -140,7 +144,8 @@ internal class LinearAuthorityInvocation(
         useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
-        feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance)
+        feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
+        gap = gap, useSourceGap = useSourceGap)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {
@@ -220,6 +225,7 @@ internal class LinearAuthorityInvocation(
             val event = frontier?.next() ?: checkNotNull(run).next()
             if (boundOrdered) component.updateGlobalBound()
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
+            if (component.gapBound() != null) return finish(null, TerminationReason.SearchExhausted, gapClosed = true)
             return when (event) {
                 SearchRunEvent.Paused -> null
                 SearchRunEvent.Exhausted -> {
@@ -306,13 +312,15 @@ internal class LinearAuthorityInvocation(
     fun snapshot(reason: TerminationReason): LinearInvocationResult = result
         ?: LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
 
-    private fun finish(terminal: SourceEvidence?, reason: TerminationReason): LinearInvocationResult {
+    private fun finish(terminal: SourceEvidence?, reason: TerminationReason,
+        gapClosed: Boolean = false): LinearInvocationResult {
         val cancelled = stop()
         val accepted = terminal?.takeUnless { cancelled }
         val stopped = if (cancelled) {
             if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled
         } else reason
-        result = LinearInvocationResult(accepted, component.rootBound, incumbent, value, stopped, stats)
+        result = LinearInvocationResult(accepted, component.rootBound, incumbent, value, stopped, stats,
+            gapClosed && !cancelled)
         return requireNotNull(result)
     }
 

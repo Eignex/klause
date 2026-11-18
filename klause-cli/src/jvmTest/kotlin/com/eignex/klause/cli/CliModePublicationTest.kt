@@ -1,6 +1,11 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -36,6 +41,32 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CliModePublicationTest {
+    @Test
+    fun `a linear gap completion should print optimal while retaining its proved bound`() {
+        val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val scope = SourceScope(SourceRevision("linear-gap-output", "exact-affine"),
+            objective = SourceObjective("gap", ObjectiveSense.MINIMIZE))
+        val context = SourceProofContext(scope, setOf(integer),
+            mapOf("lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE))), mapOf(integer to BigFraction.ONE),
+            semantics = SourceSemantics(SourceFormat.IR,
+                feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+                optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve())
+        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(sourceCuts = false))
+        var completed: Verdict? = null
+        var retained: LinearOptimizationResult? = null
+        val output = object : OutputProtocol by SmtLibOutput() {
+            override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean = true
+            override fun onLinearResult(result: LinearOptimizationResult) { retained = result }
+            override fun onComplete(verdict: Verdict) { completed = verdict }
+        }
+
+        reportLinearOptimization(result, { "point" }, output, ArithmeticPublication(output), false, 0L, true)
+
+        assertTrue(result.gapClosed)
+        assertEquals(Verdict.OPTIMAL, completed)
+        assertSame(result.bound, assertNotNull(retained).bound)
+    }
 
     @Test
     fun `ordinary source publication failure should leave a later invocation independent`() {

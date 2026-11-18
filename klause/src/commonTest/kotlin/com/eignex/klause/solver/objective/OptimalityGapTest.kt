@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.util.numbers.BigFraction
@@ -12,6 +14,23 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OptimalityGapTest {
+    @Test
+    fun `algebraic gap closure should use absolute and relative source units in either direction`() {
+        val arithmetic = AlgebraicArithmetic()
+        val policy = OptimalityTolerance(SemanticRational.ONE,
+            SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+        for (sense in ObjectiveSense.entries) {
+            val sign = if (sense == ObjectiveSense.MINIMIZE) 1L else -1L
+            val incumbent = arithmetic.rational(BigFraction.ofLong(-100 * sign))
+            val near = arithmetic.rational(BigFraction.ofLong(-110 * sign))
+            val far = arithmetic.rational(BigFraction.ofLong(-111 * sign))
+
+            assertTrue(policy.closesDeclaredGap(incumbent, near, sense, arithmetic))
+            assertFalse(policy.closesDeclaredGap(incumbent, far, sense, arithmetic))
+            assertFalse(OptimalityTolerance().closesDeclaredGap(incumbent, incumbent, sense, arithmetic))
+        }
+    }
+
     private val mps = OptimalityTolerance(
         SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000)),
         SemanticRational.of(bigIntOf(1), bigIntOf(10_000)),

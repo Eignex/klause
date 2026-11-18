@@ -13,6 +13,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.objective.closesDeclaredGap
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -44,7 +45,8 @@ internal class OpenLinearPortfolioResults(
             else -> return null
         }
         val completed = native.result ?: return null
-        val claim = completed.terminal?.claim ?: return null
+        val claim = completed.terminal?.claim
+        if (claim == null && !completed.gapClosed) return null
         val rayValue = (claim as? SourceClaim.Ray)?.let { original.linearValue(it.sample, cancellation) }
         val mathematical = LinearPortfolioTerminal(binding, original, cancellation) {
             accepted.store(Accepted(it, rayValue))
@@ -77,9 +79,14 @@ internal class OpenLinearPortfolioResults(
             else -> TerminationReason.BudgetExhausted
         }
         val authority = LinearOptimizationResult(original.scope, terminal?.result?.terminal, bound,
-            pooled?.assignment, pooled?.objective?.source, reason, result.stats, original.semantics)
+            pooled?.assignment, pooled?.objective?.source, reason, result.stats, original.semantics,
+            gapClosed = terminal?.result?.gapClosed == true && pooled != null && bound != null &&
+                original.semantics?.effective?.optimalityTolerance.closesDeclaredGap(pooled.objective.source,
+                    ((bound.claim as SourceClaim.Bound).value as SourceValue.Rational).value,
+                    requireNotNull(original.scope.objective).sense))
         val point = pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) }
         val score = pooled?.objective?.source?.let(::minimized)
+        if (authority.gapClosed) return authority.openOptimum()
         return when (val claim = authority.terminal?.claim) {
             is SourceClaim.Optimal -> OpenTheoryOptimum.Optimal(checkNotNull(point), checkNotNull(score),
                 result.stats, authority)
