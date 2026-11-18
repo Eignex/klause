@@ -54,7 +54,8 @@ class SourceQuadraticEvidenceTest {
         val context = assertNotNull(source.quadraticSourceProofContext(scope, objective))
         val arithmetic = AlgebraicArithmetic()
         val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf(1)), arithmetic.rational(BigFraction.ONE))
-        val certificate = QuadraticCertificate.attested(ModelIdentity.of(source, objective), scope, QuadraticClaim.Bound)
+        val certificate = QuadraticCertificate.attested(
+            ModelIdentity.of(source, objective), scope, QuadraticClaim.Bound)
         val result = QuadraticOptimizationResult.Optimal(point,
             QuadraticObjectiveBound(arithmetic.rational(BigFraction.ZERO), false, certificate), certificate,
             ObjectiveSense.MINIMIZE, SolveStats.EMPTY, gapClosed = true)

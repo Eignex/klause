@@ -510,7 +510,8 @@ private fun executeCapturedSource(
             val params = request.theory.boundTo(invocation)
             // Native workers own the lowered view; the linear source stays with the invocation to qualify claims.
             val native = if (invocation.linearSource == null) route.request else
-                route.request.withPreparedPlan(route.preparedPlan.linearWorkingPlan())
+                route.request.withPreparedPlan(route.preparedPlan.linearWorkingPlan(),
+                    requireNotNull(invocation.linearSource).workingGapTolerance())
             val result = if (kind == SourceExecutionKind.HEURISTIC) {
                 executeSourceHeuristic(invocation, native.preparedPlan, params, request.cores, callbacks)
             } else {
@@ -540,6 +541,7 @@ private fun executeCapturedSource(
                 PolynomialTheoryRequest(
                     route.request.problem,
                     route.preparedPlan.linearWorkingPlan(),
+                    gapTolerance = requireNotNull(invocation.linearSource).workingGapTolerance(),
                 )
             }
             val params = request.polynomial.boundTo(invocation)

@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
@@ -45,6 +46,9 @@ internal class RationalTheoryDescent(
         params.cancellation or params.timeout,
     ),
     private val publicationInvocation: EngineInvocation? = null,
+    private val gapTolerance: OptimalityTolerance? = if (context != null) {
+        context.semantics?.effective?.optimalityTolerance
+    } else source.semantics.effective.optimalityTolerance,
     private val external: () -> Pair<Sample, BigFraction>? = { null },
 ) : ResumableSearch {
     init {
@@ -65,7 +69,8 @@ internal class RationalTheoryDescent(
 
     private val state = OpenTheorySolveState(params)
     private var linear = context?.let {
-        LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state)
+        LinearAuthorityInvocation(it, params, external = { external()?.first }, state = state,
+            gapTolerance = gapTolerance)
     }
     private var proofDeclined = false
     private var checkedIncumbent: Sample? = null
@@ -213,7 +218,7 @@ internal class RationalTheoryDescent(
                 }
                 val base = if (proofDeclined) conditioned else source
                 val model = value?.let { incumbentValue ->
-                    val cutoff = if (proofDeclined) incumbentValue else source.semantics.effective.optimalityTolerance
+                    val cutoff = if (proofDeclined) incumbentValue else gapTolerance
                         ?.takeUnless { it.isExact }?.let { OptimalityGap(it).floor(incumbentValue) } ?: incumbentValue
                     roundGapBound = cutoff.takeIf { it < incumbentValue }
                     base.withFactors(
@@ -283,8 +288,10 @@ internal class RationalTheoryDescent(
                 is OpenTheoryResult.Unsat -> {
                     if (proofDeclined) return finish(TerminationReason.Unsupported)
                     objectiveGapBound = roundGapBound
-                    result = incumbent?.let { MinimizeResult.Optimal(it, requireNotNull(value).toDouble(), stats,
-                        gapBound = roundGapBound?.floorDouble()) }
+                    result = incumbent?.let {
+                        MinimizeResult.Optimal(it, requireNotNull(value).toDouble(), stats,
+                            gapBound = roundGapBound?.floorDouble())
+                    }
                         ?: MinimizeResult.Infeasible(stats = stats)
                     return result
                 }

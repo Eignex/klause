@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.objectiveUnboundedBelow
@@ -150,6 +151,7 @@ class OpenTheoryMinimizer internal constructor(
     private val presolveCancellation: ExecutionControl = ExecutionControl.Never,
     private val presolveBudget: PresolveBudget? = null,
     private val projections: PreparedFactorProjections? = null,
+    private val gapTolerance: OptimalityTolerance? = model.semantics.effective.optimalityTolerance,
 ) {
 
     constructor(model: Problem, objective: LinearObjective) : this(
@@ -220,6 +222,8 @@ class OpenTheoryMinimizer internal constructor(
         solutionSetSensitive,
         presolveCancellation,
         presolveBudget,
+        projections,
+        gapTolerance,
     )
 
     /** Minimizes the objective, tightening the bound until a round refutes it. */
@@ -398,7 +402,7 @@ class OpenTheoryMinimizer internal constructor(
             val external = externalBound()?.takeIf { terms.isNotEmpty() && (own == null || it < own) }
             roundBoundExternal = external != null
             val bound = external ?: own
-            val gapFloor = if (external == null && own != null) source.semantics.effective.optimalityTolerance
+            val gapFloor = if (external == null && own != null) gapTolerance
                 ?.takeUnless { it.isExact }?.let { OptimalityGap(it).floor(own.asFraction()) } else null
             val cutoff = gapFloor?.let { ceilDiv(it.num, it.den) } ?: bound
             roundGapBound = cutoff?.takeIf { own != null && it < own }?.asFraction()

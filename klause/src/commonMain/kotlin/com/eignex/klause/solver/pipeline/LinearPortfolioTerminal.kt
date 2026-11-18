@@ -2,6 +2,7 @@
 
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
@@ -40,6 +41,7 @@ internal class LinearPortfolioTerminal(
     private val invocation: EngineInvocation,
     private val original: SourceProofContext,
     private val cancellation: ExecutionControl,
+    private val gapTolerance: OptimalityTolerance? = original.semantics?.effective?.optimalityTolerance,
     private val accepted: (LinearOptimizationResult) -> Unit,
 ) : PortfolioTerminalCheck {
     override fun check(worker: PortfolioWorker, search: ResumableSearch?): PortfolioTerminalPublication? {
@@ -54,7 +56,7 @@ internal class LinearPortfolioTerminal(
         val checked = if (!workerInvocation.matches(completed.invocation)) {
             Verification.Rejected("linear handle differs from its worker invocation")
         } else {
-            result.verifyRuntimeTerminal(invocation, completed.invocation, original, cancellation)
+            result.verifyRuntimeTerminal(invocation, completed.invocation, original, cancellation, gapTolerance)
         }
         return PortfolioTerminalPublication(checked) { accepted(result) }
     }

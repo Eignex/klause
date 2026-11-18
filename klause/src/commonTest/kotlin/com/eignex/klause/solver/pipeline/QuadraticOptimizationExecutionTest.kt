@@ -37,6 +37,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,6 +48,33 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QuadraticOptimizationExecutionTest {
+    @Test
+    fun `quadratic workers should apply a mapped gap while retaining source semantics`() {
+        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
+            val source = Problem(1, 0, emptyArray(), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                semantics = SourceSemantics(SourceFormat.IR,
+                    feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+                    optimalityTolerance = OptimalityTolerance(
+                        SemanticRational.of(bigIntOf(1), bigIntOf(10)))).resolve())
+            val original = source.pipelineRequest()
+            val request = PolynomialTheoryRequest(original.problem, original.preparedPlan,
+                gapTolerance = OptimalityTolerance(SemanticRational.ONE))
+            val b = QuadraticVariable.Bool(SourceBoolId(0))
+            val x = QuadraticVariable.Real(SourceRealId(0))
+            val objective = QuadraticObjectiveSpec(listOf(
+                QuadraticObjectiveTerm(QuadraticCoefficient.ofLong(-1), b, b),
+                QuadraticObjectiveTerm(QuadraticCoefficient.ONE, x, x)))
+
+            val execution = OpenTheoryPipeline.minimize(request, objective,
+                params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(backtrack = BacktrackParams(
+                    valueSelector = IndomainMin))), engine = engine)
+
+            assertTrue(assertIs<QuadraticOptimizationResult.Optimal>(execution.result).gapClosed)
+            assertSame(source.semantics, execution.semantics)
+        }
+    }
+
     @Test
     fun `a quadratic incumbent should stop at the declared gap against a global box bound`() {
         for ((sense, engine) in ObjectiveSense.entries.flatMap { sense ->

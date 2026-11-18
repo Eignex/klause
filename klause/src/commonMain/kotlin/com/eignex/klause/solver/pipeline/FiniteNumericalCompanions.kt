@@ -249,7 +249,8 @@ internal class FiniteNumericalCompanions private constructor(
                 val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
                     finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics,
                     finished.gapClosed)
-                result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout, gap)
+                result = finiteNumericalCompletion(
+                    original, context, global or limits.cancellation or limits.timeout, gap)
                 return result
             }
 

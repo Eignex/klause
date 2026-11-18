@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -20,6 +21,7 @@ internal fun LinearOptimizationResult.verifyTerminal(
     cancellation: ExecutionControl,
     verifier: SourceEvidenceVerifier = SourceEvidenceVerifier(original.withLinearAuthority()),
     gap: OptimalityGap? = null,
+    gapTolerance: OptimalityTolerance? = original.semantics?.effective?.optimalityTolerance,
 ): Verification<Unit, Unit> {
     if (scope != original.scope) return Verification.Rejected("linear completion has a different source invocation")
     if (evidence.derivations.any { it.scope != scope }) {
@@ -31,7 +33,7 @@ internal fun LinearOptimizationResult.verifyTerminal(
         val checkedBound = bound ?: return Verification.Rejected("gap completion has no global bound")
         val boundValue = ((checkedBound.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
             ?: return Verification.Rejected("gap completion has no rational global bound")
-        val closes = gap?.closes(exact, boundValue) ?: original.semantics?.effective?.optimalityTolerance
+        val closes = gap?.closes(exact, boundValue) ?: gapTolerance
             .closesDeclaredGap(exact, boundValue, requireNotNull(scope.objective).sense)
         if (!closes) {
             return Verification.Rejected("linear incumbent does not satisfy the declared gap")

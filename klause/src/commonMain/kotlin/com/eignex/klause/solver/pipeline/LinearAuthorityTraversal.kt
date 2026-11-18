@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.optimization.LinearActiveRows
@@ -78,10 +79,11 @@ internal class LinearAuthorityTraversal(
     private val repairGuidance: LinearRepairGuidance? = null,
     private val gap: OptimalityGap? = null,
     private val useSourceGap: Boolean = true,
+    private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
-        (useSourceGap && source.semantics?.effective?.optimalityTolerance?.isExact == false)
+        (useSourceGap && gapTolerance?.isExact == false)
 
     private val aggregateBranches = if (aggregateBranching && !useActiveRows && !composeBooleanBranches &&
         !useRefutationReuse &&
@@ -230,7 +232,7 @@ internal class LinearAuthorityTraversal(
         val bound = rootBound ?: return null
         val exact = ((bound.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value ?: return null
         val closes = gap?.closes(value, exact) ?: (useSourceGap &&
-            source.semantics?.effective?.optimalityTolerance.closesDeclaredGap(value, exact,
+            gapTolerance.closesDeclaredGap(value, exact,
                 requireNotNull(source.scope.objective).sense))
         return bound.takeIf { closes }
     }

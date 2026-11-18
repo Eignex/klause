@@ -201,7 +201,9 @@ incumbent and a checked global bound satisfy it in original objective units.
 `LinearOptimizationResult.gapClosed` distinguishes that completion from an exact
 terminal claim; its evidence retains the witness and bound separately. Branch-only
 bounds cannot close the invocation. Numerical companions use the portfolio's objective
-scale and offset when comparing the gap. Exact feasibility keeps exact termination.
+scale and offset when comparing the gap. Lowered linear sources carry the absolute
+gap in working objective units separately from their original source semantics.
+Exact feasibility keeps exact termination.
 
 ### State and resources
 

@@ -218,6 +218,7 @@ internal class OpenPortfolio(
                 incumbents,
                 stop,
                 theoryParams.timeout,
+                request?.gapTolerance,
             )
         }
         val factories = buildList {
@@ -242,6 +243,7 @@ internal class OpenPortfolio(
                                 workerParams(slot),
                                 context,
                                 publicationInvocation = binding,
+                                gapTolerance = request.gapTolerance,
                             ) {
                                 incumbents.exchange.current()?.let { it.assignment to it.objective.execution }
                             }

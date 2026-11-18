@@ -9,4 +9,5 @@ internal fun PolynomialTheoryRequest.affineOperation(
 ): PolynomialTheoryRequest = PolynomialTheoryRequest(
     problem, preparedPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
     sourcePreparation, originalPlan.withObjective(objective, sense == ObjectiveSense.MAXIMIZE),
+    gapTolerance,
 )
