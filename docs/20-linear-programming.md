@@ -236,8 +236,11 @@ Integral source rows use the same activity scale in fresh and prepared emissions
 An exact wide row retains its positive coefficient normalization in the band's weights,
 so relative displacement remains in source units before projection into LP row units.
 Directionally rounded wide rows also carry declaration bands weighted by coefficient
-gaps, covering a tolerance crossing of a declared sign bound. A rounding sign not stated
-by the original declaration withholds positive-tolerance numerical pricing.
+gaps, covering a tolerance crossing of a declared sign bound. A nonzero coefficient gap
+without a declaration supporting the rounding direction withholds tolerance pricing.
+Boolean RLT rows retain the source row's band and coefficient-weighted lower-declaration
+bands. Their auxiliary extension admits widened binary declarations. Integer rows that
+read tolerance require original zero/one declarations rather than an inferred root box.
 
 Retained cuts keep their derived bands in both source and numeric row units. Rational
 projection scales the weights with the coefficients, and prepared projections, component
