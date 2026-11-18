@@ -12,6 +12,22 @@ import kotlin.time.Duration
 
 class RationalBasisFactorsTest {
     @Test
+    fun `caller funded factors should solve beyond the default dimension`() {
+        val size = 129
+        val matrix = List(size) { row -> List(size) { column ->
+            if (row == column) BigFraction.ONE else BigFraction.ZERO
+        } }
+        val limits = RationalBasisLimits(dimension = size)
+
+        val declined = RationalBasisFactors.factor(matrix)
+        val funded = assertIs<RationalBasisBuild.Ready>(RationalBasisFactors.factor(matrix, limits = limits))
+        val result = funded.factors.solve(List(size) { BigFraction.ONE }, limits = limits)
+
+        assertEquals(RationalBasisDecline.DIMENSION, assertIs<RationalBasisBuild.Declined>(declined).reason)
+        assertEquals(List(size) { BigFraction.ONE }, assertIs<RationalBasisSolve.Solved>(result).values)
+    }
+
+    @Test
     fun `nonsymmetric solves should preserve both source permutations`() {
         val matrix = matrix(listOf(3, 2, 1), listOf(1, 4, 3), listOf(2, 1, 5))
         val orders = listOf(intArrayOf(0, 1, 2), intArrayOf(2, 0, 1), intArrayOf(1, 2, 0))

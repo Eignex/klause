@@ -243,10 +243,7 @@ internal class LpScopedSolver(
     fun compact(remap: LpLayoutRemap, token: ExecutionControl = cancellation): Boolean =
         edit(token, compaction = remap) { it.compact(remap, token) }
 
-    val continuationLimits get() = ExactContinuationLimits(
-        startArbitraryPrecision = context.startArbitraryPrecision,
-        preserveOverflowCheckpoint = context.preserveOverflowCheckpoint,
-    )
+    val continuationLimits get() = context.continuationLimits
 
     val basisLifecycleWork: BasisOperationWork? get() = (solver as? PersistentLpSolver)?.basisLifecycleWork
 
@@ -258,7 +255,7 @@ internal class LpScopedSolver(
         continuationLimits: ExactContinuationLimits = this.continuationLimits,
         fullContinuation: Boolean = true,
         observer: LpCertificationObserver? = null,
-        refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        refinementLimits: LpRefinementLimits = context.refinementLimits,
         sparsePointRecovery: Boolean = false,
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult? {
@@ -296,6 +293,8 @@ internal class LpScopedSolver(
                 lastMetrics,
                 onBasisVerification = context.onRefinementBasisVerification,
             ),
+            reconstructionLimits = context.reconstructionLimits,
+            basisLimits = context.basisLimits,
         )
         if (token()) return null
         lastResult = certified

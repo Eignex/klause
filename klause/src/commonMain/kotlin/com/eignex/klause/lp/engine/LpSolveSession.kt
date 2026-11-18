@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
 
 @Suppress("TooGenericExceptionCaught") // Retire every owner while preserving primary and cleanup failures.
@@ -23,9 +24,10 @@ internal class LpSolveSession(
         counterResults: LpCounterResults? = null,
         floatAccept: ((FloatLpResult) -> Boolean)? = null,
         floatOffset: Double = 0.0,
-        refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        refinementLimits: LpRefinementLimits = context.refinementLimits,
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
         acceptFloatInfeasibility: Boolean = false,
+        continuationLimits: ExactContinuationLimits = context.continuationLimits,
     ): CertifiedLpResult {
         check(!closed) { "LP solve session is closed" }
         check(activeSolve == null) { "LP solve session is suspended" }
@@ -42,7 +44,7 @@ internal class LpSolveSession(
                 observer?.observeSolve(current.lastMetrics, current is ComponentLpSolverCapability)
             }
             return certification.certify(model, current, result, cancellation, observer, counterResults,
-                refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility)
+                refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility, continuationLimits)
         } catch (primary: Throwable) {
             try {
                 releaseSolvers()
@@ -63,6 +65,8 @@ internal class LpSolveSession(
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
         acceptFloatInfeasibility: Boolean = false,
         counterResults: LpCounterResults? = null,
+        refinementLimits: LpRefinementLimits = context.refinementLimits,
+        continuationLimits: ExactContinuationLimits = context.continuationLimits,
     ): LpSolveCursor<CertifiedLpResult> {
         check(!closed && activeSolve == null) { "LP solve session is closed or suspended" }
         require(workLimit >= 0L)
@@ -73,7 +77,7 @@ internal class LpSolveSession(
                 val current = prepare(model, cancellation, workLimit)
                     ?: return@LpSolveCursor cancelledResult()
                 observeQuery(model, current, current === previous, workLimit, claim,
-                    floatOffset, floatAccept != null, null)
+                    floatOffset, floatAccept != null, refinementLimits)
                 val stage = solveFloating(current, current === previous, cancellation, observer, workLimit)
                 val result = when (stage) {
                     is FloatingStage.Completed -> stage.result
@@ -86,7 +90,8 @@ internal class LpSolveSession(
                 if (cancellation()) return@LpSolveCursor cancelledResult()
                 certification.certify(model, current, result, cancellation, observer, counterResults,
                     floatAccept = floatAccept, floatOffset = floatOffset, claim = claim,
-                    acceptFloatInfeasibility = acceptFloatInfeasibility)
+                    acceptFloatInfeasibility = acceptFloatInfeasibility,
+                    refinementLimits = refinementLimits, continuationLimits = continuationLimits)
             } catch (primary: Throwable) {
                 try {
                     releaseSolvers()
@@ -197,7 +202,7 @@ internal class LpSolveSession(
         val observer = context.onQuery ?: return
         check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
         val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
-            workLimit, claim, floatOffset, hasFloatAcceptance, refinementLimits ?: LpRefinementLimits(),
+            workLimit, claim, floatOffset, hasFloatAcceptance, refinementLimits ?: context.refinementLimits,
             pricing, componentSplit) {
             solver.continuationBasis(model)
         }

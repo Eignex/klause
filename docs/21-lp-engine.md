@@ -272,6 +272,19 @@ columns. Admission counts `m * (n + m + 1)` stored cells under the 65,536-cell
 ceiling and 4,096 total columns. Callers may impose a row limit; the default
 uses the cell envelope. Work, allocation, scalar size and pivot limits also
 apply to the complete operation, including import and current-source verification.
+Verification inherits the continuation's coordinate, entry and scalar allowances
+and spends its remaining work and allocation. Increasing a retained allowance
+preserves earlier costs and complete pivots; it grants no authority to an unchecked
+point or ray. Standalone solves and continuous leaf completion accept the same
+continuation limits as scoped owners. Retained invocations can extend them without
+replacing a compatible exact checkpoint. The solve context also supplies the
+direct reconstruction, basis and refinement allowances.
+
+Reconstruction and refinement expose their rational-basis dimension and fill
+allowances. The default small basis envelope leaves restricted dual repair
+available; callers can fund larger factors without changing the proof checks.
+Nested refinement proofs spend the remaining refinement allowance. Dense basis
+storage must fit indexed-array sizes and its allocation allowance before assembly.
 
 ### Farkas and recession checks
 
@@ -310,6 +323,13 @@ have separate authority, source state restores on every exit, and child owners
 close. Feasibility auxiliaries shift the box to contain zero and maximize
 `0 <= tau <= 1` with column `-b * tau`: a witness at one proves feasibility, and an
 exact bound below one refutes it.
+
+The caller selects the maximum correction rounds. Exhausting rounds can retain a
+checked point or bound but cannot establish attainment. Feasibility continuation
+runs when a point is missing; an existing feasible point with a missing optimum
+certificate does not trigger it, and feasibility continuation is not an optimizer.
+Real-cell optimization selects 64 rounds and a 256 MiB modeled allocation envelope;
+an undecided cell remains unavailable for an optimality claim.
 
 Floating solves the closure of strict rows, so a boundary point proves neither
 strict feasibility nor refutation. The strict-margin auxiliary adds

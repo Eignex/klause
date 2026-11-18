@@ -101,8 +101,9 @@ internal fun solveAndCertify(
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
     observer: LpCertificationObserver? = null,
-    refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+    refinementLimits: LpRefinementLimits = context.refinementLimits,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
+    continuationLimits: ExactContinuationLimits = context.continuationLimits,
 ): CertifiedLpResult {
     val state = LpExactState(model)
     certifyBoundConflict(state, cancellation, context.certificationPolicy, observer, claim)?.let { return it }
@@ -128,6 +129,7 @@ internal fun solveAndCertify(
         pricing = pricing,
         refinementLimits = refinementLimits,
         claim = claim,
+        continuationLimits = continuationLimits,
     )
 }
 
@@ -177,18 +179,19 @@ internal fun solveAndCertify(
     context: LpSolveContext = LpSolveContext.Production,
     counterResults: LpCounterResults? = null,
     pricing: LpPricingOptions = LpPricingOptions(),
-    refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+    refinementLimits: LpRefinementLimits = context.refinementLimits,
     floatAccept: ((FloatLpResult) -> Boolean)? = null,
     floatOffset: Double = 0.0,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     acceptFloatInfeasibility: Boolean = false,
+    continuationLimits: ExactContinuationLimits = context.continuationLimits,
 ): CertifiedLpResult {
     if (claim == LpClaim.ATTAINED_OPTIMUM && floatAccept != null && workLimit == 0L &&
         model.exactState == null && model.floatProjectionAuthoritative()
     ) {
         return solveProjectedAndCertify(
             model, warm, cancellation, workLimit, componentSplit, observer, context, counterResults,
-            pricing, refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility,
+            pricing, refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility, continuationLimits,
         )
     }
     val authoritative = if (model.exactState != null) {
@@ -213,7 +216,7 @@ internal fun solveAndCertify(
     val result = certifyAuthoritativeSolve(
         authoritative, warm, cancellation, workLimit, componentSplit, observer, context, counters, pricing,
         refinementLimits, floatAccept,
-        floatOffset, claim, acceptFloatInfeasibility,
+        floatOffset, claim, acceptFloatInfeasibility, continuationLimits,
     )
     return sourceCertifiedResult(
         model,
@@ -263,6 +266,7 @@ private fun solveProjectedAndCertify(
     floatOffset: Double,
     claim: LpClaim,
     acceptFloatInfeasibility: Boolean,
+    continuationLimits: ExactContinuationLimits,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -308,7 +312,7 @@ private fun solveProjectedAndCertify(
     val certified = certifyAuthoritativeSolve(
         authoritative, result?.basis ?: warm, cancellation, workLimit, componentSplit, observer, context, counters,
         pricing, refinementLimits, floatAccept.takeUnless { sourceRefused }, floatOffset, claim,
-        acceptFloatInfeasibility,
+        acceptFloatInfeasibility, continuationLimits,
     )
     sourceCertifiedResult(model, authoritative, certified, cancellation, counterResults, context.certificationPolicy)
 }
@@ -328,6 +332,7 @@ private fun certifyAuthoritativeSolve(
     floatOffset: Double,
     claim: LpClaim,
     acceptFloatInfeasibility: Boolean,
+    continuationLimits: ExactContinuationLimits,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -345,7 +350,7 @@ private fun certifyAuthoritativeSolve(
     LpCertificationSession(context, pricing).use { certification ->
         certification.certify(
             model, solver, result, cancellation, observer, counterResults,
-            refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility,
+            refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility, continuationLimits,
         )
     }
 }
@@ -367,6 +372,8 @@ internal fun certifyLpResult(
     refinement: LpRefinementRequest? = null,
     sparsePointRecovery: Boolean = false,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
+    reconstructionLimits: ReconstructionLimits = ReconstructionLimits(),
+    basisLimits: ExactBasisLimits = ExactBasisLimits(),
 ): CertifiedLpResult {
     val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
     val pairing = observer?.let { LpRejectionPairing() }
@@ -376,6 +383,7 @@ internal fun certifyLpResult(
         val certified = certifyLpResultWithin(
             model, solver, result, cancellation, observation, policy, counterResults, continuationCache,
             continuationLimits, fullContinuation, refinement, sparsePointRecovery, claim, pairing,
+            reconstructionLimits, basisLimits,
         )
         completed = true
         if (observer !is LpClaimObservation) observation?.finish(certified, certified.certificationReused)
@@ -412,6 +420,8 @@ private fun certifyLpResultWithin(
     sparsePointRecovery: Boolean = false,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     pairing: LpRejectionPairing? = null,
+    reconstructionLimits: ReconstructionLimits = ReconstructionLimits(),
+    basisLimits: ExactBasisLimits = ExactBasisLimits(),
 ): CertifiedLpResult {
     fun stopped(): Boolean = cancellation().also {
         if (it) {
@@ -451,7 +461,7 @@ private fun certifyLpResultWithin(
             val direct = certifyLpBound(model, result.duals, observer, policy)
                 ?: (solver as? ComponentLpSolverCapability)?.exactBound(observer, policy)
             val checked = if (direct == null && !stopped()) {
-                certifyLpBoundOnly(model, result.duals, ReconstructionLimits(), cancellation,
+                certifyLpBoundOnly(model, result.duals, reconstructionLimits, cancellation,
                     observer, policy, result.basis)
             } else
                 null
@@ -621,6 +631,7 @@ private fun certifyLpResultWithin(
             result.basis,
             cancellation = cancellation,
             claim = claim,
+            limits = reconstructionLimits,
         )
         observer?.observe(
             LpCertifier.RATIONAL,
@@ -687,6 +698,7 @@ private fun certifyLpResultWithin(
             cancellation = cancellation,
             observer = observer,
             primalOnly = claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION,
+            limits = basisLimits,
         )
         exactBasis = checked
         if (checked.singularRank != null) {
@@ -731,7 +743,8 @@ private fun certifyLpResultWithin(
         !stopped()
     ) {
         solver.infeasibleRay?.let { candidate ->
-            reconstruction = reconstructCertificate(model, ray = candidate, cancellation = cancellation)
+            reconstruction = reconstructCertificate(model, ray = candidate, cancellation = cancellation,
+                limits = reconstructionLimits)
             observer?.observe(
                 LpCertifier.RATIONAL,
                 reconstruction.conflict != null,
@@ -752,6 +765,7 @@ private fun certifyLpResultWithin(
                 cache = solver.exactBasisCache ?: ExactBasisCache(),
                 cancellation = cancellation,
                 observer = observer,
+                limits = basisLimits,
             )
             exactBasis = checked
             if (checked.singularRank != null) {

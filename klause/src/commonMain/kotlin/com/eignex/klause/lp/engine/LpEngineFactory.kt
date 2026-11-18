@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 import kotlin.math.max
@@ -169,7 +170,16 @@ internal data class LpSolveContext(
      * holds over it, so it refutes only a model infeasible by more than this slack.
      */
     val refutationSlack: LpBoundSlack = LpBoundSlack.NONE,
+    val refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+    val exactContinuationLimits: ExactContinuationLimits? = null,
+    val reconstructionLimits: ReconstructionLimits = ReconstructionLimits(),
+    val basisLimits: ExactBasisLimits = ExactBasisLimits(),
 ) {
+    val continuationLimits get() = exactContinuationLimits ?: ExactContinuationLimits(
+        startArbitraryPrecision = startArbitraryPrecision,
+        preserveOverflowCheckpoint = preserveOverflowCheckpoint,
+    )
+
     companion object {
         val Production = LpSolveContext()
 

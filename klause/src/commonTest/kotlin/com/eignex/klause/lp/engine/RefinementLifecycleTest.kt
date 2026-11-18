@@ -14,6 +14,72 @@ import kotlin.test.assertTrue
 
 class RefinementLifecycleTest {
     @Test
+    fun `a caller funded correction after round sixty four should establish attainment`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.EQ, 1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
+        val sourceBasis = Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
+        val hint = FloatLpResult(sourceBasis, 0.5, doubleArrayOf(0.0), doubleArrayOf(0.5),
+            exactState = state)
+        for (rounds in listOf(64, 65)) {
+            var corrections = 0
+            val factory = persistentDecorator { delegate, _ ->
+                object : PersistentLpSolver by delegate {
+                    override val lastPivots = 1
+                    override val lastMetrics = LpSolveMetrics(workOps = 1L, pivots = 1)
+                    override fun solve(warm: Basis?) = FloatLpResult(basis, 0.0,
+                        doubleArrayOf(if (++corrections <= 64) 0.0 else 0.5), doubleArrayOf(0.0))
+                    override fun resolveBounds(allowance: LpFloatAllowance?) = solve(null)
+                }
+            }
+            LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
+                val result = certifyLpResult(
+                    assertNotNull(state.toWorkingModel()), hintSolver(state, hint), hint,
+                    refinement = LpRefinementRequest(owner, owner.refinementCache,
+                        LpRefinementLimits(maxRounds = rounds, maxAuxiliaries = 0)),
+                )
+
+                assertEquals(if (rounds == 64) LpVerdict.FEASIBLE else LpVerdict.ATTAINED_OPTIMUM, result.verdict,
+                    result.refinement.toString())
+                assertEquals(rounds, assertNotNull(result.refinement).rounds)
+                assertNull(result.continuation)
+            }
+        }
+    }
+
+    @Test
+    fun `refinement should honor a funded basis beyond the default dimension`() {
+        val rows = 129
+        val zero = ExactLpNumber.of(0L)
+        val state = LpExactState(ExactLpModel(
+            emptyList(), List(rows) { zero }, List(rows) { ExactLpColumn(ExactLpBounds()) },
+            List(rows) { ExactLpRow() }, ExactLpObjective(List(rows) { zero }),
+        ))
+        val basis = Basis(IntArray(rows) { it }, Array(rows) { VarStatus.BASIC })
+        for (dimension in listOf(128, rows)) {
+            LpScopedSolver(state).use { owner ->
+                val result = refineLp(
+                    assertNotNull(state.toWorkingModel()),
+                    LpRefinementRequest(owner, owner.refinementCache,
+                        LpRefinementLimits(maxAuxiliaries = 0, maxBasisDimension = dimension,
+                            maxWork = 100_000_000L, maxAllocation = 256L * 1024 * 1024)),
+                    basis = basis, preferBasis = true,
+                )
+
+                if (dimension == rows) {
+                    assertEquals(emptyList(), assertNotNull(result.witness, result.metrics.toString()).primal)
+                    assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
+                } else {
+                    assertNull(result.witness)
+                    assertNull(result.bound)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `correction headings should not replace preferred source factors`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 2.0, cost = -1.0)

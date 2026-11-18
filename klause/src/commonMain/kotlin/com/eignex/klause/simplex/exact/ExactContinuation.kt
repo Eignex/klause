@@ -53,7 +53,8 @@ internal data class ExactContinuationLimits(
     }
 
     fun admitsDimensions(rows: Int, columns: Int): Boolean =
-        rows in 0..maxRows && columns in rows..maxColumns && rows.toLong() * (columns.toLong() + 1L) <= maxCells
+        rows in 0..maxRows && columns in rows..maxColumns && columns < Int.MAX_VALUE &&
+            rows.toLong() * (columns.toLong() + 1L) <= maxCells
 }
 
 internal data class ExactContinuationMetrics(

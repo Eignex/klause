@@ -16,12 +16,14 @@ import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpRefinementLimits
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
@@ -38,6 +40,45 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
+    @Test
+    fun `leaf entry points should use caller funded exact scalar allowances`() {
+        val scale = BIG_ONE shl 5000
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.of(scale + BIG_ONE, BIG_ONE), BigFraction.of(scale, BIG_ONE)),
+                    LinearOp.EQ, BigFraction.ZERO),
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 0L),
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(1), LinearOp.EQ, 1L),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+        )
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val context = LpSolveContext(
+            refinementLimits = LpRefinementLimits(maxBits = 16384),
+            exactContinuationLimits = ExactContinuationLimits(maxBits = 16384),
+        )
+
+        val fresh = leafRealFeasibility(problem, null, sample, context = context)
+        val retained = LeafRealSolver(problem, null).use {
+            it.solve(sample, refinementLimits = context.refinementLimits,
+                continuationLimits = context.continuationLimits)
+        }
+        val cursor = LeafRealSolver(problem, null).use { owner ->
+            owner.openSolve(sample, refinementLimits = context.refinementLimits,
+                continuationLimits = context.continuationLimits).use {
+                assertIs<LpSolveStep.Completed<LeafRealResult>>(it.advance()).value
+            }
+        }
+
+        assertEquals(LpVerdict.INFEASIBLE, fresh.verdict)
+        assertEquals(LpVerdict.INFEASIBLE, retained.verdict)
+        assertEquals(LpVerdict.INFEASIBLE, cursor.verdict)
+    }
+
     @Test
     fun `numerical leaves should refute a wide row beyond exact certificate limits`() {
         val scale = BIG_ONE shl 5000
