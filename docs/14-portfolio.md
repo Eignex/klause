@@ -12,6 +12,13 @@ incumbent with that reason; an arm decline alone does not imply budget exhaustio
 
 ## Invocations and recipes
 
+Finite satisfaction enumeration uses one retained backtrack traversal rather than
+independent first-solution workers. The first selected backtrack recipe and its
+parameter edits supply the traversal; a pool without backtrack recipes uses the
+leading satisfaction recipe. Additional lanes and heuristic workers do not duplicate
+the listing. A solution cap or interruption retains the listed witnesses without
+an exhausted-search claim.
+
 Finite, linear open, polynomial, nonlinear-integer, quadratic and transcendental
 source execution supply retained recipe factories to `PortfolioInvocation` with the
 routing plan and current executable projection. The invocation owns worker slots,
