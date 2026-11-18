@@ -450,27 +450,33 @@ class BacktrackSolver internal constructor(
     }
 
     /** Enumerate accepted samples while preserving the terminal search outcome for finite orchestration. */
-    internal fun enumerationOutcomes(params: BacktrackParams): Sequence<SearchOutcome> = sequence {
+    internal fun enumerationOutcomes(params: BacktrackParams): SearchStream<SearchOutcome> {
+        var traversal: CpSatisfactionTraversal? = null
         val window = ArrayDeque<Sample>()
-        for (outcome in driveSearch(params)) {
-            when (outcome) {
-                is SearchOutcome.Found -> {
-                    val snap = outcome.sample
-                    if (farEnough(snap, window, params.minHammingDistance)) {
-                        yield(outcome)
-                        if (params.recentWindow > 0) {
-                            if (window.size >= params.recentWindow) window.removeFirst()
-                            window.addLast(snap)
-                        }
-                    }
+        return PullSearchStream(
+            pull = {
+                val cursor = traversal ?: CpSatisfactionTraversal(problem, params, null, lpSolveContext)
+                    .also { traversal = it }
+                var outcome = checkNotNull(cursor.next())
+                while (outcome is SearchOutcome.Found &&
+                    !farEnough(outcome.sample, window, params.minHammingDistance)
+                ) {
+                    outcome = checkNotNull(cursor.next())
                 }
-
-                is SearchOutcome.Exhausted, is SearchOutcome.BudgetCapped -> {
-                    yield(outcome)
-                    return@sequence
+                if (outcome is SearchOutcome.Found && params.recentWindow > 0) {
+                    if (window.size >= params.recentWindow) window.removeFirst()
+                    window.addLast(outcome.sample)
                 }
-            }
-        }
+                outcome
+            },
+            release = {
+                val cursor = traversal
+                traversal = null
+                window.clear()
+                cursor?.close()
+            },
+            terminal = { it !is SearchOutcome.Found },
+        )
     }
 
     /**

@@ -103,25 +103,6 @@ internal sealed interface SearchOutcome {
     data class BudgetCapped(val stopCause: SearchStopCause? = null) : SearchOutcome
 }
 
-/** Lazy shared-session outcomes for satisfaction, enumeration, and sampling. */
-@Suppress("TooGenericExceptionCaught") // lazy boundaries must preserve arbitrary primary and cleanup failures
-internal fun BacktrackSolver.driveSearch(
-    params: BacktrackParams,
-    sink: SolveStatsSink? = null,
-): Sequence<SearchOutcome> = sequence {
-    val traversal = CpSatisfactionTraversal(problem, params, sink, lpSolveContext)
-    while (true) {
-        val outcome = try {
-            checkNotNull(traversal.next()) { "an unsliced traversal never pauses" }
-        } catch (failure: Throwable) {
-            traversal.closeAfter(failure)
-            throw failure
-        }
-        yield(outcome)
-        if (outcome !is SearchOutcome.Found) return@sequence
-    }
-}
-
 /**
  * How a pausable [CpSatisfactionTraversal] meets its slice boundary: whether a fired cancellation is the slice
  * ending rather than the run, and the hook each node runs before it branches.

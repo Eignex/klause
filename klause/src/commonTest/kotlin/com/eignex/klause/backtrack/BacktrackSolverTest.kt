@@ -161,6 +161,22 @@ class BacktrackSolverTest {
     }
 
     @Test
+    fun `closing capped enumeration outcomes should release their search components`() {
+        var closes = 0
+        val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
+
+        solver.enumerationOutcomes(BacktrackParams(componentFactory = {
+            listOf(object : SearchComponent, AutoCloseable {
+                override fun close() {
+                    closes++
+                }
+            })
+        })).use { outcomes -> assertIs<SearchOutcome.Found>(outcomes.next()) }
+
+        assertEquals(1, closes)
+    }
+
+    @Test
     fun `finite initialization failures should preserve multiple peer cleanup failures`() {
         val primary = IllegalArgumentException("initialization")
         val cleanups = List(2) { IllegalStateException("cleanup-$it") }

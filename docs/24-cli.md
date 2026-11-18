@@ -133,7 +133,10 @@ identity-deduplicated primitive ownership plus eight bytes per modeled live refe
 this is separate from heap measurements and diagnostic payload-category sums.
 
 - `-a` / `--all-solutions`, `-n <count>`: enumeration (satisfy). `-i` is accepted as a
-  no-op, since optimization always streams improvements.
+  no-op, since optimization always streams improvements. Finite enumeration uses a
+  single complete backtrack traversal for every engine; only an exhausted traversal
+  earns the completeness marker. Reaching `-n` retains the requested witnesses
+  without that marker.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
 - `--debug`: enable statistics and lightweight runtime instrumentation. The same
   setting is available as `klause.debug=true` / `KLAUSE_DEBUG=true`.

@@ -26,6 +26,8 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.capLp
+import com.eignex.klause.portfolio.editing
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
@@ -210,6 +212,13 @@ private fun executeSourceFinite(
     require(request.sourceInvocation != null)
     if (request.optimize) return executeSourceMinimum(request, callbacks)
     val start = TimeSource.Monotonic.markNow()
+    if (request.allSolutions || (request.solutionCap ?: 1L) > 1L) {
+        val controls = request.sourceControls as? SourceFiniteControls.Backtrack
+            ?: pipelineConfigError("source enumeration requires backtrack controls")
+        return executeFixedSatisfy(BacktrackSolver(request.problem, request.lpSolveContext),
+            controls.params.copy(cancellation = controls.cancellation.includingStop(request.cancellation),
+                toleranceCheck = request.toleranceCheck), request, callbacks, start)
+    }
     val solved = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).solve(
             controls.params.copy(cancellation = controls.cancellation.includingStop( request.cancellation),
@@ -334,8 +343,9 @@ private fun executeFixedSatisfy(
     callbacks: FiniteExecutionCallbacks,
     start: TimeMark,
 ): FiniteExecutionResult.Completed {
-    val limit = if (request.allSolutions) request.solutionCap ?: Long.MAX_VALUE else 1L
-    if (limit == 1L) {
+    val enumerating = request.allSolutions || (request.solutionCap ?: 1L) > 1L
+    val limit = if (enumerating) request.solutionCap ?: Long.MAX_VALUE else 1L
+    if (!enumerating) {
         val result = solver.solve(params)
         val verdict = when (result) {
             is SolveResult.Sat -> {
@@ -360,42 +370,47 @@ private fun executeFixedSatisfy(
     var solutions = 0L
     var timedOut = false
     var indeterminate = false
+    var exhausted = false
     var reason: TerminationReason? = null
-    for (outcome in solver.enumerationOutcomes(params)) {
-        when (outcome) {
-            is SearchOutcome.Found -> {
-                if (request.deadlineExceeded()) {
-                    timedOut = true
-                    reason = TerminationReason.Timeout
+    solver.enumerationOutcomes(params).use { outcomes ->
+        for (outcome in outcomes) {
+            when (outcome) {
+                is SearchOutcome.Found -> {
+                    if (request.deadlineExceeded()) {
+                        timedOut = true
+                        reason = TerminationReason.Timeout
+                        break
+                    }
+                    callbacks.onSample(outcome.sample)
+                    solutions++
+                    if (solutions >= limit) break
+                }
+
+                is SearchOutcome.Exhausted -> {
+                    indeterminate = outcome.indeterminate
+                    exhausted = !indeterminate
+                    if (indeterminate) reason = outcome.stopCause.terminationReason()
                     break
                 }
-                callbacks.onSample(outcome.sample)
-                solutions++
-                if (solutions >= limit) break
-            }
 
-            is SearchOutcome.Exhausted -> {
-                indeterminate = outcome.indeterminate
-                if (indeterminate) reason = outcome.stopCause.terminationReason()
-                break
-            }
-
-            is SearchOutcome.BudgetCapped -> {
-                timedOut = true
-                reason = outcome.stopCause?.terminationReason() ?: when {
-                    request.deadlineExceeded() -> TerminationReason.Timeout
-                    request.nodeBudget?.exhausted() == true -> TerminationReason.BudgetExhausted
-                    request.cancellation() -> TerminationReason.Cancelled
-                    else -> TerminationReason.BudgetExhausted
+                is SearchOutcome.BudgetCapped -> {
+                    timedOut = true
+                    reason = outcome.stopCause?.terminationReason() ?: when {
+                        request.deadlineExceeded() -> TerminationReason.Timeout
+                        request.nodeBudget?.exhausted() == true -> TerminationReason.BudgetExhausted
+                        request.cancellation() -> TerminationReason.Cancelled
+                        else -> TerminationReason.BudgetExhausted
+                    }
+                    break
                 }
-                break
             }
         }
     }
     val verdict = when {
         (timedOut || indeterminate) && solutions == 0L -> FiniteExecutionVerdict.UNKNOWN
         solutions == 0L -> FiniteExecutionVerdict.UNSAT
-        else -> FiniteExecutionVerdict.SAT
+        exhausted -> FiniteExecutionVerdict.SAT
+        else -> FiniteExecutionVerdict.BEST_FOUND
     }
     return FiniteExecutionResult.Completed(
         verdict = verdict,
@@ -598,6 +613,18 @@ private fun executePortfolio(
             return backtrackDryRun(request.problem, plan.pool, plan.kind, plan.zeroObjectivePricing)
 
         is PortfolioPlan.Execute -> Unit
+    }
+    if (!request.optimize && (request.allSolutions || (request.solutionCap ?: 1L) > 1L)) {
+        val scenario = plan.scenario
+        val recipe = (scenario.btPool?.first()?.invoke() ?: BacktrackCatalog.ranked(Kind.CSP).first())
+            .editing(scenario.btEdit).capLp(request.lpConfig)
+        val params = recipe.build(request.randomSeed ?: 0L, request.onEvent).copy(
+            cancellation = request.cancellation, nodeBudget = request.nodeBudget,
+            solveBudgetMillis = request.solveBudgetMillis, toleranceCheck = request.toleranceCheck,
+            zeroObjectivePricing = request.zeroObjectivePricing,
+        )
+        return executeFixedSatisfy(BacktrackSolver(request.problem, request.lpSolveContext), params,
+            request, callbacks, TimeSource.Monotonic.markNow()).withCompleteSearch(true)
     }
     val profile = ProblemProfile.of(request.problem, request.optimize)
     val baseScenario = clausalDefaultScenario(
