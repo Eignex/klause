@@ -86,6 +86,7 @@ internal object LinearSubSumAggregation {
     fun sparsificationEligible(factorCount: Int): Boolean = factorCount <= MAX_FACTORS
 
     fun sparsifyRows(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
+        if (problem.semantics.relaxesRows(0)) return PassDelta()
         if (!sparsificationEligible(problem.factors.size) || cancellation()) return PassDelta()
         val work = Work(cancellation)
         val rows = arrayOfNulls<SparseRow>(problem.factors.size)
@@ -236,6 +237,8 @@ internal object LinearSubSumAggregation {
     }
 
     fun aggregateSubSums(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
+        // Independent tolerance bands do not admit exact substitution through an equality.
+        if (problem.semantics.relaxesRows(0)) return PassDelta()
         val factors = problem.factors
         if (factors.size > MAX_FACTORS || cancellation()) return PassDelta()
         val work = Work(cancellation)
