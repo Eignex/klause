@@ -31,7 +31,8 @@ class SearchRunTest {
         session.initialize()
         val run = session.openRun(1, modelContinuation = SearchModelContinuation.BlockAtRoot,
             lifecycle = object : SearchRunLifecycle {
-                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Exhausted
+                override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                    SearchRunDisposition.Exhausted
             })
         assertIs<SearchRunEvent.Satisfied>(run.next())
         cancelled = true
