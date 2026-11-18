@@ -20,7 +20,12 @@ object PropagationReasonOracle {
     // narrow tightens at decision level 1 before factor 0 propagates; a failed propagation checks the
     // conflict clause instead, since an omitted premise there lets learning prune solutions.
 
-    fun assertReasonsImply(problem: Problem, label: String, narrow: (PropagationState) -> Boolean) {
+    fun assertReasonsImply(
+        problem: Problem,
+        label: String,
+        allowReasonlessRootConflict: Boolean = false,
+        narrow: (PropagationState) -> Boolean,
+    ) {
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.currentLevel = 1
@@ -29,7 +34,7 @@ object PropagationReasonOracle {
         val boolsBefore = Array(problem.numBoolVars) { state.boolValues[it] }
         state.currentFactor = 0
         if (!state.factorAt(0).propagate(state, 0)) {
-            ConflictReasonOracle.assertEntailed(problem, state, 0, label)
+            ConflictReasonOracle.assertEntailed(problem, state, 0, label, allowReasonlessRootConflict)
             return
         }
         val solutions by lazy {

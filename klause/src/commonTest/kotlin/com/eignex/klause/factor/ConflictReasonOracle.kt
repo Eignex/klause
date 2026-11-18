@@ -15,8 +15,23 @@ object ConflictReasonOracle {
 
     // state must already hold a conflict on factorId; its atom registry interprets the clause literals.
 
-    fun assertEntailed(problem: Problem, state: PropagationState, factorId: Int, label: String = "reason") {
-        val reason = state.factorAt(factorId).conflictReason(state, factorId) ?: return
+    fun assertEntailed(
+        problem: Problem,
+        state: PropagationState,
+        factorId: Int,
+        label: String = "reason",
+        allowReasonlessRootConflict: Boolean = false,
+    ) {
+        val reason = state.factorAt(factorId).conflictReason(state, factorId)
+        if (reason == null) {
+            assertTrue(allowReasonlessRootConflict, "$label: factor $factorId returned no conflict reason")
+            // Root conflicts need no learned clause, but propagation cannot certify its own failure.
+            assertTrue(
+                FactorPropagationOracle.enumerateSat(problem, label, null).isEmpty(),
+                "$label: reasonless conflict is not implied by the original source",
+            )
+            return
+        }
         val solutions = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
         for (s in solutions) {
             val satisfied = reason.any { lit -> litTrueUnder(problem, state, lit, s) }
