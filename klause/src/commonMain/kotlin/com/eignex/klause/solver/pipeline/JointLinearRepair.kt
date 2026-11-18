@@ -178,7 +178,7 @@ internal class JointLinearRepair(
     private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff): Sample? {
         val offered = external() ?: return null
         val raw = comparisonValue(offered)
-        val completed = if (offered.exactReals == null && completion != null)
+        val completed = if (completion != null)
             completion.complete(source, offered, stop) else offered
         compare("external", if (completed == null) "completion-unavailable" else "available",
             raw = raw, completed = completed?.let(::comparisonValue), cutoff = cutoff)
