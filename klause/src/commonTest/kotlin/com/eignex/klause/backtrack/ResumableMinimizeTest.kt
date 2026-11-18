@@ -329,7 +329,7 @@ class ResumableMinimizeTest {
             },
             randomSeed = 62L,
             lubyRestartBase = 1,
-            lpPlan = LpPlan(bounding = true, boundEvery = 1),
+            lpPlan = LpPlan(bounding = true, boundEvery = 1, rootMaxWork = 100_000L),
         )
 
         ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
@@ -343,7 +343,7 @@ class ResumableMinimizeTest {
                 } else null,
             )
             assertEquals(-38.0, initial.objective)
-            assertTrue(initial.stats.lp.rootWorkOps.sum > 0.0)
+            assertTrue(initial.stats.lp.rootBound.isFinite())
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
             val restrictedResult = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 100000L) {}
