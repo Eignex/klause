@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -49,7 +50,8 @@ class IndependentOpenComponentsTest {
             ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.LE, 0),
         ), openIntHi = booleanArrayOf(true, false, true))
 
-        val result = OpenTheoryPipeline.searchWithoutTheory(source, TheoryParams(), objective = null, engine = FiniteEngine.BACKTRACK)
+        val result = OpenTheoryPipeline.searchWithoutTheory(source, TheoryParams(), objective = null,
+            engine = FiniteEngine.BACKTRACK)
 
         val unknown = assertIs<OpenTheoryResult.Unknown>(assertIs<OpenTheoryExecution.Satisfy>(result).result)
         assertEquals(TerminationReason.Unsupported, unknown.reason)
@@ -58,14 +60,16 @@ class IndependentOpenComponentsTest {
     @Test
     fun `satisfaction should join a complete open coordinate with a heuristic component witness`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(
-            Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1),
+            Diffn(intArrayOf(0), intArrayOf(0), longArrayOf(1), longArrayOf(1)),
             Linear(longArrayOf(1), intArrayOf(2), LinearOp.EQ, 1_000_000_000_000),
         ), openIntHi = booleanArrayOf(true, false, true))
 
         val result = OpenTheoryPipeline.searchWithoutTheory(source, TheoryParams(maxFlips = 100),
             objective = null, engine = FiniteEngine.MIXED)
 
-        val point = assertIs<OpenTheoryResult.Sat>(assertIs<OpenTheoryExecution.Satisfy>(result).result).assignment
+        val verdict = assertIs<OpenTheoryExecution.Satisfy>(result).result
+        val point = assertIs<OpenTheoryResult.Sat>(verdict, (verdict as? OpenTheoryResult.Unknown)?.reason.toString())
+            .assignment
         assertEquals("1000000000000", point.intValue(2))
         assertTrue(point.intValue(0).toLong() >= 0L)
         assertEquals("0", point.intValue(1))
@@ -91,11 +95,12 @@ class IndependentOpenComponentsTest {
             Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 10),
         ), openIntHi = booleanArrayOf(true, false, true))
         val target = EncodingTarget("conditioned-test")
-        val selected = FactorProjectionProviders(encodingTargets = setOf(target), encoder = EncoderProvider { factor, language ->
-            if (language == target && factor is Linear) {
-                Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(1)), mapOf(SourceBoolId(0) to true))
-            } else BuiltInEncoderProvider.select(factor, language)
-        }).prepare(source)
+        val selected = FactorProjectionProviders(encodingTargets = setOf(target),
+            encoder = EncoderProvider { factor, language ->
+                if (language == target && factor is Linear) {
+                    Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(1)), mapOf(SourceBoolId(0) to true))
+                } else BuiltInEncoderProvider.select(factor, language)
+            }).prepare(source)
 
         val component = assertNotNull(selected.independentOpenComponents(ExecutionControl.Never)).single()
         val result = OpenTheoryPipeline.engineFor(component.request).solve(TheoryParams())

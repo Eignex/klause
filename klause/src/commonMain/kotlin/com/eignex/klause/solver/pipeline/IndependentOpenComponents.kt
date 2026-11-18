@@ -59,7 +59,8 @@ internal fun checkIndependentComponents(
         val remainder = projections.componentSource(retained.indices.filter { retained[it] }.toIntArray(), stop)
         if (remainder == null) {
             OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(
-                if (stop()) shared.preparationStopReason(stop) else TerminationReason.BudgetExhausted, SolveStats.EMPTY))
+                if (stop()) shared.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+                SolveStats.EMPTY))
         } else {
             val partial = fallback(shared, remainder.selection)
             val verdict = (partial as OpenTheoryExecution.Satisfy).result
@@ -68,7 +69,8 @@ internal fun checkIndependentComponents(
                 val joined = joinIndependentWitnesses(projections.problem, points, stop)
                 OpenTheoryExecution.Satisfy(if (joined == null) {
                     OpenTheoryResult.Unknown(
-                        if (stop()) shared.preparationStopReason(stop) else TerminationReason.Unsupported, verdict.stats)
+                        if (stop()) shared.preparationStopReason(stop) else TerminationReason.Unsupported,
+                        verdict.stats)
                 } else OpenTheoryResult.Sat(joined, verdict.stats))
             } else partial
         }
@@ -91,7 +93,9 @@ internal fun checkIndependentComponents(
     }
 }
 
-internal fun PreparedFactorProjections.independentOpenComponents(stop: ExecutionControl): List<IndependentOpenComponent>? {
+internal fun PreparedFactorProjections.independentOpenComponents(
+    stop: ExecutionControl,
+): List<IndependentOpenComponent>? {
     val groups = independentFactorGroups(stop) ?: return null
     if (groups.size < 2) return emptyList()
     val requests = ArrayList<IndependentOpenComponent>()
@@ -221,9 +225,12 @@ private fun PreparedFactorProjections.componentSource(
         val model = Problem(
             numBoolVars = bools.size,
             numIntVars = ints.size,
-            declaredIntDomains = SourceIntDomains(IntBounds.fromModelBounds(lower, upper, openLower, openUpper), domains),
+            declaredIntDomains = SourceIntDomains(
+                IntBounds.fromModelBounds(lower, upper, openLower, openUpper), domains),
             factors = factors,
-            impliedFactorMask = source.impliedFactorMask?.let { mask -> BooleanArray(indices.size) { mask[indices[it]] } },
+            impliedFactorMask = source.impliedFactorMask?.let { mask ->
+                BooleanArray(indices.size) { mask[indices[it]] }
+            },
             hasSymmetryBreaking = source.hasSymmetryBreaking,
             numRealVars = reals.size,
             realLower = DoubleArray(reals.size) { source.realLower[realIds[it]] },

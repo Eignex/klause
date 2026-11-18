@@ -28,7 +28,8 @@ internal fun solveIndependentFinite(projections: PreparedFactorProjections, para
             cancellation = stop,
         ))
     } catch (_: CancellationException) {
-        return OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(params.preparationStopReason(stop), SolveStats.EMPTY))
+        return OpenTheoryExecution.Satisfy(
+            OpenTheoryResult.Unknown(params.preparationStopReason(stop), SolveStats.EMPTY))
     }
     return OpenTheoryExecution.Satisfy(when (result) {
         is SolveResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.Sampled(result.assignment), result.stats)
@@ -60,7 +61,8 @@ internal fun joinIndependentWitnesses(
             if (!scan.visit(1)) return null
             if (source.realLower[id] > source.realUpper[id]) return null
             SourceRealCoordinate.Rational(
-                BigFraction.ofDouble(source.realLower[id]) ?: BigFraction.ofDouble(source.realUpper[id]) ?: BigFraction.ZERO,
+                BigFraction.ofDouble(source.realLower[id]) ?: BigFraction.ofDouble(source.realUpper[id])
+                    ?: BigFraction.ZERO,
             )
         }
         val coveredFactors = BooleanArray(source.numFactors)
