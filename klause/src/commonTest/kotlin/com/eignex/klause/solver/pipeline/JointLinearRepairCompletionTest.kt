@@ -158,10 +158,12 @@ class JointLinearRepairCompletionTest {
             val params = TheoryParams(sourceIncumbentCompletion = true, sourceLpWorkLimit = 1_000_000,
                 maxFlips = 1, cancellation = ExecutionControl { cancelled })
             JointLinearRepair(model, source, objective, params, external = { offered },
-                incumbentCompletionCheck = { _, _, token ->
-                    originalChecked = true
-                    token.charge(if (limit == "funding") params.sourceLpWorkLimit else 1L)
-                    cancelled = limit == "cancellation"
+                incumbentCompletionCheck = { sample, _, token ->
+                    if (sample !== prepared) {
+                        originalChecked = true
+                        token.charge(if (limit == "funding") params.sourceLpWorkLimit else 1L)
+                        cancelled = limit == "cancellation"
+                    }
                     true
                 }, onComparison = { events += it }).use { repair ->
                 repair.search(adaptive = false).use { search ->
@@ -191,8 +193,9 @@ class JointLinearRepairCompletionTest {
             ExecutionControl.Never))
         for ((exact, real, originalAccepted) in listOf(Triple(false, 1L, true), Triple(true, 2L, true),
             Triple(true, 1L, false))) {
-            var offered = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
+            val prepared = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
                 exactReals = listOf(BigFraction.ONE))
+            var offered = prepared
             var halted = false
             val events = mutableListOf<JointRepairComparison>()
             val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1,
