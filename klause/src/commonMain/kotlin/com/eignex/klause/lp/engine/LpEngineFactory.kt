@@ -19,7 +19,8 @@ internal data class LpBoundSlack(val absolute: Double, val relative: Double) {
         require(absolute >= 0.0 && relative >= 0.0)
     }
 
-    fun at(side: Double): Double = max(absolute, relative * abs(side))
+    fun at(side: Double): Double = if (relative == 0.0 || side == 0.0) absolute
+    else max(absolute, relative * abs(side))
 
     companion object {
         val NONE = LpBoundSlack(0.0, 0.0)

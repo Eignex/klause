@@ -64,6 +64,17 @@ class FactorRelaxationProjectionToleranceTest(
             val secondAtLeastOne = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
                 LinearOp.GE, 1.0)
             return listOf(
+                arrayOf("linear source row", arrayOf<Factor>(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(2, 0), doubleArrayOf(1.0, -1.0),
+                        LinearOp.EQ, 0.0), atLeastOne),
+                    doubleArrayOf(0.0, 0.0, 0.0), doubleArrayOf(1.0, 0.0, 4.0),
+                    doubleArrayOf(0.75, 0.0, 0.46875), doubleArrayOf(0.0, 0.0, 1.0), quarter),
+                arrayOf("mixed source row", arrayOf<Factor>(
+                    Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(2), doubleArrayOf(1.0),
+                        LinearOp.EQ, 0.0),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
+                    doubleArrayOf(0.0, 0.0, 0.0), doubleArrayOf(0.0, 0.0, 4.0),
+                    doubleArrayOf(0.0, 0.0, 0.625), doubleArrayOf(0.0, 0.0, 1.0), quarter),
                 arrayOf("absolute value", arrayOf<Factor>(RealAbs(0, 2), atLeastOne),
                     doubleArrayOf(0.0, 0.0, 0.0), doubleArrayOf(1.0, 0.0, 4.0),
                     doubleArrayOf(0.75, 0.0, 0.46875), doubleArrayOf(0.0, 0.0, 1.0), quarter),
@@ -130,7 +141,7 @@ class FactorRelaxationProjectionToleranceTest(
     fun `projected bound should cover a source accepted relative tolerance point`() {
         val policy = SourceTolerance(relative = relative)
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(1, 1)), factors,
+            1, 1, arrayOf(if (factors.any { it is RealElement }) IntDomain(1, 1) else IntDomain(0, 1)), factors,
             numRealVars = 3, realLower = lower, realUpper = upper,
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
                 feasibilityTolerance = policy).resolve(),
