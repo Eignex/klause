@@ -70,7 +70,7 @@ internal class FlatZincValues private constructor(
     private var published: DoubleArray? = null
 
     fun checked(program: FlatZincProgram): FlatZincValues = apply {
-        published = program.publishedReals(boolValue, intValue, ::nearest, displayed.narrowing)
+        published = program.publishedReals(boolValue, intValue, ::nearest, publicationNarrowing())
     }
 
     // A real coordinate as a decimal literal: an algebraic one narrowed to its nearest binary64 value, and one past
@@ -97,7 +97,7 @@ internal class FlatZincValues private constructor(
 }
 
 // Algebraic coordinates narrowed on first display, all under one private allowance for the solution.
-private class DisplayedReals(val narrowing: ExecutionControl, private val algebraic: (Int) -> AlgebraicReal?) {
+private class DisplayedReals(private val narrowing: ExecutionControl, private val algebraic: (Int) -> AlgebraicReal?) {
     private val narrowed = HashMap<Int, AlgebraicReal>()
 
     private fun root(id: Int): AlgebraicReal? = narrowed[id] ?: algebraic(id)?.let { value ->

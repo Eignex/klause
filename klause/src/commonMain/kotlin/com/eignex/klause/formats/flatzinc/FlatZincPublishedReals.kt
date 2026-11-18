@@ -28,16 +28,17 @@ internal fun FlatZincProgram.publishedReals(
     val ints = if (exactInts.all { it.fitsLong() }) LongArray(exactInts.size) { exactInts[it].toLongExact() }
     else LongArray(0)
     val original = DoubleArray(problem.numRealVars, nearest)
-    fun accepted(values: DoubleArray): Boolean {
-        if (control() || values.any { !it.isFinite() }) return false
+    fun accepted(values: DoubleArray, checking: ExecutionControl = control): Boolean {
+        if (checking() || values.any { !it.isFinite() }) return false
         val binary = Sample(bools, ints, values, exactInts = exactInts)
-        if (scope.verify(problem, binary, policy, control, integerRows = false) !is Verification.Accepted) return false
+        if (scope.verify(problem, binary, policy, checking, integerRows = false) !is Verification.Accepted) return false
         val decimals = values.map { decimalValue(it) }
         val decimal = Sample(bools, ints, DoubleArray(values.size) { decimals[it].toDouble() },
             exactReals = decimals, exactInts = exactInts)
-        return scope.verify(problem, decimal, policy, control, integerRows = false) is Verification.Accepted
+        return scope.verify(problem, decimal, policy, checking, integerRows = false) is Verification.Accepted
     }
-    if (accepted(original)) return original
+    // An already representable point needs a complete source traversal regardless of the adjustment allowance.
+    if (accepted(original, ExecutionControl.Never)) return original
     val options = original.map { doubleArrayOf(it, it.nextUp(), it.nextDown()) }
     for (direction in 1..2) {
         val values = DoubleArray(original.size) { options[it][direction] }

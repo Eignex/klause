@@ -27,12 +27,23 @@ import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.times
 import kotlin.math.sqrt
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincSolutionWriterTest {
+    @Test
+    fun `valid decimal coordinates should need no adjustment allowance`() {
+        val program = parseFlatZinc("var 0.0..2.0: x; solve satisfy;")
+
+        val published = program.publishedReals({ error("no booleans") }, { error("no integers") },
+            { 1.0 }, ExecutionControl { true })
+
+        assertContentEquals(doubleArrayOf(1.0), published)
+    }
+
     @Test
     fun `tolerance boundary coordinates should publish inside the bound`() {
         val program = parseFlatZinc("var float: x; constraint float_le(2.0, x); solve minimize x;")

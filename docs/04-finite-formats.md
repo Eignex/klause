@@ -507,7 +507,8 @@ fails, the writer tries adjacent binary64 values within a bounded publication al
 `% klause-float-rounding: x = tolerance` identifies an adjusted coordinate. Failure to
 find a checked point withholds the solution block with an explicit publication error.
 Exact-coordinate comments retain the original witness, independently of this decimal point.
-At zero tolerance, decimal assignments are display approximations: each prints its nearest binary64 value, an algebraic one once
+At zero tolerance, decimal assignments are display approximations: each prints its
+nearest binary64 value, an algebraic one once
 its [narrowed interval](22-exact-arithmetic.md#binary64-values-of-algebraic-scalars)
 settles it. `% klause-float-rounding: x = undetermined` marks a coordinate whose
 narrowing ran out of allowance, printed as its interval's rounded midpoint, and
