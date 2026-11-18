@@ -140,7 +140,8 @@ the box, each column at the side the exact sign of its combination meets, which 
 its clause cites; otherwise the node is refuted without a learned clause. A refutation slack in
 `LpSolveContext` moves every side outward first, in both checks, so the ray refutes only a
 model infeasible by more than that slack. It backs infeasibility pruning, leaf refutation,
-learned conflicts and presolve root infeasibility; presolve passes no slack. Mixed row
+learned conflicts and presolve root infeasibility. Presolve reads the captured source
+slack wherever its row semantics permit tolerance. Mixed row
 projections, strict-row solves and component bounds have no numerical form and are skipped.
 Optimality, infeasibility and bound claims resting on these deductions are numerical. Under
 exact certification every deduction uses the packages below.
