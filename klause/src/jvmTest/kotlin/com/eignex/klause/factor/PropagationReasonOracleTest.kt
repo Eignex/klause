@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import org.junit.BeforeClass
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -24,6 +25,23 @@ class PropagationReasonOracleTest {
             val source = Problem(1, 0, emptyArray(), listOf(Clause(intArrayOf(Lit.make(0, true)))))
             check(FactorPropagationOracle.enumerateSat(source, "source", null).isNotEmpty())
             PropagationReasonOracle.assertReasonsImply(source, "source") { true }
+        }
+    }
+
+    @Test
+    fun `the oracle should distinguish narrowing failure inactivity deductions and conflicts`() {
+        val source = Problem(1, 0, emptyArray(), listOf(Clause(intArrayOf(Lit.make(0, true)))))
+        for (expected in PropagationReasonOracle.Outcome.entries) {
+            val outcome = PropagationReasonOracle.assertReasonsImply(source, "outcome=$expected") { state ->
+                when (expected) {
+                    PropagationReasonOracle.Outcome.NARROWING_FAILED -> false
+                    PropagationReasonOracle.Outcome.UNCHANGED -> state.pinBool(0, true)
+                    PropagationReasonOracle.Outcome.DEDUCTION -> true
+                    PropagationReasonOracle.Outcome.CONFLICT -> state.pinBool(0, false)
+                }
+            }
+
+            assertEquals(expected, outcome)
         }
     }
 

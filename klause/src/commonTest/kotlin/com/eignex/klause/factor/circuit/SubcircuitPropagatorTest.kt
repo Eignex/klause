@@ -2,6 +2,7 @@ package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -68,6 +69,7 @@ class SubcircuitPropagatorTest {
     @Test
     fun `subcircuit deductions should be implied by their reasons once some successors are fixed`() {
         val rng = Random(0x5EA5)
+        val outcomes = mutableSetOf<Outcome>()
         repeat(30) { iter ->
             val n = 5
             val problem = Problem(
@@ -76,14 +78,23 @@ class SubcircuitPropagatorTest {
                 intDomains = Array(n) { IntDomain(0, n - 1L) },
                 factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it }, subcircuit = true)),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "subcircuit#$iter") { state ->
-                (0 until 2).all { state.setInt(rng.nextInt(n), rng.nextInt(n).toLong()) } &&
-                    (0 until 4).all {
-                        val v = rng.nextInt(n)
-                        state.excludeIntValue(v, if (rng.nextBoolean()) v.toLong() else rng.nextInt(n).toLong())
+            val fixed = (0 until n).shuffled(rng).take(2).toSet()
+            outcomes += PropagationReasonOracle.assertReasonsImply(problem, "subcircuit#$iter") { state ->
+                (0 until n).all { v ->
+                    val keep = rng.nextInt(n).toLong()
+                    if (v in fixed) {
+                        state.setInt(v, keep)
+                    } else {
+                        (0L until n.toLong()).filter { it != keep }.shuffled(rng).take(2).all {
+                            state.excludeIntValue(v, it)
+                        }
                     }
+                }
             }
         }
+
+        assertTrue(Outcome.DEDUCTION in outcomes && Outcome.CONFLICT in outcomes, "$outcomes")
+        assertFalse(Outcome.NARROWING_FAILED in outcomes)
     }
 
     @Test

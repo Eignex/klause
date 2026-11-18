@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -226,7 +227,7 @@ class AllDifferentPropagatorTest {
     @Test
     fun `alldifferent matching deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xAD01)
-        repeat(210) { iter ->
+        repeat(30) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,
@@ -234,16 +235,20 @@ class AllDifferentPropagatorTest {
                 intDomains = Array(n) { IntDomain(0, 4) },
                 factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = 5)),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "alldiff#$iter") { state ->
-                (0 until 6).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(5).toLong()) }
+            val hall = (0L..4L).shuffled(rng).take(2)
+            val members = (0 until n).shuffled(rng).take(if (iter % 2 == 0) 2 else 3)
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "alldiff#$iter") { state ->
+                members.all { v -> (0L..4L).filter { it !in hall }.all { state.excludeIntValue(v, it) } }
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 
     @Test
-    fun `bounds-consistent alldifferent deductions should be implied by their reasons under carved holes`() {
+    fun `bounds-consistent alldifferent reasons should cover Hall deductions and conflicts`() {
         val rng = Random(0xAD02)
-        repeat(200) { iter ->
+        repeat(30) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,
@@ -253,23 +258,23 @@ class AllDifferentPropagatorTest {
                     AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = 5, boundsConsistent = true),
                 ),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "alldiff-bounds#$iter") { state ->
-                (0 until 5).all {
-                    val v = rng.nextInt(n)
-                    when (rng.nextInt(3)) {
-                        0 -> state.excludeIntValue(v, rng.nextInt(5).toLong())
-                        1 -> state.tightenIntMin(v, rng.nextInt(3).toLong())
-                        else -> state.tightenIntMax(v, 2L + rng.nextInt(3))
-                    }
-                }
+            val lo = rng.nextInt(3).toLong()
+            val members = (0 until n).shuffled(rng).take(if (iter % 2 == 0) 2 else 3)
+            val outside = (0 until n).first { it !in members }
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "alldiff-bounds#$iter") { state ->
+                members.all { v ->
+                    state.tightenIntMin(v, lo) && state.tightenIntMax(v, lo + 1)
+                } && state.tightenIntMin(outside, lo)
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 
     @Test
     fun `alldifferent except zero deductions should be implied by their reasons under carved holes`() {
         val rng = Random(0xAD04)
-        repeat(50) { iter ->
+        repeat(30) { iter ->
             val n = 4
             val problem = Problem(
                 numBoolVars = 0,
@@ -279,15 +284,13 @@ class AllDifferentPropagatorTest {
                     AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = 5, exceptSet = longArrayOf(0)),
                 ),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "alldiff-except0#$iter") { state ->
-                (0 until n).all { v ->
-                    when (rng.nextInt(4)) {
-                        0 -> state.setInt(v, 1L + rng.nextInt(4))
-                        2 -> true
-                        else -> state.excludeIntValue(v, 0)
-                    }
-                } && (0 until 5).all { state.excludeIntValue(rng.nextInt(n), 1L + rng.nextInt(4)) }
+            val hall = (1L..4L).shuffled(rng).take(2)
+            val members = (0 until n).shuffled(rng).take(if (iter % 2 == 0) 2 else 3)
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "alldiff-except0#$iter") { state ->
+                members.all { v -> (0L..4L).filter { it !in hall }.all { state.excludeIntValue(v, it) } }
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 }

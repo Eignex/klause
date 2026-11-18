@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -274,9 +275,9 @@ class ElementPropagatorTest {
     }
 
     @Test
-    fun `variable-array element deductions should be implied by their reasons under carved holes`() {
+    fun `variable-array element reasons should cover selection and support filtering`() {
         val rng = Random(0xE1E1)
-        repeat(100) { iter ->
+        repeat(40) { iter ->
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 5,
@@ -285,16 +286,21 @@ class ElementPropagatorTest {
                     Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
                 ),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "element-var#$iter") { state ->
-                (0 until 5).all {
-                    val v = rng.nextInt(5)
-                    when (rng.nextInt(3)) {
-                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
-                        1 -> state.tightenIntMin(v, rng.nextInt(2).toLong())
-                        else -> state.tightenIntMax(v, 1L + rng.nextInt(3))
+            val selected = rng.nextInt(3)
+            val value = rng.nextInt(4).toLong()
+            val other = (value + 1) % 4
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "element-var#$iter") { state ->
+                if (iter % 4 < 2) {
+                    state.setInt(0, selected.toLong()) && state.setInt(2 + selected, value) &&
+                        (iter % 2 == 0 || state.setInt(1, other))
+                } else {
+                    state.setInt(1, value) && (0 until 3).all { cell ->
+                        state.setInt(2 + cell, if (iter % 2 == 0 && cell == selected) value else other)
                     }
                 }
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 }

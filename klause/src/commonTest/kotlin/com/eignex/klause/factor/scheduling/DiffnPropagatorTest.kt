@@ -2,6 +2,7 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -131,9 +132,9 @@ class DiffnPropagatorTest {
     }
 
     @Test
-    fun `diffn deductions should be implied by their reasons under carved holes`() {
+    fun `diffn reasons should cover separation and overlap conflicts`() {
         val rng = Random(0xD1FF)
-        repeat(100) { iter ->
+        repeat(30) { iter ->
             val rects = 3
             val problem = Problem(
                 numBoolVars = 0,
@@ -148,16 +149,14 @@ class DiffnPropagatorTest {
                     ),
                 ),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "diffn#$iter") { state ->
-                (0 until 6).all {
-                    val v = rng.nextInt(2 * rects)
-                    when (rng.nextInt(3)) {
-                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
-                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
-                        else -> state.tightenIntMax(v, rng.nextInt(2).toLong())
-                    }
-                }
+            val (first, second) = (0 until rects).shuffled(rng)
+            val x = rng.nextInt(4).toLong()
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "diffn#$iter") { state ->
+                state.setInt(2 * first, x) && state.setInt(2 * first + 1, 0) &&
+                    state.setInt(2 * second, x) && (iter % 2 == 0 || state.setInt(2 * second + 1, 0))
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 

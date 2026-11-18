@@ -3,6 +3,7 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -473,32 +474,38 @@ class ComparisonClauseTest {
     }
 
     @Test
-    fun `comparison clause deductions should be implied by their reasons under carved holes`() {
+    fun `comparison clause reasons should cover forced and falsified alternatives`() {
         val rng = Random(0xCC10)
-        repeat(130) { iter ->
+        repeat(32) { iter ->
             val n = 3
+            val vars = (0 until n).shuffled(rng)
+            val ops = Array(n) { LinearOp.entries[rng.nextInt(LinearOp.entries.size)] }
+            val consts = LongArray(n) { 1L + rng.nextInt(2) }
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
                 intDomains = Array(n) { IntDomain(0, 3) },
                 factors = arrayOf<Factor>(
                     ComparisonClause(
-                        vars = IntArray(n) { rng.nextInt(n) },
-                        ops = Array(n) { LinearOp.entries[rng.nextInt(LinearOp.entries.size)] },
-                        consts = LongArray(n) { rng.nextInt(4).toLong() },
+                        vars = vars.toIntArray(),
+                        ops = ops,
+                        consts = consts,
                     ),
                 ),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "comparison-clause#$iter") { state ->
-                (0 until 5).all {
-                    val v = rng.nextInt(n)
-                    when (rng.nextInt(3)) {
-                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
-                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
-                        else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "comparison-clause#$iter") { state ->
+                (0 until if (iter % 2 == 0) 2 else 3).all { term ->
+                    val falseValue = when (ops[term]) {
+                        LinearOp.LE -> consts[term] + 1
+                        LinearOp.GE -> consts[term] - 1
+                        LinearOp.EQ -> (consts[term] + 1) % 4
+                        LinearOp.NE -> consts[term]
                     }
+                    state.setInt(vars[term], falseValue)
                 }
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 }
