@@ -81,7 +81,8 @@ class LpBoundingClosureTest : RuntimeInitializedTest() {
     @Test
     fun `strict source dominance retains the proved bound above the gap cutoff`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), arrayOf(
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 2.5, strict = true),
+            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0),
+                LinearOp.GE, 2.5, strict = true),
         ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val session = PropagationSession(problem)
         val sink = SolveStatsSink("strict-bound-closure")
