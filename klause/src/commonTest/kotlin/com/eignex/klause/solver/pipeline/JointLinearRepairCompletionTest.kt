@@ -657,7 +657,7 @@ class JointLinearRepairCompletionTest {
     }
 
     @Test
-    fun `non improving exact external points should leave completion checking for useful candidates`() {
+    fun `non improving exact external points should need only their preparation check`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
@@ -682,7 +682,32 @@ class JointLinearRepairCompletionTest {
             }
 
             assertEquals(0L, assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample.intValue(0))
-            assertEquals(0, importChecks)
+            assertEquals(1, importChecks)
+        }
+    }
+
+    @Test
+    fun `an advisory value above the cutoff should remain eligible for completion`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(1), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val offered = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(2.0))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ONE)
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
+            external = { offered }, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            var attempt = repair.attempt(condition, ExecutionControl.Never)
+            repeat(32) {
+                if (attempt.result == ExactNeighborhoodResult.Paused) {
+                    attempt = repair.attempt(condition, ExecutionControl.Never)
+                }
+            }
+
+            assertEquals(ExactNeighborhoodResult.Undecided, attempt.result)
+            assertEquals(listOf(BigFraction.ZERO), assertNotNull(attempt.feasiblePoint).exactReals)
         }
     }
 
