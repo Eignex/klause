@@ -11,6 +11,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.klause.util.bindStopControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -18,6 +19,24 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ClauseDbTest {
+
+    @Test
+    fun `tiny cleanup grants should share the active worker polling cadence`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(4000) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9) }
+        var polls = 0
+        val cancellation = ExecutionControl {
+            polls++
+            false
+        }.bindStopControl()
+        val params = BacktrackParams(maxLearnedClauses = 128, tieredLearnedDb = false,
+            learnedMemoryWork = 256L, learnedMemoryScratchBytes = 64L, cancellation = cancellation)
+
+        repeat(128) { forgetIfOverCap(session, params) }
+
+        assertTrue(session.nativeCapTraversalVisits > 0L)
+        assertTrue(polls <= 512, "128 tiny cleanup attempts read the full token $polls times")
+    }
 
     @Test
     fun `native retained windows should classify only new local admissions`() {

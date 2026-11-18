@@ -237,9 +237,10 @@ precedes observation and resumes while its cursor advances. Changed work, scratc
 byte-limit settings renew the opportunity, and cancellation withholds further
 maintenance until ownership changes.
 
-At root resume and restart, cleanup attempts with work grants below 65,536 share
-a 65,536-unit continuation allowance. Exhausting it pauses the slice with the
-reduction window retained; the window resumes before search branches.
+Consecutive clause-cap cleanup attempts share the active search worker's stop-polling
+cadence, including sessions created under a preparation token. Mutation checkpoints
+and continuation checkpoints consume the same countdown; full token reads decide
+whether an interruption pauses the slice or ends the search.
 
 Outside propagation, learned-store maintenance (reduction windows, retired-slot
 and watch cleanup, page and index release, and compaction) runs in bounded steps

@@ -12,6 +12,7 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
+import com.eignex.klause.util.StopPolling
 import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
@@ -1152,18 +1153,19 @@ class PropagationSession private constructor(
     /** Request a bounded learned-store compaction, preserving permanent, live and historical reasons.
      * Cancelled or unfunded preparation leaves the generation intact. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
-        compactLearnedClauses(65_536L, 1_048_576L, { false }, keep)
+        compactLearnedClauses(65_536L, 1_048_576L, { false }, keep = keep)
     }
 
     internal fun compactLearnedClauses(
         maxWork: Long,
         maxScratchBytes: Long,
         cancelled: () -> Boolean,
+        polling: StopPolling? = null,
         keep: (learnedIndex: Int, lbd: Int) -> Boolean,
     ): Boolean {
         val before = learnedClauseCount
         val published = state.forgetLearnedClauses(maxWork, maxScratchBytes,
-            cancelled = cleanupCancellation(cancelled), keep = keep)
+            cancelled = cleanupCancellation(cancelled, polling), keep = keep)
         if (learnedClauseCount != before) learnedClauseRevision++
         return published
     }
@@ -1262,9 +1264,10 @@ class PropagationSession private constructor(
         return ReclamationPreparation(maxWork, maxScratchBytes, cleanupCancellation(cancelled)) { owner.work += it }
     }
 
-    private fun cleanupCancellation(cancelled: () -> Boolean) = CleanupCancellation(cancellation.stopPolling) {
-        cancelRequested || cancelled()
-    }
+    private fun cleanupCancellation(cancelled: () -> Boolean, polling: StopPolling? = null) =
+        CleanupCancellation(polling ?: cancellation.stopPolling) {
+            cancelRequested || cancelled()
+        }
 
     internal val nativeCapWindowPending: Boolean get() = state.nativeEngine?.capWindowPending == true
     internal val nativeCapTraversalVisits: Long get() = state.nativeEngine?.capTraversalVisits ?: 0L
@@ -1279,12 +1282,13 @@ class PropagationSession private constructor(
         cancelled: () -> Boolean,
         canDrop: (Int) -> Boolean = { true },
         nativePolicy: NativeCapConfiguration? = null,
+        polling: StopPolling? = null,
         keep: (Int) -> Boolean,
     ): Int {
         if (retainedState == null || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
             inprocessingRootPending
         ) return 0
-        val polled = cleanupCancellation(cancelled)
+        val polled = cleanupCancellation(cancelled, polling)
         val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes, polled, canDrop, keep,
             nativePolicy) ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, polled, canDrop, keep)
         if (retired > 0) learnedClauseRevision++
