@@ -97,9 +97,13 @@ internal fun checkIndependentComponents(
 
 internal fun PreparedFactorProjections.independentOpenComponents(
     stop: ExecutionControl,
+    acceptsFactor: (Int) -> Boolean = { true },
 ): List<IndependentOpenComponent>? {
-    val groups = independentFactorGroups(stop) ?: return null
-    if (groups.size < 2) return emptyList()
+    val connected = independentFactorGroups(stop) ?: return null
+    if (connected.size < 2) return emptyList()
+    val groups = connected.filter { indices -> indices.all { !stop() && acceptsFactor(it) } }
+    if (stop()) return null
+    if (groups.isEmpty()) return emptyList()
     val coordinates = groups.map { componentCoordinates(it, stop) ?: return null }
     val mapping = problem.componentMapping(coordinates, stop) ?: return null
     val requests = ArrayList<IndependentOpenComponent>()

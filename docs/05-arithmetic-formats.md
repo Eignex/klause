@@ -68,10 +68,14 @@ enabled comparison; numerical rows enabled by a finite pin retain that premise, 
 retraction removes their authority. Objectives over integer backings use an exact
 positive multiplier when it fits, and an auxiliary equality otherwise; rendering
 undoes either exactly.
-Wide coefficients admit exact positive row normalization for the numerical LP, and
-a source with a nonfinite or underflowing projection declines before routing, without
-switching to an arithmetic theory. An infeasible constant row stays an explicit
-contradiction.
+Wide coefficients admit exact positive row normalization for the numerical LP.
+A connected component containing a nonfinite or underflowing projection remains
+unavailable. Under zero feasibility tolerance, complete and mixed execution retain
+exact checks for independent components whose rows admit projection; a refutation
+settles the conjunction, while component satisfaction leaves the unavailable
+remainder undecided. Positive tolerance retains source-wide decline because a
+nominal refutation need not exclude every accepted point. An infeasible constant
+row stays an explicit contradiction.
 
 ## Tolerance publication
 

@@ -15,6 +15,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 
 internal fun prepareFactorQuadratic(
     request: SourceSetupRequest,
@@ -82,6 +83,18 @@ internal fun executeNativeSource(
     val invocation = request.invocation
     val native = route.execution
     if (native == null) {
+        val independent = invocation.linearSource?.independentChecks
+        if (independent != null) {
+            val params = request.theory.boundTo(invocation)
+            val objective = invocation.workingLinearObjective
+            val result = checkIndependentComponents(independent.projections, independent.components,
+                params, objective) { remaining, _ ->
+                val stop = remaining.cancellation.includingStop(remaining.timeout)
+                incompleteOpenExecution(objective,
+                    if (stop()) remaining.preparationStopReason(stop) else TerminationReason.Unsupported)
+            }
+            return SourceExecutionResult.Linear(invocation, result)
+        }
         val reason = if (invocation.nativeDeadline()()) {
             TerminationReason.Timeout
         } else {
