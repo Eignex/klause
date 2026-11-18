@@ -372,35 +372,37 @@ private fun executeFixedSatisfy(
     var indeterminate = false
     var exhausted = false
     var reason: TerminationReason? = null
-    for (outcome in solver.enumerationOutcomes(params)) {
-        when (outcome) {
-            is SearchOutcome.Found -> {
-                if (request.deadlineExceeded()) {
-                    timedOut = true
-                    reason = TerminationReason.Timeout
+    solver.enumerationOutcomes(params).use { outcomes ->
+        for (outcome in outcomes) {
+            when (outcome) {
+                is SearchOutcome.Found -> {
+                    if (request.deadlineExceeded()) {
+                        timedOut = true
+                        reason = TerminationReason.Timeout
+                        break
+                    }
+                    callbacks.onSample(outcome.sample)
+                    solutions++
+                    if (solutions >= limit) break
+                }
+    
+                is SearchOutcome.Exhausted -> {
+                    indeterminate = outcome.indeterminate
+                    exhausted = !indeterminate
+                    if (indeterminate) reason = outcome.stopCause.terminationReason()
                     break
                 }
-                callbacks.onSample(outcome.sample)
-                solutions++
-                if (solutions >= limit) break
-            }
-
-            is SearchOutcome.Exhausted -> {
-                indeterminate = outcome.indeterminate
-                exhausted = !indeterminate
-                if (indeterminate) reason = outcome.stopCause.terminationReason()
-                break
-            }
-
-            is SearchOutcome.BudgetCapped -> {
-                timedOut = true
-                reason = outcome.stopCause?.terminationReason() ?: when {
-                    request.deadlineExceeded() -> TerminationReason.Timeout
-                    request.nodeBudget?.exhausted() == true -> TerminationReason.BudgetExhausted
-                    request.cancellation() -> TerminationReason.Cancelled
-                    else -> TerminationReason.BudgetExhausted
+    
+                is SearchOutcome.BudgetCapped -> {
+                    timedOut = true
+                    reason = outcome.stopCause?.terminationReason() ?: when {
+                        request.deadlineExceeded() -> TerminationReason.Timeout
+                        request.nodeBudget?.exhausted() == true -> TerminationReason.BudgetExhausted
+                        request.cancellation() -> TerminationReason.Cancelled
+                        else -> TerminationReason.BudgetExhausted
+                    }
+                    break
                 }
-                break
             }
         }
     }
