@@ -24,6 +24,9 @@ class LpSolveTest {
         }.build(Sense.MINIMIZE)
         for (dimension in listOf(0, 1)) {
             val context = LpSolveContext(
+                certificationPolicy = LpCertificationPolicy { certifier, success ->
+                    success && certifier != LpCertifier.EXACT_POINT
+                },
                 refinementLimits = LpRefinementLimits(maxRounds = 0, maxAuxiliaries = 0),
                 reconstructionLimits = ReconstructionLimits(maxWork = 0),
                 basisLimits = ExactBasisLimits(RationalBasisLimits(dimension = dimension)),
