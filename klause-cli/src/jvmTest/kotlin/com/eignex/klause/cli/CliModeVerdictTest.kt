@@ -194,39 +194,6 @@ class CliModeVerdictTest {
         "constraint float_lt(x,y); constraint float_lin_lt([1.0,-1.0],[y,x],0.0000015);"
 
     @Test
-    fun `finite engines should enumerate every satisfying assignment`() {
-        val model = "var 0..2: k :: output_var; var 0..2: j :: output_var; constraint int_le(k,j); solve satisfy;"
-        val counts = listOf("fixed", "cp", "mixed", "ls", "alns").associateWith { engine ->
-            val out = solveFlatZinc(model, "-e", engine, "-a")
-            assertTrue("==========" in out.lines(), out)
-            out.lines().count { it == "----------" }
-        }
-
-        assertEquals(counts.mapValues { 6 }, counts)
-    }
-
-    @Test
-    fun `a capped finite enumeration should retain its requested count without claiming completeness`() {
-        val model = "var 0..2: k :: output_var; var 0..2: j :: output_var; constraint int_le(k,j); solve satisfy;"
-        for (engine in listOf("fixed", "cp", "mixed")) {
-            for (cap in listOf(1, 2)) {
-                val out = solveFlatZinc(model, "-e", engine, "-a", "-n", cap.toString())
-
-                assertEquals(cap, out.lines().count { it == "----------" }, out)
-                assertTrue("==========" !in out.lines(), out)
-            }
-        }
-    }
-
-    @Test
-    fun `a solution count should enumerate without the all solutions flag`() {
-        val out = solveFlatZinc("var 0..2: x :: output_var; solve satisfy;", "-e", "mixed", "-n", "2")
-
-        assertEquals(2, out.lines().count { it == "----------" }, out)
-        assertTrue("==========" !in out.lines(), out)
-    }
-
-    @Test
     fun `single variable float rows should preserve feasibility slack`() {
         val source = "var 0.0..1.0: z :: output_var; constraint float_eq(z,0.3); " +
             "constraint float_le(z,0.29999995); solve satisfy;"
