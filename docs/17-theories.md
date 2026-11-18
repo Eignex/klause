@@ -71,7 +71,7 @@ indeterminate required leaf cannot justify source exhaustion.
 
 When an open factor source lacks a whole-source route, complete and mixed execution
 retain complete arithmetic checks for independent connected components. Connectivity
-includes Boolean guards as well as integer and real coordinates. Each compact view
+includes Boolean guards, encoder conditions, and integer and real coordinates. Each compact view
 keeps its source declarations and selected encoders under a fresh remapping scope.
 A component refutation proves the conjunction infeasible, including during
 optimization because these checks carry no objective cutoff. Satisfaction retains

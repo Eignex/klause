@@ -92,8 +92,7 @@ internal fun checkIndependentComponents(
 }
 
 internal fun PreparedFactorProjections.independentOpenComponents(stop: ExecutionControl): List<IndependentOpenComponent>? {
-    val source = problem
-    val groups = source.independentFactorGroups(stop) ?: return null
+    val groups = independentFactorGroups(stop) ?: return null
     if (groups.size < 2) return emptyList()
     val requests = ArrayList<IndependentOpenComponent>()
     for (indices in groups) {
@@ -110,14 +109,15 @@ internal fun PreparedFactorProjections.independentOpenComponents(stop: Execution
     return requests
 }
 
-private fun Problem.independentFactorGroups(stop: ExecutionControl): List<IntArray>? {
+private fun PreparedFactorProjections.independentFactorGroups(stop: ExecutionControl): List<IntArray>? {
+    val source = problem
     if (stop()) return null
-    stop.charge(numFactors.toLong() + numBoolVars + numIntVars + numRealVars)
+    stop.charge(source.numFactors.toLong() + source.numBoolVars + source.numIntVars + source.numRealVars)
     if (stop()) return null
-    val parents = IntArray(numFactors) { it }
-    val boolFactors = IntArray(numBoolVars) { -1 }
-    val intFactors = IntArray(numIntVars) { -1 }
-    val realFactors = IntArray(numRealVars) { -1 }
+    val parents = IntArray(source.numFactors) { it }
+    val boolFactors = IntArray(source.numBoolVars) { -1 }
+    val intFactors = IntArray(source.numIntVars) { -1 }
+    val realFactors = IntArray(source.numRealVars) { -1 }
     fun root(index: Int): Int {
         var current = index
         while (parents[current] != current) {
@@ -131,7 +131,7 @@ private fun Problem.independentFactorGroups(stop: ExecutionControl): List<IntArr
         if (previous < 0) owners[variable] = factor else parents[root(factor)] = root(previous)
     }
     ScanMeter(stop).use { scan ->
-        for ((index, factor) in factors.withIndex()) {
+        for ((index, factor) in source.factors.withIndex()) {
             if (!scan.visit(1)) return null
             for (variable in factor.boolVars) {
                 if (!scan.visit(1)) return null
@@ -145,9 +145,22 @@ private fun Problem.independentFactorGroups(stop: ExecutionControl): List<IntArr
                 if (!scan.visit(1)) return null
                 connect(realFactors, variable, index)
             }
+            for (target in providers.encodingTargets) {
+                val encoder = encoder(index, target)
+                for (id in encoder.requiredBooleans.keys) {
+                    if (!scan.visit(1)) return null
+                    if (id.index !in boolFactors.indices) return emptyList()
+                    connect(boolFactors, id.index, index)
+                }
+                for (id in encoder.requiredIntegers) {
+                    if (!scan.visit(1)) return null
+                    if (id.index !in intFactors.indices) return emptyList()
+                    connect(intFactors, id.index, index)
+                }
+            }
         }
         val groups = LinkedHashMap<Int, MutableList<Int>>()
-        for (index in factors.indices) {
+        for (index in source.factors.indices) {
             if (!scan.visit(1)) return null
             groups.getOrPut(root(index)) { ArrayList() }.add(index)
         }
@@ -170,6 +183,17 @@ private fun PreparedFactorProjections.componentSource(
             factor.boolVars.forEach(bools::add)
             factor.intVars.forEach(ints::add)
             factor.variables.reals.forEach(reals::add)
+            for (target in providers.encodingTargets) {
+                val encoder = encoder(index, target)
+                for (id in encoder.requiredBooleans.keys) {
+                    if (!scan.visit(1)) return null
+                    bools.add(id.index)
+                }
+                for (id in encoder.requiredIntegers) {
+                    if (!scan.visit(1)) return null
+                    ints.add(id.index)
+                }
+            }
         }
         if (!scan.visit(source.numBoolVars.toLong() + source.numIntVars + source.numRealVars)) return null
         val mapping = VarRemap(

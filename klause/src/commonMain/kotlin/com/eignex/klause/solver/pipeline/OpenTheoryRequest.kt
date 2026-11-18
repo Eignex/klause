@@ -455,6 +455,10 @@ object OpenTheoryPipeline {
                         heuristicSelected(model, remaining, objective, engine, cores, values, publication, prepared)
                     } else {
                         val selectedResidual = residual.problem.componentPlan(residual, cancellation = stop)
+                        if (stop() || selectedResidual.encodingDecline == EncoderDecline.RESOURCE) {
+                            return@checkIndependentComponents incompleteOpenExecution(null,
+                                if (stop()) remaining.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
+                        }
                         val residualPlan = residual.problem.preparedWithComponents(selectedResidual)
                         if (selectedResidual.theoryPipeline == ProblemPipeline.FINITE_CP &&
                             residualPlan.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.SATISFY).runnable

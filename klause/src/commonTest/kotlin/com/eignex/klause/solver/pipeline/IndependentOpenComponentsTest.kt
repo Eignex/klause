@@ -6,10 +6,16 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.theory.BuiltInEncoderProvider
+import com.eignex.klause.theory.Encoder
+import com.eignex.klause.theory.EncoderProvider
+import com.eignex.klause.theory.EncoderSupport
+import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,7 +33,7 @@ class IndependentOpenComponentsTest {
         ), openIntLo = booleanArrayOf(false, false, true), openIntHi = booleanArrayOf(true, false, true))
         assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, source.componentPlan().theoryPipeline)
 
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source),
             ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
         assertIs<SourceProblemRoute.UnsupportedOpen>(invocation.engineRoute)
 
@@ -79,16 +85,25 @@ class IndependentOpenComponentsTest {
     }
 
     @Test
-    fun `independent checks should divide finite work instead of renewing it`() {
-        val params = TheoryParams(maxLeaves = 9, openWorkLimit = 15, maxDecisions = 12, maxFlips = 21,
-            maxInstructions = 24, openHintFlips = 6, sourceLpWorkLimit = 30, sourceLpAllocationLimit = 33,
-            sourceLpOperations = 18)
+    fun `projection should retain condition coordinates for unused encoding targets`() {
+        val source = Problem(1, 3, Array(3) { IntDomain(0, 1) }, listOf(
+            Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 10),
+        ), openIntHi = booleanArrayOf(true, false, true))
+        val target = EncodingTarget("conditioned-test")
+        val selected = FactorProjectionProviders(encodingTargets = setOf(target), encoder = EncoderProvider { factor, language ->
+            if (language == target && factor is Linear) {
+                Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(1)), mapOf(SourceBoolId(0) to true))
+            } else BuiltInEncoderProvider.select(factor, language)
+        }).prepare(source)
 
-        val share = params.independentShare(3)
+        val component = assertNotNull(selected.independentOpenComponents(ExecutionControl.Never)).single()
+        val result = OpenTheoryPipeline.engineFor(component.request).solve(TheoryParams())
 
-        assertEquals(params.copy(maxLeaves = 3, openWorkLimit = 5, maxDecisions = 4, maxFlips = 7,
-            maxInstructions = 8, openHintFlips = 2, sourceLpWorkLimit = 10, sourceLpAllocationLimit = 11,
-            sourceLpOperations = 6), share)
+        assertIs<OpenTheoryResult.Sat>(result)
+        val encoder = component.projection.selection.encoder(0, target)
+        assertEquals(listOf(SourceIntId(1)), encoder.requiredIntegers)
+        assertEquals(mapOf(SourceBoolId(0) to true), encoder.requiredBooleans)
     }
 
     @Test
