@@ -29,7 +29,7 @@ internal fun LinearRow.emitLpRelaxation(
         }
 
         is IntegerConstants -> when {
-            activator == LinearRow.ALWAYS && !strict -> emitIntegerLpRelaxation(builder)
+            activator == LinearRow.ALWAYS && !strict -> emitSourceLpRow(builder) { emitIntegerLpRelaxation(builder) }
             isIntegerOnly && !strict -> emitReifiedIntegerLpRelaxation(builder)
             else -> emitPinnedLpRelaxation(builder, slack)
         }

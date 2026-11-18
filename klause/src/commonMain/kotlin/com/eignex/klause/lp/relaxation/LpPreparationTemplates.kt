@@ -15,6 +15,7 @@ import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.emitExactLpRelaxation
 import com.eignex.klause.lp.emitLpRelaxation
+import com.eignex.klause.lp.emitSourceLpRow
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpModel
@@ -164,7 +165,7 @@ internal class LpSourceRowTemplate(private val row: LinearRow, compileBoundRows:
         if (integers != null) {
             if (row.relation == LinearOp.NE) return LpSourceRowUse.REPLAYED
             val columns = IntArray(integers.size) { builder.intColumn(integers[it]) }
-            builder.row(columns, requireNotNull(coefficients), row.relation, bound)
+            row.emitSourceLpRow(builder) { builder.row(columns, requireNotNull(coefficients), row.relation, bound) }
         } else if (row is ExactLinear) row.emitExactLpRelaxation(builder)
         else row.emitLpRelaxation(builder, projection)
         return LpSourceRowUse.REPLAYED

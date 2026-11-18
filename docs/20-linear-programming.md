@@ -232,6 +232,9 @@ Real-coefficient source rows retain the larger of their source right-hand-side m
 and a bound on the sum of absolute source activities. Integer and real declarations
 supply these bounds before Boolean constants are folded or column origins are shifted.
 Open declarations give an infinite scale and withhold relative numerical pricing.
+Integral source rows use the same activity scale in fresh and prepared emissions.
+An exact wide row retains its positive coefficient normalization in the band's weights,
+so relative displacement remains in source units before projection into LP row units.
 
 Retained cuts keep their derived bands in both source and numeric row units. Rational
 projection scales the weights with the coefficients, and prepared projections, component

@@ -34,7 +34,7 @@ internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indic
                 if (Term.isInt(reference)) builder.intColumn(Term.intVar(reference))
                 else builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
             }
-            builder.exactRow(columns, row, relation, indicator, value)
+            emitSourceLpRow(builder, row.sourceScale) { builder.exactRow(columns, row, relation, indicator, value) }
             return
         }
         if (indicator < 0 && variables.reals.isEmpty()) emitWideLpRelaxation(builder)
@@ -46,8 +46,11 @@ internal fun ExactLinear.emitExactLpRelaxation(builder: RelaxationBuilder, indic
         else builder.realColumn(Term.realVar(reference)).also { if (it < 0) return }
     }
     val coefficients = LongArray(size) { constants.exactCoeff(it).toLongExact() }
-    if (indicator < 0) builder.row(columns, coefficients, relation, constants.exactBound.toLongExact())
-    else builder.conditionedRow(columns, coefficients, relation, constants.exactBound.toLongExact(), indicator, value)
+    val bound = constants.exactBound.toLongExact()
+    emitSourceLpRow(builder) {
+        if (indicator < 0) builder.row(columns, coefficients, relation, bound)
+        else builder.conditionedRow(columns, coefficients, relation, bound, indicator, value)
+    }
 }
 
 internal fun LinearIndicator.emitExactLpRelaxation(builder: RelaxationBuilder) {
