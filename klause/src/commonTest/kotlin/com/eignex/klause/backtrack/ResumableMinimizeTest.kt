@@ -324,13 +324,16 @@ class ResumableMinimizeTest {
         ).bake()
         val objective = LinearObjective(intCoefficients = LongArray(profits.size) { -profits[it] })
         val params = BacktrackParams(
+            cancellation = object : ExecutionControl() {
+                override val workScheduled = true
+            },
             randomSeed = 62L,
             lubyRestartBase = 1,
             lpPlan = LpPlan(bounding = true, boundEvery = 1),
         )
 
         ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
-            val initialResult = search.runSlice(ExecutionControl.Never, 1000L, 100000L) {}
+            val initialResult = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 100000L) {}
             val initial = assertIs<MinimizeResult.Optimal>(
                 initialResult,
                 if (initialResult == null) {
@@ -340,9 +343,10 @@ class ResumableMinimizeTest {
                 } else null,
             )
             assertEquals(-38.0, initial.objective)
+            assertTrue(initial.stats.lp.rootWorkOps.sum > 0.0)
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
-            val restrictedResult = search.runSlice(ExecutionControl.Never, 1000L, 100000L) {}
+            val restrictedResult = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 100000L) {}
             val restricted = assertIs<MinimizeResult.Optimal>(
                 restrictedResult,
                 if (restrictedResult == null) {
