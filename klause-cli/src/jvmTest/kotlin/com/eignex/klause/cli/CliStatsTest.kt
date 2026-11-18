@@ -591,8 +591,22 @@ class CliStatsTest {
         assertEquals("3", m["lsStalls"])
         assertEquals("500", m["lsMovesPerSec"]) // 1000 / (2000ms = 2s)
         assertEquals("0.5", m["lsTimeToBest"])
-        assertEquals("12", m["lsIncumbentObjective"])
+        assertEquals("12.0", m["lsIncumbentObjective"])
         assertEquals("0", m["lsIncumbentViolation"])
+    }
+
+    @Test
+    fun `incumbent statistics should preserve the complete floating objective`() {
+        for (objective in listOf(1.4142135623730951, -1.4142135623730951, 1.0e-12, Double.MAX_VALUE)) {
+            val stats = SolveStats(
+                run = RunStats(backend = "ls"),
+                ls = LocalSearchStats(incumbentObjective = objective),
+            )
+
+            val published = lsStatPairs(stats, solveTimeMs = 0).toMap().getValue("lsIncumbentObjective")
+
+            assertEquals(objective, published.toDouble())
+        }
     }
 
     @Test

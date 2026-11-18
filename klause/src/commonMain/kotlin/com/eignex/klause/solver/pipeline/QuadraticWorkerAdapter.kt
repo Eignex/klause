@@ -152,8 +152,7 @@ internal class QuadraticWorkerAdapter(
             incumbent = candidate
             onAccepted?.invoke(candidate)
             runtime.publish(candidate)
-            val approximate = candidate.value.rational?.toDouble()
-                ?: (candidate.value.lowerBound.toDouble() / 2 + candidate.value.upperBound.toDouble() / 2)
+            val approximate = candidate.value.publishedDouble()
             sink.ls.recordIncumbent(approximate, 0.0, sink.elapsedMs())
             val listener = if (heuristic) params.strategy.localSearch.onEvent else params.strategy.backtrack.onEvent
             listener?.invoke(SearchEvent.Incumbent(approximate))

@@ -590,8 +590,7 @@ internal class QuadraticIntegerOptimization(
             incumbent = point
             onAccepted?.invoke(point)
             runtime.publish(point)
-            val approximate = point.value.rational?.toDouble()
-                ?: (point.value.lowerBound.toDouble() / 2 + point.value.upperBound.toDouble() / 2)
+            val approximate = point.value.publishedDouble()
             sink.ls.recordIncumbent(approximate, 0.0, sink.elapsedMs())
             val listener = if (heuristic) controls.strategy.localSearch.onEvent else controls.strategy.backtrack.onEvent
             listener?.invoke(SearchEvent.Incumbent(approximate))

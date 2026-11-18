@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.narrowToNearestDoubles
 import com.eignex.klause.solver.Sample
@@ -60,6 +61,9 @@ internal fun publicationNarrowing(): ExecutionControl {
 }
 
 private const val PUBLICATION_POLLS = 1 shl 16
+
+internal fun AlgebraicReal.publishedDouble(): Double =
+    narrowToNearestDoubles(listOf(this), publicationNarrowing()).single().approximateDouble
 
 // This incumbent over its narrowed sample, whose quadratic publication names the narrowed point when it named this one.
 internal fun QuadraticIncumbent.withNearestReals(

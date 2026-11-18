@@ -306,6 +306,9 @@ prefix (`open*`, `nra*`, `quadratic*`, `transcendental*`) and, on a resource sto
 the limit that stopped them. The [search statistics](11-search-policies.md#statistics)
 define the conflict counters.
 
+`lsIncumbentObjective` preserves the full binary64 objective, including on quadratic
+routes whose exact algebraic objective is narrowed for publication.
+
 `frontendLoadMs` covers parsing, lowering, routing and solvable construction; the
 nested `frontendRoutingMs` must not be added to it. An omitted native work block is
 not a zero. `armFailure.<label>` reports a caught arm exception as one-line JSON; a
