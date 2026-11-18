@@ -1176,6 +1176,8 @@ internal class CpToLpRelaxation(
                 if (f.vars.size < 2 || f.vars.size > MAX_RLT_ROW) continue
                 if (row.bound < 0 || f.vars.indices.any { row.coeff(it) <= 0 }) continue
                 if (f.vars.any { !problem.statesBinary(it) }) continue
+                val sourceSlack = sourceRowSlack(f, includeAbsolute = true)
+                if (sourceSlack != null && !hasBinaryDeclarations(f.vars)) continue
                 val b = row.bound
                 for (iIdx in f.vars.indices) {
                     if (rltColumns >= MAX_RLT_COLUMNS) break
@@ -1209,9 +1211,29 @@ internal class CpToLpRelaxation(
                     val colsList = IntArrayList()
                     rltRow.forEach { k, _ -> colsList.add(k) }
                     val cols = colsList.toIntArray()
+                    val index = builder.rowCount
                     builder.addRow(cols, LongArray(cols.size) { rltRow.getOrDefault(cols[it], 0L) }, Relation.LE, 0L)
+                    sourceSlack?.let { carryRowSlack(index, rltRowSlack(f, iIdx, it)) }
                 }
             }
+        }
+
+        private fun hasBinaryDeclarations(variables: IntArray): Boolean = variables.all {
+            problem.intBounds.lower(it) == 0L && problem.intBounds.upper(it) == 1L
+        }
+
+        private fun rltRowSlack(factor: Linear, selected: Int, source: LpRowSlack): LpRowSlack {
+            val row = requireNotNull(factor.integerConstants)
+            var negativeWeight = maxOf(0L, row.bound - row.coeff(selected)).toDouble().nextUp()
+            for (index in factor.vars.indices) {
+                if (index != selected) negativeWeight = (negativeWeight + row.coeff(index).toDouble().nextUp()).nextUp()
+            }
+            // The extension max(0, min(x(i), x(k))) admits declaration crossings below zero.
+            return LpRowSlack(DoubleArray(source.size + 1) {
+                if (it == source.size) negativeWeight else source.multiplier(it)
+            }, DoubleArray(source.size + 1) {
+                if (it == source.size) 0.0 else source.magnitude(it)
+            })
         }
 
         /**
