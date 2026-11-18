@@ -6,6 +6,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.MpsObjective
 import com.eignex.klause.bench.source.SmtObjective
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -82,8 +83,8 @@ internal object InProcessRunner : Runner {
         val format = Formats[ref.format]
         require(format.inProcess) { "${ref.name}: format ${ref.format} is not in-process; use its dedicated runner" }
         val file = CorpusFetcher.resolve(src)
-        if (ref.format == Format.SMTLIB) {
-            val sense = SmtObjective.read(file)
+        if (ref.format == Format.SMTLIB || ref.format == Format.MPS) {
+            val sense = if (ref.format == Format.MPS) MpsObjective.read(file) else SmtObjective.read(file)
             val ingested by lazy { format.ingest(file) }
             return ResolvedProblem(ref, lazy { ingested.problem },
                 deferredObjective = lazy { ingested.objective }, optimizes = sense != null,
