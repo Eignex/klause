@@ -61,13 +61,14 @@ class FlatZincSolutionWriterTest {
 
     @Test
     fun `coupled boundary coordinates should retain joint feasibility`() {
-        val program = parseFlatZinc("""
+        val source = """
             var float: x; var float: y;
             constraint float_le(2.0, x);
             constraint float_le(2.0, y);
             constraint float_lin_eq([1000000000.0, -1000000000.0], [x, y], 0.0);
             solve satisfy;
-        """.trimIndent())
+        """.trimIndent()
+        val program = parseFlatZinc(source)
         val boundary = BigFraction.ofLong(2) - BigFraction.of(BIG_ONE, bigIntOf(10_000_000))
         val sample = Sample(BooleanArray(0), LongArray(0), DoubleArray(2) { boundary.toDouble() },
             List(2) { boundary })
