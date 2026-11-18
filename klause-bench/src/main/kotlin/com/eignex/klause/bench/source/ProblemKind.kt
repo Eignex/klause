@@ -2,7 +2,6 @@ package com.eignex.klause.bench.source
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
-import com.eignex.klause.formats.mps.Mps
 
 /**
  * Classifies CSP/COP from the format or source objective directive before sampling, without compilation.
@@ -17,6 +16,9 @@ internal object ProblemKind {
         Format.SMTLIB -> runCatching {
             SmtObjective.read(CorpusFetcher.resolve(ref.source)) != null
         }.getOrDefault(false)
+        Format.MPS -> runCatching {
+            MpsObjective.read(CorpusFetcher.resolve(ref.source)) != null
+        }.getOrDefault(false)
 
         else -> {
             val text = runCatching { CorpusFiles.readText(CorpusFetcher.resolve(ref.source)) }.getOrNull()
@@ -25,16 +27,10 @@ internal object ProblemKind {
                 ref.format == Format.MINIZINC -> hasSolveObjective(text)
                 ref.format == Format.OPB -> OPB_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.XCSP3 -> XCSP_OBJECTIVE.containsMatchIn(text)
-                ref.format == Format.MPS -> mpsHasObjective(text)
                 else -> false
             }
         }
     }
-
-    /** MPS declares a mandatory objective (`N`) row, but its column coefficients may all be absent — a
-     *  pure feasibility model. Parsing is the honest test; a non-empty objective term list means a COP. */
-    private fun mpsHasObjective(text: String): Boolean =
-        runCatching { Mps.parse(text).objective.indices.isNotEmpty() }.getOrDefault(false)
 
     /** A `solve minimize|maximize …;` item, ignoring `%` line comments (MiniZinc/FlatZinc). The
      *  solve item routinely spans multiple lines — `solve :: int_search(…) \n minimize obj;` — so

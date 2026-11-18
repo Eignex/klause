@@ -311,6 +311,11 @@ the `suite` and `problem` identities accepted by `solve-one`.
 classification. Fetched suites download their corpus during resolution, with progress
 on stderr so stdout retains selection JSON lines.
 
+MPS subprocess resolution scans objective declarations and direction with bounded
+retained memory. Full parsing and lowering are deferred until an in-process consumer
+requests the model or objective. Classification counts a declared constant objective
+as optimization, matching the CLI source operation.
+
 | Selection filter | Purpose |
 |---|---|
 | `suite=a,b` | Restrict suites; `core` expands to the in-process core |
