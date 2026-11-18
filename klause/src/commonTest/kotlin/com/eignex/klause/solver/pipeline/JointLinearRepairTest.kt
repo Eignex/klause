@@ -5,9 +5,12 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -25,6 +28,50 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `a failed pooled trial should retain one checked root seed opportunity`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val pooled = Sample(BooleanArray(0), LongArray(3) { 1 }, doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        val params = TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxFlips = 2)
+        for (available in listOf(false, true)) {
+            LinearRepairGuidance().use { guidance ->
+                if (available) {
+                    val funding = SourceLpFunding(10_000, 1_000_000).also { it.grant(10_000) }
+                    assertTrue(guidance.remember(source,
+                        (0..2).associate { SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.0 },
+                        SourceLpBudget(funding = funding), ExecutionControl.Never))
+                }
+                JointLinearRepair(model, source, objective, params, external = { pooled },
+                    repairGuidance = guidance, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+                    repair.search(adaptive = false).use { search ->
+                        var done = false
+                        repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                        assertTrue(done)
+                        val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+                        if (available) {
+                            val point = assertIs<MinimizeResult.WithSample>(result)
+                            assertEquals(0.0, point.objective)
+                            assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairRootSeedTrials"))
+                            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+                                .verify(SourceEvidence(source.scope, SourceClaim.Witness(point.sample),
+                                    SourceDerivation.SourceWitness)))
+                        } else assertIs<MinimizeResult.Unknown>(result)
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     fun `advisory center steps should escape three independent pinned groups`() {
         val model = Problem(0,

@@ -120,6 +120,8 @@ internal class JointLinearRepair(
     private var queryFreedIntegers = 0
     private var checkedTrialWidth = 0
     private var checkedTrialCenter: Sample? = null
+    private var checkedStartProposal: ExactNeighborhoodCondition? = null
+    private var rootSeedPending = false
     private var enlargedTrialPending = false
     private var enlargedTrialAfterWitness = false
     private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
@@ -333,17 +335,29 @@ internal class JointLinearRepair(
                     minOf(width, checkedTrialWidth + 1) else width
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
-                requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
+                val rootSeed = if (rootSeedPending) {
+                    rootSeedPending = false
+                    roundedRootSeed(from)
+                } else null
+                if (rootSeed != null) observe("jointRepairRootSeedTrials")
+                val selectedCenter = rootSeed ?: from
+                val selectedRound = if (rootSeed == null) proposalRound else 0L
+                requireNotNull(selection).propose(selectedCenter, pooled?.bools ?: bools, size,
+                    selectedRound, radius, limit)
                     .also { condition ->
                         if (observation != null) {
                             proposalSequence++
                             observationQuery = 0L
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
-                                proposalRound, count, size, if (pooled == null) "stored" else "checked-pooled",
-                                from, model.numIntVars, sourceIntegers, observedRoots, condition)
+                                selectedRound, count, size, when {
+                                    rootSeed != null -> "shared-root"
+                                    pooled == null -> "stored"
+                                    else -> "checked-pooled"
+                                }, selectedCenter, model.numIntVars, sourceIntegers, observedRoots, condition)
                         }
                         guidedProposal = condition.takeIf { guided }
                         if (checkedStart) {
+                            checkedStartProposal = condition
                             checkedTrialCenter = pooled
                             checkedTrialWidth = (sourceIntegers?.size ?: model.numIntVars) - condition.lower.size
                             enlargedTrialPending = adaptive &&
@@ -353,6 +367,27 @@ internal class JointLinearRepair(
                     }
             },
         )
+    }
+
+    private fun roundedRootSeed(center: List<BigFraction>): List<BigFraction>? {
+        val hint = repairGuidance?.find(source) ?: return null
+        val work = 1L + 4L * model.numIntVars + center.size
+        val bytes = 256L + 96L * model.numIntVars + 8L * center.size
+        if (stop() || funding.availableWork <= work || funding.remainingAllocation <= bytes) return null
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        val result = center.toMutableList()
+        var changed = false
+        for (id in 0 until model.numIntVars) {
+            if (stop()) return null
+            val coordinate = hint.integer(id)?.takeIf { it.isFinite() } ?: return null
+            var value = BigFraction.ofDouble(round(coordinate)) ?: return null
+            if (model.intBounds.hasLower(id)) value = maxOf(value, BigFraction.ofLong(model.intBounds.lower(id)))
+            if (model.intBounds.hasUpper(id)) value = minOf(value, BigFraction.ofLong(model.intBounds.upper(id)))
+            changed = changed || value != center[id]
+            result[id] = value
+        }
+        return result.takeIf { changed && !stop() && !funding.exhausted }
     }
 
     private fun requestIncumbentPreparation() {
@@ -455,6 +490,11 @@ internal class JointLinearRepair(
         readyCenterStep = null
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
+            if (condition === checkedStartProposal) {
+                rootSeedPending = !enlargedTrialPending && (result.result == ExactNeighborhoodResult.Refuted ||
+                    result.result == ExactNeighborhoodResult.Undecided)
+                checkedStartProposal = null
+            }
             observation?.event(proposalSequence, observationQuery, "result", when (result.result) {
                 is ExactNeighborhoodResult.Witness -> "checked-source-witness"
                 ExactNeighborhoodResult.Refuted -> "regional-refutation"
@@ -804,6 +844,8 @@ internal class JointLinearRepair(
         enlargedTrialAfterWitness = false
         enlargedTrialProposal = null
         checkedTrialCenter = null
+        checkedStartProposal = null
+        rootSeedPending = false
         guidedProposal = null
         readyCenterStep = null
         selection?.clearRefutation()

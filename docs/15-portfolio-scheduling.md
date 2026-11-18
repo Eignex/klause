@@ -539,6 +539,12 @@ proposals keep their captured conditions. Imported points remain query incumbent
 and centers and earn no discovery reward: only a point the repair query produces
 enters companion publication and original-source rechecking.
 
+After an unsuccessful first checked-center trial, fixed repair can spend one later
+ordinary turn on the rounded integer coordinates of the frontier's retained root
+hint. All integers are pinned and continuous coordinates stay free under the checked
+incumbent cutoff. The hint is advisory; completion and original-source checking still
+decide publication. Missing or unaffordable hints keep ordinary neighborhood selection.
+
 From the availability of a dimension-compatible incumbent through root and center
 preparation and the first proposal, joint repair receives continuation after owed
 complete-worker coverage, within its active cap, until the proposal finishes or the
