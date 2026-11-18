@@ -1,12 +1,13 @@
 package com.eignex.klause.arithmetic.json
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.arithmetic.real.compareExactly
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class ExactRealJsonTest {
+class ExactRealJsonTest : RuntimeInitializedTest() {
     @Test
     fun `closed exact expressions should survive canonical round trips`() {
         for (text in listOf(
