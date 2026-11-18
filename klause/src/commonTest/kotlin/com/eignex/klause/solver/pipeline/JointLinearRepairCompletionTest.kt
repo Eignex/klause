@@ -667,22 +667,31 @@ class JointLinearRepairCompletionTest {
         val offered = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0),
             exactReals = listOf(BigFraction.ZERO))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ONE)
-        var importChecks = 0
+        for (logging in listOf(false, true)) {
+            var importChecks = 0
+            var comparisons = 0
+            JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
+                external = { offered }, incumbentCompletionCheck = { sample, _, _ ->
+                    if (sample === offered) importChecks++
+                    true
+                }, onComparison = if (logging) { { comparisons++ } } else null).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    search.advance(ExecutionControl.Never, 1)
+                    assertEquals(1, importChecks)
+                    repeat(24) {
+                        var attempt = repair.attempt(condition, ExecutionControl.Never)
+                        repeat(32) {
+                            if (attempt.result == ExactNeighborhoodResult.Paused) {
+                                attempt = repair.attempt(condition, ExecutionControl.Never)
+                            }
+                        }
+                        assertEquals(0L, assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample.intValue(0))
+                    }
 
-        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
-            external = { offered }, incumbentCompletionCheck = { sample, _, _ ->
-                if (sample === offered) importChecks++
-                true
-            }).use { repair ->
-            var attempt = repair.attempt(condition, ExecutionControl.Never)
-            repeat(32) {
-                if (attempt.result == ExactNeighborhoodResult.Paused) {
-                    attempt = repair.attempt(condition, ExecutionControl.Never)
+                    assertEquals(1, importChecks)
+                    assertEquals(if (logging) 64 else 0, comparisons)
                 }
             }
-
-            assertEquals(0L, assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample.intValue(0))
-            assertEquals(1, importChecks)
         }
     }
 
