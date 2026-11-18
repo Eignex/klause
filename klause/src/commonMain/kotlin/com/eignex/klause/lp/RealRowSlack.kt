@@ -39,8 +39,10 @@ internal fun LinearRow.linearSourceSlack(builder: SourceRowSlackBuilder): LpRowS
     for (index in 0 until size) {
         val coefficient = when (source) {
             is IntegralConstants -> abs(source.exactCoeff(index).toDouble())
-            is RealConstants -> abs(if (index < source.intCoefficients.size) source.intCoefficients.at(index)
-                else source.realCoefficients.at(index - source.intCoefficients.size))
+            is RealConstants -> abs(
+                if (index < source.intCoefficients.size) source.intCoefficients.at(index)
+                else source.realCoefficients.at(index - source.intCoefficients.size),
+            )
         }
         if (source is RealConstants && !coefficient.isFinite()) return null
         if (coefficient == 0.0) continue
