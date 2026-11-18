@@ -29,6 +29,8 @@ internal class IndependentSourceProjection(
     val reals: IntArray,
 )
 
+private class IndependentCoordinates(val bools: IntArray, val ints: IntArray, val reals: IntArray)
+
 internal fun checkIndependentComponents(
     projections: PreparedFactorProjections,
     components: List<IndependentOpenComponent>,
@@ -98,10 +100,12 @@ internal fun PreparedFactorProjections.independentOpenComponents(
 ): List<IndependentOpenComponent>? {
     val groups = independentFactorGroups(stop) ?: return null
     if (groups.size < 2) return emptyList()
+    val coordinates = groups.map { componentCoordinates(it, stop) ?: return null }
+    val mapping = problem.componentMapping(coordinates, stop) ?: return null
     val requests = ArrayList<IndependentOpenComponent>()
-    for (indices in groups) {
+    for ((index, indices) in groups.withIndex()) {
         if (stop()) return null
-        val component = componentSource(indices, stop) ?: return null
+        val component = componentSource(indices, coordinates[index], mapping, stop) ?: return null
         val model = component.selection.problem
         val plan = model.componentPlan(component.selection, cancellation = stop)
         if (plan.encodingDecline == EncoderDecline.RESOURCE || stop()) return null
@@ -172,10 +176,10 @@ private fun PreparedFactorProjections.independentFactorGroups(stop: ExecutionCon
     }
 }
 
-private fun PreparedFactorProjections.componentSource(
+private fun PreparedFactorProjections.componentCoordinates(
     indices: IntArray,
     stop: ExecutionControl,
-): IndependentSourceProjection? {
+): IndependentCoordinates? {
     val source = problem
     val bools = LinkedHashSet<Int>()
     val ints = LinkedHashSet<Int>()
@@ -199,18 +203,51 @@ private fun PreparedFactorProjections.componentSource(
                 }
             }
         }
-        if (!scan.visit(source.numBoolVars.toLong() + source.numIntVars + source.numRealVars)) return null
-        val mapping = VarRemap(
-            IntArray(source.numBoolVars) { -1 }.also { map -> bools.forEachIndexed { local, id -> map[id] = local } },
-            IntArray(source.numIntVars) { -1 }.also { map -> ints.forEachIndexed { local, id -> map[id] = local } },
-            IntArray(source.numRealVars) { -1 }.also { map -> reals.forEachIndexed { local, id -> map[id] = local } },
-        )
-        val integerIds = ints.toIntArray()
-        val realIds = reals.toIntArray()
-        val lower = LongArray(ints.size)
-        val upper = LongArray(ints.size)
-        val openLower = Bits(ints.size)
-        val openUpper = Bits(ints.size)
+        if (!scan.check()) return null
+        return IndependentCoordinates(bools.toIntArray(), ints.toIntArray(), reals.toIntArray())
+    }
+}
+
+private fun Problem.componentMapping(groups: List<IndependentCoordinates>, stop: ExecutionControl): VarRemap? {
+    ScanMeter(stop).use { scan ->
+        if (!scan.visit(numBoolVars.toLong() + numIntVars + numRealVars)) return null
+        val bools = IntArray(numBoolVars) { -1 }
+        val ints = IntArray(numIntVars) { -1 }
+        val reals = IntArray(numRealVars) { -1 }
+        // Disjoint components can share one immutable lookup into their separate local id ranges.
+        for (group in groups) {
+            if (!scan.visit(group.bools.size.toLong() + group.ints.size + group.reals.size)) return null
+            group.bools.forEachIndexed { local, id -> bools[id] = local }
+            group.ints.forEachIndexed { local, id -> ints[id] = local }
+            group.reals.forEachIndexed { local, id -> reals[id] = local }
+        }
+        return if (scan.check()) VarRemap(bools, ints, reals) else null
+    }
+}
+
+private fun PreparedFactorProjections.componentSource(
+    indices: IntArray,
+    stop: ExecutionControl,
+): IndependentSourceProjection? {
+    val coordinates = componentCoordinates(indices, stop) ?: return null
+    val mapping = problem.componentMapping(listOf(coordinates), stop) ?: return null
+    return componentSource(indices, coordinates, mapping, stop)
+}
+
+private fun PreparedFactorProjections.componentSource(
+    indices: IntArray,
+    coordinates: IndependentCoordinates,
+    mapping: VarRemap,
+    stop: ExecutionControl,
+): IndependentSourceProjection? {
+    val source = problem
+    val integerIds = coordinates.ints
+    val realIds = coordinates.reals
+    ScanMeter(stop).use { scan ->
+        val lower = LongArray(integerIds.size)
+        val upper = LongArray(integerIds.size)
+        val openLower = Bits(integerIds.size)
+        val openUpper = Bits(integerIds.size)
         for ((local, id) in integerIds.withIndex()) {
             if (!scan.visit(1)) return null
             if (source.intBounds.hasLower(id)) lower[local] = source.intBounds.lower(id) else openLower.set(local)
@@ -223,8 +260,8 @@ private fun PreparedFactorProjections.componentSource(
         }
         if (!scan.check()) return null
         val model = Problem(
-            numBoolVars = bools.size,
-            numIntVars = ints.size,
+            numBoolVars = coordinates.bools.size,
+            numIntVars = integerIds.size,
             declaredIntDomains = SourceIntDomains(
                 IntBounds.fromModelBounds(lower, upper, openLower, openUpper), domains),
             factors = factors,
@@ -232,14 +269,14 @@ private fun PreparedFactorProjections.componentSource(
                 BooleanArray(indices.size) { mask[indices[it]] }
             },
             hasSymmetryBreaking = source.hasSymmetryBreaking,
-            numRealVars = reals.size,
-            realLower = DoubleArray(reals.size) { source.realLower[realIds[it]] },
-            realUpper = DoubleArray(reals.size) { source.realUpper[realIds[it]] },
+            numRealVars = realIds.size,
+            realLower = DoubleArray(realIds.size) { source.realLower[realIds[it]] },
+            realUpper = DoubleArray(realIds.size) { source.realUpper[realIds[it]] },
             settings = source.settings,
             semantics = source.semantics,
         )
         return IndependentSourceProjection(source, projected(model, indices, mapping), indices,
-            bools.toIntArray(), integerIds, realIds)
+            coordinates.bools, integerIds, realIds)
     }
 }
 
