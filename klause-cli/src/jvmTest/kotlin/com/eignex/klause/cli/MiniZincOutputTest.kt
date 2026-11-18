@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
@@ -13,15 +14,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
-class MiniZincOutputTest(private val direction: String, private val exact: Boolean, private val ozn: Boolean) {
-    private val program = parseFlatZinc("var float: x; solve $direction x;", exactFloats = exact)
-
+class MiniZincOutputTest(
+    private val program: FlatZincProgram,
+    private val exact: Boolean,
+    private val ozn: Boolean,
+) {
     companion object {
         @JvmStatic
-        @Parameterized.Parameters(name = "{0}, exact={1}, ozn={2}")
+        @Parameterized.Parameters(name = "case={index}, exact={1}, ozn={2}")
         fun cases(): List<Array<Any>> = listOf("minimize", "maximize").flatMap { direction ->
             listOf(false, true).flatMap { exact ->
-                listOf(false, true).map { ozn -> arrayOf(direction, exact, ozn) }
+                val program = parseFlatZinc("var float: x; solve $direction x;", exactFloats = exact)
+                listOf(false, true).map { ozn -> arrayOf(program, exact, ozn) }
             }
         }
     }

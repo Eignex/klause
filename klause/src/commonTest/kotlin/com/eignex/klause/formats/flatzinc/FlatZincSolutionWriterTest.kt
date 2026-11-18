@@ -56,6 +56,7 @@ class FlatZincSolutionWriterTest {
 
         assertTrue(requireNotNull(BigFraction.ofDouble(printed)) >= boundary, output)
         assertTrue(decimalValue(printed) >= boundary, output)
+        assertTrue("% objective=$printed" in output.lines(), output)
         assertTrue("% klause-exact: x = $boundary;" in output, output)
     }
 
@@ -92,6 +93,7 @@ class FlatZincSolutionWriterTest {
 
         val printed = output.lineSequence().first { !it.startsWith('%') }.toDouble()
         assertTrue(requireNotNull(BigFraction.ofDouble(printed)) >= boundary, output)
+        assertTrue("% objective=$printed" in output.lines(), output)
     }
 
     @Test
