@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -15,7 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class LpBoundingClosureTest {
+class LpBoundingClosureTest : RuntimeInitializedTest() {
     @Test
     fun `cut infeasibility closes independently of the objective cutoff`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
