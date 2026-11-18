@@ -316,6 +316,11 @@ retained memory. Full parsing and lowering are deferred until an in-process cons
 requests the model or objective. Classification counts a declared constant objective
 as optimization, matching the CLI source operation.
 
+MiniZinc subprocess resolution compiles to FlatZinc and scans its solve directive.
+Model construction, objective lowering and search-annotation conversion belong to
+lazy in-process access. Comments, strings and nested annotations do not supply
+objective directives.
+
 | Selection filter | Purpose |
 |---|---|
 | `suite=a,b` | Restrict suites; `core` expands to the in-process core |

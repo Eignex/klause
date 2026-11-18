@@ -10,8 +10,6 @@ import com.eignex.klause.bench.source.MpsObjective
 import com.eignex.klause.bench.source.SmtObjective
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
 /**
@@ -27,21 +25,17 @@ internal class ResolvedProblem(
     /** True when the source maximises its objective, so "better" means higher. [objective] stays
      *  minimise-canonical either way. */
     internal val maximize: Boolean = false,
-    /** Local-search-only gradient view of [objective] for decomposed objectives, when the model
-     *  provides one (see `LocalSearchParams.lsObjective`). Null ⇒ LS descends [objective]. */
-    val lsObjective: IncrementalObjective? = null,
-    /** Definitional sweep for the LS engine (see [com.eignex.klause.localsearch.DefinitionalSweep]);
-     *  carried from `FlatZincExecutionProgram.definitionalSweep` by the MiniZinc runner, null elsewhere. */
-    val definitionalSweep: DefinitionalSweep? = null,
     /** Search heuristics from the model's `solve :: int_search(...)` annotation (see
      *  `FlatZincProgram.searchHints`); null when the model has none. Metrics merge their
      *  budget/seed/restart config into this so benchmark runs honour the model author's
      *  intended search the same way the CLI does. */
-    val searchParams: BacktrackParams? = null,
+    searchParams: BacktrackParams? = null,
     deferredObjective: Lazy<LinearObjective?>? = null,
+    deferredSearchParams: Lazy<BacktrackParams?>? = null,
     internal val optimizes: Boolean = objective != null,
 ) {
     internal val objective: LinearObjective? by (deferredObjective ?: lazyOf(objective))
+    val searchParams: BacktrackParams? by (deferredSearchParams ?: lazyOf(searchParams))
 
     internal val name: String get() = ref.name
 

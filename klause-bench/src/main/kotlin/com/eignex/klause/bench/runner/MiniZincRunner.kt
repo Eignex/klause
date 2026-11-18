@@ -5,10 +5,11 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.formats.flatzinc.SolveDirective
+import com.eignex.klause.bench.source.FlatZincObjective
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.formats.flatzinc.toSearchHints
+import com.eignex.klause.ir.ObjectiveSense
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -19,8 +20,8 @@ import java.util.concurrent.TimeUnit
 /**
  * Resolves [Format.MINIZINC] problems. The system `minizinc` CLI is used **only to compile**
  * `.mzn`(+`.dzn`) → `.fzn` against klause's redefinition library; the resulting FlatZinc is
- * then parsed in-process into a klause [com.eignex.klause.ir.Problem].
- * No external solver is invoked — solving is uniform across runners via the solver axis.
+ * passed to the CLI for subprocess solves. In-process consumers request parsing and
+ * finite compatibility lazily through [ResolvedProblem].
  */
 internal class MiniZincRunner(
     private val timeoutSec: Int = System.getProperty("klause.bench.mzn.timeoutSec")?.toIntOrNull() ?: 60,
@@ -30,21 +31,23 @@ internal class MiniZincRunner(
 
     override fun supports(ref: ProblemRef): Boolean = ref.format == Format.MINIZINC
 
-    override fun resolve(ref: ProblemRef): ResolvedProblem {
-        val executionProgram = parseFlatZincExecution(compileFzn(ref).readText(), exactFloats = exactFloats)
-        val program = executionProgram.program
-        val objective = program.linearObjective()
+    override fun resolve(ref: ProblemRef): ResolvedProblem = resolveCompiled(ref, compileFzn(ref))
+
+    internal fun resolveCompiled(ref: ProblemRef, fzn: File): ResolvedProblem {
+        val sense = FlatZincObjective.read(fzn)
+        val program by lazy { parseFlatZincExecution(fzn.readText(), exactFloats = exactFloats).program }
         return ResolvedProblem(
             ref,
-            lazyOf(program.problem),
-            objective,
-            maximize = program.solve is SolveDirective.Maximize,
-            lsObjective = executionProgram.localSearchObjective,
-            definitionalSweep = executionProgram.definitionalSweep,
-            searchParams = program.searchHints?.toSearchHints()?.toBacktrackParams(
-                program.problem.numBoolVars,
-                program.problem.numIntVars,
-            ),
+            lazy { program.problem },
+            deferredObjective = lazy { program.linearObjective() },
+            optimizes = sense != null,
+            maximize = sense == ObjectiveSense.MAXIMIZE,
+            deferredSearchParams = lazy {
+                program.searchHints?.toSearchHints()?.toBacktrackParams(
+                    program.problem.numBoolVars,
+                    program.problem.numIntVars,
+                )
+            },
         )
     }
 
