@@ -7,7 +7,9 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.compareTo
 
-internal class NumericalLinearRow(val coefficients: List<BigFraction>, val rhs: BigFraction)
+internal class NumericalLinearRow(
+    val coefficients: List<BigFraction>, val rhs: BigFraction, val sourceScale: BigFraction = BigFraction.ONE,
+)
 
 internal interface ExactRelaxationBuilder : RelaxationBuilder {
     fun exactRow(columns: IntArray, row: NumericalLinearRow, op: LinearOp, indicator: Int, value: Long)
@@ -24,7 +26,7 @@ internal fun ExactLinear.numericalRow(): NumericalLinearRow? {
     val coefficients = List(size) { BigFraction.of(constants.exactCoeff(it), scale) }
     val rhs = BigFraction.of(constants.exactBound, scale)
     if (!rhs.projects() || coefficients.any { !it.projects() }) return null
-    return NumericalLinearRow(coefficients, rhs)
+    return NumericalLinearRow(coefficients, rhs, BigFraction.of(BIG_ONE, scale))
 }
 
 private fun BigFraction.projects(): Boolean {

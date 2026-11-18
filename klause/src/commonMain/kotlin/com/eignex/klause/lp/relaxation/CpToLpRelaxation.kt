@@ -47,8 +47,9 @@ import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.scaled
+import com.eignex.klause.lp.linearSourceSlack
 import com.eignex.klause.lp.lpHullEnabled
-import com.eignex.klause.lp.realSourceSlack
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesBothBounds
@@ -1327,7 +1328,15 @@ internal class CpToLpRelaxation(
             if (policy.relative.numerator.isZero()) return null
             val hasReals = (0 until row.size).any { Term.isReal(row.ref(it)) }
             if (!problem.semantics.relaxesRows(if (hasReals) 1 else 0)) return null
-            return row.realSourceSlack(this)
+            return row.linearSourceSlack(this)
+        }
+
+        override fun sourceRow(row: LinearRow, scale: BigFraction, emit: () -> Unit) {
+            val index = builder.rowCount
+            emit()
+            if (builder.rowCount != index + 1) return
+            val slack = sourceRowSlack(row) ?: return
+            carryRowSlack(index, if (scale == BigFraction.ONE) slack else slack.scaled(scale.toDouble().nextUp()))
         }
 
         override fun sourceIntMagnitude(intVar: Int): Double {
