@@ -678,14 +678,14 @@ class JointLinearRepairCompletionTest {
                 repair.search(adaptive = false).use { search ->
                     search.advance(ExecutionControl.Never, 1)
                     assertEquals(1, importChecks)
-                    repeat(24) {
+                    repeat(40) {
                         var attempt = repair.attempt(condition, ExecutionControl.Never)
                         repeat(32) {
                             if (attempt.result == ExactNeighborhoodResult.Paused) {
                                 attempt = repair.attempt(condition, ExecutionControl.Never)
                             }
                         }
-                        assertEquals(0L, assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample.intValue(0))
+                        assertEquals(0L, assertNotNull(attempt.feasiblePoint).intValue(0))
                     }
 
                     assertEquals(1, importChecks)
