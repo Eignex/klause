@@ -14,9 +14,11 @@ class RationalBasisFactorsTest {
     @Test
     fun `caller funded factors should solve beyond the default dimension`() {
         val size = 129
-        val matrix = List(size) { row -> List(size) { column ->
-            if (row == column) BigFraction.ONE else BigFraction.ZERO
-        } }
+        val matrix = List(size) { row ->
+            List(size) { column ->
+                if (row == column) BigFraction.ONE else BigFraction.ZERO
+            }
+        }
         val limits = RationalBasisLimits(dimension = size)
 
         val declined = RationalBasisFactors.factor(matrix)
