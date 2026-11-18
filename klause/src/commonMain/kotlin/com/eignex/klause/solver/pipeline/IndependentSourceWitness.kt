@@ -59,10 +59,12 @@ internal fun joinIndependentWitnesses(
         }
         val reals = MutableList<SourceRealCoordinate>(source.numRealVars) { id ->
             if (!scan.visit(1)) return null
-            if (source.realLower[id] > source.realUpper[id]) return null
+            val lower = source.realLower[id]
+            val upper = source.realUpper[id]
+            if (lower.isNaN() || upper.isNaN() || lower > upper ||
+                lower == Double.POSITIVE_INFINITY || upper == Double.NEGATIVE_INFINITY) return null
             SourceRealCoordinate.Rational(
-                BigFraction.ofDouble(source.realLower[id]) ?: BigFraction.ofDouble(source.realUpper[id])
-                    ?: BigFraction.ZERO,
+                BigFraction.ofDouble(lower) ?: BigFraction.ofDouble(upper) ?: BigFraction.ZERO,
             )
         }
         val coveredFactors = BooleanArray(source.numFactors)
