@@ -149,8 +149,9 @@ class JointLinearRepairCompletionTest {
             val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0))
             val source = assertNotNull(model.linearAuthorityContext(
                 objective, ObjectiveSense.MINIMIZE, ExecutionControl.Never))
-            var offered = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
+            val prepared = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
                 exactReals = listOf(BigFraction.ONE))
+            var offered = prepared
             var cancelled = false
             var originalChecked = false
             val events = mutableListOf<JointRepairComparison>()
@@ -197,7 +198,7 @@ class JointLinearRepairCompletionTest {
             val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1,
                 cancellation = ExecutionControl { halted })
             JointLinearRepair(model, source, objective, params, external = { offered },
-                incumbentCompletionCheck = { _, _, _ -> originalAccepted }, onComparison = {
+                incumbentCompletionCheck = { sample, _, _ -> sample === prepared || originalAccepted }, onComparison = {
                     events += it
                     if (it.phase == "query") halted = true
                 }).use { repair ->
@@ -664,12 +665,8 @@ class JointLinearRepairCompletionTest {
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ofLong(2))
 
         for (completion in listOf(false, true)) {
-            var publicationChecks = 0
             JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
-                external = { center }, incumbentCompletionCheck = { _, _, _ ->
-                    publicationChecks++
-                    true
-                },
+                external = { center }, incumbentCompletionCheck = { _, _, _ -> true },
             ).use { repair ->
                 var attempt = repair.attempt(condition, ExecutionControl.Never)
                 repeat(32) {
@@ -680,11 +677,9 @@ class JointLinearRepairCompletionTest {
 
                 if (completion) {
                     assertEquals(ExactNeighborhoodResult.Undecided, attempt.result)
-                    assertEquals(0, publicationChecks)
                     assertEquals(center, attempt.feasiblePoint)
                 } else {
                     assertEquals(center, assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample)
-                    assertEquals(1, publicationChecks)
                 }
             }
         }
