@@ -139,7 +139,8 @@ class LpScopedRowsTest {
         assertTrue(trail.assertBound(1, true, ExactLpSide(one), 7))
         assertTrue(trail.push())
         val column = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), third, false, 8)
-        val metadata = ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(3)))
+        val metadata = ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(3)),
+            slack = LpRowSlack(doubleArrayOf(1.0, 2.0), doubleArrayOf(3.0, 4.0)))
         val row = LpScopedRow(9, listOf(0 to one, 1 to third), one, ExactLpColumn(ExactLpBounds()), metadata)
 
         assertTrue(trail.append(listOf(LpStructuralColumn(column, third)), listOf(row), true))
@@ -160,6 +161,7 @@ class LpScopedRowsTest {
         )
         assertTrue(trail.pop(0))
         assertFalse(trail.state.rows.row(1).active)
+        assertEquals(metadata, trail.state.model.row(1))
         assertEquals(one, trail.state.model.column(2).bounds.upper?.number)
         assertEquals(2, trail.state.model.n)
         assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO, third.value)))

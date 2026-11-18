@@ -714,8 +714,9 @@ internal class SideSlack(private val view: FloatEvidenceModel, private val slack
 
     fun at(j: Int, side: Double): Double = when {
         slack.absolute == 0.0 && slack.relative == 0.0 -> 0.0
+        j >= view.n -> view.model.exactState?.model?.row(j - view.n)?.slack?.at(slack)
+            ?: if (slack.relative == 0.0) slack.absolute else slack.at(rows[j - view.n])
         slack.relative == 0.0 -> slack.absolute
-        j >= view.n -> slack.at(rows[j - view.n])
         else -> slack.at(abs(side) + abs(view.origin(j)))
     }
 }

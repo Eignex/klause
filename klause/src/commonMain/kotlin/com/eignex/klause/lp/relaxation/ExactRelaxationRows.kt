@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpProjectionMeter
 import com.eignex.klause.lp.engine.LpRowPremises
+import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.util.ExecutionControl
@@ -16,6 +17,11 @@ import com.eignex.util.numbers.BigFraction
 internal class ExactRelaxationRows {
     private class Row(val columns: IntArray, val coefficients: List<BigFraction>, val rhs: BigFraction)
     private val rows = LinkedHashMap<Int, Row>()
+    private val slacks = LinkedHashMap<Int, LpRowSlack>()
+
+    fun carrySlack(row: Int, slack: LpRowSlack) {
+        slacks[row] = slack
+    }
 
     fun add(
         builder: LpBuilder,
@@ -34,8 +40,16 @@ internal class ExactRelaxationRows {
     }
 
     fun project(model: LpModel, cancellation: ExecutionControl): LpModel? {
-        if (rows.isEmpty()) return model
+        if (rows.isEmpty() && slacks.isEmpty()) return model
         val original = model.authoritativeModel() ?: return null
+        val metadata = List(model.m) { index ->
+            val row = original.row(index)
+            slacks[index]?.let { row.copy(slack = it) } ?: row
+        }
+        if (rows.isEmpty()) {
+            return LpExactState(original.copy(rows = metadata))
+                .toWorkingModel(LpProjectionMeter(cancellation = cancellation))
+        }
         val matrix = List(model.n) { column ->
             original.entries(column).filter { it.row !in rows }.toMutableList()
         }
@@ -61,7 +75,7 @@ internal class ExactRelaxationRows {
                 val source = original.column(column)
                 if (column - model.n in rows) source.copy(integral = false) else source
             },
-            List(model.m) { original.row(it) }, original.objective,
+            metadata, original.objective,
         )
         return LpExactState(exact).toWorkingModel(LpProjectionMeter(cancellation = cancellation))
     }

@@ -37,9 +37,11 @@ import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutProvenance
+import com.eignex.klause.lp.engine.LpBoundSlack
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
+import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.lpHullEnabled
@@ -63,6 +65,9 @@ import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.subExact
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.nextUp
 import kotlin.time.TimeSource
 
 /**
@@ -1304,6 +1309,17 @@ internal class CpToLpRelaxation(
 
         override fun rootDomain(intVar: Int): IntDomain = problem.rootDomainOf(intVar)
 
+        override fun realMagnitude(realVar: Int): Double {
+            val magnitude = max(abs(problem.realLower[realVar]), abs(problem.realUpper[realVar]))
+            val policy = problem.semantics.effective.feasibilityTolerance
+            if (!magnitude.isFinite() || policy == null || policy.isExact) return magnitude
+            val absolute = BigFraction.of(policy.absolute.numerator, policy.absolute.denominator)
+            val relative = BigFraction.of(policy.relative.numerator, policy.relative.denominator)
+            val slack = LpBoundSlack(if (absolute.isZero) 0.0 else absolute.toDouble().nextUp(),
+                if (relative.isZero) 0.0 else relative.toDouble().nextUp())
+            return (magnitude + slack.at(magnitude).nextUp()).nextUp()
+        }
+
         override fun statesLowerBound(intVar: Int): Boolean = problem.statesLowerBound(intVar)
 
         override fun statesUpperBound(intVar: Int): Boolean = problem.statesUpperBound(intVar)
@@ -1367,6 +1383,16 @@ internal class CpToLpRelaxation(
             strict: Boolean,
             premiseLits: IntArray,
         ) = emitRealRow(columns, coeffs, op, rhs, strict, premiseLits)
+
+        override fun derivedRealRow(
+            columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, slack: LpRowSlack,
+        ) {
+            val index = builder.rowCount
+            emitRealRow(columns, coeffs, op, rhs, false, emptyIntArray())
+            if (builder.rowCount == index + 1 && problem.semantics.relaxesRows(problem.numRealVars)) {
+                exactRows.carrySlack(index, slack)
+            }
+        }
 
         override fun realRowForIntValue(
             intVar: Int,

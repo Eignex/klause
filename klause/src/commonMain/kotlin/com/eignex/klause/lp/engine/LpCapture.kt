@@ -641,7 +641,7 @@ private fun requireStrictlyAscendingRows(colPtr: IntArray, rowIdx: IntArray, lab
 private fun DoubleArray.toRawBitsArray(): LongArray = LongArray(size) { this[it].toRawBits() }
 private fun LongArray.toDoubleArray(): DoubleArray = DoubleArray(size) { Double.fromBits(this[it]) }
 
-internal const val LP_EXACT_CAPTURE_VERSION: Int = 3
+internal const val LP_EXACT_CAPTURE_VERSION: Int = 4
 internal const val LP_EXACT_EVENT_VERSION: Int = 2
 
 internal sealed class LpExactReplayEvent(val eventVersion: Int = LP_EXACT_EVENT_VERSION) {

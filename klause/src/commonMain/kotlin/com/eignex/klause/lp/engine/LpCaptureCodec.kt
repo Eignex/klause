@@ -450,7 +450,7 @@ internal fun CaptureWriter.exactState(state: LpExactState) {
 }
 
 internal fun CaptureReader.exactState(version: Int): LpExactState {
-    val model = exactModel()
+    val model = exactModel(version)
     val matrixRevision = long()
     val boundRevision = long()
     val objectiveRevision = long()
@@ -580,15 +580,16 @@ private fun CaptureWriter.scopedRow(row: LpScopedRow) {
     bool(row.metadata.global)
     bool(row.metadata.strict)
     exactPremises(row.metadata.premises)
+    rowSlack(row.metadata.slack)
     exactNumber(row.cost)
 }
 
-private fun CaptureReader.scopedRow(): LpScopedRow {
+private fun CaptureReader.scopedRow(version: Int): LpScopedRow {
     val id = long()
     val terms = List(collectionCount()) { int() to exactNumber() }
     val rhs = exactNumber()
     val logical = exactColumn()
-    val metadata = ExactLpRow(bool(), bool(), exactPremises())
+    val metadata = ExactLpRow(bool(), bool(), exactPremises(), if (version >= 4) rowSlack() else null)
     return LpScopedRow(id, terms, rhs, logical, metadata, exactNumber())
 }
 
@@ -635,11 +636,12 @@ internal fun CaptureWriter.exactModel(model: ExactLpModel) {
         bool(row.global)
         bool(row.strict)
         exactPremises(row.premises)
+        rowSlack(row.slack)
     }
     exactObjectivePayload(model.objective)
 }
 
-private fun CaptureReader.exactModel(): ExactLpModel {
+private fun CaptureReader.exactModel(version: Int): ExactLpModel {
     val matrix = List(collectionCount()) {
         List(collectionCount()) { ExactLpEntry(int(), exactNumber()) }
     }
@@ -647,8 +649,33 @@ private fun CaptureReader.exactModel(): ExactLpModel {
     val columns = List(collectionCount()) {
         ExactLpColumn(ExactLpBounds(exactSide(), exactSide()), exactNumber(), bool(), int())
     }
-    val rows = List(rhs.size) { ExactLpRow(bool(), bool(), exactPremises()) }
+    val rows = List(rhs.size) {
+        ExactLpRow(bool(), bool(), exactPremises(), if (version >= 4) rowSlack() else null)
+    }
     return ExactLpModel(matrix, rhs, columns, rows, exactObjectivePayload())
+}
+
+private fun CaptureWriter.rowSlack(slack: LpRowSlack?) {
+    bool(slack != null)
+    if (slack != null) {
+        int(slack.size)
+        repeat(slack.size) {
+            long(slack.multiplier(it).toRawBits())
+            long(slack.magnitude(it).toRawBits())
+        }
+    }
+}
+
+private fun CaptureReader.rowSlack(): LpRowSlack? {
+    if (!bool()) return null
+    val count = collectionCount()
+    val multipliers = DoubleArray(count)
+    val magnitudes = DoubleArray(count)
+    repeat(count) {
+        multipliers[it] = Double.fromBits(long())
+        magnitudes[it] = Double.fromBits(long())
+    }
+    return LpRowSlack(multipliers, magnitudes)
 }
 
 private fun CaptureWriter.exactBasis(basis: Basis?) {
@@ -767,7 +794,7 @@ internal fun CaptureReader.exactEvent(captureVersion: Int): LpExactReplayEvent {
 
         6 -> LpExactReplayEvent.Solve(exactBasis())
 
-        7 -> LpExactReplayEvent.Append(scopedRow(), bool())
+        7 -> LpExactReplayEvent.Append(scopedRow(captureVersion), bool())
 
         8 -> LpExactReplayEvent.Deactivate(long())
 
@@ -781,7 +808,7 @@ internal fun CaptureReader.exactEvent(captureVersion: Int): LpExactReplayEvent {
         11, 12 -> {
             require(captureVersion >= 3) { "structural extension requires exact LP capture version 3" }
             val columns = List(collectionCount()) { LpStructuralColumn(exactColumn(), exactNumber()) }
-            val rows = List(collectionCount()) { scopedRow() }
+            val rows = List(collectionCount()) { scopedRow(captureVersion) }
             val scoped = bool()
             val permanent = if (code == 12) longs().toSet() else emptySet()
             LpExactReplayEvent.Extend(columns, rows, scoped, permanent)

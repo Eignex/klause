@@ -52,7 +52,7 @@ internal class LpLayoutStorage private constructor(
         }
 
         private fun units(nonzeros: LongArray, rows: List<ExactLpRow>): LongArray = LongArray(rows.size) {
-            16L + nonzeros[it] * 3L + (rows[it].premises?.size ?: 0L)
+            16L + nonzeros[it] * 3L + (rows[it].premises?.size ?: 0L) + (rows[it].slack?.size ?: 0) * 2L
         }
     }
 }
