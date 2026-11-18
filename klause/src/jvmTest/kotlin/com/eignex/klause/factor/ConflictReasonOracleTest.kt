@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -81,5 +82,25 @@ class ConflictReasonOracleTest {
         }
 
         assertTrue(failure.message.orEmpty().contains("reasonless conflict is not implied by the original source"))
+    }
+
+    @Test
+    fun `root pruning should not hide a counterexample to a conflict clause`() {
+        val relation = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+        val faulty = object : Factor by relation, Invariant, Propagator {
+            override fun propagate(state: PropagationState, factorId: Int): Boolean = state.pinBool(0, true)
+            override fun conflictReason(state: PropagationState, factorId: Int): IntArray =
+                intArrayOf(Lit.make(0, true))
+        }
+        val source = Problem(1, 0, emptyArray(), listOf(faulty))
+        val state = PropagationState(source, Assumptions.None)
+        assertTrue(state.pinBool(0, false))
+        assertFalse(state.factorAt(0).propagate(state, 0))
+
+        val failure = assertFailsWith<AssertionError> {
+            ConflictReasonOracle.assertEntailed(source, state, 0)
+        }
+
+        assertTrue(failure.message.orEmpty().contains("unsound nogood"))
     }
 }
