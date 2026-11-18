@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
@@ -28,7 +29,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class AffineAbsTest {
+class AffineAbsTest : RuntimeInitializedTest() {
     @Test
     fun `finite wide absolute value should retain digit coordinates and the native relation`() {
         val input = SmtLib.parse(

@@ -126,10 +126,13 @@ class QuadraticCandidatesTest : RuntimeInitializedTest() {
     @Test
     fun `numerical rows should include a changed final coordinate in a large model`() {
         val dimension = 257
-        val coefficients = List(dimension) { if (it == dimension - 1) q(1) else q(0) }
+        val zero = q(0)
+        val one = q(1)
+        val two = q(2)
+        val coefficients = List(dimension) { if (it == dimension - 1) one else zero }
         val model = QuadraticModel(
-            List(dimension) { q(0) },
-            List(dimension) { row -> List(dimension) { column -> if (row == column) q(2) else q(0) } },
+            List(dimension) { zero },
+            List(dimension) { row -> List(dimension) { column -> if (row == column) two else zero } },
             rows = listOf(
                 QuadraticRow(coefficients.map { it.negated() }, q(-2), QuadraticRowRelation.LE),
                 QuadraticRow(coefficients, q(1) * q(2).reciprocal(), QuadraticRowRelation.LE),

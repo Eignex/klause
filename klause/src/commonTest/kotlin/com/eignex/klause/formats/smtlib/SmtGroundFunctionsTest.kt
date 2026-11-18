@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -21,7 +22,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class SmtGroundFunctionsTest {
+class SmtGroundFunctionsTest : RuntimeInitializedTest() {
     @Test
     fun `alias formals do not replace lexically captured free sorts`() {
         val parsed = SmtLib.parse("""

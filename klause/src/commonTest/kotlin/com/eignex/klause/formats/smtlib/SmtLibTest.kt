@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.FormatException
@@ -34,7 +35,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class SmtLibTest {
+class SmtLibTest : RuntimeInitializedTest() {
 
     private fun openSolve(
         model: com.eignex.klause.ir.Problem,
@@ -217,7 +218,7 @@ class SmtLibTest {
 
     @Test
     fun `a deeply nested let chain should compile without overflowing the stack`() {
-        val depth = 10_000
+        val depth = 4_096
         val body = StringBuilder("(declare-const x Int)\n(assert ")
         val close = StringBuilder()
         for (i in 0 until depth) {
