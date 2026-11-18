@@ -61,7 +61,7 @@ internal class ReclamationPreparation(
         if (cancelled() || atomicUnits > maxWork - work) throw Deferred()
     }
 
-    class Deferred : RuntimeException()
+    internal class Deferred : ReclamationControlException()
 
     private companion object {
         const val ATOMIC_PRICE = 32L

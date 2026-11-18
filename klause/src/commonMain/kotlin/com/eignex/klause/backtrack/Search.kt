@@ -53,8 +53,6 @@ import com.eignex.klause.util.workScheduled
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntHashSet
 
-private const val CAP_CONTINUATION_WORK = 65_536L
-
 /** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
  *  levels. Returns `null` when the input was empty (no assumption layer to
  *  project) or no level was touched (no information). */
@@ -606,37 +604,28 @@ private class CpSatisfactionTraversalPolicy(
         val cursor = session.nativeCapContinuationCursor
         val heap = session.nativeCapContinuationHeap
         val operation = session.nativeCapContinuationOperation
-        val startWork = session.work
         if (context.decisionLevel == 0 && slice != null && session.nativeCapWindowPending) {
             forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
         }
-        val maintenanceWork = session.work - startWork
         val simplified = simplify(context, false)
-        return if (simplified == SearchRunDisposition.Continue) {
-            capContinuation(cursor, heap, operation, maintenanceWork)
-        } else simplified
+        return if (simplified == SearchRunDisposition.Continue) capContinuation(cursor, heap, operation) else simplified
     }
 
-    // Tiny attempts share a maintenance grant before returning to branching; pausing after each attempt would
-    // split the search into segments too short to earn their share of the schedule.
-    private fun capContinuation(cursor: Long, heap: Long, operation: Long, initialWork: Long): SearchRunDisposition {
+    // A pending window that advanced takes its next bounded attempt inside the same slice. Yielding the slice at
+    // every restart would split the search into segments too short to earn their share of the schedule.
+    private fun capContinuation(cursor: Long, heap: Long, operation: Long): SearchRunDisposition {
         var seenCursor = cursor
         var seenHeap = heap
         var seenOperation = operation
-        var work = initialWork
         while (session.nativeCapWindowPending && slice?.pauses() == true &&
             (session.nativeCapContinuationCursor != seenCursor || session.nativeCapContinuationHeap != seenHeap ||
                 session.nativeCapContinuationOperation != seenOperation)
         ) {
             if (params.cancellation()) return SearchRunDisposition.Pause
-            if (params.learnedMemoryWork < CAP_CONTINUATION_WORK &&
-                work > CAP_CONTINUATION_WORK - params.learnedMemoryWork) break
             seenCursor = session.nativeCapContinuationCursor
             seenHeap = session.nativeCapContinuationHeap
             seenOperation = session.nativeCapContinuationOperation
-            val startWork = session.work
             forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
-            work += session.work - startWork
         }
         return SearchRunDisposition.Continue
     }
@@ -673,13 +662,11 @@ private class CpSatisfactionTraversalPolicy(
         val cursor = session.nativeCapContinuationCursor
         val heap = session.nativeCapContinuationHeap
         val operation = session.nativeCapContinuationOperation
-        val startWork = session.work
         forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
-        val maintenanceWork = session.work - startWork
         val simplified = simplify(context, true)
         if (simplified != SearchRunDisposition.Continue) return simplified
         pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment, replay = true) }
-        return capContinuation(cursor, heap, operation, maintenanceWork)
+        return capContinuation(cursor, heap, operation)
     }
 
     override fun onCancellation(context: SearchContext): SearchRunDisposition {

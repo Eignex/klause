@@ -21,6 +21,22 @@ import kotlin.test.assertTrue
 
 class LearnedReclamationTest {
     @Test
+    fun `deferral metadata should stay local to one attempt`() {
+        val first = assertFailsWith<ReclamationPreparation.Deferred> {
+            ReclamationPreparation(0L, 0L, { false }, {}).visit()
+        }
+        val failure = IllegalStateException("cleanup")
+        first.addSuppressed(failure)
+
+        val second = assertFailsWith<ReclamationPreparation.Deferred> {
+            ReclamationPreparation(0L, 0L, { false }, {}).visit()
+        }
+
+        assertEquals(listOf(failure), first.suppressedExceptions)
+        assertTrue(second.suppressedExceptions.isEmpty())
+    }
+
+    @Test
     fun `a funded native compaction should retry cancellation with its root reason intact`() {
         val session = PropagationSession(Problem(6, 0, emptyArray(),
             arrayOf(Clause(intArrayOf(8, 10)), Clause(intArrayOf(1)))), nativeSat = true)

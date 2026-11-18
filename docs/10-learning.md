@@ -237,6 +237,9 @@ precedes observation and resumes while its cursor advances. Changed work, scratc
 byte-limit settings renew the opportunity, and cancellation withholds further
 maintenance until ownership changes.
 
+Budget deferral raises a fresh, attempt-local control signal. Its JVM representation
+omits stack capture while preserving suppressed failure metadata.
+
 Outside propagation, learned-store maintenance (reduction windows, retired-slot
 and watch cleanup, page and index release, and compaction) runs in bounded steps
 funded from the containing work and scratch grant. Each step is charged before
@@ -426,11 +429,9 @@ Native forgetting starts at restart boundaries with a configured cap. Permanent 
 glue clauses (default LBD at most 2) survive; remaining space favors lower LBD. Cap
 eligibility and survivor quotas count active constraints, so stable retired slots do
 not consume the quota. A resumable root continues a pending window before branching
-while it advances, taking further attempts within the same slice. Attempts below the
-default work grant share at most 65,536 charged work at each resume or restart; the
-remaining allowance must fund the next complete attempt. An unfinished or unfunded
-window lets search branch with its heap retained and continues at later roots. A
-completed pass waits for the next restart before aging tiers again, and reaching the active quota
+while it advances, taking further attempts within the same slice; an unfunded
+attempt lets search proceed and stays retryable at later restarts. A completed pass
+waits for the next restart before aging tiers again, and reaching the active quota
 completes the pending pass without starting another tier epoch. Below the cap,
 retired-slot cleanup uses the containing grant without aging tier policy. The SAT
 preset enables capped tiered retention:
