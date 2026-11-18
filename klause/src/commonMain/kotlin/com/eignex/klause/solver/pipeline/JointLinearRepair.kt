@@ -382,8 +382,14 @@ internal class JointLinearRepair(
             if (stop()) return null
             val coordinate = hint.integer(id)?.takeIf { it.isFinite() } ?: return null
             var value = BigFraction.ofDouble(round(coordinate)) ?: return null
-            if (model.intBounds.hasLower(id)) value = maxOf(value, BigFraction.ofLong(model.intBounds.lower(id)))
-            if (model.intBounds.hasUpper(id)) value = minOf(value, BigFraction.ofLong(model.intBounds.upper(id)))
+            if (model.intBounds.hasLower(id)) {
+                val lower = BigFraction.ofLong(model.intBounds.lower(id))
+                if (value < lower) value = lower
+            }
+            if (model.intBounds.hasUpper(id)) {
+                val upper = BigFraction.ofLong(model.intBounds.upper(id))
+                if (value > upper) value = upper
+            }
             changed = changed || value != center[id]
             result[id] = value
         }
