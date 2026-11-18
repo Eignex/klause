@@ -414,7 +414,7 @@ absolute slack for a residual row. An unconditional strict row states its closed
 every component, and components that hold exactly keep their exact encodings for their
 other relations. A witness of the search lies within what acceptance admits, and a refutation
 shows that no point holds every relation within that slack, so the leaf verdict stays
-feasible or infeasible. Numerical LP refutations, at nodes and leaves alike, move every
+feasible or infeasible. Numerical LP refutations in root presolve, at nodes and at leaves move every
 row and column side they read outward by the slack first (`LpBoundSlack`), so they refute
 only a region infeasible by more than the slack, and such a refutation decides the leaf
 and keeps its lemma. A leaf of linear rows that the LP leaves undecided, or refutes only

@@ -22,6 +22,7 @@ import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.validation.readingSourceSlack
 import com.eignex.klause.util.ExecutionControl
 
 /**
@@ -113,7 +114,7 @@ internal fun lpRootInfeasibleReporting(
             randomSeed = randomSeed,
         ),
         sink,
-        LpSolveContext.finite(numericalLp),
+        LpSolveContext.finite(numericalLp).readingSourceSlack(problem),
         projections = projections,
     ).rootLpInfeasibleNoBake(cancellation)
     return LpRootInfeasibleResult(infeasible, sink.snapshot().lp)
@@ -164,7 +165,7 @@ internal fun lpRootBoundsReporting(
             randomSeed = randomSeed,
         ),
         sink,
-        LpSolveContext.finite(numericalLp),
+        LpSolveContext.finite(numericalLp).readingSourceSlack(problem),
         projections = projections,
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation, minimumSpan)
@@ -214,7 +215,7 @@ fun lpHarvestReporting(
             randomSeed = randomSeed,
         ),
         sink,
-        LpSolveContext.finite(numericalLp),
+        LpSolveContext.finite(numericalLp).readingSourceSlack(problem),
         eagerSourcePreparation = true,
     )
     if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
