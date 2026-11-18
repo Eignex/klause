@@ -466,6 +466,8 @@ class SearchSession(
 
                 is ComponentCheck.Infeasible -> return result
 
+                ComponentCheck.Paused -> return result
+
                 ComponentCheck.Indeterminate -> {
                     reportRepresentationDecline()
                     return result

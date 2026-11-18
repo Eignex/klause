@@ -111,6 +111,7 @@ internal class TraversalSlice(
     val pauses: () -> Boolean,
     val beforeBranch: () -> Boolean,
     val atRoot: ((PropagationSession) -> Boolean)? = null,
+    val remainingLpWork: () -> Long? = { null },
 )
 
 /**
@@ -119,7 +120,8 @@ internal class TraversalSlice(
  * This has no private DFS trail: [CpSearchComponent] and every supplied theory component are driven by
  * [com.eignex.klause.solver.search.SearchRun]. With a [slice] the traversal pauses where the slice fires — a
  * cancellation that [TraversalSlice.pauses] reports as the slice's own makes [next] return null at decision
- * granularity, and the next [next] resumes mid-tree. Root propagation polls [propagationCancellation], since a
+ * or LP iteration granularity, and the next [next] resumes mid-tree. Root propagation polls
+ * [propagationCancellation], since a
  * fixpoint a slice cut would leave the session under-propagated for the arm that resumes it.
  *
  * A [singleModel] caller takes one model, so the columns [leafColumns] admits are completed at leaves rather than
@@ -211,7 +213,7 @@ internal class CpSatisfactionTraversal(
                     !params.integerRowLearning && params.componentFactory == null &&
                     params.lpConfig == null && params.lpPlan.hasDefaultNumericalSettings())
             }
-            completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
+            completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext, propagationCancellation, slice)
             completion.lpResource?.let {
                 resources.own(it)
                 lpResources.add(it)

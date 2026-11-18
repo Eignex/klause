@@ -18,7 +18,7 @@ import com.eignex.util.numbers.saturatedAdd
 
 /**
  * The satisfaction driver for a single-threaded portfolio: one [CpSatisfactionTraversal] advanced a slice at a
- * time. A slice that ends pauses the traversal at decision granularity and keeps every learned clause, the trail
+ * time. A slice that ends pauses at decision or LP iteration granularity and keeps every learned clause, the trail
  * and the heuristics, so the arm resumes where it stopped instead of re-deriving them.
  *
  * Two tokens stop it, as in [ResumableMinimize]. The run's own token, handed to each [runSlice], ends the search;
@@ -83,7 +83,7 @@ internal class ResumableSatisfaction(
         slice = TraversalSlice(pauses = { !globalToken() }, atRoot = atRoot, beforeBranch = {
             slice.charge()
             slice.workExpired()
-        }),
+        }, remainingLpWork = slice::remainingLpWork),
     )
 
     private var done: SolveResult? = null

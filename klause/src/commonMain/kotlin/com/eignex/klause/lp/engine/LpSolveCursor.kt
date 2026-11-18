@@ -69,6 +69,16 @@ internal class LpSolveCursor<T>(
         suspendCoroutine<Unit> { continuation = it }
     }
 
+    suspend fun <R> await(cursor: LpSolveCursor<R>): R = cursor.use {
+        val before = work
+        var step = cursor.advance(shouldPause = { shouldPause(before + cursor.work) })
+        while (step is LpSolveStep.Paused) {
+            pauseAt(before + cursor.work)
+            step = cursor.advance(shouldPause = { shouldPause(before + cursor.work) })
+        }
+        (step as LpSolveStep.Completed<R>).value
+    }
+
     override fun close() {
         if (closed) return
         check(!advancing) { "LP solve cursor is already advancing" }

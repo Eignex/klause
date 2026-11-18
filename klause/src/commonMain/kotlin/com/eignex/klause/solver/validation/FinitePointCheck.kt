@@ -76,7 +76,7 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
             return when (session.checkSelectedProjection(checks = checks)) {
                 ComponentCheck.Feasible -> Verification.Accepted(candidate)
                 is ComponentCheck.Infeasible -> Verification.Rejected("original source check refutes the assignment")
-                ComponentCheck.Indeterminate ->
+                ComponentCheck.Indeterminate, ComponentCheck.Paused ->
                     Verification.Indeterminate("original source check is unavailable or cancelled")
             }
         } finally {

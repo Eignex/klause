@@ -11,7 +11,7 @@ internal class LpSolveSession(
     private var solver: RetainedLpSolver? = null
     private var certification = LpCertificationSession(context, pricing)
     private var closed = false
-    private var activeSolve: LpSolveCursor<CertifiedLpResult>? = null
+    private var activeSolve: LpSolveCursor<*>? = null
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
 
@@ -53,39 +53,6 @@ internal class LpSolveSession(
         }
     }
 
-    // A float solve whose optimum [floatAccept] admits, or null; it never continues into exact certification.
-    fun solveFloat(
-        model: LpModel,
-        cancellation: ExecutionControl,
-        workLimit: Long,
-        observer: LpCertificationObserver?,
-        floatAccept: (FloatLpResult) -> Boolean,
-        floatOffset: Double,
-    ): FloatLpResult? {
-        check(!closed) { "LP solve session is closed" }
-        check(activeSolve == null) { "LP solve session is suspended" }
-        require(workLimit >= 0L)
-        try {
-            val previous = solver
-            val current = prepare(model, cancellation, workLimit) ?: return null
-            observeQuery(model, current, current === previous, workLimit, LpClaim.FEASIBLE_COMPLETION,
-                floatOffset, true, LpRefinementLimits())
-            val result = try {
-                if (current === previous) current.resolveBounds(LpFloatAllowance(workLimit, 0)) else current.solve()
-            } finally {
-                observer?.observeSolve(current.lastMetrics, current is ComponentLpSolverCapability)
-            }
-            return certification.acceptFloat(model, result, cancellation, observer, floatAccept, floatOffset)
-        } catch (primary: Throwable) {
-            try {
-                releaseSolvers()
-            } catch (cleanup: Throwable) {
-                if (cleanup !== primary) primary.addSuppressed(cleanup)
-            }
-            throw primary
-        }
-    }
-
     fun openSolve(
         model: LpModel,
         cancellation: ExecutionControl = ExecutionControl.Never,
@@ -95,6 +62,7 @@ internal class LpSolveSession(
         floatOffset: Double = 0.0,
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
         acceptFloatInfeasibility: Boolean = false,
+        counterResults: LpCounterResults? = null,
     ): LpSolveCursor<CertifiedLpResult> {
         check(!closed && activeSolve == null) { "LP solve session is closed or suspended" }
         require(workLimit >= 0L)
@@ -116,7 +84,7 @@ internal class LpSolveSession(
                 }
                 checkpoint(current.lastMetrics.workOps)
                 if (cancellation()) return@LpSolveCursor cancelledResult()
-                certification.certify(model, current, result, cancellation, observer, null,
+                certification.certify(model, current, result, cancellation, observer, counterResults,
                     floatAccept = floatAccept, floatOffset = floatOffset, claim = claim,
                     acceptFloatInfeasibility = acceptFloatInfeasibility)
             } catch (primary: Throwable) {
@@ -130,7 +98,42 @@ internal class LpSolveSession(
         }.also { activeSolve = it }
     }
 
-    private suspend fun LpSolveCursor<CertifiedLpResult>.solveFloating(
+    // A refused float optimum starts no exact work.
+    fun openSolveFloat(
+        model: LpModel,
+        cancellation: ExecutionControl,
+        observer: LpCertificationObserver?,
+        floatAccept: (FloatLpResult) -> Boolean,
+        floatOffset: Double,
+    ): LpSolveCursor<FloatLpResult?> {
+        check(!closed && activeSolve == null) { "LP solve session is closed or suspended" }
+        requireNotNull(model.exactState) { "retained solves require immutable exact authority" }
+        return LpSolveCursor<FloatLpResult?>(completed = { activeSolve = null }) {
+            try {
+                val previous = solver
+                val current = prepare(model, cancellation, 0L) ?: return@LpSolveCursor null
+                observeQuery(model, current, current === previous, 0L, LpClaim.FEASIBLE_COMPLETION,
+                    floatOffset, true, null)
+                val stage = solveFloating(current, current === previous, cancellation, observer, 0L)
+                val result = when (stage) {
+                    is FloatingStage.Completed -> stage.result
+                    FloatingStage.Cancelled -> return@LpSolveCursor null
+                }
+                checkpoint(current.lastMetrics.workOps)
+                if (cancellation()) return@LpSolveCursor null
+                certification.acceptFloat(model, result, cancellation, observer, floatAccept, floatOffset)
+            } catch (primary: Throwable) {
+                try {
+                    releaseSolvers()
+                } catch (cleanup: Throwable) {
+                    if (cleanup !== primary) primary.addSuppressed(cleanup)
+                }
+                throw primary
+            }
+        }.also { activeSolve = it }
+    }
+
+    private suspend fun LpSolveCursor<*>.solveFloating(
         current: RetainedLpSolver,
         retained: Boolean,
         cancellation: ExecutionControl,

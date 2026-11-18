@@ -6,6 +6,8 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
+import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpSearchComponent
@@ -74,10 +76,12 @@ internal sealed interface BacktrackCompletion {
             params: BacktrackParams,
             sink: SolveStatsSink?,
             solveContext: LpSolveContext,
+            cancellation: ExecutionControl = params.cancellation,
+            slice: TraversalSlice? = null,
         ): BacktrackCompletion = if (problem.numRealVars == 0) {
             Discrete
         } else {
-            ResidualReal(ResidualRealComponent(problem, cp, params, sink, solveContext))
+            ResidualReal(ResidualRealComponent(problem, cp, params, sink, solveContext, cancellation, slice))
         }
     }
 }
@@ -179,6 +183,8 @@ private class ResidualRealComponent(
     params: BacktrackParams,
     sink: SolveStatsSink?,
     solveContext: LpSolveContext,
+    private val cancellation: ExecutionControl,
+    private val slice: TraversalSlice?,
 ) : SearchComponent,
     LpSearchResource {
     private val toleranceCheck = params.toleranceCheck
@@ -195,7 +201,7 @@ private class ResidualRealComponent(
         LpParams(
             lpPlan = params.lpPlan.copy(bounding = true, learn = true, realResidual = true),
             lpConfig = params.lpConfig,
-            cancellation = params.cancellation,
+            cancellation = cancellation,
             solveBudgetMillis = params.solveBudgetMillis,
             randomSeed = params.randomSeed,
             zeroObjectivePricing = params.zeroObjectivePricing,
@@ -204,16 +210,32 @@ private class ResidualRealComponent(
         solveContext.readingSourceSlack(problem, toleranceCheck),
     )
     private var completed: Sample? = null
+    private var pending: LpSolveCursor<ComponentCheck>? = null
 
     private fun discrete(): Sample = Sample(BooleanArray(problem.numBoolVars) { cp.session.boolValue(it) ?: false },
         LongArray(problem.numIntVars) { cp.session.intDomain(it).min })
 
     override fun check(context: SearchContext): ComponentCheck {
+        if (context.cancelled()) return ComponentCheck.Indeterminate
+        val cursor = pending ?: LpSolveCursor { checkLeaf(context) }.also { pending = it }
+        val allowance = slice?.remainingLpWork?.invoke()
+        if (allowance == 0L) return ComponentCheck.Paused
+        return when (val step = cursor.advance(allowance ?: 0L, { allowance == null && context.cancelled() })) {
+            LpSolveStep.Paused -> ComponentCheck.Paused
+            is LpSolveStep.Completed -> {
+                pending = null
+                cursor.close()
+                if (cancellation()) ComponentCheck.Indeterminate else step.value
+            }
+        }
+    }
+
+    private suspend fun LpSolveCursor<ComponentCheck>.checkLeaf(context: SearchContext): ComponentCheck {
         completed = null
         if (context.cancelled()) return ComponentCheck.Indeterminate
         absCompletion?.let { completion ->
             if (toleranceCheck != null && floatCompletion) {
-                engine.leafFloatCompletion(cp.session, toleranceCheck)?.let { sample ->
+                await(engine.openLeafFloatCompletion(cp.session, toleranceCheck))?.let { sample ->
                     completed = sample
                     return ComponentCheck.Feasible
                 }
@@ -251,10 +273,10 @@ private class ResidualRealComponent(
             }
             // The relaxation refuted over every side widened by the slack holds no point within tolerance either.
             val refuted = toleranceSearch != null &&
-                engine.leafCertify(cp.session, toleranceCheck, poolRefutation = false).refutesWithinSlack
+                await(engine.openLeafCertify(cp.session, toleranceCheck, poolRefutation = false)).refutesWithinSlack
             return if (refuted) ComponentCheck.Infeasible() else ComponentCheck.Indeterminate
         }
-        val result = engine.leafCertify(cp.session, toleranceCheck, poolRefutation = toleranceSearch == null)
+        val result = await(engine.openLeafCertify(cp.session, toleranceCheck, poolRefutation = toleranceSearch == null))
         return when (result.verdict) {
             LpVerdict.FEASIBLE,
             LpVerdict.ATTAINED_OPTIMUM,
@@ -316,14 +338,33 @@ private class ResidualRealComponent(
     }
 
     override fun retract(decisionLevel: Int) {
+        val cursor = pending
+        pending = null
+        cursor?.close()
         completed = null
     }
 
     fun sample(): Sample = requireNotNull(completed)
 
-    override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
+    override fun releasePersistentSolvers() = release(engine::releasePersistentSolvers)
 
     override fun totalSolveWork(): Long = engine.totalSolveWork() + absWork
 
-    override fun close() = engine.close()
+    override fun close() = release(engine::close)
+
+    @Suppress("TooGenericExceptionCaught") // cursor and engine cleanup must preserve the primary failure
+    private fun release(releaseEngine: () -> Unit) {
+        var failure: Throwable? = null
+        try {
+            retract(0)
+        } catch (cleanup: Throwable) {
+            failure = cleanup
+        }
+        try {
+            releaseEngine()
+        } catch (cleanup: Throwable) {
+            if (failure == null) failure = cleanup else if (failure !== cleanup) failure.addSuppressed(cleanup)
+        }
+        failure?.let { throw it }
+    }
 }

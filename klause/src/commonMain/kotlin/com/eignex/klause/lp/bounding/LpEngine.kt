@@ -47,8 +47,10 @@ import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpPrimalGuidance
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveSession
+import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
@@ -1167,20 +1169,6 @@ internal class LpEngine(
         return (perPass / SIZE_BUDGET_DIVISOR * columns).coerceIn(MIN_NODE_WORK_OPS, MAX_NODE_WORK_OPS)
     }
 
-    /**
-     * The work a leaf's cold solve of [model] may spend: one dense pass per column-derived iteration, which is
-     * [sizeBudget] without the divisor that prices a warm-started node re-solve. A work cap rather than a share
-     * of the deadline, so whether a leaf decides is a property of the model and not of the machine.
-     */
-    private fun leafWorkBudget(model: LpModel): Long {
-        val columns = model.n
-        val rows = model.m
-        if (columns <= 0 || rows <= 0) return MIN_LEAF_WORK_OPS
-        val perPass = rows.toLong() * columns
-        if (perPass > MAX_LEAF_WORK_OPS / columns) return MAX_LEAF_WORK_OPS
-        return (perPass * columns).coerceIn(MIN_LEAF_WORK_OPS, MAX_LEAF_WORK_OPS)
-    }
-
     /** Whether root and node LP work have together spent the work allowance. The one-shot root work stops
      *  on it, so it competes with the per-node solves for one allowance rather than the looser
      *  [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
@@ -1471,38 +1459,44 @@ internal class LpEngine(
      * decides the leaf within a tolerance the exact rows do not read keeps no such lemma, except from a refutation that
      * holds over the sides widened by the context's refutation slack. On [LpVerdict.FEASIBLE] and
      * [LpVerdict.ATTAINED_OPTIMUM] the returned reals complete the assignment exactly; on
-     * [LpVerdict.TOLERANCE_OPTIMUM] they are the float optimum [toleranceCheck] accepted. The float solve is
-     * capped by work sized from the model; a leaf it stops short of a verdict is [LpVerdict.INDETERMINATE].
+     * [LpVerdict.TOLERANCE_OPTIMUM] they are the float optimum [toleranceCheck] accepted.
      */
     fun leafCertify(
         session: PropagationSession,
         toleranceCheck: ((Sample) -> Boolean)? = null,
         poolRefutation: Boolean = true,
-    ): LeafRealResult {
+    ): LeafRealResult = openLeafCertify(session, toleranceCheck, poolRefutation).use { cursor ->
+        (cursor.advance() as LpSolveStep.Completed).value
+    }
+
+    internal fun openLeafCertify(
+        session: PropagationSession,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+        poolRefutation: Boolean = true,
+    ): LpSolveCursor<LeafRealResult> = LpSolveCursor {
         requireOpen()
         lpBackjump = null
         val relaxer = selectedSourceRelaxation ?: lpRelaxer
-            ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+            ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val relaxation = leafRelaxation(relaxer, session)
-            ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
+            ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
-        val certified = solver.solve(
+        val certified = await(solver.openSolve(
             model,
             cancellation = params.cancellation,
-            workLimit = leafWorkBudget(model),
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
             counterResults = lpCounterResults,
             floatAccept = toleranceCheck.floatingOptimumAcceptance()?.let { check ->
                 { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
-            claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
+            claim = LpClaim.ATTAINED_OPTIMUM,
             acceptFloatInfeasibility = toleranceCheck.permitsToleranceOptimum(),
-        )
+        ))
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
-        return when (certified.verdict) {
+        when (certified.verdict) {
             LpVerdict.TOLERANCE_OPTIMUM -> LeafRealResult(
                 LpVerdict.TOLERANCE_OPTIMUM,
                 relaxation.floatReals(checkNotNull(certified.floatOptimum).primal, problem),
@@ -1536,26 +1530,27 @@ internal class LpEngine(
         }.also { it.observeConsumption(sink.lp) }
     }
 
-    // The float completion of the leaf that [toleranceCheck] accepts, or null. A refusal starts no exact work,
-    // which leaves the caller its own exact completion.
-    fun leafFloatCompletion(session: PropagationSession, toleranceCheck: (Sample) -> Boolean): Sample? {
+    // A refusal starts no exact work, which leaves the caller its own exact completion.
+    internal fun openLeafFloatCompletion(
+        session: PropagationSession,
+        toleranceCheck: (Sample) -> Boolean,
+    ): LpSolveCursor<Sample?> = LpSolveCursor {
         requireOpen()
-        val check = toleranceCheck.floatingOptimumAcceptance() ?: return null
-        val relaxer = selectedSourceRelaxation ?: lpRelaxer ?: return null
-        val relaxation = leafRelaxation(relaxer, session) ?: return null
+        val check = toleranceCheck.floatingOptimumAcceptance() ?: return@LpSolveCursor null
+        val relaxer = selectedSourceRelaxation ?: lpRelaxer ?: return@LpSolveCursor null
+        val relaxation = leafRelaxation(relaxer, session) ?: return@LpSolveCursor null
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
-        val float = solver.solveFloat(
+        val float = await(solver.openSolveFloat(
             model,
             params.cancellation,
-            leafWorkBudget(model),
             sink.lp.certificationObserver(LpRoute.STANDALONE),
             { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) },
             relaxation.objectiveConstant.toDouble(),
-        ) ?: return null
+        )) ?: return@LpSolveCursor null
         sink.lp.observeComponentSplit(float.blocks)
-        return leafSample(session, relaxation.floatReals(float.primal, problem))
+        leafSample(session, relaxation.floatReals(float.primal, problem))
     }
 
     // The leaf's relaxation, or null when cancellation stops its assembly. An engine that runs no node bounding
@@ -1989,14 +1984,6 @@ private const val INITIAL_NODE_WORK_OPS = 1_000_000L
 
 /** Divisor on the size-derived work baseline: `columns / 40` iterations. */
 private const val SIZE_BUDGET_DIVISOR = 40L
-
-/** Floor on a leaf solve's work cap: a small model's cold solve costs more than its shape alone suggests,
- *  and a leaf the cap stops is one the search cannot decide. */
-private const val MIN_LEAF_WORK_OPS = 1_000_000L
-
-/** Ceiling on a leaf solve's work cap. Higher than the node ceiling because a leaf decides a complete
- *  assignment: its verdict is the answer for that branch, not a bound the next node can improve on. */
-private const val MAX_LEAF_WORK_OPS = 1_000_000_000L
 
 // LP work (simplex plus the node-LP overhead the engine charges) done in about one millisecond of LP time,
 // calibrated on MIPLIB 2017 models with continuous columns (median 18.7k, spread 6.4k to 72.8k).
