@@ -231,6 +231,7 @@ internal class LinearAuthorityTraversal(
         val value = incumbent()?.second ?: return null
         val bound = rootBound ?: return null
         val exact = ((bound.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value ?: return null
+        if (exact == value) return null
         val closes = gap?.closes(value, exact) ?: (useSourceGap &&
             gapTolerance.closesDeclaredGap(value, exact,
                 requireNotNull(source.scope.objective).sense))
