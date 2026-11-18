@@ -709,7 +709,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `an incumbent ahead of the external cutoff should bound exhaustion by its own gap cutoff`() {
+    fun `an incumbent ahead of the external cutoff should retain its proved exhaustion bound`() {
         val gap = OptimalityGap(gapFixtureTolerance, integral = true)
         val problem = Problem(0, 1, arrayOf(IntDomain(999_960L, 2_000_000L)), emptyArray()).bake()
         val params = BacktrackParams(valueSelector = IndomainMax, optimalityGap = gap,
@@ -723,7 +723,7 @@ class ResumableMinimizeTest {
             search.exhaustionBound
         }
 
-        assertEquals(gap.cutoff(1_000_050.0), bound)
+        assertEquals(999_960.0, bound)
     }
 
     private val gapFixtureTolerance = OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10_000)))

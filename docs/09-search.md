@@ -267,14 +267,16 @@ arm records nothing tighter. Cut infeasibility, strict-source refutations and
 conflicts from objective propagation or mixed-row deductions are independent of
 the pruning cutoff. Strict-source and recovery objective prunes retain their
 proved bound. Only a prune whose recorded bound stays below the
-incumbent's cutoff relies on the gap. The least gap cutoff such a prune read is the
+incumbent's cutoff relies on the gap. The least proved bound such a prune supplied is the
 search's gap floor: every point it left unseen, every clause learned from such a
 prune and every root floor it publishes holds only below it, so a published floor
 is capped there. Exhaustion proves the lower of the gap floor and the cutoffs in
 force, and reports `MinimizeResult.Optimal.gapBound`, raised by the root relaxation
 bound, or null when the proved bound reaches the incumbent. A repairing search
 ignores the gap, and a source whose tolerance is exact rejects one. The incumbent
-stays a checked point; the gap changes only which bound closes the search.
+stays a checked point; the gap changes only which bound closes the search. Bound
+aggregation retains the engine's numerical or exact semantics and creates no
+additional original-source proof authority.
 
 ### Lazy branch selection
 
