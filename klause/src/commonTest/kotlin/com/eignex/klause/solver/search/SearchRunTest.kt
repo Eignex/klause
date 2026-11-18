@@ -19,6 +19,57 @@ import kotlin.test.assertTrue
 
 class SearchRunTest {
     @Test
+    fun `a paused component check should resume before lifecycle or node work`() {
+        var checks = 0
+        var resumes = 0
+        var nodes = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck =
+                if (++checks < 3) ComponentCheck.Paused else ComponentCheck.Feasible
+        }))
+        session.initialize()
+        val run = session.openRun(0,
+            lifecycle = object : SearchRunLifecycle {
+                override fun onResume(context: SearchContext): SearchRunDisposition {
+                    resumes++
+                    return SearchRunDisposition.Continue
+                }
+            },
+            nodePolicy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                    nodes++
+                    return SearchNodeDisposition.Expand
+                }
+            })
+
+        repeat(2) {
+            assertIs<SearchRunEvent.Paused>(run.next())
+            assertNull(session.executionControls.stopCause)
+        }
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(3, checks)
+        assertEquals(1, resumes)
+        assertEquals(1, nodes)
+    }
+
+    @Test
+    fun `a resumed component decline should prevent exhaustion from proving infeasibility`() {
+        var checks = 0
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck =
+                if (++checks == 1) ComponentCheck.Paused else ComponentCheck.Indeterminate
+        }))
+        session.initialize()
+        val run = session.openRun(0)
+
+        assertIs<SearchRunEvent.Paused>(run.next())
+        assertIs<SearchRunEvent.Indeterminate.Component>(run.next())
+
+        assertEquals(SearchStopCause.RepresentationDecline, session.executionControls.stopCause)
+    }
+
+    @Test
     fun `a retained Boolean root should enumerate its region and reset to the whole source`() {
         val session = SearchSession(emptyList())
         session.initialize()

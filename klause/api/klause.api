@@ -16675,6 +16675,13 @@ public final class com/eignex/klause/solver/search/ComponentCheck$Infeasible : c
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/search/ComponentCheck$Paused : com/eignex/klause/solver/search/ComponentCheck {
+	public static final field INSTANCE Lcom/eignex/klause/solver/search/ComponentCheck$Paused;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class com/eignex/klause/solver/search/ComponentResult {
 }
 

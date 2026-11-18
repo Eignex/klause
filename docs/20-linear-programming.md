@@ -547,9 +547,12 @@ cancelled checks close nothing.
 
 ### Leaf completion
 
-A leaf relaxation and solve run under the search's cancellation and a work limit
-sized from the model, so a stopped leaf is indeterminate and a decided one keeps its
-verdict.
+A leaf relaxation and solve run under the caller's cancellation. Satisfaction
+completion retains its pinned relaxation and numerical cursor across slices,
+including float-only proposals before nonlinear completion. Each slice funds only
+the remaining LP work allowance; an internal model-sized ceiling cannot terminate
+the leaf. Retraction, cancellation and close release pending numerical work.
+Atomic preparation and certification keep their charges and any slice overspend.
 For a positive-tolerance source, a request permitting tolerance acceptance can reject
 the leaf through `floatFarkasRay`, using the same numerical check as node pruning.
 The result carries numerical refutation separately from exact conflicts and certificates;

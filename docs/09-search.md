@@ -93,6 +93,9 @@ A cancellation pause retains the current leaf for a complete retry. An interrupt
 check on that retained leaf adds no unresolved coverage. A leaf abandoned with an
 undecided required check still prevents exhaustion from proving completeness;
 later pauses do not clear that state.
+An explicitly paused component check keeps the same leaf and resumes before
+lifecycle maintenance, node pruning or branch selection. It records no decline or
+unresolved coverage; retraction and query reset discard the retained check.
 
 A node-owned learned consequence can retain unfinished shared propagation only
 after its native registration and consequence publication have completed. A

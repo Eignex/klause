@@ -61,7 +61,7 @@ class TheorySearchComponent<A : Any>(
         return when (val result = evaluate(context)) {
             ComponentCheck.Feasible -> ComponentResult.Consistent
             is ComponentCheck.Infeasible -> ComponentResult.Conflict(result.explanation)
-            ComponentCheck.Indeterminate -> ComponentResult.Indeterminate
+            ComponentCheck.Indeterminate, ComponentCheck.Paused -> ComponentResult.Indeterminate
         }
     }
 

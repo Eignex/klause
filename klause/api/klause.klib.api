@@ -5535,6 +5535,12 @@ sealed interface com.eignex.klause.solver.search/ComponentCheck { // com.eignex.
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/ComponentCheck.Indeterminate.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.search/ComponentCheck.Indeterminate.toString|toString(){}[0]
     }
+
+    final object Paused : com.eignex.klause.solver.search/ComponentCheck { // com.eignex.klause.solver.search/ComponentCheck.Paused|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/ComponentCheck.Paused.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/ComponentCheck.Paused.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/ComponentCheck.Paused.toString|toString(){}[0]
+    }
 }
 
 sealed interface com.eignex.klause.solver.search/ComponentResult { // com.eignex.klause.solver.search/ComponentResult|null[0]

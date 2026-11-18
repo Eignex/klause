@@ -90,6 +90,9 @@ sealed interface ComponentCheck {
 
     /** The component cannot decide the leaf exactly. */
     data object Indeterminate : ComponentCheck
+
+    /** The component retains an unfinished check of this leaf for the next slice. */
+    data object Paused : ComponentCheck
 }
 
 /**
@@ -328,7 +331,7 @@ interface SearchRunLifecycle {
     /** Called once before the first branch of a run. */
     fun onStart(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
 
-    /** Called on [SearchRun.next] entry after retained shared propagation completes. */
+    /** Called on [SearchRun.next] entry after retained propagation, unless a leaf check is pending. */
     fun onResume(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
 
     /** Called after the session has returned to root during a restart. */

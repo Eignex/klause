@@ -54,6 +54,7 @@ class SearchRun internal constructor(
     internal var pauseBeforeDecision: () -> Boolean = { false }
     private var pendingAdvance = false
     private var pendingCancellation = false
+    private var pendingCheck = false
     private var retryingAssertion = false
     private var pendingLearnedPropagation: SearchPendingLearnedPropagation? = null
     internal val learnedPropagationPending: Boolean get() = pendingLearnedPropagation != null
@@ -98,7 +99,7 @@ class SearchRun internal constructor(
                 ComponentResult.Indeterminate -> return pauseLearnedPropagation()
             }
         }
-        lifecycle.onResume(session).toEvent(SearchComponentStop.Site.Resume)?.let { return it }
+        if (!pendingCheck) lifecycle.onResume(session).toEvent(SearchComponentStop.Site.Resume)?.let { return it }
         if (retryingAssertion) {
             if (session.cancelled()) return cancelledAssertion()
             retryingAssertion = false
@@ -145,7 +146,7 @@ class SearchRun internal constructor(
                 }
                 cancellationPoller.rearm()
             }
-            when (val node = nodePolicy.beforeBranch(session)) {
+            when (val node = if (pendingCheck) SearchNodeDisposition.Expand else nodePolicy.beforeBranch(session)) {
                 SearchNodeDisposition.Expand -> Unit
 
                 SearchNodeDisposition.Prune -> {
@@ -183,8 +184,12 @@ class SearchRun internal constructor(
                 // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
                 SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
             }
-            when (val alternatives = alternatives()) {
-                is Alternatives.Leaf -> when (val result = session.check()) {
+            when (val alternatives = if (pendingCheck) Alternatives.Leaf else alternatives()) {
+                is Alternatives.Leaf -> when (val result = session.check().also {
+                    pendingCheck = it == ComponentCheck.Paused
+                }) {
+                    ComponentCheck.Paused -> return SearchRunEvent.Paused
+
                     ComponentCheck.Feasible -> {
                         params.restart.onSolution()
                         val model = session.model().also {
@@ -627,7 +632,7 @@ class SearchRun internal constructor(
     internal fun retainBooleanRoot(literal: Int): Boolean {
         if (modelContinuation != SearchModelContinuation.Chronological || queryRoot != minimumDecisionLevel ||
             !started || terminal != null || sawIndeterminate || pendingModel != null || lastModel != null ||
-            consumedModel || pendingCancellation || retryingAssertion || learnedPropagationPending ||
+            consumedModel || pendingCancellation || pendingCheck || retryingAssertion || learnedPropagationPending ||
             budgetInterrupted) return false
         val frame = frames.firstOrNull() ?: return false
         if (frame.level != minimumDecisionLevel || session.decisionLevel <= frame.level ||
@@ -664,6 +669,7 @@ class SearchRun internal constructor(
         budgetInterrupted = false
         pendingAdvance = false
         pendingCancellation = false
+        pendingCheck = false
         retryingAssertion = false
         pendingLearnedPropagation = null
         started = false

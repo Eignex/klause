@@ -520,7 +520,7 @@ class LpEngineContextTest {
     }
 
     @Test
-    fun `leaf certification should cap its solve by work`() {
+    fun `leaf certification should use the caller cancellation without an internal work ceiling`() {
         val problem = boundedLpEngineProblem()
         val factory = RecordingLpEngineFactory()
         val engine = LpEngine(
@@ -534,7 +534,7 @@ class LpEngineContextTest {
 
         engine.use { it.leafCertify(PropagationSession(problem)) }
 
-        assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > 1L)
+        assertEquals(0L, factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit)
     }
 
     @Test

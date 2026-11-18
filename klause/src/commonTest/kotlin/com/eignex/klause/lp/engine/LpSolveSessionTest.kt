@@ -9,10 +9,78 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
+    @Test
+    fun `float-only cursors should pause after spending work on a stopped solve`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 5.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+        val model = assertNotNull(LpExactState(assertNotNull(
+            builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate {
+                    override fun solve(warm: Basis?): FloatLpResult? {
+                        delegate.solve(warm)
+                        return null
+                    }
+                }
+            }
+        }
+        val sink = LpStatsSink()
+
+        LpSolveSession(LpSolveContext(factory), componentSplit = false).use { owner ->
+            owner.openSolveFloat(model, ExecutionControl.Never, sink.certificationObserver(LpRoute.STANDALONE),
+                { error("a stopped solve supplies no point") }, 0.0).use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance(1L))
+                assertTrue(sink.standaloneWork > 0L)
+
+                assertNull(assertIs<LpSolveStep.Completed<FloatLpResult?>>(cursor.advance()).value)
+            }
+        }
+    }
+
+    @Test
+    fun `float-only cursors should resume without certifying a refused optimum`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 5.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
+        val model = assertNotNull(LpExactState(assertNotNull(
+            builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel())
+        var proposals = 0
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ ->
+            error("float-only completion must not certify")
+        })
+
+        LpSolveSession(context, componentSplit = false).use { owner ->
+            owner.openSolveFloat(model, ExecutionControl.Never, null, {
+                proposals++
+                false
+            }, 0.0).use { cursor ->
+                var step = cursor.advance(1L)
+                assertIs<LpSolveStep.Paused>(step)
+                repeat(64) { if (step is LpSolveStep.Paused) step = cursor.advance(1L) }
+
+                assertNull(assertIs<LpSolveStep.Completed<FloatLpResult?>>(step).value)
+            }
+        }
+        assertEquals(1, proposals)
+    }
+
     @Test
     fun `query observations should capture exact bounds before retained solves`() {
         val builder = LpBuilder()
