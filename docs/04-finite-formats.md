@@ -248,6 +248,11 @@ Variable or negative exponents decline.
 
 ### FlatZinc Boolean channels
 
+`bool_lin_eq` and `bool_lin_le` retain `PseudoBoolean` relations with signed-word
+coefficients and bounds, including negative coefficients. Repeated Boolean operands
+and constants keep their source meaning; activity sums use exact arithmetic even
+when they exceed signed-word range. These predicates allocate no integer channels.
+
 The frontend recognizes `bool2int` channels independently of constraint order.
 Nonnegative weighted sums of channelled integers constrained to zero lower to
 Boolean conjunctions over the complemented inputs; reified sums use the shared

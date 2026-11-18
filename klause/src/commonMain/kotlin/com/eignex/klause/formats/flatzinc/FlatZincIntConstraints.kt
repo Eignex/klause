@@ -163,12 +163,10 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
 }
 
 internal fun FlatZincCompiler.emitBoolLinear(c: FznConstraint) {
-    // Negative coefficients would require bool-to-int channeling.
     expectArity(c, 3)
     val coefs = evalIntConstArrayLong(c.args[0])
     val bools = evalBoolVarArray(c.args[1])
     val bound = evalIntConst(c.args[2])
-    if (coefs.any { it < 0 }) unsupportedHere("bool_lin_* with negative coefficients not supported")
     val op = when (c.name) {
         "bool_lin_le" -> PbOp.LE
         "bool_lin_eq" -> PbOp.EQ
