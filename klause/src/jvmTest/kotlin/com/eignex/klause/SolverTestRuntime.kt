@@ -97,5 +97,9 @@ internal object SolverTestRuntime {
                 "(assert (= x 1)) (assert (= (f x) 2))",
         ).model
         check(BacktrackSolver.source(source).solve() is OpenTheoryResult.Sat)
+        val wide = SmtLib.parse(
+            "(declare-const x Int) (assert (= x 9223372036854775808))",
+        ).model
+        check(BacktrackSolver.source(wide).solve() is OpenTheoryResult.Sat)
     }
 }

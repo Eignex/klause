@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
@@ -37,7 +38,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class LpBoundingTest {
+class LpBoundingTest : RuntimeInitializedTest() {
     // Optimum 3 at (1,1,1); the separable per-term bound sees only zero minima, so only the LP prunes.
     private fun triangle(rhs: Int = 2): Problem = Problem(
         numBoolVars = 0,
@@ -673,10 +674,10 @@ class LpBoundingTest {
 
     @Test
     fun `LP stats should be populated on a cumulative makespan minimize`() {
-        val n = 5
-        val p = makespanProblem(n, longArrayOf(3, 2, 4, 2, 3), longArrayOf(1, 2, 1, 2, 1), capacity = 2L, hi = 8)
+        val n = 3
+        val p = makespanProblem(n, longArrayOf(2, 1, 2), longArrayOf(1, 2, 1), capacity = 2L, hi = 3)
         val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
-        val params = BacktrackParams(randomSeed = 7L, lpConfig = LpConfig.AGGRESSIVE)
+        val params = BacktrackParams(randomSeed = 7L, lpPlan = LpPlan(bounding = true))
         val res = BacktrackSolver(p.bake()).minimize(obj, params)
         assertTrue(res is MinimizeResult.Optimal, "got $res")
         val s = res.stats

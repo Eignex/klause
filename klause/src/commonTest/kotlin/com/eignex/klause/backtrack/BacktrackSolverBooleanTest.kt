@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -17,7 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class BacktrackSolverBooleanTest {
+class BacktrackSolverBooleanTest : RuntimeInitializedTest() {
     private fun cnf(numVars: Int, clauses: List<IntArray>): Problem = Problem(
         numBoolVars = numVars,
         numIntVars = 0,

@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
@@ -17,7 +18,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class BacktrackSolverLpTest {
+class BacktrackSolverLpTest : RuntimeInitializedTest() {
     @Test
     fun `root shaving should fix an integer from continuous rows before a satisfaction decision`() {
         val problem = Problem(
