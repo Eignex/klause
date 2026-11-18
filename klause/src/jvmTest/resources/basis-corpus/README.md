@@ -18,6 +18,10 @@ copied into the corpus. Regeneration requires the upstream revision and exact
 source bytes identified by the manifest. Replay uses the current basis backend;
 capture identity is not a current dependency requirement.
 
+MiniZinc capture metadata pairs the flattened source SHA-256 with its effective
+FlatZinc numeric authority, continuous float interpretation, default undeclared
+bounds and applicable feasibility, optimality and optional-value policies.
+
 SMT source-derived traces project the asserted exact linear state into a floating
 engine for the harness. They are not complete production theory event captures.
 The manifest records the Sudoku no-LP decline and rational-LRA disjunction

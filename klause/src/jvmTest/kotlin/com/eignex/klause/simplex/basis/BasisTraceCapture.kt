@@ -1,11 +1,14 @@
 package com.eignex.klause.simplex.basis
 
+import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.RevisedSimplex
@@ -20,6 +23,7 @@ import com.eignex.klause.theory.qflra.QfLraSystem
 import com.eignex.klause.theory.qflra.toExactLpModel
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.koblas.SparseMatrix
+import com.eignex.util.numbers.BIG_ONE
 import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
@@ -127,12 +131,11 @@ internal object BasisTraceCapture {
         )
     }
 
-    private fun prepareMiniZinc(source: Path, sourceText: String): PreparedCapture {
+    fun prepareMiniZinc(source: Path, sourceText: String): PreparedCapture {
         val precompiled = source.fileName.toString().endsWith(".fzn")
         val compiler = if (precompiled) null else miniZincVersion()
         val flatZinc = if (precompiled) sourceText else flatten(source)
-        val execution = parseFlatZinc(flatZinc)
-        val program = execution
+        val program = parseFlatZinc(flatZinc)
         val objective: LinearObjective? = when (val solve = program.solve) {
             SolveDirective.Satisfy -> null
 
@@ -155,10 +158,38 @@ internal object BasisTraceCapture {
             } else {
                 "$compiler; klause FlatZinc parser and CP/MIP LP relaxation"
             },
-            "defaultFloatBuckets;defaultFloatScale;fznSha256=${sha256(flatZinc.encodeToByteArray())}",
+            miniZincScaling(program, flatZinc),
             origins(relaxation),
         )
     }
+
+    private fun miniZincScaling(program: FlatZincProgram, flatZinc: String): String = buildList {
+        val source = program.semantics.effective
+        add("format=${source.format}")
+        add("numeric=${source.numericAuthority}")
+        when (source.floats) {
+            null -> Unit
+            FloatSemantics.Continuous -> add("floats=continuous")
+        }
+        source.undeclaredIntegers?.let {
+            add("unbounded-int-lo=${it.lower ?: "open"}")
+            add("unbounded-int-hi=${it.upper ?: "open"}")
+        }
+        source.undeclaredReals?.let {
+            add("unbounded-real-lo=${it.lower.policyText()}")
+            add("unbounded-real-hi=${it.upper.policyText()}")
+        }
+        source.feasibilityTolerance?.let {
+            add("absolute-tolerance=${it.absolute.policyText()}")
+            add("relative-tolerance=${it.relative.policyText()}")
+        }
+        source.optimalityTolerance?.let {
+            add("absolute-optimality-tolerance=${it.absolute.policyText()}")
+            add("relative-optimality-tolerance=${it.relative.policyText()}")
+        }
+        source.pinAbsentOptionalValues?.let { add("pin-absent-optional-values=$it") }
+        add("fznSha256=${sha256(flatZinc.encodeToByteArray())}")
+    }.joinToString(";")
 
     private fun prepareSmt(text: String): PreparedCapture {
         val parsed = SmtLib.parse(text)
@@ -286,13 +317,19 @@ internal object BasisTraceCapture {
     }
 }
 
-private data class PreparedCapture(
+internal data class PreparedCapture(
     val model: LpModel,
     val route: BasisTraceRoute,
     val frontend: String,
     val scaling: String,
     val origins: List<BasisColumnOrigin>,
 )
+
+private fun SemanticRational?.policyText(): String = when {
+    this == null -> "open"
+    denominator == BIG_ONE -> numerator.toString()
+    else -> "$numerator/$denominator"
+}
 
 private class RecordingBasisSolver(matrix: SparseMatrix, private val sourceColumns: Int) : BasisSolver {
     private val delegate = KotlinBasisSolver(matrix)
