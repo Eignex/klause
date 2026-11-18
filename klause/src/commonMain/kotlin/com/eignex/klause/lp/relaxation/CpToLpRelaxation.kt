@@ -1310,6 +1310,7 @@ internal class CpToLpRelaxation(
         override fun rootDomain(intVar: Int): IntDomain = problem.rootDomainOf(intVar)
 
         override fun realMagnitude(realVar: Int): Double {
+            checkCancellation()
             val magnitude = max(abs(problem.realLower[realVar]), abs(problem.realUpper[realVar]))
             val policy = problem.semantics.effective.feasibilityTolerance
             if (!magnitude.isFinite() || policy == null || policy.isExact) return magnitude
@@ -1386,9 +1387,18 @@ internal class CpToLpRelaxation(
 
         override fun derivedRealRow(
             columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, slack: LpRowSlack,
+        ) = derivedRealRow(columns, coeffs, op, rhs, slack, emptyIntArray())
+
+        override fun derivedRealRow(
+            columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, slack: LpRowSlack,
+            premiseLits: IntArray,
         ) {
             val index = builder.rowCount
-            emitRealRow(columns, coeffs, op, rhs, false, emptyIntArray())
+            emitRealRow(columns, coeffs, op, rhs, false, premiseLits)
+            carryRowSlack(index, slack)
+        }
+
+        private fun carryRowSlack(index: Int, slack: LpRowSlack) {
             if (builder.rowCount == index + 1 && problem.semantics.relaxesRows(problem.numRealVars)) {
                 exactRows.carrySlack(index, slack)
             }
@@ -1401,12 +1411,24 @@ internal class CpToLpRelaxation(
             coeffs: DoubleArray,
             op: LinearOp,
             rhs: Double,
+        ) = emitRealRowForIntValue(intVar, value, columns, coeffs, op, rhs, null)
+
+        override fun derivedRealRowForIntValue(
+            intVar: Int, value: Long, columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double,
+            slack: LpRowSlack,
+        ) = emitRealRowForIntValue(intVar, value, columns, coeffs, op, rhs, slack)
+
+        private fun emitRealRowForIntValue(
+            intVar: Int, value: Long, columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double,
+            slack: LpRowSlack?,
         ) {
             val domain = liveDomain(intVar)
             if (domain.min != value || domain.max != value) return
             val validity = LpRowPremises(intArrayOf(intVar, intVar), booleanArrayOf(false, true),
                 longArrayOf(value, value))
+            val index = builder.rowCount
             emitRealRow(columns, coeffs, op, rhs, false, emptyIntArray(), validity)
+            if (slack != null) carryRowSlack(index, slack)
         }
 
         private fun emitRealRow(

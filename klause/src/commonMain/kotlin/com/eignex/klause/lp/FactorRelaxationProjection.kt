@@ -7,6 +7,8 @@ import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.RealAbs
+import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -48,7 +50,12 @@ internal fun Factor.buildLpRelaxation(builder: RelaxationBuilder, linearProjecti
         return
     }
     if (impliedLinearRows.isNotEmpty()) {
-        for (row in impliedLinearRows) row.emitLpRelaxation(builder, linearProjection)
+        val slack = when (this) {
+            is RealAbs -> builder.realResidualSlack(result, builder.realMagnitude(operand))
+            is RealArrayMinMax -> builder.realResidualSlack(result, xs.maxOf { builder.realMagnitude(it) })
+            else -> null
+        }
+        for (row in impliedLinearRows) row.emitLpRelaxation(builder, linearProjection, slack)
         return
     }
     when (this) {

@@ -10,11 +10,14 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.complemented
+import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.subExact
 
-internal fun LinearRow.emitLpRelaxation(builder: RelaxationBuilder, projection: LinearLpProjection? = null) {
+internal fun LinearRow.emitLpRelaxation(
+    builder: RelaxationBuilder, projection: LinearLpProjection? = null, slack: LpRowSlack? = null,
+) {
     when (constants) {
         is WideConstants -> {
             if (activator != LinearRow.ALWAYS || !isIntegerOnly) return
@@ -28,10 +31,10 @@ internal fun LinearRow.emitLpRelaxation(builder: RelaxationBuilder, projection: 
         is IntegerConstants -> when {
             activator == LinearRow.ALWAYS && !strict -> emitIntegerLpRelaxation(builder)
             isIntegerOnly && !strict -> emitReifiedIntegerLpRelaxation(builder)
-            else -> emitPinnedLpRelaxation(builder)
+            else -> emitPinnedLpRelaxation(builder, slack)
         }
 
-        is RealConstants -> emitPinnedLpRelaxation(builder)
+        is RealConstants -> emitPinnedLpRelaxation(builder, slack)
     }
 }
 
@@ -74,7 +77,7 @@ private fun LinearRow.emitIntegerLpRelaxation(builder: RelaxationBuilder) {
     }
 }
 
-private fun LinearRow.emitPinnedLpRelaxation(builder: RelaxationBuilder) {
+private fun LinearRow.emitPinnedLpRelaxation(builder: RelaxationBuilder, slack: LpRowSlack?) {
     // A reified row can use a live Boolean pin without inventing a bound for an open column.
     val truth = if (activator == LinearRow.ALWAYS) true else builder.liveBool(activator) ?: return
     val columns = IntArray(size)
@@ -115,7 +118,8 @@ private fun LinearRow.emitPinnedLpRelaxation(builder: RelaxationBuilder) {
     if (BigFraction.ofDouble(rhs) != exactRhs) return
     val premise = if (activator == LinearRow.ALWAYS) intArrayOf() else intArrayOf(Lit.make(activator, truth))
     if (truth) {
-        builder.realRow(columns, coefficients, relation, rhs, strict, premise)
+        if (slack == null || strict) builder.realRow(columns, coefficients, relation, rhs, strict, premise)
+        else builder.derivedRealRow(columns, coefficients, relation, rhs, slack, premise)
     } else {
         builder.realRow(columns, coefficients, relation.complemented(), rhs, !strict, premise)
     }

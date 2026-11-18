@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.util.numbers.BigFraction
+import kotlin.math.abs
+import kotlin.math.nextUp
 
 internal fun ContinuousProduct.emitLpRelaxation(builder: RelaxationBuilder) {
     val choices = finiteChoices?.takeIf { it.hasGuards } ?: return
@@ -19,17 +21,19 @@ internal fun ContinuousProduct.emitLpRelaxation(builder: RelaxationBuilder) {
         val otherColumn = builder.realColumn(other)
         if (operandColumn < 0 || resultColumn < 0 || otherColumn < 0) continue
         val value = choices.valueAt(index)
+        val magnitude = if (value == 0.0) 0.0 else (abs(value) * builder.realMagnitude(other)).nextUp()
+        val slack = builder.realResidualSlack(result, magnitude)
         builder.realRow(intArrayOf(operandColumn), doubleArrayOf(1.0), LinearOp.EQ, value,
             premiseLits = intArrayOf(literal))
         if (resultColumn == otherColumn) {
             val exact = BigFraction.ONE - requireNotNull(BigFraction.ofDouble(value))
             val coefficient = exact.toDouble()
             if (BigFraction.ofDouble(coefficient) != exact) continue
-            builder.realRow(intArrayOf(resultColumn), doubleArrayOf(coefficient), LinearOp.EQ, 0.0,
-                premiseLits = intArrayOf(literal))
+            builder.derivedRealRow(intArrayOf(resultColumn), doubleArrayOf(coefficient), LinearOp.EQ, 0.0,
+                slack, intArrayOf(literal))
         } else {
-            builder.realRow(intArrayOf(resultColumn, otherColumn), doubleArrayOf(1.0, -value), LinearOp.EQ, 0.0,
-                premiseLits = intArrayOf(literal))
+            builder.derivedRealRow(intArrayOf(resultColumn, otherColumn), doubleArrayOf(1.0, -value), LinearOp.EQ, 0.0,
+                slack, intArrayOf(literal))
         }
     }
 }

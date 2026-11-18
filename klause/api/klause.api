@@ -6667,6 +6667,8 @@ public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public fun conditionedRow ([I[JLcom/eignex/klause/ir/LinearOp;JIJ)V
 	public fun derivedRealRow ([I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;)V
+	public fun derivedRealRow ([I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;[I)V
+	public fun derivedRealRowForIntValue (IJ[I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;)V
 	public abstract fun hullEnabled ()Z
 	public abstract fun intColumn (I)I
 	public abstract fun linearRow (Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;)V
@@ -6692,6 +6694,8 @@ public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
 	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public static fun conditionedRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JIJ)V
 	public static fun derivedRealRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;)V
+	public static fun derivedRealRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;[I)V
+	public static fun derivedRealRowForIntValue (Lcom/eignex/klause/lp/RelaxationBuilder;IJ[I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;)V
 	public static synthetic fun linearRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public static fun liveBool (Lcom/eignex/klause/lp/RelaxationBuilder;I)Ljava/lang/Boolean;
 	public static fun realColumn (Lcom/eignex/klause/lp/RelaxationBuilder;I)I

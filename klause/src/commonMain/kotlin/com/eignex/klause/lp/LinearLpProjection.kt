@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.floorBigInt
@@ -26,8 +27,10 @@ internal class LinearLpProjection {
     }
 }
 
-internal fun Linear.emitLpRelaxation(builder: RelaxationBuilder, projection: LinearLpProjection? = null) {
-    for (row in linearRows) row.emitLpRelaxation(builder, projection)
+internal fun Linear.emitLpRelaxation(
+    builder: RelaxationBuilder, projection: LinearLpProjection? = null, slack: LpRowSlack? = null,
+) {
+    for (row in linearRows) row.emitLpRelaxation(builder, projection, slack)
 }
 
 /** Emit a wide row as directionally-rounded double outer-relaxation rows. */

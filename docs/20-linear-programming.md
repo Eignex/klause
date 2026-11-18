@@ -222,6 +222,13 @@ relative tolerance. Fixed integer products retain their residual band alone.
 Nominal coefficients stay unchanged, and zero-tolerance sources emit their ordinary rows.
 Rebinding, row scopes, layout changes and exact capture retain the bands with the row.
 
+Absolute values, extrema, variable selection, first powers and guarded choice products
+retain the result and expression magnitudes when emitting their linear consequences.
+Coefficient coalescing preserves that source scale when the result also supplies an
+operand. Constant selection and zero powers use the larger of the constant and result
+magnitudes; a choice operand's membership keeps its fixed member's declaration band.
+Conditional rows retain their Boolean or integer-bound validity premises with the bands.
+
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
 integrality, origins, source premises, ordered basis and nonbasic statuses determine
 the problem. Floating factors, values and reduced costs are revision-keyed working
