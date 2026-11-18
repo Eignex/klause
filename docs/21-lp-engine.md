@@ -127,7 +127,10 @@ rows, as a finite search on a source with a tolerance search does, passes an `Lp
 through `LpSolveContext`, and each priced side, a row's slack included, moves by it against
 the bound. A relative slack reads a magnitude no smaller than the side's before the
 lower-bound shift (a column side plus its origin, a right-hand side plus each shifted term),
-so it never falls short of the slack the source bound admits. It supplies node pruning,
+so it never falls short of the slack the source bound admits. An open side is derived
+from the widened row and column premises, so its perturbation follows their weights
+and the division by its coefficient. Input magnitudes stay in its rounding estimate
+when perturbations cancel. It supplies node pruning,
 objective propagation,
 reduced-cost fixing with their reasons, root bounds shared with peers, and shaving; fixing
 also tries the objective box (zero multipliers) and half the duals.

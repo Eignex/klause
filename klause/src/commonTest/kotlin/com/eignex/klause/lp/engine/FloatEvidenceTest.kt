@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import kotlin.math.nextDown
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -13,6 +14,57 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FloatEvidenceTest {
+    @Test
+    fun `a row implied bound should include the slack of every premise`() {
+        val model = LpBuilder().apply {
+            val z = addRealVar(0.0, null, cost = -1.0)
+            val u = addRealVar(0.0, 1.0)
+            addRow(intArrayOf(z, u), longArrayOf(1L, -1L), Relation.EQ, 0L)
+        }.build(Sense.MINIMIZE)
+
+        val bound = FloatDeductionCertificate.of(model, doubleArrayOf(0.0), slack = LpBoundSlack(1.0, 0.0))?.lowerBound
+
+        assertTrue(bound == null || bound <= -3.0, "bound $bound")
+    }
+
+    @Test
+    fun `a numerical refutation should preserve a point admitted by derived bound slack`() {
+        val model = LpBuilder().apply {
+            val z = addRealVar(0.0, null)
+            val u = addRealVar(0.0, 1.0)
+            addRow(intArrayOf(z, u), longArrayOf(1L, -1L), Relation.EQ, 0L)
+            addRow(intArrayOf(z), longArrayOf(1L), Relation.GE, 4L)
+        }.build(Sense.MINIMIZE)
+
+        val refutation = floatFarkasRay(model, doubleArrayOf(0.0, -1.0), LpBoundSlack(1.0, 0.0))
+
+        assertNull(refutation)
+    }
+
+    @Test
+    fun `cancelling relative perturbations should retain their rounding allowance`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            List(2) { listOf(ExactLpEntry(0, one)) }, listOf(zero),
+            listOf(
+                ExactLpColumn(ExactLpBounds(), integral = false),
+                ExactLpColumn(ExactLpBounds(
+                    ExactLpSide(ExactLpNumber.of(10_000_000_000_000_000L)),
+                    ExactLpSide(ExactLpNumber.of(20_000_000_000_000_000L)),
+                ), integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
+            ), listOf(ExactLpRow()), ExactLpObjective(listOf(ExactLpNumber.of(-1L), zero, zero)),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+
+        val certificate = FloatDeductionCertificate.of(
+            model, doubleArrayOf(0.0), slack = LpBoundSlack(0.0, 1.0.nextDown()),
+        )
+
+        assertTrue(assertNotNull(certificate).lowerBound <= 1.5)
+    }
+
     @Test
     fun `a float deduction bound should not exceed the LP optimum and should stay within tolerance of it`() {
         val model = LpBuilder().apply {
