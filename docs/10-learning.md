@@ -237,8 +237,9 @@ precedes observation and resumes while its cursor advances. Changed work, scratc
 byte-limit settings renew the opportunity, and cancellation withholds further
 maintenance until ownership changes.
 
-Budget deferral raises a fresh, attempt-local control signal. Its JVM representation
-omits stack capture while preserving suppressed failure metadata.
+At root resume and restart, cleanup attempts with work grants below 65,536 share
+a 65,536-unit continuation allowance. Exhausting it pauses the slice with the
+reduction window retained; the window resumes before search branches.
 
 Outside propagation, learned-store maintenance (reduction windows, retired-slot
 and watch cleanup, page and index release, and compaction) runs in bounded steps
