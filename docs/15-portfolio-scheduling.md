@@ -504,6 +504,8 @@ checks precede incumbent admission, cutoff use or neighborhood centering.
 An already exact pooled point must pass the same original-source callback before
 import; exact working coordinates alone do not establish original-source feasibility.
 These checks spend the consuming companion's existing funding and lifetime.
+Joint repair declines an exact external point that cannot improve its pending cutoff
+before completion checking; this decline supplies no witness or bound authority.
 
 Each companion keeps at most sixteen recovery attempts without eviction, identified
 by the full source restrictions, rows, coordinates, objective, interpretation,
