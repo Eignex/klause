@@ -8,7 +8,6 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
-import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -16,14 +15,10 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 import kotlin.math.abs
 
-internal enum class SourceFloatMode { CONTINUOUS, GRID }
+internal enum class SourceFloatMode { CONTINUOUS }
 
 internal class SourceOptions {
     var floatMode: SourceFloatMode? = null
-    var floatBuckets: Int? = null
-    var floatScale: Long? = null
-    var gridLower: SemanticRational? = null
-    var gridUpper: SemanticRational? = null
     var absoluteTolerance: SemanticRational? = null
     var relativeTolerance: SemanticRational? = null
     var absoluteOptimalityTolerance: SemanticRational? = null
@@ -35,24 +30,6 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
     val fields = sourceOptions
     if (fields.floatMode == SourceFloatMode.CONTINUOUS) {
         resolved = resolved.copy(floats = FloatSemantics.Continuous)
-    }
-    val gridRequested = fields.floatMode == SourceFloatMode.GRID ||
-        fields.floatBuckets != null || fields.floatScale != null ||
-        fields.gridLower != null || fields.gridUpper != null
-    if (gridRequested) {
-        require(!exact) { "float grid controls conflict with --exact" }
-        val grid = if (fields.floatMode == SourceFloatMode.GRID) {
-            resolved.floats as? FloatSemantics.Grid ?: declared.floats as? FloatSemantics.Grid
-        } else (resolved.floats ?: declared.floats) as? FloatSemantics.Grid
-        require(grid != null) { "float grid controls do not apply to ${declared.format}" }
-        resolved = resolved.copy(floats = grid.copy(
-            buckets = fields.floatBuckets ?: grid.buckets,
-            linearScale = fields.floatScale ?: grid.linearScale,
-            unrangedBounds = UndeclaredRealBounds(
-                fields.gridLower ?: grid.unrangedBounds.lower,
-                fields.gridUpper ?: grid.unrangedBounds.upper,
-            ),
-        ))
     }
     if (fields.absoluteTolerance != null || fields.relativeTolerance != null) {
         val tolerance = resolved.feasibilityTolerance ?: if (exact && declared.feasibilityTolerance != null) {
@@ -123,24 +100,11 @@ internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
             upper = realBound(it),
         ))
     },
-    sourceFlag("--float-semantics", "continuous|grid", "float declaration interpretation") {
+    sourceFlag("--float-semantics", "continuous", "float declaration interpretation") {
         when (it.lowercase()) {
             "continuous" -> options.sourceOptions.floatMode = SourceFloatMode.CONTINUOUS
-            "grid" -> options.sourceOptions.floatMode = SourceFloatMode.GRID
-            else -> usageError("--float-semantics expects continuous or grid")
+            else -> usageError("--float-semantics expects continuous")
         }
-    },
-    sourceFlag("--float-buckets", "integer", "default float grid point count") {
-        options.sourceOptions.floatBuckets = it.toIntOrNull() ?: usageError("--float-buckets expects an integer")
-    },
-    sourceFlag("--float-scale", "integer", "float-linear grid coefficient scale") {
-        options.sourceOptions.floatScale = it.toLongOrNull() ?: usageError("--float-scale expects an integer")
-    },
-    sourceFlag(listOf("--float-grid-lo", "--unbounded-float-lo"), "number", "lower float approximation window") {
-        options.sourceOptions.gridLower = semanticNumber(it)
-    },
-    sourceFlag(listOf("--float-grid-hi", "--unbounded-float-hi"), "number", "upper float approximation window") {
-        options.sourceOptions.gridUpper = semanticNumber(it)
     },
     sourceFlag("--source-absolute-tolerance", "number", "absolute source feasibility slack") {
         options.sourceOptions.absoluteTolerance = semanticNumber(it)

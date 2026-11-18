@@ -158,7 +158,7 @@ internal object AffineSingletons {
         if (problem.numIntVars == 0) return null
         // The entry scan alone can dominate optional preparation on very large models.
         if (problem.factors.size > maxFactors) return null
-        val objectiveRewrite = objective?.takeUnless { problem.semantics.isApproximate }
+        val objectiveRewrite = objective?.takeUnless { problem.semantics.relaxesFeasibility }
             ?.let { AffineObjective(it, cancellation) }
         if (objectiveRewrite?.interrupted == true) return null
         val objVars = IntHashSet().apply {

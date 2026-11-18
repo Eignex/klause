@@ -2,7 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.narrowToNearestDoubles
-import com.eignex.klause.lowering.FloatBucketing
+import com.eignex.klause.lowering.FloatCoordinate
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
@@ -86,8 +86,8 @@ internal class FlatZincValues private constructor(
 
     private fun nearest(id: Int): Double = displayed.value(id) ?: approximateRealValue(id)
 
-    fun floatValue(b: FloatBucketing): Double =
-        if (b.lpOnly) realValue(b.varId) else b.valueOf(intValue(b.varId).toInt())
+    fun floatValue(b: FloatCoordinate): Double =
+        realValue(b.varId)
 }
 
 // Algebraic coordinates narrowed on first display, all under one private allowance for the solution.
@@ -150,18 +150,17 @@ internal fun writeFlatZincExactCoordinates(
         sb.append("% klause-float-semantics: flatzinc-binary64\n")
         for ((name, b) in program.floatVarsByName.entries.sortedBy { it.key }) {
             val representation = program.floatRepresentations[name]
-            val kind = if (b.lpOnly) "exact" else "grid"
+            val kind = "exact"
             sb.append("% klause-float-component: $name = $kind")
             representation?.let { sb.append(" component=${it.component}") }
-            if (!b.lpOnly) sb.append(" reason=${representation?.approximation ?: "finite grid"}")
             sb.append('\n')
-            if (b.lpOnly) sample.rounding(b.varId)?.let { sb.append("% klause-float-rounding: $name = $it\n") }
+            sample.rounding(b.varId)?.let { sb.append("% klause-float-rounding: $name = $it\n") }
         }
     }
-    if (program.floatVarsByName.values.any { it.lpOnly } &&
-        program.floatVarsByName.values.all { !it.lpOnly || sample.exactRealValue(it.varId) != null }
+    if (program.floatVarsByName.isNotEmpty() &&
+        program.floatVarsByName.values.all { sample.exactRealValue(it.varId) != null }
     ) {
-        val prefix = if (program.floatVarsByName.values.any { !it.lpOnly }) "klause-coordinate" else "klause-exact"
+        val prefix = "klause-exact"
         for ((name, id) in program.boolVarsByName) {
             sb.append("% $prefix: $name = ${sample.boolValue(id)};\n")
         }
@@ -171,19 +170,13 @@ internal fun writeFlatZincExactCoordinates(
             }
         }
         for ((name, b) in program.floatVarsByName) {
-            val value = if (b.lpOnly) sample.exactRealValue(b.varId) else
-                BigFraction.ofDouble(sample.floatValue(b))?.toString()
+            val value = sample.exactRealValue(b.varId)
             sb.append("% $prefix: $name = $value;\n")
         }
         if (outputObjective) {
             objectiveVarName(program.solve)?.let { name ->
                 val b = program.floatVarsByName[name]
-                val value = if (b?.lpOnly == true) {
-                    sample.exactRealValue(b.varId)
-                } else {
-                    if (b != null) BigFraction.ofDouble(sample.floatValue(b))?.toString() else
-                        renderScalar(program, sample, name)
-                }
+                val value = if (b != null) sample.exactRealValue(b.varId) else renderScalar(program, sample, name)
                 sb.append("% $prefix: _objective = $value;\n")
             }
         }
@@ -251,7 +244,7 @@ private fun renderArray(program: FlatZincProgram, sample: FlatZincValues, name: 
                     FlatZincArray.Vars.ElementKind.Int -> sb.append(sample.intValue(arr.varIds[i]))
 
                     FlatZincArray.Vars.ElementKind.Float -> {
-                        val b = requireNotNull(arr.floatBucketings)[i]
+                        val b = requireNotNull(arr.floatCoordinates)[i]
                         sb.append(sample.floatValue(b))
                     }
                 }

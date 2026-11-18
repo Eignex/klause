@@ -653,7 +653,7 @@ internal class CoreGuidedSearch(
                 }
 
         private fun exactColumn(problem: BakedProblem, v: Int): Boolean = v < problem.numIntVars &&
-            !problem.semantics.isApproximate && problem.intBounds.hasLower(v) && problem.intBounds.hasUpper(v)
+            !problem.semantics.relaxesFeasibility && problem.intBounds.hasLower(v) && problem.intBounds.hasUpper(v)
 
         private fun cheapest(problem: BakedProblem, objective: LinearObjective): BigInt {
             var value = objective.boolWeightValues.fold(bigIntOf(objective.constant)) { total, weight ->

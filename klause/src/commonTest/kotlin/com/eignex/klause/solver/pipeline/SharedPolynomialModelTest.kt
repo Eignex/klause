@@ -203,7 +203,7 @@ class SharedPolynomialModelTest {
         val x = FloatHandle("x", -2.0, 2.0)
         val compiled = SchemaDef<SchemaEntry>(
             mapOf(
-                "x" to FloatSpec(-2.0, 2.0, 5),
+                "x" to FloatSpec(-2.0, 2.0),
                 "square" to NamedConstraint((x * x) eq 2.0),
             ),
         ).compile()

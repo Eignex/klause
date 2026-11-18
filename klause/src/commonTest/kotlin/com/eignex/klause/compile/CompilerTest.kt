@@ -43,7 +43,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -58,8 +57,8 @@ class CompilerTest {
     fun `an independent strict component should preserve exact rational equalities`() {
         val compiled = SchemaDef<SchemaEntry>(
             mapOf(
-                "exact" to FloatSpec(0.0, 1.0, 2),
-                "grid" to FloatSpec(0.0, 1.0, 3),
+                "exact" to FloatSpec(0.0, 1.0),
+                "grid" to FloatSpec(0.0, 1.0),
                 "b" to BoolSpec,
                 "boolean" to NamedConstraint(Not(BoolRef("b"))),
                 "exactRow" to NamedConstraint(
@@ -77,11 +76,8 @@ class CompilerTest {
         val exactId = compiled.realVarIdByName.getValue("exact")
         val rational = requireNotNull(sample.exactReals)[exactId]
         assertEquals(BigFraction.ONE, rational * BigFraction.ofLong(3))
-        val gridSpec = compiled.floatDecoders.getValue("grid")
-        val grid = gridSpec.realValue(sample.ints[compiled.intVarIdByName.getValue("grid")].toInt())
+        val grid = sample.approximateRealValue(compiled.realVarIdByName.getValue("grid"))
         assertTrue(grid > 0.25 && grid <= 1.0)
-        assertFalse(compiled.floatRepresentations.getValue("exact").approximate)
-        assertTrue(compiled.floatRepresentations.getValue("grid").approximate)
     }
 
     @Test
@@ -167,7 +163,7 @@ class CompilerTest {
     @Test
     fun `a float var should lower to an LP-only column and decode`() {
         class FloatTune : VariableSchema() {
-            val rate by floatVar(min = 0.0, max = 1.0, buckets = 11)
+            val rate by floatVar(min = 0.0, max = 1.0)
             val highRate by constraint { rate ge 0.5 }
         }
         val schema = FloatTune()

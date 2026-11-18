@@ -22,7 +22,7 @@ internal class SeparableObjectiveView private constructor(
             objective: LinearObjective,
             cancellation: ExecutionControl = problem.cancellation,
         ): SeparableObjectiveView? {
-            if (problem.semantics.isApproximate || problem.numRealVars != 0 ||
+            if (problem.semantics.relaxesFeasibility || problem.numRealVars != 0 ||
                 problem.numIntVars > 4096 || objective.intCoefficientValues.size > problem.numIntVars ||
                 objective.boolWeightValues.size > minOf(4096, problem.numBoolVars) ||
                 objective.realCoefficientValues.size > 4096 || objective.intCoefficientValues.isEmpty()

@@ -2,10 +2,11 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Assignment
@@ -335,15 +336,15 @@ class DefinitionalSweepNetworkTest {
 
     @Test
     fun `propagated moves after probes should agree with complete definition sweeps`() {
-        val execution = parseFlatZincExecution(src)
-        val problem = execution.program.problem.bake()
-        val sweep = assertNotNull(execution.definitionalSweep)
+        val execution = parseFlatZinc(src)
+        val problem = execution.problem.bake()
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
         val state = LocalSearchState(problem, Random(5))
         state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         sweep.sweep(state.assignment, state.rootDomains)
         state.recompute()
-        val x = execution.program.intVarsByName.getValue("x")
-        val y = execution.program.intVarsByName.getValue("y")
+        val x = execution.intVarsByName.getValue("x")
+        val y = execution.intVarsByName.getValue("y")
         val expected = Assignment(problem.numBoolVars, problem.numIntVars)
 
         for (i in 0 until 20) {
@@ -362,9 +363,9 @@ class DefinitionalSweepNetworkTest {
 
     @Test
     fun `states sharing a definition network should propagate their own assignments`() {
-        val execution = parseFlatZincExecution(src)
-        val program = execution.program
-        val network = assertNotNull(execution.definitionalSweep)
+        val execution = parseFlatZinc(src)
+        val program = execution
+        val network = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
             .network(program.problem.numIntVars, program.problem.numBoolVars)
         val problem = program.problem.bake()
         val first = LocalSearchState(problem, Random(5))
@@ -386,13 +387,13 @@ class DefinitionalSweepNetworkTest {
 
     @Test
     fun `nested definition scores should agree with committed moves`() {
-        val execution = parseFlatZincExecution(src)
-        val problem = execution.program.problem.bake()
+        val execution = parseFlatZinc(src)
+        val problem = execution.problem.bake()
         val state = LocalSearchState(problem, Random(5))
-        state.invariants = assertNotNull(execution.definitionalSweep)
+        state.invariants = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
             .network(problem.numIntVars, problem.numBoolVars)
-        val x = execution.program.intVarsByName.getValue("x")
-        val y = execution.program.intVarsByName.getValue("y")
+        val x = execution.intVarsByName.getValue("x")
+        val y = execution.intVarsByName.getValue("y")
         state.recompute()
         state.apply(Move.IntSet(x, 7))
         state.apply(Move.IntSet(y, 0))
@@ -426,9 +427,9 @@ class DefinitionalSweepNetworkTest {
 
     @Test
     fun `defined vars should track their inputs across applied moves`() {
-        val execution = parseFlatZincExecution(src)
-        val program = execution.program
-        val sweep = assertNotNull(execution.definitionalSweep)
+        val execution = parseFlatZinc(src)
+        val program = execution
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         val iv = program.intVarsByName
         val state = LocalSearchState(program.problem.bake(), Random(5))
@@ -451,9 +452,9 @@ class DefinitionalSweepNetworkTest {
 
     @Test
     fun `defined vars should be excluded from move generation`() {
-        val execution = parseFlatZincExecution(src)
-        val program = execution.program
-        val sweep = assertNotNull(execution.definitionalSweep)
+        val execution = parseFlatZinc(src)
+        val program = execution
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         val iv = program.intVarsByName
         assertTrue(net.isDefinedInt(iv.getValue("s")))

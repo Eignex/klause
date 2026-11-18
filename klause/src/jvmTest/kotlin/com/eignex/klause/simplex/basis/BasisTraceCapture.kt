@@ -1,7 +1,7 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.formats.flatzinc.SolveDirective
-import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -131,8 +131,8 @@ internal object BasisTraceCapture {
         val precompiled = source.fileName.toString().endsWith(".fzn")
         val compiler = if (precompiled) null else miniZincVersion()
         val flatZinc = if (precompiled) sourceText else flatten(source)
-        val execution = parseFlatZincExecution(flatZinc)
-        val program = execution.program
+        val execution = parseFlatZinc(flatZinc)
+        val program = execution
         val objective: LinearObjective? = when (val solve = program.solve) {
             SolveDirective.Satisfy -> null
 

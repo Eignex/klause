@@ -4,8 +4,6 @@ import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.ExecutionControl
 
-// Route and operation binding selected by setup. A private grid consumer reads it before setup
-// returns the immutable PreparedSourceInvocation.
 internal class SourceRouteSelection(
     val request: SourceSetupRequest,
     val route: SourceProblemRoute,
@@ -44,10 +42,9 @@ internal class SourceRouteSelection(
     }
 }
 
-/** Source, operation, selected plan and optional private grid, fixed before setup returns. */
+/** Source, operation and selected plan, fixed before setup returns. */
 class PreparedSourceInvocation internal constructor(
     internal val selection: SourceRouteSelection,
-    internal val floatGrid: SelectedFloatGridBinding? = null,
 ) {
     internal constructor(
         request: SourceSetupRequest,
@@ -75,18 +72,15 @@ class PreparedSourceInvocation internal constructor(
     /** Captured strategy admission; transformed models retain their own execution admission. */
     val admission: StrategyAdmission? get() = selection.admission
 
-    internal val engineRoute: SourceProblemRoute get() = floatGrid?.route ?: route
+    internal val engineRoute: SourceProblemRoute get() = route
 
-    internal val enginePlan: PreparedSourcePlan? get() = floatGrid?.route?.preparedPlan ?: preparedPlan
+    internal val enginePlan: PreparedSourcePlan? get() = preparedPlan
 
     internal val canonicalPolynomial: Boolean get() = engineRoute is SourceProblemRoute.PolynomialTheory ||
         (enginePlan?.originalSource is com.eignex.klause.ir.Problem &&
             enginePlan?.execution is PreparedExecution.Polynomial)
 
-    /** Captured private grid geometry, when an explicit finite consumer selected it. */
-    val floatProjection: SourceFloatProjection? get() = floatGrid?.metadata
-
-    private val finite: FiniteSolveShape? = (if (floatGrid != null) gridShape(floatGrid) else originalShape())
+    private val finite: FiniteSolveShape? = originalShape()
         ?.also { it.bindSourceInvocation(this) }
 
     private fun originalShape(): FiniteSolveShape? = (route as? SourceProblemRoute.Finite)?.let { selected ->
@@ -100,30 +94,6 @@ class PreparedSourceInvocation internal constructor(
             objectiveIntVar = objective?.singleIntObjective()?.varId,
             definitionalSweep = null,
             searchHints = selection.finiteSearchHints,
-            componentPlan = selected.componentPlan,
-            preparedPlan = selected.preparedPlan,
-        )
-    }
-
-    private fun gridShape(binding: SelectedFloatGridBinding): FiniteSolveShape {
-        require(binding.consumer.selection === selection) { "grid consumer belongs to a different source invocation" }
-        binding.projection.mapping.requireSource(source.problem)
-        binding.projection.mapping.requireOwner(binding.consumer)
-        binding.projection.mapping.requireTarget(binding.route.problem)
-        require(binding.route.preparedPlan.belongsTo(binding.route.problem)) {
-            "grid plan must retain its private source frame"
-        }
-        val selected = binding.route
-        val objective = binding.nativeObjective
-        return FiniteSolveShape(
-            problem = selected.problem,
-            optimize = operation == ExecutionOperation.OPTIMIZE,
-            maximize = request.maximize,
-            localSearchObjective = null,
-            linearObjective = objective,
-            objectiveIntVar = objective?.singleIntObjective()?.varId,
-            definitionalSweep = null,
-            searchHints = source.searchHints,
             componentPlan = selected.componentPlan,
             preparedPlan = selected.preparedPlan,
         )

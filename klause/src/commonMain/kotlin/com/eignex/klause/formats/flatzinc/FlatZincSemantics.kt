@@ -1,9 +1,5 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
-import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.FloatSemantics
@@ -16,7 +12,6 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.ir.numericalSourceTolerance
-import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
@@ -27,29 +22,20 @@ import com.eignex.util.numbers.toDouble
 val flatZincSemantics: SourceSemantics = SourceSemantics(
     format = SourceFormat.FLATZINC,
     numericAuthority = NumericAuthority.BINARY64_LITERALS,
-    floats = FloatSemantics.Grid(DEFAULT_FLOAT_BUCKETS, DEFAULT_FLOAT_SCALE),
+    floats = FloatSemantics.Continuous,
     undeclaredIntegers = UndeclaredIntegerBounds(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
     undeclaredReals = UndeclaredRealBounds(),
     feasibilityTolerance = numericalSourceTolerance,
 )
 
 internal class FlatZincSemantics(
-    private val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
-    private val floatScale: Long = DEFAULT_FLOAT_SCALE,
     private val unboundedIntLo: Long? = null,
     private val unboundedIntHi: Long? = null,
-    private val unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
-    private val unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     private val exactFloats: Boolean = false,
 ) {
     fun resolve(overrides: SemanticOverrides): EffectiveSourceSemantics {
         val defaults = checkNotNull(flatZincSemantics.undeclaredIntegers)
         val legacy = flatZincSemantics.copy(
-            floats = if (exactFloats) FloatSemantics.Continuous else FloatSemantics.Grid(
-                floatBuckets, floatScale, UndeclaredRealBounds(
-                    semanticFloat(unboundedFloatLo), semanticFloat(unboundedFloatHi),
-                ),
-            ),
             feasibilityTolerance = if (exactFloats) SourceTolerance() else flatZincSemantics.feasibilityTolerance,
             undeclaredIntegers = UndeclaredIntegerBounds(
                 unboundedIntLo ?: defaults.lower,
@@ -60,13 +46,6 @@ internal class FlatZincSemantics(
         return EffectiveSourceSemantics(flatZincSemantics, effective)
     }
 }
-
-private fun semanticFloat(value: Double): SemanticRational {
-    val rational = requireNotNull(BigFraction.ofDouble(value)) { "float grid window must be finite" }
-    return SemanticRational.of(rational.num, rational.den)
-}
-
-internal fun SemanticRational.gridFloat(): Double = approximateGridValue(BigFraction.of(numerator, denominator))
 
 internal fun SemanticRational.sourceRealBound(): Double = binary64("undeclared real bound")
 
@@ -84,9 +63,3 @@ private fun SemanticRational.binary64(role: String): Double {
     }
     return value
 }
-
-internal fun EffectiveSourceSemantics.gridDefaults(): FloatSemantics.Grid =
-    effective.floats as? FloatSemantics.Grid ?: FloatSemantics.Grid(
-        DEFAULT_FLOAT_BUCKETS, DEFAULT_FLOAT_SCALE,
-        UndeclaredRealBounds(semanticFloat(DEFAULT_UNBOUNDED_FLOAT_LO), semanticFloat(DEFAULT_UNBOUNDED_FLOAT_HI)),
-    )

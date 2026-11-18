@@ -366,7 +366,7 @@ allowance and retains an already checked publication if later work stops.
 
 `solver.validation` checks coordinates that no engine enforced against original source
 obligations: caller-supplied starting points, relations an engine cannot propagate or
-score, transformed float-grid points and arithmetic completions. Integer search trusts
+score and arithmetic completions. Integer search trusts
 its own propagation and does not re-derive its leaves. A rejection refutes only the
 point, and an interrupted check is indeterminate.
 
@@ -434,9 +434,7 @@ callback can add a restriction but cannot replace relation coverage. Exact polic
 uses the full original real graph. Nonzero tolerance reads every relation over a real
 coordinate as [FlatZinc floats](04-finite-formats.md#flatzinc-floats) describe: rows
 and residual readings hold within the slack, while strict rows, disequalities and rows
-whose reifying Boolean is false hold exactly. A private-grid relation cannot
-certify its own original real relation; see
-[private float projections](02-model.md#private-float-projections).
+whose reifying Boolean is false hold exactly.
 
 `finiteWitnessVerifier` combines the finite point check with exact real checking or
 the caller's explicit tolerance policy, checking pins and deduced bounds directly on

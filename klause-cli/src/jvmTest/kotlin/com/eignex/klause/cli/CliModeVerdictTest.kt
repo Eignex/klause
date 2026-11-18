@@ -3,9 +3,6 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.formats.flatzinc.prepareFiniteCompatibility
-import com.eignex.klause.formats.flatzinc.sourceAttachment
-import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
@@ -14,10 +11,7 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.pipeline.ExecutionOperation
-import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
-import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.ConflictAnalysisStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
@@ -260,19 +254,21 @@ class CliModeVerdictTest {
         "constraint float_times(x,w,z); constraint float_eq(z,0.3);"
 
     @Test
-    fun `incomplete engines should not refute a satisfiable float product through the grid`() {
+    fun `incomplete engines should not refute a satisfiable source product`() {
         val outputs = listOf("localsearch", "alns").associateWith {
-            solveFlatZinc("$gridProduct solve satisfy;", "-e", it)
+            solveFlatZinc("$gridProduct solve satisfy;", "-e", it, "--param", "node-limit=64")
         }
 
-        assertTrue(outputs.values.all { "=====UNKNOWN=====" in it.lines() && "klause-float-claim" in it }, "$outputs")
+        assertTrue(outputs.values.all {
+            "=====UNSATISFIABLE=====" !in it.lines() && "klause-float-claim" !in it
+        }, "$outputs")
     }
 
     @Test
     fun `local search should not refute a float product minimization through the grid`() {
-        val out = solveFlatZinc("$gridProduct solve minimize x;", "-e", "localsearch")
+        val out = solveFlatZinc("$gridProduct solve minimize x;", "-e", "localsearch", "--param", "node-limit=64")
 
-        assertTrue("=====UNKNOWN=====" in out.lines() && "=====UNSATISFIABLE=====" !in out, out)
+        assertTrue("==========" !in out.lines() && "=====UNSATISFIABLE=====" !in out, out)
     }
 
     @Test
@@ -317,99 +313,7 @@ class CliModeVerdictTest {
         }
 
         assertEquals(mapOf("mixed" to listOf("%%%mzn-stat: floatApproximation=false"),
-            "localsearch -a" to listOf("%%%mzn-stat: floatApproximation=true")), stats)
-    }
-
-    @Test
-    fun `a grid enumeration should list accepted points without a completeness marker`() {
-        val out = captureStdout {
-            MiniZincOutput(floatApproximation = true, gridEnumeration = true).apply {
-                onSolution("x = 0.0;\n----------\n", null, null)
-                onComplete(Verdict.SATISFIABLE)
-            }
-        }
-
-        assertTrue("----------" in out.lines() && "klause-float-claim" in out, out)
-        assertTrue("==========" !in out.lines() && "=====UNKNOWN=====" !in out.lines(), out)
-    }
-
-    @Test
-    fun `a source-accepted grid solution should report satisfiable`() {
-        val program = parseFlatZinc("var 0.0..1.0: x :: output_var; " +
-            "constraint float_le(x,0.5); solve satisfy;", floatBuckets = 3)
-        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        assertNotNull(invocation.floatProjection)
-        val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it) }, null)
-        val common = CommonOptions().apply {
-            engine = "fixed"
-            parallel = 1
-            randomSeed = 17
-        }
-
-        val out = captureStdout { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
-
-        assertTrue("x = " in out, out)
-        assertTrue("private finite grid" in out, out)
-        assertTrue("==========" in out.lines(), out)
-    }
-
-    @Test
-    fun `a rounded grid witness should not be published as a source solution`() {
-        val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; " +
-            "constraint float_eq(x,0.5); constraint float_times(x,x,y); solve satisfy;", floatBuckets = 3)
-        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        assertNotNull(invocation.floatProjection)
-        val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it) }, null)
-        val common = CommonOptions().apply {
-            engine = "fixed"
-            parallel = 1
-            randomSeed = 17
-        }
-
-        val out = captureStdout { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
-
-        assertTrue("klause-grid-verdict: SAT" in out, out)
-        assertTrue("=====UNKNOWN=====" in out.lines(), out)
-        assertTrue("y = 0.0;" !in out && "==========" !in out.lines(), out)
-    }
-
-    @Test
-    fun `a grid refutation of a satisfiable source should report unknown`() {
-        val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; " +
-            "constraint float_eq(x,0.25); constraint float_times(x,x,y); solve satisfy;", floatBuckets = 3)
-        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
-        assertNotNull(invocation.floatProjection)
-        val solvable = Solvable(invocation.finiteShape(), { "unexpected grid point" }, null)
-        val common = CommonOptions().apply {
-            engine = "fixed"
-            parallel = 1
-            randomSeed = 17
-        }
-
-        val out = captureStdout { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
-
-        assertTrue("=====UNKNOWN=====" in out.lines(), out)
-        assertTrue("=====UNSATISFIABLE=====" !in out, out)
-        assertTrue("klause-grid-verdict: UNSAT" in out, out)
-        assertTrue("unexpected grid point" !in out, out)
-    }
-
-    @Test
-    fun `an interrupted grid incumbent should withhold an optimum marker`() {
-        val out = captureStdout {
-            MiniZincOutput(floatApproximation = true).apply {
-                onSolution("x = 0.5;\n----------\n", 1L, null)
-                onVerdictContext(VerdictContext(budgetExhausted = true))
-                onComplete(Verdict.BEST_FOUND)
-            }
-        }
-
-        assertTrue("x = 0.5;\n----------" in out, out)
-        assertTrue("==========" !in out, out)
-        assertTrue("private finite grid" in out, out)
+            "localsearch -a" to listOf("%%%mzn-stat: floatApproximation=false")), stats)
     }
 
     @Test

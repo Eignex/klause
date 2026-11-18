@@ -47,7 +47,7 @@ sealed interface ContinuousRealExpr {
     ) : ContinuousRealExpr
 }
 
-/** Exact top-level continuous equality; reified and finite-grid contexts decline. */
+/** Exact top-level continuous equality; reified contexts decline. */
 @Serializable
 @SerialName("continuous_equality")
 data class ContinuousRealEquality(

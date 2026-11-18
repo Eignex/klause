@@ -136,7 +136,7 @@ class CliModeOpenTheoryTest {
     }
 
     @Test
-    fun `an open theory satisfaction model should refuse all-solutions`() {
+    fun `an open theory satisfaction model should report unknown for all-solutions`() {
         val smt = File.createTempFile("cliopenenum", ".smt2").apply {
             writeText(
                 """
@@ -149,10 +149,10 @@ class CliModeOpenTheoryTest {
         }
 
         var code = -1
-        val err = captureStderr { code = runCli(arrayOf("-a", smt.absolutePath)) }
+        val out = captureStdout { code = runCli(arrayOf("-a", smt.absolutePath)) }
 
-        assertEquals(2, code, err)
-        assertTrue("all-solution enumeration is unavailable" in err, err)
+        assertEquals(0, code, out)
+        assertEquals("unknown", out.lines().first(), out)
     }
 
     @Test

@@ -208,7 +208,6 @@ class FlatZincCompilerTest {
                 constraint float_lin_eq([1.0, 1.0], values, 74.0);
                 solve satisfy;
                 """.trimIndent(),
-                floatBuckets = 5,
                 exactFloats = exact,
             )
 
@@ -221,7 +220,7 @@ class FlatZincCompilerTest {
     }
 
     @Test
-    fun `open scalar and array floats should use the configured search range`() {
+    fun `open scalar and array floats should retain caller real bounds`() {
         for (declaration in listOf("var float: x;", "array[1..2] of var float: x;")) {
             val program = parseFlatZinc(
                 "$declaration\n" + if (declaration.startsWith("array")) {
@@ -229,16 +228,20 @@ class FlatZincCompilerTest {
                 } else {
                     "constraint float_le(x, 0.0); solve satisfy;"
                 },
-                unboundedFloatLo = -3.0,
-                unboundedFloatHi = 7.0,
-                floatBuckets = 5,
+                semanticOverrides = com.eignex.klause.ir.SemanticOverrides(
+                    undeclaredReals = com.eignex.klause.ir.BoundsOverride(
+                        com.eignex.klause.ir.BoundOverride.Value(com.eignex.klause.ir.SemanticRational.ofLong(-3)),
+                        com.eignex.klause.ir.BoundOverride.Value(com.eignex.klause.ir.SemanticRational.ofLong(7)),
+                    ),
+                ),
             )
 
             for (float in program.floatVarsByName.values) {
-                assertEquals(-3.0, float.valueOf(0))
-                assertEquals(7.0, float.valueOf(4))
+                assertEquals(-3.0, float.lo)
+                assertEquals(7.0, float.hi)
             }
-            assertEquals(0, program.problem.numRealVars)
+            assertEquals(if (declaration.startsWith("array")) 2 else 1, program.problem.numRealVars)
+            assertEquals(0, program.problem.numIntVars)
         }
     }
 
@@ -274,7 +277,6 @@ class FlatZincCompilerTest {
             "var 0.0..1.0: x; constraint float_lin_le([1e20], [x], 1.0); solve satisfy;",
         )
 
-        assertTrue(program.floatVarsByName.getValue("x").lpOnly)
         assertEquals(0, program.problem.numIntVars)
         val row = program.sourceProgram.problem.factors.filterIsInstance<Linear>().single()
         assertEquals(1e20, row.realConstants?.realCoefficients?.at(0))

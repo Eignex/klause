@@ -143,8 +143,7 @@ private fun Factor.generalExecutionCapabilities(): FactorExecutionCapabilities? 
     } else {
         domainRelaxation
     }
-    is Abs, is GridAbs -> domainRelaxation
-    is GridArithmetic -> finiteDomains
+    is Abs -> domainRelaxation
     is WideDivMod -> finiteBounds
     is DivMod -> finiteDomains
     is Inverse, is ValuePrecede -> finiteDomains
@@ -158,7 +157,6 @@ private fun Factor.generalExecutionCapabilities(): FactorExecutionCapabilities? 
     is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation
     is Circuit, is Cumulative, is Diffn -> filteringRelaxation
     is ComparisonClause, is Xor, is LexLess, is Sort, is AllDifferentTuples -> finiteFiltering
-    is GridArrayMinMax -> filteringRelaxation
     is RealElement -> realArithmetic.copy(propagation = PropagationCapability.BOUNDS_FILTERING, inertReason = null)
     is RealArrayMinMax -> if (leafEnforced) realArithmetic.copy(scoring = ScoringCapability.INERT) else
         realArithmetic.copy(propagation = PropagationCapability.UNSUPPORTED, inertReason = null)

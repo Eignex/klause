@@ -1,14 +1,9 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
-import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -16,7 +11,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.lowering.CnfLowering
-import com.eignex.klause.lowering.FloatBucketing
+import com.eignex.klause.lowering.FloatCoordinate
 import com.eignex.klause.lowering.FloatRepresentation
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
@@ -29,50 +24,32 @@ import com.eignex.util.io.StringCharSource
 /** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(
     internal val model: FznModel,
-    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
-    floatScale: Long = DEFAULT_FLOAT_SCALE,
     // Compatibility hint; source retention is independent of the requested search.
     internal val forLocalSearch: Boolean = false,
     /** Default domain for unbounded `var int` declarations. */
     unboundedIntLo: Long? = null,
     unboundedIntHi: Long? = null,
-    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
-    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-    internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
+    internal val floatChoiceLimit: Int = 4096,
     internal val booleanZeroSumClauseLimit: Int = 32_768,
-    internal val forFloatPlanning: Boolean = false,
     private val semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ) : CnfLowering {
     internal val sourceSemantics = FlatZincSemantics(
-        floatBuckets = floatBuckets,
-        floatScale = floatScale,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
-        unboundedFloatLo = unboundedFloatLo,
-        unboundedFloatHi = unboundedFloatHi,
         exactFloats = exactFloats,
     ).resolve(semanticOverrides)
     private val integerSemantics = checkNotNull(sourceSemantics.effective.undeclaredIntegers)
     private val realSemantics = checkNotNull(sourceSemantics.effective.undeclaredReals)
     private val sourceRealLower = realSemantics.lower?.sourceRealBound() ?: Double.NEGATIVE_INFINITY
     private val sourceRealUpper = realSemantics.upper?.sourceRealBound() ?: Double.POSITIVE_INFINITY
-    private val hasDefaultRealBounds = realSemantics.lower != null || realSemantics.upper != null
-    private val gridSemantics = sourceSemantics.gridDefaults()
-    internal val floatBuckets = gridSemantics.buckets
-    internal val floatScale = gridSemantics.linearScale
     internal val unboundedIntLo = integerSemantics.lower ?: Long.MIN_VALUE
     internal val unboundedIntHi = integerSemantics.upper ?: Long.MAX_VALUE
-    internal val unboundedFloatLo: Double get() = checkNotNull(gridSemantics.unrangedBounds.lower).gridFloat()
-    internal val unboundedFloatHi: Double get() = checkNotNull(gridSemantics.unrangedBounds.upper).gridFloat()
-    internal val exactFloats = sourceSemantics.effective.floats == FloatSemantics.Continuous
     private val openIntegerLower = IntHashSet()
     private val openIntegerUpper = IntHashSet()
 
     init {
-        require(floatBuckets > 0) { "floatBuckets must be positive" }
-        require(floatScale > 0) { "floatScale must be positive" }
         require(booleanZeroSumClauseLimit >= 0) { "booleanZeroSumClauseLimit must be nonnegative" }
         require(floatChoiceLimit > 0) { "floatChoiceLimit must be positive" }
     }
@@ -83,7 +60,7 @@ internal class FlatZincCompiler(
     internal val booleanIntegerChannels = HashMap<Int, Int>()
     internal var lowerBooleanZeroSums: Boolean = true
     internal var floatRepresentations: Map<String, FloatRepresentation> = emptyMap()
-    internal val floatVars = HashMap<String, FloatBucketing>()
+    internal val floatVars = HashMap<String, FloatCoordinate>()
     internal val arrays = HashMap<String, FlatZincArray>()
     internal val intDomains = ArrayList<IntDomain>()
     internal val divModRelations = com.eignex.klause.lowering.DivModRelationIndex()
@@ -93,13 +70,9 @@ internal class FlatZincCompiler(
     override fun newBool(): Int = numBoolVars++
     override var trueLitCache: Int = -1
 
-    internal var lpOnlyFloats: Set<String> = emptySet()
-    private var declaredRealCount: Int = 0
-    private val finiteRepresentations by lazy { selectFloatRepresentations(exact = false) }
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
     internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
-    internal val floatSearchWindowIds = HashSet<Int>()
     internal val floatValueLiterals = HashMap<Pair<Int, Double>, Int>()
     internal val integerFloatSources = HashMap<Int, Int>()
 
@@ -116,12 +89,10 @@ internal class FlatZincCompiler(
 
     internal fun compile(): FlatZincProgram {
         processDeclarations()
-        declaredRealCount = realLo.size
-        lpOnlyFloats = floatVars.keys.toSet()
-        floatRepresentations = floatVars.mapValues { FloatRepresentation(it.value.varId, null) }
-        integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
+        floatRepresentations = floatVars.mapValues { FloatRepresentation(it.value.varId) }
+        integerFloatImages.putAll(collectIntegerFloatImages())
         collectAffineFloatImages()
-        if (lpOnlyFloats.isNotEmpty()) {
+        if (floatVars.isNotEmpty()) {
             for (domain in collectFiniteFloatDomains()) {
                 recordFiniteFloatChoices(domain)
             }
@@ -129,28 +100,6 @@ internal class FlatZincCompiler(
         }
         return compileConstraints()
     }
-
-    // Real and integer ids overlap after lowering; planning keeps all declarations in one
-    // placeholder namespace while retaining caller policy and source bounds.
-    internal fun floatPlanningDeclarations(): FlatZincCompiler = FlatZincCompiler(
-        model = model,
-        floatBuckets = floatBuckets,
-        floatScale = floatScale,
-        forLocalSearch = forLocalSearch,
-        unboundedIntLo = unboundedIntLo,
-        unboundedIntHi = unboundedIntHi,
-        unboundedFloatLo = DEFAULT_UNBOUNDED_FLOAT_LO,
-        unboundedFloatHi = DEFAULT_UNBOUNDED_FLOAT_HI,
-        exactFloats = exactFloats,
-        settings = settings,
-        floatChoiceLimit = floatChoiceLimit,
-        booleanZeroSumClauseLimit = booleanZeroSumClauseLimit,
-        forFloatPlanning = true,
-        semanticOverrides = semanticOverrides.copy(
-            floats = sourceSemantics.effective.floats,
-            feasibilityTolerance = sourceSemantics.effective.feasibilityTolerance,
-        ),
-    ).also { it.processDeclarations() }
 
     internal fun processDeclarations() {
         for (decl in model.varDecls) {
@@ -224,10 +173,7 @@ internal class FlatZincCompiler(
             floatRepresentations = floatRepresentations,
             semantics = sourceSemantics,
             definitionHints = definitionHints,
-        ).also { program ->
-            program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount,
-                selectRepresentations = { finiteRepresentations }, projectSearch = { compileSearchAnnotation(it) }))
-        }
+        )
     }
 
     internal fun processDecl(d: FznVarDecl) {
@@ -296,7 +242,6 @@ internal class FlatZincCompiler(
 
             is FznType.FloatRange, FznType.FloatAny -> {
                 val fb = resolveFloatElement(rhs, name)
-                if (!fb.lpOnly) intVars[name] = fb.varId
                 floatVars[name] = fb
             }
 
@@ -385,10 +330,10 @@ internal class FlatZincCompiler(
         }
         val length = type.length
         val varIds = IntArray(length)
-        val bucketings = if (type.element is FznType.FloatRange ||
+        val coordinates = if (type.element is FznType.FloatRange ||
             type.element == FznType.FloatAny
         ) {
-            ArrayList<FloatBucketing>()
+            ArrayList<FloatCoordinate>()
         } else {
             null
         }
@@ -397,16 +342,16 @@ internal class FlatZincCompiler(
                 failHere("array `$name`: initializer length ${value.elements.size} != declared $length")
             }
             for ((i, e) in value.elements.withIndex()) {
-                if (bucketings != null) {
+                if (coordinates != null) {
                     val fb = resolveFloatElement(e, "$name[${i + 1}]")
                     varIds[i] = fb.varId
-                    bucketings.add(fb)
+                    coordinates.add(fb)
                 } else {
                     varIds[i] = resolveVarRef(e, type.element)
                 }
             }
             val kind = arrayElementKind(type.element)
-            arrays[name] = FlatZincArray.Vars(name, varIds, kind, bucketings?.toList())
+            arrays[name] = FlatZincArray.Vars(name, varIds, kind, coordinates?.toList())
             return
         }
         for (i in 0 until length) {
@@ -421,12 +366,12 @@ internal class FlatZincCompiler(
                 is FznType.FloatRange -> {
                     val v = allocFloat(elemName, t.lo, t.hi)
                     varIds[i] = v
-                    requireNotNull(bucketings).add(floatVars.getValue(elemName))
+                    requireNotNull(coordinates).add(floatVars.getValue(elemName))
                 }
 
                 FznType.FloatAny -> {
                     varIds[i] = allocOpenFloat(elemName)
-                    requireNotNull(bucketings).add(floatVars.getValue(elemName))
+                    requireNotNull(coordinates).add(floatVars.getValue(elemName))
                 }
 
                 FznType.IntAny -> varIds[i] = allocUndeclaredInt(elemName)
@@ -437,7 +382,7 @@ internal class FlatZincCompiler(
             }
         }
         val kind = arrayElementKind(type.element)
-        arrays[name] = FlatZincArray.Vars(name, varIds, kind, bucketings?.toList())
+        arrays[name] = FlatZincArray.Vars(name, varIds, kind, coordinates?.toList())
     }
 
     internal fun arrayElementKind(t: FznType): FlatZincArray.Vars.ElementKind = when (t) {
@@ -541,44 +486,13 @@ internal class FlatZincCompiler(
         else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
     }
 
-    internal fun allocOpenFloat(name: String): Int {
-        if (!forFloatPlanning) return allocFloat(name, sourceRealLower, sourceRealUpper)
-        if (name in lpOnlyFloats || (forFloatPlanning && (exactFloats || hasDefaultRealBounds))) {
-            return allocFloat(name, sourceRealLower, sourceRealUpper)
-        }
-        val lower = if (realSemantics.lower == null) unboundedFloatLo else sourceRealLower
-        val upper = if (realSemantics.upper == null) unboundedFloatHi else sourceRealUpper
-        return allocFloat(name, lower, upper).also {
-            if (forFloatPlanning) floatSearchWindowIds.add(it)
-        }
-    }
+    internal fun allocOpenFloat(name: String): Int = allocFloat(name, sourceRealLower, sourceRealUpper)
 
-    internal fun allocFloat(
-        name: String,
-        lo: Double,
-        hi: Double,
-        lpOnly: Boolean = !forFloatPlanning || name in lpOnlyFloats,
-    ): Int {
-        if (lpOnly) {
-            // LP-only continuous column: a real variable, absent from CP search. The linear
-            // float handlers emit real rows over it; the returned id is a real var id (not an int var).
-            val rid = realLo.size
-            realLo.add(lo)
-            realHi.add(hi)
-            floatVars[name] = FloatBucketing(rid, lo, hi, floatBuckets, lpOnly = true)
-            return rid
-        }
-        if (exactFloats && !forFloatPlanning) {
-            unsupportedHere("float variable `$name`: its constraints are unsupported by exact float lowering")
-        }
-        if (!forFloatPlanning && (!lo.isFinite() || !hi.isFinite())) {
-            unsupportedHere("float variable `$name`: a bucketed constraint or objective requires a finite range")
-        }
-        val buckets = if (lo == hi) 1 else floatBuckets
-        val id = intDomains.size
-        intDomains.add(IntDomain(0L, (buckets - 1).toLong(), settings.storage))
-        intVars[name] = id
-        floatVars[name] = FloatBucketing(id, lo, hi, buckets)
+    internal fun allocFloat(name: String, lo: Double, hi: Double): Int {
+        val id = realLo.size
+        realLo.add(lo)
+        realHi.add(hi)
+        floatVars[name] = FloatCoordinate(id, lo, hi)
         return id
     }
 
@@ -735,25 +649,17 @@ internal class FlatZincCompiler(
  *  The [forLocalSearch] compatibility hint retains source constraints for either value. */
 fun parseFlatZinc(
     source: String,
-    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
-    floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long? = null,
     unboundedIntHi: Long? = null,
-    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
-    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): FlatZincProgram = parseFlatZinc(
     StringCharSource(source),
-    floatBuckets = floatBuckets,
-    floatScale = floatScale,
     forLocalSearch = forLocalSearch,
     unboundedIntLo = unboundedIntLo,
     unboundedIntHi = unboundedIntHi,
-    unboundedFloatLo = unboundedFloatLo,
-    unboundedFloatHi = unboundedFloatHi,
     exactFloats = exactFloats,
     settings = settings,
     semanticOverrides = semanticOverrides,
@@ -765,25 +671,17 @@ fun parseFlatZinc(
  *  The [forLocalSearch] compatibility hint retains source constraints for either value. */
 fun parseFlatZinc(
     source: CharSource,
-    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
-    floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long? = null,
     unboundedIntHi: Long? = null,
-    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
-    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
 ): FlatZincProgram = parseFlatZincWithMetadata(
     source,
-    floatBuckets,
-    floatScale,
     forLocalSearch,
     unboundedIntLo,
     unboundedIntHi,
-    unboundedFloatLo,
-    unboundedFloatHi,
     exactFloats,
     settings,
     semanticOverrides,
@@ -791,13 +689,9 @@ fun parseFlatZinc(
 
 internal fun parseFlatZincWithMetadata(
     source: CharSource,
-    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
-    floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long? = null,
     unboundedIntHi: Long? = null,
-    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
-    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
     settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
@@ -805,13 +699,9 @@ internal fun parseFlatZincWithMetadata(
     val model = FlatZincParser(FlatZincLexer(CharReader(source))).parse()
     return FlatZincCompiler(
         model,
-        floatBuckets = floatBuckets,
-        floatScale = floatScale,
         forLocalSearch = forLocalSearch,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
-        unboundedFloatLo = unboundedFloatLo,
-        unboundedFloatHi = unboundedFloatHi,
         exactFloats = exactFloats,
         settings = settings,
         semanticOverrides = semanticOverrides,

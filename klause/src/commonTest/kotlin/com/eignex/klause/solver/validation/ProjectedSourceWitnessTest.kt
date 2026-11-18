@@ -40,7 +40,7 @@ class ProjectedSourceWitnessTest {
         val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
             intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
                 feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(3), bigIntOf(10)))).resolve())
         val checker = source.withFactors(emptyArray()).bake()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))

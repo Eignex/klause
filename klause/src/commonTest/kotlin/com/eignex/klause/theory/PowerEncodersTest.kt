@@ -91,7 +91,7 @@ class PowerEncodersTest {
         val sources = listOf(
             SchemaDef<SchemaEntry>(
                 mapOf(
-                    "x" to FloatSpec(-3.0, 3.0, 7),
+                    "x" to FloatSpec(-3.0, 3.0),
                     "power" to NamedConstraint(x.pow(2) eq 4.0),
                 ),
             ).compile().problem,

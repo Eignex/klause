@@ -286,7 +286,7 @@ class MpsModel(
             "MPS requires explicit undeclared range defaults"
         }
         require(semantics.floats == null && semantics.pinAbsentOptionalValues == null) {
-            "MPS does not support grid or optional-value policies"
+            "MPS does not support float or optional-value policies"
         }
     }
 

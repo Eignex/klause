@@ -15,8 +15,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.ExecutionOperation
-import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
-import com.eignex.klause.solver.pipeline.NativeGridOutcome
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.LpStats
@@ -45,8 +43,6 @@ internal object MiniZincMode : CliMode {
         private var outputObjective = false
         private var completeAssignment = false
         private var floatSource = false
-        private var floatApproximation = false
-        private var gridEnumeration = false
         private var sourceSemantics: EffectiveSourceSemantics? = null
 
         override fun flags(): List<FlagSpec> = listOf(
@@ -122,24 +118,6 @@ internal object MiniZincMode : CliMode {
             }
             val elapsed = start.elapsedNow().inWholeMilliseconds
             common.logRoute(invocation.route, elapsed)
-            floatApproximation = invocation.floatProjection != null
-            gridEnumeration = floatApproximation && operation == ExecutionOperation.ENUMERATE
-            if (invocation.floatProjection != null) {
-                val realObjective = sourceObjective?.takeIf {
-                    it.realCoefficients.any { coefficient -> coefficient != 0.0 }
-                }
-                return Solvable(
-                    finite = invocation.finiteShape(),
-                    render = render,
-                    objectiveValue = sourceObjective?.takeIf { realObjective == null }
-                        ?.let { linear -> { sample -> linear.evaluateLong(sample) } },
-                    continuousObjectiveValue = realObjective?.let { linear ->
-                        { sample -> linear.evaluateExact(sample).toDouble() }
-                    },
-                    routingLpStats = lpStats,
-                    routingElapsedMs = elapsed,
-                )
-            }
             return preparedSourceSolvable(invocation, render, { assignment ->
                 val text = applier?.render(original, assignment)
                     ?: writeFlatZincSolution(original, assignment, outputObjective)
@@ -178,15 +156,13 @@ internal object MiniZincMode : CliMode {
         }
 
         override fun output(common: CommonOptions): OutputProtocol =
-            MiniZincOutput(floatApproximation, sourceSemantics, gridEnumeration, floatSource)
+            MiniZincOutput(sourceSemantics, floatSource)
     }
 }
 
 /** MiniZinc's standard FZN solution protocol. */
 internal class MiniZincOutput(
-    private val floatApproximation: Boolean = false,
     private val sourceSemantics: EffectiveSourceSemantics? = null,
-    private val gridEnumeration: Boolean = false,
     private val floatSource: Boolean = false,
 ) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
@@ -251,7 +227,7 @@ internal class MiniZincOutput(
     }
 
     private fun unattainedLimit(value: SourceValue, sense: ObjectiveSense, strict: Boolean) {
-        if (floatApproximation || declarationScopeChanged) return
+        if (declarationScopeChanged) return
         val minimize = sense == ObjectiveSense.MINIMIZE
         val status = if (minimize) "unattained-infimum" else "unattained-supremum"
         val direction = if (minimize) "lower" else "upper"
@@ -262,9 +238,6 @@ internal class MiniZincOutput(
     }
 
     override fun onComplete(verdict: Verdict) {
-        if (floatApproximation) {
-            println("% klause-float-claim: private finite grid; source-checked points, no grid refutation or optimum")
-        }
         if (integerScopeChanged) {
             println("% klause-source-claim: caller integer bounds; no default-source proof")
         }
@@ -272,8 +245,7 @@ internal class MiniZincOutput(
             println("% klause-source-claim: caller real bounds; no default-source proof")
         }
         when (flatZincSourceVerdict(verdict, declarationScopeChanged)) {
-            // Grid solutions skip the source points between buckets, so they never complete an enumeration.
-            Verdict.SATISFIABLE, Verdict.OPTIMAL -> if (!gridEnumeration) println("==========")
+            Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 
             // Incumbents already streamed; printing `==========` would falsely claim optimality.
             Verdict.BEST_FOUND -> Unit
@@ -296,12 +268,6 @@ internal class MiniZincOutput(
         }
     }
 
-    override fun onNativeGridOutcome(result: NativeGridOutcome) {
-        val outcome = result.outcome as? FiniteSolveOutcome.Completed ?: return
-        println("% klause-grid-verdict: ${outcome.verdict}; scope=private-grid")
-        println("% klause-grid-solutions: ${outcome.solutions}")
-    }
-
     override fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {
         printStatPairs("%%%mzn-stat:", pairs)
     }
@@ -314,7 +280,7 @@ internal class MiniZincOutput(
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
         println("%%%mzn-stat: solutions=$solutions")
-        if (floatSource) println("%%%mzn-stat: floatApproximation=$floatApproximation")
+        if (floatSource) println("%%%mzn-stat: floatApproximation=false")
         // Presolve summary is backend-independent (presolve runs before any engine), so emit it here.
         printStatPairs("%%%mzn-stat:", presolveStatPairs(stats))
         if (stats.run.backend.isNotEmpty()) {

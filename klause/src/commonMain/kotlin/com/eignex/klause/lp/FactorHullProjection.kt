@@ -1,7 +1,6 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
@@ -10,7 +9,6 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.lowering.gridAbsoluteValueTable
 
 /** The optional convex-hull family emitted by this factor's LP relaxation. */
 internal fun Factor.lpHullFamily(): HullFamily? = when (this) {
@@ -21,7 +19,7 @@ internal fun Factor.lpHullFamily(): HullFamily? = when (this) {
     is NValue -> HullFamily.NVALUE
     is Product -> HullFamily.PRODUCT
     is Regular -> HullFamily.REGULAR
-    is GridAbs, is Table -> HullFamily.TABLE
+    is Table -> HullFamily.TABLE
     else -> null
 }
 
@@ -44,7 +42,6 @@ internal fun Factor.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? = when (th
     is Mdd -> estimateLpHull(boxes)
     is NValue -> estimateLpHull(boxes)
     is Regular -> estimateLpHull(boxes)
-    is GridAbs -> gridAbsoluteValueTable(this).estimateLpHull(boxes)
     is Table -> estimateLpHull(boxes)
     else -> null
 }
@@ -58,7 +55,6 @@ internal suspend fun SequenceScope<Unit>.prepareLpHull(
     is Mdd -> prepareLpHull(factor, boxes)
     is NValue -> prepareLpHull(factor, boxes)
     is Regular -> prepareLpHull(factor, boxes)
-    is GridAbs -> prepareLpHull(gridAbsoluteValueTable(factor), boxes)
     is Table -> prepareLpHull(factor, boxes)
     else -> null
 }

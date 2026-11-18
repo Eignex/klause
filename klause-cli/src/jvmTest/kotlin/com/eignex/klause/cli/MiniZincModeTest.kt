@@ -1,10 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.flatzinc.linearObjective
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.formats.flatzinc.prepareFiniteCompatibility
-import com.eignex.klause.formats.flatzinc.sourceAttachment
-import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -179,13 +174,11 @@ class MiniZincModeTest(private val direction: String) {
                 val common = CommonOptions().apply {
                     this.engine = engine
                     parallel = 1
-                    sourceOptions.floatBuckets = 2
                 }
                 val session = MiniZincMode.newSession()
                 val solvable = session.load(source.absolutePath, common)
                 val invocation = assertNotNull(solvable.sourceInvocation)
                 assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
-                assertNull(invocation.floatProjection)
                 val bytes = ByteArrayOutputStream()
                 val stream = PrintStream(bytes)
                 try {
@@ -204,42 +197,6 @@ class MiniZincModeTest(private val direction: String) {
             System.setOut(previous)
             source.delete()
         }
-    }
-
-    @Test
-    fun `a nonlinear grid optimum should stay a grid verdict without an optimum marker`() {
-        val program = parseFlatZinc("var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
-            "constraint float_le(x,0.75); constraint float_times(x,x,y); solve $direction y;", floatBuckets = 5)
-        val maximize = direction == "maximize"
-        val objective = assertNotNull(program.sourceProgram.linearObjective())
-        val normalized = if (maximize) objective.negated() else objective
-        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, normalized, maximize = maximize))
-        assertNotNull(invocation.floatProjection)
-        val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it, true) },
-            null, continuousObjectiveValue = { normalized.evaluateExact(it).toDouble() })
-        val common = CommonOptions().apply {
-            engine = "fixed"
-            parallel = 1
-            randomSeed = 17
-        }
-        val bytes = ByteArrayOutputStream()
-        val previous = System.out
-        val stream = PrintStream(bytes)
-
-        try {
-            System.setOut(stream)
-            SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true))
-        } finally {
-            System.setOut(previous)
-            stream.close()
-        }
-
-        val text = bytes.toString(Charsets.UTF_8.name())
-        assertTrue("klause-grid-verdict: OPTIMAL" in text, text)
-        assertFalse("==========" in text.lines(), text)
-        val lines = text.lines()
-        if (maximize) assertFalse("y = 0.5;" in lines, text) else assertTrue("_objective = 0.0;" in lines, text)
     }
 
     @Test
@@ -263,7 +220,6 @@ class MiniZincModeTest(private val direction: String) {
             val solvable = session.load(source.absolutePath, common)
             val invocation = assertNotNull(solvable.sourceInvocation)
             assertEquals(FloatSemantics.Continuous, invocation.source.semantics.effective.floats)
-            assertNull(invocation.floatProjection)
             System.setOut(stream)
             SolveCore.solve(solvable, common, session.output(common))
         } finally {
@@ -339,7 +295,6 @@ class MiniZincModeTest(private val direction: String) {
                 val solvable = MiniZincMode.newSession().load(source.absolutePath, common)
                 val invocation = assertNotNull(solvable.sourceInvocation)
 
-                assertNull(invocation.floatProjection, engine)
                 assertEquals(1, assertIs<com.eignex.klause.ir.Problem>(invocation.source.originalSource).numRealVars)
             }
         } finally {

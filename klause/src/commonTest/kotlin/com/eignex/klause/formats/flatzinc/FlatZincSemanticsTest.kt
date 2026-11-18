@@ -13,16 +13,13 @@ import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.util.io.StringCharSource
-import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
-import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FlatZincSemanticsTest {
@@ -161,8 +158,6 @@ class FlatZincSemanticsTest {
         val programs = listOf(
             parseFlatZinc(source, semanticOverrides = overrides),
             parseFlatZinc(StringCharSource(source), semanticOverrides = overrides),
-            parseFlatZincExecution(source, semanticOverrides = overrides).program,
-            parseFlatZincExecution(StringCharSource(source), semanticOverrides = overrides).program,
         )
 
         for (program in programs) {
@@ -170,56 +165,6 @@ class FlatZincSemanticsTest {
             assertEquals(1_000_000L, program.problem.intBounds.upper(0))
             assertEquals(programs.first().semantics.effective, program.semantics.effective)
         }
-    }
-
-    @Test
-    fun `typed grid windows should retain representable subnormal endpoints`() {
-        val endpoint = SemanticRational.of(BIG_ONE, BIG_ONE shl 1074)
-        val bounds = UndeclaredRealBounds(endpoint, endpoint)
-        val overrides = SemanticOverrides(floats = FloatSemantics.Grid(8, 1_000_000, bounds))
-
-        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = overrides)
-
-        val variable = program.floatVarsByName.getValue("x")
-        assertEquals(Double.MIN_VALUE, variable.lo)
-        assertEquals(Double.MIN_VALUE, variable.hi)
-    }
-
-    @Test
-    fun `a typed rational window should remain exact private geometry`() {
-        val lower = SemanticRational.of(bigIntOf(1), bigIntOf(10))
-        val bounds = UndeclaredRealBounds(lower, SemanticRational.ONE)
-        val overrides = SemanticOverrides(floats = FloatSemantics.Grid(8, 1_000_000, bounds))
-
-        val execution = parseFlatZincExecution("var float: x; solve minimize x;", semanticOverrides = overrides)
-
-        val projection = assertNotNull(assertNotNull(execution.sourceInvocation).floatProjection)
-        assertEquals(lower, projection.coordinates.single().origin)
-        assertEquals(SemanticRational.of(bigIntOf(9), bigIntOf(70)), projection.coordinates.single().step)
-        assertEquals(Double.NEGATIVE_INFINITY, execution.program.sourceProgram.problem.realLower[0])
-        assertEquals(Double.POSITIVE_INFINITY, execution.program.sourceProgram.problem.realUpper[0])
-    }
-
-    @Test
-    fun `typed float windows should reach declaration planning without certifying singleton choices`() {
-        val bounds = UndeclaredRealBounds(SemanticRational.ofLong(2), SemanticRational.ofLong(2))
-        val overrides = SemanticOverrides(floats = FloatSemantics.Grid(8, 1_000_000, bounds))
-        val source = """
-            var float: x;
-            var float: y;
-            var float: z;
-            constraint float_times(x, y, z);
-            solve satisfy;
-        """.trimIndent()
-
-        val program = parseFlatZinc(source, semanticOverrides = overrides)
-
-        for (variable in program.floatVarsByName.values) {
-            assertFalse(variable.lpOnly)
-            assertEquals(2.0, variable.lo)
-            assertEquals(2.0, variable.hi)
-        }
-        assertTrue(program.semantics.isApproximate)
     }
 
     @Test
@@ -260,26 +205,8 @@ class FlatZincSemanticsTest {
             undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
         ))
 
-        assertTrue(program.floatVarsByName.getValue("x").lpOnly)
         assertEquals(2_000_000.0, program.problem.realLower[0])
         assertEquals(Double.POSITIVE_INFINITY, program.problem.realUpper[0])
-    }
-
-    @Test
-    fun `finite caller real defaults should define the unranged objective grid`() {
-        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
-            floats = FloatSemantics.Grid(4, 1_000_000),
-            undeclaredReals = BoundsOverride(
-                BoundOverride.Value(SemanticRational.ofLong(2_000_000)),
-                BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
-            ),
-        ))
-
-        val variable = program.floatVarsByName.getValue("x")
-        assertFalse(variable.lpOnly)
-        assertEquals(2_000_000.0, variable.lo)
-        assertEquals(3_000_000.0, variable.hi)
-        assertEquals(4, variable.buckets)
     }
 
     @Test
@@ -312,30 +239,5 @@ class FlatZincSemanticsTest {
         }
 
         assertTrue("undeclared real bound cannot be represented exactly" in error.message.orEmpty())
-    }
-
-    @Test
-    fun `a disjoint grid window should preserve the original real default and native route`() {
-        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
-            floats = FloatSemantics.Grid(4, 1_000_000),
-            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-        ))
-
-        assertEquals(2_000_000.0, program.sourceProgram.problem.realLower[0])
-        assertEquals(Double.POSITIVE_INFINITY, program.sourceProgram.problem.realUpper[0])
-        assertSame(program.sourceProgram.problem, program.problem)
-        assertTrue(program.floatVarsByName.getValue("x").lpOnly)
-    }
-
-    @Test
-    fun `an unrepresentable private linear scale should preserve the original source`() {
-        val policy = FloatSemantics.Grid(4, 9_007_199_254_740_993L)
-        val program = parseFlatZinc("var float: x; solve minimize x;",
-            semanticOverrides = SemanticOverrides(floats = policy))
-
-        assertEquals(policy, program.semantics.effective.floats)
-        assertSame(program.sourceProgram.problem, program.problem)
-        assertEquals(1, program.problem.numRealVars)
-        assertEquals(0, program.problem.numIntVars)
     }
 }

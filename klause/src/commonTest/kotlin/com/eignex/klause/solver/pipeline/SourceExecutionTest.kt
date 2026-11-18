@@ -524,7 +524,7 @@ class SourceExecutionTest {
     }
 
     @Test
-    fun `nonfinite enumeration should reject before constructing an execution consumer`() {
+    fun `nonfinite enumeration should decline without constructing an execution consumer`() {
         val source = Problem(
             0,
             0,
@@ -542,14 +542,10 @@ class SourceExecutionTest {
             ),
         )
 
-        assertFailsWith<PipelineConfigException> {
-            SourceSetup.execute(
-                SourceExecutionRequest(
-                    invocation,
-                    finiteRequest = { error("an incompatible finite consumer was constructed") },
-                ),
-            )
-        }
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { error("an incompatible finite consumer was constructed") }))
+
+        assertEquals(TerminationReason.Unsupported, assertIs<SourceExecutionResult.Declined>(result).reason)
     }
 
     @Test

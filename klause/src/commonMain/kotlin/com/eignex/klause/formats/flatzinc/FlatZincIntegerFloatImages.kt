@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatImage
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatProduct
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -21,7 +20,6 @@ internal fun FlatZincCompiler.collectIntegerFloatProduct(c: FznConstraint): Bool
     val a = floatImage(aRef) ?: return false
     val b = floatImage(bRef) ?: return false
     val target = resolveFloatVarOrConst(c.args[2])
-    if (target is FloatRef.Var && !target.bk.lpOnly) return false
     if (a.terms.isEmpty() || b.terms.isEmpty()) {
         val image = if (a.terms.isEmpty()) b.scaled(a.constant) else a.scaled(b.constant)
         integerFloatProducts[c] = IntegerFloatProduct(null, image)
@@ -59,13 +57,12 @@ internal fun FlatZincCompiler.emitIntegerImageProduct(c: FznConstraint, target: 
     postAffinePredicate(image + product.image.scaled(BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO)
 }
 
-internal fun FlatZincCompiler.collectIntegerFloatImages(onlyRealColumns: Boolean): Map<Int, IntegerFloatImage> {
+internal fun FlatZincCompiler.collectIntegerFloatImages(): Map<Int, IntegerFloatImage> {
     val images = HashMap<Int, IntegerFloatImage>()
     for (c in model.constraints) {
         if (c.name != "int2float" || c.args.size != 2) continue
         locateConstraint(c)
         val target = resolveFloatVarOrConst(c.args[1]) as? FloatRef.Var ?: continue
-        if (onlyRealColumns && !target.bk.lpOnly) continue
         images[target.bk.varId] = IntegerFloatImage(resolveIntVar(c.args[0]), 1.0)
     }
     val direct = images.toMap()
@@ -80,7 +77,6 @@ internal fun FlatZincCompiler.collectIntegerFloatImages(onlyRealColumns: Boolean
             if (coefficients[i] != 1.0 && coefficients[i] != -1.0) continue
             val target = variables[i] as? FloatRef.Var ?: continue
             val source = variables[1 - i] as? FloatRef.Var ?: continue
-            if (onlyRealColumns && !target.bk.lpOnly) continue
             val image = direct[source.bk.varId] ?: continue
             val scale = -coefficients[1 - i] / coefficients[i]
             if (scale.isFinite() && target.bk.varId !in images) {
@@ -93,43 +89,8 @@ internal fun FlatZincCompiler.collectIntegerFloatImages(onlyRealColumns: Boolean
 
 internal fun FlatZincCompiler.floatReferences(e: FznExpr): List<FloatRef> = when (e) {
     is FznExpr.ArrayLit -> e.elements.map(::resolveFloatVarOrConst)
-    is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.Vars)?.floatBucketings?.map { FloatRef.Var(it) }.orEmpty()
+    is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.Vars)?.floatCoordinates?.map { FloatRef.Var(it) }.orEmpty()
     else -> emptyList()
-}
-
-internal fun FlatZincCompiler.needsRoundedFloatBounds(variable: Int, image: IntegerFloatImage, limit: Int): Boolean {
-    val declaredBounds = model.varDecls.any { declaration ->
-        declaration.isVar && when (val type = declaration.type) {
-            is FznType.FloatRange -> floatVars[declaration.name]?.varId == variable
-
-            is FznType.Array -> {
-                val variables = (arrays[declaration.name] as? FlatZincArray.Vars)?.floatBucketings
-                type.element is FznType.FloatRange && variables?.any { it.varId == variable } == true
-            }
-
-            else -> false
-        }
-    }
-    if (!declaredBounds) return false
-    val bounds = floatVars.values.first { it.varId == variable }
-    val values = intDomains[image.variable].spanOrNull(limit.toLong()) ?: return false
-    val scale = requireNotNull(BigFraction.ofDouble(image.scale))
-    // The original arm accepts an image within the declared slack of its bound, so only a wider crossing rounds.
-    val policy = sourceSemantics.effective.feasibilityTolerance
-    val lower = requireNotNull(BigFraction.ofDouble(bounds.lo))
-    val upper = requireNotNull(BigFraction.ofDouble(bounds.hi))
-    for (i in 0 until values.size) {
-        val value = values.valueAt(i)
-        val rounded = image.scale * value.toDouble()
-        if (rounded != bounds.lo && rounded != bounds.hi) continue
-        val exact = scale * BigFraction.ofLong(value)
-        if ((rounded == bounds.lo && exact < lower - capturedSourceSlack(policy, lower)) ||
-            (rounded == bounds.hi && exact > upper + capturedSourceSlack(policy, upper))
-        ) {
-            return true
-        }
-    }
-    return false
 }
 
 internal fun FlatZincCompiler.emitIntegerFloatProduct(
@@ -148,7 +109,6 @@ internal fun FlatZincCompiler.emitIntegerFloatProduct(
             "__integer_float_product_${realLo.size}",
             Double.NEGATIVE_INFINITY,
             Double.POSITIVE_INFINITY,
-            lpOnly = true,
         )
     }
     factors.add(

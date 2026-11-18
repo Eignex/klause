@@ -55,7 +55,10 @@ class MiniZincModeRoutingTest(
                     "No routing LP work: standalone=${stats.standalonePasses.sum}, " +
                         "component=${stats.componentPasses.sum}",
                 )
-            } else assertNotNull(solvable.sourceInvocation.floatProjection)
+            } else {
+                val original = solvable.sourceInvocation.source.originalSource as com.eignex.klause.ir.Problem
+                assertEquals(1, original.numRealVars)
+            }
         } finally {
             source.delete()
         }

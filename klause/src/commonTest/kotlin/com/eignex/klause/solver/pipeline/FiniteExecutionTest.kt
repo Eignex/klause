@@ -181,28 +181,6 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `incomplete engines should search float sources without a private grid`() {
-        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
-
-        val grids = engines.associateWith { engine ->
-            floatEqualities.keys.map { setup(it, engine, ExecutionOperation.SATISFY).floatProjection }
-        }
-
-        assertEquals(engines.associateWith { listOf(null, null) }, grids)
-    }
-
-    @Test
-    fun `incomplete engines should enumerate float sources on the private grid`() {
-        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
-
-        val grids = engines.associateWith { engine ->
-            floatEqualities.keys.map { setup(it, engine, ExecutionOperation.ENUMERATE).floatProjection != null }
-        }
-
-        assertEquals(engines.associateWith { listOf(true, true) }, grids)
-    }
-
-    @Test
     fun `incomplete engines should satisfy a float equality the grid misses`() {
         val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
 

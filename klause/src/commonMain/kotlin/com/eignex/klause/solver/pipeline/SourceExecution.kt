@@ -410,6 +410,10 @@ fun SourceSetup.execute(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks = SourceExecutionCallbacks(),
 ): SourceExecutionResult {
+    val invocation = request.invocation
+    if (invocation.operation == ExecutionOperation.ENUMERATE &&
+        executionKind(invocation) !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
+    ) return SourceExecutionResult.Declined(invocation, TerminationReason.Unsupported)
     val kind = validateSourceExecution(request)
     if (request.prepareOnly && kind == SourceExecutionKind.LINEAR) return prepareSourceExecution(request)
     val validation = request.invocation.source.takeIf {
@@ -457,11 +461,6 @@ fun SourceSetup.execute(
 private fun validateSourceExecution(request: SourceExecutionRequest): SourceExecutionKind {
     val invocation = request.invocation
     val kind = SourceSetup.executionKind(invocation)
-    if (invocation.operation == ExecutionOperation.ENUMERATE &&
-        kind !in setOf(SourceExecutionKind.FINITE, SourceExecutionKind.REFUTED)
-    ) {
-        throw PipelineConfigException("all-solution enumeration is unavailable for source ${kind.name.lowercase()}")
-    }
     if (invocation.operation !in setOf(
             ExecutionOperation.SATISFY,
             ExecutionOperation.OPTIMIZE,

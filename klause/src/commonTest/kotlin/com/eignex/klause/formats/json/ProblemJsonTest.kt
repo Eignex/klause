@@ -181,11 +181,7 @@ class ProblemJsonTest {
         val semantics = SourceSemantics(
             SourceFormat.MPS,
             NumericAuthority.DECIMAL_LITERALS,
-            floats = FloatSemantics.Grid(
-                16,
-                1000,
-                UndeclaredRealBounds(SemanticRational.of(bigIntOf(-1), bigIntOf(3)), SemanticRational.ofLong(9)),
-            ),
+            floats = FloatSemantics.Continuous,
             undeclaredIntegers = UndeclaredIntegerBounds(0, null),
             undeclaredReals = UndeclaredRealBounds(null, SemanticRational.ofLong(5)),
             feasibilityTolerance = SourceTolerance(

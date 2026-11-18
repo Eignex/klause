@@ -85,7 +85,7 @@ class CompiledSchemaTest {
             emptyMap(),
             mapOf("bucket" to 0),
             emptyMap(),
-            mapOf("bucket" to FloatSpec(0.0, 1.0, 3)),
+            mapOf("bucket" to FloatSpec(0.0, 1.0)),
             realVarIdByName = mapOf("real" to 0),
         )
 
@@ -99,8 +99,8 @@ class CompiledSchemaTest {
         val y = FloatHandle("y", 0.0, 1.0)
         val source = SchemaDef<SchemaEntry>(
             mapOf(
-                "x" to FloatSpec(-1.0, 1.0, 3),
-                "y" to FloatSpec(0.0, 1.0, 3),
+                "x" to FloatSpec(-1.0, 1.0),
+                "y" to FloatSpec(0.0, 1.0),
                 "square" to NamedConstraint((x * x) eq y),
             ),
         ).compile()

@@ -12,8 +12,8 @@ import kotlin.test.assertTrue
 
 class FlatZincFloatConstraintsTest {
 
-    private fun solve(src: String, buckets: Int = 5): SolveResult =
-        BacktrackSolver(parseFlatZinc(src, floatBuckets = buckets).problem.bake())
+    private fun solve(src: String): SolveResult =
+        BacktrackSolver(parseFlatZinc(src).problem.bake())
             .solve(BacktrackParams(randomSeed = 0L))
 
     @Test
@@ -36,7 +36,7 @@ class FlatZincFloatConstraintsTest {
     }
 
     @Test
-    fun `default float lowering should bucket linear and nonlinear floats`() {
+    fun `default float lowering should retain linear and nonlinear real coordinates`() {
         val program = parseFlatZinc(
             """
             var 0.0..10.0: x;
@@ -47,12 +47,12 @@ class FlatZincFloatConstraintsTest {
             solve satisfy;
             """.trimIndent(),
         )
-        assertEquals(0, program.problem.numRealVars)
-        assertEquals(3, program.problem.numIntVars)
+        assertEquals(3, program.problem.numRealVars)
+        assertEquals(0, program.problem.numIntVars)
     }
 
     @Test
-    fun `nonlinear float constraint should keep the whole model bucketed`() {
+    fun `nonlinear float constraints should retain real coordinates`() {
         val program = parseFlatZinc(
             """
             var 0.0..10.0: x;
@@ -62,8 +62,8 @@ class FlatZincFloatConstraintsTest {
             solve satisfy;
             """.trimIndent(),
         )
-        assertEquals(0, program.problem.numRealVars)
-        assertTrue(program.problem.numIntVars >= 2)
+        assertEquals(2, program.problem.numRealVars)
+        assertEquals(0, program.problem.numIntVars)
     }
 
     @Test

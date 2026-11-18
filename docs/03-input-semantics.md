@@ -12,7 +12,7 @@ schema frontend. The next two chapters cover file formats.
 | Kotlin schema DSL | [Schema lowering](#schema-lowering): float representation, exact products and refused contexts |
 | Problem JSON | [Problem JSON](#problem-json): lossless interchange of any `Problem` and its captured semantics |
 | DIMACS, WCNF, OPB/WBO and XCSP3 | [Finite formats](04-finite-formats.md): encodings and objectives |
-| FlatZinc | [FlatZinc semantics](04-finite-formats.md#flatzinc): Boolean channels, exact/grid floats and reconstruction |
+| FlatZinc | [FlatZinc semantics](04-finite-formats.md#flatzinc): Boolean channels, source real arithmetic and reconstruction |
 | MPS | [MPS semantics](05-arithmetic-formats.md): decimal correspondence, exact certification and tolerances |
 | SMT-LIB | [SMT-LIB semantics](05-arithmetic-formats.md#smt-lib-source-semantics): admission, lowering and exact models |
 
@@ -27,7 +27,7 @@ model like any other source and qualifies results under its captured certificati
 | Source | Numeric authority |
 |---|---|
 | Library IR and schema DSL | Declared integers, binary64 rational real coefficients and explicit exact objective coefficients |
-| FlatZinc and compiled MiniZinc | Float components use binary64 rational literals, accepted within the declared tolerance or exactly at zero tolerance; a private grid only proposes points the source accepts |
+| FlatZinc and compiled MiniZinc | Float components use binary64 rational literals, accepted within the declared tolerance or exactly at zero tolerance |
 | SMT-LIB | Exact numerals, lexical scopes and original declarations; no invented integer domains |
 | MPS | Original decimals, indicator conditions and objective units; tolerance publication and exact certification are distinct |
 | XCSP3 | Finite integer arithmetic only |
@@ -52,8 +52,8 @@ MPS, SMT-LIB and exact FlatZinc.
 
 `-e` selects complete traversal, local search, ALNS or a mixed portfolio over the
 selected route. Supported linear and polynomial sources keep the same constraints
-and objective across those strategies, and FlatZinc floats keep the original source
-except where [FlatZinc floats](04-finite-formats.md#flatzinc-floats) selects a private grid. SMT-LIB can fall back to open local search
+and objective across those strategies. FlatZinc floats keep their original source.
+SMT-LIB can fall back to open local search
 for an unsupported fragment, supplying witnesses without a completeness claim;
 exact FlatZinc declines unsupported open fragments. MPS keeps finite search for
 bounded integer choices and the exact linear theory for surviving open integers (see
@@ -98,9 +98,8 @@ term false.
 
 Schema integer `abs` and `realAbs`, FlatZinc `int_abs`, SMT-LIB integer `abs` and XCSP3
 `abs`/`dist` retain [absolute-value relations](02-model.md#absolute-value-relations).
-Wide SMT operands use `AffineAbs`; FlatZinc floats use `RealAbs` or `GridAbs`
-under their selected semantics. SMT-LIB real `abs` is unsupported; the other file
-formats have no absolute-value syntax.
+Wide SMT operands use `AffineAbs`; FlatZinc floats use `RealAbs`. SMT-LIB real `abs`
+is unsupported; the other file formats have no absolute-value syntax.
 
 ## Execution metadata
 
@@ -378,23 +377,15 @@ domain to exclude zero. See [integer division relations](02-model.md#integer-div
 
 ### Schema floats
 
-`schemaSemantics` declares binary64 literal authority, grid defaults and
-absent-value canonicalization; compilation resolves `SemanticOverrides` and keeps
-the result on `Problem.semantics`. Every declaration states its range, open sides
-included, so undeclared-range overrides do not apply; a grid over an open side uses
-the unranged window. Compilation preserves original real
-bounds, strict comparisons, disequalities, reified rows and nonlinear relations. A
-`FloatSpec.buckets` count describes consumer geometry only; it never constrains an
-exact source route.
-
-The compatibility `problem` getter and finite solver constructors request a lazy
-finite view. Under `FloatSemantics.Grid` it grids connected strict, disequal and
-optional float components while unrelated exact components stay real;
-`FloatRepresentation` describes that choice. Grids own finite filtering, scoring and
-private encodings, and a geometry they cannot represent declines the view without
-rejecting the schema. Grid exhaustion is no source refutation: source execution
-reconstructs and checks original coordinates before publication. See
-[private projections](02-model.md#private-float-projections).
+`schemaSemantics` declares binary64 literal authority, continuous reals and
+absent-value canonicalization. Compilation resolves `SemanticOverrides` and
+keeps the result on `Problem.semantics`. Every declaration states its range,
+including open sides, so undeclared-range overrides do not apply. Compilation
+preserves real bounds, strict comparisons, disequalities, reified rows and nonlinear
+relations. `CompiledSchema.problem` retains these source coordinates; float
+handles decode real values and build objectives over their original real columns.
+Source strategies select complete arithmetic or finite leaf completion where
+available; unsupported operations return undecided.
 
 ### Product representations
 
@@ -408,8 +399,7 @@ The DSL admits product equalities such as `(x * x * y) eq z`, `(x * y) eq 2.0`
 and `((x + 0.5) * y) eq z`; multiplication by a constant stays affine.
 `ContinuousRealEquality` reuses equal subexpressions and lowers to products and
 exact affine rows without floating multiplication. Boolean reification of these
-equalities is unsupported. Private grids use `GridProduct` and `GridPower` under
-their captured approximation policy.
+equalities is unsupported.
 
 ---
 

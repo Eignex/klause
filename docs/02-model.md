@@ -24,8 +24,7 @@ and structural key unchanged while any model, plan, lazy operation or proof uses
 A rewrite creates a fresh source scope.
 
 Real coordinates are declared the same way. `RealFiniteDomain` retains an immutable
-finite set of exact binary64 values for one real coordinate, and a selected finite
-grid never rounds a declared value onto the grid. `Power` retains a fixed
+finite set of exact binary64 values for one real coordinate. `Power` retains a fixed
 nonnegative integer exponent over integer or real coordinates; real powers are
 enforced by a selected arithmetic encoder.
 
@@ -56,7 +55,7 @@ constant excluded. Zero components require a closed bound and equal values, and 
 exact feasibility tolerance makes the effective gap zero.
 
 `EffectiveSourceSemantics` keeps both the defaults and the effective policy.
-`isApproximate` marks a grid or positive tolerance and `hasOverrides` records any
+`relaxesFeasibility` marks a positive feasibility tolerance and `hasOverrides` records any
 change; neither supplies proof authority. Source rewrites, baking, presolve views
 and private projections preserve this capture, and it selects no route or engine.
 
@@ -175,8 +174,7 @@ eligible outputs and correlated repairs.
 
 `Abs` retains `result = |operand|`. Linear encoding requires nonnegativity and the
 disjunction of positive and negative equalities; polynomial encoding retains the
-same formula. `AffineAbs` supports wide exact affine operands, `RealAbs` exact
-real coordinates, and `GridAbs` the declared bucket relation. Aliases and remapping
+same formula. `AffineAbs` supports wide exact affine operands and `RealAbs` real coordinates. Aliases and remapping
 preserve operand and result roles.
 
 ### Extrema and element relations
@@ -191,8 +189,7 @@ available alongside arithmetic participation.
 inequalities form a relaxation, and complete encoders also require the selected
 equality. A finite view under a positive absolute tolerance marks each
 `RealArrayMinMax` leaf-enforced, which finite search leaves inert; without that mark it
-has no finite propagation. `GridArrayMinMax` filters with exact integer activities and establishes
-nothing outside the declared grid policy.
+has no finite propagation.
 
 ### Exact linear source relations
 
@@ -251,34 +248,6 @@ encoder installs an exact value cover, guarded product rows and guard equivalenc
 the polynomial encoder enforces the same domain, guards and product. Witness checks
 include the product, domain and guards, and rays keep the finite operand fixed.
 Unguarded products receive no LP completion authority.
-
-### Grid arithmetic relations
-
-`GridProduct` and `GridPower` retain an operation and each index's binary64 range
-and bucket count. The nearest-output-bucket relation approximates continuous
-arithmetic: exact membership in it does not establish a continuous-source witness.
-Filtering passes and private encodings admit at most 4,096 input combinations;
-larger encodings decline while native filtering and scoring remain.
-
-### Private float projections
-
-`FloatSemantics.Grid` permits a private finite or heuristic projection without
-selecting one. A requesting consumer selects that view during setup, after route
-selection and before the invocation is returned;
-[FlatZinc](04-finite-formats.md#flatzinc-floats) defines its automatic fallback, and a
-compiled schema falls back to the grid whenever the original source admits no
-complete arm for the requested engine.
-Original declarations, relations and objective remain on the attachment, and private
-helpers stay distinct. Unsupported factors or stops decline only the view.
-
-Publication reconstructs engine coordinates into the private grid, then into
-original real coordinates, and only points the original model accepts are
-published. Grid exhaustion and optimization prove only grid claims, kept in
-`FiniteSolveResult.nativeGridOutcome`; `outcome` reports unknown, or the accepted
-point as satisfiable or best-found. A satisfiable grid enumeration claims no
-complete list of solutions. `outcome` is unsatisfiable only when root propagation
-refutes the source's integer and Boolean relations alone. See [source checking](08-presolve-reductions.md#source-witness-validation) and
-[reconstruction](07-presolve.md#guarantees-and-source-mappings).
 
 ## Engine projections and factor capabilities
 
@@ -369,8 +338,7 @@ single role as a supported-model flag.
 | Integer `Product` | Yes | None unless a source reduction makes it affine | Yes |
 | `RealProduct` | Continuous completion required | Conditioned integer operand | Yes |
 | `ContinuousProduct` | Continuous completion required | Declared finite operand choices | Yes |
-| `Abs`, `AffineAbs`, `GridAbs`, element and extrema relations | Integer forms; real forms need completion | Yes | Yes |
-| `GridProduct`, `GridPower` | Yes | At most 4,096 input combinations | At most 4,096 input combinations |
+| `Abs`, `AffineAbs`, element and extrema relations | Integer forms; real forms need completion | Yes | Yes |
 | `DivMod`, `WideDivMod` | Yes | Literal or conditioned divisor; wide affine division has a literal divisor | Yes |
 | `Power` | Integer form | Affine exponent or conditioned integer base | Yes |
 | `RealFiniteDomain` | Empty membership refutes; other cases need completion | Yes | Yes |

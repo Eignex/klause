@@ -5,13 +5,14 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.flatzinc.linearObjective
-import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -115,10 +116,10 @@ class LocalSearchStateTest {
             append("constraint int_lin_eq([1, -1, 1], [balance, hi, lo], 0) :: defines_var(balance); ")
             append("solve minimize balance;")
         }
-        val execution = parseFlatZincExecution(source)
-        val program = execution.program
+        val execution = parseFlatZinc(source)
+        val program = execution
         val problem = program.problem.bake()
-        val sweep = assertNotNull(execution.definitionalSweep)
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
         val state = LocalSearchState(problem, Random(0))
         for (v in 0 until problem.numIntVars) state.assignment.setInt(v, state.rootDomains[v].min)
         val team = IntArray(4) { program.intVarsByName.getValue("p${it + 1}") }

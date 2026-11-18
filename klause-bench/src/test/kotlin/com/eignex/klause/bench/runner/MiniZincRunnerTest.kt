@@ -8,7 +8,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.formats.flatzinc.FlatZincParseException
-import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -28,7 +28,7 @@ class MiniZincRunnerTest {
         @BeforeAll
         @JvmStatic
         fun initializeParser() {
-            val problem = parseFlatZincExecution("var 0..2: x; solve satisfy;").program.problem
+            val problem = parseFlatZinc("var 0..2: x; solve satisfy;").problem
             BacktrackSolver(problem.bake()).openEnumerate(BacktrackParams()).use { it.next() }
         }
     }

@@ -25,7 +25,7 @@ internal class BinaryObjectiveView(
             objective: LinearObjective,
             allowMixedObjective: Boolean = false,
         ): BinaryObjectiveView? {
-            if (problem.numRealVars > 0 || problem.semantics.isApproximate ||
+            if (problem.numRealVars > 0 || problem.semantics.relaxesFeasibility ||
                 objective.realCoefficientValues.any { it != 0.0 } ||
                 objective.boolWeightValues.size > problem.numBoolVars ||
                 objective.intCoefficientValues.none { it != 0L }

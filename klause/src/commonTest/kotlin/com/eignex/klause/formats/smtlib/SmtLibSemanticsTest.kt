@@ -4,7 +4,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
-import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
@@ -38,7 +37,7 @@ class SmtLibSemanticsTest {
             assertEquals(smtLibSemantics, source.semantics.effective)
             assertTrue(source.model.intBounds.isOpenLower(0))
             assertTrue(source.model.intBounds.isOpenUpper(0))
-            assertFalse(source.semantics.isApproximate)
+            assertFalse(source.semantics.relaxesFeasibility)
         }
     }
 
@@ -139,7 +138,6 @@ class SmtLibSemanticsTest {
     @Test
     fun `SMT entries should reject inapplicable or approximate semantic replacements before reading input`() {
         val replacements = listOf(
-            SemanticOverrides(floats = FloatSemantics.Grid(10, 100)),
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
             SemanticOverrides(pinAbsentOptionalValues = false),
         )

@@ -49,7 +49,8 @@ internal fun TranscendentalProblem.prepareFactorCompletion(
     var decline: PreparedPlanDecline? = when {
         (0 until source.numIntVars).any { !source.intBounds.hasLower(it) || !source.intBounds.hasUpper(it) } ->
             PreparedPlanDecline.OPEN_FINITE_INTEGER
-        source.semantics.isApproximate || semantics.isApproximate -> PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT
+        source.semantics.relaxesFeasibility || semantics.relaxesFeasibility ->
+            PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT
         else -> null
     }
     var completion: SharedTranscendentalModel? = null

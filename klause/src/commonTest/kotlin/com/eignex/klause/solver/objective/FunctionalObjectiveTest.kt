@@ -1,13 +1,16 @@
 package com.eignex.klause.solver.objective
 
-import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class FunctionalObjectiveTest {
     @Test
@@ -97,9 +100,10 @@ class FunctionalObjectiveTest {
             constraint int_lin_eq([1,-1,-1],[objective,ad1,ad2],0):: defines_var(objective);
             solve minimize objective;
         """.trimIndent()
-        val execution = parseFlatZincExecution(src)
-        val program = execution.program
-        val obj = assertIs<FunctionalObjective>(execution.localSearchObjective)
+        val execution = parseFlatZinc(src)
+        val program = execution
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
+        val obj = assertIs<FunctionalObjective>(sweep.functionalObjective(checkNotNull(execution.linearObjective())))
         val (a, b, c) = listOf("a", "b", "c").map { program.intVarsByName.getValue(it) }
         val assignment = Assignment(program.problem.numBoolVars, program.problem.numIntVars)
         assignment.setInt(a, 5)
@@ -128,9 +132,10 @@ class FunctionalObjectiveTest {
             constraint int_lin_eq([1,1,-1],[t1,t2,obj],0):: defines_var(obj);
             solve maximize obj;
         """.trimIndent()
-        val execution = parseFlatZincExecution(src)
-        val program = execution.program
-        val obj = assertIs<FunctionalObjective>(execution.localSearchObjective)
+        val execution = parseFlatZinc(src)
+        val program = execution
+        val sweep = assertNotNull(DefinitionalSweep.fromSource(execution.problem, execution.definitionHints))
+        val obj = assertIs<FunctionalObjective>(sweep.functionalObjective(checkNotNull(execution.linearObjective())))
         val x = intArrayOf(1, 2, 3, 4).map { program.boolVarsByName.getValue("x$it") }
         val assignment = Assignment(program.problem.numBoolVars, program.problem.numIntVars)
         for (v in x.take(3)) assignment.setBool(v, true)

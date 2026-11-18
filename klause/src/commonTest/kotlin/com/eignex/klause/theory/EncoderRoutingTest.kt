@@ -405,7 +405,7 @@ class EncoderRoutingTest {
         val x = FloatHandle("x", -1.0, 1.0)
         val compiled = SchemaDef<SchemaEntry>(
             mapOf(
-                "x" to FloatSpec(-1.0, 1.0, 3),
+                "x" to FloatSpec(-1.0, 1.0),
                 "square" to NamedConstraint((x * x) eq 0.0),
             ),
         ).compile()

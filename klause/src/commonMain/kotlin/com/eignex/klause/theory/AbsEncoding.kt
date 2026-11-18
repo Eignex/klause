@@ -2,7 +2,6 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AffineAbs
-import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.PolynomialRealFormula
@@ -10,7 +9,6 @@ import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.absoluteValueRows
 import com.eignex.klause.lowering.affineAbsoluteValueRows
-import com.eignex.klause.lowering.gridAbsoluteValueRows
 import com.eignex.klause.lowering.polynomialRow
 import com.eignex.klause.lowering.realAbsoluteValueRows
 
@@ -44,19 +42,6 @@ internal object AbsEncoding {
     val realPolynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
         factor as RealAbs
         installPolynomial(realAbsoluteValueRows(factor.operand, factor.result), encoding)
-    }
-
-    val gridLinear = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
-        val forms = gridAbsoluteValueRows(factor as GridAbs, encoding.cancellation)
-            ?: return@Encoder EncoderDecline.RESOURCE
-        for (form in forms) encoding.linear(form)
-        null
-    }
-
-    val gridPolynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
-        val forms = gridAbsoluteValueRows(factor as GridAbs, encoding.cancellation)
-            ?: return@Encoder EncoderDecline.RESOURCE
-        installPolynomial(forms, encoding)
     }
 
     private fun installPolynomial(forms: List<LinearForm>, encoding: TheoryEncoding): EncoderDecline? {

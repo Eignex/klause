@@ -95,26 +95,8 @@ class SourceSemanticsTest {
         val resolved = declared.resolve(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
         assertEquals(NumericAuthority.DECIMAL_LITERALS, resolved.effective.numericAuthority)
-        assertFalse(resolved.isApproximate)
-        assertTrue(declared.resolve().isApproximate)
-    }
-
-    @Test
-    fun `continuous overrides should preserve other float defaults`() {
-        val declared = SourceSemantics(
-            format = SourceFormat.FLATZINC,
-            floats = FloatSemantics.Grid(1024, 1_000_000),
-            undeclaredReals = UndeclaredRealBounds(SemanticRational.ofLong(-10), SemanticRational.ofLong(10)),
-        )
-
-        val resolved = declared.resolve(SemanticOverrides(floats = FloatSemantics.Continuous))
-
-        assertEquals(
-            UndeclaredRealBounds(SemanticRational.ofLong(-10), SemanticRational.ofLong(10)),
-            resolved.effective.undeclaredReals,
-        )
-        assertFalse(resolved.isApproximate)
-        assertTrue(declared.resolve().isApproximate)
+        assertFalse(resolved.relaxesFeasibility)
+        assertTrue(declared.resolve().relaxesFeasibility)
     }
 
     @Test
@@ -159,7 +141,7 @@ class SourceSemanticsTest {
         for (tolerance in listOf(SourceTolerance(absolute = slack), SourceTolerance(relative = slack))) {
             val declared = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance)
 
-            assertTrue(declared.resolve().isApproximate)
+            assertTrue(declared.resolve().relaxesFeasibility)
         }
     }
 
@@ -176,13 +158,6 @@ class SourceSemanticsTest {
             )
 
             assertEquals(replacement, resolved.effective.undeclaredIntegers)
-        }
-    }
-
-    @Test
-    fun `grid approximation windows should require finite endpoints`() {
-        for (bounds in listOf(UndeclaredRealBounds(), UndeclaredRealBounds(lower = SemanticRational.ZERO))) {
-            assertFailsWith<IllegalArgumentException> { FloatSemantics.Grid(8, 1000, bounds) }
         }
     }
 

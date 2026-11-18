@@ -23,7 +23,7 @@ class OpbSemanticsTest {
         assertEquals(opbSemantics, source.semantics.declared)
         assertEquals(opbSemantics, source.semantics.effective)
         assertSame(source.problem.semantics, source.semantics)
-        assertFalse(source.semantics.isApproximate)
+        assertFalse(source.semantics.relaxesFeasibility)
     }
 
     @Test

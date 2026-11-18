@@ -113,12 +113,11 @@ Source-backed finite invocation checks the captured operation admission before o
 or workers; a missing required projection returns unsupported. Preparation-only
 requests retain their diagnostic surface.
 
-`PreparedSourceInvocation` retains the selected route, source plan, operation
-admission and any private grid. Setup finishes route and grid selection before
-returning it, so an invocation never changes its execution view. With a private
-float grid, `FiniteSolveResult.outcome` reports source-accepted points, and never a
-grid refutation, optimum or exhausted enumeration as a source claim.
-`nativeGridOutcome` keeps the grid's own outcome.
+`PreparedSourceInvocation` retains the selected source route, plan and operation
+admission. Setup finishes selection before returning it, so an invocation never
+changes its execution view. `FiniteSolveResult.outcome` reports source results
+in original coordinates. Enumeration on a route without an installed enumeration
+surface returns `Declined` with `Unsupported`.
 An interrupted preparation returns `Declined` with its stop reason.
 
 `SourceSetup.execute(SourceExecutionRequest(invocation, ...))` dispatches the

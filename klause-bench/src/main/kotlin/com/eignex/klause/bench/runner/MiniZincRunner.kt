@@ -7,7 +7,7 @@ import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.FlatZincObjective
 import com.eignex.klause.formats.flatzinc.linearObjective
-import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.ir.ObjectiveSense
 import java.io.File
@@ -35,7 +35,7 @@ internal class MiniZincRunner(
 
     internal fun resolveCompiled(ref: ProblemRef, fzn: File): ResolvedProblem {
         val sense = FlatZincObjective.read(fzn)
-        val program by lazy { parseFlatZincExecution(fzn.readText(), exactFloats = exactFloats).program }
+        val program by lazy { parseFlatZinc(fzn.readText(), exactFloats = exactFloats) }
         return ResolvedProblem(
             ref,
             lazy { program.problem },

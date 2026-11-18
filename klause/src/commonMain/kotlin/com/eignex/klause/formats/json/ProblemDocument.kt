@@ -155,7 +155,7 @@ internal class ToleranceDocument(
     @Serializable(with = SemanticRationalSerializer::class) val relative: SemanticRational = SemanticRational.ZERO,
 )
 
-/** Float interpretation: the bare key `"continuous"` or `{"grid": {...}}`. */
+/** Continuous float interpretation. */
 @Serializable(with = FloatSemanticsSerializer::class)
 internal sealed interface FloatSemanticsDocument {
     fun toSemantics(): FloatSemantics
@@ -163,11 +163,6 @@ internal sealed interface FloatSemanticsDocument {
     companion object {
         fun of(semantics: FloatSemantics): FloatSemanticsDocument = when (semantics) {
             FloatSemantics.Continuous -> ContinuousFloatsDocument
-            is FloatSemantics.Grid -> GridFloatsDocument(
-                semantics.buckets,
-                semantics.linearScale,
-                RationalRangeDocument(semantics.unrangedBounds.lower, semantics.unrangedBounds.upper),
-            )
         }
     }
 }
@@ -177,19 +172,9 @@ internal data object ContinuousFloatsDocument : FloatSemanticsDocument {
     override fun toSemantics(): FloatSemantics = FloatSemantics.Continuous
 }
 
-@Serializable
-internal class GridFloatsDocument(
-    val buckets: Int,
-    val linearScale: Long,
-    val unrangedBounds: RationalRangeDocument,
-) : FloatSemanticsDocument {
-    override fun toSemantics(): FloatSemantics =
-        FloatSemantics.Grid(buckets, linearScale, UndeclaredRealBounds(unrangedBounds.lower, unrangedBounds.upper))
-}
-
 internal object FloatSemanticsSerializer : CompactSerializer<FloatSemanticsDocument>(
     "com.eignex.klause.formats.json.FloatSemantics",
     FloatSemanticsDocument::class,
     JsonNodeCatalog(),
-    { listOf(jsonNode<ContinuousFloatsDocument>("continuous"), jsonNode<GridFloatsDocument>("grid")) },
+    { listOf(jsonNode<ContinuousFloatsDocument>("continuous")) },
 )
