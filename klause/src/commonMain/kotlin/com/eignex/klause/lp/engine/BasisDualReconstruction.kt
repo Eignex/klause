@@ -382,6 +382,7 @@ private class BasisDualRun(
         group: List<Int>, selected: List<Int>, local: IntArray, restricted: Boolean = false,
     ): Boolean {
         val size = group.size
+        if (size.toLong() * size > Int.MAX_VALUE) throw BasisDualStop("DIMENSION")
         meter.step(size.toLong() * size)
         meter.storage(size.toLong() * size * 16L + size * 80L)
         for (id in group.indices) local[group[id]] = id
