@@ -502,7 +502,7 @@ advisory seeds need exact original feasibility even where ordinary finite witnes
 admission permits source tolerance. Original-source witness and exact objective
 checks precede incumbent admission, cutoff use or neighborhood centering.
 An already exact pooled point must pass the same original-source callback before
-import; exact coordinates alone do not establish feasibility in a presolved source.
+import; exact working coordinates alone do not establish original-source feasibility.
 These checks spend the consuming companion's existing funding and lifetime.
 
 Each companion keeps at most sixteen recovery attempts without eviction, identified

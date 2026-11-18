@@ -38,6 +38,8 @@ miplib3/egout
 miplib3/pp08aCUTS
 miplib2003/pp08aCUTS
 miplib3/rgn
+miplib2003/opt1217
+miplib2017/opt1217
 miplib3/cap6000
 miplib2003/cap6000
 miplib2017/cap6000
