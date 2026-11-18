@@ -18,8 +18,10 @@ import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.ExactRelaxationBuilder
@@ -29,6 +31,7 @@ import com.eignex.klause.lp.LpAuxiliaryColumn
 import com.eignex.klause.lp.NumericalLinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.SharedIndexChoices
+import com.eignex.klause.lp.SourceRowSlackBuilder
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.cut.SourceCut
@@ -45,6 +48,7 @@ import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.lpHullEnabled
+import com.eignex.klause.lp.realSourceSlack
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesBothBounds
@@ -64,6 +68,7 @@ import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.subExact
 import kotlin.math.abs
 import kotlin.math.max
@@ -474,7 +479,7 @@ internal class CpToLpRelaxation(
         private val cancellation: ExecutionControl = ExecutionControl.Never,
         private val region: LpEmissionRegion? = null,
         private val columnDomains: RelaxationDomains = domains,
-    ) : ExactRelaxationBuilder, SharedIndexChoices, LpBoundRowBuilder {
+    ) : ExactRelaxationBuilder, SharedIndexChoices, LpBoundRowBuilder, SourceRowSlackBuilder {
         private val builder = LpBuilder()
         val constructionSize: Long get() = builder.constructionSize
         private val exactRows = ExactRelaxationRows()
@@ -1312,6 +1317,27 @@ internal class CpToLpRelaxation(
         override fun realMagnitude(realVar: Int): Double {
             checkCancellation()
             val magnitude = max(abs(problem.realLower[realVar]), abs(problem.realUpper[realVar]))
+            return expandedMagnitude(magnitude)
+        }
+
+        override fun sourceRowSlack(row: LinearRow): LpRowSlack? {
+            val policy = problem.semantics.effective.feasibilityTolerance ?: return null
+            if (policy.relative.numerator.isZero()) return null
+            val hasReals = (0 until row.size).any { Term.isReal(row.ref(it)) }
+            if (!problem.semantics.relaxesRows(if (hasReals) 1 else 0)) return null
+            return row.realSourceSlack(this)
+        }
+
+        override fun sourceIntMagnitude(intVar: Int): Double {
+            checkCancellation()
+            val bounds = problem.intBounds
+            if (!bounds.hasLower(intVar) || !bounds.hasUpper(intVar)) return Double.POSITIVE_INFINITY
+            val magnitude = max(abs(bounds.lower(intVar).toDouble()), abs(bounds.upper(intVar).toDouble()))
+            val outward = if (magnitude == 0.0) 0.0 else magnitude.nextUp()
+            return if (problem.semantics.relaxesRows(0)) expandedMagnitude(outward) else outward
+        }
+
+        private fun expandedMagnitude(magnitude: Double): Double {
             val policy = problem.semantics.effective.feasibilityTolerance
             if (!magnitude.isFinite() || policy == null || policy.isExact) return magnitude
             val absolute = BigFraction.of(policy.absolute.numerator, policy.absolute.denominator)

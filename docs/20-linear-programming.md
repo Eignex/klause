@@ -228,6 +228,10 @@ Coefficient coalescing preserves that source scale when the result also supplies
 operand. Constant selection and zero powers use the larger of the constant and result
 magnitudes; a choice operand's membership keeps its fixed member's declaration band.
 Conditional rows retain their Boolean or integer-bound validity premises with the bands.
+Real-coefficient source rows retain the larger of their source right-hand-side magnitude
+and a bound on the sum of absolute source activities. Integer and real declarations
+supply these bounds before Boolean constants are folded or column origins are shifted.
+Open declarations give an infinite scale and withhold relative numerical pricing.
 
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
 integrality, origins, source premises, ordered basis and nonbasic statuses determine

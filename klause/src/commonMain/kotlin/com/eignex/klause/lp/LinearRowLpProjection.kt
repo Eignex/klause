@@ -118,8 +118,9 @@ private fun LinearRow.emitPinnedLpRelaxation(builder: RelaxationBuilder, slack: 
     if (BigFraction.ofDouble(rhs) != exactRhs) return
     val premise = if (activator == LinearRow.ALWAYS) intArrayOf() else intArrayOf(Lit.make(activator, truth))
     if (truth) {
-        if (slack == null || strict) builder.realRow(columns, coefficients, relation, rhs, strict, premise)
-        else builder.derivedRealRow(columns, coefficients, relation, rhs, slack, premise)
+        val displacement = if (strict) null else slack ?: (builder as? SourceRowSlackBuilder)?.sourceRowSlack(this)
+        if (displacement == null) builder.realRow(columns, coefficients, relation, rhs, strict, premise)
+        else builder.derivedRealRow(columns, coefficients, relation, rhs, displacement, premise)
     } else {
         builder.realRow(columns, coefficients, relation.complemented(), rhs, !strict, premise)
     }

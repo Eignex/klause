@@ -6,6 +6,15 @@ import kotlin.test.assertTrue
 
 class LpRowSlackTest {
     @Test
+    fun `zero sides should retain only absolute slack under an unbounded relative rate`() {
+        val slack = LpBoundSlack(2.0, Double.POSITIVE_INFINITY)
+
+        val displacement = slack.at(0.0)
+
+        assertEquals(2.0, displacement)
+    }
+
+    @Test
     fun `derived displacement should sum each weighted premise band`() {
         val row = LpRowSlack(doubleArrayOf(3.0, 2.0), doubleArrayOf(1.0, 16.0))
 
