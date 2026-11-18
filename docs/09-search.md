@@ -91,11 +91,21 @@ rather than native CP domains.
 
 A cancellation pause retains the current leaf for a complete retry. An interrupted
 check on that retained leaf adds no unresolved coverage. A leaf abandoned with an
-undecided required check still prevents exhaustion from proving completeness;
-later pauses do not clear that state.
+undecided required check retains its shared decision prefix. After traversal exhausts,
+one retry pass replays those prefixes and repeats their required checks. Replayed
+decisions and checks spend the containing allowances; cancellation pauses retain
+the replay position. A second undecided check prevents a completeness claim.
+Retention is bounded to 4,096 leaves and 65,536 decisions; a declined retention
+also withholds completeness. Query reset and retirement discard retained prefixes.
 An explicitly paused component check keeps the same leaf and resumes before
 lifecycle maintenance, node pruning or branch selection. It records no decline or
 unresolved coverage; retraction and query reset discard the retained check.
+Optimization can retain a leaf whose real completion or optimality proof is
+undecided while publishing a checked incumbent. Such a leaf is retried without
+blocking its discrete assignment or sharing a nogood from its unfinished proof.
+Resolved retry models follow the containing traversal's model-blocking policy at
+the shared root. The selected prefix then replays against that blocker, so overlapping
+retained prefixes cannot repeat an enumerated model.
 
 A node-owned learned consequence can retain unfinished shared propagation only
 after its native registration and consequence publication have completed. A
@@ -339,8 +349,8 @@ when it publishes a witness. The pending point shares the completion's work and
 cancellation scope, survives slices with that leaf and is discarded on reseeding or
 close. A rejected point supplies no conflict.
 This witness-only path publishes the point and continues chronologically through sibling
-assignments; it cannot block an unresolved leaf as a proved nogood. Other traversal
-modes stop incomplete when their model continuation would require such a blocker.
+assignments; it cannot block an unresolved leaf as a proved nogood. The traversal
+retains its decision prefix for the retry pass before reporting incomplete coverage.
 
 ### Finite LP directional guidance
 

@@ -24,6 +24,7 @@ internal class SearchTrail {
         private set
     private val trailStartAtLevel = IntArrayList().apply { add(0) }
     val decisionLevel: Int get() = decisions.size
+    fun decisionPrefix(root: Int): List<SearchDecision> = decisions.subList(root, decisions.size).toList()
     val rootFixedCount: Int get() = valuesAtLevel[0].size
     val booleanCount: Int get() = boolValues.size
     fun rawBoolValue(variable: Int): Int = boolValues.getOrDefault(variable, -1)

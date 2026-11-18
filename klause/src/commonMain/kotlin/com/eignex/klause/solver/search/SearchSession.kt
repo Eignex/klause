@@ -90,6 +90,7 @@ class SearchSession(
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.decisionLevel
+    internal fun decisionPrefix(root: Int): List<SearchDecision> = trail.decisionPrefix(root)
 
     override fun boolValue(variable: Int): Boolean? = trail.boolValue(variable)
 
