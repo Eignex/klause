@@ -71,6 +71,23 @@ class LinearAuthorityInvocationTest {
     }
 
     @Test
+    fun `an attained bound should retain exact optimum authority under a positive gap`() {
+        val semantics = SourceSemantics(SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+            optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve()
+        val source = SourceProofContext(scope, setOf(integer),
+            mapOf("lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE))), mapOf(integer to BigFraction.ONE), semantics = semantics)
+
+        val result = LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false),
+            external = { Sample(booleanArrayOf(), longArrayOf(1)) }).use { it.run { _, _ -> } }
+
+        assertEquals(false, result.gapClosed)
+        assertIs<SourceClaim.Optimal>(assertNotNull(result.terminal).claim)
+        assertEquals(BigFraction.ONE, result.value)
+    }
+
+    @Test
     fun `an exact source should finish integer optimization without applying its declared gap`() {
         val semantics = SourceSemantics(SourceFormat.IR, feasibilityTolerance = SourceTolerance(),
             optimalityTolerance = OptimalityTolerance(SemanticRational.ONE)).resolve()
