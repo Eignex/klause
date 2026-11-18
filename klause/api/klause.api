@@ -6666,6 +6666,7 @@ public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public abstract fun boolRow ([I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
 	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public fun conditionedRow ([I[JLcom/eignex/klause/ir/LinearOp;JIJ)V
+	public fun derivedRealRow ([I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;)V
 	public abstract fun hullEnabled ()Z
 	public abstract fun intColumn (I)I
 	public abstract fun linearRow (Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;)V
@@ -6673,6 +6674,7 @@ public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public fun liveBool (I)Ljava/lang/Boolean;
 	public abstract fun liveDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public fun realColumn (I)I
+	public fun realMagnitude (I)D
 	public fun realRow ([I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
 	public fun realRowForIntValue (IJ[I[DLcom/eignex/klause/ir/LinearOp;D)V
@@ -6689,9 +6691,11 @@ public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
 	public static synthetic fun auxColumn$default (Lcom/eignex/klause/lp/RelaxationBuilder;JJ[JLcom/eignex/klause/lp/LpAuxiliaryColumn;ILjava/lang/Object;)I
 	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public static fun conditionedRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JIJ)V
+	public static fun derivedRealRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DLcom/eignex/klause/lp/engine/LpRowSlack;)V
 	public static synthetic fun linearRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public static fun liveBool (Lcom/eignex/klause/lp/RelaxationBuilder;I)Ljava/lang/Boolean;
 	public static fun realColumn (Lcom/eignex/klause/lp/RelaxationBuilder;I)I
+	public static fun realMagnitude (Lcom/eignex/klause/lp/RelaxationBuilder;I)D
 	public static fun realRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
 	public static fun realRowForIntValue (Lcom/eignex/klause/lp/RelaxationBuilder;IJ[I[DLcom/eignex/klause/ir/LinearOp;D)V
@@ -6965,6 +6969,15 @@ public final class com/eignex/klause/lp/engine/LpColumnId {
 	public fun toString ()Ljava/lang/String;
 	public static fun toString-impl (I)Ljava/lang/String;
 	public final synthetic fun unbox-impl ()I
+}
+
+public final class com/eignex/klause/lp/engine/LpRowSlack {
+	public fun <init> ([D[D)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSize ()I
+	public fun hashCode ()I
+	public final fun magnitude (I)D
+	public final fun multiplier (I)D
 }
 
 public final class com/eignex/klause/lp/engine/LpZeroObjectivePricing : java/lang/Enum {

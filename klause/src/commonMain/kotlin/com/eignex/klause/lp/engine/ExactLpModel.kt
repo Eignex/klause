@@ -105,6 +105,7 @@ internal data class ExactLpRow(
     val global: Boolean = true,
     val strict: Boolean = false,
     val premises: ExactLpPremises? = null,
+    val slack: LpRowSlack? = null,
 )
 
 internal data class ExactLpEntry(val row: Int, val number: ExactLpNumber)
@@ -283,7 +284,9 @@ internal class ExactLpModel private constructor(
         matrix == other.matrix && rows == other.rows
 
     fun toIntegerModel(): LpModel? {
-        if (columns.any { !it.bounds.consistent || !it.integral } || rows.any { it.strict }) return null
+        if (columns.any { !it.bounds.consistent || !it.integral } || rows.any { it.strict || it.slack != null }) {
+            return null
+        }
         if (objective.scale != ExactLpNumber.of(1L) || objective.externalConstant != ExactLpNumber.of(0L)) return null
         val upper = LongArray(numVars)
         val hasUpper = BooleanArray(numVars)

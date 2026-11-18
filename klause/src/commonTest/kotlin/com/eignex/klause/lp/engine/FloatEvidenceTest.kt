@@ -15,6 +15,42 @@ import kotlin.test.assertTrue
 
 class FloatEvidenceTest {
     @Test
+    fun `row implied bounds should retain a derived rows weighted premise bands`() {
+        val nominal = LpBuilder().apply {
+            val x = addRealVar(0.0, null, cost = -1.0)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
+        }.build(Sense.MINIMIZE)
+        val source = assertNotNull(nominal.authoritativeModel())
+        val model = assertNotNull(LpExactState(source.copy(rows = listOf(source.row(0).copy(
+            slack = LpRowSlack(doubleArrayOf(3.0, 2.0), doubleArrayOf(1.0, 16.0)),
+        )))).toWorkingModel())
+
+        val bound = assertNotNull(FloatDeductionCertificate.of(
+            model, doubleArrayOf(0.0), slack = LpBoundSlack(2.0, 0.25),
+        )).lowerBound
+
+        assertTrue(bound <= -15.0 && bound > -15.0 - 1e-4, "bound $bound")
+    }
+
+    @Test
+    fun `numerical refutations should retain a derived rows combined displacement`() {
+        val nominal = LpBuilder().apply {
+            val x = addRealVar(0.0, null)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 6L)
+        }.build(Sense.MINIMIZE)
+        val source = assertNotNull(nominal.authoritativeModel())
+        val model = assertNotNull(LpExactState(source.copy(rows = listOf(
+            source.row(0).copy(slack = LpRowSlack(doubleArrayOf(3.0, 2.0), doubleArrayOf(0.0, 0.0))),
+            source.row(1),
+        ))).toWorkingModel())
+
+        val refutation = floatFarkasRay(model, doubleArrayOf(1.0, 1.0), LpBoundSlack(1.0, 0.0))
+
+        assertNull(refutation)
+    }
+
+    @Test
     fun `a row implied bound should include the slack of every premise`() {
         val model = LpBuilder().apply {
             val z = addRealVar(0.0, null, cost = -1.0)

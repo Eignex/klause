@@ -1695,8 +1695,10 @@ abstract interface com.eignex.klause.lp/RelaxationBuilder { // com.eignex.klause
     abstract fun statesLowerBound(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.statesLowerBound|statesLowerBound(kotlin.Int){}[0]
     abstract fun statesUpperBound(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.statesUpperBound|statesUpperBound(kotlin.Int){}[0]
     open fun conditionedRow(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long, kotlin/Int, kotlin/Long) // com.eignex.klause.lp/RelaxationBuilder.conditionedRow|conditionedRow(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long;kotlin.Int;kotlin.Long){}[0]
+    open fun derivedRealRow(kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, com.eignex.klause.lp.engine/LpRowSlack) // com.eignex.klause.lp/RelaxationBuilder.derivedRealRow|derivedRealRow(kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;com.eignex.klause.lp.engine.LpRowSlack){}[0]
     open fun liveBool(kotlin/Int): kotlin/Boolean? // com.eignex.klause.lp/RelaxationBuilder.liveBool|liveBool(kotlin.Int){}[0]
     open fun realColumn(kotlin/Int): kotlin/Int // com.eignex.klause.lp/RelaxationBuilder.realColumn|realColumn(kotlin.Int){}[0]
+    open fun realMagnitude(kotlin/Int): kotlin/Double // com.eignex.klause.lp/RelaxationBuilder.realMagnitude|realMagnitude(kotlin.Int){}[0]
     open fun realRow(kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean = ..., kotlin/IntArray = ...) // com.eignex.klause.lp/RelaxationBuilder.realRow|realRow(kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.IntArray){}[0]
     open fun realRowForIntValue(kotlin/Int, kotlin/Long, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double) // com.eignex.klause.lp/RelaxationBuilder.realRowForIntValue|realRowForIntValue(kotlin.Int;kotlin.Long;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double){}[0]
     open fun statesBothBounds(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.statesBothBounds|statesBothBounds(kotlin.Int){}[0]
@@ -11295,6 +11297,18 @@ final class com.eignex.klause.lp.bounding/LpPlan { // com.eignex.klause.lp.bound
 }
 
 final class com.eignex.klause.lp.cut/SharedCut // com.eignex.klause.lp.cut/SharedCut|null[0]
+
+final class com.eignex.klause.lp.engine/LpRowSlack { // com.eignex.klause.lp.engine/LpRowSlack|null[0]
+    constructor <init>(kotlin/DoubleArray, kotlin/DoubleArray) // com.eignex.klause.lp.engine/LpRowSlack.<init>|<init>(kotlin.DoubleArray;kotlin.DoubleArray){}[0]
+
+    final val size // com.eignex.klause.lp.engine/LpRowSlack.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.lp.engine/LpRowSlack.size.<get-size>|<get-size>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lp.engine/LpRowSlack.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lp.engine/LpRowSlack.hashCode|hashCode(){}[0]
+    final fun magnitude(kotlin/Int): kotlin/Double // com.eignex.klause.lp.engine/LpRowSlack.magnitude|magnitude(kotlin.Int){}[0]
+    final fun multiplier(kotlin/Int): kotlin/Double // com.eignex.klause.lp.engine/LpRowSlack.multiplier|multiplier(kotlin.Int){}[0]
+}
 
 final class com.eignex.klause.lp.optimization/LinearApproach : com.eignex.klause.solver.evidence/SourceDerivation.Extension { // com.eignex.klause.lp.optimization/LinearApproach|null[0]
     constructor <init>(com.eignex.klause.solver/Sample, com.eignex.klause.solver.evidence/SourceDerivation, com.eignex.klause.solver/Sample? = ...) // com.eignex.klause.lp.optimization/LinearApproach.<init>|<init>(com.eignex.klause.solver.Sample;com.eignex.klause.solver.evidence.SourceDerivation;com.eignex.klause.solver.Sample?){}[0]

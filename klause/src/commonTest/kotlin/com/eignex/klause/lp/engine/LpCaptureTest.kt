@@ -96,7 +96,8 @@ class LpCaptureTest {
             listOf(0 to third, 1 to one),
             one,
             ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(11))),
+            ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(11)),
+                slack = LpRowSlack(doubleArrayOf(1.0, 2.0), doubleArrayOf(3.0, 4.0))),
         )
         val capture = LpExactCapture.capture(
             source,
@@ -139,6 +140,9 @@ class LpCaptureTest {
             LpExactState(source, rows = LpScopedRows(listOf(LpRowIdentity(0, null, false)), 0)),
             LpExactState(source, rows = LpScopedRows(listOf(LpRowIdentity(0, null)), 2)),
             LpExactState(source, rowRevision = 1),
+            LpExactState(source.copy(rows = listOf(ExactLpRow(
+                slack = LpRowSlack(doubleArrayOf(2.0), doubleArrayOf(3.0)),
+            )))),
         )
         for (variant in variants) {
             assertFalse(original.fullAuthorityEquals(variant))
@@ -159,7 +163,8 @@ class LpCaptureTest {
                 ExactLpColumn(ExactLpBounds(ExactLpSide(negativeZero), ExactLpSide(negativeZero))),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(third, strict = true, premises))),
             ),
-            listOf(ExactLpRow(global = false, strict = true, premises)),
+            listOf(ExactLpRow(global = false, strict = true, premises,
+                slack = LpRowSlack(doubleArrayOf(3.0, 0.5), doubleArrayOf(0.0, Double.POSITIVE_INFINITY)))),
             ExactLpObjective(listOf(third, negativeZero, third), third, third, third, Sense.MAXIMIZE),
         )
         val basis = Basis(intArrayOf(2), arrayOf(VarStatus.FREE, VarStatus.FIXED, VarStatus.BASIC), false)

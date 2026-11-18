@@ -135,6 +135,13 @@ objective propagation,
 reduced-cost fixing with their reasons, root bounds shared with peers, and shaving; fixing
 also tries the objective box (zero multipliers) and half the duals.
 
+A derived row can replace the uniform side displacement with `LpRowSlack`, an immutable
+sum of weighted premise bands. Each term reads the larger of absolute slack and relative
+slack times its retained magnitude bound; products and sums round outward. Both numerical
+bounds and Farkas checks read this displacement, including when deriving an open column
+side. The exact row retains the numeric metadata through scopes and layout changes, and
+exact capture includes it in the source state key. Zero slack leaves every side unchanged.
+
 `floatFarkasRay` normalises a dual-unbounded ray and accepts it when its binary64 Farkas
 margin exceeds the tolerance times the terms' size, pricing open sides at their row-implied
 bounds. Each implying row is folded into the ray so its open column cancels, in binary64

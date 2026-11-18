@@ -212,6 +212,16 @@ connected dominant component remains subject to the ordinary size and work guard
 
 ## Numerical authority
 
+Derived real rows can retain an immutable sum of weighted premise bands beside their
+exact row metadata. Each premise supplies its absolute multiplier and a bound on its
+relative scale. Integer-times-real product envelopes carry the product residual band
+and the relevant real endpoint's band multiplied by the integer interval width.
+Declared real ranges, expanded by source feasibility tolerance, bound the product's
+relative scale. An infinite scale prevents pricing that band's row under positive
+relative tolerance. Fixed integer products retain their residual band alone.
+Nominal coefficients stay unchanged, and zero-tolerance sources emit their ordinary rows.
+Rebinding, row scopes, layout changes and exact capture retain the bands with the row.
+
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
 integrality, origins, source premises, ordered basis and nonbasic statuses determine
 the problem. Floating factors, values and reduced costs are revision-keyed working

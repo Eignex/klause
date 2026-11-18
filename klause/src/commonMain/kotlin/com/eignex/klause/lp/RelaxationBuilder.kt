@@ -5,6 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lp.engine.LpColumnId
+import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.util.arrays.emptyIntArray
 
@@ -70,6 +71,14 @@ interface RelaxationBuilder {
      * relaxation driver overrides it. See [realRow].
      */
     fun realColumn(realVar: Int): Int = -1
+
+    /** Largest magnitude admitted by a real coordinate's declaration and feasibility band, or infinity. */
+    fun realMagnitude(realVar: Int): Double = Double.POSITIVE_INFINITY
+
+    /** Emit a derived real row whose numerical deductions carry the combined premise displacement [slack]. */
+    fun derivedRealRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, slack: LpRowSlack) {
+        realRow(columns, coeffs, op, rhs)
+    }
 
     /**
      * Emit a real-coefficient row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles obtained from
