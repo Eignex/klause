@@ -507,6 +507,11 @@ fails, the writer tries adjacent binary64 values within a bounded publication al
 `% klause-float-rounding: x = tolerance` identifies an adjusted coordinate. Failure to
 find a checked point withholds the solution block with an explicit publication error.
 Exact-coordinate comments retain the original witness, independently of this decimal point.
+For optimization, `% objective=` reads the named source objective from this same
+published decimal assignment. At zero tolerance it instead uses the exact coordinate
+when available. `% klause-exact: _objective` always describes the exact-coordinate
+comments; `_objective` assignments requested by the output protocol use the decimal
+coordinate. The `.ozn` applier uses the same bindings and objective metadata.
 At zero tolerance, decimal assignments are display approximations: each prints its
 nearest binary64 value, an algebraic one once
 its [narrowed interval](22-exact-arithmetic.md#binary64-values-of-algebraic-scalars)

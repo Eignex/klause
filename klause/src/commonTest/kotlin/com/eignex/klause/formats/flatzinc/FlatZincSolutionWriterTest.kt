@@ -90,7 +90,8 @@ class FlatZincSolutionWriterTest {
 
         val output = OznApplier("float: x; output [show(x), \"\\n\"];").render(program, sample)
 
-        assertTrue(requireNotNull(BigFraction.ofDouble(output.lineSequence().first().toDouble())) >= boundary, output)
+        val printed = output.lineSequence().first { !it.startsWith('%') }.toDouble()
+        assertTrue(requireNotNull(BigFraction.ofDouble(printed)) >= boundary, output)
     }
 
     @Test
