@@ -455,9 +455,9 @@ as incumbents without an optimality proof and its refutation decides nothing. Th
 bounds that prune and propagate against these optima move every side they price by the
 slack too, lowering the bound by the reduced cost times the slack. That is the widening
 the source gives a row, declaration or column that the relaxation states as the source
-does. Integer-times-real product rows carry their
-[combined premise bands](20-linear-programming.md#numerical-authority). A cut or another
-envelope row without that metadata can combine source sides and move by the sum
+does. Product, extremum, selection, guarded-choice and linear-power projections retain
+their [source band scales](20-linear-programming.md#numerical-authority). A cut without
+combined premise bands can combine source sides and move by the sum
 of its multipliers times the slack under the tolerance yet is widened by one slack, so a
 subtree whose improvement lies within the remaining `(sum - 1) * slack` times that row's
 dual can still be pruned or refuted, and its verdict then depends on visiting order. The

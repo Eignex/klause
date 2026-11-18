@@ -80,6 +80,13 @@ interface RelaxationBuilder {
         realRow(columns, coeffs, op, rhs)
     }
 
+    /** Emit a derived row carrying both its combined displacement and Boolean validity premises. */
+    fun derivedRealRow(
+        columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, slack: LpRowSlack, premiseLits: IntArray,
+    ) {
+        realRow(columns, coeffs, op, rhs, premiseLits = premiseLits)
+    }
+
     /**
      * Emit a real-coefficient row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles obtained from
      * [intColumn], [boolColumn], or [realColumn] — the LP-only linear form of a constraint that touches a
@@ -109,6 +116,19 @@ interface RelaxationBuilder {
         op: LinearOp,
         rhs: Double,
     ) {}
+
+    /** Emit a derived row valid at [intVar] = [value], retaining its displacement and both bound premises. */
+    fun derivedRealRowForIntValue(
+        intVar: Int,
+        value: Long,
+        columns: IntArray,
+        coeffs: DoubleArray,
+        op: LinearOp,
+        rhs: Double,
+        slack: LpRowSlack,
+    ) {
+        realRowForIntValue(intVar, value, columns, coeffs, op, rhs)
+    }
 
     /** The live pin of Boolean variable [boolVar] in this build's domains, or null when unpinned (or
      *  the builder has no Boolean backing). Lets a conditionally-active factor emit only the rows its

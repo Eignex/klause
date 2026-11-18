@@ -11,6 +11,8 @@ internal fun Power.emitLpRelaxation(builder: RelaxationBuilder) {
     val variables = if (exponent == 0) intArrayOf(output.id.index) else
         intArrayOf(output.id.index, operand.id.index)
     val coefficients = if (exponent == 0) doubleArrayOf(1.0) else doubleArrayOf(1.0, -1.0)
+    val slack = if (exponent == 0) builder.realConstantSlack(output.id.index, 1.0) else
+        builder.realResidualSlack(output.id.index, builder.realMagnitude(operand.id.index))
     Linear(intArrayOf(), doubleArrayOf(), variables, coefficients, LinearOp.EQ,
-        if (exponent == 0) 1.0 else 0.0).emitLpRelaxation(builder)
+        if (exponent == 0) 1.0 else 0.0).emitLpRelaxation(builder, slack = slack)
 }
