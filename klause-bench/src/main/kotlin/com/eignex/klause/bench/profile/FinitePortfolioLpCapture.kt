@@ -62,7 +62,9 @@ internal object FinitePortfolioLpCapture {
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
         val captureJoint = mode == "joint-ordinary" || mode == "joint-handoff"
         val centerStep = options["source-refutation-center-step"]?.let {
-            require(captureJoint) { "source-refutation-center-step requires joint-ordinary capture or joint-handoff capture" }
+            require(captureJoint) {
+                "source-refutation-center-step requires joint-ordinary capture or joint-handoff capture"
+            }
             it.toBooleanStrict()
         }
         if ("inspect-rays" in options) {

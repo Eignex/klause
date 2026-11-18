@@ -674,7 +674,9 @@ class JointLinearRepairCompletionTest {
                 external = { offered }, incumbentCompletionCheck = { sample, _, _ ->
                     if (sample === offered) importChecks++
                     true
-                }, onComparison = if (logging) { { comparisons++ } } else null).use { repair ->
+                }, onComparison = if (logging) {
+                    { comparisons++ }
+                } else null).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     search.advance(ExecutionControl.Never, 1)
                     assertEquals(1, importChecks)
