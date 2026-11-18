@@ -2,6 +2,7 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -27,7 +28,7 @@ class DisjunctivePropagatorTest {
     @Test
     fun `disjunctive deductions over optional tasks should be implied by their reasons`() {
         val rng = Random(0xD15)
-        repeat(100) { iter ->
+        repeat(12) { iter ->
             val n = 3
             val problem = Problem(
                 numBoolVars = n,
@@ -41,17 +42,13 @@ class DisjunctivePropagatorTest {
                     ),
                 ),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "disjunctive#$iter") { state ->
-                (0 until n).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
-                    (0 until 3).all {
-                        val v = rng.nextInt(n)
-                        if (rng.nextBoolean()) {
-                            state.tightenIntMax(v, rng.nextInt(4).toLong())
-                        } else {
-                            state.tightenIntMin(v, 1L + rng.nextInt(4))
-                        }
-                    }
+            val (first, second) = (0 until n).shuffled(rng)
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "disjunctive#$iter") { state ->
+                state.pinBool(first, true) && state.pinBool(second, true) && state.setInt(first, 0) &&
+                    (iter % 2 == 0 || state.setInt(second, 0))
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 
@@ -91,16 +88,14 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `overload deductions over duration ranges and optional tasks should be implied by their reasons`() {
-        for ((index, shape) in overloadShapes.withIndex()) {
+        for (shape in overloadShapes) {
             val problem = shape.problem()
-            val rng = Random(0xD17 + index)
-            repeat(5) { iter ->
-                PropagationReasonOracle.assertReasonsImply(problem, "${shape.label}#$iter") { state ->
-                    (0 until 3).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
-                        shape.starts.all { state.tightenIntMax(it, 1L + rng.nextInt(3)) } &&
-                        shape.durationVars.all { rng.nextBoolean() || state.tightenIntMin(it, 2) } &&
-                        (rng.nextBoolean() || state.excludeIntValue(shape.starts[2], 1))
+            for (conflict in listOf(false, true)) {
+                val outcome = PropagationReasonOracle.assertReasonsImply(problem, "${shape.label} conflict=$conflict") {
+                    shape.narrowForOverload(it, conflict)
                 }
+
+                assertEquals(if (conflict) Outcome.CONFLICT else Outcome.DEDUCTION, outcome, shape.label)
             }
         }
     }
@@ -115,16 +110,14 @@ class DisjunctivePropagatorTest {
             OverloadShape("shared guard zero minima", presents = guards, minDuration = 0),
             OverloadShape("one guard", presents = IntArray(3) { Lit.make(0, false) }),
         )
-        for ((index, shape) in shapes.withIndex()) {
+        for (shape in shapes) {
             val problem = shape.problem()
-            val rng = Random(0xD19 + index)
-            repeat(5) { iter ->
-                PropagationReasonOracle.assertReasonsImply(problem, "${shape.label}#$iter") { state ->
-                    (0 until 2).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
-                        shape.starts.all { state.tightenIntMax(it, 1L + rng.nextInt(2)) } &&
-                        shape.durationVars.all { rng.nextBoolean() || state.tightenIntMin(it, 2) } &&
-                        (rng.nextBoolean() || state.excludeIntValue(shape.starts[0], 1))
+            for (conflict in listOf(false, true)) {
+                val outcome = PropagationReasonOracle.assertReasonsImply(problem, "${shape.label} conflict=$conflict") {
+                    shape.narrowForOverload(it, conflict)
                 }
+
+                assertEquals(if (conflict) Outcome.CONFLICT else Outcome.DEDUCTION, outcome, shape.label)
             }
         }
     }
@@ -136,6 +129,39 @@ class DisjunctivePropagatorTest {
         val presents: IntArray = IntArray(3) { Lit.make(it, true) },
         val minDuration: Long = 1,
     ) {
+        fun narrowForOverload(state: PropagationState, conflict: Boolean): Boolean {
+            val repeated = presents.firstOrNull { guard -> presents.count { it == guard } > 1 }
+            val complement = presents.firstOrNull { Lit.negate(it) in presents }
+            val latest = if (repeated == null && complement != null) 0L else 1L
+            if (!starts.all { state.tightenIntMax(it, latest) } ||
+                !durationVars.all { state.tightenIntMin(it, 1) }
+            ) return false
+            val target = when {
+                repeated != null -> {
+                    val anchor = presents.firstOrNull { Lit.variable(it) != Lit.variable(repeated) }
+                    if (anchor != null && !state.pinBool(Lit.variable(anchor), Lit.isPositive(anchor))) return false
+                    repeated
+                }
+
+                complement != null -> {
+                    if (!state.pinBool(Lit.variable(complement), Lit.isPositive(complement))) return false
+                    presents.first { Lit.variable(it) != Lit.variable(complement) }
+                }
+
+                else -> {
+                    val excluded = starts.indices.first { candidate ->
+                        starts.indices.filter { it != candidate }.map { starts[it] }.distinct().size == 2
+                    }
+                    if (!presents.indices.filter { it != excluded }.all { task ->
+                            state.pinBool(Lit.variable(presents[task]), Lit.isPositive(presents[task]))
+                        }
+                    ) return false
+                    presents[excluded]
+                }
+            }
+            return !conflict || state.pinBool(Lit.variable(target), Lit.isPositive(target))
+        }
+
         fun problem(): Problem {
             val used = (starts + durationVars).toSet()
             return Problem(

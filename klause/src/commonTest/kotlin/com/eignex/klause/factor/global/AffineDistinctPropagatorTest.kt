@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -205,7 +206,7 @@ class AffineDistinctPropagatorTest {
     }
 
     @Test
-    fun `aliased affine operands should preserve their satisfying assignments`() {
+    fun `aliased affine operands should explain exclusions from a fixed source`() {
         val factor = Distinct(
             listOf(
                 Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
@@ -215,8 +216,10 @@ class AffineDistinctPropagatorTest {
         )
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) }, arrayOf(factor))
 
-        PropagationReasonOracle.assertReasonsImply(problem, "aliased source Hall") { state ->
-            state.tightenIntMax(0, 1)
+        val outcome = PropagationReasonOracle.assertReasonsImply(problem, "aliased source Hall") { state ->
+            state.setInt(0, 1)
         }
+
+        assertEquals(Outcome.DEDUCTION, outcome)
     }
 }

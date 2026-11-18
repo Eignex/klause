@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -77,9 +78,11 @@ class NValuePropagatorTest {
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
                 factors = arrayOf(NValue(2, intArrayOf(0, 1), mode, exceptSet = longArrayOf(0))),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "excepted-$mode") { state ->
-                state.excludeIntValue(0, 0) && state.setInt(1, 0)
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "excepted-$mode") { state ->
+                state.setInt(0, 1) && state.setInt(1, 0)
             }
+
+            assertEquals(Outcome.DEDUCTION, outcome, "$mode")
         }
     }
 

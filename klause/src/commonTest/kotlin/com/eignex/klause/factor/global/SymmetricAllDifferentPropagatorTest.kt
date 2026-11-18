@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -29,9 +30,9 @@ class SymmetricAllDifferentPropagatorTest {
     }
 
     @Test
-    fun `symmetric alldifferent deductions should be implied by their reasons under carved holes`() {
+    fun `symmetric alldifferent reasons should cover mirror deductions and conflicts`() {
         val rng = Random(0x5A11)
-        repeat(150) { iter ->
+        repeat(30) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,
@@ -39,9 +40,13 @@ class SymmetricAllDifferentPropagatorTest {
                 intDomains = Array(n) { IntDomain(0, n - 1L) },
                 factors = arrayOf<Factor>(SymmetricAllDifferent(IntArray(n) { it })),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "symmetric-alldiff#$iter") { state ->
-                (0 until 6).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(n).toLong()) }
+            val (first, second, third) = (0 until n).shuffled(rng)
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "symmetric-alldiff#$iter") { state ->
+                state.setInt(first, second.toLong()) &&
+                    (iter % 2 == 0 || state.setInt(second, third.toLong()))
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 }

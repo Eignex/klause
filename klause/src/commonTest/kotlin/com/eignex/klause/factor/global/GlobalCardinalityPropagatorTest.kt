@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -21,9 +22,9 @@ import kotlin.test.assertTrue
 class GlobalCardinalityPropagatorTest {
 
     @Test
-    fun `global cardinality deductions should be implied by their reasons under carved holes`() {
+    fun `global cardinality reasons should cover saturated and overfull counts`() {
         val rng = Random(0x6CC0)
-        repeat(100) { iter ->
+        repeat(30) { iter ->
             val n = 5
             val problem = Problem(
                 numBoolVars = 0,
@@ -39,9 +40,13 @@ class GlobalCardinalityPropagatorTest {
                     ),
                 ),
             )
-            PropagationReasonOracle.assertReasonsImply(problem, "gcc#$iter") { state ->
-                (0 until 6).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(4).toLong()) }
+            val value = rng.nextInt(4).toLong()
+            val members = (0 until n).shuffled(rng).take(if (iter % 2 == 0) 2 else 3)
+            val outcome = PropagationReasonOracle.assertReasonsImply(problem, "gcc#$iter") { state ->
+                members.all { state.setInt(it, value) }
             }
+
+            assertEquals(if (iter % 2 == 0) Outcome.DEDUCTION else Outcome.CONFLICT, outcome)
         }
     }
 

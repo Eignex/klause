@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.PropagationReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle.Outcome
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -179,9 +180,11 @@ class ExactLinearTest {
                 )
                 val source = Problem(activator + 1, 2, Array(2) { IntDomain(0, 3) }, arrayOf(row))
 
-                PropagationReasonOracle.assertReasonsImply(source, "$relation activator=$activator") { state ->
-                    state.tightenIntMin(0, 2L) && (activator < 0 || state.pinBool(activator, true))
+                val outcome = PropagationReasonOracle.assertReasonsImply(source, "$relation activator=$activator") {
+                    it.setInt(0, 2L) && (activator < 0 || it.pinBool(activator, true))
                 }
+
+                assertEquals(Outcome.DEDUCTION, outcome, "$relation activator=$activator")
             }
         }
     }

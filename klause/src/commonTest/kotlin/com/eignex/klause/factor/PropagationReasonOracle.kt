@@ -14,6 +14,8 @@ import kotlin.test.assertTrue
 
 object PropagationReasonOracle {
 
+    enum class Outcome { NARROWING_FAILED, UNCHANGED, DEDUCTION, CONFLICT }
+
     // narrow tightens at decision level 1 before factor 0 propagates; a failed propagation checks the
     // conflict clause instead, since an omitted premise there lets learning prune solutions.
 
@@ -22,24 +24,26 @@ object PropagationReasonOracle {
         label: String,
         allowReasonlessRootConflict: Boolean = false,
         narrow: (PropagationState) -> Boolean,
-    ) {
+    ): Outcome {
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.currentLevel = 1
-        if (!narrow(state)) return
+        if (!narrow(state)) return Outcome.NARROWING_FAILED
         val before = Array(problem.numIntVars) { state.intDomains[it] }
         val boolsBefore = Array(problem.numBoolVars) { state.boolValues[it] }
         state.currentFactor = 0
         if (!state.factorAt(0).propagate(state, 0)) {
             ConflictReasonOracle.assertEntailed(problem, state, 0, label, allowReasonlessRootConflict)
-            return
+            return Outcome.CONFLICT
         }
         val solutions by lazy {
             FactorPropagationOracle.enumerateSat(problem, label, null)
         }
+        var deduced = false
         for (b in 0 until problem.numBoolVars) {
             val value = state.boolValues[b] ?: continue
             if (boolsBefore[b] != null) continue
+            deduced = true
             val reason = state.reasonOf(state.boolAntecedents[b])
             for (s in solutions) {
                 val implied = s.bools[b] == value ||
@@ -55,6 +59,7 @@ object PropagationReasonOracle {
             val after = state.intDomains[v]
             for (k in values(before[v])) {
                 if (k in after) continue
+                deduced = true
                 val (recorded, holds) = when {
                     k < after.min -> state.intMinAntecedents[v] to { s: Sample -> s.ints[v] >= after.min }
                     k > after.max -> state.intMaxAntecedents[v] to { s: Sample -> s.ints[v] <= after.max }
@@ -72,6 +77,7 @@ object PropagationReasonOracle {
                 }
             }
         }
+        return if (deduced) Outcome.DEDUCTION else Outcome.UNCHANGED
     }
 
     private fun values(d: IntDomain): List<Long> = (d.min..d.max).filter { it in d }
