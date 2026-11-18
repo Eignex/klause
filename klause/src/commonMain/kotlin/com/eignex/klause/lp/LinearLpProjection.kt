@@ -5,11 +5,14 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.engine.LpRowSlack
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.floorBigInt
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.toDouble
+import kotlin.math.max
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 
@@ -114,6 +117,8 @@ private class WideSplit(
 
     fun minus(i: Int): Int = minusCol[i]
 
+    fun isNonNegative(i: Int): Boolean = nonNegative[i]
+
     /** Whether column [i]'s coefficient rounds down on a row read in direction [ge]. */
     fun roundsDown(i: Int, ge: Boolean): Boolean = nonNegative[i] != ge
 }
@@ -145,7 +150,38 @@ private fun LinearRow.emitWideOuterRow(
         }
     }
     val rhs = if (ge) rounded.floorBound else rounded.ceilBound
-    builder.realRow(cols, dcoeffs, if (ge) LinearOp.GE else LinearOp.LE, rhs, strict = false)
+    val op = if (ge) LinearOp.GE else LinearOp.LE
+    val slack = wideRowSlack(builder, rounded, ge, split)
+    if (slack == null) builder.realRow(cols, dcoeffs, op, rhs, strict = false)
+    else builder.derivedRealRow(cols, dcoeffs, op, rhs, slack)
+}
+
+private fun LinearRow.wideRowSlack(
+    builder: RelaxationBuilder, rounded: WideRounding, ge: Boolean, split: WideSplit,
+): LpRowSlack? {
+    val source = builder as? SourceRowSlackBuilder ?: return null
+    val original = source.sourceRowSlack(this, includeAbsolute = true) ?: return null
+    var gapWeight = 0.0
+    var boundMagnitude = 0.0
+    val coefficients = wideCoefficients
+    val variables = intVars
+    for (index in variables.indices) {
+        if (split.straddles(index)) continue
+        val coefficient = if (split.roundsDown(index, ge)) rounded.floorCoeffs[index] else rounded.ceilCoeffs[index]
+        val difference = checkNotNull(BigFraction.ofDouble(coefficient)) - BigFraction.of(coefficients[index], BIG_ONE)
+        val gap = if (difference < BigFraction.ZERO) difference.negated() else difference
+        if (gap.isZero) continue
+        gapWeight = (gapWeight + gap.toDouble().nextUp()).nextUp()
+        boundMagnitude = max(boundMagnitude,
+            source.sourceBoundMagnitude(variables[index], upper = !split.isNonNegative(index)))
+    }
+    if (gapWeight == 0.0) return original
+    // A tolerance crossing of a declared sign bound reverses the coefficient's outward rounding direction.
+    return LpRowSlack(DoubleArray(original.size + 1) {
+        if (it == original.size) gapWeight else original.multiplier(it)
+    }, DoubleArray(original.size + 1) {
+        if (it == original.size) boundMagnitude else original.magnitude(it)
+    })
 }
 
 private class WideRoundingResult(val rounding: WideRounding?)

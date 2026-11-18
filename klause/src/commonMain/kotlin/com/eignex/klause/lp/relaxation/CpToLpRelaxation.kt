@@ -1323,12 +1323,14 @@ internal class CpToLpRelaxation(
             return expandedMagnitude(magnitude)
         }
 
-        override fun sourceRowSlack(row: LinearRow): LpRowSlack? {
+        override fun sourceRowSlack(row: LinearRow, includeAbsolute: Boolean): LpRowSlack? {
             val policy = problem.semantics.effective.feasibilityTolerance ?: return null
-            if (policy.relative.numerator.isZero()) return null
+            val absoluteOnly = policy.relative.numerator.isZero()
+            if (absoluteOnly && !includeAbsolute) return null
             val hasReals = (0 until row.size).any { Term.isReal(row.ref(it)) }
             if (!problem.semantics.relaxesRows(if (hasReals) 1 else 0)) return null
-            return row.linearSourceSlack(this)
+            return if (absoluteOnly) LpRowSlack(doubleArrayOf(1.0), doubleArrayOf(0.0))
+            else row.linearSourceSlack(this)
         }
 
         override fun sourceRow(row: LinearRow, scale: BigFraction, emit: () -> Unit) {
@@ -1346,6 +1348,20 @@ internal class CpToLpRelaxation(
             val magnitude = max(abs(bounds.lower(intVar).toDouble()), abs(bounds.upper(intVar).toDouble()))
             val outward = if (magnitude == 0.0) 0.0 else magnitude.nextUp()
             return if (problem.semantics.relaxesRows(0)) expandedMagnitude(outward) else outward
+        }
+
+        override fun sourceBoundMagnitude(intVar: Int, upper: Boolean): Double {
+            checkCancellation()
+            val bounds = problem.intBounds
+            val value = if (upper) {
+                if (!bounds.hasUpper(intVar)) return Double.POSITIVE_INFINITY
+                bounds.upper(intVar)
+            } else {
+                if (!bounds.hasLower(intVar)) return Double.POSITIVE_INFINITY
+                bounds.lower(intVar)
+            }
+            val magnitude = abs(value.toDouble())
+            return if (magnitude == 0.0) 0.0 else magnitude.nextUp()
         }
 
         private fun expandedMagnitude(magnitude: Double): Double {

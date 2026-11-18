@@ -235,6 +235,8 @@ Open declarations give an infinite scale and withhold relative numerical pricing
 Integral source rows use the same activity scale in fresh and prepared emissions.
 An exact wide row retains its positive coefficient normalization in the band's weights,
 so relative displacement remains in source units before projection into LP row units.
+Directionally rounded wide rows also carry declaration bands weighted by coefficient
+gaps, covering a tolerance crossing of a declared sign bound.
 
 Retained cuts keep their derived bands in both source and numeric row units. Rational
 projection scales the weights with the coefficients, and prepared projections, component

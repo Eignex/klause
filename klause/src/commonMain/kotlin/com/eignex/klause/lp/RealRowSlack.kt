@@ -18,8 +18,9 @@ internal fun RelaxationBuilder.realConstantSlack(result: Int, value: Double): Lp
     LpRowSlack(doubleArrayOf(1.0), doubleArrayOf(max(realMagnitude(result), abs(value))))
 
 internal interface SourceRowSlackBuilder : RelaxationBuilder {
-    fun sourceRowSlack(row: LinearRow): LpRowSlack?
+    fun sourceRowSlack(row: LinearRow, includeAbsolute: Boolean = false): LpRowSlack?
     fun sourceIntMagnitude(intVar: Int): Double
+    fun sourceBoundMagnitude(intVar: Int, upper: Boolean): Double
     fun sourceRow(row: LinearRow, scale: BigFraction, emit: () -> Unit)
 }
 

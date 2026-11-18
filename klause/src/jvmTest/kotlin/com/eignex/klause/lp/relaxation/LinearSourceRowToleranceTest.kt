@@ -23,6 +23,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.shl
 import org.junit.BeforeClass
 import org.junit.runner.RunWith
@@ -38,7 +39,7 @@ class LinearSourceRowToleranceTest(
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0} cached={1} relaxed={2}")
-        fun variants(): List<Array<Any>> = listOf("linear", "exact", "wide exact").flatMap { form ->
+        fun variants(): List<Array<Any>> = listOf("linear", "exact", "wide exact", "wide outer").flatMap { form ->
             listOf(false, true).flatMap { cached -> listOf(false, true).map { arrayOf(form, cached, it) } }
         }
 
@@ -59,10 +60,18 @@ class LinearSourceRowToleranceTest(
         val relative = if (relaxed) SemanticRational.of(BIG_ONE, bigIntOf(2)) else SemanticRational.ZERO
         val policy = SourceTolerance(relative = relative)
         val pairs = listOf(intArrayOf(0, 1), intArrayOf(1, 2), intArrayOf(0, 2))
-        val scale = if (form == "wide exact") BigFraction.of(BIG_ONE shl 64, BIG_ONE) else BigFraction.ONE
+        val scale = when (form) {
+            "wide exact" -> BigFraction.of(BIG_ONE shl 64, BIG_ONE)
+            "wide outer" -> BigFraction.of((BIG_ONE shl 64) + bigIntOf(4095), BIG_ONE)
+            else -> BigFraction.ONE
+        }
         val factors: List<Factor> = pairs.map { variables ->
-            if (form == "linear") Linear(intArrayOf(1, 1), variables, LinearOp.LE, 1)
-            else ExactLinear.of(variables.map(Term::ofIntVar).toIntArray(), listOf(scale, scale), LinearOp.LE, scale)
+            when (form) {
+                "linear" -> Linear(intArrayOf(1, 1), variables, LinearOp.LE, 1)
+                "wide outer" -> Linear(variables, arrayOf(scale.num, scale.num), LinearOp.LE, scale.num)
+                else -> ExactLinear.of(variables.map(Term::ofIntVar).toIntArray(),
+                    listOf(scale, scale), LinearOp.LE, scale)
+            }
         }
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors,
             semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = policy).resolve())
