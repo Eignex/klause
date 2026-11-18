@@ -385,14 +385,14 @@ private fun executeFixedSatisfy(
                     solutions++
                     if (solutions >= limit) break
                 }
-    
+
                 is SearchOutcome.Exhausted -> {
                     indeterminate = outcome.indeterminate
                     exhausted = !indeterminate
                     if (indeterminate) reason = outcome.stopCause.terminationReason()
                     break
                 }
-    
+
                 is SearchOutcome.BudgetCapped -> {
                     timedOut = true
                     reason = outcome.stopCause?.terminationReason() ?: when {
