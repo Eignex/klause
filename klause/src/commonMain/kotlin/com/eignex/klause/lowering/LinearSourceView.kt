@@ -35,6 +35,7 @@ internal class LinearSourceView(
     val exact: Boolean,
     val constraintsExact: Boolean,
     val objectiveScale: BigFraction,
+    val constraintFactorCount: Int,
 )
 
 // [negativeZeroBound] reports whether a zero bound of source column `index` was written as binary64 -0.0; its
@@ -142,6 +143,7 @@ internal fun lowerLinearSource(
         }
     }
     val constraintsExact = exact
+    val constraintFactorCount = factors.size
     var objectiveScale = BigFraction.ONE
     val objective = source.objective?.let { original ->
         val integral = MutableList(integers) { BigFraction.ZERO }
@@ -218,6 +220,7 @@ internal fun lowerLinearSource(
     )
     return LinearSourceView(
         source, model, objective, columns, sourceIntegers, sourceReals, exact, constraintsExact, objectiveScale,
+        constraintFactorCount,
     ).takeUnless { stop() }
 }
 

@@ -39,7 +39,8 @@ class IndependentLinearSourceTest {
                     LinearSourceRow(listOf(LinearSourceTerm(1, SemanticRational.ONE)),
                         lower = SemanticRational.ofLong(2)),
                 ),
-                LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE)), sense = sense),
+                LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE)), sense = sense),
                 SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance()).resolve(),
             )
             val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),

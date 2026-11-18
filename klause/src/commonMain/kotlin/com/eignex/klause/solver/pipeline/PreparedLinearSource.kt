@@ -59,9 +59,12 @@ internal fun prepareLinearSource(
     if (stop()) return interrupted()
     val supported = view.model.finiteRowsSupported()
     val mayRefute = !numerical && request.engine != FiniteEngine.LOCAL_SEARCH && request.engine != FiniteEngine.ALNS
-    val projections = if (supported || mayRefute) request.providers.prepare(view.model) else null
+    val model = if (!supported && mayRefute) {
+        view.model.withFactors(view.model.factors.take(view.constraintFactorCount))
+    } else view.model
+    val projections = if (supported || mayRefute) request.providers.prepare(model) else null
     val components = if (!supported && mayRefute) {
-        requireNotNull(projections).independentOpenComponents(stop) { view.model.factors[it].finiteRowSupported() }
+        requireNotNull(projections).independentOpenComponents(stop) { model.factors[it].finiteRowSupported() }
     } else emptyList()
     if (stop()) return interrupted()
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound,

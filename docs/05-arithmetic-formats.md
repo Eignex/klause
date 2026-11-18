@@ -71,9 +71,10 @@ undoes either exactly.
 Wide coefficients admit exact positive row normalization for the numerical LP.
 A connected component containing a nonfinite or underflowing projection remains
 unavailable. Under zero feasibility tolerance, complete and mixed execution retain
-exact checks for independent components whose rows admit projection; a refutation
-settles the conjunction, while component satisfaction leaves the unavailable
-remainder undecided. Positive tolerance retains source-wide decline because a
+exact checks for independent components whose rows admit projection. Feasibility
+connectivity excludes the auxiliary objective definition. A refutation settles
+the conjunction, while component satisfaction leaves the unavailable remainder
+undecided. Positive tolerance retains source-wide decline because a
 nominal refutation need not exclude every accepted point. An infeasible constant
 row stays an explicit contradiction.
 

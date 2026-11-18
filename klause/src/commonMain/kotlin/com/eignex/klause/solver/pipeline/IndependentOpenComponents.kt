@@ -100,7 +100,7 @@ internal fun PreparedFactorProjections.independentOpenComponents(
     acceptsFactor: (Int) -> Boolean = { true },
 ): List<IndependentOpenComponent>? {
     val connected = independentFactorGroups(stop) ?: return null
-    if (connected.size < 2) return emptyList()
+    if (connected.isEmpty()) return emptyList()
     val groups = connected.filter { indices -> indices.all { !stop() && acceptsFactor(it) } }
     if (stop()) return null
     if (groups.isEmpty()) return emptyList()
