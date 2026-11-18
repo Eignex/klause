@@ -31,7 +31,7 @@ internal fun forgetIfOverCap(
     if (session.learnedClauseCount > session.activeLearnedClauseCount) {
         session.compactLearnedClauses(
             (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
-            params.learnedMemoryScratchBytes, cancelled) { _, _ -> true }
+            params.learnedMemoryScratchBytes, cancelled, polling = params.cancellation.stopPolling) { _, _ -> true }
     }
 }
 
@@ -50,7 +50,7 @@ private fun forgetWindow(
                     !session.learnedClauseUsedSinceReduction(index)))
         }, nativePolicy = if (session.usesNativeSat) NativeCapConfiguration(
             params.tieredLearnedDb, params.lbdGlueThreshold, params.midLbdThreshold,
-        ) else null) { index ->
+        ) else null, polling = params.cancellation.stopPolling) { index ->
         val lbd = session.learnedClauseLbd(index)
         if (!params.tieredLearnedDb) {
             lbd <= params.lbdGlueThreshold

@@ -49,6 +49,7 @@ import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.pollStop
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntHashSet
@@ -617,11 +618,13 @@ private class CpSatisfactionTraversalPolicy(
         var seenCursor = cursor
         var seenHeap = heap
         var seenOperation = operation
-        while (session.nativeCapWindowPending && slice?.pauses() == true &&
+        while (session.nativeCapWindowPending && slice != null &&
             (session.nativeCapContinuationCursor != seenCursor || session.nativeCapContinuationHeap != seenHeap ||
                 session.nativeCapContinuationOperation != seenOperation)
         ) {
-            if (params.cancellation()) return SearchRunDisposition.Pause
+            if (params.cancellation.pollStop()) {
+                return if (slice.pauses()) SearchRunDisposition.Pause else SearchRunDisposition.Continue
+            }
             seenCursor = session.nativeCapContinuationCursor
             seenHeap = session.nativeCapContinuationHeap
             seenOperation = session.nativeCapContinuationOperation
