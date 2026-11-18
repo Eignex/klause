@@ -455,8 +455,8 @@ as incumbents without an optimality proof and its refutation decides nothing. Th
 bounds that prune and propagate against these optima move every side they price by the
 slack too, lowering the bound by the reduced cost times the slack. That is the widening
 the source gives a row, declaration or column that the relaxation states as the source
-does. A relaxation row that combines source rows, such as a presolve aggregate, a cut,
-the bound a row implies for an open side or the chord of an envelope, moves by the sum
+does. A relaxation row that combines source rows, such as a presolve aggregate, a cut
+or the chord of an envelope, moves by the sum
 of its multipliers times the slack under the tolerance yet is widened by one slack, so a
 subtree whose improvement lies within the remaining `(sum - 1) * slack` times that row's
 dual can still be pruned or refuted, and its verdict then depends on visiting order. The

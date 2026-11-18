@@ -314,17 +314,20 @@ private fun exactWrong(
 private fun magnitudeAbove(value: BigFraction): Double? =
     quotientAbove(if (value.num.signum() < 0) value.num.negate() else value.num, value.den)
 
-/**
+/*
  * The rows of [exact] as equalities `Σ a(i, j)·z(j) + s(i) = b(i)` over shifted structural columns and their slacks,
  * with each row's least and greatest activity, to imply a column's range from the other columns' bounds. Every
- * implied bound is widened outward by the rounding its doubles can carry, so a range is never understated.
+ * finite premise moves by [moved] before elimination. Implied bounds include the rounding of the perturbation's
+ * operands as well as the resulting activities, so cancellation cannot understate a range.
  */
-internal class RowView(private val exact: FloatEvidenceModel) {
+internal class RowView(private val exact: FloatEvidenceModel, private val moved: SideSlack? = null) {
     private val lower = DoubleArray(exact.numVars) {
-        exact.lower(it)
+        val side = exact.lower(it)
+        if (side.isFinite() && moved != null) side - moved.at(it, side) else side
     }
     private val upper = DoubleArray(exact.numVars) {
-        exact.upper(it)
+        val side = exact.upper(it)
+        if (side.isFinite() && moved != null) side + moved.at(it, side) else side
     }
 
     // Finite parts of each row's activity extremes, their absolute sums, how many terms are infinite, and the
@@ -409,17 +412,23 @@ internal class RowView(private val exact: FloatEvidenceModel) {
         }
         if (low.isFinite()) {
             least[i] += low
-            leastMagnitude[i] += abs(low)
+            leastMagnitude[i] += if (moved == null) abs(low) else abs(a) * sideMagnitude(j, a < 0)
         } else {
             leastInfinite[i]++
         }
         if (high.isFinite()) {
             most[i] += high
-            mostMagnitude[i] += abs(high)
+            mostMagnitude[i] += if (moved == null) abs(high) else abs(a) * sideMagnitude(j, a > 0)
         } else {
             mostInfinite[i]++
         }
         terms[i]++
+    }
+
+    // Keep the perturbation's operands in the rounding estimate even when their difference cancels.
+    private fun sideMagnitude(j: Int, upper: Boolean): Double {
+        val side = if (upper) exact.upper(j) else exact.lower(j)
+        return abs(side) + requireNotNull(moved).at(j, side)
     }
 
     /** Width of [j]'s box intersected with the interval every row through it implies, never below zero. */
@@ -642,9 +651,9 @@ internal class FloatDeductionCertificate private constructor(
             val reduced = DoubleArray(view.numVars)
             val sides = ByteArray(view.numVars)
             val citedRows = BooleanArray(view.m)
-            val rows = node.rows
             val cache = IntArray(2 * view.m) { NONE_CITED }
             val moved = SideSlack(view, slack)
+            val rows = if (slack == LpBoundSlack.NONE) node.rows else lazy { RowView(view, moved) }
 
             // An open side is priced at the tightest bound one row implies; that row and each side the implied bound
             // reads are cited.
@@ -667,16 +676,16 @@ internal class FloatDeductionCertificate private constructor(
                     val side = if (boxed.isFinite()) boxed else implied(j, d > 0.0) ?: return null
                     value += d * side
                     magnitude += abs(d * side)
-                    margin += error * abs(side) + abs(d) * moved.at(j, side)
+                    margin += error * abs(side) + if (boxed.isFinite()) abs(d) * moved.at(j, side) else 0.0
                     if (boxed.isFinite()) reduced[j] = d / scale
                     continue
                 }
                 // A sign within rounding prices both sides, and the finite box sides are cited. A side no row bounds
                 // takes the reduced cost as the zero it equals within that rounding: the numerical acceptance.
-                val low = if (lower.isFinite()) lower else implied(j, true) ?: 0.0
-                val high = if (upper.isFinite()) upper else implied(j, false) ?: 0.0
+                val low = if (lower.isFinite()) lower - moved.at(j, lower) else implied(j, true) ?: 0.0
+                val high = if (upper.isFinite()) upper + moved.at(j, upper) else implied(j, false) ?: 0.0
                 val extent = max(abs(low), abs(high))
-                margin += (abs(d) + error) * (extent + moved.at(j, extent))
+                margin += (abs(d) + error) * extent
                 sides[j] = (sides[j].toInt() or finiteSides(view, j)).toByte()
             }
             margin += (view.numVars + view.m + 4) * UNIT_ROUNDOFF * magnitude
@@ -772,9 +781,9 @@ internal fun floatFarkasRay(model: LpModel, ray: DoubleArray, slack: LpBoundSlac
     }
     if (largest == 0.0) return null
     val view = FloatEvidenceModel(model)
-    val rows = lazy { RowView(view) }
     val normalized = DoubleArray(ray.size) { ray[it] / largest }
     val moved = SideSlack(view, slack)
+    val rows = lazy { RowView(view, moved.takeUnless { slack == LpBoundSlack.NONE }) }
     val sign = farkasSign(view, normalized, rows, moved) ?: return null
     val oriented = DoubleArray(ray.size) { sign * normalized[it] }
     val open = openColumns(view)
@@ -918,9 +927,10 @@ private fun farkasSign(view: FloatEvidenceModel, ray: DoubleArray, rows: Lazy<Ro
             val (low, high) = rows.value.impliedBounds(j)
             lower = low
             upper = high
+        } else {
+            lower -= moved.at(j, lower)
+            upper += moved.at(j, upper)
         }
-        lower -= moved.at(j, lower)
-        upper += moved.at(j, upper)
         val high = r * (if (r > 0.0) upper else lower)
         val low = r * (if (r > 0.0) lower else upper)
         most += high
