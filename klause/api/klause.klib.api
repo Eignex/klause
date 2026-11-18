@@ -10702,8 +10702,6 @@ final class com.eignex.klause.localsearch/LocalSearchModel { // com.eignex.klaus
 final class com.eignex.klause.localsearch/LocalSearchMoveInspection { // com.eignex.klause.localsearch/LocalSearchMoveInspection|null[0]
     final val assignment // com.eignex.klause.localsearch/LocalSearchMoveInspection.assignment|{}assignment[0]
         final fun <get-assignment>(): com.eignex.klause.solver/Sample // com.eignex.klause.localsearch/LocalSearchMoveInspection.assignment.<get-assignment>|<get-assignment>(){}[0]
-    final val factorDegrees // com.eignex.klause.localsearch/LocalSearchMoveInspection.factorDegrees|{}factorDegrees[0]
-        final fun <get-factorDegrees>(): kotlin/IntArray // com.eignex.klause.localsearch/LocalSearchMoveInspection.factorDegrees.<get-factorDegrees>|<get-factorDegrees>(){}[0]
     final val netDelta // com.eignex.klause.localsearch/LocalSearchMoveInspection.netDelta|{}netDelta[0]
         final fun <get-netDelta>(): kotlin/Long // com.eignex.klause.localsearch/LocalSearchMoveInspection.netDelta.<get-netDelta>|<get-netDelta>(){}[0]
     final val objectiveDelta // com.eignex.klause.localsearch/LocalSearchMoveInspection.objectiveDelta|{}objectiveDelta[0]
@@ -18225,35 +18223,6 @@ final class com.eignex.klause.solver.result/ValueOrderingStats { // com.eignex.k
 
 final class com.eignex.klause.solver.search/AssembledSearchModel { // com.eignex.klause.solver.search/AssembledSearchModel|null[0]
     final fun <#A1: kotlin/Any> valueOf(com.eignex.klause.solver.search/TypedSearchValueKey<#A1>): #A1? // com.eignex.klause.solver.search/AssembledSearchModel.valueOf|valueOf(com.eignex.klause.solver.search.TypedSearchValueKey<0:0>){0§<kotlin.Any>}[0]
-}
-
-final class com.eignex.klause.solver.search/BooleanCoverageAttribution { // com.eignex.klause.solver.search/BooleanCoverageAttribution|null[0]
-    constructor <init>(com.eignex.klause.solver.search/BooleanProofContext, kotlin/Int = ..., kotlin/Int = ..., kotlin/Function2<kotlin/Int, com.eignex.klause.solver.search/BooleanCube, kotlin/Unit> = ...) // com.eignex.klause.solver.search/BooleanCoverageAttribution.<init>|<init>(com.eignex.klause.solver.search.BooleanProofContext;kotlin.Int;kotlin.Int;kotlin.Function2<kotlin.Int,com.eignex.klause.solver.search.BooleanCube,kotlin.Unit>){}[0]
-
-    final val context // com.eignex.klause.solver.search/BooleanCoverageAttribution.context|{}context[0]
-        final fun <get-context>(): com.eignex.klause.solver.search/BooleanProofContext // com.eignex.klause.solver.search/BooleanCoverageAttribution.context.<get-context>|<get-context>(){}[0]
-    final val literalBytes // com.eignex.klause.solver.search/BooleanCoverageAttribution.literalBytes|{}literalBytes[0]
-        final fun <get-literalBytes>(): kotlin/Long // com.eignex.klause.solver.search/BooleanCoverageAttribution.literalBytes.<get-literalBytes>|<get-literalBytes>(){}[0]
-    final val refutedRegions // com.eignex.klause.solver.search/BooleanCoverageAttribution.refutedRegions|{}refutedRegions[0]
-        final fun <get-refutedRegions>(): kotlin/Int // com.eignex.klause.solver.search/BooleanCoverageAttribution.refutedRegions.<get-refutedRegions>|<get-refutedRegions>(){}[0]
-    final val regions // com.eignex.klause.solver.search/BooleanCoverageAttribution.regions|{}regions[0]
-        final fun <get-regions>(): kotlin/Int // com.eignex.klause.solver.search/BooleanCoverageAttribution.regions.<get-regions>|<get-regions>(){}[0]
-
-    final var declinedEntries // com.eignex.klause.solver.search/BooleanCoverageAttribution.declinedEntries|{}declinedEntries[0]
-        final fun <get-declinedEntries>(): kotlin/Long // com.eignex.klause.solver.search/BooleanCoverageAttribution.declinedEntries.<get-declinedEntries>|<get-declinedEntries>(){}[0]
-    final var duplicateEntries // com.eignex.klause.solver.search/BooleanCoverageAttribution.duplicateEntries|{}duplicateEntries[0]
-        final fun <get-duplicateEntries>(): kotlin/Long // com.eignex.klause.solver.search/BooleanCoverageAttribution.duplicateEntries.<get-duplicateEntries>|<get-duplicateEntries>(){}[0]
-    final var duplicateRefutations // com.eignex.klause.solver.search/BooleanCoverageAttribution.duplicateRefutations|{}duplicateRefutations[0]
-        final fun <get-duplicateRefutations>(): kotlin/Long // com.eignex.klause.solver.search/BooleanCoverageAttribution.duplicateRefutations.<get-duplicateRefutations>|<get-duplicateRefutations>(){}[0]
-    final var entries // com.eignex.klause.solver.search/BooleanCoverageAttribution.entries|{}entries[0]
-        final fun <get-entries>(): kotlin/Long // com.eignex.klause.solver.search/BooleanCoverageAttribution.entries.<get-entries>|<get-entries>(){}[0]
-    final var repeatedEntries // com.eignex.klause.solver.search/BooleanCoverageAttribution.repeatedEntries|{}repeatedEntries[0]
-        final fun <get-repeatedEntries>(): kotlin/Long // com.eignex.klause.solver.search/BooleanCoverageAttribution.repeatedEntries.<get-repeatedEntries>|<get-repeatedEntries>(){}[0]
-
-    final fun clear() // com.eignex.klause.solver.search/BooleanCoverageAttribution.clear|clear(){}[0]
-    final fun observer(kotlin/Int, kotlin/Int, kotlin/Function0<com.eignex.klause.solver.search/BooleanProofContext> = ...): com.eignex.klause.solver.search/SearchBranchAttemptObserver // com.eignex.klause.solver.search/BooleanCoverageAttribution.observer|observer(kotlin.Int;kotlin.Int;kotlin.Function0<com.eignex.klause.solver.search.BooleanProofContext>){}[0]
-    final fun record(com.eignex.klause.solver.search/BooleanProofContext, kotlin/Int, com.eignex.klause.solver.search/BooleanCube): kotlin/Boolean // com.eignex.klause.solver.search/BooleanCoverageAttribution.record|record(com.eignex.klause.solver.search.BooleanProofContext;kotlin.Int;com.eignex.klause.solver.search.BooleanCube){}[0]
-    final fun recordRefutation(com.eignex.klause.solver.search/BooleanProofContext, kotlin/Int, com.eignex.klause.solver.search/BooleanCube): kotlin/Boolean // com.eignex.klause.solver.search/BooleanCoverageAttribution.recordRefutation|recordRefutation(com.eignex.klause.solver.search.BooleanProofContext;kotlin.Int;com.eignex.klause.solver.search.BooleanCube){}[0]
 }
 
 final class com.eignex.klause.solver.search/BooleanCube { // com.eignex.klause.solver.search/BooleanCube|null[0]

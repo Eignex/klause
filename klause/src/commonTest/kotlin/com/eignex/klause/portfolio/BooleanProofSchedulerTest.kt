@@ -114,7 +114,6 @@ class BooleanProofSchedulerTest {
 
             assertEquals(4, scheduler.completed)
             assertTrue(scheduler.nativeCoverageComplete)
-            assertFalse(scheduler.independentlyCheckedCoverageComplete)
         }
     }
 

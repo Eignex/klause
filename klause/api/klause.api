@@ -5476,7 +5476,6 @@ public final class com/eignex/klause/localsearch/LocalSearchModel$Companion {
 
 public final class com/eignex/klause/localsearch/LocalSearchMoveInspection {
 	public final fun getAssignment ()Lcom/eignex/klause/solver/Sample;
-	public final fun getFactorDegrees ()[I
 	public final fun getNetDelta ()J
 	public final fun getObjectiveDelta ()D
 	public final fun getWeightedNetDelta ()D
@@ -16513,25 +16512,6 @@ public final class com/eignex/klause/solver/search/BooleanBranching$None : com/e
 public final class com/eignex/klause/solver/search/BooleanBranching$SourceOrder : com/eignex/klause/solver/search/BooleanBranching {
 	public fun <init> (I)V
 	public fun alternatives (Lcom/eignex/klause/solver/search/SearchContext;)Ljava/util/List;
-}
-
-public final class com/eignex/klause/solver/search/BooleanCoverageAttribution {
-	public fun <init> (Lcom/eignex/klause/solver/search/BooleanProofContext;IILkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/search/BooleanProofContext;IILkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun clear ()V
-	public final fun getContext ()Lcom/eignex/klause/solver/search/BooleanProofContext;
-	public final fun getDeclinedEntries ()J
-	public final fun getDuplicateEntries ()J
-	public final fun getDuplicateRefutations ()J
-	public final fun getEntries ()J
-	public final fun getLiteralBytes ()J
-	public final fun getRefutedRegions ()I
-	public final fun getRegions ()I
-	public final fun getRepeatedEntries ()J
-	public final fun observer (IILkotlin/jvm/functions/Function0;)Lcom/eignex/klause/solver/search/SearchBranchAttemptObserver;
-	public static synthetic fun observer$default (Lcom/eignex/klause/solver/search/BooleanCoverageAttribution;IILkotlin/jvm/functions/Function0;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchBranchAttemptObserver;
-	public final fun record (Lcom/eignex/klause/solver/search/BooleanProofContext;ILcom/eignex/klause/solver/search/BooleanCube;)Z
-	public final fun recordRefutation (Lcom/eignex/klause/solver/search/BooleanProofContext;ILcom/eignex/klause/solver/search/BooleanCube;)Z
 }
 
 public final class com/eignex/klause/solver/search/BooleanCube {

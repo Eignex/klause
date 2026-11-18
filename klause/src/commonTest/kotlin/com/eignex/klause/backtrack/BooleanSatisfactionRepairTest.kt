@@ -245,7 +245,6 @@ class BooleanSatisfactionRepairTest {
             assertTrue(result is SolveResult.Unsat)
             assertEquals(4, scheduler.completed)
             assertTrue(scheduler.nativeCoverageComplete)
-            assertFalse(scheduler.independentlyCheckedCoverageComplete)
         }
     }
 

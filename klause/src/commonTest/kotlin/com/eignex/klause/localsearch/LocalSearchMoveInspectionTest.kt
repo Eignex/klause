@@ -58,7 +58,6 @@ class LocalSearchMoveInspectionTest {
         assertEquals(-2L, observed.netDelta)
         assertEquals(2.0, observed.objectiveDelta)
         assertEquals(2L, observed.assignment.intValue(0))
-        assertContentEquals(intArrayOf(1), observed.factorDegrees)
         assertContentEquals(before.ints, state.assignment.snapshot().ints)
         assertContentEquals(degrees, state.factorDegree)
         assertContentEquals(touched, state.tabu.lastTouched)
@@ -85,7 +84,6 @@ class LocalSearchMoveInspectionTest {
         )
 
         assertContentEquals(longArrayOf(2, 3, 6), observed.assignment.ints)
-        assertContentEquals(intArrayOf(0), observed.factorDegrees)
         assertEquals(6.0, observed.objectiveDelta)
         assertContentEquals(longArrayOf(0, 0, 0), state.assignment.snapshot().ints)
         assertEquals(0L, state.cost)

@@ -72,7 +72,6 @@ internal class BooleanProofScheduler(
 
     val context: BooleanProofContext get() = tasks.context
     val nativeCoverageComplete: Boolean get() = tasks.nativeCoverageComplete
-    val independentlyCheckedCoverageComplete: Boolean get() = tasks.independentlyCheckedCoverageComplete
     val pending: Int get() = tasks.pending
     val completed: Int get() = tasks.closed
     val size: Int get() = tasks.size
