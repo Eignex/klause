@@ -57,8 +57,8 @@ internal class CutContext(
                 facts.add(CutProofFact(premise, map.isGlobal(premise)))
             }
         }
-        val proof = CutProvenance(map.model, map.epoch, facts, map.assumptions)
-        return Cut(cut.cols, cut.coeffs, cut.rel, cut.rhs, global = proof.global, provenance = proof)
+        val proof = CutProvenance(map.model, map.epoch, facts, map.assumptions, slack = cut.slack)
+        return Cut(cut.cols, cut.coeffs, cut.rel, cut.rhs, global = proof.global, provenance = proof, slack = cut.slack)
     }
 }
 

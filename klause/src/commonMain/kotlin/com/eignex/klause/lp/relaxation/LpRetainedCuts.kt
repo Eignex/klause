@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Cut
@@ -35,7 +36,7 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
         val numericKey: String = numeric.key()
         val proof: CutProvenance get() = requireNotNull(numeric.provenance)
         val storageUnits: Long = numeric.cols.size.toLong() * 2L + numericKey.length +
-            source.expression.storageUnits + proof.storageUnits + 5L
+            source.expression.storageUnits + proof.storageUnits + (numeric.slack?.size?.toLong() ?: 0L) * 2L + 5L
     }
     private class Change(val depth: Int, val previous: List<Binding>)
     private var bindings = emptyList<Binding>()
@@ -92,7 +93,7 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
             val columns = IntArray(cut.cols.size) { remap.column(cut.cols[it]).also { column -> check(column >= 0) } }
             if (columns.contentEquals(cut.cols)) previous else {
                 Binding(previous.id, previous.source, Cut(columns, cut.coeffs, cut.rel, cut.rhs,
-                    cut.global, previous.proof, family = cut.family))
+                    cut.global, previous.proof, family = cut.family, slack = cut.slack))
             }
         }
         val next = bindings.map {
@@ -203,13 +204,14 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
         val integral = rhs.den == BIG_ONE && coefficients.all { (column, coefficient) ->
             coefficient.den == BIG_ONE && state.model.column(column).integral
         }
+        val slack = if (proof.model is Problem) cut.sourceRowSlack(proof.model) else cut.slack
         return LpScopedRow(
             id,
             coefficients.filterValues { !it.isZero }.entries.sortedBy { it.key }
                 .map { it.key to ExactLpNumber.of(it.value) },
             ExactLpNumber.of(rhs),
             ExactLpColumn(ExactLpBounds(zero, if (cut.rel == Relation.EQ) zero else null), integral = integral),
-            ExactLpRow(global = proof.global),
+            ExactLpRow(global = proof.global, slack = slack),
         )
     }
 }

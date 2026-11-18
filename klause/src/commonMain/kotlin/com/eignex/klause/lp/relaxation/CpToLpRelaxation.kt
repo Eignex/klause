@@ -1050,8 +1050,10 @@ internal class CpToLpRelaxation(
                     candidate
                 }
                 if (cut.cols.all { it in 0 until builder.varCount }) {
-                    cut.provenance?.let { cutParents[builder.rowCount] = it }
+                    val index = builder.rowCount
+                    cut.provenance?.let { cutParents[index] = it }
                     builder.addRow(cut.cols, cut.coeffs, cut.rel, cut.rhs, cut.global)
+                    cut.sourceRowSlack(problem)?.let { carryRowSlack(index, it) }
                 }
             }
 

@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.exactRhs
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.remapSources
+import com.eignex.klause.lp.engine.scaled
 import com.eignex.klause.lp.relaxation.CutColumnBinding
 import com.eignex.klause.lp.relaxation.CutColumnLayout
 import com.eignex.klause.lp.relaxation.CutSourceMap
@@ -34,6 +35,7 @@ import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
+import kotlin.math.nextUp
 
 internal enum class CutMappingDecline {
     MISSING_SOURCE,
@@ -81,6 +83,7 @@ internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression
         conclusion,
         definitions.filterKeys { it in referenced },
         family,
+        slack,
     )
 }
 
@@ -92,7 +95,8 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
         value.num.magnitudeBitLength() <= bits && value.den.magnitudeBitLength() <= bits
 
     fun accepts(proof: CutProvenance): Boolean {
-        var remaining = terms
+        var remaining = terms - (proof.slack?.size ?: 0)
+        if (remaining < 0) return false
         val definitions = proof.auxiliaryDefinitions
         fun expression(value: CutExpression): Boolean {
             val coefficients = value.terms
@@ -166,11 +170,12 @@ private class PreparedSourceCutProjection(
     private val columns = cut.cols.copyOf()
     private val coefficients = cut.coeffs.copyOf()
     private val bound = cut.rhs
+    private val slack = cut.slack
     override val projection: Boolean get() = true
     override val storageUnits: Long get() = source.projectedPreparationUnits
 
     fun cut(proof: CutProvenance): Cut = Cut(columns, coefficients, source.relation, bound,
-        global = proof.global, provenance = proof, family = source.family)
+        global = proof.global, provenance = proof, family = source.family, slack = slack)
 }
 
 internal fun SourceCutPreparation.withoutProjection(): SourceCutPreparation =
@@ -185,7 +190,8 @@ internal class SourceCut(
 ) {
     internal val preparationExtent: Long get() = provenance.storageUnits + expression.storageUnits + 1L
     internal val projectedPreparationUnits: Long
-        get() = SourceCutPreparation.STORAGE_UNITS + expression.storageUnits + 8L
+        get() = SourceCutPreparation.STORAGE_UNITS + expression.storageUnits +
+            (provenance.slack?.size?.toLong() ?: 0L) * 2L + 8L
 
     val key: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
         val definitions = provenance.auxiliaryDefinitions
@@ -287,11 +293,15 @@ internal class SourceCut(
         fun representable(value: BigInt): Boolean =
             value >= min && value <= max && (relation != Relation.GE || value != min)
         // Absolute slack drives pool aging, so retain representable input scaling.
+        var reduction = BIG_ONE
         val integers = if (scaledIntegers.all { representable(it) }) {
             scaledIntegers
         } else {
             val divisor = scaledIntegers.fold(BIG_ZERO) { gcd, value -> gcd.gcd(value.abs()) }
-            if (divisor.isZero()) scaledIntegers else scaledIntegers.map { it / divisor }
+            if (divisor.isZero()) scaledIntegers else {
+                reduction = divisor
+                scaledIntegers.map { it / divisor }
+            }
         }
         if (integers.any { !representable(it) }) {
             return CutMapping.Declined(CutMappingDecline.LONG_RANGE)
@@ -306,6 +316,7 @@ internal class SourceCut(
             conclusion,
             provenance.auxiliaryDefinitions,
             family,
+            provenance.slack,
         )
         if (proof !== original && !limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         val result = CutMapping.Mapped(
@@ -317,6 +328,7 @@ internal class SourceCut(
                 global = proof.global,
                 provenance = proof,
                 family = family,
+                slack = proof.slack?.scaled(BigFraction.of(scale, reduction).toDouble().nextUp()),
             ),
         )
         if (onPrepared != null && original === this.provenance) {
@@ -539,6 +551,7 @@ private class SourceCutMapper(
             CutPremise.Row(inequality, cut.rel, BigFraction.ofLong(cut.rhs)),
             auxiliary,
             cut.family,
+            cut.slack,
         ).retainReferencedDefinitions(inequality) ?: decline(CutMappingDecline.MISSING_SOURCE)
         if (!limits.accepts(proof)) decline(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(SourceCut(inequality, cut.rel, BigFraction.ofLong(cut.rhs), proof, cut.family))

@@ -21,6 +21,7 @@ internal class Cut(
     val provenance: CutProvenance? = null,
     val tableau: TableauCutProvenance? = null,
     val family: CutFamily = provenance?.family ?: CutFamily.UNSPECIFIED,
+    val slack: LpRowSlack? = null,
 ) {
     val cols: IntArray = cols.copyOf()
     val coeffs: LongArray = coeffs.copyOf()
@@ -38,5 +39,5 @@ internal class Cut(
     }
 
     fun withFamily(value: CutFamily): Cut =
-        Cut(cols, coeffs, rel, rhs, global, provenance?.withFamily(value), tableau, value)
+        Cut(cols, coeffs, rel, rhs, global, provenance?.withFamily(value), tableau, value, slack)
 }
