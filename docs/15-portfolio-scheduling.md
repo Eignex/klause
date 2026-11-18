@@ -534,7 +534,11 @@ seeds by disagreement with the center, debiting the producing and consuming work
 existing funding; a missing, closed or unaffordable hint falls back to ordinary seed
 order without delaying a start or requesting a relaxation, and the repair owner
 releases the snapshot on retirement. Guidance carries no witness, bound or proof
-authority. Continuous columns stay free, cutoff checks stay exact, and later
+authority. Fixed repair can round a complete, distinct root hint into its first
+small neighborhood's integer center, clamped to the working bounds, while retaining
+the checked pooled cutoff. Missing, unchanged or unaffordable root hints retain the
+pooled center. This preparation spends the existing work and allocation funding.
+Continuous columns stay free, cutoff checks stay exact, and later
 proposals keep their captured conditions. Imported points remain query incumbents
 and centers and earn no discovery reward: only a point the repair query produces
 enters companion publication and original-source rechecking.

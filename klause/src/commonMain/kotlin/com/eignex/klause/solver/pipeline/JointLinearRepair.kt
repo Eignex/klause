@@ -314,8 +314,10 @@ internal class JointLinearRepair(
                 }
                 val checkedStart = pooled != null && completion != null && round == 0L
                 if (round == 0L && completion != null) incumbentTrialPending = checkedStart
+                val rootSeed = if (checkedStart && !adaptive) roundedRootSeed(from) else null
+                val selectedCenter = rootSeed ?: from
                 val width = if (enlargedTrialAfterWitness) checkedTrialWidth + 1 else if (checkedStart) {
-                    observe("jointRepairCheckedCenterStarts")
+                    observe(if (rootSeed == null) "jointRepairCheckedCenterStarts" else "jointRepairRootSeedStarts")
                     minOf(count, 2)
                 } else if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
                     focusedRemaining--
@@ -332,15 +334,19 @@ internal class JointLinearRepair(
                 val size = if (enlargedTrialPending && width > checkedTrialWidth)
                     minOf(width, checkedTrialWidth + 1) else width
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
-                val guided = requireNotNull(selection).guide(hint, from, budget, stop)
-                requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
+                val guided = requireNotNull(selection).guide(hint, selectedCenter, budget, stop)
+                requireNotNull(selection).propose(selectedCenter, pooled?.bools ?: bools, size,
+                    proposalRound, radius, limit)
                     .also { condition ->
                         if (observation != null) {
                             proposalSequence++
                             observationQuery = 0L
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
-                                proposalRound, count, size, if (pooled == null) "stored" else "checked-pooled",
-                                from, model.numIntVars, sourceIntegers, observedRoots, condition)
+                                proposalRound, count, size, when {
+                                    rootSeed != null -> "shared-root"
+                                    pooled == null -> "stored"
+                                    else -> "checked-pooled"
+                                }, selectedCenter, model.numIntVars, sourceIntegers, observedRoots, condition)
                         }
                         guidedProposal = condition.takeIf { guided }
                         if (checkedStart) {
@@ -353,6 +359,33 @@ internal class JointLinearRepair(
                     }
             },
         )
+    }
+
+    private fun roundedRootSeed(center: List<BigFraction>): List<BigFraction>? {
+        val hint = repairGuidance?.find(source) ?: return null
+        val work = 1L + 4L * model.numIntVars + center.size
+        val bytes = 256L + 96L * model.numIntVars + 8L * center.size
+        if (stop() || funding.availableWork <= work || funding.remainingAllocation <= bytes) return null
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        val result = center.toMutableList()
+        var changed = false
+        for (id in 0 until model.numIntVars) {
+            if (stop()) return null
+            val coordinate = hint.integer(id)?.takeIf { it.isFinite() } ?: return null
+            var value = BigFraction.ofDouble(round(coordinate)) ?: return null
+            if (model.intBounds.hasLower(id)) {
+                val lower = BigFraction.ofLong(model.intBounds.lower(id))
+                if (value < lower) value = lower
+            }
+            if (model.intBounds.hasUpper(id)) {
+                val upper = BigFraction.ofLong(model.intBounds.upper(id))
+                if (value > upper) value = upper
+            }
+            changed = changed || value != center[id]
+            result[id] = value
+        }
+        return result.takeIf { changed && !stop() && !funding.exhausted }
     }
 
     private fun requestIncumbentPreparation() {

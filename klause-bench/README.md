@@ -1179,6 +1179,8 @@ an LP operation, but that alone establishes no source-level benefit.
 proposal from a checked pooled center, skipping its all-pinned bootstrap. The first
 proposal frees at most two connected integers under the same repair allowance;
 record completed checked improvements separately from proposal/import counts.
+`jointRepairRootSeedStarts` distinguishes fixed repair's first small proposal from
+a distinct shared root hint, retaining the checked pooled cutoff and the same allowance.
 The first pending checked-center proposal receives continuation behind complete-worker
 coverage within the unchanged companion cap, including root and center preparation
 when a compatible advisory or exact-coordinate incumbent is available. Advisory
