@@ -4,6 +4,10 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Cut
@@ -16,11 +20,15 @@ import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.FloatDeductionCertificate
+import com.eignex.klause.lp.engine.LpBoundSlack
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpLayoutRemap
+import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.propagation.PropagationSession
@@ -34,6 +42,65 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedCutsTest {
+    @Test
+    fun `retained cuts without displacement should not exclude a tolerance feasible objective`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 1),
+        ), semantics = SourceSemantics(SourceFormat.MPS,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE)).resolve())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(-1, -1, -1)))
+            .build(RootDomains(problem))
+        val candidate = Cut(base.intColOf, longArrayOf(1, 1, 1), Relation.LE, 1L, global = true)
+        val cuts = LpRetainedCuts()
+        LpScopedSolver(LpExactState(assertNotNull(base.model.authoritativeModel()))).use { owner ->
+            val edit = assertNotNull(cuts.prepare(owner.state, base, listOf(candidate)))
+            assertTrue(owner.replaceRows(edit.retired, emptyList(), edit.rows, false))
+            edit.commit()
+            val current = assertNotNull(owner.state.ownerWorkingModel())
+
+            val certificate = RevisedSimplex(current).use { solver ->
+                val result = assertNotNull(solver.solve())
+                FloatDeductionCertificate.of(current, result.duals, slack = LpBoundSlack(1.0, 0.0))
+            }
+
+            assertTrue(certificate == null || certificate.lowerBound <= -3.0)
+        }
+    }
+
+    @Test
+    fun `scoped cut pricing should restore ancestor premise displacement on pop`() {
+        val model = LpBuilder().apply { addVar(0L, 10L, cost = -1L) }.build(Sense.MINIMIZE)
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val map = CutSourceMap(Any(), 0, listOf(CutColumnSource(source)))
+        val base = LpRelaxation(model, intArrayOf(0), BooleanArray(1), 0L, intArrayOf(0), intArrayOf(), sourceMap = map)
+        val cuts = LpRetainedCuts()
+        LpScopedSolver(LpExactState(assertNotNull(model.authoritativeModel()))).use { owner ->
+            for ((rhs, weight) in listOf(1L to 3.0, 0L to 5.0)) {
+                if (rhs == 0L) assertTrue(owner.push())
+                val candidate = Cut(intArrayOf(0), longArrayOf(1L), Relation.LE, rhs, global = true,
+                    slack = LpRowSlack(doubleArrayOf(weight), doubleArrayOf(0.0)))
+                val current = base.withModel(assertNotNull(owner.state.ownerWorkingModel()), map)
+                val edit = assertNotNull(cuts.prepare(owner.state, current, listOf(candidate)))
+                assertTrue(owner.replaceRows(edit.retired, emptyList(), edit.rows, rhs == 0L))
+                edit.commit()
+            }
+            for ((depth, expected) in listOf(1 to -5.0, 0 to -4.0)) {
+                assertTrue(owner.pop(depth))
+                cuts.retract(depth)
+                val current = assertNotNull(owner.state.ownerWorkingModel())
+                val bound = RevisedSimplex(current).use { solver ->
+                    val result = assertNotNull(solver.solve())
+                    assertNotNull(FloatDeductionCertificate.of(current, result.duals,
+                        slack = LpBoundSlack(1.0, 0.0))).lowerBound
+                }
+
+                assertTrue(bound <= expected && bound > expected - 1e-4, "bound $bound should cover $expected")
+            }
+        }
+    }
+
     @Test
     fun `equivalent auxiliary coordinates should refresh retained proofs without replacing their rows`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray())

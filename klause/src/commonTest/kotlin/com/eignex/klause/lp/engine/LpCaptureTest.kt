@@ -164,7 +164,8 @@ class LpCaptureTest {
                 ExactLpColumn(ExactLpBounds(ExactLpSide(third, strict = true, premises))),
             ),
             listOf(ExactLpRow(global = false, strict = true, premises,
-                slack = LpRowSlack(doubleArrayOf(3.0, 0.5), doubleArrayOf(0.0, Double.POSITIVE_INFINITY)))),
+                slack = LpRowSlack(doubleArrayOf(3.0, Double.POSITIVE_INFINITY),
+                    doubleArrayOf(0.0, Double.POSITIVE_INFINITY)))),
             ExactLpObjective(listOf(third, negativeZero, third), third, third, third, Sense.MAXIMIZE),
         )
         val basis = Basis(intArrayOf(2), arrayOf(VarStatus.FREE, VarStatus.FIXED, VarStatus.BASIC), false)

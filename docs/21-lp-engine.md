@@ -142,6 +142,14 @@ bounds and Farkas checks read this displacement, including when deriving an open
 side. The exact row retains the numeric metadata through scopes and layout changes, and
 exact capture includes it in the source state key. Zero slack leaves every side unchanged.
 
+Integer tableau cuts combine the bands of their structural lower bounds and input rows.
+Shifting a negative integer premise to zero consumes at most one rounding unit for CG,
+or twice the divisor plus one for scaled MIR; this also covers coefficient gcd rounding.
+An equality's omitted logical column adds its aggregation multiplier's magnitude.
+Repeated magnitudes share one accumulated weight. More than 4096 distinct magnitudes,
+or an overflowing weight, withholds positive-tolerance numerical pricing while retaining
+the nominal cut and its exact interpretation.
+
 `floatFarkasRay` normalises a dual-unbounded ray and accepts it when its binary64 Farkas
 margin exceeds the tolerance times the terms' size, pricing open sides at their row-implied
 bounds. Each implying row is folded into the ray so its open column cancels, in binary64

@@ -773,6 +773,7 @@ internal class ComponentLpSolver(
                         },
                         proof.divisor, proof.mir, proof.reduction,
                     ),
+                    slack = cut.slack,
                 )
                 if (cuts.size == maxCuts) return cuts
             }

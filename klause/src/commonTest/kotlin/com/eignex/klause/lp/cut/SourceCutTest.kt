@@ -14,7 +14,9 @@ import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.LpBoundSlack
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpRowSlack
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
@@ -40,6 +42,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SourceCutTest {
+    @Test
+    fun `rational cut projection should scale premise displacement with its coefficients`() {
+        val half = BigFraction.of(BIG_ONE, bigIntOf(2))
+        val source = SourceCut(CutExpression(mapOf(x to half)), Relation.LE, BigFraction.ONE,
+            CutProvenance(modelToken, 0, emptyList(), slack = LpRowSlack(doubleArrayOf(3.0), doubleArrayOf(4.0))))
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
+
+        val cut = assertNotNull(source.toCut(map).orNull())
+        val movement = assertNotNull(cut.slack).at(LpBoundSlack(1.0, 0.5))
+
+        assertTrue(movement >= 12.0 && movement < 12.0 + 1e-12)
+    }
+
+    @Test
+    fun `prepared cut projections should retain their premise displacement`() {
+        val expression = CutExpression(mapOf(x to BigFraction.of(BIG_ONE, bigIntOf(2))))
+        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+            slack = LpRowSlack(doubleArrayOf(3.0), doubleArrayOf(4.0))))
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
+        val columns = assertNotNull(CutColumnLayout.capture(map, 64L, ExecutionControl.Never) {})
+        var prepared: SourceCutPreparation? = null
+        assertNotNull(source.toCut(map, onPrepared = { prepared = it }, columnBinding = columns).orNull())
+        assertTrue(assertNotNull(prepared).projection)
+
+        val cut = assertNotNull(source.toCut(map, preparation = prepared, columnBinding = columns).orNull())
+        val movement = assertNotNull(cut.slack).at(LpBoundSlack(1.0, 0.5))
+
+        assertTrue(movement >= 12.0 && movement < 12.0 + 1e-12)
+    }
+
     private val x = CutSource(CutSourceKind.INTEGER, 0)
     private val y = CutSource(CutSourceKind.REAL, 0)
     private val term = CutSource(CutSourceKind.TERM, 7)

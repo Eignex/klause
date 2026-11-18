@@ -13,14 +13,14 @@ class LpRowSlack(multipliers: DoubleArray, magnitudes: DoubleArray) {
 
     init {
         require(weights.size == scales.size)
-        require(weights.all { it.isFinite() && it >= 0.0 })
+        require(weights.all { it >= 0.0 })
         require(scales.all { it >= 0.0 })
     }
 
     /** Number of premise bands. */
     val size: Int get() = weights.size
 
-    /** Nonnegative multiplier of premise [index]. */
+    /** Nonnegative multiplier of premise [index], infinite when no finite displacement can be priced. */
     fun multiplier(index: Int): Double = weights[index]
 
     /** Upper bound on the relative scale of premise [index], possibly infinite. */
@@ -31,8 +31,9 @@ class LpRowSlack(multipliers: DoubleArray, magnitudes: DoubleArray) {
         var sum = 0.0
         for (index in weights.indices) {
             if (weights[index] == 0.0) continue
-            val band = if (slack.relative == 0.0) slack.absolute
+            val band = if (slack.relative == 0.0 || scales[index] == 0.0) slack.absolute
             else max(slack.absolute, (slack.relative * scales[index]).nextUp())
+            if (band == 0.0) continue
             sum = (sum + (weights[index] * band).nextUp()).nextUp()
         }
         return sum
@@ -43,3 +44,14 @@ class LpRowSlack(multipliers: DoubleArray, magnitudes: DoubleArray) {
 
     override fun hashCode(): Int = 31 * weights.contentHashCode() + scales.contentHashCode()
 }
+
+internal fun LpRowSlack.scaled(factor: Double): LpRowSlack = LpRowSlack(
+    DoubleArray(size) {
+        if (multiplier(it) == 0.0 || factor == 0.0) 0.0 else (multiplier(it) * factor).nextUp()
+    },
+    DoubleArray(size, ::magnitude),
+)
+
+internal val UNPRICED_CUT_SLACK = LpRowSlack(
+    doubleArrayOf(Double.POSITIVE_INFINITY), doubleArrayOf(Double.POSITIVE_INFINITY),
+)

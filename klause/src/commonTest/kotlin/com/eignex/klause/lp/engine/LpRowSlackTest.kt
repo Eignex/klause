@@ -6,6 +6,22 @@ import kotlin.test.assertTrue
 
 class LpRowSlackTest {
     @Test
+    fun `an unpriced cut should withhold positive tolerance pricing and retain exact pricing`() {
+        assertEquals(Double.POSITIVE_INFINITY, UNPRICED_CUT_SLACK.at(LpBoundSlack(1.0, 0.0)))
+        assertEquals(Double.POSITIVE_INFINITY, UNPRICED_CUT_SLACK.at(LpBoundSlack(0.0, 0.25)))
+        assertEquals(0.0, UNPRICED_CUT_SLACK.at(LpBoundSlack.NONE))
+    }
+
+    @Test
+    fun `zero premise bands should not multiply an infinite rate or weight`() {
+        val row = LpRowSlack(doubleArrayOf(Double.POSITIVE_INFINITY), doubleArrayOf(0.0))
+
+        val displacement = row.at(LpBoundSlack(0.0, Double.POSITIVE_INFINITY))
+
+        assertEquals(0.0, displacement)
+    }
+
+    @Test
     fun `zero sides should retain only absolute slack under an unbounded relative rate`() {
         val slack = LpBoundSlack(2.0, Double.POSITIVE_INFINITY)
 

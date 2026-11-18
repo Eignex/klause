@@ -233,6 +233,11 @@ and a bound on the sum of absolute source activities. Integer and real declarati
 supply these bounds before Boolean constants are folded or column origins are shifted.
 Open declarations give an infinite scale and withhold relative numerical pricing.
 
+Retained cuts keep their derived bands in both source and numeric row units. Rational
+projection scales the weights with the coefficients, and prepared projections, component
+mapping, row scopes and compaction preserve them. A cut without a known displacement
+cannot supply positive-tolerance numerical authority; its nominal row remains available.
+
 The exact matrix, costs, objective sense/scale/constant, bounds, strictness,
 integrality, origins, source premises, ordered basis and nonbasic statuses determine
 the problem. Floating factors, values and reduced costs are revision-keyed working

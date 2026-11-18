@@ -704,13 +704,20 @@ internal class FloatDeductionCertificate private constructor(
 // it never falls short of the slack the source bound admits.
 internal class SideSlack(private val view: FloatEvidenceModel, private val slack: LpBoundSlack) {
     private val rows by lazy(LazyThreadSafetyMode.NONE) {
-        val magnitudes = DoubleArray(view.m) { abs(view.rhs(it)) }
+        val magnitudes = DoubleArray(view.m) { abs(view.rhs(it)).nextUp() }
         for (j in 0 until view.n) {
             val origin = view.origin(j)
-            if (origin != 0.0) view.forEachInColumn(j) { row, a -> magnitudes[row] += abs(a * origin) }
+            if (origin != 0.0) view.forEachInColumn(j) { row, a ->
+                magnitudes[row] = (magnitudes[row] + abs(a * origin).nextUp()).nextUp()
+            }
         }
         magnitudes
     }
+
+    fun bands(j: Int, side: Double): LpRowSlack =
+        if (j >= view.n) view.model.exactState?.model?.row(j - view.n)?.slack
+            ?: LpRowSlack(doubleArrayOf(1.0), doubleArrayOf(rows[j - view.n]))
+        else LpRowSlack(doubleArrayOf(1.0), doubleArrayOf((abs(side) + abs(view.origin(j))).nextUp()))
 
     fun at(j: Int, side: Double): Double = when {
         slack.absolute == 0.0 && slack.relative == 0.0 -> 0.0

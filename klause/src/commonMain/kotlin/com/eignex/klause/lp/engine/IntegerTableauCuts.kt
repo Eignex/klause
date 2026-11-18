@@ -340,7 +340,8 @@ private fun emitGeCut(
         // Σ (vals/g) x ≥ rhs/g, integral LHS ⇒ ≥ ⌈rhs/g⌉.
         rhs = ceilDiv(rhs, g)
     }
-    return Cut(outCols, outVals, Relation.GE, rhs, tableau = provenance.reduced(g))
+    return Cut(outCols, outVals, Relation.GE, rhs, tableau = provenance.reduced(g),
+        slack = roundingCutSlack(provenance))
 }
 
 /** `⌈ a / b ⌉` for `b > 0`. */
