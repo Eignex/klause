@@ -74,8 +74,7 @@ open class VariableSchema : Schema<SchemaEntry>() {
     protected fun floatVar(
         min: Double = Double.NEGATIVE_INFINITY,
         max: Double = Double.POSITIVE_INFINITY,
-        buckets: Int? = null,
-    ) = register(FloatSpec(min, max, buckets)) { FloatHandle(it, min, max) }
+    ) = register(FloatSpec(min, max)) { FloatHandle(it, min, max) }
 
     /**
      * Shared delegate for the opt-variable builders: declares the synthetic presence Boolean
@@ -103,12 +102,12 @@ open class VariableSchema : Schema<SchemaEntry>() {
 
     /**
      * Optional float variable: declares a presence Boolean named `<prop>__present` alongside the
-     * bucketised-float value variable. Compare via [OptFloatHandle]'s opt-aware operators to get
+     * continuous real value variable. Compare via [OptFloatHandle]'s opt-aware operators to get
      * MiniZinc's "undefined → false" semantics; decode with
      * [com.eignex.klause.compile.CompiledSchema.decode] to read `null` when absent.
      */
-    protected fun optFloatVar(min: Double, max: Double, buckets: Int? = null) =
-        optVar(FloatSpec(min, max, buckets)) { name, present ->
+    protected fun optFloatVar(min: Double, max: Double) =
+        optVar(FloatSpec(min, max)) { name, present ->
             OptFloatHandle(name = name, present = present, value = FloatHandle(name, min, max))
         }
 

@@ -19,7 +19,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
@@ -67,27 +66,6 @@ class SourceOptionsTest {
     }
 
     @Test
-    fun `grid controls should replace requested fields and preserve declared defaults`() {
-        val common = CommonOptions()
-        parseArgs(
-            arrayOf("--float-semantics", "grid", "--float-buckets", "17", "--float-scale", "3000000000",
-                "--float-grid-lo", "-2.5"),
-            commonFlagSpecs(common),
-        ) {}
-
-        common.sourceOverrides(flatZincSemantics)
-
-        val capture = assertNotNull(common.sourceSemantics)
-        val grid = assertIs<FloatSemantics.Grid>(capture.effective.floats)
-        assertEquals(17, grid.buckets)
-        assertEquals(3_000_000_000L, grid.linearScale)
-        assertEquals(SemanticRational.of(bigIntOf(-5), bigIntOf(2)), grid.unrangedBounds.lower)
-        assertEquals(assertIs<FloatSemantics.Grid>(flatZincSemantics.floats).unrangedBounds.upper,
-            grid.unrangedBounds.upper)
-        assertEquals(flatZincSemantics, capture.declared)
-    }
-
-    @Test
     fun `exact source controls should require continuous floats and zero applicable tolerance`() {
         for (declared in listOf(flatZincSemantics, smtLibSemantics, mpsSemantics, dimacsSemantics,
             wcnfSemantics, opbSemantics, xcsp3Semantics)) {
@@ -97,7 +75,7 @@ class SourceOptionsTest {
             common.sourceOverrides(declared)
 
             val capture = assertNotNull(common.sourceSemantics)
-            assertFalse(capture.isApproximate)
+            assertFalse(capture.relaxesFeasibility)
             if (declared.floats != null) assertEquals(FloatSemantics.Continuous, capture.effective.floats)
             if (declared.feasibilityTolerance != null) {
                 assertEquals(SourceTolerance(), capture.effective.feasibilityTolerance)
@@ -165,10 +143,8 @@ class SourceOptionsTest {
     @Test
     fun `conflicting approximate and exact source controls should be rejected`() {
         for ((declared, args) in listOf(
-            flatZincSemantics to arrayOf("--exact", "--float-buckets", "2"),
             mpsSemantics to arrayOf("--exact", "--source-relative-tolerance", "1/10"),
             mpsSemantics to arrayOf("--exact", "--source-relative-optimality-tolerance", "1/10"),
-            flatZincSemantics to arrayOf("--float-semantics", "continuous", "--float-grid-lo", "0"),
         )) {
             val common = CommonOptions()
             parseArgs(args, commonFlagSpecs(common)) {}
@@ -227,7 +203,6 @@ class SourceOptionsTest {
             mpsSemantics to SemanticOverrides(
                 feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
             ),
-            flatZincSemantics to SemanticOverrides(floats = FloatSemantics.Grid(2, 1000)),
         )
         for ((declared, base) in policies) {
             val common = CommonOptions().apply {
@@ -238,7 +213,7 @@ class SourceOptionsTest {
             common.sourceOverrides(declared)
 
             assertSame(base, common.semanticOverrides)
-            assertFalse(assertNotNull(common.sourceSemantics).isApproximate)
+            assertFalse(assertNotNull(common.sourceSemantics).relaxesFeasibility)
         }
     }
 }

@@ -24,7 +24,7 @@ rejected. Malformed input raises `MpsFormatException`.
 
 `MpsModel.semantics` captures source defaults before lowering. Parsed models declare
 `DECIMAL_LITERALS`; programmatic models read supplied doubles as exact binary64
-literals. Float grid and optional-value overrides do not apply to MPS.
+literals. Float interpretation and optional-value overrides do not apply to MPS.
 
 Wholly unranged integer columns default to `[0,1]` and wholly unranged real columns
 to `[0,+infinity)`; overrides replace either endpoint independently. A column with

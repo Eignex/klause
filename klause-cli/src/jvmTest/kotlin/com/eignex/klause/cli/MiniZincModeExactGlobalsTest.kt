@@ -11,7 +11,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
@@ -102,7 +101,6 @@ class MiniZincModeExactGlobalsTest(
             val solvable = session.load(source.absolutePath, common)
             val invocation = assertNotNull(solvable.sourceInvocation)
             assertEquals(FloatSemantics.Continuous, invocation.source.semantics.effective.floats)
-            assertNull(invocation.floatProjection)
             val original = invocation.source.originalSource as Problem
             global.third?.let { type -> assertTrue(original.factors.any { it::class.simpleName == type }, type) }
             System.setOut(stream)

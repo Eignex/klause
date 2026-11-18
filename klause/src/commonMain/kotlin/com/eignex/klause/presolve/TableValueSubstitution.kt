@@ -25,7 +25,7 @@ internal object TableValueSubstitution {
 
     fun reduce(problem: BakedProblem, context: PresolveContext): PassDelta {
         val objective = context.linearObjective ?: return PassDelta()
-        if (context.solutionSetSensitive || problem.semantics.isApproximate || problem.numRealVars != 0 ||
+        if (context.solutionSetSensitive || problem.semantics.relaxesFeasibility || problem.numRealVars != 0 ||
             problem.numIntVars > MAX_COLUMNS || objective.realCoefficientValues.isNotEmpty() ||
             objective.intCoefficientValues.size > problem.numIntVars || context.cancellation()
         ) return PassDelta()

@@ -78,26 +78,6 @@ data class UndeclaredRealBounds(
 sealed interface FloatSemantics {
     /** Continuous values under the source's numeric authority. */
     data object Continuous : FloatSemantics
-
-    /** Bounded grid defaults for declarations without an explicit per-variable grid. */
-    data class Grid(
-        /** Number of grid points. */
-        val buckets: Int,
-        /** Fixed-point scale of float-linear source lowering. */
-        val linearScale: Long,
-        /** Approximation window for a float without a declared finite range. */
-        val unrangedBounds: UndeclaredRealBounds = UndeclaredRealBounds(
-            SemanticRational.ofLong(-1_000_000), SemanticRational.ofLong(1_000_000),
-        ),
-    ) : FloatSemantics {
-        init {
-            require(buckets > 0) { "float buckets must be positive" }
-            require(linearScale > 0) { "float linear scale must be positive" }
-            require(unrangedBounds.lower != null && unrangedBounds.upper != null) {
-                "a float grid requires a finite approximation window"
-            }
-        }
-    }
 }
 
 /**
@@ -292,12 +272,12 @@ class EffectiveSourceSemantics internal constructor(
     val hasOverrides: Boolean get() = declared != effective
 
     /**
-     * Whether policy declares grid defaults or a positive tolerance. Individual components can
-     * retain exact representations. This flag establishes no witness validity, completeness,
+     * Whether policy declares a positive feasibility tolerance. This flag establishes no witness validity,
+     * completeness,
      * refutation authority or independently checked proof.
      */
-    val isApproximate: Boolean
-        get() = effective.floats is FloatSemantics.Grid || effective.feasibilityTolerance?.isExact == false
+    val relaxesFeasibility: Boolean
+        get() = effective.feasibilityTolerance?.isExact == false
 
     // A format that types its floats states integer and Boolean relations exactly, so its slack reaches only
     // relations over a real coordinate; an untyped decimal format reads every row within the slack.

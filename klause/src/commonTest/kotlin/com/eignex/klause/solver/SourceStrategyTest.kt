@@ -73,7 +73,7 @@ class SourceStrategyTest {
     @Test
     fun `an explicit source portfolio should retain the compiled coordinate frame`() {
         val x = FloatHandle("x", 0.125, 0.125)
-        val compiled = SchemaDef<SchemaEntry>(mapOf("x" to FloatSpec(0.125, 0.125, 2))).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf("x" to FloatSpec(0.125, 0.125))).compile()
         val strategy = BacktrackSolver.source(compiled)
 
         val result = strategy.solve(FiniteEngine.MIXED)
@@ -599,7 +599,7 @@ class SourceStrategyTest {
         val x = FloatHandle("x", -2.0, 2.0)
         val compiled = SchemaDef<SchemaEntry>(
             mapOf(
-                "x" to FloatSpec(-2.0, 2.0, 5),
+                "x" to FloatSpec(-2.0, 2.0),
                 "square" to NamedConstraint((x * x) eq 2.0),
             ),
         ).compile()
@@ -619,8 +619,8 @@ class SourceStrategyTest {
         val y = FloatHandle("y", 0.0, 2.0)
         val compiled = SchemaDef<SchemaEntry>(
             mapOf(
-                "x" to FloatSpec(0.0, 2.0, 5),
-                "y" to FloatSpec(0.0, 2.0, 5),
+                "x" to FloatSpec(0.0, 2.0),
+                "y" to FloatSpec(0.0, 2.0),
                 "product" to NamedConstraint((x * y) eq 1.0),
             ),
         ).compile()
@@ -640,7 +640,7 @@ class SourceStrategyTest {
     @Test
     fun `schema product chain should yield exact shared coordinates`() {
         val schema = object : VariableSchema() {
-            val x by floatVar(-2.0, 2.0, 5)
+            val x by floatVar(-2.0, 2.0)
             val cube by constraint { (x * x * x) eq x }
         }
 

@@ -1,6 +1,5 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -10,14 +9,11 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.codec.FactorCodecs
 import com.eignex.klause.ir.EffectiveSourceSemantics
-import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
-import com.eignex.klause.ir.SourceBoolId
-import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
@@ -85,11 +81,8 @@ import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.projection.FloatGridAbsentPin
-import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.skema.SchemaDef
 import com.eignex.util.collections.MutableIntObjectMap
-import com.eignex.util.numbers.BigFraction
 
 internal class Compiler(
     config: KlauseConfig,
@@ -123,8 +116,6 @@ internal class Lowering(
     val impliedFactors = HashSet<Int>()
     var hasSymmetryBreaking = false
     val pinAbsentOptVars = checkNotNull(semantics.effective.pinAbsentOptionalValues)
-    private val grid = semantics.effective.floats as? FloatSemantics.Grid
-    val floatBuckets = grid?.buckets ?: DEFAULT_FLOAT_BUCKETS
 
     override val factors get() = problemBuilder.factors
     val boolVarIdByName get() = problemBuilder.boolVarIdByName
@@ -139,9 +130,6 @@ internal class Lowering(
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
     val floatDecoders = mutableMapOf<String, FloatSpec>()
-    val auxiliaryReals = HashSet<Int>()
-    val floatAbsentPins = HashMap<Int, FloatGridAbsentPin>()
-    val truncatedFloatRows = HashSet<Int>()
     val realVarIdByName get() = problemBuilder.realVarIdByName
 
     /**
@@ -172,7 +160,7 @@ internal class Lowering(
     fun markOpenInt(id: Int, lower: Boolean, upper: Boolean) = problemBuilder.markOpen(id, lower, upper)
 
     fun newRealVar(lower: Double, upper: Double, name: String? = null): Int =
-        problemBuilder.newReal(lower, upper, name).also { if (name == null) auxiliaryReals += it }
+        problemBuilder.newReal(lower, upper, name)
 
     fun continuousProduct(a: Int, b: Int, result: Int) = problemBuilder.continuousProduct(a, b, result)
 
@@ -503,8 +491,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
             }
 
             is FloatSpec -> {
-                val buckets = entry.buckets ?: floatBuckets
-                floatDecoders[name] = entry.copy(buckets = buckets)
+                floatDecoders[name] = entry
                 newRealVar(entry.min, entry.max, name)
             }
 
@@ -528,12 +515,8 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
     val source = buildProblem()
     val namedReals = realVarIdByName.toMap()
-    val specsById = namedReals.entries.associate { (name, id) -> id to floatDecoders.getValue(name) }
     val binding = CompiledSourceBinding(source, intVarIdByName, namedReals,
-        (0 until source.numRealVars).map { id ->
-            FloatGridVariable(SourceRealId(id), specsById[id]?.buckets, id in auxiliaryReals, floatAbsentPins[id],
-                preserveBuckets = id in specsById)
-        }, schemaFloatRepresentations(def), truncatedFloatRows)
+        representations = schemaFloatRepresentations(def))
     return CompiledSchema(
         problem = source,
         boolVarIdByName = boolVarIdByName.toMap(),
@@ -563,14 +546,8 @@ private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
                 val spec = floatDecoders.getValue(base)
                 val default = 0.0.coerceIn(spec.min, spec.max)
                 val id = realVarIdByName.getValue(base)
-                val first = factors.size
                 val equality = reifyRealLinear(doubleArrayOf(1.0), intArrayOf(id), LinearOp.EQ, default)
                 factors += Clause(intArrayOf(Lit.make(boolVarIdByName.getValue(name), true), equality))
-                val rows = (first until factors.size).filter {
-                    factors[it] is com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-                }
-                floatAbsentPins[id] = FloatGridAbsentPin(SourceBoolId(boolVarIdByName.getValue(name)),
-                    checkNotNull(BigFraction.ofDouble(default)), rows)
             }
 
             intVarIdByName.containsKey(base) -> {

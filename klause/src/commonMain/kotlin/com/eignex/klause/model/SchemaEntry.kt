@@ -89,12 +89,7 @@ data class IntDomainSpec(
     }
 }
 
-/**
- * Float declaration with an optional explicit grid of [buckets] values across `[min, max]`.
- * Components requiring a grid use an integer index and a retained decoder. Other supported
- * components retain continuous real coordinates. An infinite side is open; a grid over it uses the
- * effective semantics' unranged window.
- */
+/** Continuous real declaration; an infinite endpoint leaves that side open. */
 @Serializable
 @SerialName("float")
 data class FloatSpec(
@@ -102,23 +97,7 @@ data class FloatSpec(
     val min: Double = Double.NEGATIVE_INFINITY,
     /** Inclusive upper bound of the real interval, positive infinity when open. */
     val max: Double = Double.POSITIVE_INFINITY,
-    /** Explicit grid size (at least two), or null to use the compiler's effective source policy. */
-    val buckets: Int? = null,
-) : VarSpec {
-    init {
-        require(buckets == null || buckets >= 2) { "FloatSpec needs at least 2 buckets" }
-    }
-
-    /** Real-value step `(max - min) / (buckets - 1)` for a grid resolved by compilation. */
-    val scale: Double
-        get() {
-            val count = requireNotNull(buckets) { "float grid must be resolved by compilation" }
-            return (max - min) / (count - 1)
-        }
-
-    /** Decode bucket index [bucket] to its real value: `min + scale * bucket`. */
-    fun realValue(bucket: Int): Double = min + scale * bucket
-}
+) : VarSpec
 
 /** Set variable over an integer universe. The universe is fixed at schema-construction
  *  time and need not be contiguous, though contiguous ranges are the common case. */

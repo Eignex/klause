@@ -206,12 +206,11 @@ fields feed the same local search weights and presolve symmetry gate as
 
 FlatZinc is MiniZinc's flat constraint language. The frontend keeps source names,
 constraints, search annotations and output reconstruction. Float components retain
-their source arithmetic, accepted within the declared tolerance or exactly. A private
-float grid only finds candidate points; its refutations and optima are not verdicts.
+their source arithmetic, accepted within the declared tolerance or exactly.
 
 ### Declared semantics and caller ranges
 
-`flatZincSemantics` declares binary64 literal authority, a default grid policy,
+`flatZincSemantics` declares binary64 literal authority, continuous reals,
 `[-1000000, 1000000]` for unranged integer declarations, open endpoints for
 unranged floats and `SourceTolerance(absolute=1/10000000)`, an absolute slack with
 no relative component. Parsing resolves `SemanticOverrides` before declaration
@@ -223,9 +222,7 @@ stays authoritative. `BoundOverride.Open` keeps a genuinely open side, and the
 finite placeholder endpoints carry no source-bound authority. Rational real
 endpoints must be exactly representable in binary64 and are never rounded.
 
-Float grid windows stay separate from continuous source bounds. A window disjoint
-from the declared range declines the grid without refuting the source, and a
-singleton window cannot certify a finite choice. When effective endpoints differ
+When effective endpoints differ
 from the defaults, the output protocol prints them and withholds default-source
 refutation, unboundedness and optimum markers.
 
@@ -243,7 +240,7 @@ zero keeps its nonzero alternatives.
 
 `all_different_int` and `alldifferent_except_0` retain native `AllDifferent`
 over signed-word domains. Fixed nonnegative integer powers retain `Power`; exact
-float powers use polynomial completion and bucketed powers use `GridPower`.
+float powers use polynomial completion.
 Variable or negative exponents decline.
 
 ### FlatZinc Boolean channels
@@ -333,18 +330,11 @@ arbitrary real functions remain unsupported. The advertised predicate list lives
 
 ### FlatZinc floats
 
-Canonical compilation retains original real declarations and exact real relations;
-`FlatZincProgram.sourceProgram` and `sourceAttachment()` expose that frame without
-a grid. A grid policy only permits a private view. Automatic execution keeps the
-original source when the requested engine's arm runs there: an admitted complete arm
-on any route but a heuristic one, or for `-e ls` and `-e alns` an admitted
-local-search or ALNS arm on the finite route, which completes reals at each leaf
-under the source tolerance as the default portfolio's incomplete arms do. It runs
-the grid view otherwise: when no such arm exists, when the route is heuristic (an
-open model whose objective the linear theory cannot minimize, or one without a
-complete route), when `-e ls` or `-e alns` would take a linear or polynomial route,
-and for an enumeration other than complete finite search. The `problem` getter and `prepareFiniteCompatibility` request the finite
-compatibility view explicitly.
+Canonical compilation retains original real declarations and real relations.
+`FlatZincProgram.problem`, `sourceProgram` and `sourceAttachment()` share
+one source frame. Setup selects the source's finite, linear, polynomial or heuristic
+route under the declared feasibility tolerance, or exactly at zero tolerance. A route
+without an admitted strategy returns undecided.
 
 Supported float operations retain exact relations: strict and reified comparisons,
 `RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling and
@@ -366,22 +356,12 @@ In both default and exact mode, loading one raises `UnsupportedFlatZincException
 with `unsupported FlatZinc builtin` and the predicate name. FlatZinc does not lower
 these predicates to the [transcendental theory](19-nonlinear-arithmetic.md#transcendental-real-arithmetic).
 
-In the compatibility view, a component that needs approximation or has more than
-4,096 finite alternatives uses integer buckets. Bucketed search decides a finite
-grid: it misses solutions between grid points, and rounding can produce candidates
-that violate the source relations. The grid is therefore neither the model's meaning
-nor a relaxation of it. A grid point is published only when the original source
-accepts it, within the declared tolerance or exactly, so a found point is a source
-solution or incumbent. A grid refutation, a grid optimum and an exhausted grid
-enumeration decide nothing about the source: the source verdict is unknown, or
-satisfiable or best-found when a point was accepted, and an enumeration never
-claims that it listed every solution. The source's integer and Boolean relations
-hold exactly, so a root refutation of those relations alone is a source refutation.
-A local-search or ALNS engine on the original source publishes source points without
-an optimum or enumeration completeness claim, and refutes only through presolve
-infeasibility or its root propagation, both of which cover the real relations too. Its enumeration takes the grid and lists the accepted grid
-points. Grid relations (`GridArrayMinMax`, `GridAbs`,
-`GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
+Local search and ALNS publish source-accepted points and incumbents. Their own search
+establishes no optimum or enumeration completeness; presolve and root propagation
+can refute the source. All-solutions requests enumerate the discrete projection when
+finite execution supports it, using complete backtracking. Linear, polynomial and
+heuristic routes without an enumeration surface return unsupported without publishing
+a completeness marker, including requests made with local search or ALNS.
 
 The original arm is numerical under the declared tolerance. Finite LP deductions are
 [numerical](21-lp-engine.md#numerical-and-exact-deductions), and a real
@@ -470,8 +450,7 @@ rounds are leaf search work: the minimize path charges them to its slice and
 pauses between rounds, resuming the pending leaf; a round itself runs to completion, so
 a leaf with many choice combinations can overrun its slice and repay the excess from the
 slices that follow. A stopped round decides nothing, and a refutation that finishes as
-the stop fires is not trusted. Projected
-grid witnesses are checked against the same readings.
+the stop fires is not trusted.
 
 A source without integer columns takes the finite lane under a positive tolerance and
 the [linear theory](18-linear-arithmetic.md) at zero tolerance; an MPS source takes the
@@ -482,8 +461,7 @@ whose false side is a strict complement, or a strict row at zero tolerance),
 since leaf completion attains no supremum, and when all solutions are requested. The
 finite lane, for sources with integer columns too, states each unconditional strict row
 as its closed row, so every engine on the original source decides the row acceptance
-reads, and a local-search or ALNS run on a grid publishes only grid points acceptance
-admits. An optimum against it is attained. It also leaves each real minimum and
+reads. An optimum against it is attained. It also leaves each real minimum and
 maximum inert during search and enforces it at the leaf: the leaf completion chooses
 the selected operand, within the slack where acceptance reads it. In a source with
 integer columns, a reified non-strict row takes the finite lane and its false side
@@ -505,8 +483,7 @@ numerical policy.
 `--exact` zeroes the tolerance, so completion and LP certification are exact. It
 preserves continuous variables and open bounds, routes linear
 satisfaction through the shared real/mixed theory and requires exact certification
-for continuous objectives. It never selects a grid; unsupported exact models
-decline. Overflow during lowering and integer constants that
+for continuous objectives. Unsupported exact models decline. Overflow during lowering and integer constants that
 binary64 cannot represent decline with a diagnostic.
 
 #### Rounded FlatZinc bounds
@@ -514,11 +491,9 @@ binary64 cannot represent decline with a diagnostic.
 Exact mode checks mathematical arithmetic over parsed binary64 literals and keeps
 every declared bound. For example, binary64 `0.01 * 200` exceeds `2.0` by
 `3/72057594037927936`: rounding the result to `2.0` violates the defining row.
-A compiler-rounded integer image crossing a declared bound therefore declines exact
-mode. An image within the declared slack of its bound keeps its original representation,
-and the original arm accepts it within the tolerance under every engine. An image beyond
-the slack records the approximation, and the compatibility view uses the grid. See
-[FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt).
+The real rows and declared bounds retain those exact binary64 literals. An image
+within the declared slack of its bound is accepted under the numerical policy;
+zero tolerance requires the exact defining relation and bound together.
 
 ### MiniZinc output rendering
 
@@ -534,18 +509,11 @@ narrowing ran out of allowance, printed as its interval's rounded midpoint, and
 fraction or root description retains source authority.
 A completion accepted within tolerance carries binary64 coordinates only, so its
 block has decimal assignments and no exact comments.
-Mixed exact/grid witnesses add
-`% klause-coordinate:` and `% klause-float-component:` comments with each grid
-point's binary64 value and approximation reason. With a selected finite grid,
-`==========` follows only a source-accepted satisfaction point, never a grid
-optimum or a grid enumeration, and `=====UNSATISFIABLE=====` follows only a refutation
-of the integer and Boolean relations. The
-`% klause-float-claim:` comment marks the private grid, and
-`% klause-grid-verdict:` retains the native grid verdict as a comment. With `-s`, a
-source declaring float variables also reports `floatApproximation=true` or `false`
-as a statistic, stating whether this run selected the grid. Optimization
-keeps its accepted incumbent without an optimum marker; a search without an
-accepted point remains UNKNOWN.
+Float component comments identify source real coordinates. With `-s`, a source
+declaring float variables reports `floatApproximation=false`. Accepted source
+satisfaction and completed optimization use the standard terminal marker;
+interrupted optimization keeps its incumbent without an optimum marker, and an
+unsupported source operation remains UNKNOWN.
 Caller declaration-range overrides still withhold default-source completion claims.
 
 `OznApplier` renders bindings through the parsed `.ozn` output model with signed

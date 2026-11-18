@@ -71,8 +71,7 @@ interface IncrementalObjective : Objective {
  * - [constant] is added unconditionally; useful for objectives whose "zero" assignment
  *   has nonzero cost.
  *
- * Bucketed float objectives use the integer bucket's coefficient. LP-only continuous objectives
- * use [realCoefficients]; [evaluateExact] retains certified rational coordinates.
+ * Continuous real objectives use [realCoefficients]; [evaluateExact] retains certified rational coordinates.
  *
  * Coefficient buffers are captured at construction. Exported arrays are independent copies;
  * evaluation reads the owned coefficients directly.

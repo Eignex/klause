@@ -12,11 +12,6 @@ import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.DivModExpression
 import com.eignex.klause.factor.arithmetic.DivisionConvention
 import com.eignex.klause.factor.arithmetic.ExactRealEquality
-import com.eignex.klause.factor.arithmetic.GridAbs
-import com.eignex.klause.factor.arithmetic.GridArrayMinMax
-import com.eignex.klause.factor.arithmetic.GridCoordinate
-import com.eignex.klause.factor.arithmetic.GridPower
-import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealAbs
@@ -77,42 +72,7 @@ internal class AffinePayload(
 internal class AffineAbsPayload(val operand: AffinePayload, val result: AffinePayload)
 
 @Serializable
-internal class GridAbsPayload(
-    val operand: Int,
-    val result: Int,
-    val operandLower: Double,
-    val operandUpper: Double,
-    val operandBuckets: Int,
-    val resultLower: Double,
-    val resultUpper: Double,
-    val resultBuckets: Int,
-)
-
-@Serializable
 internal class ArrayMinMaxPayload(val result: Int, val xs: IntArray, val max: Boolean)
-
-@Serializable
-internal class GridArrayMinMaxPayload(
-    val coordinates: IntArray,
-    val steps: DoubleArray,
-    val origins: DoubleArray,
-    val constants: BooleanArray,
-    val scale: Long,
-    val max: Boolean,
-)
-
-@Serializable
-internal class GridCoordinatePayload(val variable: Int, val lower: Double, val upper: Double, val buckets: Int)
-
-@Serializable
-internal class GridProductPayload(
-    val a: GridCoordinatePayload,
-    val b: GridCoordinatePayload,
-    val result: GridCoordinatePayload,
-)
-
-@Serializable
-internal class GridPowerPayload(val base: GridCoordinatePayload, val exponent: Int, val result: GridCoordinatePayload)
 
 /** Exactly one of [divisor] (a column) and [constantDivisor] (an exact literal) is present. */
 @Serializable
@@ -145,10 +105,6 @@ private fun AffinePayload.terms(): Map<Int, BigInt> {
     require(vars.distinct().size == vars.size) { "affine vars must be distinct" }
     return vars.indices.associate { vars[it] to coefficients[it] }
 }
-
-private fun GridCoordinate.payload(): GridCoordinatePayload = GridCoordinatePayload(variable, lower, upper, buckets)
-
-private fun GridCoordinatePayload.toCoordinate(): GridCoordinate = GridCoordinate(variable, lower, upper, buckets)
 
 private fun Power.payload(): PowerPayload = when (val coordinate = base) {
     is Power.Coordinate.Integer -> PowerPayload(
@@ -252,21 +208,6 @@ internal fun arithmeticFactorCodecs(): List<FactorCodec<*, *>> = listOf(
             )
         },
     ),
-    factorCodec<GridAbs, GridAbsPayload>(
-        "gridAbs",
-        {
-            GridAbsPayload(
-                it.operand, it.result, it.operandLower, it.operandUpper, it.operandBuckets,
-                it.resultLower, it.resultUpper, it.resultBuckets,
-            )
-        },
-        {
-            GridAbs(
-                it.operand, it.result, it.operandLower, it.operandUpper, it.operandBuckets,
-                it.resultLower, it.resultUpper, it.resultBuckets,
-            )
-        },
-    ),
     factorCodec<ArrayMinMax, ArrayMinMaxPayload>(
         "arrayMinMax",
         { ArrayMinMaxPayload(it.result, it.xs, it.max) },
@@ -276,21 +217,6 @@ internal fun arithmeticFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "realArrayMinMax",
         { RealArrayMinMaxPayload(it.result, it.xs, it.max) },
         { RealArrayMinMax(it.result, it.xs, it.max) },
-    ),
-    factorCodec<GridArrayMinMax, GridArrayMinMaxPayload>(
-        "gridArrayMinMax",
-        { GridArrayMinMaxPayload(it.coordinates, it.steps, it.origins, it.constants, it.scale, it.max) },
-        { GridArrayMinMax(it.coordinates, it.steps, it.origins, it.constants, it.scale, it.max) },
-    ),
-    factorCodec<GridProduct, GridProductPayload>(
-        "gridProduct",
-        { GridProductPayload(it.a.payload(), it.b.payload(), it.output.payload()) },
-        { GridProduct(it.a.toCoordinate(), it.b.toCoordinate(), it.result.toCoordinate()) },
-    ),
-    factorCodec<GridPower, GridPowerPayload>(
-        "gridPower",
-        { GridPowerPayload(it.base.payload(), it.exponent, it.output.payload()) },
-        { GridPower(it.base.toCoordinate(), it.exponent, it.result.toCoordinate()) },
     ),
     factorCodec<DivMod, DivModPayload>(
         "divMod",

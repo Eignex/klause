@@ -87,11 +87,6 @@ the nearest declared operand. These scores are heuristic: zero violation require
 exact completion of the whole source relation in
 [Completion, restarts and ownership](#continuous-candidate-completion).
 
-`GridProduct` and `GridPower` instead grade their declared rounded index relation
-with integer deltas, respecting aliases, domain holes and channel ownership. Exact
-grid membership supplies no continuous-source witness; approximation metadata and
-whole-source validation remain required.
-
 ## Board swap coverage
 
 After a strict feasible descent's sampled pick misses, the reserved structural draw

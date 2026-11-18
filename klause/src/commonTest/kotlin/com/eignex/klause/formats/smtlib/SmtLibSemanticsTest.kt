@@ -38,7 +38,7 @@ class SmtLibSemanticsTest {
             assertEquals(smtLibSemantics, source.semantics.effective)
             assertTrue(source.model.intBounds.isOpenLower(0))
             assertTrue(source.model.intBounds.isOpenUpper(0))
-            assertFalse(source.semantics.isApproximate)
+            assertFalse(source.semantics.relaxesFeasibility)
         }
     }
 
@@ -139,7 +139,7 @@ class SmtLibSemanticsTest {
     @Test
     fun `SMT entries should reject inapplicable or approximate semantic replacements before reading input`() {
         val replacements = listOf(
-            SemanticOverrides(floats = FloatSemantics.Grid(10, 100)),
+            SemanticOverrides(floats = FloatSemantics.Continuous),
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
             SemanticOverrides(pinAbsentOptionalValues = false),
         )

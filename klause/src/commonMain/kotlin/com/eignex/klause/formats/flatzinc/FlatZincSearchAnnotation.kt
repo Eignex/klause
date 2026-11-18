@@ -80,7 +80,6 @@ private fun FlatZincCompiler.collectSearchVars(
                 return
             }
             floatNames[name]?.let {
-                if (!it.lpOnly) ints.add(it.varId)
                 return
             }
             setNames[name]?.let { layout ->
@@ -93,8 +92,7 @@ private fun FlatZincCompiler.collectSearchVars(
                         FlatZincArray.Vars.ElementKind.Bool -> for (v in arr.varIds) bools.add(v)
 
                         FlatZincArray.Vars.ElementKind.Int -> for (v in arr.varIds) ints.add(v)
-                        FlatZincArray.Vars.ElementKind.Float -> arr.floatBucketings.orEmpty()
-                            .filter { !it.lpOnly }.forEach { ints.add(it.varId) }
+                        FlatZincArray.Vars.ElementKind.Float -> Unit
                     }
                 }
 
@@ -112,9 +110,7 @@ private fun FlatZincCompiler.collectSearchVars(
                 FlatZincArray.Vars.ElementKind.Bool -> bools.add(arr.varIds[idx])
 
                 FlatZincArray.Vars.ElementKind.Int -> ints.add(arr.varIds[idx])
-                FlatZincArray.Vars.ElementKind.Float -> arr.floatBucketings?.get(idx)?.let {
-                    if (!it.lpOnly) ints.add(it.varId)
-                }
+                FlatZincArray.Vars.ElementKind.Float -> Unit
             }
         }
 

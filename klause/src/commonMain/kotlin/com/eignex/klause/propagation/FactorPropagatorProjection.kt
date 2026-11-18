@@ -16,7 +16,6 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.WideConstants
-import com.eignex.klause.lowering.gridAbsoluteValueTable
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.difference.DifferenceSystemPropagator
 import com.eignex.klause.util.PermutationGroup
@@ -52,13 +51,7 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is AffineAbs -> AffineAbsPropagator(this)
 
-    is GridAbs -> gridAbsoluteValueTable(this).buildPropagatorProjection(preparation)
-
-    is GridArithmetic -> GridArithmeticPropagator(this)
-
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
-
-    is GridArrayMinMax -> GridArrayMinMaxPropagator(this)
 
     is Cardinality -> CardinalityPropagator(boolVars, intVars, literals, min, max)
 

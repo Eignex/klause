@@ -62,7 +62,7 @@ class FlatZincFiniteFloatProductsTest {
     fun `literal products should not round exact source equalities`() {
         for ((a, output, valid) in listOf(Triple(0.5, 0.25, true), Triple(0.1, 0.010000000000000002, false))) {
             val program = parseFlatZinc(
-                "constraint float_times($a, $a, $output); solve satisfy;",
+                "var $output..$output: z; constraint float_times($a, $a, z); solve satisfy;",
                 exactFloats = true,
             )
 
@@ -85,12 +85,8 @@ class FlatZincFiniteFloatProductsTest {
                 constraint int_eq(n, 2);
                 solve satisfy;
                 """.trimIndent(),
-                floatBuckets = 2,
                 exactFloats = exact,
             )
-
-            assertTrue(program.floatVarsByName.getValue("quotient").lpOnly)
-            assertTrue(program.floatVarsByName.getValue("denominator").lpOnly)
         }
     }
 
@@ -133,7 +129,6 @@ class FlatZincFiniteFloatProductsTest {
             constraint float_eq_reif(values[1], 0.375, alias);
             solve satisfy;
             """.trimIndent(),
-            floatBuckets = 2,
             exactFloats = true,
         )
 
@@ -230,7 +225,6 @@ class FlatZincFiniteFloatProductsTest {
                 constraint float_eq(y, 0.5);
                 solve satisfy;
                 """.trimIndent(),
-                floatBuckets = 2,
                 exactFloats = true,
             )
 

@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lowering.FloatBucketing
+import com.eignex.klause.lowering.FloatCoordinate
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.reifyRealLinear
 
@@ -15,7 +15,6 @@ internal fun FlatZincCompiler.emitFiniteFloatDomains() {
 }
 
 internal fun FlatZincCompiler.recordFiniteFloatChoices(domain: FiniteFloatDomain) {
-    if (!domain.variable.lpOnly) return
     val values = domain.values.distinct().toDoubleArray()
     val existing = finiteFloatChoices[domain.variable.varId]
     finiteFloatChoices[domain.variable.varId] = existing?.filter { candidate -> values.any { it == candidate } }
@@ -23,11 +22,10 @@ internal fun FlatZincCompiler.recordFiniteFloatChoices(domain: FiniteFloatDomain
 }
 
 internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, result: FloatRef) {
-    fun coordinate(ref: FloatRef): FloatBucketing = when (ref) {
-        is FloatRef.Var -> ref.bk.takeIf { it.lpOnly }
-            ?: unsupportedHere("`float_times` cannot mix exact real and grid coordinates")
+    fun coordinate(ref: FloatRef): FloatCoordinate = when (ref) {
+        is FloatRef.Var -> ref.bk
         is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(ref.value),
-            "__finite_product_${floatVars.size}", lpOnly = true)
+            "__finite_product_${floatVars.size}")
     }
     val first = FloatRef.Var(coordinate(a))
     val second = FloatRef.Var(coordinate(b))

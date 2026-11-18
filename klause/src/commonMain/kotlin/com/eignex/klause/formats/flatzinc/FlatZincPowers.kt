@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.factor.arithmetic.GridPower
 import com.eignex.klause.factor.arithmetic.Power
 
 internal fun FlatZincCompiler.emitIntPower(c: FznConstraint) {
@@ -18,19 +17,11 @@ internal fun FlatZincCompiler.emitFloatPower(c: FznConstraint) {
     if (value.value < 0.0 || value.value > Int.MAX_VALUE.toDouble() || value.value != value.value.toInt().toDouble()) {
         unsupportedHere("float_pow requires a fixed nonnegative Int exponent")
     }
-    val base = resolveFloatVarOrConst(c.args[0])
-    val result = resolveFloatVarOrConst(c.args[2])
-    if (listOf(base, result).filterIsInstance<FloatRef.Var>().any { !it.bk.lpOnly }) {
-        factors.add(GridPower(gridArithmeticCoordinate(base, "__grid_power"), value.value.toInt(),
-            gridArithmeticCoordinate(result, "__grid_power")))
-        return
-    }
     fun coordinate(expression: FznExpr): Power.Coordinate.Real {
         val ref = resolveFloatVarOrConst(expression)
         val id = when (ref) {
-            is FloatRef.Const -> allocFloat("__power_const_${realLo.size}", ref.value, ref.value, lpOnly = true)
+            is FloatRef.Const -> allocFloat("__power_const_${realLo.size}", ref.value, ref.value)
             is FloatRef.Var -> {
-                if (!ref.bk.lpOnly) unsupportedHere("float_pow requires exact continuous coordinates")
                 ref.bk.varId
             }
         }

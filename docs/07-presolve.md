@@ -407,11 +407,9 @@ cleanup, and missing costs remain unobserved.
 
 ### Finite reconstruction
 
-For a selected private float grid, finite presolve reconstructs into the private grid
-model first, then the invocation's explicit grid map lifts to original real
-coordinates before source checking. Source and engine plans keep separate
-namespaces, and a foreign source, target or consumer cannot reuse the map; see
-[private float projections](02-model.md#private-float-projections).
+Finite presolve reconstructs original integer, Boolean and real coordinates before
+source checking. A reconstruction belongs to its original source and prepared model;
+a foreign coordinate frame cannot reuse it.
 
 [PresolveShared.rebuildProblem](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveShared.kt)
 and [RootBaker.reseed](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/RootBaker.kt)

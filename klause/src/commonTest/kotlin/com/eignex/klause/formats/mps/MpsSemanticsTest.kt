@@ -266,7 +266,7 @@ class MpsSemanticsTest {
         assertEquals(NumericAuthority.DECIMAL_LITERALS, source.semantics.numericAuthority)
         assertEquals(source.semantics, compiled.semantics.declared)
         assertSame(compiled.semantics, compiled.model.semantics)
-        assertTrue(compiled.semantics.isApproximate)
+        assertTrue(compiled.semantics.relaxesFeasibility)
     }
 
     @Test
@@ -352,7 +352,7 @@ class MpsSemanticsTest {
         val compiled = source.toProblem(semanticOverrides = exact)
 
         assertTrue(compiled.sourceExact)
-        assertFalse(compiled.semantics.isApproximate)
+        assertFalse(compiled.semantics.relaxesFeasibility)
         assertNull(assertNotNull(source.toLinearSourceProblem(exact))
             .checkMpsWitness(listOf(BigFraction.ofLong(3).reciprocal())))
     }

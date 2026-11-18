@@ -20,8 +20,11 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.toSample
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class CompilerOptLoweringTest {
@@ -47,27 +50,31 @@ class CompilerOptLoweringTest {
     }
 
     private class AbsentFloatZero : VariableSchema() {
-        val f by optFloatVar(min = -1.0, max = 1.0, buckets = 5)
+        val f by optFloatVar(min = -1.0, max = 1.0)
         init {
             constraint(Not(f.present.toExpr()))
         }
     }
 
     private class AbsentFloatClamped : VariableSchema() {
-        val f by optFloatVar(min = 2.0, max = 7.0, buckets = 11)
+        val f by optFloatVar(min = 2.0, max = 7.0)
         init {
             constraint(Not(f.present.toExpr()))
         }
     }
 
     private class PresentFloat : VariableSchema() {
-        val f by optFloatVar(min = -1.0, max = 1.0, buckets = 5)
+        val f by optFloatVar(min = -1.0, max = 1.0)
         init {
             constraint(f eq 0.0)
         }
     }
 
     private fun firstFeasible(compiled: CompiledSchema): Sample {
+        if (compiled.problem.numRealVars > 0) {
+            val result = LocalSearchSolver.source(compiled).solve(LocalSearchParams(maxFlips = 20_000, randomSeed = 7))
+            return assertIs<OpenTheoryResult.Sat>(result).assignment.toSample(compiled.problem)
+        }
         val solver = LocalSearchSolver(compiled.problem.bake())
         val s = solver.samples(LocalSearchParams(maxFlips = 20_000, randomSeed = 7)).firstOrNull()
         assertTrue(s != null)
@@ -99,11 +106,11 @@ class CompilerOptLoweringTest {
     }
 
     @Test
-    fun `an absent float should pin to the bucket of the canonical default`() {
+    fun `an absent float should pin to the canonical real default`() {
         val s = AbsentFloatZero()
         val compiled = s.compile()
         val sample = firstFeasible(compiled)
-        assertEquals(2, sample.ints[compiled.intVarIdByName.getValue("f")])
+        assertEquals(0.0, compiled.decode(s.f.value, sample))
         assertEquals(null, compiled.decode(s.f, sample))
     }
 
@@ -112,7 +119,7 @@ class CompilerOptLoweringTest {
         val s = AbsentFloatClamped()
         val compiled = s.compile()
         val sample = firstFeasible(compiled)
-        assertEquals(0, sample.ints[compiled.intVarIdByName.getValue("f")])
+        assertEquals(2.0, compiled.decode(s.f.value, sample))
         assertEquals(null, compiled.decode(s.f, sample))
     }
 
@@ -125,19 +132,15 @@ class CompilerOptLoweringTest {
     }
 
     @Test
-    fun `the float pin should reject a non-default bucket only when enabled`() {
+    fun `the float pin should reject a non-default real value only when enabled`() {
         val pinned = AbsentFloatZero().compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = true))
         val unpinned = AbsentFloatZero().compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = false))
-        val nonDefault = mapOf(unpinned.intVarIdByName.getValue("f") to 1L)
-        assertTrue(
-            BacktrackSolver(unpinned.problem.bake()).solve(
-                BacktrackParams(assumptions = Assumptions(ints = nonDefault)),
-            ) is SolveResult.Sat,
-        )
-        assertTrue(
-            BacktrackSolver(pinned.problem.bake()).solve(BacktrackParams(assumptions = Assumptions(ints = nonDefault)))
-                is SolveResult.Unsat,
-        )
+        fun restricted(compiled: CompiledSchema) = compiled.problem.withFactors(compiled.problem.factors +
+            com.eignex.klause.factor.arithmetic.Linear(intArrayOf(), doubleArrayOf(),
+                intArrayOf(compiled.realVarIdByName.getValue("f")), doubleArrayOf(1.0),
+                com.eignex.klause.ir.LinearOp.EQ, 0.5))
+        assertTrue(BacktrackSolver(restricted(unpinned).bake()).solve() is SolveResult.Sat)
+        assertTrue(BacktrackSolver(restricted(pinned).bake()).solve() is SolveResult.Unsat)
     }
 
     private class ReifiedAllDiff(n: Int) : VariableSchema() {

@@ -10,11 +10,6 @@ import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.DivModExpression
 import com.eignex.klause.factor.arithmetic.DivisionConvention
 import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.GridAbs
-import com.eignex.klause.factor.arithmetic.GridArrayMinMax
-import com.eignex.klause.factor.arithmetic.GridCoordinate
-import com.eignex.klause.factor.arithmetic.GridPower
-import com.eignex.klause.factor.arithmetic.GridProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Power
@@ -125,16 +120,8 @@ internal fun factorCodecSamples(): List<Pair<String, Factor>> = listOf(
         AbsAffineValue(mapOf(0 to wide, 1 to bigIntOf(-2)), bigIntOf(3)),
         AbsAffineValue(mapOf(2 to BIG_ONE), BIG_ZERO),
     ),
-    "gridAbs" to GridAbs(0, 1, -2.0, 2.0, 5, 0.0, 2.0, 3),
     "arrayMinMax" to ArrayMinMax(0, intArrayOf(1, 2, 2), true),
     "realArrayMinMax" to RealArrayMinMax(0, intArrayOf(1, 2), false),
-    "gridArrayMinMax" to GridArrayMinMax(
-        intArrayOf(0, 1), doubleArrayOf(0.5, 0.25), doubleArrayOf(0.0, -1.0), booleanArrayOf(false, true), 4, true,
-    ),
-    "gridProduct" to GridProduct(
-        GridCoordinate(0, 0.0, 1.0, 3), GridCoordinate(1, -1.0, 1.0, 5), GridCoordinate(2, -1.0, 1.0, 9),
-    ),
-    "gridPower" to GridPower(GridCoordinate(0, -1.0, 1.0, 5), 2, GridCoordinate(1, 0.0, 1.0, 5)),
     "divMod" to DivMod(0, 1, 2, 3),
     "divMod" to DivMod(0, wide, 1, 2, DivisionConvention.EUCLIDEAN),
     "wideDivMod" to WideDivMod(

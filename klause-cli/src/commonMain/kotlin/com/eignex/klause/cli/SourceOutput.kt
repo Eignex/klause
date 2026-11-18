@@ -28,13 +28,6 @@ private fun sourcePolicyText(semantics: EffectiveSourceSemantics): String = buil
     when (val floats = source.floats) {
         null -> Unit
         FloatSemantics.Continuous -> add("floats=continuous")
-        is FloatSemantics.Grid -> {
-            add("floats=grid")
-            add("buckets=${floats.buckets}")
-            add("scale=${floats.linearScale}")
-            add("grid-lo=${floats.unrangedBounds.lower.policyText()}")
-            add("grid-hi=${floats.unrangedBounds.upper.policyText()}")
-        }
     }
     source.undeclaredIntegers?.let {
         add("unbounded-int-lo=${it.lower ?: "open"}")

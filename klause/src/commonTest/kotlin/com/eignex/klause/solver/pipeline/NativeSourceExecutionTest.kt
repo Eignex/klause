@@ -434,7 +434,7 @@ class NativeSourceExecutionTest {
     }
 
     @Test
-    fun `native enumeration should reject before constructing an unrelated finite consumer`() {
+    fun `native enumeration should decline without constructing a finite consumer`() {
         val parsed = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 1))")
         val source = PolynomialRealProblem(
             parsed.formula,
@@ -454,13 +454,9 @@ class NativeSourceExecutionTest {
             ),
         )
 
-        assertFailsWith<PipelineConfigException> {
-            SourceSetup.execute(
-                SourceExecutionRequest(
-                    invocation,
-                    finiteRequest = { error("native enumeration constructed a finite consumer") },
-                ),
-            )
-        }
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { error("native enumeration constructed a finite consumer") }))
+
+        assertEquals(TerminationReason.Unsupported, assertIs<SourceExecutionResult.Declined>(result).reason)
     }
 }

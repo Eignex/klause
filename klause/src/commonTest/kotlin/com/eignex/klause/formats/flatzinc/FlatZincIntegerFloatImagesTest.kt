@@ -7,7 +7,7 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
-import kotlin.test.assertFalse
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -24,25 +24,20 @@ class FlatZincIntegerFloatImagesTest {
 
     @Test
     fun `a rounded bound within the declared slack should keep the original representation`() {
-        val program = parseFlatZinc(roundedBound, floatBuckets = 2)
+        val program = parseFlatZinc(roundedBound)
 
-        assertTrue(program.floatVarsByName.getValue("scaled").lpOnly)
-        assertFalse(program.floatRepresentations.getValue("scaled").approximate)
+        assertEquals(2, program.problem.numRealVars)
     }
 
     @Test
     fun `rounded derived bounds should preserve exact source intake and a private grid view`() {
-        val program = parseFlatZinc(roundedBound, floatBuckets = 2,
+        val program = parseFlatZinc(roundedBound,
             semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
-        assertFalse(program.floatVarsByName.getValue("scaled").lpOnly)
         val exact = parseFlatZinc(roundedBound, exactFloats = true).sourceProgram
-        assertTrue(exact.floatVarsByName.values.all { it.lpOnly })
         assertTrue(exact.problem.realLower.contentEquals(doubleArrayOf(50.0, 0.5)))
         assertTrue(exact.problem.realUpper.contentEquals(doubleArrayOf(200.0, 2.0)))
-        assertTrue(program.floatRepresentations.getValue("scaled").approximate)
-        val reason = program.floatRepresentations.getValue("scaled").approximation.orEmpty()
-        assertTrue(reason.contains("rounded arithmetic"))
+        assertTrue(program.problem.realUpper.contentEquals(exact.problem.realUpper))
     }
 
     @Test
@@ -65,7 +60,6 @@ class FlatZincIntegerFloatImagesTest {
                 constraint int2float(m, raw_y);
                 solve satisfy;
                 """.trimIndent(),
-                floatBuckets = 2,
                 exactFloats = exact,
             )
 

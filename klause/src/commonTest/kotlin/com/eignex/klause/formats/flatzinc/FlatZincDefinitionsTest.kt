@@ -15,7 +15,7 @@ class FlatZincDefinitionsTest {
             "constraint int_plus(x, 2, y) :: defines_var(y); solve minimize y;"
 
         val plain = parseFlatZinc(source)
-        val execution = parseFlatZincExecution(source).program
+        val execution = parseFlatZinc(source)
         val hint = assertIs<DefinitionHint.Plus>(plain.definitionHints.single())
 
         assertEquals(plain.problem.numIntVars, execution.problem.numIntVars)

@@ -2,19 +2,16 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class FlatZincFloatSelectionTest {
     @Test
@@ -55,13 +52,12 @@ class FlatZincFloatSelectionTest {
         val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0))
 
         val value = program.floatVarsByName.getValue("x")
-        assertTrue(value.lpOnly)
         assertEquals(0.375, assertIs<SolveResult.Sat>(result).assignment.reals[value.varId])
         assertEquals(1, program.problem.factors.filterIsInstance<RealElement>().size)
     }
 
     @Test
-    fun `grid selection should preserve repeated entries over a wide source index`() {
+    fun `float selection should preserve repeated entries over a wide source index`() {
         val model = FlatZincParser(
             FlatZincLexer(
                 """
@@ -72,7 +68,7 @@ class FlatZincFloatSelectionTest {
                 """.trimIndent(),
             ),
         ).parse()
-        val program = FlatZincCompiler(model, floatBuckets = 3, floatChoiceLimit = 1).compile()
+        val program = FlatZincCompiler(model, floatChoiceLimit = 1).compile()
         val value = program.floatVarsByName.getValue("x")
         val index = program.intVarsByName.getValue("i")
         val solver = BacktrackSolver(program.problem.bake())
@@ -86,14 +82,13 @@ class FlatZincFloatSelectionTest {
             )
 
             val sample = assertIs<SolveResult.Sat>(result).assignment
-            assertEquals(expected, value.valueOf(sample.intValue(value.varId).toInt()))
+            assertEquals(expected, sample.approximateRealValue(value.varId))
         }
-        assertFalse(value.lpOnly)
-        assertEquals(1, program.problem.factors.filterIsInstance<Element>().size)
+        assertEquals(1, program.problem.factors.filterIsInstance<RealElement>().size)
     }
 
     @Test
-    fun `grid selection should exclude source indexes outside the array`() {
+    fun `float selection should exclude source indexes outside the array`() {
         val model = FlatZincParser(
             FlatZincLexer(
                 """
@@ -104,7 +99,7 @@ class FlatZincFloatSelectionTest {
                 """.trimIndent(),
             ),
         ).parse()
-        val program = FlatZincCompiler(model, floatBuckets = 3, floatChoiceLimit = 1).compile()
+        val program = FlatZincCompiler(model, floatChoiceLimit = 1).compile()
         val index = program.intVarsByName.getValue("i")
         val solver = BacktrackSolver(program.problem.bake())
 
@@ -121,7 +116,7 @@ class FlatZincFloatSelectionTest {
     }
 
     @Test
-    fun `grid extrema should retain the result coordinate units`() {
+    fun `float extrema should retain the result coordinate units`() {
         for ((operation, selected, expected) in listOf(Triple("float_min", 0, -1.0), Triple("float_max", 2, 2.0))) {
             val model = FlatZincParser(
                 FlatZincLexer(
@@ -137,20 +132,20 @@ class FlatZincFloatSelectionTest {
                     """.trimIndent(),
                 ),
             ).parse()
-            val program = FlatZincCompiler(model, floatBuckets = 3, floatChoiceLimit = 1).compile()
+            val program = FlatZincCompiler(model, floatChoiceLimit = 1).compile()
 
-            val result = BacktrackSolver(program.problem.bake()).solve()
+            val result = BacktrackSolver.source(program.problem).solve()
 
             val value = program.floatVarsByName.getValue("r")
-            val sample = assertIs<SolveResult.Sat>(result).assignment
-            assertFalse(value.lpOnly)
-            assertEquals(1, program.problem.factors.filterIsInstance<GridArrayMinMax>().size)
-            assertEquals(expected, value.valueOf(sample.intValue(value.varId).toInt()))
+            val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+            val sample = assertIs<OpenTheoryAssignment.Sampled>(assignment).sample
+            assertEquals(1, program.problem.factors.filterIsInstance<RealArrayMinMax>().size)
+            assertEquals(expected, sample.approximateRealValue(value.varId), 1e-6)
         }
     }
 
     @Test
-    fun `grid extrema should reject values absent from the scaled result grid`() {
+    fun `float extrema should accept zero in the declared result interval`() {
         val model = FlatZincParser(
             FlatZincLexer(
                 """
@@ -165,11 +160,11 @@ class FlatZincFloatSelectionTest {
                 """.trimIndent(),
             ),
         ).parse()
-        val program = FlatZincCompiler(model, floatBuckets = 3, floatChoiceLimit = 1).compile()
+        val program = FlatZincCompiler(model, floatChoiceLimit = 1).compile()
 
-        val result = BacktrackSolver(program.problem.bake()).solve()
+        val result = BacktrackSolver.source(program.problem).solve()
 
-        assertIs<SolveResult.Unsat>(result)
+        assertIs<OpenTheoryResult.Sat>(result)
     }
 
     @Test

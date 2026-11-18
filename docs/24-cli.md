@@ -364,9 +364,7 @@ replaces its default independently, and explicit source bounds stay authoritativ
 |---|---|
 | `--unbounded-int-lo N` / `--unbounded-int-hi N` | Default integer declaration endpoints; `open` removes an endpoint |
 | `--unbounded-real-lo N` / `--unbounded-real-hi N` | Default real declaration endpoints; `open` removes an endpoint |
-| `--float-semantics continuous\|grid` | Continuous values only, or also a private search grid whose points the source must accept, used where [automatic execution](04-finite-formats.md#flatzinc-floats) falls back to it |
-| `--float-buckets N` / `--float-scale N` | Default grid point count and float-linear coefficient scale |
-| `--float-grid-lo N` / `--float-grid-hi N` | Finite window for unranged grid floats |
+| `--float-semantics continuous` | Continuous source real coordinates |
 | `--source-absolute-tolerance N` / `--source-relative-tolerance N` | Source feasibility slack components |
 | `--source-absolute-optimality-tolerance N` / `--source-relative-optimality-tolerance N` | Source optimality gap components |
 
@@ -387,7 +385,7 @@ prints `s OPTIMUM FOUND` with `c optimizationStatus=gap-optimum` and its proved 
 on `c objectiveBoundDirection=`, `c objectiveBound=` and `c objectiveBoundStrict=`
 lines, the comments SMT-LIB and MiniZinc results use for objective bounds. A nondefault effective
 interpretation is printed as a protocol comment before results; it adds no proof
-authority. [FlatZinc floats](04-finite-formats.md#flatzinc-floats) define the grid contract.
+authority. [FlatZinc floats](04-finite-formats.md#flatzinc-floats) define source-real execution and publication.
 
 ## Environment knobs
 

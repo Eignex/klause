@@ -7,7 +7,6 @@ import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AbsAffineValue
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -156,51 +155,6 @@ class AbsEncodingTest {
                 val sample = assertIs<ExactNeighborhoodResult.Witness>(outcome).sample
 
                 assertEquals(expected, sample.exactIntValue(input.intVarNames.getValue("x")).toString())
-            }
-        }
-    }
-
-    @Test
-    fun `polynomial grid participation should preserve the complete finite image`() {
-        val relation = GridAbs(0, 1, -1.0, 1.0, 5, 0.0, 0.8, 5)
-        val source = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 4) },
-            arrayOf<Factor>(
-                relation,
-                RealProduct(0, 0, 1, 0.0, 0.0),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0),
-            realUpper = doubleArrayOf(0.0, 0.0),
-        )
-        val model = assertNotNull(source.prepareExecutionPlan().polynomialModel)
-        assertEquals(0, model.encodingAttributions.first().sourceFactorIndex)
-        for (input in 0L..4L) {
-            for (output in 0L..4L) {
-                val arithmetic = PolynomialArithmetic()
-                val values = longArrayOf(input, output)
-                val fixed = mutableMapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
-                for ((id, column) in model.integerColumns) fixed[column] = BigFraction.ofLong(values[id])
-                val normalized = PolynomialFormula.normalize(model.service.formula, arithmetic, fixed)
-                val signs = normalized.atoms.map { atom ->
-                    assertTrue(atom.polynomial.variables.isEmpty())
-                    val sign = (atom.polynomial.terms.singleOrNull()?.coefficient ?: BigFraction.ZERO)
-                        .compareTo(BigFraction.ZERO)
-                    if (atom.holds(sign)) PolynomialFormula.TRUE else PolynomialFormula.FALSE
-                }.toIntArray()
-
-                val truth = normalized.truth(intArrayOf(), signs, arithmetic)
-
-                assertEquals(
-                    if (output == relation.image[input.toInt()].toLong()) {
-                        PolynomialFormula.TRUE
-                    } else {
-                        PolynomialFormula.FALSE
-                    },
-                    truth,
-                )
             }
         }
     }

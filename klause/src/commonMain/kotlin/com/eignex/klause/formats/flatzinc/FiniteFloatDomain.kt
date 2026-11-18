@@ -1,11 +1,11 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.lowering.FloatBucketing
+import com.eignex.klause.lowering.FloatCoordinate
 
-internal data class FiniteFloatDomain(val constraintIndex: Int, val variable: FloatBucketing, val values: DoubleArray)
+internal data class FiniteFloatDomain(val constraintIndex: Int, val variable: FloatCoordinate, val values: DoubleArray)
 
 internal fun FlatZincCompiler.collectFiniteFloatDomains(): List<FiniteFloatDomain> {
-    val equalities = HashMap<Int, Pair<FloatBucketing, Double>>()
+    val equalities = HashMap<Int, Pair<FloatCoordinate, Double>>()
     for (c in model.constraints) {
         if (c.name != "float_eq_reif" || c.args.size != 3) continue
         locateConstraint(c)
@@ -25,7 +25,7 @@ internal fun FlatZincCompiler.collectFiniteFloatDomains(): List<FiniteFloatDomai
             val variable = (resolveFloatVarOrConst(c.args[1]) as? FloatRef.Var)?.bk
                 ?: return@mapIndexedNotNull null
             val source = resolveIntVar(c.args[0])
-            if (variable.lpOnly) integerFloatSources[variable.varId] = source
+            integerFloatSources[variable.varId] = source
             val domain = intDomains[source]
             // Every integer in this range has an exact binary64 representation.
             if (domain.min < -9007199254740992L || domain.max > 9007199254740992L) {

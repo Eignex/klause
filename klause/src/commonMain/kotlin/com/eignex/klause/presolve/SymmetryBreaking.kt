@@ -58,7 +58,7 @@ internal object SymmetryBreaking {
     fun breakObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): PassDelta {
         val objective = context.linearObjective ?: return PassDelta()
         if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
-            problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 }
+            problem.semantics.relaxesFeasibility || objective.realCoefficientValues.any { it != 0.0 }
         ) return PassDelta()
         val ints = objective.intCoefficientValues
         val bools = objective.boolWeightValues

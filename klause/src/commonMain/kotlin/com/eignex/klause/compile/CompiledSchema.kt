@@ -31,9 +31,7 @@ import com.eignex.klause.solver.objective.minimizeInt
  * Result of compiling a [com.eignex.klause.schema.VariableSchema] to a solver-side `Problem`,
  * carrying the index needed to decode an assignment back to schema values.
  *
- * Boolean-side names map to packed-bit ids. The compatibility maps describe finite integer,
- * bucket and retained-real coordinates. Source strategies use the original declarations;
- * decoding distinguishes their namespace by the assignment's captured frame.
+ * Names retain original Boolean, integer and real coordinates. Decoding checks the assignment frame.
  */
 class CompiledSchema internal constructor(
     problem: Problem,
@@ -43,7 +41,7 @@ class CompiledSchema internal constructor(
     intVarIdByName: Map<String, Int>,
     /** Per-nominal one-hot indicator bool ids, by schema name. */
     nominalIndicators: Map<String, Map<String, Int>>,
-    /** Per-float bucket→real decoders, by schema name. */
+    /** Per-float declarations, by schema name. */
     floatDecoders: Map<String, FloatSpec>,
     /** Default branching params derived from the schema's `search { … }` annotation, or `null` when
      *  the schema declares none; [backtrackParams] falls back to [BacktrackPresets.conflictDriven]. */
@@ -55,21 +53,19 @@ class CompiledSchema internal constructor(
     /** Label list (in universe-index order) for each nominal-set var. Empty map entry for
      *  int-universe set vars. */
     setNominalLabels: Map<String, List<String>> = emptyMap(),
-    /** Real (LP-only continuous) variable id by schema name, for floats lowered as LP-only columns
-     *  rather than bucketed; their value is read from [Sample.reals]. Empty when floats
-     *  are bucketed (see [floatDecoders]). */
+    /** Real variable id by schema name. */
     realVarIdByName: Map<String, Int> = emptyMap(),
-    /** Per-component representation and approximation reason by source float name. */
+    /** Per-component identity by source float name. */
     floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
     sourceBinding: CompiledSourceBinding? = null,
 ) {
     internal val sourceBinding = sourceBinding ?: CompiledSourceBinding(problem, intVarIdByName, realVarIdByName,
         representations = floatRepresentations)
 
-    /** Explicit finite compatibility view; source strategies retain the original declarations. */
-    val problem: Problem get() = sourceBinding.compatibilityProblem
+    /** Original source declarations and relations. */
+    val problem: Problem get() = sourceBinding.originalProblem
 
-    internal val realVarIdByName: Map<String, Int> get() = sourceBinding.compatibilityRealNames()
+    internal val realVarIdByName: Map<String, Int> get() = sourceBinding.realNames.toMap()
 
     private val booleanIds: Map<String, Int> = boolVarIdByName.toMap()
 
@@ -79,7 +75,7 @@ class CompiledSchema internal constructor(
     private val integerIds: Map<String, Int> = intVarIdByName.toMap()
 
     /** Integer variable id by schema name (a defensive copy). */
-    val intVarIdByName: Map<String, Int> get() = sourceBinding.compatibilityIntegerNames()
+    val intVarIdByName: Map<String, Int> get() = integerIds.toMap()
 
     private val nominalIds: Map<String, Map<String, Int>> = nominalIndicators.mapValues { it.value.toMap() }
 
@@ -88,7 +84,7 @@ class CompiledSchema internal constructor(
 
     private val floatSpecs: Map<String, FloatSpec> = floatDecoders.toMap()
 
-    /** Per-float bucket decoders by schema name (a defensive copy). */
+    /** Per-float declarations by schema name (a defensive copy). */
     val floatDecoders: Map<String, FloatSpec> get() = floatSpecs.toMap()
 
     private val setLabels: Map<String, List<String>> = setNominalLabels.mapValues { it.value.toList() }
@@ -109,7 +105,7 @@ class CompiledSchema internal constructor(
         requireNotNull(integerIds[handle.name]) { "No integer variable named '${handle.name}'" },
     )
 
-    /** Original real location, independent of the selected finite representation. */
+    /** Original real location. */
     fun sourceRealId(handle: FloatHandle): SourceRealId? = sourceBinding.realNames[handle.name]?.let(::SourceRealId)
 
     /** The schema's declared [defaultBacktrackParams] if any, else [BacktrackPresets.conflictDriven]. */
@@ -200,22 +196,11 @@ class CompiledSchema internal constructor(
         return out
     }
 
-    /** Decode [handle]'s real value from [sample] — from [Sample.approximateRealValue] for an LP-only continuous
-     *  column, else from the bucket index. */
+    /** Decode [handle] from the assignment's real coordinates. */
     fun decode(handle: FloatHandle, sample: Sample): Double {
-        if (sourceBinding.isOriginal(sample)) {
-            val id = sourceBinding.realNames[handle.name] ?: error("No float variable named '${handle.name}'")
-            return sample.approximateRealValue(id)
-        }
-        sourceBinding.compatibilityColumn(handle.name)?.let { column ->
-            return checkNotNull(column.value(sample.intValue(column.coordinate.variable))) {
-                "Float '${handle.name}' has an invalid value-carrier index"
-            }.toDouble()
-        }
-        realVarIdByName[handle.name]?.let { return sample.approximateRealValue(it) }
-        val spec = floatSpecs[handle.name] ?: error("No float variable named '${handle.name}'")
-        val id = integerIds[handle.name] ?: error("Float '${handle.name}' has no int-side id")
-        return spec.realValue(sample.intValue(id).toInt())
+        sourceBinding.isOriginal(sample)
+        val id = sourceBinding.realNames[handle.name] ?: error("No float variable named '${handle.name}'")
+        return sample.approximateRealValue(id)
     }
 
     /** A [LinearObjective] that minimises [handle], resolving its compiled variable id. */
@@ -246,33 +231,15 @@ class CompiledSchema internal constructor(
         return sourceBinding.paired(problem.maximizeBool(id))
     }
 
-    /**
-     * Minimise [handle] through its continuous column or integer bucket index. Bucket values
-     * `min + bucket · (max − min) / (buckets − 1)` increase with the index, so the integer objective
-     * preserves their ordering; decoding recovers the real value.
-     */
-    fun minimize(handle: FloatHandle): LinearObjective {
-        sourceBinding.compatibilityColumn(handle.name)?.let {
-            return sourceBinding.paired(problem.minimizeInt(it.coordinate.variable))
-        }
-        realVarIdByName[handle.name]?.let { return realObjective(it, maximize = false) }
-        floatSpecs[handle.name] ?: error("No float variable named '${handle.name}'")
-        val id = integerIds[handle.name]
-            ?: error("Float '${handle.name}' has no int-side id")
-        return sourceBinding.paired(problem.minimizeInt(id))
-    }
+    /** A [LinearObjective] that minimises [handle]. */
+    fun minimize(handle: FloatHandle): LinearObjective = realObjective(
+        sourceBinding.realNames[handle.name] ?: error("No float variable named '${handle.name}'"), maximize = false,
+    )
 
-    /** A [LinearObjective] that maximises [handle] — minimise the negated bucket id (or real column). */
-    fun maximize(handle: FloatHandle): LinearObjective {
-        sourceBinding.compatibilityColumn(handle.name)?.let {
-            return sourceBinding.paired(problem.maximizeInt(it.coordinate.variable))
-        }
-        realVarIdByName[handle.name]?.let { return realObjective(it, maximize = true) }
-        floatSpecs[handle.name] ?: error("No float variable named '${handle.name}'")
-        val id = integerIds[handle.name]
-            ?: error("Float '${handle.name}' has no int-side id")
-        return sourceBinding.paired(problem.maximizeInt(id))
-    }
+    /** A [LinearObjective] that maximises [handle]. */
+    fun maximize(handle: FloatHandle): LinearObjective = realObjective(
+        sourceBinding.realNames[handle.name] ?: error("No float variable named '${handle.name}'"), maximize = true,
+    )
 
     /** A single-real-column [LinearObjective] over LP-only continuous var [realId]; the always-minimising
      *  frame negates the coefficient to maximise. */

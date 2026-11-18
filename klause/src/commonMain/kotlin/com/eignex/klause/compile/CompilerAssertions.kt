@@ -218,7 +218,6 @@ internal fun Lowering.expandTable(t: TableConstraint): BoolExpr {
 internal fun Lowering.assertFloatLinear(constraint: FloatLinearConstraint) {
     val variables = IntArray(constraint.varNames.size) { realVarIdByName.getValue(constraint.varNames[it]) }
     val (operation, strict) = floatComparison(constraint.op)
-    truncatedFloatRows += factors.size
     factors += Linear(emptyIntArray(), emptyDoubleArray(), variables, constraint.coeffs.copyOf(),
         operation, constraint.bound, strict)
 }

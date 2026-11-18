@@ -17,7 +17,6 @@ import com.eignex.klause.factor.table.*
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.lowering.gridAbsoluteValueTable
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntIntMap
 import com.eignex.util.collections.LongHashSet
@@ -48,13 +47,7 @@ internal fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invari
 
     is AffineAbs -> AffineAbsInvariant(this)
 
-    is GridAbs -> gridAbsoluteValueTable(this).buildInvariantProjection(domains)
-
-    is GridArithmetic -> GridArithmeticInvariant(this)
-
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)
-
-    is GridArrayMinMax -> GridArrayMinMaxInvariant(this)
 
     is Cardinality -> CardinalityInvariant(boolVars, literals, min, max)
 

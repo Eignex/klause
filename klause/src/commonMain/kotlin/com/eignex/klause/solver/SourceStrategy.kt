@@ -32,7 +32,6 @@ import com.eignex.klause.solver.pipeline.PolynomialTheoryStats
 import com.eignex.klause.solver.pipeline.PreparedPlanDecline
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.QuadraticOptimizationExecution
-import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
@@ -40,7 +39,6 @@ import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.SourceIncumbentPublication
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.pipeline.SourceRouteSelection
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
@@ -102,10 +100,10 @@ class SourceStrategy internal constructor(
             else
                 TerminationReason.Cancelled, stats,
         )
-        val invocation = SourceSetup.prepareWithGrid(SourceSetupRequest(
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
             sourceAttachment(), ExecutionOperation.SATISFY, engine,
             providers = projectionProviders, cancellation = stop,
-        ), ::selectPrivateGrid)
+        ))
         var finiteWitness: Sample? = null
         val execution = SourceSetup.execute(
             SourceExecutionRequest(
@@ -133,8 +131,6 @@ class SourceStrategy internal constructor(
                         (execution.result.nativeSourceResult as? SolveResult.Unknown)?.reason
                             ?: if (stop())
                                 stopped().reason
-                            else if (invocation.floatGrid != null)
-                                TerminationReason.Unsupported
                             else
                                 TerminationReason.BudgetExhausted,
                         outcome.stats,
@@ -234,7 +230,7 @@ class SourceStrategy internal constructor(
         val scope = scope(polynomial, theory)
         if (scope.stop()) return scope.unknown()
         if (!scope.supportsSource()) return scope.unsupported()
-        val invocation = SourceSetup.prepareWithGrid(
+        val invocation = SourceSetup.prepare(
             SourceSetupRequest(
                 sourceAttachment(),
                 ExecutionOperation.SATISFY,
@@ -243,7 +239,6 @@ class SourceStrategy internal constructor(
                 cancellation = scope.stop,
                 boundCancellation = scope.stop,
             ),
-            ::selectPrivateGrid,
             polynomialCancellation = scope.polynomialPreparation(),
         )
         val route = invocation.engineRoute
@@ -446,8 +441,7 @@ class SourceStrategy internal constructor(
         )
         if (scope.stop()) return incomplete(scope.unknown().reason)
         if (!scope.supportsSource()) return incomplete(TerminationReason.Unsupported)
-        var stoppedBeforeGrid = false
-        val invocation = SourceSetup.prepareWithGrid(
+        val invocation = SourceSetup.prepare(
             SourceSetupRequest(
                 sourceAttachment(),
                 ExecutionOperation.OPTIMIZE,
@@ -458,13 +452,8 @@ class SourceStrategy internal constructor(
                 cancellation = scope.stop,
                 boundCancellation = scope.stop,
             ),
-            { selection ->
-                stoppedBeforeGrid = scope.stop()
-                if (stoppedBeforeGrid) null else selectPrivateGrid(selection)
-            },
             polynomialCancellation = scope.polynomialPreparation(),
         )
-        if (stoppedBeforeGrid) return incomplete(scope.unknown().reason)
         val route = invocation.engineRoute
         if (route is SourceProblemRoute.UnsupportedOpen &&
             route.preparedPlan.decline == PreparedPlanDecline.RESOURCE
@@ -496,9 +485,6 @@ class SourceStrategy internal constructor(
     private fun sourceAttachment(): SourceAttachment = compiledSchema?.sourceBinding?.attachment()
         ?: SourceAttachment(source)
 
-    private fun selectPrivateGrid(selection: SourceRouteSelection): SelectedFloatGridPreparation? =
-        compiledSchema?.sourceBinding?.selectView(selection)
-
     private fun unsupportedQuadratic(
         sense: ObjectiveSense,
         reason: TerminationReason = TerminationReason.Unsupported,
@@ -524,8 +510,6 @@ class SourceStrategy internal constructor(
                 (result.nativeSourceResult as? SolveResult.Unknown)?.reason
                     ?: if (scope.stop())
                         scope.unknown().reason
-                    else if (invocation.floatGrid != null)
-                        TerminationReason.Unsupported
                     else
                         TerminationReason.BudgetExhausted,
                 outcome.stats,
@@ -564,8 +548,6 @@ class SourceStrategy internal constructor(
             is MinimizeResult.Unbounded -> TerminationReason.Unsupported
             else -> if (scope.stop())
                 scope.unknown().reason
-            else if (invocation.floatGrid != null)
-                TerminationReason.Unsupported
             else
                 TerminationReason.BudgetExhausted
         }

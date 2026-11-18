@@ -80,7 +80,7 @@ class OznApplier(oznSource: String) {
                     FlatZincArray.Vars.ElementKind.Int -> intBindingFrom(sample.intValue(v))
 
                     FlatZincArray.Vars.ElementKind.Float -> {
-                        val b = requireNotNull(arr.floatBucketings)[idx]
+                        val b = requireNotNull(arr.floatCoordinates)[idx]
                         OznValue.FloatV(sample.floatValue(b))
                     }
                 }

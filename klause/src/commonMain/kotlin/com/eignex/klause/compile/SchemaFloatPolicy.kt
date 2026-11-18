@@ -7,9 +7,7 @@ import com.eignex.klause.model.ContinuousRealEquality
 import com.eignex.klause.model.ContinuousRealExpr
 import com.eignex.klause.model.FloatLinearConstraint
 import com.eignex.klause.model.FloatSpec
-import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.NamedConstraint
-import com.eignex.klause.model.PresenceSpec
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.skema.SchemaDef
 import com.eignex.util.collections.IntDisjointSet
@@ -42,17 +40,8 @@ internal fun schemaFloatRepresentations(def: SchemaDef<SchemaEntry>): Map<String
         val vars = (continuousNames(product.left) + continuousNames(product.right)).map { ids.getValue(it) }
         for (id in vars.drop(1)) components.union(vars.first(), id)
     }
-    val reasons = HashMap<Int, String>()
-    for (row in rows) {
-        if (row.op == IntCmpOp.LT || row.op == IntCmpOp.GT || row.op == IntCmpOp.NE) {
-            row.varNames.forEach { reasons[components.find(ids.getValue(it))] = "strict or disequal schema float row" }
-        }
-    }
-    for (presence in def.entries.values.filterIsInstance<PresenceSpec>()) {
-        ids[presence.valueName]?.let { reasons[components.find(it)] = "optional schema float value" }
-    }
     return names.associateWith { name ->
         val root = components.find(ids.getValue(name))
-        FloatRepresentation(root, reasons[root])
+        FloatRepresentation(root)
     }
 }

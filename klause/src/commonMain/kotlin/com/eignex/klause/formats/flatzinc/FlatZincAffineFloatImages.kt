@@ -17,7 +17,7 @@ import com.eignex.util.numbers.toLong
 
 internal fun FlatZincCompiler.collectAffineFloatImages() {
     for (variable in floatVars.values) {
-        if (variable.lpOnly && variable.lo == variable.hi) {
+        if (variable.lo == variable.hi) {
             val constant = BigFraction.ofDouble(variable.lo) ?: continue
             affineFloatImages[variable.varId] = AffineFloatImage(emptyMap(), constant)
         }
@@ -26,9 +26,7 @@ internal fun FlatZincCompiler.collectAffineFloatImages() {
         if (c.name != "int2float" || c.args.size != 2) continue
         locateConstraint(c)
         val target = resolveFloatVarOrConst(c.args[1]) as? FloatRef.Var ?: continue
-        if (target.bk.lpOnly) {
-            affineFloatImages[target.bk.varId] = AffineFloatImage(mapOf(resolveIntVar(c.args[0]) to BigFraction.ONE))
-        }
+        affineFloatImages[target.bk.varId] = AffineFloatImage(mapOf(resolveIntVar(c.args[0]) to BigFraction.ONE))
     }
     var changed: Boolean
     do {
@@ -38,7 +36,7 @@ internal fun FlatZincCompiler.collectAffineFloatImages() {
             val definition = affineDefinition(c) ?: continue
             val coefficients = definition.coefficients
             val variables = definition.variables
-            if (coefficients.size != variables.size || variables.any { it is FloatRef.Var && !it.bk.lpOnly }) continue
+            if (coefficients.size != variables.size) continue
             val unknown = variables.indices.filter {
                 coefficients[it] != 0.0 && floatImage(variables[it]) == null
             }

@@ -38,7 +38,6 @@ class ModelJsonTest {
             NominalSpec(listOf("a", "b")) to """{"nominal":["a","b"]}""",
             IntSpec(0, 9) to """{"int":[0,9]}""",
             FloatSpec(0.0, 1.0) to """{"float":{"min":0.0,"max":1.0}}""",
-            FloatSpec(0.0, 1.0, 5) to """{"float":{"min":0.0,"max":1.0,"buckets":5}}""",
             SetSpec(listOf(1, 3)) to """{"set":[1,3]}""",
             MultipleSpec(listOf("a")) to """{"multiple":["a"]}""",
             NamedConstraint(p) to """{"constraint":{"ref":"p"}}""",

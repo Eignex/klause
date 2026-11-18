@@ -216,7 +216,7 @@ class FiniteSolveResult(
     val preparation: FinitePipelinePreparation,
     /** Time spent preparing the canonical model and any private search view. */
     val preparationElapsed: Duration,
-    /** Terminal result in source terms; a private grid's verdict stays in [FiniteSolveResult.nativeGridOutcome]. */
+    /** Terminal result in source terms. */
     val outcome: FiniteSolveOutcome,
 ) {
     private var completeSearch: Boolean? = null
@@ -251,16 +251,6 @@ class FiniteSolveResult(
         nativeSourceMinimum: MinimizeResult?,
     ) : this(preparation, preparationElapsed, outcome, nativeSourceResult) {
         retainedSourceMinimum = nativeSourceMinimum
-    }
-
-    private var grid: NativeGridOutcome? = null
-
-    /** Native private-grid claims, retained independently of [outcome] publication qualification. */
-    val nativeGridOutcome: NativeGridOutcome? get() = grid
-
-    internal fun bindNativeGridOutcome(value: NativeGridOutcome) {
-        require(grid == null) { "finite result already retains its native grid outcome" }
-        grid = value
     }
 }
 
@@ -383,9 +373,6 @@ internal fun FinitePipeline.solve(
         { improvement -> if (validation.accept(improvement.sample)) callbacks.onImprovement(improvement) },
     )
     val stop = validation?.let { containingStop or it.stop } ?: containingStop
-    val gridPublication = request.shape.sourceInvocation?.floatGrid?.let {
-        FloatGridPublication(it, stop, request.toleranceCheck, publicationCallbacks)
-    }
     fun result(
         preparation: FinitePipelinePreparation,
         elapsed: Duration,
@@ -395,11 +382,10 @@ internal fun FinitePipeline.solve(
         completeSearchAdmitted: Boolean? = null,
         nativeObjectiveBound: FiniteObjectiveBound? = null,
     ): FiniteSolveResult =
-        (gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
-            ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum))
+        FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
             .also {
                 it.bindCompleteSearchAdmission(completeSearchAdmitted)
-                if (gridPublication == null) it.nativeObjectiveBound = nativeObjectiveBound
+                it.nativeObjectiveBound = nativeObjectiveBound
             }
             .let { validation?.qualify(it) ?: it }
     if (request.shape.sourceInvocation != null && stop()) {
@@ -488,7 +474,7 @@ internal fun FinitePipeline.solve(
         it.source.semantics.effective.feasibilityTolerance?.isExact == false
     } ?: true
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
-        (request.toleranceCheck ?: invocation?.takeIf { gridPublication == null }?.let {
+        (request.toleranceCheck ?: invocation?.let {
             capturedRealAcceptance(it.source.problem, stop)
         })?.let { check ->
             val source = invocation?.source?.problem
@@ -532,7 +518,7 @@ internal fun FinitePipeline.solve(
             // A source that accepts points within its slack completes numerically in every worker; exact
             // completion in the incomplete workers would refuse the points the complete ones publish.
             executionOptions = if (linearSource == null &&
-                (invocation == null || gridPublication != null || !sourceCheck.permitsToleranceOptimum())
+                (invocation == null || !sourceCheck.permitsToleranceOptimum())
             ) request.executionOptions else request.executionOptions.withNumericalCompletion(),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
@@ -552,33 +538,28 @@ internal fun FinitePipeline.solve(
             onPortfolioLpQuery = onPortfolioLpQuery,
             onPortfolioGuidance = onPortfolioGuidance,
             onPortfolioJointRepair = onPortfolioJointRepair,
-            toleranceCheck = if (gridPublication == null) {
-                sourceCheck?.let { check ->
-                    FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
-                        (check as? FiniteSourceAcceptance)?.objective?.let { score ->
-                            { sample -> score(preparation.reconstruct(sample)) }
-                        }, check.toleranceSearch()?.reconstructedBy(preparation.reconstruct))
-                }
-            } else null,
+            toleranceCheck = sourceCheck?.let { check ->
+                FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
+                    (check as? FiniteSourceAcceptance)?.objective?.let { score ->
+                        { sample -> score(preparation.reconstruct(sample)) }
+                    }, check.toleranceSearch()?.reconstructedBy(preparation.reconstruct))
+            },
             sourceInvocation = request.shape.sourceInvocation,
             sourceMapping = preparation.sourceMapping,
             sourceControls = request.sourceControls,
             numericalCompanionParams = numericalCompanions,
             objectiveCoordinates = objectiveCoordinates,
-            optimalityGap = if (gridPublication == null && request.shape.optimize) {
+            optimalityGap = if (request.shape.optimize) {
                 invocation?.let { sourceOptimalityGap(it, preparation) }
             } else null,
         ),
         FiniteExecutionCallbacks(
             onSample = { sample ->
                 val lifted = preparation.reconstruct(sample)
-                if (gridPublication == null) publicationCallbacks.onSample(lifted) else gridPublication.onSample(lifted)
+                publicationCallbacks.onSample(lifted)
             },
             onImprovement = { improvement ->
-                if (gridPublication != null) {
-                    gridPublication.onImprovement(preparation.reconstruct(improvement.sample),
-                        improvement.workerLabel, improvement.elapsedMs)
-                } else publicationCallbacks.onImprovement(
+                publicationCallbacks.onImprovement(
                     FiniteSolveImprovement(
                         preparation.reconstruct(improvement.sample),
                         improvement.workerLabel,

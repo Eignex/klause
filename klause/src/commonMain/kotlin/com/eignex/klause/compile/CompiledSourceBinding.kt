@@ -1,6 +1,5 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
@@ -12,22 +11,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
-import com.eignex.klause.solver.pipeline.FloatGridConsumerPurpose
-import com.eignex.klause.solver.pipeline.SelectedFloatGridPreparation
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.solver.pipeline.SourceRouteSelection
-import com.eignex.klause.solver.pipeline.SourceSetup
-import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
-import com.eignex.klause.solver.pipeline.preservesOriginalCompleteArm
-import com.eignex.klause.solver.projection.FloatGridColumn
-import com.eignex.klause.solver.projection.FloatGridDefinition
-import com.eignex.klause.solver.projection.FloatGridPreparation
-import com.eignex.klause.solver.projection.FloatGridRequest
-import com.eignex.klause.solver.projection.FloatGridVariable
-import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.ExecutionControl
-import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
@@ -37,57 +23,20 @@ internal class CompiledSourceBinding(
     val originalProblem: Problem,
     integerNames: Map<String, Int>,
     realNames: Map<String, Int>,
-    variables: List<FloatGridVariable> = emptyList(),
     representations: Map<String, FloatRepresentation> = emptyMap(),
-    truncatedRows: Set<Int> = emptySet(),
 ) {
     val integerNames = integerNames.toMap()
     val realNames = realNames.toMap()
-    private val variables = variables.toList()
     private val declaredRepresentations = representations.toMap()
-    private val truncatedRows = truncatedRows.toSet()
-    private val compatibilityDefinition: Lazy<FloatGridDefinition?> = lazy { prepareCompatibility() }
-    private val compatibilityColumns by lazy {
-        compatibilityDefinition.value?.columns()?.associateBy { it.source.index }.orEmpty()
-    }
-    val compatibilityProblem: Problem get() = compatibilityDefinition.value?.target ?: originalProblem
 
-    fun attachment(): SourceAttachment = SourceAttachment(originalProblem, emptyList(), null, variables)
+    fun attachment(): SourceAttachment = SourceAttachment(originalProblem)
 
-    fun selectView(selection: SourceRouteSelection): SelectedFloatGridPreparation? {
-        require(selection.source.originalSource === originalProblem)
-        if (SourceSetup.preservesOriginalCompleteArm(selection)) return null
-        val selected = selectedVariables(selection.cancellation) ?: return null
-        return if (selected.isEmpty()) null else SourceSetup.prepareSelectedFloatGrid(selection, selected,
-            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY, truncatedRows)
-    }
-
-    fun floatRepresentations(): Map<String, FloatRepresentation> =
-        if (originalProblem.semantics.effective.floats == FloatSemantics.Continuous) {
-            declaredRepresentations.mapValues { FloatRepresentation(it.value.component) }
-        } else declaredRepresentations.toMap()
-
-    fun compatibilityColumn(name: String): FloatGridColumn? {
-        val source = realNames[name] ?: return null
-        return compatibilityColumns[source]
-    }
-
-    fun compatibilityIntegerNames(): Map<String, Int> = integerNames + realNames.mapNotNull { (name, _) ->
-        compatibilityColumn(name)?.let { name to it.selector().coordinate.variable }
-    }.toMap()
-
-    fun compatibilityRealNames(): Map<String, Int> {
-        val definition = compatibilityDefinition.value ?: return realNames.toMap()
-        return realNames.mapNotNull { (name, source) ->
-            definition.retainedReal(source).takeIf { it >= 0 }?.let { name to it }
-        }.toMap()
-    }
+    fun floatRepresentations(): Map<String, FloatRepresentation> = declaredRepresentations.toMap()
 
     fun isOriginal(sample: Sample): Boolean {
         val frame = sample.coordinateFrame
         if (frame === originalProblem) return true
-        val compatible = compatibilityDefinition.isInitialized() && frame === compatibilityDefinition.value?.target
-        require(frame == null || compatible) {
+        require(frame == null) {
             "assignment belongs to a different compiled coordinate frame"
         }
         return false
@@ -103,20 +52,10 @@ internal class CompiledSourceBinding(
     }
 
     fun paired(objective: LinearObjective): LinearObjective {
-        val problem = compatibilityProblem
-        val integers = MutableList<QuadraticVariable?>(problem.numIntVars) { id ->
-            if (id < originalProblem.numIntVars) QuadraticVariable.Int(SourceIntId(id)) else null
-        }
-        compatibilityDefinition.value?.columns()?.forEach {
-            integers[it.coordinate.variable] = QuadraticVariable.Real(it.source)
-        }
-        val reals = MutableList<QuadraticVariable?>(problem.numRealVars) { null }
-        for (id in 0 until originalProblem.numRealVars) {
-            val target = compatibilityDefinition.value?.retainedReal(id) ?: id
-            if (target >= 0) reals[target] = QuadraticVariable.Real(SourceRealId(id))
-        }
-        val booleans = List<QuadraticVariable?>(problem.numBoolVars) { id ->
-            if (id < originalProblem.numBoolVars) QuadraticVariable.Bool(SourceBoolId(id)) else null
+        val integers = List<QuadraticVariable?>(originalProblem.numIntVars) { QuadraticVariable.Int(SourceIntId(it)) }
+        val reals = List<QuadraticVariable?>(originalProblem.numRealVars) { QuadraticVariable.Real(SourceRealId(it)) }
+        val booleans = List<QuadraticVariable?>(originalProblem.numBoolVars) {
+            QuadraticVariable.Bool(SourceBoolId(it))
         }
         return objective.paired(CompiledObjectivePairing.capture(this, booleans, integers, reals, objective))
     }
@@ -164,59 +103,5 @@ internal class CompiledSourceBinding(
         val constant = original.constant
         if (constant.denominator != BIG_ONE || !constant.numerator.fitsLong()) return null
         return LinearObjective(boolWeights, intWeights, constant.numerator.toLongExact(), realWeights)
-    }
-
-    private fun prepareCompatibility(): FloatGridDefinition? {
-        val selected = selectedVariables(ExecutionControl.Never) ?: error("schema finite view preparation interrupted")
-        if (selected.isEmpty()) return null
-        val request = FloatGridRequest(originalProblem, selected, truncatedRows = truncatedRows)
-        return when (val prepared = prepareFloatGrid(request, ExecutionControl.Never)) {
-            is FloatGridPreparation.Prepared -> prepared.mapping.definition()
-            is FloatGridPreparation.Declined -> error("schema finite view declined: ${prepared.cause}")
-        }
-    }
-
-    private fun selectedVariables(cancellation: ExecutionControl): List<FloatGridVariable>? {
-        if (cancellation()) return null
-        if (originalProblem.semantics.effective.floats !is FloatSemantics.Grid) return emptyList()
-        val selected = HashSet<Int>()
-        for ((name, id) in realNames) {
-            cancellation.charge(1)
-            if (cancellation()) return null
-            if (declaredRepresentations[name]?.approximate == true) selected += id
-        }
-        if (selected.isEmpty()) return emptyList()
-        val incident = HashMap<Int, MutableList<Int>>()
-        for ((index, factor) in originalProblem.factors.withIndex()) {
-            cancellation.charge(1)
-            if (cancellation()) return null
-            for (id in factor.variables.reals) {
-                cancellation.charge(1)
-                if (cancellation()) return null
-                incident.getOrPut(id) { ArrayList() } += index
-            }
-        }
-        val pending = IntArrayDeque()
-        for (id in selected) pending.addLast(id)
-        val visited = HashSet<Int>()
-        while (pending.isNotEmpty()) {
-            for (factor in incident[pending.removeFirst()].orEmpty()) {
-                cancellation.charge(1)
-                if (cancellation()) return null
-                if (!visited.add(factor)) continue
-                for (id in originalProblem.factors[factor].variables.reals) {
-                    cancellation.charge(1)
-                    if (cancellation()) return null
-                    if (selected.add(id)) pending.addLast(id)
-                }
-            }
-        }
-        val result = ArrayList<FloatGridVariable>()
-        for (variable in variables) {
-            cancellation.charge(1)
-            if (cancellation()) return null
-            if (variable.source.index in selected) result += variable
-        }
-        return result
     }
 }

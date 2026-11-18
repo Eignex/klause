@@ -25,7 +25,7 @@ internal fun BakedProblem.withRealDifferenceSystem(
     stop: ExecutionControl,
     onInterrupted: () -> Unit = {},
 ): BakedProblem {
-    if (numRealVars !in 1..10000 || semantics.isApproximate) return this
+    if (numRealVars !in 1..10000 || semantics.relaxesFeasibility) return this
     val system = RealDifferenceFragment(this, stop, onInterrupted).prepare() ?: return this
     return withAppendedFactor(system)
 }

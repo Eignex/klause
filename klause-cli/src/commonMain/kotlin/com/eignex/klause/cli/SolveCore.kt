@@ -512,7 +512,6 @@ internal object SolveCore {
                 ) as SourceExecutionResult.Finite
                 ).result
         }
-        result.nativeGridOutcome?.let(output::onNativeGridOutcome)
         val preparation = result.preparation
         cliLogger(common.verbose, common.diagnostic).v {
             val p0 = solvable.finiteProblem

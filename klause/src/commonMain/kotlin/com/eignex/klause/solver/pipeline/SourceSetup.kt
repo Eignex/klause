@@ -123,22 +123,6 @@ object SourceSetup {
         polynomialCancellation: ExecutionControl): PreparedSourceInvocation =
         PreparedSourceInvocation(selectRoute(request, null, polynomialCancellation))
 
-    // The grid consumer runs on the selected route before the invocation exists, so no execution view escapes first.
-    internal fun prepareWithGrid(
-        request: SourceSetupRequest,
-        privateGrid: (SourceRouteSelection) -> SelectedFloatGridPreparation?,
-        polynomialCancellation: ExecutionControl = request.cancellation,
-        onLpStats: ((LpStats) -> Unit)? = null,
-    ): PreparedSourceInvocation {
-        val selection = selectRoute(request, onLpStats, polynomialCancellation)
-        val prepared = privateGrid(selection) as? SelectedFloatGridPreparation.Prepared
-            ?: return PreparedSourceInvocation(selection)
-        require(prepared.invocation.selection === selection) {
-            "grid invocation belongs to a different route selection"
-        }
-        return prepared.invocation
-    }
-
     internal fun selectRoute(
         request: SourceSetupRequest,
         onLpStats: ((LpStats) -> Unit)? = null,

@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FlatZincSearchAnnotationTest {
@@ -31,7 +32,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `mixed float arrays should exclude real columns from integer search groups`() {
+    fun `float arrays should not create integer search groups`() {
         val program = parseFlatZinc(
             """
             var 0.0..1.0: exact;
@@ -42,10 +43,7 @@ class FlatZincSearchAnnotationTest {
             """.trimIndent(),
         )
 
-        val neutral = searchHints(program).toSearchHints()
-
-        assertContentEquals(intArrayOf(program.floatVarsByName.getValue("grid").varId), neutral.tiers.single().intVars)
-        assertEquals(com.eignex.klause.ir.ValueSelection.Maximum, neutral.tiers.single().valueSelector)
+        assertNull(program.searchHints)
     }
 
     @Test

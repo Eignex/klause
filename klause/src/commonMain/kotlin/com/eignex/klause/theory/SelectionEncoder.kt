@@ -1,7 +1,6 @@
 package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
@@ -12,7 +11,6 @@ import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.SelectionEncodingInterrupted
 import com.eignex.klause.lowering.elementEncoding
-import com.eignex.klause.lowering.gridMinMaxEncoding
 import com.eignex.klause.lowering.minMaxEncoding
 import com.eignex.klause.lowering.polynomialRow
 import com.eignex.klause.lowering.realElementEncoding
@@ -28,8 +26,6 @@ internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, enc
             val formula = when (factor) {
                 is ArrayMinMax -> minMaxEncoding(factor, encoding.cancellation, row,
                     { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) })
-                is GridArrayMinMax -> gridMinMaxEncoding(factor, encoding.cancellation, row,
-                    { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) })
                 is Element -> elementEncoding(factor, encoding.cancellation, row,
                     { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) }, affineBinary = true)
                 is RealElement -> realElementEncoding(factor, encoding.cancellation, row,
@@ -43,8 +39,6 @@ internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, enc
             val row = { row: LinearRow -> LinearEncodingFormula.Relation(LinearForm.Conjunction(listOf(row))) }
             val formula = when (factor) {
                 is ArrayMinMax -> minMaxEncoding<LinearEncodingFormula>(factor, encoding.cancellation, row,
-                    { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) })
-                is GridArrayMinMax -> gridMinMaxEncoding<LinearEncodingFormula>(factor, encoding.cancellation, row,
                     { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) })
                 is Element -> elementEncoding<LinearEncodingFormula>(factor, encoding.cancellation, row,
                     { LinearEncodingFormula.And(it) }, { LinearEncodingFormula.Or(it) },

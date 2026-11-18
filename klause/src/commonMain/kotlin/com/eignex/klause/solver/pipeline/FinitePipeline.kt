@@ -218,7 +218,7 @@ object FinitePipeline {
             ) { token, observation ->
                 bakedModel.withRealDifferenceSystem(token) { observation.preparationInterrupted() }.also {
                     if (it === bakedModel) observation?.outcome = if (
-                        bakedModel.numRealVars !in 1..10000 || bakedModel.semantics.isApproximate
+                        bakedModel.numRealVars !in 1..10000 || bakedModel.semantics.relaxesFeasibility
                     ) PresolveInvocationOutcome.ELIGIBILITY_SKIP else PresolveInvocationOutcome.COMPLETE_MISS
                 }
             }

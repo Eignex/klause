@@ -21,26 +21,12 @@ const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
  *  adopts it and an `unsat` within it is a sound `unsat`. */
 const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
 
-/** Default lower search bound for a bucketed FlatZinc float with no declared range. */
-const val DEFAULT_UNBOUNDED_FLOAT_LO: Double = -1_000_000.0
-
-/** Default upper search bound for a bucketed FlatZinc float with no declared range. */
-const val DEFAULT_UNBOUNDED_FLOAT_HI: Double = 1_000_000.0
-
 /** Default integer-domain span above which the span-gated LP presolve steps engage. A model whose
  *  widest integer domain spans no more than this stays on the pure (cheap) presolve + bake path; only a
  *  genuinely wide domain — where the root bake's bound propagation would grind O(span) — pays for the LP
  *  feasibility / bound-tightening that runs ahead of the bake. A pure cost gate; the result is unchanged
  *  either way. Widen or lower it via env `KLAUSE_LARGE_SPAN_THRESHOLD`. */
 const val DEFAULT_LARGE_SPAN_THRESHOLD: Long = 1_000_000
-
-/** Default number of uniformly-spaced buckets a `floatVar` is discretised into. 10-bit
- *  precision is enough for typical config-style fractions; raise it for finer granularity. */
-const val DEFAULT_FLOAT_BUCKETS: Int = 1024
-
-/** Default fixed-point scale for the FlatZinc float-linear lowering: real coefficients and
- *  bounds are multiplied by this and rounded to integers. */
-const val DEFAULT_FLOAT_SCALE: Long = 1_000_000L
 
 /** Default **base** relaxation-size cap (`rows × (cols + rows + 1)` cells). The sparse revised simplex
  *  is the only LP engine; this is a pure per-node cost guard (not a memory bound), and the bound

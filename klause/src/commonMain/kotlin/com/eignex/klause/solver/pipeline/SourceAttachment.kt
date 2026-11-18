@@ -14,7 +14,6 @@ import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.solver.projection.FloatGridVariable
 
 /** Borrowed canonical source structure with owned invocation metadata. */
 class SourceAttachment private constructor(
@@ -68,18 +67,6 @@ class SourceAttachment private constructor(
         ?: FactorProjectionProviders.Default
     private val definitions = definitionHints.toList()
     private val search = searchHints?.captured()
-    private var floats: List<FloatGridVariable> = emptyList()
-
-    internal constructor(
-        problem: Problem,
-        definitionHints: List<DefinitionHint>,
-        searchHints: SearchHints?,
-        floatVariables: List<FloatGridVariable>,
-    ) : this(problem, definitionHints, searchHints) {
-        floats = floatVariables.toList()
-    }
-
-    internal val floatVariables: List<FloatGridVariable> get() = floats.toList()
 
     /** Original source identity, borrowed read-only for every attached invocation. */
     val originalSource: SourceSemanticsOwner = factorSource ?: requireNotNull(formula).source
@@ -103,7 +90,7 @@ class SourceAttachment private constructor(
     /** Add an original-source witness check, preserving this attachment and its source identity. */
     fun withWitnessValidator(validator: SourceWitnessValidator): SourceAttachment = SourceAttachment(
         factorSource, formula, definitions, search, settings, definitionReferences, witnessValidators + validator,
-    ).also { it.floats = floats }
+    )
 }
 
 private fun SearchHints.captured(): SearchHints = copy(
