@@ -36,6 +36,10 @@ Git pack with its original commit identity. Builds and tools use the current rev
 Use `lab/bench-mps-linux.json` for MPS-only selections; it uses the same Linux adapter and runtime without staging
 the MiniZinc compiler. `lab/bench-linux.json` includes that compiler for MiniZinc workloads.
 
+`ObjectiveSymmetryCapture` accepts exact `suite/problem` selections in a lab profile
+and records original-source identity, bounded default/protected preparation, and
+generators that move objective columns. It does not solve or establish performance.
+
 Corpus input indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
 (`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
 transfers no corpus bytes. Regenerate them from complete collection trees with
