@@ -66,15 +66,22 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
 
     @Test
     fun `private neighborhoods should reject improving points outside their change radius`() {
-        for ((size, radius) in listOf(5 to 4, 50 to 5, 400 to 32)) {
+        for ((size, radius, hasHint) in listOf(
+            Triple(5, 4, false), Triple(50, 5, false), Triple(400, 32, false),
+            Triple(5, 4, true), Triple(50, 5, true), Triple(400, 32, true),
+        )) {
             val columns = (0 until size).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }.toSet()
             val source = SourceProofContext(SourceScope(SourceRevision("radius", "exact"),
                 objective = SourceObjective("cost", ObjectiveSense.MINIMIZE)), columns, emptyMap(),
                 columns.associateWith { BigFraction.ONE })
             val center = Sample(booleanArrayOf(), LongArray(size) { 1L })
             val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+            val budget = SourceLpBudget(funding = funding)
+            val guidance = LinearRepairGuidance()
+            if (hasHint) assertTrue(guidance.remember(source, columns.associateWith { 0.5 },
+                budget, ExecutionControl.Never))
             val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ofLong(size.toLong()),
-                SourceLpBudget(funding = funding), ExecutionControl.Never))
+                budget, ExecutionControl.Never, guidance.find(source)))
             val inside = center.copy(ints = LongArray(size) { if (it < radius) 0L else 1L })
             val outside = center.copy(ints = LongArray(size) { if (it <= radius) 0L else 1L })
 
@@ -113,7 +120,8 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
         val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ZERO,
             SourceLpBudget(funding = funding), ExecutionControl.Never))
 
-        assertEquals(BigFraction.of(bigIntOf(-1), bigIntOf(1000)), query.premises.getValue("incumbent-proximity-target").inequality.rhs)
+        assertEquals(BigFraction.of(bigIntOf(-1), bigIntOf(1000)),
+            query.premises.getValue("incumbent-proximity-target").inequality.rhs)
     }
 
     @Test
