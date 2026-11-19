@@ -1,10 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpNumber
@@ -16,11 +11,8 @@ import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
-import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.withModel
-import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
@@ -297,19 +289,13 @@ class LpHintsTest {
     }
 
     private fun recordedHints(lpValue: Double): LpHints {
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 10)),
-            factors = arrayOf<Factor>(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 10L)),
-        )
-        val rel = CpToLpRelaxation(p, LinearObjective(intCoefficients = longArrayOf(1))).build(PropagationSession(p))
+        val builder = LpBuilder()
+        val column = builder.addVar(0, 10, cost = 1L)
+        builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.LE, 10L)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0), booleanArrayOf(false),
+            0L, intArrayOf(column), IntArray(0))
         val hints = LpHints(numIntVars = 1, numBoolVars = 0)
-        val primal = DoubleArray(rel.colVarId.size)
-        for (col in rel.colVarId.indices) {
-            if (rel.colVarId[col] == 0 && !rel.colIsBool[col]) primal[col] = lpValue
-        }
-        hints.record(rel, primal, DoubleArray(rel.model.m))
+        hints.record(relaxation, doubleArrayOf(lpValue), DoubleArray(relaxation.model.m))
         return hints
     }
 
