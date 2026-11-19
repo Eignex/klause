@@ -8,10 +8,12 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Runners
+import com.eignex.klause.factor.codec.MissingFactorCodecException
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.PropagationSession
@@ -29,18 +31,31 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.util.ExecutionControl
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.util.IdentityHashMap
-import kotlin.time.Duration.Companion.milliseconds
+import com.sun.management.OperatingSystemMXBean
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.util.IdentityHashMap
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object PortfolioArithmeticLearningCapture {
+    private class Snapshot(val json: String?, val decline: String?)
+
+    private fun snapshot(codec: ProblemJson, problem: Problem): Snapshot {
+        if (problem.numBoolVars > 4096 || problem.numIntVars > 4096) return Snapshot(null, "coordinate limit")
+        return try {
+            val json = codec.encodeToString(problem)
+            if (json.encodeToByteArray().size <= 262_144) Snapshot(json, null) else Snapshot(null, "model byte limit")
+        } catch (missing: MissingFactorCodecException) {
+            Snapshot(null, missing.message?.take(512) ?: "missing factor codec")
+        }
+    }
+
     private class Observed(
         val worker: String,
         val ordinal: Int,
@@ -56,7 +71,7 @@ internal object PortfolioArithmeticLearningCapture {
         val kind = options["learning"] ?: "integer"
         val traceMode = options["trace"] ?: "first-integer"
         val codec = ProblemJson()
-        val cpu = ManagementFactory.getOperatingSystemMXBean() as? com.sun.management.OperatingSystemMXBean
+        val cpu = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { records ->
             for (learning in listOf(false, true)) {
                 val opened = System.nanoTime()
@@ -85,6 +100,7 @@ internal object PortfolioArithmeticLearningCapture {
                 var callbacks = 0
                 var omitted = 0
                 var attachmentNs = 0L
+                val snapshotDeclines = ArrayList<String>()
                 val pairs = listOf("integer-row-learning=${learning && kind != "pb"}",
                     "pb-learning=${learning && kind != "integer"}", "portfolio-progress=false")
                 val policy = if (options["lp"] == "off") {
@@ -92,23 +108,28 @@ internal object PortfolioArithmeticLearningCapture {
                 } else SourceExecutionPolicy()
                 val request = SourceExecutionRequest(invocation, policy, ExecutionOptions.parse(pairs),
                     cores = 1, randomSeed = seed, timeout = stop, cancellation = stop)
-                val original = if (SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE)
-                    codec.encodeToString(invocation.finiteShape().problem) else null
-                require(original == null || original.encodeToByteArray().size <= 262_144)
+                val finiteRoute = SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE
+                val originalSnapshot = if (finiteRoute) snapshot(codec, invocation.finiteShape().problem)
+                else Snapshot(null, "finite route unavailable")
+                val original = originalSnapshot.json
                 var observed = request
-                if (original != null) {
+                if (finiteRoute) {
                     val observer: (String, PropagationSession) -> Unit = observer@{ worker, native ->
                         callbacks++
                         if (sessions.containsKey(native)) return@observer
-                        if (sessions.size >= 4) {
+                        if (sessions.size >= 4 || callbacks > 16) {
                             omitted++
                             return@observer
                         }
                         val started = System.nanoTime()
                         try {
-                            require(native.problem.numBoolVars <= 4096 && native.problem.numIntVars <= 4096)
-                            val model = codec.encodeToString(native.problem)
-                            require(model.encodeToByteArray().size <= 262_144)
+                            val payload = snapshot(codec, native.problem)
+                            val model = payload.json
+                            if (model == null) {
+                                snapshotDeclines += "$worker: ${payload.decline}"
+                                omitted++
+                                return@observer
+                            }
                             val capture = PreparedArithmeticLearningProfile.Capture(native, 1024, 65536,
                                 captureFirstInteger = learning && kind != "pb" && traceMode == "first-integer",
                                 captureFirstPb = learning && kind != "integer" && traceMode == "first-pb")
@@ -134,9 +155,8 @@ internal object PortfolioArithmeticLearningCapture {
                 val completed = finite?.outcome as? FiniteSolveOutcome.Completed
                 val label = if (learning) kind else "clause"
                 original?.let { out.resolve("$label-original.json").writeText(it) }
-                finite?.let {
-                    out.resolve("$label-prepared.json").writeText(codec.encodeToString(it.preparation.problem))
-                }
+                val preparedSnapshot = finite?.let { snapshot(codec, it.preparation.problem) }
+                preparedSnapshot?.json?.let { out.resolve("$label-prepared.json").writeText(it) }
                 for (session in ordered) {
                     val index = session.ordinal
                     out.resolve("$label-worker-$index.json").writeText(session.model)
@@ -154,6 +174,7 @@ internal object PortfolioArithmeticLearningCapture {
                         put("integerRowLearning", learning && kind != "pb")
                         put("pbLearning", learning && kind != "integer")
                         put("original", original)
+                        put("originalExportDecline", originalSnapshot.decline)
                         put("prepared", session.model)
                         put("preparedSha256", sha256(session.model.encodeToByteArray()))
                         put("lifecycle", session.capture.lifecycle())
@@ -179,9 +200,13 @@ internal object PortfolioArithmeticLearningCapture {
                     put("nativeSessionCallbacks", callbacks)
                     put("capturedSessions", sessions.size)
                     put("omittedSessionCallbacks", omitted)
+                    put("snapshotDeclines", JsonArray(snapshotDeclines.map(::JsonPrimitive)))
+                    put("originalExportDecline", originalSnapshot.decline)
+                    put("preparedExportDecline", preparedSnapshot?.decline)
                     put("attachmentNs", attachmentNs)
                     put("executionNs", elapsed)
-                    put("processCpuNs", if (cpuBefore != null && cpuAfter != null)
+                    put("processCpuNs", if (cpuBefore != null && cpuBefore >= 0L &&
+                        cpuAfter != null && cpuAfter >= 0L)
                         JsonPrimitive(cpuAfter - cpuBefore) else JsonNull)
                     put("cancelled", stop())
                     put("independentWitnessOrProofCheck", false)

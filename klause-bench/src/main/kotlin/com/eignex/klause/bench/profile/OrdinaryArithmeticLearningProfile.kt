@@ -31,16 +31,16 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object OrdinaryArithmeticLearningProfile {
     @JvmStatic

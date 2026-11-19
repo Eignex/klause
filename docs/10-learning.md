@@ -471,6 +471,10 @@ existing state without reconstructing reasons or running propagation, and suppli
 proof or source-mapping authority; an incomplete trace cannot establish exhaustive
 applicability.
 
+Successful integer cancellation records the selected variable, source factor,
+historical deduction position and whether the reason needed mixed-integer rounding.
+These choices bind a long derivation without guessing its pivots from the final row.
+
 ## Learned-clause retention
 
 Native forgetting starts at restart boundaries with a configured cap. Permanent and

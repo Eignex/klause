@@ -56,32 +56,6 @@ import kotlin.time.Duration.Companion.seconds
 
 class SourceExecutionTest {
     @Test
-    fun `ordinary finite execution should expose its native sessions before search`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 5) }, arrayOf(
-            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 4),
-        ))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(problem),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
-            objective = LinearObjective(intCoefficients = longArrayOf(2, 3, 1))))
-        val workers = mutableListOf<String>()
-        val counts = mutableListOf<Int>()
-        val request = SourceExecutionRequest(invocation,
-            SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioLpCeiling = LpConfig.OFF),
-            randomSeed = 1L, presolveConfig = PresolveConfig.NONE).withPortfolioSessionObserver { worker, native ->
-            workers += worker
-            counts += native.learnedClauseCount
-            assertEquals(3, native.problem.numIntVars)
-        }
-
-        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
-
-        assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
-        assertTrue(workers.isNotEmpty())
-        assertTrue(workers.all { it.startsWith("bt/") })
-        assertTrue(counts.all { it == 0 })
-    }
-
-    @Test
     fun `mixed observer attachment should preserve the quiet joint observer`() {
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),

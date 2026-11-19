@@ -1226,7 +1226,11 @@ Catalog capture records at most four native sessions in creation order, with wor
 labels, initial levels and learned counts, canonical source and actual worker models,
 their digests, and bounded traces. `native-capture` records carry no repeated timing
 totals; one `arm-result` holds containing execution and process CPU, including observer
-attachment, and reports omitted session callbacks. Each model admits 256 KiB.
+attachment, and reports omitted session callbacks. At most sixteen callbacks attempt
+model snapshots, and each model admits 256 KiB. Missing factor codecs and oversized
+snapshots report explicit export declines; they do not erase available worker traces
+or establish zero activity. Generated preparation factors can therefore remain
+unexported while a worker's actual model and derivation are retained.
 The hook delegates recipe selectors and observes before branching; it does not replace
 the ordinary catalog with a diagnostic recipe. Native counters, captured consequences,
 source checking and uninstrumented performance remain separate observations.
