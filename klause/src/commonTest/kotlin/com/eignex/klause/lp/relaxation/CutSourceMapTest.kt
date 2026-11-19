@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -142,6 +143,134 @@ class CutSourceMapTest {
 
         assertSame(proof, derived.parent(0))
         assertNull(root.parent(0))
+    }
+
+    @Test
+    fun `active fixed facts remain available without separate bounds`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val fixed = CutPremise.Fixed(source, BigFraction.ONE)
+        val root = CutSourceMap(Any(), 0L, emptyList())
+
+        val derived = root.withActivePremises(setOf(fixed))
+
+        assertTrue(derived.isActive(fixed))
+        assertFalse(root.isActive(fixed))
+    }
+
+    @Test
+    fun `fixed premises combine lp and cp bound directions`() {
+        for (cpUpper in listOf(false, true)) {
+            val source = CutSource(CutSourceKind.INTEGER, 0)
+            val problem = Problem(0, 1, arrayOf(if (cpUpper) IntDomain(0, 3) else IntDomain(3, 10)), emptyList())
+            val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)))
+            val model = LpBuilder().apply { if (cpUpper) addVar(3L, 10L) else addVar(0L, 3L) }
+                .build(Sense.MINIMIZE)
+
+            val rebound = root.withCpBounds(model, PropagationSession(problem))
+
+            assertTrue(rebound.isActive(CutPremise.Fixed(source, BigFraction.ofLong(3L))))
+        }
+    }
+
+    @Test
+    fun `cp bound checks preserve exact endpoint strictness without lp columns`() {
+        for (origin in listOf(Long.MIN_VALUE, 0L, Long.MAX_VALUE)) {
+            for (upper in listOf(false, true)) {
+                val problem = Problem(0, 1, arrayOf(IntDomain(origin, origin)), emptyList())
+                val source = CutSource(CutSourceKind.INTEGER, 0)
+                val expression = CutExpression(mapOf(source to BigFraction.ONE))
+                val exact = BigFraction.ofLong(origin)
+                val half = BigFraction.of(parseBigInt("1"), parseBigInt("2"))
+                val weaker = if (upper) exact + half else exact - half
+                val stronger = if (upper) exact - half else exact + half
+                val map = CutSourceMap(problem, 0L, emptyList())
+                    .withCpBounds(LpBuilder().build(Sense.MINIMIZE), PropagationSession(problem))
+
+                assertTrue(map.isActive(CutPremise.Bound(expression, upper, exact)))
+                assertFalse(map.isActive(CutPremise.Bound(expression, upper, exact, strict = true)))
+                assertTrue(map.isActive(CutPremise.Bound(expression, upper, weaker, strict = true)))
+                assertFalse(map.isActive(CutPremise.Bound(expression, upper, stronger)))
+                assertFalse(map.isGlobal(CutPremise.Bound(expression, upper, exact)))
+            }
+        }
+    }
+
+    @Test
+    fun `cp rebinding captures absent column bounds without retaining the session`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList())
+        val session = PropagationSession(problem)
+        val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
+        val lower = CutPremise.Bound(expression, false, BigFraction.ofLong(3L))
+        val model = LpBuilder().build(Sense.MINIMIZE)
+        session.pinInt(0, 3L)
+        val child = CutSourceMap(problem, 0L, emptyList()).withCpBounds(model, session)
+        session.popLast()
+
+        val restored = child.withCpBounds(model, session)
+
+        assertTrue(child.isActive(lower))
+        assertFalse(restored.isActive(lower))
+    }
+
+    @Test
+    fun `source derivations preserve captured cp bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 10)), emptyList())
+        val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
+        val lower = CutPremise.Bound(expression, false, BigFraction.ofLong(3L))
+        val root = CutSourceMap(problem, 0L, emptyList())
+            .withCpBounds(LpBuilder().build(Sense.MINIMIZE), PropagationSession(problem))
+
+        for (derived in listOf(root.withParentRows(emptyMap()), root.withActivePremises(emptySet()))) {
+            assertTrue(derived.isActive(lower))
+        }
+    }
+
+    @Test
+    fun `lp bound refresh discards captured cp bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 10)), emptyList())
+        val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
+        val lower = CutPremise.Bound(expression, false, BigFraction.ofLong(3L))
+        val model = LpBuilder().build(Sense.MINIMIZE)
+        val root = CutSourceMap(problem, 0L, emptyList()).withCpBounds(model, PropagationSession(problem))
+
+        val rebound = root.withBounds(model)
+
+        assertFalse(rebound.isActive(lower))
+        assertTrue(root.isActive(lower))
+    }
+
+    @Test
+    fun `captured Boolean pins preserve polarity and distinguish unknown values`() {
+        for (value in listOf(false, true)) {
+            val problem = Problem(1, 0, emptyArray(), emptyList())
+            val session = PropagationSession(problem)
+            val model = LpBuilder().build(Sense.MINIMIZE)
+            val root = CutSourceMap(problem, 0L, emptyList())
+            session.pinBool(0, value)
+            val child = root.withCpBounds(model, session)
+            session.popLast()
+
+            val restored = child.withCpBounds(model, session)
+
+            assertTrue(child.isActive(CutPremise.Literal(if (value) 0 else 1)))
+            assertFalse(child.isActive(CutPremise.Literal(if (value) 1 else 0)))
+            for (literal in listOf(0, 1, 2, -1)) {
+                assertFalse(restored.isActive(CutPremise.Literal(literal)))
+            }
+        }
+    }
+
+    @Test
+    fun `cp snapshots do not imply bounds in transformed coordinates`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 10)), emptyList())
+        val root = CutSourceMap(problem, 0L, emptyList())
+            .withCpBounds(LpBuilder().build(Sense.MINIMIZE), PropagationSession(problem))
+
+        for (expression in listOf(CutExpression(mapOf(source to BigFraction.ofLong(2L))),
+            CutExpression(mapOf(source to BigFraction.ONE), BigFraction.ONE))) {
+            assertFalse(root.isActive(CutPremise.Bound(expression, false, BigFraction.ofLong(3L))))
+        }
     }
 
     @Test

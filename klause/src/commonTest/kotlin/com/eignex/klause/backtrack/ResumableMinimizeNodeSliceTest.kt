@@ -160,7 +160,8 @@ class ResumableMinimizeNodeSliceTest {
 
             val terminal = search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = budget) { }
 
-            assertTrue(search.stats.lp.workOps.sum > 0.0)
+            assertTrue(search.stats.lp.workOps.sum + search.stats.lp.overheadOps.sum > 0.0)
+            assertTrue(search.work > search.stats.search.nodes.sum)
             assertTrue(
                 terminal == null && search.stats.search.nodes.sum < budget,
                 "slice ${search.stats.search.nodes.sum} of $budget, terminal $terminal",

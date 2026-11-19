@@ -407,8 +407,13 @@ and target reset, reseed and engine close release the preferences.
 
 Cut-source maps capture incoming collections once. Derived maps share immutable
 column expressions, global premises and source definitions while owning their active
-premises and row-parent mappings. A bound refresh assembles column bounds, CP bounds,
-Boolean pins and auxiliary exclusions into one fresh owned premise set. Source
+premises and row-parent mappings. A CP bound refresh captures all integer endpoints
+and Boolean pins in private primitive arrays, including variables absent from LP
+columns. Exact endpoint values materialize only for requested premise checks.
+Column bounds and auxiliary exclusions form a fresh owned premise set; fixed-value
+checks can combine its bound directions with the captured CP endpoints. Row-parent
+and premise derivations preserve the capture. A CP refresh replaces it; an LP-only
+bound refresh clears it. Source
 identities and epochs keep their existing scope. Source-map and retained-layout binding
 report structural traversal and exact premise work separately, including cached bound
 refreshes and failed attempts. The host charges them with the existing construction

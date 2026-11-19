@@ -71,6 +71,7 @@ internal class CutSourceMap private constructor(
     assumptions: Set<String>,
     parentRows: Map<Int, CutProvenance>,
     auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition>,
+    private val cpBounds: CpCutBounds?,
     owned: Boolean,
 ) {
     constructor(
@@ -84,7 +85,7 @@ internal class CutSourceMap private constructor(
         parentRows: Map<Int, CutProvenance> = emptyMap(),
         auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
     ) : this(model, epoch, columns, globalPremises, activePremises, fixed, assumptions,
-        parentRows, auxiliaryDefinitions, false)
+        parentRows, auxiliaryDefinitions, null, false)
 
     private val columnSnapshot = if (owned) columns else columns.toList()
     private val globalSnapshot = if (owned) globalPremises else globalPremises.toSet()
@@ -128,7 +129,17 @@ internal class CutSourceMap private constructor(
                         (source.kind == CutSourceKind.INTEGER || source.kind == CutSourceKind.BOOLEAN)
                 }
             )
-    fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || implied(premise, activeSnapshot)
+    fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || impliedActive(premise)
+
+    private fun impliedActive(premise: CutPremise): Boolean {
+        if (premise in activeSnapshot) return true
+        if (premise is CutPremise.Fixed) {
+            val expression = CutExpression(mapOf(premise.source to BigFraction.ONE))
+            return impliedActive(CutPremise.Bound(expression, false, premise.value)) &&
+                impliedActive(CutPremise.Bound(expression, true, premise.value))
+        }
+        return cpBounds?.implies(premise) == true || implied(premise, activeSnapshot)
+    }
 
     fun presenceGuard(premise: CutPremise.Bound): CutPremise.Excluded? {
         val term = premise.expression.terms.entries.singleOrNull() ?: return null
@@ -173,7 +184,10 @@ internal class CutSourceMap private constructor(
         withBoundSnapshot(facts.apply { addAll(active) })
     }
 
-    private fun withBoundSnapshot(active: Set<CutPremise>): CutSourceMap = CutSourceMap(
+    private fun withBoundSnapshot(
+        active: Set<CutPremise>,
+        cp: CpCutBounds? = null,
+    ): CutSourceMap = CutSourceMap(
         model,
         epoch + 1,
         columnSnapshot,
@@ -183,6 +197,7 @@ internal class CutSourceMap private constructor(
         assumptionSnapshot,
         parentSnapshot,
         auxiliarySnapshot,
+        cp,
         true,
     )
 
@@ -192,28 +207,7 @@ internal class CutSourceMap private constructor(
         onWork: ((CutSourceWork) -> Unit)? = null,
     ): CutSourceMap = measureCutSourceWork(onWork) { work ->
         val facts = columnBounds(model, columnSnapshot, work)
-        val expressions = HashMap<Int, CutExpression>()
-        for (column in columnSnapshot) {
-            work.structural()
-            if (column != null && column.source.kind == CutSourceKind.INTEGER &&
-                column.scale == BigFraction.ONE && column.offset.isZero
-            ) expressions[column.source.id] = column.expression()
-        }
-        for (variable in 0 until session.problem.numBoolVars) {
-            work.structural()
-            val value = session.boolValue(variable) ?: continue
-            work.structural()
-            facts.add(CutPremise.Literal((variable shl 1) or if (value) 0 else 1))
-        }
-        for (variable in 0 until session.problem.numIntVars) {
-            work.structural()
-            val domain = session.intDomain(variable)
-            val expression = expressions[variable]
-                ?: CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
-            work.exact(2L)
-            facts.add(CutPremise.Bound(expression, false, BigFraction.ofLong(domain.min)))
-            facts.add(CutPremise.Bound(expression, true, BigFraction.ofLong(domain.max)))
-        }
+        val cp = CpCutBounds.capture(session, work)
         for (definition in auxiliarySnapshot.values) {
             val required = definition.required
             work.structural(required.size.toLong() + 1L)
@@ -229,7 +223,7 @@ internal class CutSourceMap private constructor(
                 }
             }
         }
-        withBoundSnapshot(facts)
+        withBoundSnapshot(facts, cp)
     }
 
     fun withParentRows(
@@ -238,12 +232,12 @@ internal class CutSourceMap private constructor(
     ): CutSourceMap = measureCutSourceWork(onWork) { work ->
         work.structural(parents.size.toLong())
         CutSourceMap(model, epoch, columnSnapshot, globalSnapshot, activeSnapshot, fixedSnapshot, assumptionSnapshot,
-            parents.toMap(), auxiliarySnapshot, true)
+            parents.toMap(), auxiliarySnapshot, cpBounds, true)
     }
 
     fun withActivePremises(premises: Set<CutPremise>): CutSourceMap = CutSourceMap(
         model, epoch, columnSnapshot, globalSnapshot, activeSnapshot + premises, fixedSnapshot, assumptionSnapshot,
-        parentSnapshot, auxiliarySnapshot, true,
+        parentSnapshot, auxiliarySnapshot, cpBounds, true,
     )
 }
 

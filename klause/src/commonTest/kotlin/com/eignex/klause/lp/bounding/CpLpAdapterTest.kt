@@ -65,7 +65,6 @@ class CpLpAdapterTest {
         }
     }
 
-
     @Test
     fun `LP pass should catch up skipped CP scopes and restore ancestor bounds`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
