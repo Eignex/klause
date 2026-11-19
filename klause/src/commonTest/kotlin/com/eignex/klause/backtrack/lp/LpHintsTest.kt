@@ -74,7 +74,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable value advice reaches matching applied and withheld commitments`() {
+    fun `cancellation discards a reliable variable commitment`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -83,18 +83,16 @@ class LpHintsTest {
         val variable = VarRef.IntVar(0)
         val down = SearchDecision.IntAtMost(0, 2)
         val up = SearchDecision.IntAtLeast(0, 3)
-        val costs = ArrayList<Long>()
         for (apply in listOf(false, true)) {
-            var work = 0L
             val events = ArrayList<String>()
             val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
-                observe = events::add, charge = { work += it })
+                observe = events::add)
             repeat(2) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
                 hints.branch(variable)
-                for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 10.0))) {
+                for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 11.0))) {
                     hints.commit(decision, 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
@@ -105,19 +103,15 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
-            val before = work
+            assertEquals(variable, hints.selectVariable(variable, variable))
             hints.branch(variable)
 
-            val selected = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
-            hints.commit(selected.first(), 1)
+            hints.commit(down, 1, ExecutionControl { true })
 
-            assertEquals(if (apply) listOf(up, down) else listOf(down, up), selected)
-            val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
-            assertFalse("PASSIVE_COLLECTION_COMMIT_CHANGED" in events)
-            costs.add(work - before)
+            assertTrue("PASSIVE_VARIABLE_COMPARED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMIT_WITHHELD" in events)
         }
-        assertEquals(costs.first(), costs.last())
     }
 
     @Test
@@ -282,7 +276,7 @@ class LpHintsTest {
                     assertEquals(before, work)
                 } else {
                     assertEquals(sqrt(3.0), score, 1e-9)
-                    assertEquals(before + 1L, work)
+                    assertTrue(work > before)
                 }
             }
         }

@@ -33,8 +33,6 @@ internal class LpHints(
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
     private val passiveChoice = if (collect) LpPassiveVariableChoice(applyAdvice, observe, charge) else null
-    private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
-    private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
     private var passivePoint: LpRelaxation? = null
     private var passiveState: LpExactState? = null
     private var freshRecord = false
@@ -65,8 +63,6 @@ internal class LpHints(
             charge(2L)
             observe("PASSIVE_VARIABLE_OPTIMUM_CHECK")
             passiveChoice.clear()
-            passiveValues?.clear()
-            passiveCollection?.clear()
             passiveState = null
         }
         if (!collect || relaxation.colVarId.size > 8192) return
@@ -121,8 +117,6 @@ internal class LpHints(
 
     fun finishNode(state: LpExactState? = null) {
         passiveChoice?.clear()
-        passiveValues?.clear()
-        passiveCollection?.clear()
         history.finishNode()
         if (scopeModel != null && state != null &&
             (scopeModel !== state.baseModel || scopeRows !== state.rows)
@@ -133,8 +127,6 @@ internal class LpHints(
     }
 
     fun branch(variable: VarRef) {
-        passiveValues?.clear()
-        passiveCollection?.clear()
         passiveChoice?.branch(variable, if (passivePointCurrent()) solveStamp else -1)
         if (directionalGains && scopeModel != null) {
             observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
@@ -146,9 +138,11 @@ internal class LpHints(
     }
 
     fun commit(decision: SearchDecision, depth: Int, cancelled: ExecutionControl = ExecutionControl.Never) {
+        if (passiveChoice?.nominatedVariable != null) {
+            charge(2L)
+            if (cancelled() || !passivePointCurrent()) passiveChoice.clear()
+        }
         passiveChoice?.commit(decision)
-        passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
-        passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         if (collect && scopeModel != null) {
             history.commit(decision, depth)
         }
@@ -222,40 +216,8 @@ internal class LpHints(
     private fun clearPassivePoint() {
         val choice = passiveChoice ?: return
         choice.clear()
-        passiveValues?.clear()
-        passiveCollection?.clear()
         passivePoint = null
         passiveState = null
-    }
-
-    fun orderAlternatives(
-        variable: VarRef,
-        alternatives: List<SearchDecision>,
-        cancelled: ExecutionControl,
-    ): List<SearchDecision> {
-        val collection = passiveCollection ?: return alternatives
-        val values = checkNotNull(passiveValues)
-        values.clear()
-        collection.clear()
-        val valueReady = history.hasValueHistory
-        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
-        if (!history.hasObservations || (!valueReady && !collectReady) ||
-            cancelled() || !passivePointCurrent()
-        ) return alternatives
-        val point = passivePoint
-        val state = passiveState
-        val stamp = solveStamp
-        val current = {
-            !cancelled() && passivePoint === point && passiveState === state &&
-                stamp == solveStamp && passivePointCurrent()
-        }
-        if (valueReady) {
-            val advised = values.select(variable, value(variable), alternatives, history, stamp,
-                cutoff = cutoff - scopeConstant.toDouble(), fresh = current)
-            if (values.hasNomination) return advised
-        }
-        if (!collectReady || !current()) return alternatives
-        return collection.select(variable, value(variable), alternatives, history, stamp, current)
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
@@ -325,8 +287,6 @@ internal class LpHints(
             charge(2L)
             observe("PASSIVE_VARIABLE_POINT")
             passiveChoice.clear()
-            passiveValues?.clear()
-            passiveCollection?.clear()
             passivePoint = relaxation
             passiveState = null
         }

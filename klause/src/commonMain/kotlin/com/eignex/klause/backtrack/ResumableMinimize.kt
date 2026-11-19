@@ -1637,9 +1637,6 @@ internal class ResumableMinimize(
             val rooted = lpEngine.orderRootValues(variable, values)
             return lpHints?.order(variable, rooted) ?: rooted
         }
-
-        override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
-            lpHints?.orderAlternatives(variable, alternatives, params.cancellation) ?: alternatives
     }
 
     /** Refutes LP-dominated partial assignments through the shared frame stack. */

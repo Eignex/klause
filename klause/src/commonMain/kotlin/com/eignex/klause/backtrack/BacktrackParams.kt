@@ -488,7 +488,7 @@ data class BacktrackParams(
     val arithmeticLearningWork: Long = 262_144,
     /** Per-conflict cumulative modeled allocation allowance for optional cutting-planes learning. */
     val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
-    /** Apply reliable directional branching advice; false retains its observations, collection and comparison work. */
+    /** Apply reliable directional branching advice; false retains its observations and comparison work. */
     val lpDirectionalAdvice: Boolean = true,
 ) : SolverParams {
     init {
