@@ -326,11 +326,19 @@ private fun LpExactState.restrictTo(
     val source = model
     val indices = columns.toIntArray() + IntArray(rows.size) { source.n + rows[it] }
     val zero = ExactLpNumber.of(0L)
+    var ordered = true
+    for (index in 1 until rows.size) {
+        if (rows[index - 1] >= rows[index]) {
+            ordered = false
+            break
+        }
+    }
     val restricted = ExactLpModel(
         matrix = List(columns.size) { column ->
-            source.columnEntries(columns[column]).mapNotNull { entry ->
+            val entries = source.columnEntries(columns[column]).mapNotNull { entry ->
                 rowMap[entry.row].takeIf { it >= 0 }?.let { ExactLpEntry(it, entry.number) }
-            }.sortedBy { it.row }
+            }
+            if (ordered) entries else entries.sortedBy { it.row }
         },
         rhs = List(rows.size) { source.rhs(rows[it]) },
         columns = indices.map { source.column(it) },

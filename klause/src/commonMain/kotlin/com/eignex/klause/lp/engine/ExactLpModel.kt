@@ -31,8 +31,26 @@ internal class ExactLpNumber private constructor(
     companion object {
         private val minimumLong = bigIntOf(Long.MIN_VALUE)
         private val maximumLong = bigIntOf(Long.MAX_VALUE)
-        fun of(value: Long): ExactLpNumber = ExactLpNumber(BigFraction.ofLong(value), null, value)
-        fun of(value: BigFraction): ExactLpNumber = ExactLpNumber(value, null, integerOf(value))
+        private val zero = ExactLpNumber(BigFraction.ZERO, null, 0L)
+        private val one = ExactLpNumber(BigFraction.ONE, null, 1L)
+        private val negativeOne = ExactLpNumber(BigFraction.ofLong(-1L), null, -1L)
+
+        fun of(value: Long): ExactLpNumber = when (value) {
+            0L -> zero
+            1L -> one
+            -1L -> negativeOne
+            else -> ExactLpNumber(BigFraction.ofLong(value), null, value)
+        }
+
+        fun of(value: BigFraction): ExactLpNumber {
+            val integer = integerOf(value)
+            return when (integer) {
+                0L -> zero
+                1L -> one
+                -1L -> negativeOne
+                else -> ExactLpNumber(value, null, integer)
+            }
+        }
         fun ofIeee(value: Double): ExactLpNumber {
             val exact = requireNotNull(BigFraction.ofDouble(value)) { "exact input must be finite" }
             return ExactLpNumber(exact, value.toRawBits(), integerOf(exact))
@@ -179,8 +197,11 @@ internal class ExactLpModel private constructor(
         require(n.toLong() + m == numVars.toLong() && rightHandSide.size == m && objective.size == numVars)
         if (validateMatrix) {
             for (column in this.matrix) {
-                require(column.all { it.row in 0 until m })
-                require(column.zipWithNext().all { (a, b) -> a.row < b.row })
+                var previous = -1
+                for (entry in column) {
+                    require(entry.row in 0 until m && entry.row > previous)
+                    previous = entry.row
+                }
             }
             require((n until numVars).all { this.columns[it].origin.value.isZero }) { "slack origins must be zero" }
         }
