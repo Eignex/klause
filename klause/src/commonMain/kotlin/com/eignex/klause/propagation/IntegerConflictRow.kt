@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
@@ -227,6 +228,7 @@ internal class IntegerConflictRow private constructor(
             for (coefficient in terms.values) {
                 budget?.scalar(divisor, coefficient)
                 divisor = divisor.gcd(coefficient.abs())
+                if (divisor == BIG_ONE) break
             }
             val height = Int.SIZE_BITS - terms.size.countLeadingZeroBits()
             budget?.spend(work = terms.size.toLong() * height, bytes = terms.size.toLong() * 16)
@@ -234,9 +236,15 @@ internal class IntegerConflictRow private constructor(
             variables.sort()
             val coefficients = Array(variables.size) {
                 val coefficient = terms.getValue(variables[it])
-                budget?.scalar(coefficient, divisor)
-                coefficient / divisor
+                if (divisor == BIG_ONE) {
+                    budget?.scalar(coefficient, BIG_ONE)
+                    coefficient
+                } else {
+                    budget?.scalar(coefficient, divisor)
+                    coefficient / divisor
+                }
             }
+            if (divisor == BIG_ONE) return IntegerConflictRow(variables, coefficients, bound, guard)
             budget?.scalar(bound, divisor)
             return IntegerConflictRow(variables, coefficients, floorDiv(bound, divisor), guard)
         }
@@ -248,8 +256,13 @@ internal class IntegerConflictRow private constructor(
             for (index in 0 until size) {
                 budget?.scalar(divisor, coefficients[index])
                 divisor = divisor.gcd(coefficients[index].abs())
+                if (divisor == BIG_ONE) break
             }
             budget?.spend(work = size.toLong(), bytes = size.toLong() * 16)
+            if (divisor == BIG_ONE) {
+                for (index in 0 until size) budget?.scalar(coefficients[index], BIG_ONE)
+                return IntegerConflictRow(variables.copyOf(size), coefficients.copyOfRange(0, size), bound, guard)
+            }
             val normalized = Array(size) {
                 budget?.scalar(coefficients[it], divisor)
                 coefficients[it] / divisor
