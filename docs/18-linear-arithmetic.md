@@ -436,6 +436,8 @@ tries to turn that float point into an exact witness:
 4. Complete the free real coordinates per connected component, grouped by shared
    rows, through an exact point from the [source LP owner](20-linear-programming.md).
    Residuals use sparse preparation and the same certification policy and caller allowance.
+   Strict residuals maximize a private common margin bounded between zero and one;
+   only a positive exact margin supplies a point, and source publication omits it.
    Recovery retains the input bounds of 10,000 real columns and 100,000 rows;
    sparse preparation applies the shared work, allocation and scalar guards.
 

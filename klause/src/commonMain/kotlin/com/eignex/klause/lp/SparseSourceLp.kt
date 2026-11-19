@@ -40,6 +40,7 @@ internal data class SparseSourceLpPreparation(
 // Preparation admits sparse authority, independently of exact-primal reconstruction and basis fill.
 internal class SparseSourceLp private constructor(
     val model: ExactLpModel,
+    val pointMarginColumn: Int?,
     private val rowSupport: List<IntArray>,
     private val columnSupport: List<IntArray>,
     val sourceRowCount: Int,
@@ -115,6 +116,7 @@ internal class SparseSourceLp private constructor(
             limits: SparseSourceLpLimits,
             cancellation: ExecutionControl = ExecutionControl.Never,
             rowPolicy: SparseSourceLpRowPolicy = SparseSourceLpRowPolicy.IDENTITY,
+            pointMargin: Boolean = false,
         ): SparseSourceLpPreparation {
             val meter = SparsePreparationMeter(limits, cancellation)
             var inputEntries = 0L
@@ -124,23 +126,44 @@ internal class SparseSourceLp private constructor(
                 SparseSourceLpMetrics(inputEntries, emittedEntries, meter.bits, meter.work, meter.allocation),
             )
             if (!meter.reserve(1L, 0L)) return result()
-            if (columns.size != costs.size || columns.size.toLong() + rows.size > Int.MAX_VALUE) {
+            var strict = false
+            if (pointMargin) for (row in rows) {
+                if (!meter.reserve(1L, 0L)) return result()
+                if (row.strict) {
+                    strict = true
+                    break
+                }
+            }
+            val marginColumn = columns.size.takeIf { strict }
+            val structuralColumns = columns.size.toLong() + if (marginColumn == null) 0L else 1L
+            if (columns.size != costs.size || structuralColumns + rows.size > Int.MAX_VALUE) {
                 meter.decline = SparseSourceLpDecline.SHAPE
                 return result()
             }
             // Includes the owned CSC, adjacency, vector and constructor-copy reservations. Exact payload is
             // reserved per scalar below; this is modeled preparation storage, not measured JVM allocation.
-            val dimension = columns.size.toLong() + rows.size
+            val dimension = structuralColumns + rows.size
             if (!meter.reserve(dimension * 8L + 1L, dimension * 256L + 1024L) ||
                 !meter.number(constant)
             ) return result()
+            if (pointMargin && !constant.isZero) {
+                meter.decline = SparseSourceLpDecline.SHAPE
+                return result()
+            }
             for (column in columns.indices) {
                 val descriptor = columns[column]
                 if (!meter.number(costs[column]) || !meter.number(descriptor.origin.value) ||
                     descriptor.bounds.lower?.let { !meter.side(it) } == true ||
                     descriptor.bounds.upper?.let { !meter.side(it) } == true
                 ) return result()
+                if (pointMargin && !costs[column].isZero) {
+                    meter.decline = SparseSourceLpDecline.SHAPE
+                    return result()
+                }
             }
+            if (marginColumn != null &&
+                (!meter.number(BigFraction.ONE) || !meter.number(BigFraction.MINUS_ONE))
+            ) return result()
             for (row in rows) {
                 if (!meter.number(row.rhs)) return result()
                 for (entry in row.columns.indices) {
@@ -167,10 +190,11 @@ internal class SparseSourceLp private constructor(
                 sourceRow += if (paired) 2 else 1
             }
             val emittedRows = primaryRows.map { rows[it] }
-            val matrix = List(columns.size) { ArrayList<ExactLpEntry>() }
+            val matrix = List(structuralColumns.toInt()) { ArrayList<ExactLpEntry>() }
             val rowSupport = ArrayList<IntArray>(emittedRows.size)
             val rhs = ArrayList<ExactLpNumber>(emittedRows.size)
             val zero = ExactLpNumber.of(0L)
+            val one = ExactLpNumber.of(1L)
             for (id in emittedRows.indices) {
                 if (!meter.poll()) return result()
                 val row = emittedRows[id]
@@ -185,19 +209,29 @@ internal class SparseSourceLp private constructor(
                     matrix[column].add(ExactLpEntry(id, ExactLpNumber.of(coefficient)))
                     support += column
                 }
+                if (marginColumn != null && row.strict) {
+                    if (!meter.reserve(4L, 192L)) return result()
+                    emittedEntries++
+                    matrix[marginColumn].add(ExactLpEntry(id, one))
+                    support += marginColumn
+                }
                 rowSupport += support.toIntArray()
                 rhs += ExactLpNumber.of(row.rhs)
             }
             val model = ExactLpModel(
                 matrix, rhs,
-                columns + emittedRows.mapIndexed { id, row ->
+                columns + (if (marginColumn == null) emptyList() else listOf(
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), integral = false),
+                )) + emittedRows.mapIndexed { id, row ->
                     // Opposing closed inequalities share a fixed logical column; either multiplier sign
                     // lifts to one of the original source rows.
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero, row.strict),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero, row.strict && marginColumn == null),
                         ExactLpSide(zero).takeIf { oppositeRows[id] >= 0 }), integral = false)
                 },
-                emittedRows.map { ExactLpRow(strict = it.strict) },
-                ExactLpObjective(costs.map(ExactLpNumber::of) + List(emittedRows.size) { zero },
+                emittedRows.map { ExactLpRow(strict = it.strict && marginColumn == null) },
+                ExactLpObjective(costs.map(ExactLpNumber::of) +
+                    (if (marginColumn == null) emptyList() else listOf(ExactLpNumber.of(-1L))) +
+                    List(emittedRows.size) { zero },
                     ExactLpNumber.of(constant)),
             )
             if (!meter.poll()) return result()
@@ -205,7 +239,7 @@ internal class SparseSourceLp private constructor(
                 column.map { it.row }.toIntArray()
             }
             if (!meter.poll()) return result()
-            return result(SparseSourceLp(model, rowSupport, adjacency, rows.size,
+            return result(SparseSourceLp(model, marginColumn, rowSupport, adjacency, rows.size,
                 primaryRows.toIntArray(), oppositeRows.toIntArray()))
         }
 
@@ -216,8 +250,9 @@ internal class SparseSourceLp private constructor(
             constant: BigFraction,
             policy: SparseSourceLpPolicy,
             cancellation: ExecutionControl = ExecutionControl.Never,
+            pointMargin: Boolean = false,
         ): SparseSourceLpPreparation = prepare(rows, columns, costs, constant, policy.preparation,
-            cancellation, policy.rowPolicy)
+            cancellation, policy.rowPolicy, pointMargin)
     }
 }
 

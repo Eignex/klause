@@ -12,6 +12,21 @@ import kotlin.test.assertTrue
 
 class SourceLpPointTest {
     @Test
+    fun `strict residual chains should complete beyond tableau cell admission`() {
+        val columns = 8
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
+        ) + List(columns - 1) {
+            ExactRationalInequality(intArrayOf(it, it + 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)
+        } + List(252) { exactColumnUpper(columns - 1, BigFraction.ONE) }
+
+        val point = assertNotNull(sourceLpPoint(rows, columns, SourceLpBudget(), ExecutionControl.Never))
+
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
     fun `unsafe sparse dimensions should decline before allocating column metadata`() {
         val budget = SourceLpBudget()
 
@@ -31,6 +46,7 @@ class SourceLpPointTest {
 
         val point = assertNotNull(sourceLpPoint(rows, 1, SourceLpBudget(), ExecutionControl.Never))
 
+        assertEquals(1, point.size)
         assertTrue(point.satisfiesSourceRows(rows))
     }
 

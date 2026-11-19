@@ -25,7 +25,7 @@ internal fun sourceLpPoint(
     val policy = SparseSourceLpPolicy()
     return budget.runSparse(cancellation, { token ->
         SparseSourceLp.prepare(rows, ConstantList(variables, ExactLpColumn(ExactLpBounds(), integral = false)),
-            ConstantList(variables, BigFraction.ZERO), BigFraction.ZERO, policy, token)
+            ConstantList(variables, BigFraction.ZERO), BigFraction.ZERO, policy, token, pointMargin = true)
     }) { prepared, token ->
         val observer = object : LpCertificationObserver {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
@@ -49,9 +49,11 @@ internal fun sourceLpPoint(
         val owner = LpScopedSolver(LpExactState(prepared.model), token, context = budget.context,
             iterationLimit = policy.floating.iterations, workLimit = policy.floating.work)
         try {
+            val margin = prepared.pointMarginColumn
             val result = owner.solve(token = token, observer = observer, sparsePointRecovery = true,
-                claim = LpClaim.FEASIBLE_COMPLETION)
+                claim = if (margin == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM)
             val primal = result?.exactPrimal ?: return@runSparse null
+            if (margin != null && primal.getOrNull(margin)?.signum() != 1) return@runSparse null
             val validationWork = variables.toLong() + rows.sumOf { it.columns.size.toLong() + 1L }
             token.charge(validationWork)
             budget.observe(refinement = validationWork)
