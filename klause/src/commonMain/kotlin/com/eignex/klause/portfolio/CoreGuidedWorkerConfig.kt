@@ -29,8 +29,8 @@ internal class CoreGuidedWorkerConfig(
     override fun withCoreRefinement(mode: CoreRefinementMode): CoreGuidedWorkerConfig =
         CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, edit)
 
-    internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, edit)
+    internal fun withActiveTimeLimit(uniformCosts: Boolean): CoreGuidedWorkerConfig =
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, if (uniformCosts) 12_000L else 2_000L, coreRefinement, edit)
 
     internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
         CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, edit)
@@ -81,3 +81,16 @@ internal class CoreGuidedWorkerConfig(
         return worker
     }
 }
+
+internal val LinearObjective.uniformCosts: Boolean
+    get() {
+        var magnitude = 0L
+        for (costs in arrayOf(boolWeightValues, intCoefficientValues)) {
+            for (cost in costs) {
+                if (cost == 0L) continue
+                val size = if (cost < 0L) -cost else cost
+                if (magnitude == 0L) magnitude = size else if (size != magnitude) return false
+            }
+        }
+        return magnitude != 0L
+    }
