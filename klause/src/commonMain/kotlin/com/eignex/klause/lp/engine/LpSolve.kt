@@ -444,6 +444,7 @@ private fun certifyLpResultWithin(
         result,
         continuationLimits,
         cancellation,
+        continuationCache,
     ).also { capturedTarget = it }
     if (state != null) {
         if (stopped()) return CertifiedLpResult(null, null, null, null, null, false, { null })
