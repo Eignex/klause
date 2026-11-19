@@ -16,6 +16,36 @@ import kotlin.time.TestTimeSource
 
 class PortfolioProofTest {
     @Test
+    fun `an improvement only sibling should not delay funded core coverage`() {
+        var completeVisits = 0
+        var variantVisits = 0
+        var coreVisits = 0
+        val completeBase = ScriptedSearch({ it == 0 }) { completeVisits++ }
+        val complete = object : ResumableSearch by completeBase {
+            override val work: Long get() = completeBase.work + if (completeVisits > 0) 100_000L else 0L
+        }
+        val variant = ScriptedSearch({ false }) { variantVisits++ }
+        val coreBase = ScriptedSearch({ false }) { coreVisits++ }
+        val core = object : ResumableSearch by coreBase {
+            override val stats: SolveStats get() = SolveStats(coreGuided = CoreGuidedStats(continuationGrants = 1L))
+        }
+        val workers = listOf(trackingWorker("complete", 0, complete),
+            trackingWorker("variant", 1, variant).also { it.improvementOnly = true },
+            trackingWorker("core", 2, core).also {
+                it.auxiliaryProof = true
+                it.improvementOnly = true
+                it.retainInitialProofCoverage = true
+            })
+
+        Portfolio.thompson(workers, seed = 0, maxSliceWork = 20_000L, reseedStaleThreshold = 0).use {
+            it.minimize(ExecutionControl { coreVisits >= 3 || variantVisits >= 8 || completeVisits >= 8 })
+        }
+
+        assertEquals(3, coreVisits)
+        assertEquals(1, variantVisits)
+    }
+
+    @Test
     fun `retiring a funded core should restore ordinary work growth`() {
         val offers = ArrayList<Long>()
         var coreVisits = 0
@@ -140,7 +170,8 @@ class PortfolioProofTest {
 
             assertEquals(3, offers.size)
             assertEquals(7L, offers.first().second)
-            assertTrue(offers.drop(1).all { it.first <= 2_000L })
+            assertTrue(offers.drop(1).all { it.first <= 60_000L })
+            assertTrue(offers.drop(1).any { it.first > 2_000L })
             assertTrue(offers.drop(1).all { it.second in minOf(28L, maximum)..maximum })
             assertTrue(coverage.isNotEmpty())
             assertTrue(coverage.all { it == 7L })
