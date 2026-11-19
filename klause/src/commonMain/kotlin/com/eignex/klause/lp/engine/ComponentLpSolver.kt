@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BigFraction
@@ -184,12 +185,7 @@ internal class ComponentLpSolver(
         val nextParts = ArrayList<LpNeighborhood>(parts.size)
         for (part in parts) {
             if (token()) return false
-            fun contains(column: Int): Boolean = if (column < model.n) {
-                part.cols.binarySearch(column) >= 0
-            } else {
-                part.rows.binarySearch(column - model.n) >= 0
-            }
-            val affected = changes == null || changes.bounds.any(::contains) || changes.costs.any(::contains)
+            val affected = changes == null || part.readsScalarChange(changes, model.n)
             nextParts += if (affected) part.rebindExact(state, token) ?: return false else part
         }
         if (token()) return false
@@ -969,6 +965,15 @@ internal data class LpComponentShape(
     val componentCells: Long,
     val modeledBytes: Long,
 )
+
+private fun LpNeighborhood.readsScalarChange(changes: LpProjectedScalarChanges, columns: Int): Boolean {
+    fun contains(column: Int): Boolean = if (column < columns) {
+        cols.binarySearchInt(column) >= 0
+    } else {
+        rows.binarySearchInt(column - columns) >= 0
+    }
+    return changes.bounds.any(::contains) || changes.costs.any(::contains)
+}
 
 // Structural decisions stay fixed for an owner so scalar edits can retain a declined inspection.
 internal fun interface LpComponentAdmission {
