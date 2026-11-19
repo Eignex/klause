@@ -3,6 +3,7 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -846,6 +847,23 @@ class SparseLpAdmissionTest {
             SolveStatsSink("explicit-objective-corner")).use {
             assertTrue(it.sparseTrialActive)
         }
+    }
+
+    @Test
+    fun `LP corner screening ignores propagator only symmetry restrictions`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
+            SymmetryHandling(listOf(intArrayOf(1, 0) to intArrayOf())),
+        ), settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val sink = SolveStatsSink("symmetric-objective-corner")
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpConfig = LpConfig.AUTO), sink).use {
+            assertFalse(it.sparseTrialActive)
+        }
+
+        assertEquals(1L, sink.snapshot().lp.sparseTrial["DeclineObjectiveCorner"])
+        assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
     }
 
     @Test

@@ -154,6 +154,8 @@ private suspend fun SequenceScope<Unit>.objectiveCornerSatisfiesSource(
             work++
             if (work > allowance || cancellation()) return false
             if (index % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            // This propagator-only restriction emits no LP row and supplies no point authority here.
+            if (factor is SymmetryHandling) continue
             val compact = factor as? Linear
             val exact = factor as? ExactLinear
             if (compact == null && exact == null) return false

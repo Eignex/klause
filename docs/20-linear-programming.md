@@ -350,8 +350,10 @@ The automatic root lifetime is capped by that total forecast, with the existing
 initial query quantum as a minimum and the caller and sparse ceilings as maxima.
 An underestimated query stops within that cap; ordinary node funding is separate.
 An exact scan declines speculative setup when the objective-favorable declared
-integer corner satisfies every supported source row. Overflow leaves that scan
-undecided. Its bounded work spends source preparation and publishes no point or bound.
+integer corner satisfies every supported linear row, so the emitted LP cannot
+improve the box objective bound. Propagator-only symmetry restrictions emit no LP
+rows. Overflow leaves that scan undecided. Its bounded work spends source preparation
+and publishes no CP feasibility claim, point or bound.
 Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
 techniques and caller work policies. Explicit cut and relaxation strategies retain
 their ordinary route. Automatic sparse admission supplies no additional portfolio slot or slice.
