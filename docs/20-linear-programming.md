@@ -373,7 +373,8 @@ and target reset, reseed and engine close release the preferences.
 
 The independent `lp-component-reuse` setting rejects small or oversized owners before
 partition allocation, then admits numerical node ownership from the partition's size,
-tableau-size reduction and modeled private storage. Construction and declined inspection
+tableau-size reduction and modeled child-model storage. A finite shared basis-entry
+limit is divided among the admitted children. Construction and declined inspection
 spend the containing LP grant separately from each adaptive numerical query. Owner
 preparation has a bounded atomic grant; search accounts any slice excess as work debt.
 A declined partition keeps the ordinary monolithic preparation limit, and scalar trail

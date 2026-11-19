@@ -960,9 +960,12 @@ internal data class LpComponentShape(
     val modeledBytes: Long,
 )
 
+// Structural decisions stay fixed for an owner so scalar edits can retain a declined inspection.
 internal fun interface LpComponentAdmission {
     fun accepts(shape: LpComponentShape): Boolean
     fun inspect(columns: Int, rows: Int, entries: Int): Boolean = true
+    val basisEntryLimit: Long get() = Long.MAX_VALUE
+    val basisWorkLimit: Long get() = Long.MAX_VALUE
 }
 
 private fun LpModel.componentRestrictions(

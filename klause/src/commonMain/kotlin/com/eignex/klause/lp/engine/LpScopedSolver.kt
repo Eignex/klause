@@ -517,7 +517,8 @@ internal class LpScopedSolver(
         val model = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return
         check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
         val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
-            allowance?.work ?: workLimit, null, 0.0, false, null, pricing,
+            allowance?.work ?: workLimit, null, 0.0, false, null,
+            if (current is ComponentLpSolverCapability) componentPricing() else pricing,
             if (componentAdmission == null) componentSplit else current is ComponentLpSolverCapability,
             route, allowance != null, allowance?.iterations ?: iterationLimit, quantum, retainFundingStop,
             refactorUpdateLimit, trackDegeneracy) { current.continuationBasis(model) }
@@ -998,8 +999,13 @@ internal class LpScopedSolver(
         }
     }
 
+    private fun componentPricing(): LpPricingOptions = componentAdmission?.let {
+        pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, it.basisEntryLimit),
+            basisWorkLimit = minOf(pricing.basisWorkLimit, it.basisWorkLimit))
+    } ?: pricing
+
     private fun componentPricing(part: LpModel, columns: Int, rowOnlyRows: Int): LpPricingOptions =
-        pricing.componentShare(part.n, columns, rowOnlyRows)
+        componentPricing().componentShare(part.n, columns, rowOnlyRows)
 
     override fun close() {
         requireAvailable()

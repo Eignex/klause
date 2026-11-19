@@ -890,7 +890,8 @@ reuse or zero-cut result. Component count alone establishes no saved work or
 whole-source improvement.
 `param.lp-component-reuse=true|false` isolates cost-admitted numerical node reuse
 from component guidance and private rounding. Its admission observations retain
-the child count and modeled storage estimate in `lpPhase_COMPONENT_ADMISSION_*`.
+the child count, modeled child-model storage and shared basis-storage reservation
+in `lpPhase_COMPONENT_ADMISSION_*`; sums of reservations are not live memory peaks.
 `lpPhase_COMPONENT_LIFECYCLE_*` records child `SOLVED` and `REUSED` counts through
 the existing route ledger; numerical work, pivots and factors count actual solves.
 `SOLVED` counts invocations, including attempts that stop without a result.

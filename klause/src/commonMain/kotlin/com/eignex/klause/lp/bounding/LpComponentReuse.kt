@@ -13,6 +13,9 @@ internal fun componentReusePreparationWork(remaining: Long?): Long =
 
 internal val LpEngine.numericalComponentAdmission: LpComponentAdmission
     get() = object : LpComponentAdmission {
+        override val basisEntryLimit = 131_072L
+        override val basisWorkLimit = 8_000_000L
+
         override fun inspect(columns: Int, rows: Int, entries: Int): Boolean {
             val outcome = componentReuseInspection(columns, rows, entries) ?: return true
             sink.lp.observeComponentAdmission(outcome, 0, 0L)
@@ -21,7 +24,8 @@ internal val LpEngine.numericalComponentAdmission: LpComponentAdmission
 
         override fun accepts(shape: LpComponentShape): Boolean {
             val outcome = componentReuseAdmission(shape)
-            sink.lp.observeComponentAdmission(outcome, shape.blocks, shape.modeledBytes)
+            sink.lp.observeComponentAdmission(outcome, shape.blocks, shape.modeledBytes,
+                if (outcome == "ADMITTED") basisEntryLimit else 0L)
             return outcome == "ADMITTED"
         }
     }

@@ -40,14 +40,23 @@ class LpScopedSolverProgressTest {
         val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         for (admitted in listOf(false, true)) {
             val observed = ArrayList<Boolean>()
-            val context = LpSolveContext(onQuery = { observed += it.componentSplit })
+            val entries = ArrayList<Long>()
+            val context = LpSolveContext(onQuery = {
+                observed += it.componentSplit
+                entries += it.pricing.basisEntryLimit
+            })
+            val admission = object : LpComponentAdmission {
+                override fun accepts(shape: LpComponentShape): Boolean = admitted
+                override val basisEntryLimit = 32L
+            }
             LpScopedSolver(LpExactState(source), context = context,
-                componentSplit = true, componentAdmission = { admitted }).use { owner ->
+                componentSplit = true, componentAdmission = admission).use { owner ->
 
                 val solved = assertNotNull(owner.solveFloat())
 
                 assertEquals(admitted, solved.first is ComponentLpSolverCapability)
                 assertEquals(listOf(admitted), observed)
+                assertEquals(listOf(if (admitted) 32L else Long.MAX_VALUE), entries)
             }
         }
     }

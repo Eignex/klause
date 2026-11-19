@@ -167,10 +167,11 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
-    fun observeComponentAdmission(outcome: String, blocks: Int, modeledBytes: Long) {
+    fun observeComponentAdmission(outcome: String, blocks: Int, modeledBytes: Long, basisEntries: Long = 0L) {
         val key = "COMPONENT_ADMISSION_${probeRoute.name}"
         val delta = LpPhaseStats(calls = 1L, outcomes = mapOf(
             outcome to 1L, "BLOCKS_SUM" to blocks.toLong(), "MODELED_BYTES_SUM" to modeledBytes,
+            "BASIS_ENTRY_LIMIT_SUM" to basisEntries, "BASIS_RESERVED_BYTES_SUM" to 256L * basisEntries,
         ))
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
