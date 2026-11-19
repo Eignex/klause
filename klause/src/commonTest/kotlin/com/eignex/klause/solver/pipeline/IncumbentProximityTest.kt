@@ -2,6 +2,10 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.OptimalityTolerance
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.solver.Sample
@@ -22,6 +26,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IncumbentProximityTest : RuntimeInitializedTest() {
+    @Test
+    fun `small declared gaps should retain the coefficient improvement floor`() {
+        val column = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val semantics = SourceSemantics(SourceFormat.MPS, optimalityTolerance = OptimalityTolerance(
+            SemanticRational.of(bigIntOf(1), bigIntOf(10_000_000)))).resolve()
+        val source = SourceProofContext(SourceScope(SourceRevision("proximity-gap", "exact"),
+            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE)), setOf(column), emptyMap(),
+            mapOf(column to BigFraction.MINUS_ONE), semantics = semantics)
+        val center = Sample(booleanArrayOf(), longArrayOf(0))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+
+        val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ZERO,
+            SourceLpBudget(funding = funding), ExecutionControl.Never))
+
+        assertEquals(BigFraction.of(bigIntOf(-1), bigIntOf(1000)), query.premises.values.single().inequality.rhs)
+    }
+
+    @Test
+    fun `relative improvement should be independent of objective translation`() {
+        val column = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        for (constant in listOf(0L, 1_000_000L)) {
+            val source = SourceProofContext(SourceScope(SourceRevision("proximity-translation", "exact"),
+                objective = SourceObjective("cost", ObjectiveSense.MINIMIZE)), setOf(column), emptyMap(),
+                mapOf(column to BigFraction.ofLong(200)), BigFraction.ofLong(constant))
+            val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+
+            val query = assertNotNull(IncumbentProximity.prepare(source, Sample(booleanArrayOf(), longArrayOf(1)),
+                BigFraction.ofLong(200 + constant), SourceLpBudget(funding = funding), ExecutionControl.Never))
+
+            assertEquals(BigFraction.ofLong(198), query.premises.values.single().inequality.rhs)
+        }
+    }
+
     @Test
     fun `private distance should count binary changes while preserving receiving pins`() {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }

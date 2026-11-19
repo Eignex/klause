@@ -77,9 +77,13 @@ internal object IncumbentProximity {
             if (scale == null || magnitude < scale) scale = magnitude
         }
         val gap = source.semantics?.effective?.optimalityTolerance?.gapAllowance(cutoff)
-        val improvement = gap?.takeIf { it.signum() > 0 }
-            ?: (requireNotNull(scale) * BigFraction.of(BIG_ONE, bigIntOf(1000)))
         val originalConstant = if (maximize) source.objectiveConstant.negated() else source.objectiveConstant
+        val variableValue = cutoff - originalConstant
+        val magnitude = if (variableValue.signum() < 0) variableValue.negated() else variableValue
+        var improvement = requireNotNull(scale) * BigFraction.of(BIG_ONE, bigIntOf(1000))
+        val relative = magnitude * BigFraction.of(BIG_ONE, bigIntOf(100))
+        if (relative > improvement) improvement = relative
+        if (gap != null && gap > improvement) improvement = gap
         val target = cutoff - improvement - originalConstant
         if (target.num.magnitudeBitLength() + target.den.magnitudeBitLength() > 4096 || cancellation()) return null
         val premises = source.premises.toMutableMap()

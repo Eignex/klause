@@ -505,11 +505,15 @@ After importing a checked point, the numerical owner alternates its ordinary
 frontier consultations with a private proximity query inside the same turn offers.
 The frontier retains its tree, LP owner and global bounds. Both searches share one
 LP operation/work/allocation ledger and containing decision/check allowances.
+The private search visits center-side integer alternatives in depth order, keeping
+that advisory center separate from its feasible incumbents. The ordinary frontier
+retains its bound order.
 Private query progress supplies no root-fixing or learned-clause reward. A private
 witness passes original-source completion and the receiving frontier's checks
 before it can improve the source incumbent; private proofs never enter its coverage.
-A successful private query recenters on its checked improvement, while the frontier
-keeps the next consultation and all containing allowances stay cumulative.
+A private query retires as soon as it delivers a checked improvement. Improvements
+from either traversal recenter the private search, while the frontier keeps the next
+consultation and all containing allowances stay cumulative.
 
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
@@ -572,8 +576,9 @@ funding retain the connected two-integer start.
 Fixed binary companion repair instead searches proximity to a checked center with
 every integer and continuous residual free except for the source's original pins.
 Its private objective counts changed binary coordinates. A separate original-cost
-row requests improvement by the declared positive objective allowance, or by one
-thousandth of the smallest nonzero objective coefficient under an exact policy.
+row requests improvement by the largest of the declared positive objective allowance,
+one percent of the current variable objective magnitude, and one thousandth of the
+smallest nonzero objective coefficient.
 Source constants and maximization direction stay in that row. Preparation and
 native progress spend the existing query grants. Only a freshly source- and
 original-checked strict improvement can leave this search; its distance bounds,
