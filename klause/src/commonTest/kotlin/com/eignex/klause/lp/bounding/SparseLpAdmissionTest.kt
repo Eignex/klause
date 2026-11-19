@@ -277,6 +277,41 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `sparse root slices share one numerical continuation grant`() {
+        val problem = Problem(0, 32, Array(32) { IntDomain(0, 1) },
+            List(31) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        for (numerical in listOf(false, true)) {
+            var queries = 0
+            var sliceEnd = Long.MAX_VALUE
+            lateinit var engine: LpEngine
+            val context = LpSolveContext(numericalDeductions = numerical, onQuery = { queries++ })
+            engine = LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
+                LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+                SolveStatsSink("sparse-sliced-continuation"), context,
+                nodeWorkAllowance = {
+                    if (sliceEnd == Long.MAX_VALUE) null else (sliceEnd - engine.totalSolveWork()).coerceAtLeast(0L)
+                })
+            engine.use {
+                assertTrue(it.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+                val relaxer = requireNotNull(it.lpRelaxer)
+                val token = ExecutionControl { it.totalSolveWork() >= sliceEnd }
+
+                repeat(2) {
+                    sliceEnd = engine.totalSolveWork() + 500L
+                    engine.rootLpRelaxationBound(relaxer, emptyList(), token)
+                }
+                sliceEnd = engine.totalSolveWork() + 1_000_000L
+                val lower = engine.rootLpRelaxationBound(relaxer, emptyList(), token)
+
+                assertEquals(16.0, lower)
+                assertEquals(1, queries)
+                assertTrue(engine.totalSolveWork() <= SPARSE_LP_MAX_WORK)
+            }
+        }
+    }
+
+    @Test
     fun `checked paused bounds survive a later root consultation stop`() {
         val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },

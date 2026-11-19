@@ -337,6 +337,10 @@ and root scopes. The owner advances its floating cursor in adaptive work quanta;
 pause publishes nothing and authority edits discard the cursor. Completed floating
 results enter the exact bound check within a 16 MiB checking reservation;
 exhaustion, cancellation or refusal withholds the root bound.
+The retained owner's preparation and solve lifetime use the remaining cumulative
+root and LP grants. A worker's current slice offer limits only the numerical query
+quantum; resuming a cursor keeps its original lifetime grant and charges each slice's
+actual work to the same ledger.
 
 Sparse-trial preparation is capped at eight million modeled work units; root and
 node LP work stop at 150 million units or the containing invocation's smaller
