@@ -398,9 +398,10 @@ Disabled directional gains collect no history or retained model scope and charge
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
 The same recent directional estimates can order the selected variable's two
-existing adjacent alternatives. Without a finite cutoff it visits the lower
-predicted gain first to seek an incumbent; with a cutoff it visits the higher
-predicted gain first to seek early pruning. Predicted gains carry no pruning authority.
+existing adjacent alternatives. It visits the lower predicted gain first to seek
+an incumbent, unless a predicted child gain reaches the current objective gap;
+then it visits the higher predicted gain first to seek early pruning.
+Predicted gains carry no pruning authority.
 Both directions need two in-age observations; equal or unavailable
 estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
 creates no LP query, charges constant comparison and commitment work to the LP
