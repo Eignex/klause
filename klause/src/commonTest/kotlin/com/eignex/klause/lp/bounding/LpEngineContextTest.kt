@@ -30,6 +30,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 
 class LpEngineContextTest {
     private val decline = LpCertificationPolicy { _, _ -> false }
@@ -282,7 +283,7 @@ class LpEngineContextTest {
             val sink = SolveStatsSink("component-funding-decline")
             LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
                 LpParams(lpPlan = LpPlan(bounding = true, componentReuse = reuse,
-                    probe = false, rootCutHarvest = false), solveBudgetMillis = 10_000L),
+                    probe = false, rootCutHarvest = false), cancellation = ExecutionControl.after(1.hours)),
                 sink, LpSolveContext(factory, decline)).use { engine ->
                 assertFalse(engine.pruneNode(PropagationSession(problem), 1.5, -1, true))
             }

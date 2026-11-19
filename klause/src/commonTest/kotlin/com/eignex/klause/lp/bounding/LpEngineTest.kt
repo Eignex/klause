@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Element
@@ -43,6 +45,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 
 class LpEngineTest {
     @Test
@@ -59,8 +62,10 @@ class LpEngineTest {
         val sink = SolveStatsSink("automatic-numerical-reuse")
         var offeredWork = 1L
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
-            LpParams(lpPlan = LpPlan(bounding = true,
-                probe = false, cuts = false, rootCutHarvest = false)), sink, LpSolveContext(factory),
+            BacktrackParams(lpPlan = LpPlan(bounding = true,
+                probe = false, cuts = false, rootCutHarvest = false), lpConfig = null,
+                nodeBudget = NodeBudget(10_000L), cancellation = ExecutionControl.after(1.hours)).lpParams(),
+            sink, LpSolveContext(factory),
             nodeWorkAllowance = { offeredWork }).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)

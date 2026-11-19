@@ -8,8 +8,18 @@ private const val MAX_COMPONENT_BYTES = 16L * 1024 * 1024
 private const val MAX_COMPONENTS = 1024
 private const val MAX_COMPONENT_PREPARATION_WORK = 16_000_000L
 
-internal fun componentReuseFundingAvailable(allowance: Long?): Boolean =
-    allowance == null || allowance / 4L >= MAX_COMPONENT_PREPARATION_WORK
+internal fun componentReuseFundingAvailable(
+    allowance: Long?,
+    horizon: Long? = null,
+    deadlineBounded: Boolean = false,
+): Boolean {
+    val available = when {
+        allowance == null -> horizon
+        horizon == null -> allowance
+        else -> minOf(allowance, horizon)
+    }
+    return if (available == null) !deadlineBounded else available / 4L >= MAX_COMPONENT_PREPARATION_WORK
+}
 
 internal fun componentReusePreparationWork(remaining: Long?): Long =
     minOf(MAX_COMPONENT_PREPARATION_WORK, remaining?.coerceAtLeast(1L) ?: MAX_COMPONENT_PREPARATION_WORK)

@@ -11080,6 +11080,7 @@ final class com.eignex.klause.lp.bounding/LpConfig { // com.eignex.klause.lp.bou
 }
 
 final class com.eignex.klause.lp.bounding/LpParams { // com.eignex.klause.lp.bounding/LpParams|null[0]
+    constructor <init>() // com.eignex.klause.lp.bounding/LpParams.<init>|<init>(){}[0]
     constructor <init>(com.eignex.klause.lp.bounding/LpPlan = ..., com.eignex.klause.lp.bounding/LpConfig? = ..., com.eignex.klause.util/ExecutionControl = ..., kotlin/Long? = ..., kotlin/Long? = ..., com.eignex.klause.lp.engine/LpZeroObjectivePricing = ...) // com.eignex.klause.lp.bounding/LpParams.<init>|<init>(com.eignex.klause.lp.bounding.LpPlan;com.eignex.klause.lp.bounding.LpConfig?;com.eignex.klause.util.ExecutionControl;kotlin.Long?;kotlin.Long?;com.eignex.klause.lp.engine.LpZeroObjectivePricing){}[0]
 
     final val cancellation // com.eignex.klause.lp.bounding/LpParams.cancellation|{}cancellation[0]

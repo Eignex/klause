@@ -284,7 +284,7 @@ internal class LpEngine(
                 params.solveBudgetMillis,
                 params.randomSeed,
                 params.zeroObjectivePricing,
-            ),
+            ).withComponentReuseWorkHorizon(params.componentReuseWorkHorizon),
             sink,
             solveContext,
             projections = projections,
@@ -963,7 +963,8 @@ internal class LpEngine(
         },
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
-    private val componentReuseFunded = componentReuseFundingAvailable(lpEffortGovernor.remainingWork())
+    private val componentReuseFunded = componentReuseFundingAvailable(lpEffortGovernor.remainingWork(),
+        params.componentReuseWorkHorizon, params.cancellation.deadline() != null)
     private val automaticComponentReuse: Boolean get() = params.lpPlan.componentReuse && componentReuseFunded
     private var componentFundingDeclineObserved = false
 

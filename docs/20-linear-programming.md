@@ -376,8 +376,12 @@ column expressions, global premises and source definitions while owning their ac
 premises and row-parent mappings. Source identities and epochs keep their existing scope.
 
 The default `lp-component-reuse` setting requires its bounded owner setup to fit
-within a quarter of the worker's total LP work allowance. This funding decision is
-fixed for that worker; a decline keeps its ordinary preparation and query policies.
+within a quarter of the worker's LP work horizon. A remaining node quota supplies
+a deterministic horizon through the per-node LP effort policy; this hint grants no
+work. A cumulative LP allowance narrows it. Deadline-bound workers with neither
+decline component retention. Without a supplied LP horizon or a deadline, retention
+can use its bounded atomic grant. The funding decision is fixed for that worker;
+a decline keeps its ordinary preparation and query policies.
 Funded workers reject small or oversized owners before
 partition allocation, then admits numerical node ownership from the partition's size,
 tableau-size reduction and modeled child-model storage. A finite shared basis-entry

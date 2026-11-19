@@ -14,6 +14,9 @@ class LpComponentReuseTest {
         assertTrue(componentReuseFundingAvailable(64_000_000L))
         assertFalse(componentReuseFundingAvailable(63_999_999L))
         assertFalse(componentReuseFundingAvailable(0L))
+        assertFalse(componentReuseFundingAvailable(null, deadlineBounded = true))
+        assertTrue(componentReuseFundingAvailable(null, 64_000_000L, deadlineBounded = true))
+        assertFalse(componentReuseFundingAvailable(Long.MAX_VALUE, 63_999_999L, deadlineBounded = true))
     }
 
     @Test
