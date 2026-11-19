@@ -396,6 +396,11 @@ completed clause fallback; containing interruption withholds unfinished analysis
 Row width, decision depth, derivation length and retained-row count have no separate
 fixed limits. Retained rows use ordinary learned-store retention.
 
+Unsupported seed projection kinds keep their completed clausal analysis without
+constructing integer discovery state. A box reduction whose degree already covers
+every coefficient and needs no rounding retains its normalized row without rebuilding
+term storage.
+
 Each combination must remain conflicting. A retained row must propagate against the
 session's historical domains at its first-UIP clause's native backjump and at the
 mapped shared target, preserving clausal backjump selection. The raw assertion target
@@ -447,6 +452,13 @@ a satisfied endpoint literal cannot discharge the row or certify a root contradi
 A rolling capture can focus on the first admitted integer or PB row, retaining its
 derivation and later consumers inside the fixed event and word allowances.
 
+Single-core finite source execution can attach a native-session observer through
+the ordinary portfolio factories. The hook wraps each selected recipe's selector
+notification, preserving its fresh selector, choices and other notifications. It
+identifies the worker and exposes its actual session before branching, including
+replacement sessions. Observation does not select a recipe or grant source authority;
+its work spends the containing invocation allowance.
+
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction: seed and fallback literals, integer
 endpoints and historical row domains, signed guards, native and shared targets,
@@ -458,6 +470,10 @@ arithmetic value outside its signed-word event format, reads
 existing state without reconstructing reasons or running propagation, and supplies no
 proof or source-mapping authority; an incomplete trace cannot establish exhaustive
 applicability.
+
+Successful integer cancellation records the selected variable, source factor,
+historical deduction position and whether the reason needed mixed-integer rounding.
+These choices bind a long derivation without guessing its pivots from the final row.
 
 ## Learned-clause retention
 

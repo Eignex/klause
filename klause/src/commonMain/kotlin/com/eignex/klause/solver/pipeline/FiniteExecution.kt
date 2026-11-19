@@ -19,6 +19,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.effortStats
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.encodingPreparationScope
@@ -358,6 +359,7 @@ internal fun FinitePipeline.solve(
     onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
 ): FiniteSolveResult {
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == request.lpSolveContext) {
         "custom LP dependencies require the fixed finite route"
@@ -540,6 +542,7 @@ internal fun FinitePipeline.solve(
             onPortfolioLpQuery = onPortfolioLpQuery,
             onPortfolioGuidance = onPortfolioGuidance,
             onPortfolioJointRepair = onPortfolioJointRepair,
+            onPortfolioSession = onPortfolioSession,
             toleranceCheck = sourceCheck?.let { check ->
                 FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
                     (check as? FiniteSourceAcceptance)?.objective?.let { score ->

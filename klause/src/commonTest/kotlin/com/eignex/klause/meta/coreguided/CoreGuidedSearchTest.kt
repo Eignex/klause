@@ -52,6 +52,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
@@ -403,6 +404,33 @@ class CoreGuidedSearchTest {
             assertEquals(0L, search.stats.coreGuided.continuationGrants)
             search.close()
         }
+    }
+
+    @Test
+    fun `a submillisecond active remainder should retire instead of pausing`() {
+        val clock = TestTimeSource()
+        val params = BacktrackParams(componentFactory = {
+            listOf(object : PreparingSearchComponent {
+                override fun prepareInitialization(context: SearchContext): Iterator<ComponentResult?> = sequence {
+                    clock += 1_999_500.microseconds
+                    yield(ComponentResult.Consistent)
+                }.iterator()
+            })
+        })
+        val search = CoreGuidedSearch(
+            Problem(1, 0, emptyArray(), emptyArray()).bake(),
+            LinearObjective(longArrayOf(1)),
+            params,
+            maximumMillis = 2_000L,
+            timeSource = clock,
+        )
+        assertNull(search.runSlice(ExecutionControl.Never, 1_000L, -1L) { error("paused query") })
+
+        val result = search.use {
+            it.runSlice(ExecutionControl.Never, 1_000L, -1L) { error("expired active allowance") }
+        }
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
     }
 
     @Test
