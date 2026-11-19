@@ -366,6 +366,12 @@ results before rounding. Numerical work, checking and source projection spend th
 same cumulative allowance. Only the identical source-root model and exact state
 qualify; later CP assertions supply no global bound. Search publishes accepted
 bounds to its objective floor and retains them in its terminal bound.
+With a checked bound and a positive decision allowance, a sliced monolithic finite
+worker can enter discrete search before its root numerical query completes.
+The handoff retires the unfinished cursor and skips further root consultations for
+that search binding; the accepted global bound remains available.
+Completed-point rounding, component-owned plans and workers without a decision
+allowance keep their existing root consultation paths.
 
 Sparse-trial preparation is capped at eight million modeled work units; root and
 node LP work stop at 150 million units or the containing invocation's smaller

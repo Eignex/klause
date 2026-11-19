@@ -176,6 +176,7 @@ internal class LpEngine(
     private val requestedPlan = params0.lpPlan
     internal var sparseTrialActive = false
         private set
+    private var rootBoundHandedOff = false
     private var admittedSourceLayout: LpRelaxation? = null
     private val sparseTrialRequested = params0.lpConfig?.resolved(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
@@ -196,6 +197,17 @@ internal class LpEngine(
             field = value
         }
     internal var rootRoundingInterrupted: Boolean = false
+    internal fun handoffRootBoundSearch() {
+        rootBoundHandedOff = true
+        rootRoundingInterrupted = false
+        rootRoundingWarmStart = null
+        propagator.releaseSolver()
+    }
+
+    internal fun resetRootBoundSearch() {
+        rootBoundHandedOff = false
+    }
+
     internal val rootRoundingQueryPaused: Boolean
         get() {
             val guidance = rootRoundingWarmStart ?: return false
@@ -1735,6 +1747,7 @@ internal class LpEngine(
         ): Boolean {
             val lpRelaxerL = lpRelaxer ?: return false
             if (lpEffortGovernor.allowanceSpent) return false
+            if (rootBoundHandedOff && session.decisionLevel == 0) return false
             if (sparseTrialActive && session.decisionLevel == 0 && retainedRootCumulativeWork() <= 0L) return false
             lpEffortGovernor.observeNode()
             if (!params.lpPlan.realResidual && (
