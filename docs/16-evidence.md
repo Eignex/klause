@@ -73,6 +73,11 @@ aggregate restrictions; coordinate and Boolean alternatives provide no aggregate
 assumption. Affine mapping declines aggregate restrictions without a proved
 integral image.
 
+Private query conditions also admit signed unit rows over at most 4,096 declared
+integers, for binary Hamming neighborhoods. Their terms spend the containing proof
+allowance and remain restrictions on that query. Aggregate coverage splits retain
+the 32-term limit; a neighborhood restriction supplies no global consequence.
+
 An active-linear refutation substitutes only established Boolean coefficients and
 uses rows with established Boolean guards and independently established integer
 pins. Its checker reconstructs that subset from the original source in the claimed

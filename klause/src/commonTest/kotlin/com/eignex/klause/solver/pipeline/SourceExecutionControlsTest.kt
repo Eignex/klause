@@ -1,13 +1,18 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
+import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.solver.result.TerminationReason
@@ -24,7 +29,54 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
-class SourceExecutionControlsTest {
+class SourceExecutionControlsTest : RuntimeInitializedTest() {
+    @Test
+    fun `ordinary numerical MPS reuse should preserve legacy finite scheduling controls`() {
+        val semantics = SourceSemantics(SourceFormat.MPS, NumericAuthority.DECIMAL_LITERALS,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE)).resolve()
+        val source = LinearSourceProblem(listOf(
+            LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+            LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))), semantics = semantics)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        for ((options, expected) in listOf(
+            emptyList<String>() to true,
+            listOf("source-incumbent-completion=false") to false,
+            listOf("source-incumbent-completion=true") to false,
+            listOf("companion-integers=true") to false,
+            listOf("companion-after-incumbent=true") to false,
+            listOf("companion-repair=adaptive") to false,
+            listOf("companion-admission=funded") to false,
+        )) {
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+
+            assertEquals(expected, request.companionIncumbentReuse)
+            assertEquals("source-incumbent-completion=true" in options, request.theory.sourceIncumbentCompletion)
+        }
+    }
+
+    @Test
+    fun `observer and cancellation copies should retain automatic companion reuse`() {
+        val semantics = SourceSemantics(SourceFormat.MPS, NumericAuthority.DECIMAL_LITERALS,
+            feasibilityTolerance = SourceTolerance(SemanticRational.ONE)).resolve()
+        val source = LinearSourceProblem(listOf(
+            LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+            LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))), semantics = semantics)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+
+        val request = SourceExecutionRequest(invocation, ExecutionOptions())
+            .withPortfolioLpQueryObserver { _, _, _ -> }
+            .withPortfolioGuidanceObserver { _, _ -> }
+            .withPortfolioJointRepairObserver { _, _, _ -> }
+            .withValidationCancellation(ExecutionControl.Never)
+
+        assertTrue(request.companionIncumbentReuse)
+        assertFalse(request.theory.sourceIncumbentCompletion)
+    }
+
     @Test
     fun `source binding should retain a shared live deadline when it is rearmed`() {
         val clock = TestTimeSource()
