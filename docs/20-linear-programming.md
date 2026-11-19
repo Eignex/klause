@@ -277,7 +277,8 @@ form.
 Polynomial adapters use `LinearEnvelopes` and `CertifiedEnvelopeLp` to assemble
 exact square and bilinear relaxations outside the engine. An owner retains its
 matrix for coordinate objectives and tangent additions inside one immutable query
-scope. Exact row certificates tighten its bounds before numerical solving. Row
+scope. A forward and reverse pass of exact row certificates tightens its bounds
+before numerical solving. Row
 addition retains exact state until a query needs a numerical owner. A coordinate
 direction without an endpoint that relaxes every inequality supplies no finite
 coordinate bound and needs no numerical objective query. A temporary

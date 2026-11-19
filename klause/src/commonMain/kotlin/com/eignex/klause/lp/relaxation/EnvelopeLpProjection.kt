@@ -29,7 +29,8 @@ internal fun projectEnvelopeRows(
         if (control()) throw LpProjectionStop()
     }
     try {
-        for ((index, row) in rows.withIndex()) {
+        for (index in rows.indices.asSequence() + rows.indices.reversed().asSequence()) {
+            val row = rows[index]
             control.charge(row.columns.size.toLong() + 1)
             if (control() || trail.state.conflict != null) break
             val state = trail.state
