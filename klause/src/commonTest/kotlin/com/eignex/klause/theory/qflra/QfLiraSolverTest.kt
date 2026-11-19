@@ -56,6 +56,32 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `prepared rows with shared coefficients should preserve distinct strict thresholds`() {
+        val source = Problem(3, intBounds = openBounds(0), factors = arrayOf(
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0),
+                LinearOp.LE, 1.0),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0),
+                LinearOp.GE, 2.0),
+            ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, -1.0),
+                LinearOp.LE, 2.0, strict = true),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
+        prepared.open().use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+
+            assertIs<SearchResult.Satisfied>(session.solve(3))
+        }
+    }
+
+    @Test
     fun `affine guard implications should use current bound premises after backtracking`() {
         for (strict in listOf(false, true)) {
             val source = Problem(3, 0, emptyArray(), arrayOf(

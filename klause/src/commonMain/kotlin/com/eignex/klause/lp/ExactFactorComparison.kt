@@ -132,6 +132,17 @@ internal fun LinearRow.exactComparison(
     booleanValue: (Int) -> Boolean,
 ): ExactComparison = exactForm(realColumns).comparison(truth, booleanValue)
 
+internal class ExactRowTerms(val coefficients: Map<Int, BigFraction>) {
+    val ordered = ExactOrderedTerms(coefficients)
+}
+
+internal class ExactRowTermPool {
+    private val terms = HashMap<Map<Int, BigFraction>, ExactRowTerms>()
+
+    fun captureOwned(coefficients: Map<Int, BigFraction>): ExactRowTerms =
+        terms.getOrPut(coefficients) { ExactRowTerms(coefficients) }
+}
+
 /**
  * A row's terms in exact rationals, read once, with the Booleans it carries left open: a Boolean term only
  * moves the right-hand side, and the activator only picks the operator, so a consumer that states the same
@@ -145,8 +156,8 @@ internal class ExactRowForm(
     private val relation: LinearOp,
     private val strict: Boolean,
     private val hasReals: Boolean,
+    private val ordered: ExactOrderedTerms,
 ) {
-    private val ordered = ExactOrderedTerms(terms)
     val hasBooleanTerms get() = booleanLiterals.isNotEmpty()
 
     fun sameNumericInputs(previous: List<BigFraction>, current: List<BigFraction>, visit: () -> Boolean): Boolean =
@@ -192,7 +203,7 @@ internal class ExactRowForm(
 }
 
 /** This row's [ExactRowForm] over the mixed columns, the first [realColumns] of them continuous. */
-internal fun LinearRow.exactForm(realColumns: Int): ExactRowForm {
+internal fun LinearRow.exactForm(realColumns: Int, pool: ExactRowTermPool? = null): ExactRowForm {
     val terms = HashMap<Int, BigFraction>()
     val booleanLiterals = ArrayList<Int>()
     val booleanCoefficients = ArrayList<BigFraction>()
@@ -223,14 +234,16 @@ internal fun LinearRow.exactForm(realColumns: Int): ExactRowForm {
             else -> terms.add(Term.realVar(reference), coefficient)
         }
     }
+    val captured = pool?.captureOwned(terms)
     return ExactRowForm(
-        terms,
+        captured?.coefficients ?: terms,
         rhs,
         booleanLiterals.toIntArray(),
         booleanCoefficients,
         relation,
         strict,
         hasReals = c is RealConstants || (0 until size).any { Term.isReal(ref(it)) },
+        ordered = captured?.ordered ?: ExactOrderedTerms(terms),
     )
 }
 
