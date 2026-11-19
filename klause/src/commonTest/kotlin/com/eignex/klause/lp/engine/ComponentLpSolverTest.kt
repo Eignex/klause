@@ -76,6 +76,36 @@ class ComponentLpSolverTest {
     }
 
     @Test
+    fun `throwing preparation without a construction report should retain its reserved charge`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+
+            assertFailsWith<IllegalStateException> {
+                owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
+                    val child = newPersistentLpSolver(model, cancellation = token, workLimit = work)
+                    object : PersistentLpSolver by child {
+                        override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? =
+                            error("preparation failed")
+                    }
+                }
+            }
+
+            assertEquals(0L, owner.lastReservedConstructionWork)
+        }
+    }
+
+    @Test
     fun `cancelled joining preparation should retain the original collection`() {
         val builder = LpBuilder()
         repeat(3) {
@@ -147,6 +177,51 @@ class ComponentLpSolverTest {
             assertTrue(charged in 1L..3L)
             assertSame(state, raw.exactState)
             assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+        }
+    }
+
+    @Test
+    fun `later staging exhaustion should close earlier replacements and retain the original collection`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            repeat(2) { column ->
+                assertTrue(next.append(LpScopedRow(3L + column, listOf(column to ExactLpNumber.of(-1L)),
+                    ExactLpNumber.of(-3L), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+            }
+            var constructed = 0
+            var closed = 0
+
+            val accepted = owner.appendLocalRows(next.state, ExecutionControl.Never, 100_000L) { model, token, work ->
+                constructed++
+                val child = newPersistentLpSolver(model, cancellation = token, workLimit = work)
+                var prepared = false
+                object : PersistentLpSolver by child {
+                    override val lastMetrics: LpSolveMetrics
+                        get() = child.lastMetrics.let { if (prepared) it.copy(workOps = work - 1L) else it }
+
+                    override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? =
+                        child.prepareBasis(basis, token).also { prepared = true }
+
+                    override fun close() {
+                        closed++
+                        child.close()
+                    }
+                }
+            }
+            val raw = assertNotNull(owner.solve())
+
+            assertFalse(accepted)
+            assertEquals(1, constructed)
+            assertEquals(1, closed)
+            assertSame(state, raw.exactState)
         }
     }
 

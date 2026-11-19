@@ -497,6 +497,10 @@ Component staging observations count construction attempts separately for unchan
 ordered row/column selections with scalar authority changes, added local rows and
 joined blocks. Failed and cancelled attempts remain counted; these observations
 establish neither committed owners nor consumed numerical reuse.
+Each staged child reserves construction from its own remaining allowance before
+creating an owner. Its active reservations and numerical work narrow live child
+grants. A positive preparation report replaces the construction reservation once;
+an absent or default report retains its reservation as a conservative charge.
 
 ### Cuts
 

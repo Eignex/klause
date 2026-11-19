@@ -38,6 +38,7 @@ internal class ComponentLpSolver(
     private var deductions = ComponentLpDeductionCache(parts.size)
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var activeChild: LpSolver? = null
+    private var activeStaging: LpComponentStaging? = null
     private var solveStarted = false
     var queryAllowance: LpFloatAllowance? = null
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
@@ -64,7 +65,11 @@ internal class ComponentLpSolver(
     override var lastTermination: LpFloatTermination? = null
         private set
 
-    override val lastMetrics: LpSolveMetrics get() = activeChild?.let { metrics + it.lastMetrics } ?: metrics
+    override val lastMetrics: LpSolveMetrics
+        get() {
+            val staged = activeStaging?.let { metrics + it.metrics } ?: metrics
+            return activeChild?.let { staged + it.lastMetrics } ?: staged
+        }
     override val lastPivots: Int get() = lastMetrics.pivots
     override val lastWorkOps: Long get() = lastMetrics.workOps
     override val lastRefactorizations: Int get() = lastMetrics.let {
@@ -72,7 +77,7 @@ internal class ComponentLpSolver(
             it.updateLimitRefactorizations + it.backendRequestedRefactorizations +
             it.reconcileRecoveryRefactorizations + it.numericalRecoveryRefactorizations + it.primalRefactorizations
     }
-    override val currentWork: Long get() = metrics.workOps + when (val child = activeChild) {
+    override val currentWork: Long get() = metrics.workOps + (activeStaging?.work ?: 0L) + when (val child = activeChild) {
         is ResumableLpSolver -> child.currentWork
         null -> 0L
         else -> child.lastMetrics.workOps
@@ -283,7 +288,6 @@ internal class ComponentLpSolver(
             return false
         } finally {
             metrics += LpSolveMetrics(workOps = projection.work)
-            lastReservedConstructionWork = planner.constructionWork
         }
         lastLocalEditDecline = LpComponentEditDecline.CONSTRUCTION
         val origins = IntArray(plan.parts.size) { index ->
@@ -316,28 +320,46 @@ internal class ComponentLpSolver(
                     metrics += LpSolveMetrics(workOps = warmProjection.work)
                 }
                 if (stop()) return false
-                val remaining = if (workLimit > 0L) workLimit - metrics.workOps else 0L
-                val ancestors = plan.ancestors[index]
-                metrics += when {
-                    ancestors.size > 1 -> LpSolveMetrics(componentJoinStages = 1L)
-                    plan.parts[index].rows.contentEquals(parts[ancestors.single()].rows) &&
-                        plan.parts[index].cols.contentEquals(parts[ancestors.single()].cols) ->
-                        LpSolveMetrics(componentScalarStages = 1L)
-                    else -> LpSolveMetrics(componentRowStages = 1L)
-                }
-                val child = engine(plan.parts[index].model, token, remaining)
-                replacements += child
-                nextSolvers += child
-                activeChild = child
-                val basis = try {
-                    if (warm == null) child.prepareLogicals(stop) else child.prepareBasis(warm, stop)
+                val staging = LpComponentStaging(if (workLimit > 0L) workLimit - metrics.workOps else 0L, token)
+                activeStaging = staging
+                try {
+                    staging.reserveConstruction(LpScalingView.constructionWorkBound(plan.parts[index].model))
+                    val remaining = staging.beginConstruction() ?: return false
+                    val ancestors = plan.ancestors[index]
+                    metrics += when {
+                        ancestors.size > 1 -> LpSolveMetrics(componentJoinStages = 1L)
+                        plan.parts[index].rows.contentEquals(parts[ancestors.single()].rows) &&
+                            plan.parts[index].cols.contentEquals(parts[ancestors.single()].cols) ->
+                            LpSolveMetrics(componentScalarStages = 1L)
+                        else -> LpSolveMetrics(componentRowStages = 1L)
+                    }
+                    var child: PersistentLpSolver? = null
+                    val basis = try {
+                        engine(plan.parts[index].model, token, remaining).also { candidate ->
+                            child = candidate
+                            replacements += candidate
+                            nextSolvers += candidate
+                            activeChild = candidate
+                        }.let { candidate ->
+                            if (warm == null) candidate.prepareLogicals(stop) else candidate.prepareBasis(warm, stop)
+                        }
+                    } finally {
+                        activeChild = null
+                        staging.recordConstruction(child?.lastMetrics)
+                    }
+                    if (basis == null || !basis.validFor(checkNotNull(plan.parts[index].model.exactState).model) ||
+                        stop()
+                    ) return false
+                } catch (_: LpProjectionStop) {
+                    lastLocalEditDecline = if (token() || token.admission?.exhausted == true) {
+                        LpComponentEditDecline.STOPPED
+                    } else LpComponentEditDecline.PROJECTION_LIMIT
+                    return false
                 } finally {
-                    activeChild = null
-                    metrics += child.lastMetrics
+                    activeStaging = null
+                    metrics += staging.metrics
+                    lastReservedConstructionWork += staging.reservedConstructionWork
                 }
-                if (basis == null || !basis.validFor(checkNotNull(plan.parts[index].model.exactState).model) ||
-                    stop()
-                ) return false
             }
             if (token()) return false
             val retired = publishRowEdits(plan, nextSolvers, origins)

@@ -117,7 +117,6 @@ internal class LpComponentRows(
                 if (token() || token.admission?.exhausted == true) LpComponentEditDecline.STOPPED
                 else LpComponentEditDecline.REBIND_UNAVAILABLE,
             )
-            if (rebound !== previous) reserveConstruction(rebound.model)
             return rebound
         }
         val sortWork = group.columns.toLong() * (32 - group.columns.countLeadingZeroBits()) +
@@ -137,18 +136,7 @@ internal class LpComponentRows(
         sortedColumns.forEach { nonzeros += state.model.columnEntries(it).size.toLong() }
         projection.reserve(nonzeros * 8L + group.columns + group.rows,
             nonzeros * 128L + (group.columns.toLong() + group.rows) * 128L, matrix = true)
-        val part = working.restrictTo(sortedColumns, sortedRows, null, copyCosts = true, scratch)
-        reserveConstruction(part.model)
-        return part
-    }
-
-    var constructionWork = 0L
-        private set
-
-    private fun reserveConstruction(part: LpModel) {
-        val work = LpScalingView.constructionWorkBound(part)
-        projection.reserve(work, 0L, matrix = true)
-        constructionWork += work
+        return working.restrictTo(sortedColumns, sortedRows, null, copyCosts = true, scratch)
     }
 
     private fun reject(reason: LpComponentEditDecline): Boolean {
