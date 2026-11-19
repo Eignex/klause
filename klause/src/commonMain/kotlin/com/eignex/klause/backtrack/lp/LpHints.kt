@@ -42,6 +42,7 @@ internal class LpHints(
     private var directionalChoice: VarRef? = null
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
+    // Bound views share the relaxation's read-only structural column maps.
     private var scopeVariables = IntArray(0)
     private var scopeBooleans = BooleanArray(0)
     private var scopeConstant = 0L
@@ -69,25 +70,47 @@ internal class LpHints(
         }
         if (!collect || relaxation.colVarId.size > 8192) return
         val state = relaxation.model.exactState ?: return
-        charge(2L * relaxation.colVarId.size + 1L)
+        charge(5L)
         if (scopeModel !== state.baseModel || scopeRows !== state.rows ||
-            !scopeVariables.contentEquals(relaxation.colVarId) || !scopeBooleans.contentEquals(relaxation.colIsBool) ||
-            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff
+            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff ||
+            !matchesScope(relaxation.colVarId) || !matchesScope(relaxation.colIsBool)
         ) {
             if (scopeModel != null) observe("INCOMPATIBLE")
-            charge(2L * relaxation.colVarId.size)
             history.clear(report = scopeModel != null)
             scopeModel = state.baseModel
             scopeRows = state.rows
-            scopeVariables = relaxation.colVarId.copyOf()
-            scopeBooleans = relaxation.colIsBool.copyOf()
             scopeConstant = relaxation.objectiveConstant
             scopeCutoff = cutoff
         }
+        charge(2L)
+        scopeVariables = relaxation.colVarId
+        scopeBooleans = relaxation.colIsBool
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         objectiveRecorded = objective.isFinite()
         if (passiveChoice != null && passivePoint === relaxation) passiveState = state
         history.record(objective)
+    }
+
+    private fun matchesScope(variables: IntArray): Boolean {
+        charge(1L)
+        if (scopeVariables === variables) return true
+        if (scopeVariables.size != variables.size) return false
+        for (index in variables.indices) {
+            charge(1L)
+            if (scopeVariables[index] != variables[index]) return false
+        }
+        return true
+    }
+
+    private fun matchesScope(booleans: BooleanArray): Boolean {
+        charge(1L)
+        if (scopeBooleans === booleans) return true
+        if (scopeBooleans.size != booleans.size) return false
+        for (index in booleans.indices) {
+            charge(1L)
+            if (scopeBooleans[index] != booleans[index]) return false
+        }
+        return true
     }
 
     override fun recordInfeasible() {
@@ -264,7 +287,7 @@ internal class LpHints(
     fun resetHistory() {
         clearPassivePoint()
         if (scopeModel != null) {
-            charge(scopeVariables.size.toLong() + scopeBooleans.size)
+            charge(2L)
             history.clear()
         }
         scopeModel = null
