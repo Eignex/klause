@@ -590,6 +590,9 @@ ordinary selections resume that same conditioned subproblem and retain its branc
 LP state and private incumbent until completion or the existing allowance ends.
 An unchanged query incumbent is not republished. Publication ends the initial
 continuation trial; retaining the query grants no scheduling priority or allowance.
+Within an existing repair turn, a checked query that makes native progress can
+resume private pauses while the turn has instructions and time left. A pause without
+progress yields; the turn, active lifetime and global funding keep their original limits.
 
 With explicit incumbent completion, from the availability of a dimension-compatible
 incumbent through root and center preparation and the first proposal, joint repair
