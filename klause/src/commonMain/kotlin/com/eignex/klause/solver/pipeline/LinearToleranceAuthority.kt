@@ -23,10 +23,11 @@ internal class LinearToleranceAuthority(
     val scope = SourceScope(SourceRevision(identity, "absolute-tolerance-envelope-v1"),
         objective = SourceObjective("$identity/objective", ObjectiveSense.MINIMIZE))
 
-    private fun sameObjective(costs: LinearObjective?): Boolean = costs != null && costs.constant == objective.constant &&
-        costs.boolWeightValues.contentEquals(objective.boolWeightValues) &&
-        costs.intCoefficientValues.contentEquals(objective.intCoefficientValues) &&
-        costs.realCoefficientValues.contentEquals(objective.realCoefficientValues)
+    private fun sameObjective(costs: LinearObjective?): Boolean =
+        costs != null && costs.constant == objective.constant &&
+            costs.boolWeightValues.contentEquals(objective.boolWeightValues) &&
+            costs.intCoefficientValues.contentEquals(objective.intCoefficientValues) &&
+            costs.realCoefficientValues.contentEquals(objective.realCoefficientValues)
 
     fun compatible(mapping: SourceMapping?, working: Problem, costs: LinearObjective?,
         stop: ExecutionControl = ExecutionControl.Never): Boolean {
