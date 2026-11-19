@@ -370,12 +370,21 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
+in each direction permit the geometric mean of the predicted child gains; a zero
+gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
-Saturated scope-wide sample counts skip history lookups while two-sided reliability
-is impossible. Passing that prerequisite still requires the variable's own recent
-samples; it grants no score or authority. History reset clears the prerequisite.
+Each direction uses the lower of its latest two in-age normalized gains, so one
+large observation cannot raise its estimate alone. The two gains must agree within
+a factor of two; disagreement withholds advice until passive observations stabilize.
+Each observation ages separately.
+Replacing the ordinary LP variable requires reliable history for that reference
+as well, including measured zero gains, and a strictly greater predicted gain.
+The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
+and skips history lookups until such a variable has been observed, or after all
+such observations have aged out. Samples from different variables cannot open that
+gate. Passing it still requires the variable's own recent samples; it grants no
+score or authority. History reset clears the prerequisite.
 Selection rechecks that the fractional point and optimum belong to the same current
 relaxation and exact state, and declines on cancellation or stale information. A
 nomination retains only its variable, point and solve stamp. Proposal and
@@ -388,16 +397,35 @@ an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
+The same recent directional estimates can order the selected variable's two
+existing adjacent alternatives. It visits the lower predicted gain first to seek
+an incumbent, unless a predicted child gain reaches the current objective gap;
+then it visits the higher predicted gain first to seek early pruning.
+Predicted gains carry no pruning authority.
+Both directions need two in-age observations; equal or unavailable
+estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
+creates no LP query, charges constant comparison and commitment work to the LP
+allowance, and checks the current point, scope, solve stamp and cancellation.
+Value nominations and matching committed changes have separate counters from
+variable advice and missing-direction collection. Withheld advice retains ordinary
+value order while paying the same comparison work.
+
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
-child first to collect missing passive information. It uses an existing recent
-sample for the selected variable and only reorders the two adjacent alternatives
-around its fresh fractional LP point. Equal sample counts or two reliable directions
+child first to collect missing passive information. It uses a recent positive
+directional estimate for the selected variable and only reorders the two adjacent alternatives
+around its fresh fractional LP point. Each direction needs an in-age observation
+before collection can complete a nearly reliable pair, and the more observed side
+must have a stable positive estimate. A scope-wide availability
+stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
 history resets do not renew those limits. It creates no LP query and charges the
 existing LP allowance. Collection comparisons and changed committed splits have
 separate counters from reliable variable advice. Withholding reliable advice keeps
-this collection policy and its costs enabled.
+this collection policy and its costs enabled. `lp-directional-advice=false` keeps
+the ordinary variable and value choices while retaining enabled directional observation,
+nomination and comparison work; the corresponding backtrack setting is
+`BacktrackParams.lpDirectionalAdvice`.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
@@ -406,7 +434,8 @@ Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
 histories and 128 ancestor splits are retained. Ancestor records use depth-indexed
-slots allocated on the first usable split; trimming clears removed references and
+slots allocated on the first usable split; allocation is charged once and trimming
+charges the visited slots rather than unused ancestor capacity. Trimming clears removed references and
 counts only live records. Bookkeeping charges the existing LP work allowance and
 creates no extra LP query. Invocation close releases the scope.
 
@@ -586,6 +615,11 @@ deduction or constructing its premise; a partial publication cannot certify a le
 A conflict or indeterminate publication result ends the callback immediately.
 Slice polls charge completed native propagation visits before deciding whether the
 slice has expired.
+
+A private satisfaction driver can supply a live containing-slice stop independently
+of its run-end token. Slice stops retain preparation, traversal and learning;
+containing-run cancellation and cumulative exhaustion retire the query. Rounded delegate
+deadlines therefore pause the paid query without becoming lifetime cancellation.
 
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,

@@ -79,13 +79,13 @@ data class SmtStats(
     val continuation: LpContinuationStats = LpContinuationStats(),
     /** Common-engine source adapter counters. */
     val sourceLp: SourceLpWorkStats = SourceLpWorkStats(),
-    /** Openings admitted to the complete pure-real difference graph. */
+    /** Compatibility counter; shared LP openings contribute zero. */
     val realGraphOpenings: Long = 0L,
-    /** Completed primitive preference tables captured from an existing graph point. */
+    /** Compatibility counter; shared LP preferences contribute zero. */
     val graphPointHintCaptures: Long = 0L,
     /** Completed primitive preference tables captured from an existing LP point. */
     val lpPointHintCaptures: Long = 0L,
-    /** Live default consultations that released a graph-first opening's optional hints. */
+    /** Compatibility counter; shared LP consultations contribute zero. */
     val defaultGraphHintReleases: Long = 0L,
     /** Compiled Boolean count of the complete traversal that observed [completeSearchMinUnassignedBooleans]. */
     val completeSearchBooleanVariables: Int? = null,
@@ -187,10 +187,7 @@ internal class SmtStatsSink {
     private var strictWitnessAccepted = 0L
     private var wideWitnessCandidates = 0L
     private var wideWitnessAccepted = 0L
-    private var realGraphOpenings = 0L
-    private var graphPointHintCaptures = 0L
     private var lpPointHintCaptures = 0L
-    private var defaultGraphHintReleases = 0L
     private var completeSearchBooleanVariables: Int? = null
     private var completeSearchMinUnassignedBooleans: Int? = null
     private var completeSearchLinearChecks: Long? = null
@@ -228,16 +225,8 @@ internal class SmtStatsSink {
         completeSearchLinearPoints = (completeSearchLinearPoints ?: 0L) + 1L
     }
 
-    fun observeRealGraphOpening() {
-        realGraphOpenings++
-    }
-
-    fun observePointHintCapture(graph: Boolean) {
-        if (graph) graphPointHintCaptures++ else lpPointHintCaptures++
-    }
-
-    fun observeDefaultGraphHintRelease() {
-        defaultGraphHintReleases++
+    fun observePointHintCapture() {
+        lpPointHintCaptures++
     }
 
     fun observeConflict(explanation: SearchExplanation?) {
@@ -276,7 +265,7 @@ internal class SmtStatsSink {
         reductionRequests, reductionCacheHits, reductionAccepted, reductionDeclined, reductionNs,
         witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
         wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
-        realGraphOpenings, graphPointHintCaptures, lpPointHintCaptures, defaultGraphHintReleases,
+        0L, 0L, lpPointHintCaptures, 0L,
         completeSearchBooleanVariables, completeSearchMinUnassignedBooleans,
         completeSearchLinearChecks, completeSearchLinearPoints, completeSearchLinearOutcomes?.toMap(),
         completeSearchStages?.toMap(),

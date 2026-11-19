@@ -1,6 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 private const val DECLINE_CENSUS_KINDS = 64
 private const val DECLINE_CENSUS_NAME_LENGTH = 96
@@ -21,6 +23,7 @@ internal class ArithmeticLearningTrace(
     var omittedPayloads = 0
         private set
     var captureFirstInteger = false
+    var captureFirstPb = false
     var collectDeclines = false
     private val declineNames = ArrayList<String>()
     private val declineIndices = HashMap<String, Int>()
@@ -37,6 +40,9 @@ internal class ArithmeticLearningTrace(
     }
     var focusedIntegerId: Int? = null
         private set
+    var focusedPbId: Int? = null
+        private set
+    private val focusedArithmeticId: Int? get() = focusedIntegerId ?: focusedPbId
     var discardedWindows = 0L
         private set
     var discardedEvents = 0L
@@ -56,7 +62,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun beginConflict(factorId: Int, level: Int, trail: Int) {
-        if (captureFirstInteger && focusedIntegerId == null && events.isNotEmpty()) {
+        if ((captureFirstInteger || captureFirstPb) && focusedArithmeticId == null && events.isNotEmpty()) {
             discardedWindows++
             discardedEvents += events.size
             discardedWords += words
@@ -71,7 +77,7 @@ internal class ArithmeticLearningTrace(
     }
 
     private fun omitFocusedDetails(): Boolean {
-        if (focusedIntegerId == null) return false
+        if (focusedArithmeticId == null) return false
         omittedObservations++
         return true
     }
@@ -98,7 +104,7 @@ internal class ArithmeticLearningTrace(
     fun record(kind: String, vararg data: Long) {
         countDecline(kind)
         if (!accepting) return
-        if (focusedIntegerId != null) {
+        if (focusedArithmeticId != null) {
             if ((kind == "traversal.pick" || kind == "traversal.attempt") && pendingPick) pendingPick = false
             else if (!kind.startsWith("consumer.") && kind != "store.remap" &&
                 kind != "traversal.finished" && kind != "traversal.retirement-checked"
@@ -119,8 +125,7 @@ internal class ArithmeticLearningTrace(
     fun clause(kind: String, literals: IntArray, state: PropagationState) {
         if (!accepting || omitFocusedDetails()) return
         if (literals.size > 64) {
-            omittedPayloads++
-            record("$kind.omitted", literals.size.toLong())
+            omitPayload(kind, literals.size)
             return
         }
         record(kind, *LongArray(literals.size * 5) { index ->
@@ -146,9 +151,20 @@ internal class ArithmeticLearningTrace(
         })
     }
 
+    fun omitPayload(kind: String, size: Int) {
+        if (!accepting || omitFocusedDetails()) return
+        omittedPayloads++
+        record("$kind.omitted", size.toLong())
+    }
+
     fun row(kind: String, row: IntegerConflictRow, state: PropagationState, trail: Int? = null) {
         if (!accepting || omitFocusedDetails()) return
-        record(kind, row.bound, (trail ?: -1).toLong())
+        if (!row.bound.fitsLong() || row.coefficients.any { !it.fitsLong() }) {
+            truncationCause = "wide-integer"
+            truncated = true
+            return
+        }
+        record(kind, row.bound.toLongExact(), (trail ?: -1).toLong())
         if (!accepting) return
         record("$kind.guard", row.guard.toLong())
         if (row.guard != Lit.NONE) clause("$kind.guard-literal", intArrayOf(row.guard), state)
@@ -167,7 +183,7 @@ internal class ArithmeticLearningTrace(
                     holes.add(it)
                 }
             }
-            record("$kind.endpoint", variable.toLong(), row.coefficients[index], domain.min, domain.max,
+            record("$kind.endpoint", variable.toLong(), row.coefficients[index].toLongExact(), domain.min, domain.max,
                 holes.size.toLong(), state.intMinReason[variable].toLong(), state.intMaxReason[variable].toLong())
             for (hole in holes) record("$kind.hole", variable.toLong(), hole)
         }
@@ -211,6 +227,9 @@ internal class ArithmeticLearningTrace(
         record("$kind.stored", id.toLong(), factorId.toLong())
         if (!truncated && kind == "integer" && captureFirstInteger) {
             focusedIntegerId = id
+            pendingPick = true
+        } else if (!truncated && kind == "pb" && captureFirstPb) {
+            focusedPbId = id
             pendingPick = true
         }
     }

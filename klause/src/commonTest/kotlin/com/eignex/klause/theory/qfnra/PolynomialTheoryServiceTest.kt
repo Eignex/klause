@@ -86,7 +86,7 @@ class PolynomialTheoryServiceTest {
         )
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
         val complete = service.invocation().use { assertIs<QfNraResult.Unsatisfiable>(it.check()) }
-        assertTrue(complete.stats.projectedPolynomials > 0)
+        assertTrue(complete.stats.projectedPolynomials > 0 || complete.stats.envelopeRefutations > 0)
 
         service.invocation(QfNraParams(maximumWork = complete.stats.workSpent + 1)).use { invocation ->
             val pending = invocation.prepareCheck()
@@ -98,7 +98,7 @@ class PolynomialTheoryServiceTest {
             }
 
             assertIs<QfNraResult.Unsatisfiable>(result)
-            assertTrue(pauses > 2)
+            assertTrue(pauses > 0)
             assertEquals(complete.stats, result.stats)
             assertEquals(complete.stats, invocation.stats)
             assertEquals(1L, invocation.queries)

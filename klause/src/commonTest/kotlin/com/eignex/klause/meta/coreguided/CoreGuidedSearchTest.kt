@@ -57,6 +57,31 @@ import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
     @Test
+    fun `cancelled bound publication should defer continuation funding until resume`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+        )).bake()
+        var cancelled = false
+        val search = CoreGuidedSearch(source, LinearObjective(longArrayOf(1, 1, 1)),
+            BacktrackParams(objectiveBoundSupplier = { 2.0 },
+                objectiveLowerBoundSink = { if (it == 1.0) cancelled = true }),
+            maximumMillis = 2_000L, continueProductive = true)
+        val caller = ExecutionControl.after(60.seconds) or ExecutionControl { cancelled }
+
+        val paused = search.runSlice(caller, Long.MAX_VALUE, -1L) {}
+
+        assertNull(paused)
+        assertEquals(0L, search.stats.coreGuided.continuationGrants)
+        cancelled = false
+        val result = search.runSlice(caller, Long.MAX_VALUE, -1L) {}
+        assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(1L, search.stats.coreGuided.continuationGrants)
+        search.close()
+    }
+
+    @Test
     fun `wide integer cost frontiers should exhaust their allowance without claiming attainment`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1_000_000_000L) }, arrayOf(
             Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1_000_000_000L),
@@ -134,11 +159,15 @@ class CoreGuidedSearchTest {
     fun `native segment interruption after a decision should pause the core query`() {
         val clock = TestTimeSource()
         val interrupter = ClockJumpOnDecision(clock)
+        var openings = 0
         val params = BacktrackParams(
             nativeSat = false,
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
-            componentFactory = { listOf(interrupter) },
+            componentFactory = {
+                openings++
+                listOf(interrupter)
+            },
         )
         val problem = Problem(
             40,
@@ -158,6 +187,7 @@ class CoreGuidedSearchTest {
         assertFalse(search.isDone)
         val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, 1_000L, -1L) {})
         assertEquals(0L, objective.evaluateLong(resumed.sample))
+        assertEquals(1, openings)
         search.close()
     }
 
@@ -313,29 +343,66 @@ class CoreGuidedSearchTest {
     }
 
     @Test
-    fun `active preparation time should not renew after an interrupted opening`() {
+    fun `near attainment continuation should preserve its paid query beyond the initial active limit`() {
         val clock = TestTimeSource()
         val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val source = Problem(2, 0, emptyArray(), arrayOf(hard))
+        val source = Problem(3, 0, emptyArray(), arrayOf(hard,
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+        ))
+        var advanced = false
         val providers = observingHard(hard) { state ->
-            if (state.problem.numBoolVars > source.numBoolVars) clock += 3.seconds
+            if (!advanced && state.problem.numBoolVars > source.numBoolVars) {
+                advanced = true
+                clock += 3.seconds
+            }
         }
-        val search = CoreGuidedSearch(
-            source.bake(providers.prepare(source)),
-            LinearObjective(longArrayOf(1, 1)),
-            BacktrackParams(),
-            maximumMillis = 2_000L,
-            timeSource = clock,
-        )
+        val search = CoreGuidedSearch(source.bake(providers.prepare(source)),
+            LinearObjective(longArrayOf(1, 1, 1)),
+            BacktrackParams(objectiveBoundSupplier = { 2.0 }),
+            maximumMillis = 2_000L, timeSource = clock, continueProductive = true)
+        val caller = ExecutionControl.after(60.seconds)
 
-        val stopped = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { error("expired preparation") }
-        val charged = search.work
-        val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { error("renewed active time") }
+        val paused = search.runSlice(caller, 2_000L, -1L) {}
+        val result = paused ?: search.runSlice(caller, 2_000L, -1L) {}
 
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
-        assertEquals(stopped, resumed)
-        assertEquals(charged, search.work)
+        assertIs<MinimizeResult.Optimal>(result)
+        assertTrue(advanced)
+        assertTrue(search.stats.coreGuided.activeMillisLimit!! > 2_000L)
+        assertEquals(1L, search.stats.coreGuided.continuationGrants)
+        assertEquals(2L, LinearObjective(longArrayOf(1, 1, 1)).evaluateLong(result.sample))
         search.close()
+    }
+
+    @Test
+    fun `active preparation time should not renew after an interrupted opening`() {
+        for ((productive, caller) in listOf(false to ExecutionControl.Never, true to ExecutionControl.Never,
+            true to ExecutionControl.after(kotlin.time.Duration.INFINITE))) {
+            val clock = TestTimeSource()
+            val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+            val source = Problem(2, 0, emptyArray(), arrayOf(hard))
+            val providers = observingHard(hard) { state ->
+                if (state.problem.numBoolVars > source.numBoolVars) clock += 3.seconds
+            }
+            val search = CoreGuidedSearch(
+                source.bake(providers.prepare(source)),
+                LinearObjective(longArrayOf(1, 1)),
+                BacktrackParams(objectiveBoundSupplier = { 2.0 }),
+                maximumMillis = 2_000L,
+                timeSource = clock,
+                continueProductive = productive,
+            )
+
+            val stopped = search.runSlice(caller, Long.MAX_VALUE, -1) { error("expired preparation") }
+            val charged = search.work
+            val resumed = search.runSlice(caller, Long.MAX_VALUE, -1) { error("renewed active time") }
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
+            assertEquals(stopped, resumed)
+            assertEquals(charged, search.work)
+            assertEquals(0L, search.stats.coreGuided.continuationGrants)
+            search.close()
+        }
     }
 
     @Test

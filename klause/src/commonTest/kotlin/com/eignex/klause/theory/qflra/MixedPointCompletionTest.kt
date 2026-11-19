@@ -39,6 +39,9 @@ class MixedPointCompletionTest {
                 doubleArrayOf(0.5, 0.5, 1.0, 1.0),
                 rows,
                 ExecutionControl.Never,
+                realCompletion = { columns, residual, stop ->
+                    completeMixedRealComponents(columns, residual, SourceLpBudget(), stop)
+                },
             ),
         )
 
@@ -63,6 +66,9 @@ class MixedPointCompletionTest {
                 doubleArrayOf(1.0 / 3, 1.0 / 3, 1.0 / 3, 1.0),
                 rows,
                 ExecutionControl.Never,
+                realCompletion = { columns, residual, stop ->
+                    completeMixedRealComponents(columns, residual, SourceLpBudget(), stop)
+                },
             ),
         )
 
@@ -97,6 +103,9 @@ class MixedPointCompletionTest {
                 doubleArrayOf(1.0 / 3, 1.0 / 3, 0.7, 1.0),
                 rows,
                 ExecutionControl.Never,
+                realCompletion = { columns, residual, stop ->
+                    completeMixedRealComponents(columns, residual, SourceLpBudget(), stop)
+                },
             ),
         )
 
@@ -130,6 +139,9 @@ class MixedPointCompletionTest {
                 doubleArrayOf(0.0, 0.0, 0.0, 1.0),
                 rows,
                 ExecutionControl.Never,
+                realCompletion = { columns, residual, stop ->
+                    completeMixedRealComponents(columns, residual, SourceLpBudget(), stop)
+                },
             ),
         )
 
@@ -225,6 +237,9 @@ class MixedPointCompletionTest {
                 doubleArrayOf(0.0, 0.0, 1.0),
                 rows,
                 ExecutionControl.Never,
+                realCompletion = { columns, residual, stop ->
+                    completeMixedRealComponents(columns, residual, SourceLpBudget(), stop)
+                },
             ),
         )
 

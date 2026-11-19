@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -185,6 +186,50 @@ internal class JointRepairNeighborhood private constructor(
         selectedIntegers += freed.size
         val pins = (inputs?.asIterable() ?: (0 until integers)).filter { it !in freed }.associateWith { centers[it] }
         // The full continuous residual stays free: an omitted boundary row could invalidate a local repair.
+        return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
+    }
+
+    fun relaxationNeighborhood(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
+        bools: BooleanArray, cutoff: BigFraction?, budget: SourceLpBudget,
+        token: ExecutionControl): ExactNeighborhoodCondition? {
+        if (hint == null || cutoff == null || centers.size < integers || token()) return null
+        val pins = linkedMapOf<Int, BigFraction>()
+        var free = 0
+        for (id in inputs?.asIterable() ?: (0 until integers)) {
+            val center = centers[id]
+            val bits = center.num.magnitudeBitLength().toLong() + center.den.magnitudeBitLength()
+            if (bits > MAX_GUIDANCE_SCALAR_BITS ||
+                !payRefutation(budget, token, 1L + bits * bits / 64L, 128L + 8L * bits)) return null
+            val value = center.toDouble()
+            val relaxed = hint.integer(id)
+            if (!value.isFinite()) return null
+            if (relaxed != null && abs(relaxed - value) <= 1e-6) pins[id] = center else free++
+        }
+        if (token() || pins.isEmpty() || free == 0) return null
+        selectedIntegers += free
+        // Agreement selects a subproblem; it proves neither a fixing nor a source bound.
+        return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
+    }
+
+    fun binaryNeighborhood(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>, bounds: IntBounds,
+        bools: BooleanArray, cutoff: BigFraction?, budget: SourceLpBudget,
+        token: ExecutionControl): ExactNeighborhoodCondition? {
+        if (inputs != null || hint == null || cutoff == null || integers !in 2..4096 ||
+            centers.size < integers || token()) return null
+        val pins = linkedMapOf<Int, BigFraction>()
+        for (id in 0 until integers) {
+            if (!payRefutation(budget, token, 16L, 256L) ||
+                !bounds.hasLower(id) || !bounds.hasUpper(id) || bounds.lower(id) < 0L || bounds.upper(id) > 1L
+            ) return null
+            val center = centers[id]
+            if (center != BigFraction.ZERO && center != BigFraction.ONE) return null
+            val relaxed = hint.integer(id) ?: return null
+            if (center.isZero && abs(relaxed) <= 1e-6) pins[id] = BigFraction.ZERO
+        }
+        if (token() || pins.size == integers ||
+            !payRefutation(budget, token, integers.toLong(), 256L * integers)) return null
+        selectedIntegers += integers - pins.size
+        // Incumbent ones stay free so a repair can exchange them for several entering variables.
         return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
     }
 

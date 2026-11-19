@@ -174,8 +174,10 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-component-reuse",
     "lp-bound-max-pivots", "lp-adaptive-work",
-    "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
-    "pb-learning", "pb-objective-cutoff", "propagation-attribution", "historical-table-reasons",
+    "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
+    "pb-learning", "pb-objective-cutoff", "integer-row-learning",
+    "arithmetic-learning-work", "arithmetic-learning-allocation-bytes",
+    "propagation-attribution", "historical-table-reasons",
     "objective-guided-values",
     "var-selector", "val-selector",
 )
@@ -246,11 +248,18 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpAdaptiveWork = p[ExecutionOption.lpAdaptiveWork]
     val lpBranching = p[ExecutionOption.lpBranching]
     val lpDirectionalGains = p[ExecutionOption.lpDirectionalGains]
+    val lpDirectionalAdvice = p[ExecutionOption.lpDirectionalAdvice]
     val lpVariableShaving = p[ExecutionOption.lpVariableShaving]
     val lpPruneHulls = p[ExecutionOption.lpPruneHulls]
     val lpRootCuts = p[ExecutionOption.lpRootCuts]
     val pbLearning = p[ExecutionOption.pbLearning]
     val integerRowLearning = p[ExecutionOption.integerRowLearning]
+    val arithmeticLearningWork = p[ExecutionOption.arithmeticLearningWork]?.also {
+        if (it < 0) pipelineConfigError("arithmetic learning allowances must be non-negative")
+    }
+    val arithmeticLearningAllocationBytes = p[ExecutionOption.arithmeticLearningAllocationBytes]?.also {
+        if (it < 0) pipelineConfigError("arithmetic learning allowances must be non-negative")
+    }
     val propagationAttribution = p[ExecutionOption.propagationAttribution]
     val historicalTableReasons = p[ExecutionOption.historicalTableReasons]
     val costAwarePropagation = p[ExecutionOption.costAwarePropagation]
@@ -273,9 +282,10 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpComponentReuse,
         lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
-        pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons, costAwarePropagation,
+        pbObjectiveCutoff, integerRowLearning, arithmeticLearningWork, arithmeticLearningAllocationBytes,
+        propagationAttribution, historicalTableReasons, costAwarePropagation,
         reasonPreflight,
-        objectiveGuidedValues, lpDirectionalGains,
+        objectiveGuidedValues, lpDirectionalGains, lpDirectionalAdvice,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -331,11 +341,14 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpAdaptiveWork?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundAdaptiveWork = it)) }
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
         lpDirectionalGains?.let { out = out.copy(lpDirectionalGains = it) }
+        lpDirectionalAdvice?.let { out = out.copy(lpDirectionalAdvice = it) }
         lpVariableShaving?.let { out = out.copy(lpPlan = out.lpPlan.copy(variableShaving = it)) }
         lpPruneHulls?.let { out = out.copy(lpPlan = out.lpPlan.copy(pruneHulls = it)) }
         lpRootCuts?.let { out = out.copy(lpPlan = out.lpPlan.copy(rootCutHarvest = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         integerRowLearning?.let { out = out.copy(integerRowLearning = it) }
+        arithmeticLearningWork?.let { out = out.copy(arithmeticLearningWork = it) }
+        arithmeticLearningAllocationBytes?.let { out = out.copy(arithmeticLearningAllocationBytes = it) }
         propagationAttribution?.let { out = out.copy(propagationAttribution = it) }
         historicalTableReasons?.let { out = out.copy(historicalTableReasons = it) }
         costAwarePropagation?.let { out = out.copy(costAwarePropagation = it) }

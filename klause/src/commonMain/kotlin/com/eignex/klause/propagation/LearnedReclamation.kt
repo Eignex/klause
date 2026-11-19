@@ -189,10 +189,12 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
             ints(prop.byWeightDesc)
             longs(prop.weights)
         }
+        is LearnedExactPbPropagator -> prop.sharingMemory(sample, protected)
         is LearnedIntegerPropagator -> {
             sample.owned(prop, Int.SIZE_BYTES.toLong(), protected)
             ints(prop.row.variables)
-            longs(prop.row.coefficients)
+            prop.row.sharingMemory(sample, protected)
+            prop.compact?.let { longs(it.coeffs) }
         }
     }
     ints(learned.store.payload(index) as? IntArray)

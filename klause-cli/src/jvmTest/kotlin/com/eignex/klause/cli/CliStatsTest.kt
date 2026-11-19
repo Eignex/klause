@@ -244,6 +244,18 @@ class CliStatsTest {
     }
 
     @Test
+    fun `core continuation telemetry should combine grants and retain the largest allowance`() {
+        val first = SolveStats(coreGuided = CoreGuidedStats(1, 2, parseBigInt("1"), null, 2_000L, 1L))
+        val second = SolveStats(coreGuided = CoreGuidedStats(2, 3, parseBigInt("2"), null, 30_000L, 2L))
+
+        val pairs = searchStatPairs(first.mergedWith(second)).toMap()
+
+        assertEquals("3", pairs["coreGuidedContinuationGrants"])
+        assertEquals("30000", pairs["coreGuidedActiveMillisLimit"])
+        assertEquals("2", pairs["coreGuidedLowerBound"])
+    }
+
+    @Test
     fun `core bounds should preserve exact integers when worker snapshots combine`() {
         val first = SolveStats(coreGuided = CoreGuidedStats(1, 2, parseBigInt("9007199254740993")))
         val second = SolveStats(coreGuided = CoreGuidedStats(2, 3, parseBigInt("9007199254740995")))

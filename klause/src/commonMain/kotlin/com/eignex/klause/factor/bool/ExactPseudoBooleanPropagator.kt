@@ -14,10 +14,10 @@ import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 
 internal class ExactPseudoBooleanPropagator(
-    constants: IntegralConstants,
-    private val literals: IntArray,
-    private val op: PbOp,
-    private val auxBoolVar: Int = -1,
+    val constants: IntegralConstants,
+    val literals: IntArray,
+    val op: PbOp,
+    val auxBoolVar: Int = -1,
 ) : Propagator {
     private val body = ExactBooleanSum(constants, literals)
 

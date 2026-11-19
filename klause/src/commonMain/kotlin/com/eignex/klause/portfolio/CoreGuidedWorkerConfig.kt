@@ -20,20 +20,21 @@ internal class CoreGuidedWorkerConfig(
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
+    private val continueProductive: Boolean = false,
     private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
 ) : WorkerConfig {
     override val label: String get() = "core-guided"
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, edit)
+        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, continueProductive, edit)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, edit)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, continueProductive, edit)
 
     internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, edit)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, true, edit)
 
     internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, edit)
+        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, false, edit)
 
     override fun materialize(
         problem: BakedProblem,
@@ -69,9 +70,12 @@ internal class CoreGuidedWorkerConfig(
         worker = PortfolioWorker.of(
             workerLabel,
             armId,
-            CoreGuidedSolver(problem, maximumWork, maximumMillis, coreRefinement).session(),
+            CoreGuidedSolver(problem, maximumWork, maximumMillis, coreRefinement, continueProductive).session(),
             params,
             sourceObjective,
+            withBound = if (continueProductive) { parameters, supplier ->
+                parameters.copy(objectiveBoundSupplier = supplier)
+            } else null,
         ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(problem, sourceObjective)).also {
             it.auxiliaryProof = maximumWork != null || maximumMillis != null
             it.sharedPools = matched

@@ -353,7 +353,7 @@ data class BacktrackParams(
      * all-off [LpPlan] (no LP unless a field is set or [lpConfig] resolves one on).
      */
     val lpPlan: LpPlan = LpPlan(),
-    /** Use reliable, recent directional LP gains for finite variable ordering; missing history keeps LP scoring. */
+    /** Use reliable, recent directional LP gains for finite branching; missing history keeps ordinary LP guidance. */
     val lpDirectionalGains: Boolean = false,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
@@ -427,7 +427,7 @@ data class BacktrackParams(
      * in any reached reason retains clause fallback.
      */
     val pbLearning: Boolean? = null,
-    /** Learn bounded mandatory integer rows from finite conflicts; disabled by default. */
+    /** Learn exact mandatory integer rows from finite conflicts; disabled by default. */
     val integerRowLearning: Boolean = false,
     /**
      * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
@@ -484,8 +484,15 @@ data class BacktrackParams(
     val rootProbeBinaryGate: Boolean = false,
     /** Explore one global batch, then prefer learned neighborhoods in Boolean General states without root signals. */
     val rootProbeGeneralGate: Boolean = false,
+    /** Per-conflict work allowance for optional cutting-planes learning, inside propagation work. */
+    val arithmeticLearningWork: Long = 262_144,
+    /** Per-conflict cumulative modeled allocation allowance for optional cutting-planes learning. */
+    val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
+    /** Apply reliable directional branching advice; false retains its observations, collection and comparison work. */
+    val lpDirectionalAdvice: Boolean = true,
 ) : SolverParams {
     init {
+        require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
         require(privateRebuildWork in -1L..1_048_576L) {
             "private rebuild work must be -1 (automatic) or in 0..1048576"

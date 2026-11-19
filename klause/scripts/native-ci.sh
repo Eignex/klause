@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-options=(--no-daemon --max-workers=1 --console=plain --info --stacktrace "$NATIVE_CACHE_OPTION")
+options=(--no-daemon --max-workers=1 --console=plain --info --stacktrace --refresh-dependencies "$NATIVE_CACHE_OPTION")
 tasks=(:klause:linuxX64Test :klause-cli:linkReleaseExecutableLinuxX64 :klause:linkLpProfileReleaseExecutableLinuxX64)
 log=$(mktemp)
 trap 'rm -f "$log"' EXIT

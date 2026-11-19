@@ -147,6 +147,7 @@ internal class ExactRowForm(
     private val hasReals: Boolean,
 ) {
     private val ordered = ExactOrderedTerms(terms)
+    val hasBooleanTerms get() = booleanLiterals.isNotEmpty()
 
     fun hintComparison(
         booleanValue: (Int) -> Boolean?,

@@ -22,10 +22,10 @@ import com.eignex.util.numbers.compareTo
  */
 internal class WideLinearPropagator(
     val intVars: IntArray,
-    private val vars: IntArray,
-    private val coeffs: Array<BigInt>,
-    private val op: LinearOp,
-    private val bound: BigInt,
+    val vars: IntArray,
+    val coeffs: Array<BigInt>,
+    val op: LinearOp,
+    val bound: BigInt,
 ) : Propagator {
 
     /** Interval reasoning reads only `min`/`max` (see [LinearPropagator]); subscribe to bound moves. */

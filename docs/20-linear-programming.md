@@ -274,6 +274,22 @@ form.
 
 ## Consumers, explanations and cuts
 
+Polynomial adapters use `LinearEnvelopes` and `CertifiedEnvelopeLp` to assemble
+exact square and bilinear relaxations outside the engine. An owner retains its
+matrix for coordinate objectives and tangent additions inside one immutable query
+scope. A forward and reverse pass of exact row certificates tightens its bounds
+before numerical solving. Row
+addition retains exact state until a query needs a numerical owner. A coordinate
+direction without an endpoint that relaxes every inequality supplies no finite
+coordinate bound and needs no numerical objective query. A temporary
+trial pins proposed coordinates in sequence, propagating affine rows between
+choices, but only the exact primal/dual checker against the retained scope can
+certify it; trial pins never narrow that
+scope. Spatial child boxes create separate owners. Certified LP infeasibility
+refutes the relaxed scope; objective certificates bound source coordinates, while
+LP points require the caller's original nonlinear witness check. Shared search
+owns integer rounding, antecedents and retraction.
+
 Consumers decide when to request certified bounds, fixings, conflicts or witnesses
 and how to apply and retract them. Their policy stays outside the engine. Floating
 values used as guidance in this chapter (rounding targets, value preferences, source
@@ -337,19 +353,26 @@ cuts and expanded hulls stay outside its allowance, and admitted roots enable th
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
 and root scopes. The owner advances its floating cursor in adaptive work quanta; a
-pause publishes nothing and authority edits discard the cursor. Completed floating
-results enter the policy's bound check within a 16 MiB checking reservation;
-exhaustion, cancellation or refusal withholds the root bound.
+numerical pause alone supplies no authority, and authority edits discard the cursor.
+Paused dual proposals and completed results enter the policy's bound check within a
+16 MiB checking reservation; exhaustion, cancellation or refusal supplies no new bound.
 The retained owner's preparation and solve lifetime use the remaining cumulative
 root and LP grants. A worker's current slice offer limits only the numerical query
 quantum; resuming a cursor keeps its original lifetime grant and charges each slice's
 actual work to the same ledger.
 
+Primal consultations check the preceding paused dual before advancing and completed
+results before rounding. Numerical work, checking and source projection spend the
+same cumulative allowance. Only the identical source-root model and exact state
+qualify; later CP assertions supply no global bound. Search publishes accepted
+bounds to its objective floor and retains them in its terminal bound.
+
 Sparse-trial preparation is capped at eight million modeled work units; root and
 node LP work stop at 150 million units or the containing invocation's smaller
 allowance, and tighter caller deadlines and work shares remain in force. Bounded
 atomic numerical operations can finish past a work boundary; the ledger keeps their
-actual cost.
+actual cost. An exhausted root grant cannot restart an unchanged root query through
+the node consumer.
 The two-GiB modeled storage envelope covers source authority, sparse owners,
 scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;
@@ -386,7 +409,7 @@ decline component retention. Without a supplied LP horizon or a deadline, retent
 can use its bounded atomic grant. The funding decision is fixed for that worker;
 a decline keeps its ordinary preparation and query policies.
 Funded workers reject small or oversized owners before
-partition allocation, then admits numerical node ownership from the partition's size,
+partition allocation, then admit numerical node ownership from the partition's size,
 tableau-size reduction and modeled child-model storage. A finite shared basis-entry
 limit is divided among the admitted children. Construction and declined inspection
 spend the containing LP grant separately from each adaptive numerical query. Owner
@@ -653,8 +676,11 @@ cutoff. Missing exact coordinates or an unrepresentable result leave coverage
 incomplete; neither a rounded tie nor a declined candidate closes the cutoff.
 
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
-fixing integer guesses, within its `SourceLpBudget`. Only exact primal coordinates
-are consumed, and a failed guess supplies no conflict or bound. Real array selection
+fixing integer guesses, within its `SourceLpBudget`. Residuals use `SparseSourceLp` preparation and the scoped certified solver. Components share the same operation allowance, and preparation, solving,
+certification and retirement costs remain charged on a decline. Only exact primal coordinates
+are consumed. Point preparation replaces strict rows with closed common-margin
+companions and maximizes that bounded private coordinate; acceptance requires a
+positive exact margin and rechecks the original rows. A failed guess supplies no conflict or bound. Real array selection
 emits index-range rows on every build, and a fixed index adds its equality with both
 index premises. In every case the original source rows decide publication.
 

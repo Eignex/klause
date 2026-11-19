@@ -21,6 +21,7 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.exactColumnLower
@@ -141,8 +142,13 @@ internal class LiveQfLraSystem(
     rowForms: List<List<ExactRowForm>> = source.factors.map { factor ->
         factor.linearRows.map { it.exactForm(source.numRealVars) }
     },
+    strictMargin: Boolean = false,
+    private val preparationStop: ExecutionControl = ExecutionControl.Never,
 ) {
     private val columns = source.numRealVars + source.numIntVars
+    private val marginColumn = columns.takeIf { strictMargin }
+    val pointColumns = columns + if (strictMargin) 1 else 0
+    val usesStrictMargin get() = marginColumn != null
     private val sourceColumns = source.exactLpSourceColumns()
     private val declaredFixed = sourceColumns.mapIndexedNotNull { index, column ->
         val lower = column.lower ?: return@mapIndexedNotNull null
@@ -172,14 +178,134 @@ internal class LiveQfLraSystem(
     private val normalized = preparedTerms.values.associateTo(HashMap()) { keys ->
         keys.positive to SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
     }
-    private val terms = normalized.filterKeys { it in initialTerms }.values
-        .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
-    private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    private val terms = buildList {
+        addAll(normalized.filterKeys { strictMargin || it in initialTerms }.values.map { it.term.coefficients })
+        if (marginColumn != null) {
+            for ((factorIndex, forms) in rowForms.withIndex()) {
+                val rows = source.factors[factorIndex].linearRows
+                for ((rowIndex, form) in forms.withIndex()) {
+                    val truths = if (rows[rowIndex].activator == LinearRow.ALWAYS) listOf(true) else listOf(true, false)
+                    for (truth in truths) {
+                        val sides = ArrayList<ExactRationalInequality>(2)
+                        val comparison = form.comparison(truth) { false }
+                        preparationStop.charge(16L * (comparison.terms.size + 1L))
+                        if (preparationStop.pollStop()) return@buildList
+                        if (comparison.op == LinearOp.NE) {
+                            comparison.rowsInto(sides, LinearOp.LE)
+                            comparison.rowsInto(sides, LinearOp.GE)
+                        } else {
+                            comparison.rowsInto(sides)
+                        }
+                        for (side in sides) {
+                            if (!side.strict) continue
+                            val expression = side.columns.indices.associate {
+                                side.columns[it] to side.coefficients[it]
+                            } + (marginColumn to BigFraction.ONE)
+                            add(intern(expression, declaredFixed).coefficients)
+                        }
+                    }
+                }
+            }
+        }
+    }.filter { it.size != 1 }.distinct()
+    private val definitions = terms.withIndex().associate { (index, term) ->
+        term to pointColumns + index
+    }.toMutableMap()
     var batchSourceBounds = true
     var observeAssertionCost = false
     val assertionCost = SmtSourceAssertionCost()
+    private var checkedPoint: List<BigFraction>? = null
+    private var checkedState: LpExactState? = null
+    private var definitionPoint = HashMap<Int, BigFraction>()
+    private var sourcePoint = HashMap<SmtTermKey, BigFraction>()
+
+    fun releasePoint() {
+        checkedPoint = null
+        checkedState = null
+        definitionPoint = HashMap()
+        sourcePoint = HashMap()
+    }
+
+    fun hasPositiveMargin(point: List<BigFraction>?): Boolean = marginColumn?.let {
+        point?.getOrNull(it)?.signum()?.let { sign -> sign > 0 } == true
+    } ?: (point != null)
+
+    fun acceptsPoint(point: List<BigFraction>, stop: ExecutionControl): Boolean {
+        val state = lp.state ?: return false
+        if (point.size != pointColumns || !hasPositiveMargin(point) || state.conflict != null || stop()) return false
+        val arithmetic = MixedPointArithmetic(stop)
+        stop.charge(point.size.toLong())
+        if (point != checkedPoint) {
+            if (!point.all(arithmetic::admitted)) return false
+            checkedPoint = point.toList()
+            checkedState = null
+            definitionPoint.clear()
+            sourcePoint.clear()
+        }
+        if (state === checkedState) return !stop()
+        fun holds(column: Int, value: BigFraction): Boolean {
+            stop.charge(2L)
+            if (stop.pollStop()) return false
+            val metadata = state.model.column(column)
+            val previous = checkedState?.model
+            if (previous != null && column < previous.numVars && metadata === previous.column(column)) return true
+            val bounds = metadata.bounds
+            if (bounds.lower?.let { !arithmetic.admitted(it.number.value) } == true ||
+                bounds.upper?.let { !arithmetic.admitted(it.number.value) } == true
+            ) return false
+            return bounds.lower?.let { side ->
+                value > side.number.value || (value == side.number.value && !side.strict)
+            } != false && bounds.upper?.let { side ->
+                value < side.number.value || (value == side.number.value && !side.strict)
+            } != false
+        }
+        for (column in point.indices) if (!holds(column, point[column])) return false
+        // Every auxiliary column is defined by its source affine term; retraction changes only its bounds.
+        for ((term, column) in definitions) {
+            stop.charge(2L)
+            if (stop.pollStop()) return false
+            val metadata = state.model.column(column)
+            if (metadata.bounds.lower == null && metadata.bounds.upper == null) continue
+            val previous = checkedState?.model
+            if (previous != null && column < previous.numVars && metadata === previous.column(column)) continue
+            val value = definitionPoint[column] ?: run {
+                var negative = BigFraction.ZERO
+                for ((sourceColumn, coefficient) in term) {
+                    negative = arithmetic.subtractProduct(negative, coefficient, point[sourceColumn]) ?: return false
+                }
+                negative.negated().also { definitionPoint[column] = it }
+            }
+            if (!holds(column, value)) return false
+        }
+        val accepted = !stop()
+        if (accepted) checkedState = state
+        return accepted
+    }
+
+    fun checkedPointSatisfies(
+        comparison: ExactComparison,
+        direction: LinearOp?,
+        stop: ExecutionControl,
+    ): Boolean {
+        val point = checkedPoint ?: return false
+        val key = preparedTerms[comparison.ordered]?.positive ?: return false
+        val arithmetic = MixedPointArithmetic(stop)
+        if (!arithmetic.admitted(comparison.bound)) return false
+        val value = sourcePoint[key] ?: key.valueAt(point, arithmetic)?.also { sourcePoint[key] = it } ?: return false
+        return when (comparison.op) {
+            LinearOp.LE -> if (comparison.strict) value < comparison.bound else value <= comparison.bound
+            LinearOp.GE -> if (comparison.strict) value > comparison.bound else value >= comparison.bound
+            LinearOp.EQ -> value == comparison.bound
+            LinearOp.NE -> when (direction) {
+                LinearOp.LE -> value < comparison.bound
+                LinearOp.GE -> value > comparison.bound
+                else -> value != comparison.bound
+            }
+        }
+    }
 
     fun install(): Boolean {
+        if (preparationStop()) return false
         val structural = sourceColumns.map { column ->
             ExactLpColumn(
                 ExactLpBounds(
@@ -189,9 +315,12 @@ internal class LiveQfLraSystem(
                 integral = column.integral,
                 tag = column.tag,
             )
-        }
+        } + if (marginColumn == null) emptyList() else listOf(ExactLpColumn(
+            ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)), ExactLpSide(ExactLpNumber.of(1L))),
+            integral = false,
+        ))
         val logical = List(terms.size) { ExactLpColumn(ExactLpBounds(), integral = false) }
-        val entries = List(columns) { ArrayList<ExactLpEntry>() }
+        val entries = List(pointColumns) { ArrayList<ExactLpEntry>() }
         terms.forEachIndexed { row, term ->
             for ((column, coefficient) in term) {
                 if (column in entries.indices && !coefficient.isZero) {
@@ -206,7 +335,9 @@ internal class LiveQfLraSystem(
                 List(terms.size) { ExactLpNumber.of(0L) },
                 structural + logical,
                 List(terms.size) { ExactLpRow() },
-                ExactLpObjective(List(columns + terms.size) { ExactLpNumber.of(0L) }),
+                ExactLpObjective(List(pointColumns + terms.size) {
+                    ExactLpNumber.of(if (it == marginColumn) -1L else 0L)
+                }),
             ),
         )
     }
@@ -245,11 +376,13 @@ internal class LiveQfLraSystem(
             if (stop.pollStop()) return false
             if (lp.state?.conflict != null) return true
             require(input.comparison.op != LinearOp.NE)
-            if (!batchSourceBounds || lp.state?.depth == 0) {
+            if (!batchSourceBounds) {
                 if (!assertComparison(input.comparison, null, input.premise)) return false
                 committed(index)
                 continue
             }
+            // Direct source bounds can expose root fixings to the next comparison's normalization.
+            if (lp.state?.depth == 0 && batch.hasBoundsBelow(pointColumns) && !batch.flush()) return batch.conflict
             val comparison = input.comparison
             val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
             val rows = ArrayList<ExactRationalInequality>(2)
@@ -257,10 +390,10 @@ internal class LiveQfLraSystem(
             for ((side, row) in rows.withIndex()) {
                 if (stop.pollStop()) return false
                 val negated = comparison.op == LinearOp.GE || (comparison.op == LinearOp.EQ && side == 1)
-                val bound = prepareBound(if (negated) keys.negative else keys.positive,
+                val bounds = prepareBounds(if (negated) keys.negative else keys.positive,
                     true, row.rhs, row.strict, input.premise, { !stop() && batch.flush() })
                     ?: return batch.conflict
-                val consistent = batch.add(bound)
+                val consistent = bounds.all(batch::add)
                 if (!consistent) {
                     if (side == rows.lastIndex) batch.complete(index)
                     return !stop() && (batch.flush() || batch.conflict)
@@ -269,6 +402,21 @@ internal class LiveQfLraSystem(
             batch.complete(index)
         }
         return !stop() && (batch.flush() || batch.conflict)
+    }
+
+    fun affineInputSides(comparison: ExactComparison, stop: ExecutionControl): List<PartialLinearSide?>? {
+        stop.charge(comparison.terms.size.toLong() + 1L)
+        if (stop.pollStop()) return null
+        val key = preparedTerms[comparison.ordered]?.positive
+        val term = key?.let { (it.slot ?: normalized[it])?.term }
+        val column = term?.let { definitions[it.coefficients] }
+        val state = lp.state ?: return null
+        return listOf(false, true).map { upper ->
+            val active = column?.let { state.activeSide(it, upper) } ?: return@map null
+            val premise = lp.activeBoundPremise(column, upper) ?: return null
+            if (premise === SearchAtomPremise.Unavailable) return null
+            PartialLinearSide(active.side.number.value, active.side.strict)
+        }
     }
 
     fun affineImplication(comparison: ExactComparison, stop: ExecutionControl): PartialLinearImplication? {
@@ -350,15 +498,8 @@ internal class LiveQfLraSystem(
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
-        val bound = prepareBound(key, upper, threshold, strict, premise) ?: return false
-        return measureAssertion({ assertionCost.boundNs += it }) {
-            if (observeAssertionCost) {
-                assertionCost.boundCalls++
-                val previous = lp.state?.activeSide(bound.column, bound.upper)?.side
-                if (previous == null || bound.side.strongerThan(previous, bound.upper)) assertionCost.boundSides++
-            }
-            lp.assertBound(bound.column, bound.upper, bound.side, bound.premise)
-        }
+        val bounds = prepareBounds(key, upper, threshold, strict, premise) ?: return false
+        return assertBounds(bounds) !is LpBoundBatchResult.Declined
     }
 
     private fun assertBounds(bounds: List<LpPremisedBound>): LpBoundBatchResult =
@@ -395,6 +536,23 @@ internal class LiveQfLraSystem(
             ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
             term.premise(premise),
         )
+    }
+
+    private fun prepareBounds(
+        key: SmtTermKey,
+        upper: Boolean,
+        threshold: BigFraction,
+        strict: Boolean,
+        premise: SearchAtomPremise,
+        beforeDefinition: () -> Boolean = { true },
+    ): List<LpPremisedBound>? {
+        val original = prepareBound(key, upper, threshold, strict, premise, beforeDefinition) ?: return null
+        val margin = marginColumn ?: return listOf(original)
+        if (!strict) return listOf(original)
+        val expression = key.expression() + (margin to if (upper) BigFraction.ONE else BigFraction.MINUS_ONE)
+        val interior = prepareBound(SmtTermKey.of(expression), upper, threshold, false, premise, beforeDefinition)
+            ?: return null
+        return listOf(original, interior)
     }
 
     private fun definitionColumn(coefficients: Map<Int, BigFraction>, beforeAppend: () -> Boolean): Int? =
@@ -482,6 +640,8 @@ private class SmtSourceBoundBatch(
     var conflict = false
         private set
 
+    fun hasBoundsBelow(columns: Int): Boolean = bounds.any { it.column < columns }
+
     fun add(bound: LpPremisedBound): Boolean {
         val key = bound.column to bound.upper
         val previous = sides[key] ?: lp.state?.activeSide(bound.column, bound.upper)?.side
@@ -520,6 +680,14 @@ private class SmtTermKey(val columns: IntArray, private val coefficients: List<B
     var slot: SmtTermSlot? = null
 
     fun expression(): Map<Int, BigFraction> = columns.indices.associate { columns[it] to coefficients[it] }
+
+    fun valueAt(point: List<BigFraction>, arithmetic: MixedPointArithmetic): BigFraction? {
+        var negative = BigFraction.ZERO
+        for (index in columns.indices) {
+            negative = arithmetic.subtractProduct(negative, coefficients[index], point[columns[index]]) ?: return null
+        }
+        return negative.negated()
+    }
 
     override fun hashCode(): Int = hash
 

@@ -11,6 +11,20 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 class SourceIntegerAggregateSplitTest {
+    @Test
+    fun `coordinate updates should retain aggregate restrictions`() {
+        val original = scope.condition.integerBound(below)
+        val updated = original.copy(lower = mapOf(x to BigFraction.ONE))
+        val branch = scope.copy(condition = updated)
+        val context = SourceProofContext(branch, setOf(x, y), emptyMap()).withLinearAuthority()
+        val sample = Sample(booleanArrayOf(), longArrayOf(1, 0))
+
+        val result = SourceEvidenceVerifier(context).verify(
+            SourceEvidence(branch, SourceClaim.Witness(sample), SourceDerivation.SourceWitness))
+
+        assertIs<SourceEvidenceCheck.Rejected>(result)
+    }
+
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
     private val scope = SourceScope(SourceRevision("aggregate", "exact-affine"))

@@ -33,6 +33,40 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
     @Test
+    fun `incumbent guidance should order splits only within available funding`() {
+        for ((registered, limited) in listOf(false to false, true to false, false to true, true to true)) {
+            val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+            val scope = SourceScope(SourceRevision("incumbent-order", "exact-affine"),
+                objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+            val source = SourceProofContext(scope, setOf(integer), mapOf("lower" to SourcePremise(
+                SourceInequality(mapOf(integer to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE))),
+                mapOf(integer to BigFraction.ONE))
+            val standing = Sample(booleanArrayOf(), longArrayOf(2)) to BigFraction.ofLong(2)
+            val offers = mutableListOf<Sample>()
+            val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+            LinearAuthorityTraversal(source, SourceLpBudget(funding = funding), ExecutionControl.Never,
+                { false }, { offers += it }, { standing }, useRefutationPropagation = registered,
+                guideIncumbent = true).use { component ->
+                val session = SearchComponentSet(listOf(component)).session(
+                    atoms = if (registered) SearchAtomRegistry(0) else null)
+                assertEquals(ComponentResult.Consistent, session.initialize())
+                assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+                if (limited) funding.grant(1L)
+
+                val alternatives = assertNotNull(component.nextBranch(session))
+                assertEquals(ComponentResult.Consistent, session.push(alternatives.first()))
+                funding.grant(1_000_000L)
+                assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
+
+                if (limited) assertTrue(offers.isEmpty()) else assertEquals(1L, offers.single().ints.single())
+                assertEquals(2, alternatives.size)
+                assertEquals(if (limited) null else 1L,
+                    component.observations()["numericalIncumbentBranchPreferences"])
+            }
+        }
+    }
+
+    @Test
     fun `a selected bound should prune without completing its primal point`() {
         for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
             val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)

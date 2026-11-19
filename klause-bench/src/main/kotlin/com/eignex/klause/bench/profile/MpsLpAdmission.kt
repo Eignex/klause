@@ -73,7 +73,9 @@ internal object MpsLpAdmission {
             SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop,
         ))
-        val plan = requireNotNull(invocation.preparedPlan)
+        val plan = requireNotNull(invocation.preparedPlan) {
+            "finite plan unavailable: route=${invocation.route::class.simpleName}, cancelled=${stop()}"
+        }
         val canonical = requireNotNull(plan.model)
         val sourceObjective = preparedObjective(plan)
         val budget = PresolveBudget(1_650_000_000L)
@@ -85,7 +87,7 @@ internal object MpsLpAdmission {
         check(preparation.presolve?.infeasible != true) { "preparation refuted source" }
         val problem = preparation.problem
         val objective = preparation.objective
-        val report = buildJsonObject {
+        val prepared = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("suite", options.getValue("suite"))
             put("problem", options.getValue("problem"))
@@ -116,8 +118,6 @@ internal object MpsLpAdmission {
             put("aggressiveAdmission", admission(problem, LpConfig.AGGRESSIVE))
             put("mixedRecipes", recipes(problem as BakedProblem, objective, EngineMix.MIXED))
             put("cpRecipes", recipes(problem, objective, EngineMix.BACKTRACK))
-            put("full", shape(problem, objective, false, stop))
-            put("objectiveCone", shape(problem, objective, true, stop))
             put("javaVersion", System.getProperty("java.version"))
             put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
             put("os", System.getProperty("os.name"))
@@ -125,6 +125,12 @@ internal object MpsLpAdmission {
             put("jvmOptions", buildJsonArray {
                 ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
             })
+        }
+        out.resolve("preparation.json").writeText("$prepared\n")
+        val report = buildJsonObject {
+            prepared.forEach { (key, value) -> put(key, value) }
+            put("full", shape(problem, objective, false, stop))
+            put("objectiveCone", shape(problem, objective, true, stop))
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)

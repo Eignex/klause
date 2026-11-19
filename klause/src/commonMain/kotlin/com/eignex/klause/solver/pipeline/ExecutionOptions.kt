@@ -410,6 +410,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `lp-directional-gains` execution setting. */
         val lpDirectionalGains: ExecutionOption<Boolean> = ExecutionOption("lp-directional-gains", ValueKind.BOOLEAN)
 
+        /** The `lp-directional-advice` execution setting. */
+        val lpDirectionalAdvice: ExecutionOption<Boolean> = ExecutionOption("lp-directional-advice", ValueKind.BOOLEAN)
+
         /** The `lp-variable-shaving` execution setting. */
         val lpVariableShaving: ExecutionOption<Boolean> = ExecutionOption("lp-variable-shaving", ValueKind.BOOLEAN)
 
@@ -424,6 +427,13 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         /** The `integer-row-learning` execution setting. */
         val integerRowLearning: ExecutionOption<Boolean> = ExecutionOption("integer-row-learning", ValueKind.BOOLEAN)
+
+        /** Per-conflict work allowance for integer row learning. */
+        val arithmeticLearningWork: ExecutionOption<Long> = ExecutionOption("arithmetic-learning-work", ValueKind.LONG)
+
+        /** Per-conflict cumulative modeled allocation allowance for integer row learning. */
+        val arithmeticLearningAllocationBytes: ExecutionOption<Long> =
+            ExecutionOption("arithmetic-learning-allocation-bytes", ValueKind.LONG)
 
         /** Collect bounded propagation and explanation value diagnostics. */
         val propagationAttribution: ExecutionOption<Boolean> =
@@ -643,8 +653,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpComponentReuse,
                 lpBoundMaxPivots, lpAdaptiveWork,
-                lpBranching, lpDirectionalGains,
+                lpBranching, lpDirectionalGains, lpDirectionalAdvice,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
+                arithmeticLearningWork, arithmeticLearningAllocationBytes,
                 propagationAttribution, historicalTableReasons, costAwarePropagation,
                 reasonPreflight, pbObjectiveCutoff,
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,

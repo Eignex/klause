@@ -12,6 +12,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.followStopControl
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.saturatedAdd
@@ -37,6 +38,7 @@ internal class ResumableSatisfaction(
     atRoot: ((PropagationSession) -> Boolean)? = null,
     private val affineFactorId: Int = -1,
     onPropagationWork: ((() -> Long) -> Unit)? = null,
+    private val containingSlice: ExecutionControl = ExecutionControl.Never,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: ExecutionControl = params0.cancellation
@@ -55,6 +57,12 @@ internal class ResumableSatisfaction(
             override fun deadline() = listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
             override val workScheduled get() = globalToken.workScheduled()
             override val stopPolling get() = globalToken.stopPolling
+        }.let { control ->
+            if (containingSlice === ExecutionControl.Never) control else cancelledWhen(
+                { listOfNotNull(control.deadline(), containingSlice.deadline()).minOrNull() },
+                { control.workScheduled() || containingSlice.workScheduled() },
+                { control.stopPolling ?: containingSlice.stopPolling },
+            ) { control() || containingSlice() }
         },
     )
     private var assumptions = params0.assumptions

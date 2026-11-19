@@ -1220,10 +1220,10 @@ Native completion flags do not independently validate proofs.
 ## Prepared arithmetic learning
 
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
-sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial
+sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off learning=integer|pb|both trace=first-integer|first-pb|initial
 attribution=false|true`.
 It runs clause and opt-in
-integer-row arms through ordinary finite preparation and backtrack traversal,
+arithmetic arms through ordinary finite preparation and backtrack traversal,
 without a decision replay. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
 retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
@@ -1243,6 +1243,9 @@ counts and omitted observations are explicit; the live event and word caps stay
 fixed. `trace=initial` keeps the initial window instead. The clause arm keeps its
 initial window. Deadlines, decisions and total work/lifecycle counts cover the
 entire invocation; discarding diagnostic data resets no solver allowance.
+The default `learning=integer` records integer rows; `learning=pb` and `learning=both`
+also admit Boolean arithmetic reasons. `trace=first-pb` uses the same rolling window
+and object-specific consumer capture for the first admitted PB row.
 
 Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
 A catalog hash mismatch retains the bytes and observed digest and stops before solving.
@@ -1482,6 +1485,9 @@ differences. Different rows may use different machines. Rows report `COMPLETE`, 
 an arm has no terminal verdict within its budget, `INVALID` with reasons, or `MISSING` for
 cancelled or absent arms. The script exits 1 when a row is invalid or missing, 3 when rows are
 accepted but the declared experiment is only partly verified, and 0 when it is verified.
+
+Checker identities match between arms reporting feasible witnesses or a checker receipt. An unknown arm
+without either makes no checker identity claim; feasible arms with missing or different policies still differ.
 
 Outcomes keep native claims, checked witnesses and native proofs apart; a valid check whose
 witness digest does not match the retained witness is `valid-unbound`, and no retained record

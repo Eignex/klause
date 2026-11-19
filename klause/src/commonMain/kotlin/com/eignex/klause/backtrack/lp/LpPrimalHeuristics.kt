@@ -8,6 +8,7 @@ import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.lp.bounding.LpRounding
 import com.eignex.klause.lp.bounding.RootComponentRounding
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
+import com.eignex.klause.lp.bounding.checkContinuedRootBound
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpFloatTermination
@@ -701,7 +702,7 @@ private fun LpEngine.solvePrimalRelaxation(
 ): FloatLpResult? {
     requireOpen()
     if (cancellation()) return null
-    if (ownsRootPrimalModel(model)) return solveRetainedPrimalRelaxation(cancellation, observeResult)
+    if (ownsRootPrimalModel(model)) return solveRetainedPrimalRelaxation(model, cancellation, observeResult)
     val started = TimeSource.Monotonic.markNow()
     val simplex = newTableauCutSolver(model, cancellation,
         workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
@@ -729,6 +730,7 @@ private fun LpEngine.solvePrimalRelaxation(
 }
 
 private fun LpEngine.solveRetainedPrimalRelaxation(
+    model: LpModel,
     cancellation: ExecutionControl,
     observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)?,
 ): FloatLpResult? {
@@ -737,12 +739,19 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
     val remaining = minOf(rootPrimalWorkBudget(), retainedRootRemainingWork())
     if (remaining <= 0L) return null
     val token = cancellation or ExecutionControl { retainedRootRemainingWork() <= 0L }
+    var observed = false
     try {
+        checkContinuedRootBound(model, null, token)
         val attempt = propagator.solveFloat(token = token, queryAllowance = {
             minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)
         })
         if (attempt == null) observeSparsePausedProgress()
         val result = attempt?.second
+        if (sparseTrialActive) {
+            observed = true
+            observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
+        }
+        if (result != null) checkContinuedRootBound(model, result, token)
         val termination = propagator.floatTermination
         outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {
             "RETAINED_${termination?.name ?: "OTHER"}"
@@ -757,7 +766,9 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
         return result?.takeIf { it.optimal }
     } finally {
         try {
-            observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
+            if (!observed) {
+                observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
+            }
         } finally {
             sink.lp.observePrimalPhase("PRIMAL_LP_DUAL", outcome, started.elapsedNow().inWholeNanoseconds)
         }

@@ -12,6 +12,18 @@ import kotlin.test.assertTrue
 
 class MixedRealCompletionTest {
     @Test
+    fun `sparse source declarations should recover beyond two hundred fifty six real columns`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(299), listOf(BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true),
+        )
+
+        val point = assertNotNull(completeMixedRealComponents(300, rows, SourceLpBudget(), ExecutionControl.Never))
+
+        assertTrue(point.satisfiesSourceRows(rows))
+    }
+
+    @Test
     fun `independent real components should retain exact source row agreement`() {
         val rows = listOf(
             ExactRationalInequality(

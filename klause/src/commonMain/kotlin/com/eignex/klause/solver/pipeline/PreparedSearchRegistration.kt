@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.CpSearchComponent
@@ -19,7 +18,6 @@ import com.eignex.klause.solver.search.SourceCoordinateAgreement
 import com.eignex.klause.solver.search.SourceCoordinateAgreementComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.ExecutionControl
-import com.eignex.klause.util.ScanMeter
 
 internal class SearchComponentOpening(
     val cancellation: ExecutionControl,
@@ -52,21 +50,6 @@ internal class SearchComponentOpening(
         own(AutoCloseable { release() })
     }
 
-    private fun graphSelectionGuidance(source: Problem): Boolean? {
-        if (source.numBoolVars == 0 || source.numIntVars != 0 || source.numRealVars == 0 ||
-            source.factors.size > SourceConjunctionHints.MAX_INDEX_ENTRIES
-        ) return false
-        ScanMeter (cancellation).use { scan ->
-            if (!scan.check()) return null
-            for (factor in source.factors) {
-                if (!scan.visit(1L)) return null
-                if (factor is Cardinality && factor.max == 1 &&
-                    factor.literals.size > 2) return if (scan.check()) true else null
-            }
-            return if (scan.check()) false else null
-        }
-    }
-
     fun candidateHints(source: Problem, defaultComponent: SearchComponent? = null): SearchCandidateHints {
         var accounted = false
         fun outcome(value: HintIndexOutcome) {
@@ -78,13 +61,7 @@ internal class SearchComponentOpening(
             if (registered == null) {
                 val component = defaultComponent as? ExactLiraSearchComponent
                 val direct = if (openHintFlips == null && component != null) {
-                    val selections = graphSelectionGuidance(source)
-                    if (selections == null) {
-                        outcome(HintIndexOutcome.STOPPED)
-                        return SearchCandidateHints.None
-                    }
-                    component.partialPointHints(cancellation, defaultOpening = true,
-                        defaultGraphSelections = selections)?.second.also {
+                    component.partialPointHints(cancellation, defaultOpening = true)?.second.also {
                         if (it != null) component.useDefaultDisjunctionHints()
                     }
                 } else null

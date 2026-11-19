@@ -109,11 +109,18 @@ private class FixedReconstructionVerifier(
                     return null
                 }
             }
-            value = plus(value, times(from(a.costs[j]), x[j]))
+            if (a.costs[j].isZero) meter.step()
+            else value = plus(value, times(from(a.costs[j]), x[j]))
         }
         val sourceObjective = plus(times(value, reciprocal(from(a.scale))), from(a.external))
-        val sourcePrimal = List(a.n) { big(plus(x[it], from(a.origins[it]))) }
-        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), x.map { big(it) })
+        val coordinates = x.map { big(it) }
+        val sourcePrimal = List(a.n) {
+            if (a.origins[it].isZero) {
+                meter.step()
+                coordinates[it]
+            } else big(plus(x[it], from(a.origins[it])))
+        }
+        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), coordinates)
     }
 
     fun dual(multipliers: List<BigFraction>, ray: Boolean): ReconstructedDual? {
@@ -218,11 +225,18 @@ private class BigReconstructionVerifier(
                     return null
                 }
             }
-            value = plus(value, times(from(a.costs[j]), x[j]))
+            if (a.costs[j].isZero) meter.step()
+            else value = plus(value, times(from(a.costs[j]), x[j]))
         }
         val sourceObjective = plus(times(value, reciprocal(from(a.scale))), from(a.external))
-        val sourcePrimal = List(a.n) { big(plus(x[it], from(a.origins[it]))) }
-        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), x.map { big(it) })
+        val coordinates = x.map { big(it) }
+        val sourcePrimal = List(a.n) {
+            if (a.origins[it].isZero) {
+                meter.step()
+                coordinates[it]
+            } else big(plus(x[it], from(a.origins[it])))
+        }
+        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), coordinates)
     }
 
     fun dual(multipliers: List<BigFraction>, ray: Boolean): ReconstructedDual? {
@@ -561,14 +575,20 @@ private fun reconstructCandidates(
         val x = primal?.let { values ->
             values(meter).mapIndexed { j, value -> meter.fraction(value - authority.origins[j]) }
         }
-        val y = duals?.invoke(meter)?.let {
+        fun checkPoint() {
+            if (x == null) return
+            current.point(x, basis)
+            if (goal != ReconstructionGoal.POINT || current.point == null) {
+                current.seated(x, basis)?.takeIf { it != x }?.let { current.point(it, basis) }
+            }
+        }
+        if (goal == ReconstructionGoal.POINT) checkPoint()
+        val pointComplete = goal == ReconstructionGoal.POINT && current.point != null
+        val y = if (pointComplete) null else duals?.invoke(meter)?.let {
             if (goal == ReconstructionGoal.BOUND) repairBoundMultipliers(authority, it, meter) else it
         }
-        val rho = ray?.invoke(meter)
-        if (x != null) {
-            current.point(x, basis)
-            current.seated(x, basis)?.takeIf { it != x }?.let { current.point(it, basis) }
-        }
+        val rho = if (pointComplete) null else ray?.invoke(meter)
+        if (goal != ReconstructionGoal.POINT) checkPoint()
         if (y != null) current.dual(y, ray = false)
         if (rho != null && current.point == null) {
             current.dual(rho, ray = true)
@@ -609,9 +629,11 @@ private fun reconstructCandidates(
                 if (!repairBasis) meter.attempts++
                 if (x != null) {
                     reconstructExactVector(x, denominator, meter)?.let { current.point(it, basis) }
-                    current.reconstructedSeated(x, basis, denominator)?.let { current.point(it, basis) }
+                    if (goal != ReconstructionGoal.POINT || current.point == null) {
+                        current.reconstructedSeated(x, basis, denominator)?.let { current.point(it, basis) }
+                    }
                 }
-                if (y != null) {
+                if (y != null && (goal != ReconstructionGoal.POINT || current.point == null)) {
                     if (goal != ReconstructionGoal.BOUND || current.bound == null) {
                         val vector = reconstructExactVector(y, denominator, meter)
                             ?: if (goal == ReconstructionGoal.BOUND) {

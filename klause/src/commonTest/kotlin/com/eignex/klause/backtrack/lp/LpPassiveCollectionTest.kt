@@ -19,9 +19,11 @@ class LpPassiveCollectionTest {
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, point)
-            history.commit(down, 1)
-            history.beginNode(1)
-            history.record(11.0)
+            for (decision in listOf(down, up, down)) {
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
             val events = ArrayList<String>()
             var work = 0L
             val exploration = LpPassiveCollection(events::add, { work += it })
@@ -31,7 +33,7 @@ class LpPassiveCollectionTest {
             exploration.commit(up, 1) { true }
 
             assertEquals(listOf(up, down), selected)
-            assertFalse(history.hasTwoSidedSamples)
+            assertFalse(history.hasReliableHistory)
             assertEquals(1, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
             assertTrue(events.none { it.startsWith("PASSIVE_DIRECTION_") })
             assertEquals(36L, work)
@@ -40,19 +42,23 @@ class LpPassiveCollectionTest {
 
     @Test
     fun `unavailable history points and splits retain ordinary order`() {
-        for (condition in listOf("missing", "equal", "reliable", "integral", "foreign", "cancelled")) {
+        for (condition in listOf("missing", "one-sided", "equal", "reliable", "integral", "foreign", "cancelled")) {
             val history = LpDirectionalHistory({})
             val variable = VarRef.IntVar(0)
-            if (condition != "missing") repeat(if (condition == "reliable") 2 else 1) {
+            val directions = when (condition) {
+                "missing" -> emptyList()
+                "one-sided" -> listOf(false, false)
+                "equal" -> listOf(false, true)
+                "reliable" -> listOf(false, true, false, true)
+                else -> listOf(false, true, false)
+            }
+            for (up in directions) {
                 history.beginNode(0)
                 history.record(10.0)
                 history.branch(variable, 2.25)
-                val directions = if (condition in listOf("equal", "reliable")) listOf(false, true) else listOf(false)
-                for (up in directions) {
-                    history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
-                    history.beginNode(1)
-                    history.record(11.0)
-                }
+                history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(11.0)
             }
             val events = ArrayList<String>()
             val exploration = LpPassiveCollection(events::add, {})
@@ -83,9 +89,11 @@ class LpPassiveCollectionTest {
                 history.beginNode(0)
                 history.record(10.0)
                 history.branch(variable, 2.25)
-                history.commit(alternatives.first(), 1)
-                history.beginNode(1)
-                history.record(11.0)
+                for (decision in listOf(alternatives.first(), alternatives.last(), alternatives.first())) {
+                    history.commit(decision, 1)
+                    history.beginNode(1)
+                    history.record(11.0)
+                }
             }
             exploration.select(variable, 2.25, alternatives, history, 1) { true }
             exploration.clear()
@@ -93,9 +101,11 @@ class LpPassiveCollectionTest {
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, 2.25)
-            history.commit(alternatives.first(), 1)
-            history.beginNode(1)
-            history.record(11.0)
+            for (decision in listOf(alternatives.first(), alternatives.last(), alternatives.first())) {
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
             val before = work
 
             val selected = exploration.select(variable, 2.25, alternatives, history, 2) { true }
@@ -116,9 +126,11 @@ class LpPassiveCollectionTest {
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, 2.25)
-            history.commit(alternatives.first(), 1)
-            history.beginNode(1)
-            history.record(11.0)
+            for (decision in listOf(alternatives.first(), alternatives.last(), alternatives.first())) {
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
             val events = ArrayList<String>()
             val exploration = LpPassiveCollection(events::add, {})
             var consultations = 0

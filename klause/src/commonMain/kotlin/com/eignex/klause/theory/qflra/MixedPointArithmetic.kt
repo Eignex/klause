@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
@@ -9,7 +10,7 @@ internal class MixedPointArithmetic(private val stop: ExecutionControl) {
     fun admitted(value: BigFraction): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         stop.charge(1L + bits / Long.SIZE_BITS)
-        return bits <= MAX_POINT_BITS && !stop()
+        return bits <= MAX_POINT_BITS && !stop.pollStop()
     }
 
     fun satisfies(point: List<BigFraction>, rows: List<ExactRationalInequality>): Boolean {
@@ -31,7 +32,7 @@ internal class MixedPointArithmetic(private val stop: ExecutionControl) {
         if (bits > MAX_POINT_BITS * 2L + 2L) return false
         val words = bits / Long.SIZE_BITS + 1L
         stop.charge(bits + words * words)
-        return !stop()
+        return !stop.pollStop()
     }
 
     fun quotient(value: BigFraction, divisor: BigFraction): BigFraction? {

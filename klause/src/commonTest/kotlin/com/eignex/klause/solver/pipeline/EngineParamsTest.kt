@@ -20,6 +20,21 @@ import kotlin.test.assertTrue
 
 class EngineParamsTest {
     @Test
+    fun `integer learning allowances should reach fixed and portfolio workers`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        val settings = listOf("arithmetic-learning-work=0", "arithmetic-learning-allocation-bytes=4096")
+
+        val workers = listOf(applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true),
+            applyBacktrackParams(base, EngineParams(settings)))
+
+        for (worker in workers) {
+            assertEquals(0L, worker.arithmeticLearningWork)
+            assertEquals(4096L, worker.arithmeticLearningAllocationBytes)
+            assertEquals(false, worker.integerRowLearning)
+        }
+    }
+
+    @Test
     fun `source rate rewards should be an independent opt in`() {
         val ordinary = scenario(cores = 1)
         for ((option, families) in listOf("source-rate" to false, "source-rate-family" to true)) {
@@ -175,6 +190,17 @@ class EngineParamsTest {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertTrue(!base.lpDirectionalGains)
         assertTrue(applyBacktrackParams(base, EngineParams(listOf("lp-directional-gains=true"))).lpDirectionalGains)
+    }
+
+    @Test
+    fun `withholding directional advice preserves enabled collection`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams(lpDirectionalGains = true)
+
+        val configured = applyBacktrackParams(base, EngineParams(listOf("lp-directional-advice=false")))
+
+        assertTrue(base.lpDirectionalAdvice)
+        assertTrue(configured.lpDirectionalGains)
+        assertTrue(!configured.lpDirectionalAdvice)
     }
 
     @Test

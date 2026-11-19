@@ -126,6 +126,12 @@ restart schedule takes precedence.
 non-inprocessing work follows the first eligible complete root. Zero disables the
 warmup; see [root scheduling](11-search-policies.md#restarts-phases-and-inprocessing).
 
+`--param arithmetic-learning-work=N` (262,144 word-priced work units) and
+`--param arithmetic-learning-allocation-bytes=N` (8 MiB of cumulative modeled
+allocation) bound each optional cutting-planes analysis inside propagation work and
+cancellation. Both accept nonnegative values. Zero keeps clause fallback; neither
+control enables integer-row or pseudo-Boolean learning. See [learning](10-learning.md).
+
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
 (1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch

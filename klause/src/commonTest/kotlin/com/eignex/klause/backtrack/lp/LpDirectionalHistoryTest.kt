@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,6 +10,66 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
+    @Test
+    fun `parent bookkeeping pays allocation without repeatedly charging unused capacity`() {
+        var work = 0L
+        val history = LpDirectionalHistory({}, charge = { work += it })
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        assertTrue(work >= 128L)
+        val before = work
+
+        history.commit(SearchDecision.Bool(0), 1)
+        history.beginNode(1)
+        history.record(12.0)
+        history.branch(VarRef.Bool(1), 0.5)
+
+        assertTrue(work - before in 1L until 128L)
+    }
+
+    @Test
+    fun `clearing sparse parents pays the ancestor slots it visits`() {
+        var work = 0L
+        val history = LpDirectionalHistory({}, charge = { work += it })
+        for (level in listOf(0, 100)) {
+            history.beginNode(level)
+            history.record(10.0)
+            history.branch(VarRef.Bool(level), 0.5)
+        }
+        val before = work
+
+        history.clear()
+
+        assertTrue(work - before >= 101L)
+        assertEquals(0, history.retainedEntries)
+    }
+
+    @Test
+    fun `reliable child preference seeks lower gains unless a child can reach the cutoff`() {
+        for (cheaperUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.75)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up == cheaperUp) 10.0 else 13.0)
+                }
+            }
+
+            history.beginNode(0)
+            history.record(10.0)
+
+            assertEquals(cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75))
+            assertEquals(cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 14.0))
+            assertEquals(!cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 12.0))
+            assertNull(history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 10.0))
+        }
+    }
+
     @Test
     fun `collection prefers only a recent under observed direction`() {
         for (firstUp in listOf(false, true)) {
@@ -24,10 +85,61 @@ class LpDirectionalHistoryTest {
                 history.record(11.0)
             }
 
+            assertFalse(history.hasCollectionHistory)
+            assertNull(history.preferUnderObservedDirection(variable, 2.25))
+            history.commit(if (firstUp) SearchDecision.IntAtMost(0, 2) else SearchDecision.IntAtLeast(0, 3), 1)
+            history.beginNode(1)
+            history.record(11.0)
+
+            assertTrue(history.hasCollectionHistory)
             assertEquals(!firstUp, history.preferUnderObservedDirection(variable, 2.25))
             assertTrue(history.score(variable, 2.25).isNaN())
             repeat(5) { history.beginNode(0) }
+            assertFalse(history.hasCollectionHistory)
             assertNull(history.preferUnderObservedDirection(variable, 2.25))
+        }
+    }
+
+    @Test
+    fun `aging the opposite direction refreshes collection availability`() {
+        val history = LpDirectionalHistory({}, maxAge = 4L)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        history.commit(SearchDecision.Bool(1), 1)
+        history.beginNode(1)
+        history.record(11.0)
+        repeat(2) { history.beginNode(1) }
+        for (decision in listOf(SearchDecision.Bool(1), SearchDecision.Bool(0), SearchDecision.Bool(0))) {
+            history.commit(decision, 1)
+            history.beginNode(1)
+            history.record(11.0)
+        }
+
+        assertTrue(history.hasCollectionHistory)
+        assertFalse(history.hasReliableHistory)
+        assertEquals(false, history.preferUnderObservedDirection(variable, 0.5))
+    }
+
+    @Test
+    fun `zero observed gains keep ordinary child order`() {
+        for (up in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(10.0)
+            }
+            history.commit(SearchDecision.Bool(if (up) 1 else 0), 1)
+            history.beginNode(1)
+            history.record(13.0)
+
+            assertNull(history.preferUnderObservedDirection(variable, 0.5))
         }
     }
 
@@ -82,12 +194,12 @@ class LpDirectionalHistoryTest {
 
             history.record(value)
 
-            assertFalse(history.hasTwoSidedSamples)
+            assertFalse(history.hasReliableHistory)
         }
     }
 
     @Test
-    fun `two sided availability does not establish variable reliability`() {
+    fun `samples from different variables do not admit reliable scoring`() {
         val history = LpDirectionalHistory({})
         for (up in listOf(false, true)) {
             repeat(2) {
@@ -102,7 +214,7 @@ class LpDirectionalHistoryTest {
             }
         }
 
-        assertTrue(history.hasTwoSidedSamples)
+        assertFalse(history.hasReliableHistory)
         assertTrue(history.score(VarRef.IntVar(0), 2.25).isNaN())
         assertTrue(history.score(VarRef.IntVar(1), 2.25).isNaN())
     }
@@ -120,11 +232,11 @@ class LpDirectionalHistoryTest {
                 history.record(if (up) 13.0 else 11.0)
             }
         }
-        assertTrue(history.hasTwoSidedSamples)
+        assertTrue(history.hasReliableHistory)
 
         history.clear()
 
-        assertFalse(history.hasTwoSidedSamples)
+        assertFalse(history.hasReliableHistory)
     }
 
     @Test
@@ -144,7 +256,7 @@ class LpDirectionalHistoryTest {
             history.record(13.0)
         }
 
-        assertEquals(1.5, history.score(variable, 2.25), 1e-9)
+        assertEquals(sqrt(3.0), history.score(variable, 2.25), 1e-9)
     }
 
     @Test
@@ -192,7 +304,7 @@ class LpDirectionalHistoryTest {
     @Test
     fun `aged directional observations lose reliability`() {
         val observations = ArrayList<String>()
-        val history = LpDirectionalHistory(observations::add, maxAge = 2L)
+        val history = LpDirectionalHistory(observations::add, maxAge = 4L)
         history.beginNode(0)
         history.record(10.0)
         history.branch(VarRef.Bool(0), 0.5)
@@ -205,8 +317,10 @@ class LpDirectionalHistoryTest {
             history.record(12.0)
         }
         assertTrue(history.score(VarRef.Bool(0), 0.5).isFinite())
-        repeat(3) { history.beginNode(0) }
+        assertTrue(history.hasReliableHistory)
+        repeat(5) { history.beginNode(0) }
 
+        assertFalse(history.hasReliableHistory)
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
         assertEquals(2, observations.count { it == "EXPIRED" })
     }
@@ -258,5 +372,92 @@ class LpDirectionalHistoryTest {
         }
 
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+    }
+
+    @Test
+    fun `a gain in only one child keeps ordinary scoring`() {
+        for (improvingUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up == improvingUp) 110.0 else 10.0)
+                }
+            }
+
+            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+        }
+    }
+
+    @Test
+    fun `refreshing one direction cannot renew the scope scoring gate`() {
+        val history = LpDirectionalHistory({}, maxAge = 4L)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        assertTrue(history.hasReliableHistory)
+
+        repeat(5) {
+            history.commit(SearchDecision.Bool(0), 1)
+            history.beginNode(1)
+            history.record(12.0)
+        }
+
+        assertFalse(history.hasReliableHistory)
+    }
+
+    @Test
+    fun `aging an older observation removes two sample reliability`() {
+        for (firstUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({}, maxAge = 4L)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            repeat(2) {
+                for (up in listOf(firstUp, !firstUp)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(12.0)
+                }
+            }
+            assertTrue(history.hasReliableHistory)
+
+            repeat(2) { history.beginNode(1) }
+
+            assertFalse(history.hasReliableHistory)
+            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+        }
+    }
+
+    @Test
+    fun `disagreeing gains withhold advice until recent observations stabilize`() {
+        val history = LpDirectionalHistory({})
+        for ((gain, expected) in listOf(
+            4.0 to Double.NaN, 8.0 to 4.0, 100.0 to Double.NaN, 6.0 to Double.NaN, 6.0 to 6.0,
+        )) {
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(10.0 + gain)
+            }
+
+            val score = history.score(VarRef.Bool(0), 0.5)
+
+            if (expected.isNaN()) assertTrue(score.isNaN()) else assertEquals(expected, score, 1e-9)
+        }
     }
 }

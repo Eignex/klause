@@ -29,6 +29,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 class ResumableSatisfactionTest {
     @Test
@@ -500,6 +502,29 @@ class ResumableSatisfactionTest {
         assertIs<SolveResult.Unknown>(result)
         assertEquals(3L, budget.spent)
         assertEquals(3.0, result.stats.search.nodes.sum)
+    }
+
+    @Test
+    fun `a resumed satisfaction query should use its current containing deadline`() {
+        var deadline = TimeSource.Monotonic.markNow() - 1.seconds
+        val containing = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = deadline.hasPassedNow()
+            override fun deadline() = deadline
+        }
+        val budget = NodeBudget(3L)
+        val search = ResumableSatisfaction(
+            BacktrackSolver(pigeonhole(6, 5).bake()),
+            BacktrackParams(nativeSat = false, nodeBudget = budget),
+            containingSlice = containing,
+        )
+        deadline = TimeSource.Monotonic.markNow() + 10.seconds
+
+        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
+        deadline = TimeSource.Monotonic.markNow() + 20.seconds
+        val result = search.use { runToVerdict(it, 1L) }
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<SolveResult.Unknown>(result).reason)
+        assertEquals(3L, budget.spent)
     }
 
     @Test
