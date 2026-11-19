@@ -6,5 +6,6 @@ once per test process, before individual test timing. It also runs when Gradle
 selects a single class or method. Native tests use an empty base class.
 
 `SolverTestRuntime` uses fixed in-memory arithmetic, schema, Boolean search, LP and SMT inputs.
+The arithmetic input exercises vector reductions and a tail coordinate before behavior timing.
 Initialization failures fail class setup; behavior assertions stay in the tests.
 Keep setup bounded and offline, and do not move expensive behavior fixtures into it.
