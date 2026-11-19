@@ -282,6 +282,8 @@ The captured lex order places nonzero-cost coordinates before zero-cost coordina
 retaining ID order within each group. Generator lex propagation, stabilizer expansion
 and orbital fixing share that order. Factor remapping, structural keys and codecs
 retain it; every orbit still has a minimum under this fixed order.
+Orbital fixing retains immutable prefix orbits in per-factor engine state, bounded to
+65,536 integer entries; trail changes only select the first unfixed position.
 Typed integer and Boolean rows remain exact under a format's floating-point
 tolerance policy; that unused real tolerance does not exclude their symmetry scan.
 
