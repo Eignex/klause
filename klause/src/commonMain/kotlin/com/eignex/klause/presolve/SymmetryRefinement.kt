@@ -215,6 +215,20 @@ internal fun refineColours(
     return equitablePartition(problem, seedInt, seedBool)
 }
 
+internal class SymmetryIncidence(val problem: Problem) {
+    val ints = Array(problem.numIntVars) { IntArrayList() }
+    val bools = Array(problem.numBoolVars) { IntArrayList() }
+    val arcs: Int
+
+    init {
+        problem.factors.forEachIndexed { fi, factor ->
+            for (v in factor.intVars.distinct()) ints[v].add(fi)
+            for (v in factor.boolVars.distinct()) bools[v].add(fi)
+        }
+        arcs = ints.sumOf { it.size } + bools.sumOf { it.size }
+    }
+}
+
 /**
  * Weisfeiler–Leman refinement to an equitable partition (the colour-refinement core shared by
  * candidate seeding and the individualization–refinement generator search). [seedInt] / [seedBool]
@@ -229,20 +243,16 @@ internal fun equitablePartition(
     seedBool: Array<RefineKey>,
     budget: IntArray? = null,
     cancellation: ExecutionControl = ExecutionControl.Never,
+    incidence: SymmetryIncidence = SymmetryIncidence(problem),
 ): Pair<IntArray, IntArray> {
+    require(incidence.problem === problem)
     val nInt = problem.numIntVars
     val nBool = problem.numBoolVars
-    val intInc = Array(nInt) { IntArrayList() }
-    val boolInc = Array(nBool) { IntArrayList() }
-    problem.factors.forEachIndexed { fi, f ->
-        for (v in f.intVars.distinct()) intInc[v].add(fi)
-        for (v in f.boolVars.distinct()) boolInc[v].add(fi)
-    }
+    val intInc = incidence.ints
+    val boolInc = incidence.bools
     // A round visits every variable–factor incidence once (one [portSignature] port per arc); that
     // arc count is the deterministic work unit charged against the budget.
-    var arcsPerRound = 0
-    for (inc in intInc) arcsPerRound += inc.size
-    for (inc in boolInc) arcsPerRound += inc.size
+    val arcsPerRound = incidence.arcs
     val intColour = IntArray(nInt)
     val boolColour = IntArray(nBool)
     var numColours = assignColours(seedInt, seedBool, intColour, boolColour)

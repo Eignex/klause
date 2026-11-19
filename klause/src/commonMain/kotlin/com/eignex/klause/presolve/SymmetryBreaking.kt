@@ -554,7 +554,10 @@ internal object SymmetryBreaking {
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
 
         // Cells of the base equitable partition: only same-colour variables can be interchangeable.
-        val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase, budget, cancellation)
+        val incidence = SymmetryIncidence(problem)
+        val (intColour, boolColour) = equitablePartition(
+            problem, seedIntBase, seedBoolBase, budget, cancellation, incidence,
+        )
         val cells = MutableIntObjectMap<MutableList<Int>>()
         for (v in 0 until nInt) if (v !in objectiveIntVars) cells.getOrPut(intColour[v]) { ArrayList() }.add(v)
         for (v in 0 until nBool) {
@@ -571,7 +574,8 @@ internal object SymmetryBreaking {
             if (members.size < 2 || members.size > MAX_VERIFIED_GROUP) continue
             val sorted = members.sorted()
             val r = sorted[0]
-            val refLeaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, r, budget, cancellation) ?: continue
+            val refLeaf = refineToDiscrete(problem, incidence, seedIntBase, seedBoolBase, r, budget, cancellation)
+                ?: continue
             // Disjoint set over this cell's members tracks r's orbit under generators found so far, so
             // a member already in the orbit is skipped (it would only re-derive an existing element).
             val index = MutableIntIntMap()
@@ -580,7 +584,8 @@ internal object SymmetryBreaking {
             for (v in sorted) {
                 if (v == r || budget[0] <= 0 || cancellation()) continue
                 if (orbit.connected(index.getOrDefault(r, 0), index.getOrDefault(v, 0))) continue
-                val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget, cancellation) ?: continue
+                val leaf = refineToDiscrete(problem, incidence, seedIntBase, seedBoolBase, v, budget, cancellation)
+                    ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
                 // A permutation maps solutions to solutions only if it also maps every column's values onto
                 // its image's, which the factor check below does not see; the seeds are those values.
@@ -611,6 +616,7 @@ internal object SymmetryBreaking {
     @Suppress("ReturnCount")
     private fun refineToDiscrete(
         problem: Problem,
+        incidence: SymmetryIncidence,
         seedIntBase: Array<RefineKey>,
         seedBoolBase: Array<RefineKey>,
         firstIndiv: Int,
@@ -636,7 +642,7 @@ internal object SymmetryBreaking {
             // cancellation) means the partition below may be partial, so abandon this leaf.
             if (budget[0] <= 0 || cancellation()) return null
             val before = budget[0]
-            val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget)
+            val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget, incidence = incidence)
             cancellation.charge(before.toLong() - budget[0])
             val leaf = IntArray(n) { -1 }
             val cellSize = IntArray(n)
