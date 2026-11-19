@@ -476,7 +476,9 @@ Retirement only weakens the relaxation. A query's cut mask names the cut rows it
 activates; managed current masks and fully checked selected families keep
 unselected and retired rows as inactive numerical rows with free logical columns
 and zero multipliers, so a compatible owner survives additions and retirement.
-Completed base bounds survive a paused or declined separation round. A new template
+Completed base bounds survive a paused or declined separation round. A stronger checked
+selected bound retains its cut-family attribution even when primal completion is unavailable
+or interrupted; the base point and split remain guidance for an unfinished node. A new template
 first runs the ordinary checked recipe; a completed point can add one selection
 round, and a successful round retains its checked mask. Scores combine normalized
 violation, inverse square-root support and objective parallelism and guide

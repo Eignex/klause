@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
@@ -26,7 +27,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class LinearAuthorityPointCutsTest {
+class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
     private val scope = SourceScope(SourceRevision("point-cuts", "exact-affine"),
@@ -924,6 +925,62 @@ class LinearAuthorityPointCutsTest {
         }
 
         assertEquals(listOf(-2L, -3L, -2L).map { SourceValue.Rational(BigFraction.ofLong(it)) }, values)
+    }
+
+    @Test
+    fun `a selected bound should survive unavailable primal completion`() {
+        val strictReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val context = SourceProofContext(mixedMaximum.scope, mixedMaximum.coordinates + strictReal,
+            mixedMaximum.premises + mapOf(
+                "strict lower" to SourcePremise(SourceInequality(mapOf(strictReal to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO, strict = true)),
+                "strict upper" to SourcePremise(SourceInequality(mapOf(strictReal to BigFraction.ONE),
+                    BigFraction.ONE)),
+            ), mixedMaximum.objective)
+        val budget = SourceLpBudget(maxOperations = 2)
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val result = authority.advanceWithPointCuts(context, ExecutionControl.Never)
+
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+            assertNull(result.incumbent)
+            assertNull(result.evidence)
+            assertEquals(2, budget.operations)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionImprovedRounds"])
+        }
+    }
+
+    @Test
+    fun `cancelled primal completion should retain the checked selected bound without completing the round`() {
+        val strictReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val context = SourceProofContext(mixedMaximum.scope, mixedMaximum.coordinates + strictReal,
+            mixedMaximum.premises + mapOf(
+                "strict lower" to SourcePremise(SourceInequality(mapOf(strictReal to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO, strict = true)),
+                "strict upper" to SourcePremise(SourceInequality(mapOf(strictReal to BigFraction.ONE),
+                    BigFraction.ONE)),
+            ), mixedMaximum.objective)
+        var stopped = false
+        var operations = 0L
+        val budget = SourceLpBudget(onWork = {
+            operations += it.operations
+            if (operations == 3L) stopped = true
+        })
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val result = authority.advanceWithPointCuts(context, ExecutionControl { stopped })
+
+            assertTrue(stopped)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+            assertNull(result.evidence)
+            assertNull(result.incumbent)
+            assertNull(authority.cutObservations()["numericalCutSelectionImprovedRounds"])
+        }
     }
 
     @Test

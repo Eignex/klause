@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
@@ -30,7 +31,48 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class LinearAuthorityTraversalTest {
+class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
+    @Test
+    fun `a selected bound should prune without completing its primal point`() {
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+            val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val strictReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+            val sign = if (sense == ObjectiveSense.MAXIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
+            val scope = SourceScope(SourceRevision("selected-bound-closure", "exact-affine"),
+                objective = SourceObjective("x", sense))
+            val source = SourceProofContext(scope, setOf(x, real, strictReal), linkedMapOf(
+                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "strict lower" to SourcePremise(SourceInequality(mapOf(strictReal to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO, strict = true)),
+                "strict upper" to SourcePremise(SourceInequality(mapOf(strictReal to BigFraction.ONE),
+                    BigFraction.ONE)),
+            ), mapOf(x to sign))
+            val standing = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(1.0, 0.5),
+                exactReals = listOf(BigFraction.ONE, BigFraction.ofLong(2).reciprocal())) to
+                BigFraction.ofLong(2) * sign
+            val budget = SourceLpBudget(maxOperations = 2)
+            LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { standing },
+                useGuidance = true, pointCuts = true).use { component ->
+                val session = SearchComponentSet(listOf(component)).session()
+                assertEquals(ComponentResult.Consistent, session.initialize())
+
+                val disposition = component.beforeBranch(session)
+
+                assertEquals(SearchNodeDisposition.Prune, disposition)
+                assertEquals(2, budget.operations)
+                assertEquals(1L, component.observations()["numericalCutLifecycleSOURCE_MIXED_ROUNDING_BOUND_PRUNE"])
+                val terminal = assertNotNull(component.completed())
+                assertEquals(SourceValue.Rational(standing.second), assertIs<SourceClaim.Optimal>(terminal.claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+            }
+        }
+    }
+
     @Test
     fun `a later incumbent should close a checked partial bound without another LP query`() {
         for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
