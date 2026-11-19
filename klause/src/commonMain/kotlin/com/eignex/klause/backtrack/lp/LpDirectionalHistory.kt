@@ -145,7 +145,7 @@ internal class LpDirectionalHistory(
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
             if (history.down.stable && history.up.stable) {
                 val pairStamp = minOf(history.down.pairStamp, history.up.pairStamp)
-                if (history.down.gain > 0.0 || history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
+                if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
             } else observe("UNSTABLE")
         }
         observe(if (child.up) "UP" else "DOWN")
@@ -227,8 +227,7 @@ internal class LpDirectionalHistory(
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
-        val minimum = minOf(down, up)
-        val score = minimum + (maxOf(down, up) - minimum) / 7.0
+        val score = minOf(down, up)
         return score.takeIf { it.isFinite() } ?: Double.NaN
     }
 

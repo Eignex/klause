@@ -114,7 +114,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable passive history reaches matching applied and withheld commitments`() {
+    fun `passive history commits advice only with positive minimum gains`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -151,23 +151,23 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
-            assertEquals(if (downGain == 0.0) 3.0 / 7.0 else 9.0 / 7.0,
-                hints.directionalScore(proposal), 1e-9)
+            if (downGain == 0.0) assertTrue(hints.directionalScore(proposal).isNaN())
+            else assertEquals(1.0, hints.directionalScore(proposal), 1e-9)
             val before = work
             hints.beginPassiveSelection()
 
             val selected = assertNotNull(hints.selectVariable(proposal, baseline))
             hints.branch(selected)
-            hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, if (selected == proposal) 3L else 2L), 1)
 
-            assertEquals(if (apply) proposal else baseline, selected)
+            assertEquals(if (apply && downGain > 0.0) proposal else baseline, selected)
             val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
+            assertEquals(if (downGain > 0.0) 1 else 0, events.count { it == event })
             assertEquals(4, events.count { it == "UP" })
             assertEquals(4, events.count { it == "DOWN" })
             costs.add(work - before)
         }
-        assertTrue(costs.all { it == costs.first() })
+        for (pair in costs.chunked(2)) assertEquals(pair.first(), pair.last())
     }
 
     @Test
@@ -276,7 +276,7 @@ class LpHintsTest {
                     assertTrue(score.isNaN())
                     assertEquals(before, work)
                 } else {
-                    assertEquals(9.0 / 7.0, score, 1e-9)
+                    assertEquals(1.0, score, 1e-9)
                     assertTrue(work > before)
                 }
             }
@@ -541,7 +541,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 
-            assertEquals(9.0 / 7.0, hints.directionalScore(variable), 1e-9, "constant=$constant")
+            assertEquals(1.0, hints.directionalScore(variable), 1e-9, "constant=$constant")
         }
     }
 }

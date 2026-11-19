@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class LpPassiveCollectionTest {
     @Test
-    fun `completing a measured zero direction makes weighted advice available`() {
+    fun `completing a measured zero direction leaves the minimum gain at zero`() {
         val variable = VarRef.IntVar(0)
         val down = SearchDecision.IntAtMost(0, 2)
         val up = SearchDecision.IntAtLeast(0, 3)
@@ -29,8 +29,9 @@ class LpPassiveCollectionTest {
         history.beginNode(1)
         history.record(10.0)
 
-        assertTrue(history.hasReliableHistory)
-        assertEquals(1.0 / 7.0, history.score(variable, 2.25), 1e-12)
+        assertFalse(history.hasReliableHistory)
+        assertEquals(0.0, history.estimate(variable, 2.25))
+        assertTrue(history.score(variable, 2.25).isNaN())
     }
 
     @Test

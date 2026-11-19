@@ -178,7 +178,7 @@ class LpDirectionalHistoryTest {
             history.record(13.0)
         }
 
-        assertEquals(9.0 / 7.0, history.score(variable, 2.25), 1e-9)
+        assertEquals(1.0, history.score(variable, 2.25), 1e-9)
     }
 
     @Test
@@ -298,7 +298,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `a measured zero direction retains a weaker weighted score`() {
+    fun `a measured zero direction keeps the minimum estimate at zero`() {
         for (improvingUp in listOf(false, true)) {
             val history = LpDirectionalHistory({})
             history.beginNode(0)
@@ -312,10 +312,29 @@ class LpDirectionalHistoryTest {
                 }
             }
 
-            assertTrue(history.hasReliableHistory)
-            assertEquals(100.0 / 7.0, history.score(VarRef.Bool(0), 0.5), 1e-9)
-            assertTrue(history.score(VarRef.Bool(0), 0.5) < 100.0)
+            assertFalse(history.hasReliableHistory)
+            assertEquals(0.0, history.estimate(VarRef.Bool(0), 0.5))
+            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
         }
+    }
+
+    @Test
+    fun `minimum gain favors balanced children over one large direction`() {
+        val history = LpDirectionalHistory({})
+        for (variable in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+            repeat(2) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool((variable.varId shl 1) or if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (variable.varId == 1) 4.0 else if (up) 1000.0 else 1.0)
+                }
+            }
+        }
+
+        assertTrue(history.score(VarRef.Bool(1), 0.5) > history.score(VarRef.Bool(0), 0.5))
     }
 
     @Test

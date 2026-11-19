@@ -370,9 +370,10 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit a weighted mean of the predicted child gains, with six
-parts of the smaller gain and one of the larger. Both zero gains keep the fallback;
-a measured zero direction contributes zero rather than an artificial gain floor.
+in each direction permit ranking by the smaller predicted child gain. A measured
+zero direction leaves the estimate at zero and keeps the ordinary variable choice.
+Balanced predicted improvement therefore takes priority over improvement confined
+to one child. Measured zeros remain available for comparing the ordinary reference.
 Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
