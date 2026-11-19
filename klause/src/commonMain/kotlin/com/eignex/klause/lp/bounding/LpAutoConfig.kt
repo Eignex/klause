@@ -148,6 +148,17 @@ object LpAutoConfig {
         return checkNotNull(result)
     }
 
+    internal fun enablesNumericalWork(
+        problem: Problem, config: LpConfig, objective: LinearObjective?,
+    ): Boolean {
+        var enabled = false
+        sequence<Unit> {
+            enabled = !prepare(problem, config, LpPlan(), objective, skipSparseForOrdinaryPlan = true)
+                .hasDefaultNumericalSettings()
+        }.forEach { }
+        return enabled
+    }
+
     internal fun admission(problem: Problem, config: LpConfig, base: LpPlan): LpAdmission {
         var result: LpAdmission? = null
         sequence { prepare(problem, config, base) { result = it } }.forEach { }
@@ -164,6 +175,7 @@ object LpAutoConfig {
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
         sparseTrialQueryWork: Long = SPARSE_LP_MAX_WORK,
         sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,
+        skipSparseForOrdinaryPlan: Boolean = false,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -416,7 +428,8 @@ object LpAutoConfig {
             !base.componentOwnership && !base.lbTreeSearch && !coneRequested && cells > baseCap &&
             !base.cuts && !base.booleanRlt && !base.impliedBoundCuts && !base.flowCoverCuts &&
             config.overrides.none { (technique, enabled) -> enabled && technique.timing == LpTiming.EXHAUSTIVE }
-        val sparse = if (sparsePermitted && !base.bounding &&
+        val sparse = if ((!skipSparseForOrdinaryPlan || plan.hasDefaultNumericalSettings()) &&
+            sparsePermitted && !base.bounding &&
             (explicitSparse || automaticSparse) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {

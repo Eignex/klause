@@ -344,6 +344,10 @@ integer box sum when it fits, falling back to rational accumulation on overflow.
 Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
+Portfolio capability checks use an applicable ordinary numerical plan directly;
+sparse admission prepares a source for that check only when ordinary work supplies no capability.
+Detailed plans and worker engines retain their full admission path.
+
 Numerical emphasis permits automatic sparse root admission beyond the small-relaxation
 budget for compact finite optimizing linear sources. Component ownership, tree
 search, objective cones and forced cut families keep their requested plans.

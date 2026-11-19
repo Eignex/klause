@@ -9,8 +9,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
-import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.presolve.binaryChannelLiteral
 import com.eignex.klause.propagation.BakedProblem
@@ -124,9 +122,9 @@ internal class ProblemFacts(
                             factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
                     },
                 relaxation = { emphasis ->
-                    LpAutoConfig.resolve(
-                        problem, LpConfig(emphasis).cappedUnder(lpCeiling), LpPlan(), objective,
-                    ).hasDefaultNumericalSettings().not()
+                    LpAutoConfig.enablesNumericalWork(
+                        problem, LpConfig(emphasis).cappedUnder(lpCeiling), objective,
+                    )
                 },
             )
         }

@@ -10,6 +10,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -31,6 +32,50 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ArmNeedsTest {
+    @Test
+    fun `ordinary LP work remains available across sparse options`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 100L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        for (spec in listOf("default", "default,+sparse-trial", "default,-sparse-trial")) {
+            val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), LpConfig.parse(spec), objective)
+
+            assertTrue(facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)), spec)
+        }
+    }
+
+    @Test
+    fun `sparse root work can supply an otherwise unavailable relaxation`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        for ((spec, expected) in listOf("default" to true, "default,+sparse-trial" to true,
+            "default,-sparse-trial" to false)) {
+            val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), LpConfig.parse(spec), objective)
+
+            assertEquals(expected, facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)), spec)
+        }
+    }
+
+    @Test
+    fun `unaffordable automatic sparse work does not supply a relaxation`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            List(600) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+
+        for ((spec, expected) in listOf("default" to false, "default,+sparse-trial" to true,
+            "default,-sparse-trial" to false)) {
+            val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), LpConfig.parse(spec), objective)
+
+            assertEquals(expected, facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)), spec)
+        }
+    }
+
     @Test
     fun `curated eligibility should identify the missing objective without changing explicit recipes`() {
         val facts = ProblemFacts.assumed(Kind.CSP)
