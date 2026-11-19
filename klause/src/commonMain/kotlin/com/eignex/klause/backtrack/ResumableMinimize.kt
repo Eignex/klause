@@ -578,7 +578,8 @@ internal class ResumableMinimize(
     private val lpHints: LpHints? =
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
-                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) })
+                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
+                applyAdvice = params.lpDirectionalAdvice)
         } else
             null
 

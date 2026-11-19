@@ -407,6 +407,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `lp-directional-gains` execution setting. */
         val lpDirectionalGains: ExecutionOption<Boolean> = ExecutionOption("lp-directional-gains", ValueKind.BOOLEAN)
 
+        /** The `lp-directional-advice` execution setting. */
+        val lpDirectionalAdvice: ExecutionOption<Boolean> = ExecutionOption("lp-directional-advice", ValueKind.BOOLEAN)
+
         /** The `lp-variable-shaving` execution setting. */
         val lpVariableShaving: ExecutionOption<Boolean> = ExecutionOption("lp-variable-shaving", ValueKind.BOOLEAN)
 
@@ -646,7 +649,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
-                lpBranching, lpDirectionalGains,
+                lpBranching, lpDirectionalGains, lpDirectionalAdvice,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
                 arithmeticLearningWork, arithmeticLearningAllocationBytes,
                 propagationAttribution, historicalTableReasons, costAwarePropagation,

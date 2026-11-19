@@ -193,6 +193,17 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `withholding directional advice preserves enabled collection`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams(lpDirectionalGains = true)
+
+        val configured = applyBacktrackParams(base, EngineParams(listOf("lp-directional-advice=false")))
+
+        assertTrue(base.lpDirectionalAdvice)
+        assertTrue(configured.lpDirectionalGains)
+        assertTrue(!configured.lpDirectionalAdvice)
+    }
+
+    @Test
     fun `early objective core admission should reject parallel portfolios`() {
         assertFailsWith<PipelineConfigException> { scenario(2, listOf("core-early=true")) }
     }
