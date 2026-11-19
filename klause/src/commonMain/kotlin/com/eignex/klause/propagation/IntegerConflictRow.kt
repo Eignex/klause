@@ -194,7 +194,7 @@ internal class IntegerConflictRow private constructor(
             var ordered = true
             for (index in variables.indices) {
                 budget?.spend()
-                if (coefficients[index] == BIG_ZERO || index > 0 && variables[index - 1] >= variables[index]) {
+                if (coefficients[index] == BIG_ZERO || (index > 0 && variables[index - 1] >= variables[index])) {
                     ordered = false
                     break
                 }
