@@ -246,7 +246,10 @@ internal class LiveQfLraSystem(
         fun holds(column: Int, value: BigFraction): Boolean {
             stop.charge(2L)
             if (stop.pollStop()) return false
-            val bounds = state.model.column(column).bounds
+            val metadata = state.model.column(column)
+            val previous = checkedState?.model
+            if (previous != null && column < previous.numVars && metadata === previous.column(column)) return true
+            val bounds = metadata.bounds
             if (bounds.lower?.let { !arithmetic.admitted(it.number.value) } == true ||
                 bounds.upper?.let { !arithmetic.admitted(it.number.value) } == true
             ) return false

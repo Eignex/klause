@@ -109,11 +109,18 @@ private class FixedReconstructionVerifier(
                     return null
                 }
             }
-            value = plus(value, times(from(a.costs[j]), x[j]))
+            if (a.costs[j].isZero) meter.step()
+            else value = plus(value, times(from(a.costs[j]), x[j]))
         }
         val sourceObjective = plus(times(value, reciprocal(from(a.scale))), from(a.external))
-        val sourcePrimal = List(a.n) { big(plus(x[it], from(a.origins[it]))) }
-        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), x.map { big(it) })
+        val coordinates = x.map { big(it) }
+        val sourcePrimal = List(a.n) {
+            if (a.origins[it].isZero) {
+                meter.step()
+                coordinates[it]
+            } else big(plus(x[it], from(a.origins[it])))
+        }
+        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), coordinates)
     }
 
     fun dual(multipliers: List<BigFraction>, ray: Boolean): ReconstructedDual? {
@@ -218,11 +225,18 @@ private class BigReconstructionVerifier(
                     return null
                 }
             }
-            value = plus(value, times(from(a.costs[j]), x[j]))
+            if (a.costs[j].isZero) meter.step()
+            else value = plus(value, times(from(a.costs[j]), x[j]))
         }
         val sourceObjective = plus(times(value, reciprocal(from(a.scale))), from(a.external))
-        val sourcePrimal = List(a.n) { big(plus(x[it], from(a.origins[it]))) }
-        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), x.map { big(it) })
+        val coordinates = x.map { big(it) }
+        val sourcePrimal = List(a.n) {
+            if (a.origins[it].isZero) {
+                meter.step()
+                coordinates[it]
+            } else big(plus(x[it], from(a.origins[it])))
+        }
+        return ReconstructedPoint(ExactLpWitness(sourcePrimal, big(sourceObjective)), coordinates)
     }
 
     fun dual(multipliers: List<BigFraction>, ray: Boolean): ReconstructedDual? {

@@ -214,6 +214,8 @@ inclusive and overlap the certifier ledger. A successful check alone is not
 consumption: separate observations count accepted leaf packages and actual bound or
 conflict pruning. Heuristic LP seeding consumes floating coordinates directly and
 requests no certificate.
+Exact point reconstruction checks every bound, skips zero objective products, and
+reuses converted coordinates where the source origin is zero.
 
 ### Safe objective bounds
 

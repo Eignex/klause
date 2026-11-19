@@ -455,12 +455,13 @@ class QfLiraSolverHintsTest {
     fun `interrupted point evaluation should spend the existing meter and publish no hints`() {
         for (incremental in listOf(false, true)) {
             var halted = false
+            var evaluating = false
             var charged = 0L
             val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = halted
                 override val accounting: WorkMeter get() = WorkMeter { units ->
                     charged += units
-                    if (units >= 4L) halted = true
+                    if (evaluating && units >= 4L) halted = true
                 }
             }
             val model = Problem(
@@ -486,10 +487,12 @@ class QfLiraSolverHintsTest {
                 val hints = assertNotNull(component.partialPointHints(stop)).second
                 component.useSolveStop(stop)
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                val registrationWork = charged
+                evaluating = true
 
                 assertIs<ComponentResult.Indeterminate>(session.initialize())
 
-                assertTrue(charged > 0L)
+                assertTrue(charged > registrationWork)
                 assertNull(hints.preferredBool(0))
                 assertNull(session.model().valueOf(component.realAssignmentKey))
             }
