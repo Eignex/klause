@@ -4,7 +4,6 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
-import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
@@ -14,9 +13,7 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
-import kotlin.math.ceil
 import kotlin.math.round
-import kotlin.math.sqrt
 
 internal class JointRepairNeighborhood private constructor(
     private val integers: Int,
@@ -215,13 +212,11 @@ internal class JointRepairNeighborhood private constructor(
     }
 
     fun binaryNeighborhood(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>, bounds: IntBounds,
-        bools: BooleanArray, radius: BigFraction, cutoff: BigFraction?, budget: SourceLpBudget,
-        token: ExecutionControl): Pair<ExactNeighborhoodCondition, SourceInequality>? {
+        bools: BooleanArray, cutoff: BigFraction?, budget: SourceLpBudget,
+        token: ExecutionControl): ExactNeighborhoodCondition? {
         if (inputs != null || hint == null || cutoff == null || integers !in 2..4096 ||
             centers.size < integers || token()) return null
-        val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
-        var ones = 0
-        var disagreements = 0
+        val pins = linkedMapOf<Int, BigFraction>()
         for (id in 0 until integers) {
             if (!payRefutation(budget, token, 16L, 256L) ||
                 !bounds.hasLower(id) || !bounds.hasUpper(id) || bounds.lower(id) != 0L || bounds.upper(id) != 1L
@@ -229,20 +224,13 @@ internal class JointRepairNeighborhood private constructor(
             val center = centers[id]
             if (center != BigFraction.ZERO && center != BigFraction.ONE) return null
             val relaxed = hint.integer(id) ?: return null
-            if (abs(relaxed - center.toDouble()) > 1e-6) disagreements++
-            if (center == BigFraction.ONE) ones++
-            coefficients[SourceCoordinate(SourceCoordinate.Kind.Integer, id)] =
-                if (center == BigFraction.ONE) BigFraction.MINUS_ONE else BigFraction.ONE
+            if (center.isZero && abs(relaxed) <= 1e-6) pins[id] = BigFraction.ZERO
         }
-        val maximum = BigFraction.ofLong(integers.toLong())
-        val width = BigFraction.ofLong(maxOf(4, ceil(sqrt(disagreements.toDouble())).toInt()).toLong()) *
-            if (radius > maximum) maximum else radius
-        val limit = if (width > maximum) maximum else width
-        if (token() || !payRefutation(budget, token, integers.toLong(), 256L * integers)) return null
-        selectedIntegers += integers
-        // Hamming distance is a private query restriction, never a source fixing or global cut.
-        return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, emptyMap(), emptyMap(), cutoff) to
-            SourceInequality(coefficients, limit - BigFraction.ofLong(ones.toLong()))
+        if (token() || pins.size == integers ||
+            !payRefutation(budget, token, integers.toLong(), 256L * integers)) return null
+        selectedIntegers += integers - pins.size
+        // Incumbent ones stay free so a repair can exchange them for several entering variables.
+        return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
     }
 
     private fun connected(roots: List<Int>, count: Int): Set<Int> {

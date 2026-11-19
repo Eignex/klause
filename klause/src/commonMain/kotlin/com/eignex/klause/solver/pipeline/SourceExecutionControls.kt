@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.numericalOptimalityTolerance
+import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -217,10 +219,11 @@ private fun PreparedSourceInvocation.automaticCompanionReuse(reader: ExecutionOp
     val semantics = linearSource?.view?.source?.semantics ?: return false
     if (operation != ExecutionOperation.OPTIMIZE || semantics.effective.format != SourceFormat.MPS ||
         semantics.effective.numericAuthority != NumericAuthority.DECIMAL_LITERALS ||
-        !semantics.relaxesFeasibility || semantics.hasOverrides
+        semantics.effective.feasibilityTolerance != numericalSourceTolerance ||
+        semantics.effective.optimalityTolerance != numericalOptimalityTolerance || semantics.hasOverrides
     ) return false
     if (reader[ExecutionOption.sourceIncumbentCompletion] != null ||
-        reader[ExecutionOption.companionIntegers] == true || reader[ExecutionOption.companionAfterIncumbent] == true
+        reader[ExecutionOption.companionIntegers] == true || reader[ExecutionOption.companionAfterIncumbent] != true
     ) return false
     return reader[ExecutionOption.companionAdmission].let { it == null || it == "ordinary" } &&
         reader[ExecutionOption.companionRepair].let { it == null || it == "fixed" }

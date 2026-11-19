@@ -17,7 +17,6 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
-import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
@@ -102,7 +101,6 @@ internal class JointLinearRepair(
     private var preparedCenter: CheckedCenter? = null
     private var checkedProposal: CheckedProposal? = null
     private var relaxationProposal: ExactNeighborhoodCondition? = null
-    private var binaryProposal: Pair<ExactNeighborhoodCondition, SourceInequality>? = null
     private var retainedProposal: ExactNeighborhoodCondition? = null
     private var publishedQueryIncumbent: Sample? = null
     private var bootstrapHint: LinearRepairGuidance.Hint? = null
@@ -362,13 +360,13 @@ internal class JointLinearRepair(
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
                 val binary = if (!adaptive && pooled != null && completion != null && !bootstrap)
                     requireNotNull(selection).binaryNeighborhood(hint, from, model.intBounds,
-                        pooled.bools, radius, limit, budget, stop) else null
+                        pooled.bools, limit, budget, stop) else null
                 val relaxation = if (checkedStart && binary == null) requireNotNull(selection).relaxationNeighborhood(
                     hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
                 if (checkedStart && hint != null) relaxationAttempted = true
                 if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
-                if (binary != null) observe("jointRepairBinaryNeighborhoods")
-                (binary?.first ?: relaxation ?: requireNotNull(selection).propose(
+                if (binary != null) observe("jointRepairBinarySupportNeighborhoods")
+                (binary ?: relaxation ?: requireNotNull(selection).propose(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
                         if (bootstrap) {
@@ -378,7 +376,6 @@ internal class JointLinearRepair(
                             observe("jointRepairPaidRootBootstraps")
                         }
                         relaxationProposal = condition.takeIf { relaxation != null || binary != null }
-                        binaryProposal = binary
                         checkedProposal = pooled?.takeIf { completion != null && !bootstrap }
                             ?.let { CheckedProposal(condition, it) }
                         if (observation != null) {
@@ -582,7 +579,6 @@ internal class JointLinearRepair(
                     bounds = bounds.bound(coordinate, value, upper)
                 }
             }
-            binaryProposal?.takeIf { it.first === condition }?.let { bounds = bounds.integerBound(it.second) }
             pending = captured
             if (onComparison != null || observation != null) conditionSequence++
             observationQuery = conditionSequence
@@ -870,7 +866,6 @@ internal class JointLinearRepair(
         checkedTrialCenter = null
         checkedProposal = null
         relaxationProposal = null
-        binaryProposal = null
         bootstrapHint = null
         guidedProposal = null
         readyCenterStep = null

@@ -489,9 +489,11 @@ completion.
 
 ### Incumbent completion and repair
 
-Ordinary execution options enable incumbent reuse for admitted binary companions
-over nominal decimal MPS sources with unchanged numerical semantics, fixed repair,
-ordinary admission and ungated starts. `source-incumbent-completion=false` opts out.
+With `companion-after-incumbent=true`, ordinary execution options enable incumbent
+reuse for admitted binary companions
+over nominal decimal MPS sources with the default feasibility and optimality
+tolerances and unchanged numerical semantics, fixed repair and ordinary admission.
+`source-incumbent-completion=false` opts out. Ungated starts retain explicit selection.
 Consumer-local completion leaves finite workers' cutoff accounting and the first
 repair trial's scheduling priority at their ordinary settings. Explicit completion
 keeps its selected accounting and priority; exact sources, other formats, supplied
@@ -546,12 +548,11 @@ center starts joint repair without a root
 relaxation. Fixed repair first tries the rounded integers from an available paid
 root point under the checked incumbent's cutoff, retaining the ordinary continuous
 completion. The following repair can use a checked pool point at that same cutoff
-as its center. For binary models, a paid root point selects a private Hamming
-neighborhood around that checked center. All integers can move; the initial distance
-is at least four and otherwise the ceiling of the square root of the number of
-root disagreements beyond `1e-6`. The repair radius enlarges that distance after
-stalls. Its signed unit row remains in the query scope, including witness and proof
-checks; it supplies no global cut or coverage. Other integer models can pin the
+as its center. For binary models, a paid root point selects a private support
+neighborhood around that checked center. Incumbent ones and root values outside
+`1e-6` of zero remain free, so an exchange can remove agreeing incumbent ones.
+Common zeros stay pinned. These pins restrict only that query and supply no global
+fixing or coverage. Other integer models can pin the
 eligible integers agreeing with the paid point, releasing every disagreement.
 Continuous columns remain free. Missing guidance, cancellation and unavailable
 funding retain the connected two-integer start.
@@ -573,15 +574,15 @@ its own source rows and pins before using that point to prune or guide traversal
 Imported points remain query incumbents
 and centers and earn no discovery reward: only a point the repair query produces
 enters companion publication and original-source rechecking.
-A live relaxation-induced query survives publication of an improving point. Later
-ordinary selections resume that same pinned subproblem and retain its branch tree,
+A live incumbent neighborhood query survives publication of an improving point. Later
+ordinary selections resume that same conditioned subproblem and retain its branch tree,
 LP state and private incumbent until completion or the existing allowance ends.
 An unchanged query incumbent is not republished. Publication ends the initial
 continuation trial; retaining the query grants no scheduling priority or allowance.
 
-From the availability of a dimension-compatible incumbent through root and center
-preparation and the first proposal, joint repair receives continuation after owed
-complete-worker coverage, within its active cap, until the proposal finishes or the
+With explicit incumbent completion, from the availability of a dimension-compatible
+incumbent through root and center preparation and the first proposal, joint repair
+receives continuation after owed complete-worker coverage, within its active cap, until the proposal finishes or the
 companion's allowance retires it. This trial earns no incumbent reward and renews no
 work, allocation or active time; a declined center clears the request, and later
 proposals use ordinary selection.

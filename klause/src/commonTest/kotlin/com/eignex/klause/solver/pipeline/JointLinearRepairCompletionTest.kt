@@ -151,7 +151,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                 val result =
                     assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
-                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairBinaryNeighborhoods"))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairBinarySupportNeighborhoods"))
                 assertTrue((repair.stats.smt.completeSearchStages?.get("jointRepairImportedIncumbents") ?: 0L) > 0)
                 assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
                     SourceEvidence(source.scope, SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
