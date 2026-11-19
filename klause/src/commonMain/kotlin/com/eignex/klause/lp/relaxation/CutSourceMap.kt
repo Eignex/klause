@@ -93,6 +93,7 @@ internal class CutSourceMap(
     val columnCount: Int get() = columnSnapshot.size
     val fixed: Map<CutSource, BigFraction> get() = fixedSnapshot.toMap()
     val assumptions: Set<String> get() = assumptionSnapshot.toSet()
+    val hasAssumptions: Boolean get() = assumptionSnapshot.isNotEmpty()
     fun column(index: Int): CutColumnSource? = columnSnapshot.getOrNull(index)
     fun columnForInt(variable: Int): CutColumnSource? = columnSnapshot.firstOrNull {
         it?.source == CutSource(CutSourceKind.INTEGER, variable)

@@ -9,6 +9,32 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `discarding pending observations preserves estimates without renewing their age`() {
+        val history = LpDirectionalHistory({}, maxAge = 4L)
+        val variable = VarRef.IntVar(0)
+        repeat(2) {
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 2.25)
+            for (up in listOf(false, true)) {
+                history.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(if (up) 13.0 else 11.0)
+            }
+        }
+        val score = history.score(variable, 2.25)
+        assertTrue(score.isFinite())
+        history.commit(SearchDecision.IntAtMost(0, 2), 1)
+
+        history.discardObservations()
+        history.record(10000.0)
+
+        assertEquals(score, history.score(variable, 2.25))
+        repeat(4) { history.beginNode(0) }
+        assertTrue(history.score(variable, 2.25).isNaN())
+    }
+
+    @Test
     fun `sparse ancestor records retain exact counts across depth trimming`() {
         for (operation in listOf("branch", "commit", "clear")) {
             val history = LpDirectionalHistory({})

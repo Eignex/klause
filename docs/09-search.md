@@ -382,9 +382,18 @@ an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
-Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+Each parent/child observation shares one exact base model, active-row identity,
+objective mapping and incumbent cutoff. Changed rows or cuts discard pending
+observations and ancestor splits. Completed estimates can survive those edits when
+the original source identity, structural column objects, source coordinates,
+variable mapping, objective units and coefficients, and cutoff still match.
+Logical columns must have zero objective cost, and sources with assumptions decline
+retention. A bounded source check charges the existing LP allowance; it retains at
+most 8,192 structural coordinates and admits at most 8,192 rows. A changed source,
+layout, column declaration or objective clears the estimates. Edits after the
+returned node optimum suspend advice until a fresh compatible optimum arrives.
+Retention preserves sample ages and reliability requirements. Restart and assumption
+reseeding clear history.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
