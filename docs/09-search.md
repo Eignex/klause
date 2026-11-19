@@ -432,6 +432,10 @@ and incumbent cutoff. Read-only column maps shared by bound views compare by ide
 replacement arrays are checked element by element. Scope capture borrows those arrays,
 and comparison work charges the visited elements. Changed rows or cuts, layout or objective rescaling invalidate
 history and pending comparisons. Restart and assumption reseeding clear history.
+Invalidations report the first differing scope facet: base model, active rows,
+objective constant, incumbent cutoff, variable mapping or variable kind, in that order.
+Initial scope capture reports no invalidation. The additional reason observation
+charges the existing LP work allowance.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
