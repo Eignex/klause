@@ -374,9 +374,11 @@ in each direction permit the geometric mean of the predicted child gains; a zero
 gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
+Each direction uses the lower of its latest two in-age normalized gains, so one
+large observation cannot raise its estimate alone. Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
-The scope retains the most recent older-direction stamp of any reliable variable
+The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that
 gate. Passing it still requires the variable's own recent samples; it grants no
@@ -394,8 +396,8 @@ Disabled directional gains collect no history or retained model scope and charge
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
-child first to collect missing passive information. It uses an existing recent
-positive-gain sample for the selected variable and only reorders the two adjacent alternatives
+child first to collect missing passive information. It uses a recent positive
+directional estimate for the selected variable and only reorders the two adjacent alternatives
 around its fresh fractional LP point. Equal sample counts or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and

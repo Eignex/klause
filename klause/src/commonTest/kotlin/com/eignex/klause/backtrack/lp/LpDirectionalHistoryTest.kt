@@ -211,7 +211,7 @@ class LpDirectionalHistoryTest {
     @Test
     fun `aged directional observations lose reliability`() {
         val observations = ArrayList<String>()
-        val history = LpDirectionalHistory(observations::add, maxAge = 2L)
+        val history = LpDirectionalHistory(observations::add, maxAge = 4L)
         history.beginNode(0)
         history.record(10.0)
         history.branch(VarRef.Bool(0), 0.5)
@@ -225,7 +225,7 @@ class LpDirectionalHistoryTest {
         }
         assertTrue(history.score(VarRef.Bool(0), 0.5).isFinite())
         assertTrue(history.hasReliableHistory)
-        repeat(3) { history.beginNode(0) }
+        repeat(5) { history.beginNode(0) }
 
         assertFalse(history.hasReliableHistory)
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
@@ -322,5 +322,47 @@ class LpDirectionalHistoryTest {
         }
 
         assertFalse(history.hasReliableHistory)
+    }
+
+    @Test
+    fun `aging an older observation removes two sample reliability`() {
+        for (firstUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({}, maxAge = 4L)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            repeat(2) {
+                for (up in listOf(firstUp, !firstUp)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(12.0)
+                }
+            }
+            assertTrue(history.hasReliableHistory)
+
+            repeat(2) { history.beginNode(1) }
+
+            assertFalse(history.hasReliableHistory)
+            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+        }
+    }
+
+    @Test
+    fun `one large observation cannot replace the smaller recent gain`() {
+        val history = LpDirectionalHistory({})
+        for ((gain, expected) in listOf(4.0 to Double.NaN, 8.0 to 4.0, 100.0 to 8.0, 6.0 to 6.0)) {
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(10.0 + gain)
+            }
+
+            val score = history.score(VarRef.Bool(0), 0.5)
+
+            if (expected.isNaN()) assertTrue(score.isNaN()) else assertEquals(expected, score, 1e-9)
+        }
     }
 }
