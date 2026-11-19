@@ -316,14 +316,16 @@ private fun columnBounds(
     for ((index, column) in columns.withIndex()) {
         if (column == null) continue
         val (bounds, origin) = bound(index)
+        if (bounds.lower == null && bounds.upper == null) continue
+        val expression = column.expression()
         bounds.lower?.let {
             active.add(
-                CutPremise.Bound(column.expression(), false, it.number.value + origin, it.strict),
+                CutPremise.Bound(expression, false, it.number.value + origin, it.strict),
             )
         }
         bounds.upper?.let {
             active.add(
-                CutPremise.Bound(column.expression(), true, it.number.value + origin, it.strict),
+                CutPremise.Bound(expression, true, it.number.value + origin, it.strict),
             )
         }
         if (column.source.kind == CutSourceKind.BOOLEAN) {
