@@ -126,14 +126,16 @@ internal class CertifiedEnvelopeLp private constructor(
 
     private fun directPoint(column: Int?, upper: Boolean): CertifiedLpResult? {
         val source = state
-        val proposed = List(variables) { id ->
-            proposalValue(source.model.column(id).bounds)
-        }.toMutableList()
+        val proposed = ArrayList<BigFraction>(variables)
+        for (id in 0 until variables) {
+            control.charge(1L)
+            if (control()) return null
+            proposed += proposalValue(source.model.column(id).bounds)
+        }
         if (column != null) {
             val bounds = source.model.column(column).bounds
             proposed[column] = (if (upper) bounds.upper else bounds.lower)?.number?.value ?: return null
         }
-        control.charge(variables.toLong())
         if (control()) return null
         if (projection.accepts(proposed)) checkedPoint(source, proposed, column)?.let { return it }
         if (control()) return null
