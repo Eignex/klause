@@ -203,12 +203,17 @@ class RationalBasisFactorsTest {
 
     @Test
     fun `singularity after overflow should require a completed big rank scan`() {
-        val h = power(100).reciprocal()
-        val matrix = listOf(listOf(h, h), listOf(h, h))
+        val h = power(100)
+        val matrix = listOf(
+            listOf(h, BigFraction.ONE, BigFraction.ZERO),
+            listOf(BigFraction.ONE, h, BigFraction.ZERO),
+            listOf(BigFraction.ONE, h, BigFraction.ZERO),
+        )
         val result = assertIs<RationalBasisBuild.Singular>(RationalBasisFactors.factor(matrix))
-        assertEquals(1, result.rank)
+        assertEquals(2, result.rank)
         assertEquals(1, result.stats.restarts)
         assertEquals(2, result.stats.builds)
+        assertTrue(result.stats.maxBits > 128)
         val limited = RationalBasisFactors.factor(matrix, limits = RationalBasisLimits(work = result.stats.work - 1))
         assertEquals(RationalBasisDecline.WORK, assertIs<RationalBasisBuild.Declined>(limited).reason)
         assertEquals(1, limited.stats.restarts)
