@@ -141,8 +141,12 @@ internal class LiveQfLraSystem(
     rowForms: List<List<ExactRowForm>> = source.factors.map { factor ->
         factor.linearRows.map { it.exactForm(source.numRealVars) }
     },
+    strictMargin: Boolean = false,
 ) {
     private val columns = source.numRealVars + source.numIntVars
+    private val marginColumn = columns.takeIf { strictMargin }
+    val pointColumns = columns + if (strictMargin) 1 else 0
+    val usesStrictMargin get() = marginColumn != null
     private val sourceColumns = source.exactLpSourceColumns()
     private val declaredFixed = sourceColumns.mapIndexedNotNull { index, column ->
         val lower = column.lower ?: return@mapIndexedNotNull null
@@ -174,14 +178,18 @@ internal class LiveQfLraSystem(
     }
     private val terms = normalized.filterKeys { it in initialTerms }.values
         .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
-    private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
+    private val definitions = terms.withIndex().associate { (index, term) -> term to pointColumns + index }.toMutableMap()
     var batchSourceBounds = true
     var observeAssertionCost = false
     val assertionCost = SmtSourceAssertionCost()
 
+    fun hasPositiveMargin(point: List<BigFraction>?): Boolean = marginColumn?.let {
+        point?.getOrNull(it)?.signum()?.let { sign -> sign > 0 } == true
+    } ?: (point != null)
+
     fun acceptsPoint(point: List<BigFraction>, stop: ExecutionControl): Boolean {
         val state = lp.state ?: return false
-        if (point.size != columns || state.conflict != null || stop()) return false
+        if (point.size != pointColumns || !hasPositiveMargin(point) || state.conflict != null || stop()) return false
         val arithmetic = MixedPointArithmetic(stop)
         if (!point.all(arithmetic::admitted)) return false
         fun holds(column: Int, value: BigFraction): Boolean {
@@ -219,9 +227,12 @@ internal class LiveQfLraSystem(
                 integral = column.integral,
                 tag = column.tag,
             )
-        }
+        } + if (marginColumn == null) emptyList() else listOf(ExactLpColumn(
+            ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)), ExactLpSide(ExactLpNumber.of(1L))),
+            integral = false,
+        ))
         val logical = List(terms.size) { ExactLpColumn(ExactLpBounds(), integral = false) }
-        val entries = List(columns) { ArrayList<ExactLpEntry>() }
+        val entries = List(pointColumns) { ArrayList<ExactLpEntry>() }
         terms.forEachIndexed { row, term ->
             for ((column, coefficient) in term) {
                 if (column in entries.indices && !coefficient.isZero) {
@@ -236,7 +247,7 @@ internal class LiveQfLraSystem(
                 List(terms.size) { ExactLpNumber.of(0L) },
                 structural + logical,
                 List(terms.size) { ExactLpRow() },
-                ExactLpObjective(List(columns + terms.size) { ExactLpNumber.of(0L) }),
+                ExactLpObjective(List(pointColumns + terms.size) { ExactLpNumber.of(if (it == marginColumn) -1L else 0L) }),
             ),
         )
     }
@@ -287,10 +298,10 @@ internal class LiveQfLraSystem(
             for ((side, row) in rows.withIndex()) {
                 if (stop.pollStop()) return false
                 val negated = comparison.op == LinearOp.GE || (comparison.op == LinearOp.EQ && side == 1)
-                val bound = prepareBound(if (negated) keys.negative else keys.positive,
+                val bounds = prepareBounds(if (negated) keys.negative else keys.positive,
                     true, row.rhs, row.strict, input.premise, { !stop() && batch.flush() })
                     ?: return batch.conflict
-                val consistent = batch.add(bound)
+                val consistent = bounds.all(batch::add)
                 if (!consistent) {
                     if (side == rows.lastIndex) batch.complete(index)
                     return !stop() && (batch.flush() || batch.conflict)
@@ -380,15 +391,8 @@ internal class LiveQfLraSystem(
         strict: Boolean,
         premise: SearchAtomPremise,
     ): Boolean {
-        val bound = prepareBound(key, upper, threshold, strict, premise) ?: return false
-        return measureAssertion({ assertionCost.boundNs += it }) {
-            if (observeAssertionCost) {
-                assertionCost.boundCalls++
-                val previous = lp.state?.activeSide(bound.column, bound.upper)?.side
-                if (previous == null || bound.side.strongerThan(previous, bound.upper)) assertionCost.boundSides++
-            }
-            lp.assertBound(bound.column, bound.upper, bound.side, bound.premise)
-        }
+        val bounds = prepareBounds(key, upper, threshold, strict, premise) ?: return false
+        return assertBounds(bounds) !is LpBoundBatchResult.Declined
     }
 
     private fun assertBounds(bounds: List<LpPremisedBound>): LpBoundBatchResult =
@@ -425,6 +429,23 @@ internal class LiveQfLraSystem(
             ExactLpSide(ExactLpNumber.of(term.bound(threshold)), strict),
             term.premise(premise),
         )
+    }
+
+    private fun prepareBounds(
+        key: SmtTermKey,
+        upper: Boolean,
+        threshold: BigFraction,
+        strict: Boolean,
+        premise: SearchAtomPremise,
+        beforeDefinition: () -> Boolean = { true },
+    ): List<LpPremisedBound>? {
+        val original = prepareBound(key, upper, threshold, strict, premise, beforeDefinition) ?: return null
+        val margin = marginColumn ?: return listOf(original)
+        if (!strict) return listOf(original)
+        val expression = key.expression() + (margin to if (upper) BigFraction.ONE else BigFraction.MINUS_ONE)
+        val interior = prepareBound(SmtTermKey.of(expression), upper, threshold, false, premise, beforeDefinition)
+            ?: return null
+        return listOf(original, interior)
     }
 
     private fun definitionColumn(coefficients: Map<Int, BigFraction>, beforeAppend: () -> Boolean): Int? =

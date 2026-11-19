@@ -37,6 +37,15 @@ normalized multi-column term gets one slack column defined by an equality row, s
 every asserted atom becomes a bound on a single column, and asserting or retracting
 an atom only moves a bound.
 
+Pure-real feasibility retains a private margin column `e` in `[0, 1]` and minimizes
+`-e`. Each strict side `t < b` also asserts the closed side `t + e <= b`; the
+original strict bound stays available to explained interval deductions. A finite
+strict system has an interior point exactly when a common positive margin exists.
+A certified point with positive margin supplies a source candidate. A certified
+lower bound of zero on `-e` refutes strict feasibility and explains the conflict
+with the bound's current source premises. The margin and its affine definitions
+share the primary LP's scopes and basis and are omitted from source coordinates.
+
 Bound intersection retains exact sides even when they have no finite binary64
 projection. Crossed sides yield a conflict with both premises before numerical
 preparation; a consistent unprojectable system can still decline its numerical check

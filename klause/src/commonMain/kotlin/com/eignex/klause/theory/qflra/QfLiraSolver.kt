@@ -311,7 +311,7 @@ class ExactLiraSearchComponent private constructor(
         )
     }
     private val lp: LpPropagator by lpDelegate
-    private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
+    private val system by lazy { LiveQfLraSystem(model, lp, exactForms, strictMargin = model.numIntVars == 0) }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -1479,18 +1479,23 @@ class ExactLiraSearchComponent private constructor(
             solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
             system.acceptsPoint(retained, lpStop)
         ) {
-            candidate = retained
+            candidate = retained.take(model.numRealVars + model.numIntVars)
             dirty = false
             observeCompleteStage("LP_POINT_RECHECK")
-            if (bools.any { it == UNASSIGNED }) capturePointHints(retained, context)
-            else captureCompleteWitness(retained)
+            if (bools.any { it == UNASSIGNED }) capturePointHints(checkNotNull(candidate), context)
+            else captureCompleteWitness(candidate)
             return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
         }
         if (operationStop()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
-        val result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
+        var result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
             lp.solve(sparsePointRecovery = true, claim = LpClaim.FEASIBLE_COMPLETION)
+        }
+        if (result != null && result.verdict != LpVerdict.INFEASIBLE && system.usesStrictMargin &&
+            !system.hasPositiveMargin(result.exactPrimal) && !operationStop()
+        ) {
+            result = lp.solve(sparsePointRecovery = true, claim = LpClaim.BOUND) ?: result
         }
         if (complete) {
             val key = if (result == null)
@@ -1514,11 +1519,14 @@ class ExactLiraSearchComponent private constructor(
         if (result == null) return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
         dirty = false
-        candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
-        if (candidate != null) retainedLpPoint = candidate
+        candidate = result.exactPrimal?.takeIf(system::hasPositiveMargin)
+            ?.take(model.numRealVars + model.numIntVars)
+        if (candidate != null) retainedLpPoint = result.exactPrimal?.take(system.pointColumns)
         unconsumedLpPoint = candidate
-        if (result.verdict == LpVerdict.INFEASIBLE) {
-            val explanation = lp.explainConflict(result.conflictSupport, context)
+        val marginConflict = system.usesStrictMargin && result.lowerBound?.let { it >= BigFraction.ZERO } == true
+        if (result.verdict == LpVerdict.INFEASIBLE || marginConflict) {
+            val support = if (marginConflict) result.bound?.support else result.conflictSupport
+            val explanation = lp.explainConflict(support, context)
             smtStats?.observeConflict(explanation)
             outcome = ComponentCheck.Infeasible(explanation)
             LpClaim.CONTRADICTION.consumed(primaryLpObserver)

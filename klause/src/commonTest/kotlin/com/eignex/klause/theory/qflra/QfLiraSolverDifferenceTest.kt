@@ -37,6 +37,39 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverDifferenceTest {
     @Test
+    fun `a large strict chain should complete through its retained margin LP`() {
+        val chain = Array(129) { column ->
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(column, column + 1),
+                doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0)
+        }
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 130,
+            realLower = DoubleArray(130) { 0.0 },
+            realUpper = DoubleArray(130) { 1.0 },
+            factors = chain + arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0, true),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(129), doubleArrayOf(1.0), LinearOp.LE, 1.0, true),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.5),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val point = assertNotNull(session.model().valueOf(component.realAssignmentKey)).reals
+            assertTrue(point.first() > BigFraction.ofLong(2).reciprocal())
+            assertTrue(point.last() < BigFraction.ONE)
+            assertTrue(point.zipWithNext().all { (left, right) -> left <= right })
+        }
+    }
+
+    @Test
     fun `partial difference checks and complete source witnesses should share the LP owner`() {
         val model = Problem(
             numBoolVars = 2,
