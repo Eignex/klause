@@ -38,7 +38,8 @@ class LinearAuthorityAggregateDerivationTest {
     @Test
     fun `either aggregate owner should retract its cut while an independent cut remains active`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
-        val root = SourceProofContext(scope, setOf(x, y, real, z), linkedMapOf(
+        val guards = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) }
+        val root = SourceProofContext(scope, setOf(x, y, real, z) + guards, linkedMapOf(
             "left" to SourcePremise(left, guards = mapOf(0 to true)),
             "right" to SourcePremise(right, guards = mapOf(1 to true)),
             "independent" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2)), BigFraction.ONE)),
