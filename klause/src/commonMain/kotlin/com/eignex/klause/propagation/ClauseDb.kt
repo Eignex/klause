@@ -12,6 +12,10 @@ import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.toLongExact
 
 /**
  * Invoke [action] with the *other* literal of every binary clause that contains [lit].
@@ -142,6 +146,40 @@ internal fun PropagationState.addLearnedPb(
     for (lit in watched) installLitWatch(lit, newFid, NO_BLOCKER)
     refPayload[newFid] = watched
     return newFid
+}
+
+internal fun PropagationState.addLearnedPb(
+    weights: Array<com.eignex.util.numbers.BigInt>,
+    literals: IntArray,
+    degree: com.eignex.util.numbers.BigInt,
+    lbd: Int,
+    permanent: Boolean = false,
+): Int {
+    var total = com.eignex.util.numbers.BIG_ZERO
+    var largest = total
+    for (weight in weights) {
+        checkFiniteWork()
+        checkIntegerScalarWork(total, weight)
+        total += weight
+        if (weight > largest) largest = weight
+    }
+    checkIntegerScalarWork(degree, largest)
+    if (total.fitsLong() && (degree + largest).fitsLong()) {
+        return addLearnedPb(LongArray(weights.size) { weights[it].toLongExact() }, literals,
+            degree.toLongExact(), lbd, permanent)
+    }
+    learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Constructed)
+    val prop = LearnedExactPbPropagator(weights.copyOf(), literals.copyOf(), degree)
+    val factor = totalFactorCount
+    addGeneralLearnedRow(prop, 0, lbd, permanent, OWN_ORIGIN)
+    learned.nonClauseCount++
+    work++
+    work += learned.trackCapObject(learned.size - 1, permanent, LearnedKind.Pb)
+    learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Admitted)
+    arithmeticLearningTrace?.stored(factor, "pb")
+    for (literal in prop.literals) installLitWatch(literal, factor, NO_BLOCKER)
+    refPayload[factor] = prop.literals
+    return factor
 }
 
 internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): Int {
@@ -493,7 +531,7 @@ internal fun PropagationState.remapQueue(queue: IntArrayDeque, remap: IntArray, 
 }
 
 internal fun PropagationState.learnedKind(index: Int): LearnedKind = when (learned.store[index]) {
-    is PseudoBooleanPropagator -> LearnedKind.Pb
+    is PseudoBooleanPropagator, is LearnedExactPbPropagator -> LearnedKind.Pb
     is LearnedIntegerPropagator -> LearnedKind.Integer
     else -> LearnedKind.Clause
 }

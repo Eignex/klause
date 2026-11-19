@@ -18,7 +18,11 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 import kotlin.math.ln
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
@@ -1014,7 +1018,24 @@ class PropagationSession private constructor(
         }
     }
 
-    /** Enable bounded mandatory integer-row learning for subsequent finite conflicts. */
+    internal fun addLearnedPb(
+        weights: Array<com.eignex.util.numbers.BigInt>,
+        literals: IntArray,
+        degree: com.eignex.util.numbers.BigInt,
+        lbd: Int,
+        permanent: Boolean = false,
+    ): PropagationResult {
+        if (permanent) scopedLearnedAssertion = true
+        return registerAndPropagate(base = state.undoTop) {
+            state.addLearnedPb(weights, literals, degree, lbd, permanent)
+        }
+    }
+
+    internal fun configureArithmeticLearning(workLimit: Long, allocationBytes: Long) {
+        state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
+    }
+
+    /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
     fun enableIntegerRowLearning() {
         check(!state.incremental)
         state.integerRowLearning = true
@@ -1040,7 +1061,7 @@ class PropagationSession private constructor(
         when (learned) {
             is ConflictAnalyzer.AnalysisResult.Learned -> learned.literals.any { litTruth(it) == true }
             is ConflictAnalyzer.AnalysisResult.LearnedPb -> {
-                var trueWeight = 0L
+                var trueWeight = BIG_ZERO
                 for (index in learned.literals.indices) {
                     if (litTruth(learned.literals[index]) == true) trueWeight += learned.weights[index]
                 }
@@ -1061,7 +1082,13 @@ class PropagationSession private constructor(
      *  once, and either surface the cascaded conflict or re-baseline the level with the asserted facts. */
     private inline fun registerAndPropagate(base: Int, register: () -> Int): PropagationResult {
         bakedUnsat?.let { return it }
-        val newFid = register()
+        state.finiteWork.cancellation = cancellation
+        val newFid = try {
+            register()
+        } catch (_: FinitePropagationInterrupted) {
+            state.runCancelled = true
+            return PropagationResult.Implied.EMPTY
+        }
         state.factorAttribution?.let {
             if (state.nativeEngine == null) it.admit(state.factorAt(newFid))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)

@@ -5,8 +5,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.PermutationGroup
 import com.eignex.util.collections.IntArrayList
-import com.eignex.util.collections.IntHashSet
-import com.eignex.util.collections.toSortedIntArray
 
 /**
  * Dynamic symmetry handling: one global propagator for the whole automorphism group rather than an
@@ -17,7 +15,7 @@ import com.eignex.util.collections.toSortedIntArray
  * predicate is a sound symmetry break and at least one representative per orbit always survives.
  *
  * A generator permutes integer and Boolean variables independently (detection is kind-preserving),
- * so the lex sequence orders the integer support in id order, then the Boolean support in id order;
+ * so each position of the captured lex order compares coordinates of the same kind;
  * each position compares a variable against its image of the same kind. The filtering is the `α`/`β`
  * lex rule (α = first undecided position, β = start of the forced `≥` suffix) of Frisch, Hnich,
  * Kiziltan, Miguel and Walsh, "Propagation algorithms for lexicographic ordering constraints",
@@ -31,7 +29,12 @@ internal class SymmetryPropagator(
     private val generators: List<Generator>,
     private val unified: List<IntArray>,
     private val nInt: Int,
+    private val supportOrder: IntArray,
 ) : Propagator {
+
+    private companion object {
+        const val MAX_CACHED_ORBIT_WORDS = 65_536
+    }
 
     /** A generator's lex sequence: position `k` compares [leftVar]`[k]` against its image
      *  [rightVar]`[k]`, both Boolean when [isBool]`[k]` (else both integer). */
@@ -40,17 +43,14 @@ internal class SymmetryPropagator(
     /** Permutation degree (`nInt + nBool`). */
     private val n: Int = if (unified.isEmpty()) nInt else unified.first().size
 
-    /** The group's support (variables some generator moves), as unified ids in ascending order — the
-     *  fixed total order the orbital-fixing rule walks. */
-    private val supportOrder: IntArray = run {
-        val moved = IntHashSet()
-        for (p in unified) for (i in p.indices) if (p[i] != i) moved.add(i)
-        moved.toSortedIntArray()
+    private class OrbitCache(size: Int) {
+        val frontiers = arrayOfNulls<IntArray>(size)
+        var words = 0
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         for (g in generators) if (!propagateLexLeader(state, g)) return false
-        return orbitalFix(state)
+        return orbitalFix(state, factorId)
     }
 
     /**
@@ -65,17 +65,18 @@ internal class SymmetryPropagator(
      * https://doi.org/10.1007/s10107-003-0394-6.
      */
     @Suppress("ReturnCount")
-    private fun orbitalFix(state: PropagationState): Boolean {
+    private fun orbitalFix(state: PropagationState, factorId: Int): Boolean {
         if (unified.isEmpty()) return true
-        val prefix = IntArrayList()
-        for (k in supportOrder) {
+        val cache = (state.refPayload[factorId] as? OrbitCache)
+            ?: OrbitCache(supportOrder.size).also { state.refPayload[factorId] = it }
+        for (index in supportOrder.indices) {
+            val k = supportOrder[index]
             val kBool = k >= nInt
             val kVar = if (kBool) k - nInt else k
             if (lo(state, kVar, kBool) == hi(state, kVar, kBool)) {
-                prefix.add(k)
                 continue
             }
-            val orbit = PermutationGroup.orbitUnderStabilizer(unified, prefix.toIntArray(), k, n)
+            val orbit = frontierOrbit(cache, index)
             for (j in orbit) {
                 if (j == k) continue
                 val jBool = j >= nInt
@@ -105,6 +106,19 @@ internal class SymmetryPropagator(
             return true // only the frontier position; deeper positions resolve as it fixes
         }
         return true
+    }
+
+    private fun frontierOrbit(cache: OrbitCache, index: Int): IntArray {
+        // The group and prefix positions are immutable; the trail only selects which frontier is reached.
+        cache.frontiers[index]?.let { return it }
+        val orbit = PermutationGroup.orbitUnderStabilizer(
+            unified, supportOrder.copyOf(index), supportOrder[index], n,
+        ).toIntArray()
+        if (orbit.size <= MAX_CACHED_ORBIT_WORDS - cache.words) {
+            cache.frontiers[index] = orbit
+            cache.words += orbit.size
+        }
+        return orbit
     }
 
     /** The premise of an `x ≤ y` bound transfer: the cited variable's current bound (an integer

@@ -262,7 +262,8 @@ readers. Value orbits intersecting an active objective column's domain stay fixe
 Active-column scans charge and poll the pass token; an interrupted scan
 posts no break. Both passes stay off for solution-set-sensitive queries.
 
-The opt-in finite `objective-symmetry` pass runs before `symmetry` and admits
+The finite `objective-symmetry` pass replaces the ordinary `symmetry` scan by default
+for complete optimization routes with an exact current objective. It admits
 variable permutations under the exact current replacement objective. Candidate
 colors combine root domains or Boolean fixings with signed objective coefficients;
 verification checks those declarations, every coefficient and the complete factor
@@ -271,8 +272,22 @@ adjacent single transposition to pass verification, so a lockstep matrix orbit
 receives only the existing generator lex and stabilizer propagation. Value symmetry
 still protects objective domains. Protection-only contexts, real coordinates,
 source symmetry annotations and solution-sensitive operations decline this pass;
-pure local-search plans disable it. Default admission retains objective-column
-protection. Discovery and verification share the preparation allowance.
+local-search, mixed and ALNS routes disable it. Unsupported objective semantics use
+the ordinary scan with objective-column protection. Disabling `objective-symmetry`
+also restores that scan. Counting, sampling and enumeration retain their solution
+set. Discovery and verification share the preparation allowance, with structural
+size and refinement-work limits; singleton domain/cost seeds skip refinement.
+One source-bound incidence snapshot serves all individualization leaves in a scan.
+Each individualization starts from the refined partition and retains its canonical
+color classes between splits; candidate verification remains independent of coloring.
+The captured lex order places nonzero-cost coordinates before zero-cost coordinates,
+retaining ID order within each group. Generator lex propagation, stabilizer expansion
+and orbital fixing share that order. Factor remapping, structural keys and codecs
+retain it; every orbit still has a minimum under this fixed order.
+Orbital fixing retains immutable prefix orbits in per-factor engine state, bounded to
+65,536 integer entries; trail changes only select the first unfixed position.
+Typed integer and Boolean rows remain exact under a format's floating-point
+tolerance policy; that unused real tolerance does not exclude their symmetry scan.
 
 Boolean probing retains failed-literal units and bounds implied by both polarities;
 integer and open-range probing extend this to bounds and holes. Compilation, incidence,

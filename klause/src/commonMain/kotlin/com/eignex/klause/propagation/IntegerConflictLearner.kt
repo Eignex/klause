@@ -1,18 +1,18 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.internals.linearLazyReason
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.CheckedLongOverflowException
-
-internal const val INTEGER_LEARNING_ROWS = 64
-private const val INTEGER_LEARNING_STEPS = 16
-private const val INTEGER_LEARNING_LEVELS = 64
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.compareTo
 
 internal class IntegerConflictLearner(private val state: PropagationState) {
-    private var previousSource: IntegerSourceRow? = null
-    private var previousUseLo = false
-    private var previousRow: IntegerConflictRow? = null
-    private var combinations = 0
+    private val budget = ArithmeticLearningBudget(state)
+    private val sources = GuardedIntegerSource(state, budget)
+    private val normalized = mutableMapOf<Pair<Any, Boolean>, IntegerConflictRow?>()
+    private val eagerMarkers = mutableMapOf<Pair<Int, Boolean>, IntArray?>()
 
     fun learn(
         factorId: Int,
@@ -20,6 +20,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? = try {
         derive(factorId, currentLevel, fallback)
+    } catch (stop: ArithmeticLearningDeclined) {
+        decline(stop.reason)
     } catch (_: CheckedLongOverflowException) {
         state.arithmeticLearningTrace?.record("integer.decline.overflow")
         null
@@ -35,66 +37,65 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         currentLevel: Int,
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? {
-        if (currentLevel !in 1..INTEGER_LEARNING_LEVELS) {
-            state.arithmeticLearningTrace?.record("integer.level-limit", currentLevel.toLong(), factorId.toLong(),
-                state.baseFactorCount.toLong(), fallback.backjumpLevel.toLong(),
-                if (fallback.asserting) 1L else 0L, fallback.literals.size.toLong())
-            val originalSeed = factorId in 0 until state.baseFactorCount
-            return decline(if (originalSeed) "level-limit-original" else "level-limit-learned")
-        }
+        if (currentLevel <= 0) return decline("root")
         if (!fallback.asserting) return decline("fallback-nonasserting")
         if (fallback.literals.isEmpty()) return decline("fallback-empty")
         if (fallback.backjumpLevel !in 0 until currentLevel) return decline("fallback-target")
-        if ((state.learned.integerRows?.size ?: 0) >= INTEGER_LEARNING_ROWS) return decline("store-capacity")
         val target = fallback.backjumpLevel
         val trail = state.integerLearningTrailAtLevel?.invoke(target) ?: return decline("assertion-unavailable")
         state.arithmeticLearningTrace?.record("integer.fallback-target", target.toLong(), trail.toLong())
         val source = sourceFactor(factorId) ?: return decline("seed-source")
-        var row = when (source.linear.op) {
+        var row = when (source.op) {
             LinearOp.LE -> normalizedSource(source, useLo = true)
             LinearOp.GE -> normalizedSource(source, useLo = false)
             LinearOp.EQ -> {
                 val lower = normalizedSource(source, useLo = true) ?: return decline("seed-normalization")
-                if (lower.minimum(state) > lower.bound) lower else normalizedSource(source, useLo = false)
+                if (lower.minimum(state, budget = budget) > lower.bound) lower else
+                    normalizedSource(source, useLo = false)
             }
             LinearOp.NE -> null
         } ?: return decline("seed-normalization")
         state.arithmeticLearningTrace?.row("integer.seed-row", row, state)
-        if (row.minimum(state) <= row.bound) return decline("seed-not-conflicting")
+        if (row.minimum(state, budget = budget) <= row.bound) return decline("seed-not-conflicting")
         val used = mutableSetOf<Pair<Int, Int>>()
-        repeat(INTEGER_LEARNING_STEPS) {
-            state.checkFiniteWork()
+        while (true) {
+            budget.spend()
             val event = reason(row, used) ?: return decline("no-qualified-endpoint")
+            budget.spend(bytes = 48)
             used.add(event.key)
             state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
-            row = event.combination
-            if (row.minimum(state) <= row.bound) return decline("combination-lost-conflict")
-            if (state.learned.integerRows?.any { it.row.subsumes(row) } == true) return decline("duplicate")
-            val asserts = row.assertsAt(state, trail)
+            row = event.combination.reduced(state, budget = budget) ?: event.combination
+            if (row.minimum(state, budget = budget) <= row.bound) return decline("combination-lost-conflict")
+            val duplicate = state.learned.integerRows?.any {
+                budget.spend()
+                if (it.row.directionHash == row.directionHash) budget.spend(row.variables.size.toLong())
+                it.row.subsumes(row)
+            } == true
+            if (duplicate) continue
+            val asserts = row.assertsAt(state, trail, budget)
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
                 if (asserts) 1 else 0)
-            if (!asserts) return@repeat
+            if (!asserts) continue
+            val metadataSize = row.variables.size.toLong() + fallback.decisionLevels.size
+            budget.spend(work = metadataSize * (Long.SIZE_BITS - metadataSize.countLeadingZeroBits()),
+                bytes = metadataSize * 40)
             val levels = row.variables.indices.map { index ->
+                budget.spend()
                 val variable = row.variables[index]
-                val lower = row.coefficients[index] > 0L
+                val lower = row.coefficients[index] > BIG_ZERO
                 val domain = state.intDomains[variable]
                 state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
             }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row, target, levels.size, levels, fallback)
         }
-        return decline("step-limit-without-assertion")
     }
 
     private fun normalizedSource(source: IntegerSourceRow, useLo: Boolean): IntegerConflictRow? {
-        val previous = previousSource
-        if (previous != null && previous.linear === source.linear && previous.guard == source.guard &&
-            previousUseLo == useLo) {
-            return previousRow
-        }
-        val row = source.row(useLo)
-        previousSource = source
-        previousUseLo = useLo
-        previousRow = row
+        val key = source.identity to useLo
+        if (normalized.containsKey(key)) return normalized[key]
+        budget.spend(bytes = 80)
+        val row = source.row(useLo, budget)
+        normalized[key] = row
         return row
     }
 
@@ -102,23 +103,20 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         factorId: Int,
         trail: Int = state.undo.size,
         forBoundReason: Boolean = false,
-    ): IntegerSourceRow? = GuardedIntegerSource(state).source(factorId, trail, forBoundReason)
+    ): IntegerSourceRow? = sources.source(factorId, trail, forBoundReason)
 
     private fun reason(row: IntegerConflictRow, used: Set<Pair<Int, Int>>): BoundEvent? {
-        if (combinations == INTEGER_LEARNING_STEPS) return null
+        budget.spend(bytes = row.variables.size.toLong() * Int.SIZE_BYTES)
+        val trails = IntArray(row.variables.size)
         var candidates: IntArray? = null
         var count = 0
         for (index in row.variables.indices) {
-            state.checkFiniteWork()
+            budget.spend()
             val variable = row.variables[index]
-            val lower = row.coefficients[index] > 0L
+            val lower = row.coefficients[index] > BIG_ZERO
             val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
-            val marker = if (lower) state.intMinAntecedents[variable] else state.intMaxAntecedents[variable]
+            val marker = endpointMarker(row, index)
             state.arithmeticLearningTrace?.marker(variable, lower, marker)
-            if (!isLazyReason(marker)) {
-                state.arithmeticLearningTrace?.record("integer.endpoint-decline.eager-or-decision")
-                continue
-            }
             marker ?: continue
             if (marker.size != LAZY_PAYLOAD + 6 || marker[1] != factorId) {
                 state.arithmeticLearningTrace?.record("integer.endpoint-decline.marker-shape")
@@ -126,36 +124,91 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             val key = variable to if (lower) marker[2] else marker[2].inv()
             if (key in used) continue
-            val indices = candidates ?: IntArray(row.variables.size).also { candidates = it }
-            var position = count
-            while (position > 0) {
-                state.checkFiniteWork()
-                val previous = checkNotNull(endpointMarker(row, indices[position - 1]))
-                if (previous[2] >= marker[2]) break
-                indices[position] = indices[position - 1]
-                position--
+            trails[index] = marker[2]
+            val indices = candidates ?: run {
+                budget.spend(bytes = row.variables.size.toLong() * Int.SIZE_BYTES)
+                IntArray(row.variables.size).also { candidates = it }
             }
-            indices[position] = index
-            count++
+            indices[count++] = index
         }
         val indices = candidates ?: return null
-        for (position in 0 until count) {
-            state.checkFiniteWork()
-            if (combinations == INTEGER_LEARNING_STEPS) return null
-            qualifiedReason(row, indices[position])?.let { return it }
+        fun later(left: Int, right: Int): Boolean {
+            budget.spend()
+            val l = trails[left]
+            val r = trails[right]
+            return l > r || (l == r && left < right)
+        }
+        fun sift(start: Int, size: Int) {
+            var root = start
+            while (root * 2 + 1 < size) {
+                budget.spend()
+                var child = root * 2 + 1
+                if (child + 1 < size && later(indices[child + 1], indices[child])) child++
+                if (!later(indices[child], indices[root])) return
+                val swap = indices[root]
+                indices[root] = indices[child]
+                indices[child] = swap
+                root = child
+            }
+        }
+        for (root in count / 2 - 1 downTo 0) sift(root, count)
+        var remaining = count
+        while (remaining > 0) {
+            val index = indices[0]
+            remaining--
+            indices[0] = indices[remaining]
+            sift(0, remaining)
+            budget.spend()
+            qualifiedReason(row, index)?.let { return it }
         }
         return null
     }
 
     private fun endpointMarker(row: IntegerConflictRow, index: Int): IntArray? {
         val variable = row.variables[index]
-        return if (row.coefficients[index] > 0L) state.intMinAntecedents[variable]
-        else state.intMaxAntecedents[variable]
+        val lower = row.coefficients[index] > BIG_ZERO
+        val recorded = if (lower) state.intMinAntecedents[variable] else state.intMaxAntecedents[variable]
+        if (isLazyReason(recorded)) return recorded
+        if (recorded == null) return null
+        val key = variable to lower
+        if (eagerMarkers.containsKey(key)) return eagerMarkers[key]
+        budget.spend(bytes = 96)
+        val marker = eagerEndpoint(variable, lower)
+        eagerMarkers[key] = marker
+        return marker
+    }
+
+    private fun eagerEndpoint(variable: Int, lower: Boolean): IntArray? {
+        val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+        if (factorId < 0) return null
+        val moves = state.boundMoves[variable] ?: return null
+        val previous =
+            (if (lower) state.boundMovePriorMin[variable] else state.boundMovePriorMax[variable]) ?: return null
+        val live = state.intDomains[variable].let { if (lower) it.min else it.max }
+        var lo = 0
+        var hi = moves.size
+        while (lo < hi) {
+            budget.spend()
+            val mid = (lo + hi) ushr 1
+            if (if (lower) previous[mid] < live else previous[mid] > live) lo = mid + 1 else hi = mid
+        }
+        if (lo == 0) return null
+        val trail = moves[lo - 1]
+        val source = sourceFactor(factorId, trail, forBoundReason = true) ?: return null
+        budget.spend(source.variables.size.toLong())
+        val position = source.variables.indexOf(variable)
+        if (position < 0) return null
+        val positive = normalizedSource(source, source.op != LinearOp.GE)?.coefficient(variable) ?: return null
+        val useLo = if (source.op == LinearOp.GE) false else (positive > BIG_ZERO) != lower
+        return linearLazyReason(state, factorId, position, useLo, 0,
+            source.guard xor 1, source.guard != Lit.NONE).also {
+            it[2] = trail
+        }
     }
 
     private fun qualifiedReason(row: IntegerConflictRow, index: Int): BoundEvent? {
         val variable = row.variables[index]
-        val lower = row.coefficients[index] > 0L
+        val lower = row.coefficients[index] > BIG_ZERO
         val marker = checkNotNull(endpointMarker(row, index))
         val factorId = marker[1]
         val key = variable to if (lower) marker[2] else marker[2].inv()
@@ -175,16 +228,16 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             return null
         }
         val position = marker[LAZY_PAYLOAD]
-        if (source.linear.vars.getOrNull(position) != variable) {
+        if (source.variables.getOrNull(position) != variable) {
             state.arithmeticLearningTrace?.record("integer.endpoint-decline.source-position")
             return null
         }
         val useLo = marker[LAZY_PAYLOAD + 1] == 1
-        if ((source.linear.op == LinearOp.LE && !useLo) || (source.linear.op == LinearOp.GE && useLo)) return null
+        if ((source.op == LinearOp.LE && !useLo) || (source.op == LinearOp.GE && useLo)) return null
         val sourceRow = normalizedSource(source, useLo) ?: return null
-        if ((sourceRow.coefficient(variable) > 0L) == lower) return null
+        if ((sourceRow.coefficient(variable) > BIG_ZERO) == lower) return null
         state.arithmeticLearningTrace?.row("integer.endpoint-row", sourceRow, state, marker[2])
-        val proposed = sourceRow.boundFor(state, variable, marker[2])
+        val proposed = sourceRow.boundFor(state, variable, marker[2], budget)
         if (proposed == null) {
             state.arithmeticLearningTrace?.record("integer.endpoint-decline.unavailable-bound")
             return null
@@ -195,12 +248,16 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 domain.min, domain.max, marker[2].toLong())
             return null
         }
-        combinations++
-        val combination = row.resolve(sourceRow, variable)
+        var combination = row.resolve(sourceRow, variable, budget)
         if (combination == null) {
             state.arithmeticLearningTrace?.record("integer.endpoint-decline.combination-shape-or-guard")
             return null
         }
+        if (combination.minimum(state, budget = budget) <= combination.bound) {
+            val reduced = sourceRow.reduced(state, sourceRow.coefficient(variable).abs(), budget)
+            combination = reduced?.let { row.resolve(it, variable, budget) } ?: combination
+        }
+        if (combination.minimum(state, budget = budget) <= combination.bound) return null
         return BoundEvent(sourceRow, marker[2], key, combination)
     }
 

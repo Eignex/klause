@@ -24,8 +24,13 @@ import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 
 /**
  * The finite-domain participant in a shared search session.
@@ -156,8 +161,8 @@ class CpSearchComponent(
             }
         }
         val state = session.explanationState
-        var available = 0L
-        var maxFree = 0L
+        var available = BIG_ZERO
+        var maxFree = BIG_ZERO
         for (i in learned.literals.indices) {
             if (context.cancelled()) return false
             val literal = learned.literals[i]
@@ -173,7 +178,7 @@ class CpSearchComponent(
             if (freed) maxFree = maxOf(maxFree, learned.weights[i])
         }
         val slack = available - learned.degree
-        return slack >= 0 && maxFree > slack
+        return slack >= BIG_ZERO && maxFree > slack
     }
 
     /** Align shared decision level zero with CP's post-seed root. */

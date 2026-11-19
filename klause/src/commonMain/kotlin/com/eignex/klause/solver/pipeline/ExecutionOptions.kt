@@ -422,6 +422,13 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `integer-row-learning` execution setting. */
         val integerRowLearning: ExecutionOption<Boolean> = ExecutionOption("integer-row-learning", ValueKind.BOOLEAN)
 
+        /** Per-conflict work allowance for integer row learning. */
+        val arithmeticLearningWork: ExecutionOption<Long> = ExecutionOption("arithmetic-learning-work", ValueKind.LONG)
+
+        /** Per-conflict cumulative modeled allocation allowance for integer row learning. */
+        val arithmeticLearningAllocationBytes: ExecutionOption<Long> =
+            ExecutionOption("arithmetic-learning-allocation-bytes", ValueKind.LONG)
+
         /** Collect bounded propagation and explanation value diagnostics. */
         val propagationAttribution: ExecutionOption<Boolean> =
             ExecutionOption("propagation-attribution", ValueKind.BOOLEAN)
@@ -641,6 +648,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
+                arithmeticLearningWork, arithmeticLearningAllocationBytes,
                 propagationAttribution, historicalTableReasons, costAwarePropagation,
                 reasonPreflight, pbObjectiveCutoff,
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,

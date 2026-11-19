@@ -165,6 +165,28 @@ class CompilerNativeFactorsTest {
     }
 
     @Test
+    fun `fixed symmetry coordinates omitted from native bindings should compile`() {
+        class S : VariableSchema() {
+            val x by intVar(0, 1)
+            val y by intVar(0, 1)
+            val b by boolVar()
+            val c by boolVar()
+            val symmetry by constraint {
+                factor(
+                    SymmetryHandling(
+                        listOf(intArrayOf(1, 0, 2) to intArrayOf(1, 0, 2)), intArrayOf(3, 4, 0, 1, 2, 5),
+                    ),
+                    ints = listOf(x, y), bools = listOf(b, c),
+                )
+            }
+        }
+
+        val compiled = S().compile()
+
+        assertEquals(10, BacktrackSolver(compiled.problem.bake()).enumerate().count())
+    }
+
+    @Test
     fun `an absent wide integer should retain its declared value`() {
         val definition = JsonSchema.parse(
             """{"entries":{

@@ -80,7 +80,7 @@ object PresolvePipeline {
         // An already-baked model reached this boundary through a finite preparation that ran the phase,
         // so running it again would re-derive the same fixpoint at full cost.
         val rewriteObjective = finiteLane && transformObjective && !solutionSetSensitive &&
-            !problem.semantics.relaxesFeasibility
+            !problem.semantics.relaxesRows(problem.numRealVars)
         if (problem is BakedProblem) return PreparedSource.unchanged(problem, presolveBudget, rewriteObjective)
         val mark = TimeSource.Monotonic.markNow()
         val context = PresolveContext.of(

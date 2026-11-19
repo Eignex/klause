@@ -3,6 +3,8 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Lit
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 import kotlin.time.TimeSource
 
 /**
@@ -135,9 +137,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
          * .PseudoBooleanPropagator].
          */
         data class LearnedPb(
-            val weights: LongArray,
+            val weights: Array<com.eignex.util.numbers.BigInt>,
             val literals: IntArray,
-            val degree: Long,
+            val degree: com.eignex.util.numbers.BigInt,
             override val backjumpLevel: Int,
             override val lbd: Int,
             override val decisionLevels: IntArray,
@@ -352,13 +354,26 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
         pbResolvent?.let { pb ->
             pb.seedFactorId = seedFactorId
-            val r = runResolution(pb, seedReason, currentLevel)
+            val r = try {
+                runResolution(pb, seedReason, currentLevel)
+            } catch (stop: ArithmeticLearningDeclined) {
+                pb.resourceDecline(stop.reason)
+                AnalysisResult.NotApplicable
+            } finally {
+                pb.releaseArithmetic()
+            }
             if (!pb.failed) {
                 state.arithmeticLearningTrace?.record(if (r is AnalysisResult.LearnedPb) "pb.derived" else "pb.clause")
                 if (r is AnalysisResult.LearnedPb) {
                     state.arithmeticLearningTrace?.clause("pb.literals", r.literals, state)
-                    if (r.weights.size <= 64) state.arithmeticLearningTrace?.record("pb.weights", *r.weights)
-                    state.arithmeticLearningTrace?.record("pb.target", r.degree, r.backjumpLevel.toLong())
+                    if (r.weights.size <= 64 && r.weights.all { it.fitsLong() } && r.degree.fitsLong()) {
+                        val weights = LongArray(r.weights.size) { r.weights[it].toLongExact() }
+                        state.arithmeticLearningTrace?.record("pb.weights", *weights)
+                        state.arithmeticLearningTrace?.record("pb.target", r.degree.toLongExact(),
+                            r.backjumpLevel.toLong())
+                    } else {
+                        state.arithmeticLearningTrace?.omitPayload("pb.weights", r.weights.size)
+                    }
                 } else if (r is AnalysisResult.Learned) {
                     state.arithmeticLearningTrace?.clause("pb.clause-result", r.literals, state)
                 }

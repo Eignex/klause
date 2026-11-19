@@ -56,20 +56,25 @@ class ArithmeticLearningTraceTest {
 
     @Test
     fun `focused capture should retain branch attempts within its allowance`() {
-        for (kind in listOf("traversal.pick", "traversal.attempt")) {
-            val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 16).apply { captureFirstInteger = true }
-            trace.stored(4, "integer")
-            trace.record(kind, 1)
-            repeat(8) { trace.record(kind, 2) }
+        for (family in listOf("integer", "pb")) {
+            for (kind in listOf("traversal.pick", "traversal.attempt")) {
+                val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 16).apply {
+                    captureFirstInteger = family == "integer"
+                    captureFirstPb = family == "pb"
+                }
+                trace.stored(4, family)
+                trace.record(kind, 1)
+                repeat(8) { trace.record(kind, 2) }
 
-            trace.pin(4, 0, 2, "upper", 2)
-            trace.record(kind, 3)
+                trace.pin(4, 0, 2, "upper", 2)
+                trace.record(kind, 3)
 
-            assertEquals(4, trace.events.size)
-            assertContentEquals(longArrayOf(1, 3), trace.events.filter { it.kind == kind }
-                .map { it.data[0] }.toLongArray())
-            assertEquals(8L, trace.omittedObservations)
-            assertFalse(trace.truncated)
+                assertEquals(4, trace.events.size)
+                assertContentEquals(longArrayOf(1, 3), trace.events.filter { it.kind == kind }
+                    .map { it.data[0] }.toLongArray())
+                assertEquals(8L, trace.omittedObservations)
+                assertFalse(trace.truncated)
+            }
         }
     }
 

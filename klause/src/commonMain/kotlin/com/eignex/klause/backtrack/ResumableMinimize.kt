@@ -663,6 +663,7 @@ internal class ResumableMinimize(
                 cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
             )).also {
                 if (params.integerRowLearning) it.enableIntegerRowLearning()
+                it.configureArithmeticLearning(params.arithmeticLearningWork, params.arithmeticLearningAllocationBytes)
                 it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
                     params.costAwarePropagation, params.reasonPreflight)
             },
