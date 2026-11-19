@@ -556,6 +556,8 @@ adds a template policy that pairs rows of opposite sign on a shared continuous
 coordinate, with at least one integer-activity row, and retains at most 64
 proposals. A nonseparating mixed-row seed can continue greedily along one
 opposite-sign continuous incidence path through at most four original rows.
+Point and unseeded pair generation share a 500,000-work, 8 MiB family allowance;
+each derivation remains bounded by 65,536 work and 1 MiB within that allowance.
 Pure-integer points also try half rounding, two-row combinations and half scaling
 whose odd coefficients cite established endpoint premises. An established
 invocation bound can stand in for a missing stated endpoint only as a typed
