@@ -40,11 +40,13 @@ internal fun PreparedLinearSource.qualifyBound(
     val claim = evidence?.claim as? SourceClaim.Bound ?: return null
     val objective = view.source.objective ?: return null
     val expected = if (finite == null) objective.sense else ObjectiveSense.MINIMIZE
-    if ((!view.exact && !acceptedModelExact) || !unrestricted || evidence.scope.condition != SourceCondition() ||
+    val acceptedAuthority = toleranceAuthority?.scope == evidence.scope
+    val qualified = view.exact || acceptedModelExact || acceptedAuthority
+    if (!qualified || !unrestricted || evidence.scope.condition != SourceCondition() ||
         evidence.scope.objective?.sense != expected
     ) return null
     var value = finite?.value ?: (claim.value as? SourceValue.Rational)?.value ?: return null
     if (finite != null && objective.sense == ObjectiveSense.MAXIMIZE) value = value.negated()
     return LinearSourceBound(value * view.objectiveScale.reciprocal(), objective.sense, claim.strict,
-        toleranceEnvelope = acceptedModelExact)
+        toleranceEnvelope = acceptedModelExact || acceptedAuthority)
 }

@@ -375,8 +375,9 @@ replaces its default independently, and explicit source bounds stay authoritativ
 | `--source-absolute-tolerance N` / `--source-relative-tolerance N` | Source feasibility slack components |
 | `--source-absolute-optimality-tolerance N` / `--source-relative-optimality-tolerance N` | Source optimality gap components |
 
-`--source-tolerance-envelope true` opts an MPS source into exact LP separation and
-completion over its absolute-tolerance accepted set. It requires zero relative
+`--source-tolerance-envelope true` opts an MPS source into exact LP separation over
+its absolute-tolerance accepted set. Compatible finite coordinates retain ordinary
+numerical witness search beside that authority. It requires zero relative
 feasibility tolerance and leaves an exact source unchanged. The source's declared
 optimality gap still applies. Statistics publish such original-unit bounds as
 `nativeAcceptedObjectiveBound`, with scope `absolute-tolerance-envelope`, instead

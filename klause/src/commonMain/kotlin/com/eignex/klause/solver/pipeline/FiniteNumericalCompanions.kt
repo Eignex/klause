@@ -264,9 +264,10 @@ internal class FiniteNumericalCompanions private constructor(
 
     companion object {
         fun admission(model: BakedProblem, objective: LinearObjective, cancellation: ExecutionControl,
-            cost: WorkerConstructionCost): FiniteCompanionAdmission = FiniteCompanionAdmission(
+            cost: WorkerConstructionCost,
+            toleranceAuthority: LinearToleranceAuthority? = null): FiniteCompanionAdmission = FiniteCompanionAdmission(
             cancellation, requireNotNull(cost.activeMillis), requireNotNull(cost.sliceMillis),
-            capture = { captureContext(model, objective, it) })
+            capture = { captureContext(model, objective, it, toleranceAuthority) })
 
         fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: ExecutionControl, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
@@ -285,9 +286,10 @@ internal class FiniteNumericalCompanions private constructor(
             adaptiveRepair: Boolean = false,
             onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
             onObservation: ((Long, JointRepairObservation) -> Unit)? = null,
+            toleranceAuthority: LinearToleranceAuthority? = null,
         ): Preparation {
             val started = clock.markNow()
-            val context = captureContext(model, objective, cancellation)
+            val context = captureContext(model, objective, cancellation, toleranceAuthority)
             val companions = context?.let {
                 FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
                     incumbentCompletionCheck, adaptiveRepair = adaptiveRepair, onComparison = onComparison,
@@ -297,7 +299,8 @@ internal class FiniteNumericalCompanions private constructor(
         }
 
         private fun captureContext(model: BakedProblem, objective: LinearObjective,
-            cancellation: ExecutionControl): SourceProofContext? {
+            cancellation: ExecutionControl, toleranceAuthority: LinearToleranceAuthority? = null): SourceProofContext? {
+            if (toleranceAuthority != null) return toleranceAuthority.capture(model, objective, cancellation)
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
             return affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,

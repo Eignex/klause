@@ -26,6 +26,7 @@ internal class PreparedLinearSource(
     val acceptedObjectiveBound: BigFraction?,
     val independentChecks: IndependentLinearSourceChecks? = null,
     val acceptedModelExact: Boolean = false,
+    val toleranceAuthority: LinearToleranceAuthority? = null,
 )
 
 internal class IndependentLinearSourceChecks(
@@ -55,9 +56,13 @@ internal fun prepareLinearSource(
     val envelope = request.linearToleranceEnvelope && numerical
     val working = if (request.linearToleranceEnvelope) source.absoluteToleranceEnvelope(stop) ?: return interrupted()
     else source
-    val lowered = lowerLinearSource(working, request.source.settings, numerical && !envelope, stop)
+    val accepted = lowerLinearSource(working, request.source.settings, numerical && !envelope, stop)
         ?: return interrupted()
-    val view = if (!envelope) lowered else LinearSourceView(source, lowered.model, lowered.objective,
+    val nominal = if (envelope) lowerLinearSource(source, request.source.settings, numerical, stop)
+        ?: return interrupted() else null
+    val separate = nominal?.sharesToleranceCoordinates(accepted, stop) == true
+    val lowered = if (separate) checkNotNull(nominal) else accepted
+    val view = if (!envelope || separate) lowered else LinearSourceView(source, lowered.model, lowered.objective,
         lowered.columns, lowered.sourceIntegerCoordinates, lowered.sourceRealCoordinates, false, false,
         lowered.objectiveScale, lowered.constraintFactorCount)
     val objective = view.objective?.toLinearObjective()
@@ -77,7 +82,9 @@ internal fun prepareLinearSource(
     if (stop()) return interrupted()
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound,
         components?.takeIf { it.isNotEmpty() }?.let { IndependentLinearSourceChecks(requireNotNull(projections), it) },
-        acceptedModelExact = envelope && lowered.exact)
+        acceptedModelExact = envelope && !separate && lowered.exact,
+        toleranceAuthority = if (separate && objective != null) LinearToleranceAuthority(view.model, accepted.model,
+            if (source.objective?.sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective) else null)
     if (!supported) {
         return SourceRouteSelection(request,
             SourceProblemRoute.NativeFormula(null,
