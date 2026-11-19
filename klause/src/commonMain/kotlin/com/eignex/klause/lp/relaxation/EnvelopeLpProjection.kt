@@ -76,8 +76,8 @@ internal class EnvelopeLpProjection(private val variables: Int, private val cont
                 val bound = projectRowBound(state, index, row.terms[entry], row.terms, minimum, true, meter)
                 settle()
                 if (bound != null) {
-                    if (!trail.assertBound(bound.column, bound.upper,
-                            ExactLpSide(ExactLpNumber.of(bound.value), bound.strict), nextWitness(), control)) return false
+                    val side = ExactLpSide(ExactLpNumber.of(bound.value), bound.strict)
+                    if (!trail.assertBound(bound.column, bound.upper, side, nextWitness(), control)) return false
                     changedColumn(bound.column)
                 }
             }
