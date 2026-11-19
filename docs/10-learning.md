@@ -444,6 +444,9 @@ a satisfied endpoint literal cannot discharge the row or certify a root contradi
 
 ## Arithmetic diagnostics
 
+A rolling capture can focus on the first admitted integer or PB row, retaining its
+derivation and later consumers inside the fixed event and word allowances.
+
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction: seed and fallback literals, integer
 endpoints and historical row domains, signed guards, native and shared targets,

@@ -15,10 +15,14 @@ import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -27,6 +31,33 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class GuardedIntegerSourceTest {
+    @Test
+    fun `reified source discovery should preflight its width dependent scratch`() {
+        val width = 32
+        for (wide in listOf(false, true)) {
+            val variables = IntArray(width) { it }
+            val factor = if (wide) ReifiedLinear(0, variables, Array(width) { bigIntOf(1) shl 64 },
+                LinearOp.LE, bigIntOf(0)) else ReifiedLinear(0, IntArray(width) { 1 }, variables, LinearOp.LE, 0)
+            val state = PropagationState(Problem(1, width, Array(width) { IntDomain(0, 1) }, arrayOf(factor)),
+                Assumptions.None)
+            assertTrue(state.pinBool(0, true))
+            state.arithmeticLearningLimits = ArithmeticLearningLimits(allocationBytes = 100)
+
+            assertFailsWith<ArithmeticLearningDeclined> { GuardedIntegerSource(state).source(0) }
+        }
+    }
+
+    @Test
+    fun `wide source complementation should observe cancellation before exact arithmetic`() {
+        val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            ReifiedLinear(0, intArrayOf(0), arrayOf(bigIntOf(1)), LinearOp.LE, bigIntOf(1) shl 8192),
+        )), Assumptions.None)
+        assertTrue(state.pinBool(0, false))
+        state.finiteWork.cancellation = ExecutionControl { true }
+
+        assertFailsWith<FinitePropagationInterrupted> { GuardedIntegerSource(state).source(0) }
+    }
+
     @Test
     fun `compact exact integer sources should derive a mapped consumed row`() {
         val native = PropagationSession(Problem(0, 3,

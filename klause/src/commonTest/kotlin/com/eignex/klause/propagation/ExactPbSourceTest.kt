@@ -31,8 +31,10 @@ class ExactPbSourceTest {
                         val target = PbAccumulator()
                         val budget = ArithmeticLearningBudget(state)
                         val loaded = when (source) {
-                            is ExactPseudoBooleanPropagator -> source.loadArithmeticReason(target, forced, state, budget)
-                            is ReifiedPseudoBooleanPropagator -> source.loadArithmeticReason(target, forced, state, budget)
+                            is ExactPseudoBooleanPropagator ->
+                                source.loadArithmeticReason(target, forced, state, budget)
+                            is ReifiedPseudoBooleanPropagator ->
+                                source.loadArithmeticReason(target, forced, state, budget)
                             else -> error("unsupported projection")
                         }
                         val wanted = if (forced != Lit.NONE && Lit.variable(forced) == 0) !truth else truth

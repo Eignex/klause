@@ -56,7 +56,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val nodes = (options["nodes"] ?: "4096").toLong().also { require(it in 1..100_000L) }
         val traceMode = options["trace"] ?: "first-integer"
-        require(traceMode in setOf("initial", "first-integer"))
+        require(traceMode in setOf("initial", "first-integer", "first-pb"))
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
@@ -140,6 +140,7 @@ internal object OrdinaryArithmeticLearningProfile {
                         val recorder = PreparedArithmeticLearningProfile.Capture(
                             session, 1024, 65536,
                             captureFirstInteger = learning && learningKind != "pb" && traceMode == "first-integer",
+                            captureFirstPb = learning && learningKind != "integer" && traceMode == "first-pb",
                         )
                         capture = recorder
                         integerRowsAtCapture = recorder.lifecycle()["learningIntegerAdmitted"]

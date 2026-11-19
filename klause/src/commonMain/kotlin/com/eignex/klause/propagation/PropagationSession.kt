@@ -1082,7 +1082,13 @@ class PropagationSession private constructor(
      *  once, and either surface the cascaded conflict or re-baseline the level with the asserted facts. */
     private inline fun registerAndPropagate(base: Int, register: () -> Int): PropagationResult {
         bakedUnsat?.let { return it }
-        val newFid = register()
+        state.finiteWork.cancellation = cancellation
+        val newFid = try {
+            register()
+        } catch (_: FinitePropagationInterrupted) {
+            state.runCancelled = true
+            return PropagationResult.Implied.EMPTY
+        }
         state.factorAttribution?.let {
             if (state.nativeEngine == null) it.admit(state.factorAt(newFid))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)

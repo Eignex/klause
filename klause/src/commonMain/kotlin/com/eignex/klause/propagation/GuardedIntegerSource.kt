@@ -144,11 +144,14 @@ internal class GuardedIntegerSource(
                         LinearOp.NE -> LinearOp.EQ
                     }
                     if (op == LinearOp.NE) return decline("disequality", factorId)
+                    if (!truth) budget.scalar(source.bound, BIG_ONE)
                     val bound = if (truth) source.bound else when (original.op) {
                         LinearOp.LE -> source.bound + BIG_ONE
                         LinearOp.GE -> source.bound - BIG_ONE
                         else -> source.bound
                     }
+                    budget.spend(work = source.vars.size.toLong() * 2,
+                        bytes = 96 + source.vars.size.toLong() * 2 * Int.SIZE_BYTES)
                     return IntegerSourceRow(
                         WideLinearPropagator(source.intVars, source.vars, source.coeffs, op, bound), guard,
                     )
@@ -174,6 +177,8 @@ internal class GuardedIntegerSource(
                     LinearOp.GE -> subExact(constants.bound, 1L)
                     else -> constants.bound
                 }
+                budget.spend(work = source.vars.size.toLong() * 2,
+                    bytes = 96 + source.vars.size.toLong() * 2 * Int.SIZE_BYTES)
                 IntegerSourceRow(LinearPropagator(intArrayOf(), source.intVars, source.coeffs, source.vars, op, bound),
                     guard)
             }
@@ -195,6 +200,7 @@ internal class GuardedIntegerSource(
                 if (cell !in 0 until state.problem.numIntVars.toLong()) {
                     return decline("element-cell-coordinate", factorId)
                 }
+                budget.spend(work = 4, bytes = 192)
                 val variables = intArrayOf(original.result, cell.toInt())
                 val guard = Lit.make(state.atomVarEq(original.idx, selected.min), true)
                 if (!state.integerGuardTrueAt(guard, trail)) return decline("guard-history", factorId)

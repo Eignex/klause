@@ -43,7 +43,9 @@ class PbConflictResolventTest {
             assertTrue(state.pinBool(0, true))
             assertTrue(state.pinBool(1, true))
 
-            val result = state.conflictAnalyzer.analyzeConflictClause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
+            val result = state.conflictAnalyzer.analyzeConflictClause(
+                intArrayOf(Lit.make(0, false), Lit.make(1, false)),
+            )
 
             assertIs<ConflictAnalyzer.AnalysisResult.Learned>(result)
             assertTrue(!state.runCancelled)

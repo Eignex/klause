@@ -23,6 +23,7 @@ internal class ArithmeticLearningTrace(
     var omittedPayloads = 0
         private set
     var captureFirstInteger = false
+    var captureFirstPb = false
     var collectDeclines = false
     private val declineNames = ArrayList<String>()
     private val declineIndices = HashMap<String, Int>()
@@ -39,6 +40,9 @@ internal class ArithmeticLearningTrace(
     }
     var focusedIntegerId: Int? = null
         private set
+    var focusedPbId: Int? = null
+        private set
+    private val focusedArithmeticId: Int? get() = focusedIntegerId ?: focusedPbId
     var discardedWindows = 0L
         private set
     var discardedEvents = 0L
@@ -58,7 +62,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun beginConflict(factorId: Int, level: Int, trail: Int) {
-        if (captureFirstInteger && focusedIntegerId == null && events.isNotEmpty()) {
+        if ((captureFirstInteger || captureFirstPb) && focusedArithmeticId == null && events.isNotEmpty()) {
             discardedWindows++
             discardedEvents += events.size
             discardedWords += words
@@ -73,7 +77,7 @@ internal class ArithmeticLearningTrace(
     }
 
     private fun omitFocusedDetails(): Boolean {
-        if (focusedIntegerId == null) return false
+        if (focusedArithmeticId == null) return false
         omittedObservations++
         return true
     }
@@ -100,7 +104,7 @@ internal class ArithmeticLearningTrace(
     fun record(kind: String, vararg data: Long) {
         countDecline(kind)
         if (!accepting) return
-        if (focusedIntegerId != null) {
+        if (focusedArithmeticId != null) {
             if ((kind == "traversal.pick" || kind == "traversal.attempt") && pendingPick) pendingPick = false
             else if (!kind.startsWith("consumer.") && kind != "store.remap" &&
                 kind != "traversal.finished" && kind != "traversal.retirement-checked"
@@ -223,6 +227,9 @@ internal class ArithmeticLearningTrace(
         record("$kind.stored", id.toLong(), factorId.toLong())
         if (!truncated && kind == "integer" && captureFirstInteger) {
             focusedIntegerId = id
+            pendingPick = true
+        } else if (!truncated && kind == "pb" && captureFirstPb) {
+            focusedPbId = id
             pendingPick = true
         }
     }
