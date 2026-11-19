@@ -111,6 +111,7 @@ internal class FiniteExecutionRequest(
     val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
     /** Source optimality gap over [objective]; see [BacktrackParams.optimalityGap]. */
     val optimalityGap: OptimalityGap? = null,
+    val companionIncumbentReuse: Boolean = false,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -663,6 +664,7 @@ private fun executePortfolio(
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
         numericalCompanions = request.numericalCompanionParams,
+        companionIncumbentReuse = request.companionIncumbentReuse,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(

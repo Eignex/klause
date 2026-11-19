@@ -495,6 +495,22 @@ completion.
 
 ### Incumbent completion and repair
 
+Admitted nominal MPS binary companions with ordinary admission and fixed repair use
+checked incumbent completion automatically under the declared default numerical
+policy. Explicit `source-incumbent-completion=false` withholds that consumer default.
+Other source interpretations and repair/admission controls retain explicit selection.
+Automatic reuse keeps ordinary finite cutoff windows and scheduling; only the
+explicit completion option selects its cutoff accounting and first-proposal trial.
+After importing a checked point, the numerical owner alternates its ordinary
+frontier consultations with a private proximity query inside the same turn offers.
+The frontier retains its tree, LP owner and global bounds. Both searches share one
+LP operation/work/allocation ledger and containing decision/check allowances.
+Private query progress supplies no root-fixing or learned-clause reward. A private
+witness passes original-source completion and the receiving frontier's checks
+before it can improve the source incumbent; private proofs never enter its coverage.
+A successful private query recenters on its checked improvement, while the frontier
+keeps the next consultation and all containing allowances stay cumulative.
+
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
 approximate real coordinates guiding rational reconstruction without authority. A
@@ -553,6 +569,17 @@ fixing or coverage. Other integer models can pin the
 eligible integers agreeing with the paid point, releasing every disagreement.
 Continuous columns remain free. Missing guidance, cancellation and unavailable
 funding retain the connected two-integer start.
+Fixed binary companion repair instead searches proximity to a checked center with
+every integer and continuous residual free except for the source's original pins.
+Its private objective counts changed binary coordinates. A separate original-cost
+row requests improvement by the declared positive objective allowance, or by one
+thousandth of the smallest nonzero objective coefficient under an exact policy.
+Source constants and maximization direction stay in that row. Preparation and
+native progress spend the existing query grants. Only a freshly source- and
+original-checked strict improvement can leave this search; its distance bounds,
+refutations and optima supply no parent objective or coverage evidence. A failed
+target ends undecided and is not retried at the same cutoff; unavailable preparation
+falls back to ordinary neighborhoods.
 The all-pinned rounded-root bootstrap serves a center without that handoff.
 Before a checked center exists, root repair can keep the ordinary
 pre-selection relaxation point for advisory centering and neighborhood order,

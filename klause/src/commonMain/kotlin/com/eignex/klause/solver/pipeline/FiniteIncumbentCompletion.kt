@@ -8,7 +8,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 
 internal fun FiniteExecutionRequest.incumbentCompletionCheck(): ((Sample, BigFraction, ExecutionControl) -> Boolean)? {
-    if (numericalCompanionParams?.sourceIncumbentCompletion != true) return null
+    if (!companionIncumbentReuse && numericalCompanionParams?.sourceIncumbentCompletion != true) return null
     val original = sourceInvocation?.linearSource ?: return null
     return original.incumbentCompletionCheck(sourceMapping)
 }
