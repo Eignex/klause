@@ -114,7 +114,7 @@ internal class SmtSessionOutput(
         privateIncumbentReuse: Boolean) {
         comment("arm=$arm objective=${continuousObjective ?: objective} time=$elapsedMs")
     }
-    override fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long) {
+    override fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long, privateIncumbentReuse: Boolean) {
         comment("arm=$arm objective=$objective time=$elapsedMs")
     }
     fun result(): SmtSessionResult = SmtSessionResult(status,

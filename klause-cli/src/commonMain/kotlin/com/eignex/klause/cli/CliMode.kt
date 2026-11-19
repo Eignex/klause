@@ -652,8 +652,9 @@ internal interface OutputProtocol {
         println("%%%klause-arm: label=$arm objective=$objective$continuous time=$elapsedMs$reuse")
     }
 
-    fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long) {
-        println("%%%klause-arm: label=$arm objective=$objective time=$elapsedMs")
+    fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long, privateIncumbentReuse: Boolean = false) {
+        val reuse = if (privateIncumbentReuse) " privateIncumbentReuse=true" else ""
+        println("%%%klause-arm: label=$arm objective=$objective time=$elapsedMs$reuse")
     }
 }
 

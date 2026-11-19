@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.util.numbers.BigFraction
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -121,6 +122,7 @@ class CliModeMpsTest {
             output.onImprovement("mixed-min", -3L, continuousObjective = -63.5, elapsedMs = 30)
             output.onImprovement("mixed-max", 3L, continuousObjective = 63.5, elapsedMs = 40)
             output.onImprovement("private", 2L, elapsedMs = 50, privateIncumbentReuse = true)
+            output.onImprovement("private-exact", BigFraction.ofLong(1), 60, privateIncumbentReuse = true)
         }
 
         assertTrue("label=integer objective=9007199254740993 time=10" in out, out)
@@ -128,6 +130,7 @@ class CliModeMpsTest {
         assertTrue("label=mixed-min objective=-3 continuousObjective=-63.5 time=30" in out, out)
         assertTrue("label=mixed-max objective=3 continuousObjective=63.5 time=40" in out, out)
         assertTrue("label=private objective=2 time=50 privateIncumbentReuse=true" in out, out)
+        assertTrue("label=private-exact objective=1 time=60 privateIncumbentReuse=true" in out, out)
     }
 
     @Test

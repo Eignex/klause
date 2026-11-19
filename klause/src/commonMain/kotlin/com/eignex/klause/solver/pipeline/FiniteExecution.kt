@@ -275,8 +275,12 @@ class FiniteSolveImprovement(
     /** Engine-normalized objective value at [sample]. */
     val objective: Double,
     /** The accepted candidate came from a private incumbent-reuse query. */
-    val privateIncumbentReuse: Boolean = false,
-)
+    val privateIncumbentReuse: Boolean,
+) {
+    /** Creates an improvement with default producer metadata. */
+    constructor(sample: Sample, workerLabel: String, elapsedMs: Long, objective: Double) :
+        this(sample, workerLabel, elapsedMs, objective, false)
+}
 
 /** Terminal outcome exposed by the finite solve facade. */
 sealed class FiniteSolveOutcome {

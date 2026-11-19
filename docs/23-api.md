@@ -172,6 +172,9 @@ above are implementation APIs.
 `List<String>` constructors remain as compatibility adapters.
 [Finite execution options](02-model.md#finite-execution-options)
 define capture and worker lifetimes. Telemetry snapshots supply no result authority.
+`FiniteSolveImprovement` keeps accepted producer metadata, including whether the
+candidate came from a private incumbent-reuse query; its four-argument constructor
+uses default metadata.
 
 `PreparedSourcePlan`, component and strategy admission, CP projection planning,
 search session construction and concrete theory adapters are experimental
