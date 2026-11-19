@@ -76,6 +76,8 @@ same `SearchComponent` lifecycle. Batch `Theory` services participate through
 `TheorySearchComponent`; directly incremental arithmetic components use the lifecycle
 without a batch service. Participation supplies no completeness guarantee:
 indeterminate required checks prevent exhaustion from becoming a source refutation.
+Execution stop causes are diagnostics: a completed feasible check or fully covered
+traversal retains its verdict when a stop is observed at that completion boundary.
 See [theory roles](17-theories.md#extension-roles-and-completeness). The session
 exchanges Boolean literals, semantic integer bounds and opaque theory decisions
 rather than native CP domains.

@@ -15,6 +15,51 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class SearchExecutionControlsTest {
     @Test
+    fun `a completed feasible check should survive a simultaneous stop`() {
+        for (cause in SearchStopCause.entries) {
+            var cancelled = false
+            val controls = SearchExecutionControlAdapter(ExecutionControl { cancelled })
+            val component = object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck {
+                    controls.reportStop(cause)
+                    cancelled = cause == SearchStopCause.Cancelled
+                    return ComponentCheck.Feasible
+                }
+            }
+            val session = SearchSession(listOf(component), executionControls = controls)
+
+            assertIs<SearchResult.Satisfied>(session.solve(0), cause.toString())
+
+            assertEquals(cause, controls.stopCause)
+        }
+    }
+
+    @Test
+    fun `complete coverage should survive a stop during the final check`() {
+        for (cause in SearchStopCause.entries) {
+            var cancelled = false
+            var checks = 0
+            val controls = SearchExecutionControlAdapter(ExecutionControl { cancelled })
+            val component = object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck {
+                    if (++checks == 2) {
+                        controls.reportStop(cause)
+                        cancelled = cause == SearchStopCause.Cancelled
+                    }
+                    return ComponentCheck.Infeasible()
+                }
+            }
+            val run = SearchSession(listOf(component), executionControls = controls).openRun(1)
+
+            assertEquals(SearchRunEvent.Exhausted, run.next(), cause.toString())
+
+            assertEquals(2, checks)
+            assertEquals(cause, controls.stopCause)
+            assertEquals(SearchRunEvent.Exhausted, run.next())
+        }
+    }
+
+    @Test
     fun `invocation controls should preserve the caller meter and deadline`() {
         var charged = 0L
         val deadline = ExecutionControl.after(1000.milliseconds)

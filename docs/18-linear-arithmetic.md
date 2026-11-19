@@ -199,6 +199,9 @@ source conditions and incumbent cutoffs. Their refutations exclude only the
 conditioned query, so an authority decline still withholds source-wide infeasibility
 and optimality; a checked witness remains available without a terminal claim.
 
+CLI reporting derives the verdict from the accepted claim or gap completion;
+budget exhaustion and termination reasons remain separate diagnostic metadata.
+
 A declared positive optimality gap can complete the traversal once a checked source
 incumbent and a checked global bound satisfy it in original objective units.
 `LinearOptimizationResult.gapClosed` distinguishes that completion from an exact
