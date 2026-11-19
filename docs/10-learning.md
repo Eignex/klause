@@ -379,6 +379,11 @@ their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use arbitrary-precision integer coefficients,
 exact activity and gcd normalization with downward rounding of the upper bound.
+Normalized rows retain sorted coordinates; cancellation merges their terms in linear
+time and removes zero coefficients before normalization. Activity accumulates checked
+signed words and promotes the partial sum at the first product or sum overflow.
+Wide coefficients enter exact accumulation directly; failed word attempts remain
+charged to the containing allowance.
 Saturation expresses the row as a positive cover over integer distances from declared
 box endpoints and caps each weight at its degree. If ordinary cancellation loses the
 conflict, scaled mixed-integer rounding can reduce the reason before another

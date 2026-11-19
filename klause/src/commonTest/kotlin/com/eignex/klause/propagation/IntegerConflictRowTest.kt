@@ -20,6 +20,58 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `activity should promote overflowing word operations without losing terms`() {
+        val inputs = listOf(
+            longArrayOf(Long.MAX_VALUE, 1) to longArrayOf(2, 3),
+            longArrayOf(Long.MAX_VALUE, 1) to longArrayOf(1, 1),
+            longArrayOf(Long.MIN_VALUE, 1) to longArrayOf(-1, 0),
+            longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, 1) to longArrayOf(1, 1, -Long.MAX_VALUE),
+        )
+        for ((coefficients, values) in inputs) {
+            val row = requireNotNull(IntegerConflictRow.source(IntArray(values.size) { it },
+                Array(values.size) { bigIntOf(coefficients[it]) }, bigIntOf(0), useLo = true))
+            val state = PropagationState(Problem(0, values.size,
+                Array(values.size) { IntDomain(values[it], values[it]) }, emptyArray()), Assumptions.None)
+            var expected = bigIntOf(0)
+            for (index in values.indices) expected += bigIntOf(coefficients[index]) * bigIntOf(values[index])
+
+            val minimum = row.minimum(state)
+            val maximum = row.maximum(state)
+
+            assertEquals(expected, minimum)
+            assertEquals(expected, maximum)
+        }
+    }
+
+    @Test
+    fun `endpoint reconstruction should retain overflowing activity cancellation`() {
+        val large = bigIntOf(Long.MAX_VALUE)
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1, 2),
+            arrayOf(bigIntOf(1), large, bigIntOf(1)), large * bigIntOf(2) + bigIntOf(3), useLo = true))
+        val state = PropagationState(Problem(0, 3,
+            arrayOf(IntDomain(0, 10), IntDomain(2, 2), IntDomain(1, 1)), emptyArray()), Assumptions.None)
+
+        val endpoint = row.boundFor(state, 0, 0)
+
+        assertEquals(2L, endpoint)
+    }
+
+    @Test
+    fun `resolution should combine interleaved terms and remove every cancellation`() {
+        val left = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 2, 4, 6),
+            arrayOf(bigIntOf(2), bigIntOf(3), bigIntOf(5), bigIntOf(7)), bigIntOf(-1), useLo = true))
+        val right = requireNotNull(IntegerConflictRow.source(intArrayOf(1, 2, 5, 6),
+            arrayOf(bigIntOf(11), bigIntOf(-6), bigIntOf(13), bigIntOf(-14)), bigIntOf(-2), useLo = true))
+
+        val combined = requireNotNull(left.resolve(right, 2))
+
+        assertTrue(combined.variables.contentEquals(intArrayOf(0, 1, 4, 5)))
+        assertEquals(listOf(bigIntOf(4), bigIntOf(11), bigIntOf(10), bigIntOf(13)),
+            combined.coefficients.toList())
+        assertEquals(bigIntOf(-4), combined.bound)
+    }
+
+    @Test
     fun `large coefficient arithmetic should observe cancellation before its primitive`() {
         val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
             arrayOf(bigIntOf(1) shl 4096, bigIntOf(1)), bigIntOf(0), useLo = true))
