@@ -558,7 +558,7 @@ class ExactLiraSearchComponent private constructor(
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == LIRA_TRUE }
                 val inputs = if (partialLinearCache) {
-                    partialLinearInputs(comparison)
+                    partialLinearInputs(comparison, partialLinearDeclines[prepared])
                 } else
                     null
                 if (inputs != null && partialLinearDeclines[prepared] == inputs) {
@@ -621,8 +621,33 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun partialLinearInputs(comparison: ExactComparison): PartialLinearInputs? {
+    private fun partialLinearInputs(
+        comparison: ExactComparison,
+        previous: PartialLinearInputs?,
+    ): PartialLinearInputs? {
         val state = lp.state ?: return null
+        val affine = if (incrementalLinearPropagation && comparison.terms.size > 1) {
+            system.affineInputSides(comparison, operationStop) ?: return null
+        } else emptyList()
+        if (previous != null && previous.bound == comparison.bound &&
+            previous.sides.size == comparison.terms.size * 2 + affine.size
+        ) {
+            var unchanged = true
+            var index = 0
+            for (column in comparison.terms.keys) {
+                operationAccounting?.charge(3)
+                if (lpStop.poll()) return null
+                val metadata = state.model.column(column)
+                if (metadata.tag != column || !metadata.origin.value.isZero) return null
+                for (upper in 0..1) {
+                    val side = state.activeSide(column, upper == 1)?.side
+                    val retained = previous.sides[index++]
+                    if (retained?.value != side?.number?.value || retained?.strict != side?.strict) unchanged = false
+                }
+            }
+            for (side in affine) if (previous.sides[index++] != side) unchanged = false
+            if (unchanged) return previous
+        }
         val sides = ArrayList<PartialLinearSide?>(comparison.terms.size * 2)
         for (column in comparison.terms.keys) {
             operationAccounting?.charge(3)
@@ -633,9 +658,7 @@ class ExactLiraSearchComponent private constructor(
                 sides += state.activeSide(column, upper)?.side?.let { PartialLinearSide(it.number.value, it.strict) }
             }
         }
-        if (incrementalLinearPropagation && comparison.terms.size > 1) {
-            sides += system.affineInputSides(comparison, operationStop) ?: return null
-        }
+        sides += affine
         return PartialLinearInputs(comparison.bound, sides)
     }
 
@@ -1523,7 +1546,7 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val retained = retainedLpPoint
-        if (retained != null && model.numIntVars == 0 &&
+        if (retained != null && (model.numIntVars == 0 || model.numRealVars > 0) &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
             system.acceptsPoint(retained, lpStop)
         ) {

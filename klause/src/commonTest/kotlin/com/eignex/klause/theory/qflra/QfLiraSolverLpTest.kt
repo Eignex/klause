@@ -67,6 +67,68 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `a compatible mixed guard should complete without another numerical query`() {
+        var unavailable = false
+        val factory = TrackingLpFactory { solver, allowance ->
+            check(!unavailable) { "numerical repair is unavailable" }
+            solver.resolveBounds(allowance)
+        }
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(4), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(4.0),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 4.0),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            component.solveWith(LpSolveContext(factory))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            unavailable = true
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val point = assertNotNull(session.model().valueOf(component.assignmentKey))
+            assertEquals(BigFraction.of(point.ints.single(), BIG_ONE), point.reals.single())
+        }
+    }
+
+    @Test
+    fun `mixed point reuse should repair changed integer bounds`() {
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(4), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(4.0),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 4.0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val point = assertNotNull(session.model().valueOf(component.assignmentKey))
+            assertTrue(point.ints.single() >= BIG_ONE)
+            assertEquals(BigFraction.of(point.ints.single(), BIG_ONE), point.reals.single())
+        }
+    }
+
+    @Test
     fun `complete traversal should resolve a disequality before reusing its point`() {
         val factor = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
             doubleArrayOf(1.0), LinearOp.LE, -2.5) {

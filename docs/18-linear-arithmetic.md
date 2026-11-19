@@ -55,8 +55,11 @@ A term is normalized before lookup: zero coefficients are dropped and the first
 remaining coefficient is scaled to one, flipping the bound direction for a negative
 scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column.
 Pure-real openings install prepared affine and strict-margin definitions without
-their guarded bounds, preserving the matrix across source Boolean choices. Other
-terms first seen under a branch or disjunct get their definition row appended
+their guarded bounds, preserving the matrix across source Boolean choices.
+Source rows with the same coefficient vector share its prepared keys and
+normalization; strict-margin definitions are prepared once per oriented term.
+Thresholds and premises belong to each asserted source side.
+Other terms first seen under a branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
 
@@ -98,12 +101,16 @@ sides, under the current operation allowance. Affine values are cached for one
 owned point; a changed point clears those values. Definitions with no active bound
 need no evaluation; bounded new definitions are evaluated before acceptance.
 A completed bound check is reusable for the same point values and identical
-immutable LP state or column metadata. Edits and retraction check every changed
+immutable LP model or column metadata. Scope edits that preserve that model reuse
+the completed check. Edits and retraction check every changed
 column; newly appended bounded definitions require evaluation before acceptance.
 Closing the component releases the point, checked state and activity caches.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
-Complete traversal can recheck that point against the selected source comparisons
+Mixed components can reuse a continuous point after checking the asserted integer
+bounds; source integrality, finite-domain membership and all selected rows remain
+required before publishing a complete witness.
+Pure-real complete traversal can recheck that point against the selected source comparisons
 before materializing pending LP bounds. Source activities are cached for that owned
 point, while current Boolean constants, strictness and disequality directions are
 checked on each use. Failed checks flush pending source bounds before another LP
@@ -125,6 +132,9 @@ the shared fixpoint before numerical checking, retaining the operation allowance
 An optional decline cache reuses only a failed numerical comparison with the same
 right-hand side and exact bound values and strictness. It retains no consequence
 or premise; changed bounds and every successful proof require fresh evaluation.
+Unchanged inputs reuse their owned snapshot after comparing current exact sides.
+Affine-side snapshots are shared only while both immutable bound assertions
+retain their identities, including their witness and premises.
 
 The incremental route also reads bounds on existing normalized affine slack
 columns. The normalization's scale selects the bounding side, and its offset
