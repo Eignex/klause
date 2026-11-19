@@ -505,9 +505,14 @@ only a stronger checked replacement changes that attribution.
 An opt-in absolute-tolerance envelope prepares MPS declarations and each stated row
 side widened by the captured absolute feasibility slack before lowering and separation.
 It preserves missing sides, exact integrality, indicator activation and the original
-objective. Relative feasibility tolerance is unsupported. Its working model requires
-exact deductions and exact leaf completion, so no second band enlarges the accepted set.
-Source publication still checks the original decimal source. Bound metadata identifies
+objective. Relative feasibility tolerance is unsupported. Compatible integer sides,
+coordinate layouts and objective units retain the nominal finite model and its ordinary
+numerical witness search. The numerical companions capture their own exact envelope
+rows and root sides, without importing propagated nominal sides. Their source scope
+alone identifies accepted-set bounds; nominal bounds keep their nominal scope.
+An opaque reconstruction or changed objective withholds that separate authority.
+Different coordinate layouts retain exact envelope execution, with no second feasibility
+band. Source publication still checks the original decimal source. Bound metadata identifies
 the accepted-set envelope separately from nominal-source bounds; neither establishes
 independent proof validation. Exact source requests retain their original model.
 

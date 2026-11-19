@@ -22,6 +22,7 @@ internal class FiniteCompanionControls(
     val waitForImprovement: Boolean = false,
     val adaptiveRepair: Boolean = false,
     val onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    val toleranceAuthority: LinearToleranceAuthority? = null,
 )
 
 /**
@@ -106,7 +107,7 @@ internal class FiniteCompanionArms private constructor(
             val admission = if (funded && eligibility?.admitted == true) {
                 FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
                     cancellation or requireNotNull(params).cancellation or params.timeout,
-                    eligibility.requirements.construction)
+                    eligibility.requirements.construction, controls.toleranceAuthority)
             } else null
             val comparison: ((SearchEvent.CompanionComparison) -> Unit)? =
                 if (scenario.reportPortfolioProgress && onEvent != null) { event -> onEvent(JOINT_REPAIR, event) }
@@ -119,7 +120,7 @@ internal class FiniteCompanionArms private constructor(
                 FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(params),
                     cancellation, eligibility.requirements.construction, scenario.companionAfterIncumbent,
                     controls.incumbentCompletionCheck, adaptiveRepair = adaptive, onComparison = comparison,
-                    onObservation = observation)
+                    onObservation = observation, toleranceAuthority = controls.toleranceAuthority)
             } else null
             val companions = if (admission?.initiallyFunded == true) {
                 FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(params),

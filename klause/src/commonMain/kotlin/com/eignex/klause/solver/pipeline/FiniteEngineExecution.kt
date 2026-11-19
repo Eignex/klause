@@ -663,6 +663,8 @@ private fun executePortfolio(
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
         numericalCompanions = request.numericalCompanionParams,
+        toleranceAuthority = request.sourceInvocation?.linearSource?.toleranceAuthority
+            ?.takeIf { it.compatible(request.sourceMapping, request.problem, request.objective) },
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(
