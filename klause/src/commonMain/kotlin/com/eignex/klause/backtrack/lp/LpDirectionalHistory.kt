@@ -11,8 +11,12 @@ internal class LpDirectionalHistory(
 ) {
     private class Direction {
         var count = 0
-        var mean = 0.0
+        var latest = 0.0
+        var previous = 0.0
         var stamp = 0L
+        var previousStamp = 0L
+
+        val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
     }
 
     private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
@@ -66,12 +70,16 @@ internal class LpDirectionalHistory(
         val history = gains.getOrPut(child.parent.variable, ::Gains)
         val direction = if (child.up) history.up else history.down
         expire(direction)
-        direction.count = minOf(direction.count + 1, 8)
-        direction.mean += (normalized - direction.mean) / direction.count
+        direction.previous = direction.latest
+        direction.previousStamp = direction.stamp
+        direction.latest = normalized
+        direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
         observed = true
-        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
-            reliableStamp = maxOf(reliableStamp, minOf(history.down.stamp, history.up.stamp))
+        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY &&
+            history.down.gain > 0.0 && history.up.gain > 0.0
+        ) {
+            reliableStamp = maxOf(reliableStamp, minOf(history.down.previousStamp, history.up.previousStamp))
         }
         observe(if (child.up) "UP" else "DOWN")
     }
@@ -148,8 +156,8 @@ internal class LpDirectionalHistory(
         if (history.down.count < RELIABILITY || history.up.count < RELIABILITY) return Double.NaN
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
-        val down = history.down.mean * fraction
-        val up = history.up.mean * (1.0 - fraction)
+        val down = history.down.gain * fraction
+        val up = history.up.gain * (1.0 - fraction)
         val score = sqrt(down) * sqrt(up)
         return score.takeIf { it.isFinite() } ?: Double.NaN
     }
@@ -163,8 +171,8 @@ internal class LpDirectionalHistory(
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
-        val observed = if (history.up.count < history.down.count) history.down else history.up
-        if (observed.mean <= 0.0) {
+        val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
+        if (sampledDirection.gain <= 0.0) {
             observe("PASSIVE_COLLECTION_ZERO_GAIN")
             return null
         }
@@ -174,7 +182,12 @@ internal class LpDirectionalHistory(
     private fun expire(direction: Direction) {
         if (direction.count > 0 && stamp - direction.stamp > maxAge) {
             direction.count = 0
-            direction.mean = 0.0
+            direction.latest = 0.0
+            direction.previous = 0.0
+            observe("EXPIRED")
+        } else if (direction.count >= RELIABILITY && stamp - direction.previousStamp > maxAge) {
+            direction.count = 1
+            direction.previous = 0.0
             observe("EXPIRED")
         }
     }
