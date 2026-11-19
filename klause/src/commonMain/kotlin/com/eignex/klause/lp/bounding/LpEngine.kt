@@ -1633,6 +1633,10 @@ internal class LpEngine(
     }
 
     internal fun linearBoundDominates(session: PropagationSession, cutoff: BigFraction): Boolean {
+        if (session.problem.numBoolVars == 0 && objective.boolWeightValues.isEmpty()) {
+            val compact = linearLowerBound(objective, session)
+            if (compact != Long.MIN_VALUE) return BigFraction.ofLong(compact) >= cutoff
+        }
         var lower = BigFraction.ofLong(objective.constant)
         for (b in 0 until minOf(session.problem.numBoolVars, objective.boolWeightValues.size)) {
             val weight = objective.boolWeightValues[b]
