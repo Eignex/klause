@@ -80,9 +80,17 @@ class LpDirectionalHistoryTest {
                 history.record(11.0)
             }
 
+            assertFalse(history.hasCollectionHistory)
+            assertNull(history.preferUnderObservedDirection(variable, 2.25))
+            history.commit(if (firstUp) SearchDecision.IntAtMost(0, 2) else SearchDecision.IntAtLeast(0, 3), 1)
+            history.beginNode(1)
+            history.record(11.0)
+
+            assertTrue(history.hasCollectionHistory)
             assertEquals(!firstUp, history.preferUnderObservedDirection(variable, 2.25))
             assertTrue(history.score(variable, 2.25).isNaN())
             repeat(5) { history.beginNode(0) }
+            assertFalse(history.hasCollectionHistory)
             assertNull(history.preferUnderObservedDirection(variable, 2.25))
         }
     }
@@ -100,6 +108,9 @@ class LpDirectionalHistoryTest {
                 history.beginNode(1)
                 history.record(10.0)
             }
+            history.commit(SearchDecision.Bool(if (up) 1 else 0), 1)
+            history.beginNode(1)
+            history.record(13.0)
 
             assertNull(history.preferUnderObservedDirection(variable, 0.5))
         }
