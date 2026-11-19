@@ -103,7 +103,7 @@ internal class FiniteExecutionRequest(
     val sourceInvocation: PreparedSourceInvocation? = null,
     val sourceMapping: SourceMapping? = null,
     val sourceControls: SourceFiniteControls? = null,
-    val numericalCompanionParams: TheoryParams? = null,
+    val numericalCompanionParams: FiniteCompanionPolicy? = null,
     val objectiveCoordinates: ObjectiveCoordinateView? = null,
     val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
@@ -647,6 +647,8 @@ private fun executePortfolio(
             admitted = true, requirements = "bounded early trial with historical-reason refinement",
             declines = emptyList(), selected = true))
     }
+    val toleranceAuthority = request.sourceInvocation?.linearSource?.toleranceAuthority
+        ?.takeIf { it.compatible(request.sourceMapping, request.problem, request.objective, request.cancellation) }
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,
@@ -662,9 +664,8 @@ private fun executePortfolio(
         onGuidance = request.onPortfolioGuidance,
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
-        numericalCompanions = request.numericalCompanionParams,
-        toleranceAuthority = request.sourceInvocation?.linearSource?.toleranceAuthority
-            ?.takeIf { it.compatible(request.sourceMapping, request.problem, request.objective, request.cancellation) },
+        numericalCompanions = request.numericalCompanionParams?.resolve(toleranceAuthority),
+        toleranceAuthority = toleranceAuthority,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(

@@ -150,12 +150,18 @@ internal fun linearSourceSolvable(
     var lpStats = LpStats()
     val invocation = common.routingPreparationCancellation().use { scope ->
         val stop = scope.control
-        val request = SourceSetupRequest(
+        val envelope = common.sourceOptions.linearToleranceEnvelope
+        val request = if (envelope == null) SourceSetupRequest(
             source, operation, common.resolvedEngine(),
             maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
             cancellation = stop,
             boundCancellation = common.routingCancellation(),
-            linearToleranceEnvelope = common.sourceOptions.linearToleranceEnvelope,
+        ) else SourceSetupRequest(
+            source, operation, common.resolvedEngine(),
+            maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
+            cancellation = stop,
+            boundCancellation = common.routingCancellation(),
+            linearToleranceEnvelope = envelope,
         )
         SourceSetup.prepare(request, onLpStats = { lpStats = it })
     }

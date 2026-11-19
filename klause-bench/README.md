@@ -25,7 +25,7 @@ Execution verifies the planned file and directory identities before each solve.
 
 Solver records retain reported numerical LP authority, objective tolerance and original-unit
 bound/gap metadata. Independent source validation remains separate from those reported claims.
-`param.source-tolerance-envelope=true` forwards the CLI's opt-in absolute MPS tolerance
+`param.source-tolerance-envelope=true` forwards the CLI's explicit absolute MPS tolerance
 envelope control; its accepted-set bounds retain a separate scope from nominal bounds.
 
 Declared-input planning uses the complete corpus-pack index even when only a subset

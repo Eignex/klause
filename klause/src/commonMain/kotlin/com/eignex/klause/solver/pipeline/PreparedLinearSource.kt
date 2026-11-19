@@ -8,6 +8,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.lowering.LinearSourceView
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.lp.finiteRelaxationSupported
@@ -28,6 +29,7 @@ internal class PreparedLinearSource(
     val independentChecks: IndependentLinearSourceChecks? = null,
     val acceptedModelExact: Boolean = false,
     val toleranceAuthority: LinearToleranceAuthority? = null,
+    val automaticCutSelection: Boolean = false,
 )
 
 internal class IndependentLinearSourceChecks(
@@ -54,21 +56,31 @@ internal fun prepareLinearSource(
         SourceRouteSelection(request, SourceProblemRoute.NativeFormula(null), stop)
     if (stop()) return interrupted()
     val numerical = source.semantics.effective.feasibilityTolerance?.isExact == false
-    val envelope = request.linearToleranceEnvelope && numerical
-    val working = if (request.linearToleranceEnvelope) source.absoluteToleranceEnvelope(stop) ?: return interrupted()
+    val automaticRequest = request.automaticLinearCutSelection && numerical &&
+        source.semantics.effective.format == SourceFormat.MPS &&
+        source.semantics.effective.feasibilityTolerance?.relative == SemanticRational.ZERO &&
+        request.engine == FiniteEngine.MIXED && request.operation == ExecutionOperation.OPTIMIZE
+    val original = if (automaticRequest) lowerLinearSource(source, request.source.settings, numerical, stop)
+        ?: return interrupted() else null
+    val automatic = original != null && original.model.numBoolVars == 0 && original.model.numIntVars > 0 &&
+        original.model.numRealVars > 0 && original.model.binaryIntegers
+    val envelope = (request.linearToleranceEnvelope || automatic) && numerical
+    val working = if (request.linearToleranceEnvelope || automatic)
+        source.absoluteToleranceEnvelope(stop) ?: return interrupted()
     else source
-    val accepted = lowerLinearSource(working, request.source.settings, numerical && !envelope, stop)
-        ?: return interrupted()
-    val nominal = if (envelope) lowerLinearSource(source, request.source.settings, numerical, stop)
+    val accepted = if (original != null && !automatic) original else
+        lowerLinearSource(working, request.source.settings, numerical && !envelope, stop) ?: return interrupted()
+    val nominal = original ?: if (envelope) lowerLinearSource(source, request.source.settings, numerical, stop)
         ?: return interrupted() else null
     val separate = request.engine == FiniteEngine.MIXED && request.operation == ExecutionOperation.OPTIMIZE &&
         nominal != null && nominal.model.numBoolVars == 0 && nominal.model.numIntVars > 0 &&
         nominal.model.numRealVars > 0 && nominal.model.binaryIntegers &&
         nominal.sharesToleranceCoordinates(accepted, stop)
-    val lowered = if (separate) checkNotNull(nominal) else accepted
-    val view = if (!envelope || separate) lowered else LinearSourceView(source, lowered.model, lowered.objective,
-        lowered.columns, lowered.sourceIntegerCoordinates, lowered.sourceRealCoordinates, false, false,
-        lowered.objectiveScale, lowered.constraintFactorCount)
+    val lowered = if (separate || automaticRequest) checkNotNull(nominal) else accepted
+    val view = if (!envelope || separate || automaticRequest) lowered else
+        LinearSourceView(source, lowered.model, lowered.objective, lowered.columns,
+            lowered.sourceIntegerCoordinates, lowered.sourceRealCoordinates, false, false,
+            lowered.objectiveScale, lowered.constraintFactorCount)
     val objective = view.objective?.toLinearObjective()
     val qualification = if (numerical) source.toleranceQualification(stop) else null
     val covers = !numerical || qualification?.verify() == true
@@ -86,9 +98,10 @@ internal fun prepareLinearSource(
     if (stop()) return interrupted()
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound,
         components?.takeIf { it.isNotEmpty() }?.let { IndependentLinearSourceChecks(requireNotNull(projections), it) },
-        acceptedModelExact = envelope && !separate && lowered.exact,
+        acceptedModelExact = envelope && !separate && !automatic && lowered.exact,
         toleranceAuthority = if (separate && objective != null) LinearToleranceAuthority(view.model, accepted.model,
-            if (source.objective?.sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective) else null)
+            if (source.objective?.sense == ObjectiveSense.MAXIMIZE) objective.negated() else objective) else null,
+        automaticCutSelection = automatic && separate && objective != null)
     if (!supported) {
         return SourceRouteSelection(request,
             SourceProblemRoute.NativeFormula(null,

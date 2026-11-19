@@ -348,14 +348,14 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCall
 
 internal fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks,
     numericalCompanions: TheoryParams): FiniteSolveResult =
-    solve(request, callbacks, request.lpSolveContext, numericalCompanions)
+    solve(request, callbacks, request.lpSolveContext, FiniteCompanionPolicy(numericalCompanions))
 
 /** Execute the fixed finite route with per-invocation LP dependencies. */
 internal fun FinitePipeline.solve(
     request: FiniteSolveRequest,
     callbacks: FiniteSolveCallbacks,
     lpSolveContext: LpSolveContext,
-    numericalCompanions: TheoryParams? = null,
+    numericalCompanions: FiniteCompanionPolicy? = null,
     onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,

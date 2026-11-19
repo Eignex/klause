@@ -38,6 +38,7 @@ class SourceSetupRequest private constructor(
     internal val requiresQuadraticCompletion: Boolean = false,
     /** Opt into exact separation over an absolute-tolerance linear source's accepted set. */
     val linearToleranceEnvelope: Boolean = false,
+    internal val automaticLinearCutSelection: Boolean = false,
 ) {
     /** Bind an affine operation or the objective already embedded in a native formula. */
     constructor(
@@ -49,7 +50,8 @@ class SourceSetupRequest private constructor(
         providers: FactorProjectionProviders = source.providers,
         cancellation: ExecutionControl = ExecutionControl.Never,
         boundCancellation: ExecutionControl = cancellation,
-    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
+    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null,
+        automaticLinearCutSelection = true)
 
     /** Bind a linear source with an explicit absolute-tolerance envelope policy. */
     constructor(

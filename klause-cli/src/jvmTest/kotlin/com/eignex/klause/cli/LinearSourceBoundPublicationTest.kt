@@ -54,7 +54,6 @@ class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {
             engine = "mixed"
             parallel = 1
             statistics = true
-            sourceOptions.linearToleranceEnvelope = true
         }
         val solvable = linearSourceSolvable(SourceAttachment(source, ProblemSettings()), common, { "point" })
         val pairs = mutableMapOf<String, String>()

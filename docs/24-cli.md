@@ -115,8 +115,12 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
 
 The `source-cuts`, `source-point-cuts` and `source-aggregate-cuts` Boolean parameters
 configure [source cut selection](20-linear-programming.md#cuts) in admitted numerical
-companions of linear sources. Finite
+companions of linear sources. Compatible absolute-tolerance mixed binary/continuous
+MPS optimization supplies point selection and aggregation defaults. Explicit values
+override those defaults; a changed prepared mapping disables only automatic values. Finite
 worker recipes do not interpret these controls; admission and lifetime are separate.
+Disabling point selection also disables omitted aggregation; explicit aggregation
+selects its full recipe independently.
 
 `--param luby=N` requires a strictly positive integer. Zero and negative units
 produce a configuration error before worker execution, including when an adaptive
@@ -379,13 +383,16 @@ replaces its default independently, and explicit source bounds stay authoritativ
 | `--source-absolute-tolerance N` / `--source-relative-tolerance N` | Source feasibility slack components |
 | `--source-absolute-optimality-tolerance N` / `--source-relative-optimality-tolerance N` | Source optimality gap components |
 
-`--source-tolerance-envelope true` opts an MPS source into exact LP separation over
+`--source-tolerance-envelope true` explicitly selects exact LP separation over
 its absolute-tolerance accepted set. Compatible finite coordinates retain ordinary
 numerical witness search beside that authority. It requires zero relative
 feasibility tolerance and leaves an exact source unchanged. The source's declared
 optimality gap still applies. Statistics publish such original-unit bounds as
 `nativeAcceptedObjectiveBound`, with scope `absolute-tolerance-envelope`, instead
-of `nativeNominalObjectiveBound`. The default route retains its ordinary policy.
+of `nativeNominalObjectiveBound`. Omission selects this separate authority automatically
+for compatible mixed binary/continuous optimization. Unsupported automatic layouts
+retain nominal execution; explicit true retains exact envelope execution as its fallback.
+Explicit false keeps nominal source preparation and its configured cut controls.
 
 Values accept exact decimals, scientific notation and rationals; a value that cannot
 be represented is rejected rather than rounded. Tolerance uses
