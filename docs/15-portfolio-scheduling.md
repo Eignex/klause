@@ -537,10 +537,16 @@ scalar limit and keys beyond the remaining allocation are refused before retenti
 Sharing completions grants no work, lifetime, bound or terminal authority. The
 control changes neither worker admission nor lifetimes.
 
-With completion enabled, a checked pooled center starts joint repair in a small
-connected integer neighborhood that frees at most two integers, without a root
-relaxation; the all-pinned rounded-root bootstrap serves a center without that
-handoff. Before a checked center exists, root repair can keep the ordinary
+With completion enabled, the numerical traversal visits the accepted incumbent's
+side of an existing integer split first; both alternatives retain ordinary coverage
+and certification. A checked pooled center starts joint repair without a root
+relaxation. When the frontier's paid root point is available, the first repair pins
+only eligible integers agreeing with that point within `1e-6`, releasing every
+disagreement and leaving continuous columns free. Agreement selects a private
+neighborhood, not a source fixing or bound. Empty or full agreement, missing guidance,
+cancellation and unavailable funding retain the connected two-integer start.
+The all-pinned rounded-root bootstrap serves a center without that handoff.
+Before a checked center exists, root repair can keep the ordinary
 pre-selection relaxation point for advisory centering and neighborhood order,
 separately from point-selected bounds. Before the first proposal, a newer exact
 pooled point (never an advisory one) can replace the center and tighten the cutoff,
