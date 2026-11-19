@@ -28,6 +28,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEngineContextTest {
@@ -246,26 +247,51 @@ class LpEngineContextTest {
     @Test
     fun `preparation should respect the remaining grant under its slice policy`() {
         val problem = boundedLpEngineProblem()
-        for ((components, reuse) in listOf(false to false, true to false, false to true)) {
+        for ((components, reuse, budgetMillis) in listOf(Triple(false, false, 4L), Triple(true, false, 4L),
+            Triple(false, true, 4L), Triple(false, true, 12_800L))) {
             val plan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components,
                 componentReuse = reuse)
             var offered: Long? = null
             LpEngine(
                 problem,
                 LinearObjective(),
-                LpParams(lpPlan = plan, solveBudgetMillis = 4L),
+                LpParams(lpPlan = plan, solveBudgetMillis = budgetMillis),
                 SolveStatsSink(backend = "preparation-remaining"),
                 nodeWorkAllowance = { offered },
                 rootQueryPolicy = if (components) LpRootQueryPolicy.SHARED_WORK else
                     LpRootQueryPolicy.SEPARATE_PREPARATION,
             ).use { engine ->
-                engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
+                val spent = if (budgetMillis == 4L) 5_000L else 63_985_000L
+                engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = spent))
 
                 for ((grant, expected) in listOf(null to 15_000L, 30_000L to 15_000L, 500L to 500L, 0L to 1L)) {
                     offered = grant
-                    assertEquals(if (reuse) 15_000L else expected, engine.nodePreparationWorkBudget())
+                    assertEquals(if (reuse && budgetMillis == 12_800L) 15_000L else expected,
+                        engine.nodePreparationWorkBudget())
                 }
             }
+        }
+    }
+
+    @Test
+    fun `unfunded component reuse preserves ordinary preparation and query grants`() {
+        val problem = boundedLpEngineProblem()
+        var ordinaryWork: Long? = null
+        for (reuse in listOf(false, true)) {
+            val factory = RecordingLpEngineFactory()
+            val sink = SolveStatsSink("component-funding-decline")
+            LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+                LpParams(lpPlan = LpPlan(bounding = true, componentReuse = reuse,
+                    probe = false, rootCutHarvest = false), solveBudgetMillis = 10_000L),
+                sink, LpSolveContext(factory, decline)).use { engine ->
+                assertFalse(engine.pruneNode(PropagationSession(problem), 1.5, -1, true))
+            }
+
+            val work = factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit
+            if (reuse) assertEquals(ordinaryWork, work) else ordinaryWork = work
+            assertNull(factory.floatAllowances.single())
+            assertEquals(if (reuse) 1L else null,
+                sink.snapshot().lp.phases["COMPONENT_ADMISSION_NODE"]?.outcomes?.get("FUNDING"))
         }
     }
 

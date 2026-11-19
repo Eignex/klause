@@ -963,6 +963,9 @@ internal class LpEngine(
         },
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
+    private val componentReuseFunded = componentReuseFundingAvailable(lpEffortGovernor.remainingWork())
+    private val automaticComponentReuse: Boolean get() = params.lpPlan.componentReuse && componentReuseFunded
+    private var componentFundingDeclineObserved = false
 
     // Pivot budget for an LP that is not repaying its cost. See [LpPivotBudget].
     private val lpPivotBudget = LpPivotBudget(
@@ -1045,7 +1048,7 @@ internal class LpEngine(
 
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         retainedRootCumulativeWork().coerceAtLeast(1L)
-    } else if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership) {
+    } else if (automaticComponentReuse && !params.lpPlan.componentOwnership) {
         componentReusePreparationWork(lpEffortGovernor.remainingWork())
     } else ordinaryNodePreparationWorkBudget()
 
@@ -1153,7 +1156,8 @@ internal class LpEngine(
     private val ordinarySeparateNodePreparation: Boolean get() = sparseTrialRequested ||
         requestedPlan.componentOwnership || rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
-    private val separateNodePreparation: Boolean get() = requestedPlan.componentReuse || ordinarySeparateNodePreparation
+    private val separateNodePreparation: Boolean get() =
+        (requestedPlan.componentReuse && componentReuseFunded) || ordinarySeparateNodePreparation
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
         rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
@@ -1232,10 +1236,10 @@ internal class LpEngine(
                 work = nodePreparationWorkBudget(),
                 trackDegeneracy = adaptiveWork,
                 pricing = pricingOptions,
-                componentSplit = params.lpPlan.componentOwnership || params.lpPlan.componentReuse,
-                componentAdmission = if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership)
+                componentSplit = params.lpPlan.componentOwnership || automaticComponentReuse,
+                componentAdmission = if (automaticComponentReuse && !params.lpPlan.componentOwnership)
                     numericalComponentAdmission else null,
-                monolithicPreparationWork = if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership)
+                monolithicPreparationWork = if (automaticComponentReuse && !params.lpPlan.componentOwnership)
                     ordinaryNodePreparationWorkBudget() else null,
             )
         },
@@ -1881,6 +1885,12 @@ internal class LpEngine(
                 }
             }
             params = params.copy(lpPlan = plan)
+        }
+        if (params.lpPlan.bounding && params.lpPlan.componentReuse && !componentReuseFunded &&
+            !params.lpPlan.componentOwnership && !componentFundingDeclineObserved
+        ) {
+            sink.lp.observeComponentAdmission("FUNDING", 0, 0L)
+            componentFundingDeclineObserved = true
         }
         structuralCutSupport = structuralCutSupport || params.lpPlan.circuit
         if (params.lpPlan.cuts && !structuralCutSupport) {

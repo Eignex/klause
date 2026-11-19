@@ -375,7 +375,10 @@ Cut-source maps capture incoming collections once. Derived maps share immutable
 column expressions, global premises and source definitions while owning their active
 premises and row-parent mappings. Source identities and epochs keep their existing scope.
 
-The default `lp-component-reuse` setting rejects small or oversized owners before
+The default `lp-component-reuse` setting requires its bounded owner setup to fit
+within a quarter of the worker's total LP work allowance. This funding decision is
+fixed for that worker; a decline keeps its ordinary preparation and query policies.
+Funded workers reject small or oversized owners before
 partition allocation, then admits numerical node ownership from the partition's size,
 tableau-size reduction and modeled child-model storage. A finite shared basis-entry
 limit is divided among the admitted children. Construction and declined inspection

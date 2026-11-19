@@ -3,10 +3,19 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.lp.engine.LpComponentShape
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpComponentReuseTest {
+    @Test
+    fun `owner setup must fit a quarter of the total lp funding`() {
+        assertTrue(componentReuseFundingAvailable(null))
+        assertTrue(componentReuseFundingAvailable(64_000_000L))
+        assertFalse(componentReuseFundingAvailable(63_999_999L))
+        assertFalse(componentReuseFundingAvailable(0L))
+    }
+
     @Test
     fun `numerical reuse is enabled independently of root component guidance`() {
         assertTrue(LpPlan().componentReuse)
