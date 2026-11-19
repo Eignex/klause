@@ -59,9 +59,12 @@ internal object FinitePortfolioLpCapture {
                 "source-refutation-center-step")
         })
         val mode = options["capture-mode"] ?: "portfolio"
-        require(mode in setOf("portfolio", "joint-before", "joint-ordinary"))
+        require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
+        val captureJoint = mode == "joint-ordinary" || mode == "joint-handoff"
         val centerStep = options["source-refutation-center-step"]?.let {
-            require(mode == "joint-ordinary") { "source-refutation-center-step requires joint-ordinary capture" }
+            require(captureJoint) {
+                "source-refutation-center-step requires joint-ordinary capture or joint-handoff capture"
+            }
             it.toBooleanStrict()
         }
         if ("inspect-rays" in options) {
@@ -71,15 +74,16 @@ internal object FinitePortfolioLpCapture {
         require(preset in setOf("ordinary", "retained", "complete")) { "unsupported portfolio policy: $preset" }
         val handoff = options.getValue("handoff").toBooleanStrict()
         val progress = options["portfolio-progress"]?.toBooleanStrict() ?: (mode == "portfolio")
-        if (mode in setOf("joint-before", "joint-ordinary")) {
+        if (mode == "joint-before" || captureJoint) {
             require(handoff && preset == "complete" && !progress)
             require(options.keys.none {
                 it in setOf("cutoff-bits", "capture-worker", "capture-route",
                     "capture-guidance")
             })
-            if (mode == "joint-ordinary") require((options["captures"]?.toInt() ?: 0) == 0)
-            return listOf("companion-integers=true", "companion-active-ms=4000",
-                "companion-after-incumbent=false", "companion-admission=ordinary", "companion-repair=fixed",
+            if (captureJoint) require((options["captures"]?.toInt() ?: 0) == 0)
+            return listOf("companion-integers=${mode != "joint-handoff"}", "companion-active-ms=4000",
+                "companion-after-incumbent=${mode == "joint-handoff"}",
+                "companion-admission=ordinary", "companion-repair=fixed",
                 "source-incumbent-completion=true", "portfolio-progress=false",
                 "portfolio-proof-workers=complete", "portfolio-proof-share=0.5") +
                 listOfNotNull(centerStep?.let { "source-refutation-center-step=$it" })
@@ -102,7 +106,7 @@ internal object FinitePortfolioLpCapture {
             return
         }
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
-        val captureJoint = options["capture-mode"] == "joint-ordinary"
+        val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff")
         val limit = options["captures"]?.toInt() ?: if (captureJoint) 0 else 1
         val captureGuidance = options["capture-guidance"]?.toBooleanStrict() ?: false
         val seed = options.getValue("seed").toLong()

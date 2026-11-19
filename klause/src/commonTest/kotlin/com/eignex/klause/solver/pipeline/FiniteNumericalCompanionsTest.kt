@@ -36,6 +36,43 @@ import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
     @Test
+    fun `original source rejection should withhold exact pooled points from both companions`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val center = Sample(BooleanArray(0), LongArray(4) { 1 }, doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        for (arm in 0..1) {
+            val events = mutableListOf<PortfolioLifecycleKind>()
+            val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+                ExecutionControl.Never, cost, incumbentCompletionCheck = { _, _, _ -> false }).companions)
+            companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
+
+            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
+                companions.factories(plan, 0).elementAt(arm)
+                    .materialize(plan, resources.slots[arm]).use { worker ->
+                        worker.onLifecycle = { kind, _ -> events += kind }
+                        assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
+                            repeat(4) {
+                                if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
+                            }
+                        }
+                    }
+            }
+
+            assertTrue(PortfolioLifecycleKind.INCUMBENT_READ in events)
+            assertFalse(PortfolioLifecycleKind.INCUMBENT_IMPORTED in events, "arm $arm")
+            assertFalse(PortfolioLifecycleKind.INCUMBENT_CONSUMED in events, "arm $arm")
+        }
+    }
+
+    @Test
     fun `point delivery should control imported seeds for both companions`() {
         val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
             Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
