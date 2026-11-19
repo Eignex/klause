@@ -3,6 +3,7 @@
 # source is listed under every committed edition that carries its name.
 # MIPLIB
 miplib2017/amaze22012-06-28i
+miplib2017/n6-3
 miplib3/gt2
 miplib2017/gt2
 miplib3/stein27

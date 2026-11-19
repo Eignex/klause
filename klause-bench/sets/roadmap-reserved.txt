@@ -8,5 +8,4 @@ miplib2017/neos-3665875-lesum
 miplib2017/neos-4736745-arroux
 miplib2017/neos-831188
 miplib2017/usAbbrv-8-25_70
-miplib2017/n6-3
 miplib2017/germany50-UUM
