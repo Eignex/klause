@@ -79,25 +79,36 @@ class ConflictAnalyzerTest {
     fun `historical table replay should improve the minimized asserting backjump`() {
         val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }
             .toLongArray() + longArrayOf(1, 0, 0, 1, 1, 1, 1, 0)
-        val problem = Problem(1, 4, Array(4) { IntDomain(0, 1) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
-        for (enabled in listOf(false, true)) {
-            val state = PropagationState(problem, Assumptions.None)
+        for ((sourceBooleans, enabled) in listOf(true, false).flatMap { sourceBooleans ->
+            listOf(false, true).map { enabled -> sourceBooleans to enabled }
+        }) {
+            val integers = if (sourceBooleans) 4 else 5
+            val problem = Problem(if (sourceBooleans) 1 else 0, integers, Array(integers) { IntDomain(0, 1) },
+                arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
+            val state = PropagationState(problem, Assumptions.None, pbLearning = !sourceBooleans)
             state.undoLogging = true
+            state.integerRowLearning = !sourceBooleans
             state.historicalTableReasons = enabled
             state.factorAttribution = FactorAttribution()
             check(state.setIntMinAsDecision(2, 1))
             check(state.setIntMinAsDecision(1, 1))
-            check(state.pinBoolAsDecision(0, true))
-            check(state.tightenIntMin(3, 1, intArrayOf(Lit.make(0, false))))
+            val guard = if (sourceBooleans) {
+                check(state.pinBoolAsDecision(0, true))
+                0
+            } else {
+                check(state.setIntMinAsDecision(4, 1))
+                state.atomVarGe(4, 1)
+            }
+            check(state.tightenIntMin(3, 1, intArrayOf(Lit.make(guard, false))))
             val x = state.atomVarGe(0, 1)
             val b = state.atomVarGe(2, 1)
             state.currentFactor = 0
             check(state.factorAt(0).propagate(state, 0))
-            val seed = intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false))
+            val seed = intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(guard, false))
 
             val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(
-                state.conflictAnalyzer.analyzeConflictClause(seed))
+                if (sourceBooleans) state.conflictAnalyzer.analyzeConflictClause(seed) else
+                    state.conflictAnalyzer.analyze(state.addLearnedClause(Clause(seed), lbd = 3)))
 
             assertTrue(learned.asserting)
             assertEquals(if (enabled) 1 else 2, learned.backjumpLevel)
@@ -264,7 +275,8 @@ class ConflictAnalyzerTest {
         assertEquals(2, learned.backjumpLevel)
     }
 
-    private fun atomGeState(levels: IntArray, ants: Array<IntArray?>? = null): PropagationState {
+    private fun atomGeState(levels: IntArray, ants: Array<IntArray?>? = null,
+        pbLearning: Boolean = false): PropagationState {
         val n = levels.size
         val problem = Problem(
             numBoolVars = 0,
@@ -272,7 +284,7 @@ class ConflictAnalyzerTest {
             intDomains = Array(n) { IntDomain(0, 10) },
             factors = arrayOf<Factor>(),
         )
-        val state = PropagationState(problem, Assumptions.None)
+        val state = PropagationState(problem, Assumptions.None, pbLearning = pbLearning)
         state.undoLogging = true
         for (v in 0 until n) {
             state.currentLevel = levels[v]
@@ -292,6 +304,39 @@ class ConflictAnalyzerTest {
     private fun negAtom(i: Int) = Lit.make(i, false)
 
     private fun varsOf(literals: IntArray): Set<Int> = literals.map { Lit.variable(it) }.toSet()
+
+    @Test
+    fun `PB enablement without source Booleans should preserve clause analysis and work`() {
+        for (integerLearning in listOf(false, true)) {
+            val results = listOf(false, true).map { pbLearning ->
+                val state = atomGeState(intArrayOf(1, 2), pbLearning = pbLearning)
+                state.integerRowLearning = integerLearning
+                state.currentLevel = 2
+                val factor = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
+                val before = state.work
+
+                val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(factor))
+
+                assertEquals(setOf(negAtom(0), negAtom(1)), learned.literals.toSet())
+                assertEquals(1, learned.backjumpLevel)
+                assertTrue(learned.asserting)
+                state.work - before
+            }
+            assertEquals(results[0], results[1])
+        }
+    }
+
+    @Test
+    fun `PB enablement without source Booleans should retain containing cancellation`() {
+        val state = atomGeState(intArrayOf(1, 2), pbLearning = true)
+        state.currentLevel = 2
+        state.finiteWork.cancellation = ExecutionControl { true }
+
+        val result = state.conflictAnalyzer.analyzeConflictClause(intArrayOf(negAtom(0), negAtom(1)))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.NotApplicable>(result)
+        assertTrue(state.runCancelled)
+    }
 
     @Test
     fun `1UIP analysis should learn an asserting atom clause backjumping to the lower level`() {

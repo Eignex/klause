@@ -45,7 +45,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     /** The pseudo-Boolean resolvent admits only Boolean premises in each analyzed conflict. */
     private val pbResolvent: PbConflictResolvent? =
-        if (state.pbLearning) PbConflictResolvent(state, this) else null
+        if (state.pbLearning && state.problem.numBoolVars > 0) PbConflictResolvent(state, this) else null
 
     /** The resolvent that produced the most recent result — its bump sets feed VSIDS. */
     private var lastResolvent: ConflictResolvent = clauseResolvent
@@ -232,11 +232,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
         state.finiteWork.begin()
-        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
+        if (state.pbLearning || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
             state.finiteWork.checkNow()
         }
         val result = analyze()
-        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
+        if (state.pbLearning || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
             state.finiteWork.checkNow()
         }
         if (state.runCancelled) AnalysisResult.NotApplicable else result
@@ -350,7 +350,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 lastResolvent = clauseResolvent
                 return row
             }
-            if (pbResolvent == null) {
+            if (pbResolvent == null && (!state.pbLearning || !state.historicalTableReasons)) {
                 lastResolvent = clauseResolvent
                 return fallback
             }
