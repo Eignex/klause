@@ -6,6 +6,7 @@ import com.eignex.lab.bench.BenchProtocol
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -145,6 +146,38 @@ class PairedAuditTest {
         assertEquals(mapOf("valid-unbound" to 1), report.outcomes.getValue("candidate").checkedWitnesses)
         assertEquals(mapOf("proven-optimum" to 1), report.outcomes.getValue("base").native)
         assertEquals(1, report.outcomes.getValue("base").nativeProofsWithoutIndependentProof)
+    }
+
+    @Test
+    fun `an unknown arm without a witness should not require a checker receipt`() {
+        val (base, candidate) = row()
+        val unknown = base.with("record.feasible", JsonNull).with("record.proven", false)
+            .with("record.objective", JsonNull).with("record.finalWitness", null).with("record.labCheck", null)
+
+        val report = audit(listOf(unknown, candidate))
+
+        assertTrue(report.accepted, report.rows.single().reasons.toString())
+    }
+
+    @ParameterizedTest
+    @CsvSource("record.labCheck.policy, other", "record.labCheck,")
+    fun `feasible arms with different checker policies should invalidate their row`(path: String, value: String?) {
+        val (base, candidate) = row()
+
+        val report = audit(listOf(base, candidate.with(path, value)))
+
+        assertTrue("undeclared checker difference" in report.rows.single().reasons)
+    }
+
+    @Test
+    fun `an observed checker policy on an unknown arm should still match`() {
+        val (base, candidate) = row()
+        val unknown = base.with("record.feasible", JsonNull).with("record.proven", false)
+            .with("record.labCheck.policy", "other")
+
+        val report = audit(listOf(unknown, candidate))
+
+        assertTrue("undeclared checker difference" in report.rows.single().reasons)
     }
 
     @Test
