@@ -338,9 +338,11 @@ and root scopes. The owner advances its floating cursor in adaptive work quanta;
 pause publishes nothing and authority edits discard the cursor. Completed floating
 results enter the policy's bound check within a 16 MiB checking reservation;
 exhaustion, cancellation or refusal withholds the root bound.
-Automatic admission reserves preparation, row-intersection risk and a sparse pricing
-work estimate against the caller's remaining root grant. Pricing combines emitted
+Automatic admission prices source preparation, root optimization and one downstream
+query against the caller's remaining root grant. Each query includes
+row-intersection risk and a sparse pricing estimate. Pricing combines emitted
 nonzeros and dimensions with the smaller dimension of the largest component.
+Source assembly is counted once; the query and continuation estimates are separate.
 Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
 techniques, and automatic sparse admission supplies no additional portfolio slot or slice.
 Automatic roots retain ordinary node bounding where the dense size guard permits

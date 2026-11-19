@@ -199,12 +199,14 @@ internal fun estimateSparseLpAdmission(
     }
     val fillRisk = rowDegree.sumOf { it.toLong() * maxOf(0, it - 1) }
     val storage = sparseLpStorage(model.m.toLong(), model.n.toLong(), entries)
-    val queryWork = preparationWork + fillRisk + (entries + dimensions) * minOf(largestRows, largestColumns)
+    val queryWork = fillRisk + (entries + dimensions) * minOf(largestRows, largestColumns)
+    // Root optimization and its downstream query share one source assembly and one admission grant.
+    val totalWork = preparationWork + 2L * queryWork
     val decline = when {
         scalarBits > 128 -> "ScalarWidth"
         storage > SPARSE_LP_MAX_ALLOCATION -> "Storage"
         preparationWork > SPARSE_LP_MAX_PREPARATION_WORK -> "PreparationWork"
-        automatic && queryWork > workAllowance -> "QueryWork"
+        automatic && totalWork > workAllowance -> "QueryWork"
         else -> null
     }
     return SparseLpAdmission(buildMap {
@@ -217,6 +219,9 @@ internal fun estimateSparseLpAdmission(
         put("ScalarBits", scalarBits.toLong())
         put("RowIntersectionRisk", fillRisk)
         put("EstimatedQueryWork", queryWork)
+        put("EstimatedContinuationWork", queryWork)
+        put("EstimatedTotalWork", totalWork)
+        put("QueryWorkAllowance", workAllowance.coerceAtLeast(0L))
         put("Automatic", if (automatic) 1L else 0L)
         put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
         put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)

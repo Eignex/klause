@@ -361,18 +361,20 @@ class SparseLpAdmissionTest {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
             settings = ProblemSettings(lpMaxTableauCells = 1L))
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
-            LpParams(lpConfig = LpConfig.AUTO, lpPlan = LpPlan(rootMaxWork = 20_000L),
-                solveBudgetMillis = 10_000L), SolveStatsSink("funded-sparse-node")).use { engine ->
-            assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
-            engine.noteNodeOverhead(engine.retainedRootCumulativeWork())
-            assertTrue(engine.propagator.atLevel(1))
-            assertTrue(engine.propagator.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L))))
+        for (budget in listOf(null, 10_000L)) {
+            LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
+                LpParams(lpConfig = LpConfig.AUTO, lpPlan = LpPlan(rootMaxWork = 20_000L),
+                    solveBudgetMillis = budget), SolveStatsSink("funded-sparse-node")).use { engine ->
+                assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
+                engine.noteNodeOverhead(engine.retainedRootCumulativeWork())
+                assertTrue(engine.propagator.atLevel(1))
+                assertTrue(engine.propagator.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L))))
 
-            val result = engine.propagator.solveFloat()?.second
+                val result = engine.propagator.solveFloat()?.second
 
-            assertEquals(3.0, requireNotNull(result).objective)
-            assertEquals(0L, engine.retainedRootCumulativeWork())
+                assertEquals(3.0, requireNotNull(result).objective)
+                assertEquals(0L, engine.retainedRootCumulativeWork())
+            }
         }
     }
 
@@ -573,7 +575,7 @@ class SparseLpAdmissionTest {
             addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 3L)
             addRow(intArrayOf(2, 3), longArrayOf(2L, 1L), Relation.LE, 4L)
         }.build(Sense.MINIMIZE)
-        val estimated = requireNotNull(estimateSparseLpAdmission(model).metrics["EstimatedQueryWork"])
+        val estimated = requireNotNull(estimateSparseLpAdmission(model).metrics["EstimatedTotalWork"])
 
         for (funded in listOf(false, true)) {
             val admission = estimateSparseLpAdmission(model,
