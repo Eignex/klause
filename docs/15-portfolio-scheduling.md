@@ -504,6 +504,14 @@ checks precede incumbent admission, cutoff use or neighborhood centering.
 An already exact pooled point must pass the same original-source callback before
 import; exact working coordinates alone do not establish original-source feasibility.
 These checks spend the consuming companion's existing funding and lifetime.
+Each completion owner retains at most its latest completed exact-point acceptance
+or rejection. Reuse requires the same source restrictions, rows, coordinates,
+objective, interpretation, checker and full point with its coordinate frame.
+Interrupted or unavailable checks are not retained. Lookups and bounded snapshot
+retention spend existing funding; unaffordable retention leaves ordinary checking
+available. Closing the owner releases the entry. Reuse supplies no publication or
+bound authority, and receiving queries still check their own integer pins and
+conditions before admitting an imported point.
 Joint repair declines an exact external point that cannot improve its pending cutoff
 before completion checking; this decline supplies no witness or bound authority.
 

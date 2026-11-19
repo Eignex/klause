@@ -657,6 +657,44 @@ class JointLinearRepairCompletionTest {
     }
 
     @Test
+    fun `reused exact imports should still respect each receiving neighborhoods integer pins`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val offered = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        val conditions = listOf(
+            ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO), mapOf(0 to BigFraction.ZERO)),
+            ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO),
+                mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)),
+        )
+        var importChecks = 0
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
+            external = { offered }, incumbentCompletionCheck = { sample, _, _ ->
+                if (sample === offered) importChecks++
+                true
+            }).use { repair ->
+            for (condition in conditions) {
+                var attempt = repair.attempt(condition, ExecutionControl.Never)
+                repeat(32) {
+                    if (attempt.result == ExactNeighborhoodResult.Paused) {
+                        attempt = repair.attempt(condition, ExecutionControl.Never)
+                    }
+                }
+
+                assertEquals(0L, assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample.intValue(0))
+            }
+            assertEquals(1, importChecks)
+            assertTrue((repair.stats.smt.completeSearchStages?.get(
+                "jointRepairExternalCompletionExactCheckedReused") ?: 0L) > 0L)
+        }
+    }
+
+    @Test
     fun `non improving exact external points should need only their preparation check`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = emptyArray(), numRealVars = 1,
