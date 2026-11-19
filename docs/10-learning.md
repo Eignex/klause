@@ -382,7 +382,9 @@ exact activity and gcd normalization with downward rounding of the upper bound.
 Normalized rows retain sorted coordinates; cancellation merges their terms in linear
 time and removes zero coefficients before normalization.
 Ordered source coordinates use array normalization directly; unordered, repeated or
-zero terms pass through aggregation before normalization. Activity accumulates checked
+zero terms pass through aggregation before normalization.
+Once the coefficient gcd reaches one, normalization copies the canonical terms and
+keeps the bound without further gcd or identity divisions. Activity accumulates checked
 signed words and promotes the partial sum at the first product or sum overflow.
 Wide coefficients enter exact accumulation directly; failed word attempts remain
 charged to the containing allowance.

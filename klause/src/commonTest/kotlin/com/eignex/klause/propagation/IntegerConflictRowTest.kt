@@ -20,6 +20,52 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `a primitive source should fund wide coefficient hashing before retention`() {
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(work = 32))
+        val coefficients = arrayOf(bigIntOf(1), bigIntOf(1) shl 4096)
+
+        val decline = assertFailsWith<ArithmeticLearningDeclined> {
+            IntegerConflictRow.source(intArrayOf(0, 1), coefficients, bigIntOf(0), useLo = true, budget = budget)
+        }
+
+        assertEquals("work", decline.reason)
+    }
+
+    @Test
+    fun `a primitive source should preserve its complete row in either coordinate order`() {
+        val sources = listOf(
+            intArrayOf(0, 1, 2, 3) to longArrayOf(6, 10, 1, 7),
+            intArrayOf(3, 0, 2, 1) to longArrayOf(7, 6, 1, 10),
+        )
+        for ((variables, coefficients) in sources) {
+            for (useLo in listOf(false, true)) {
+                val row = requireNotNull(IntegerConflictRow.source(variables,
+                    Array(coefficients.size) { bigIntOf(coefficients[it]) }, bigIntOf(-9), useLo))
+                val sign = if (useLo) 1L else -1L
+
+                assertTrue(row.variables.contentEquals(intArrayOf(0, 1, 2, 3)))
+                assertEquals(listOf(6L, 10L, 1L, 7L).map { bigIntOf(it * sign) }, row.coefficients.toList())
+                assertEquals(bigIntOf(-9L * sign), row.bound)
+            }
+        }
+    }
+
+    @Test
+    fun `a primitive source should capture its coordinate and coefficient arrays`() {
+        val variables = intArrayOf(0, 1)
+        val large = bigIntOf(1) shl 256
+        val coefficients = arrayOf(bigIntOf(1), large)
+        val row = requireNotNull(IntegerConflictRow.source(variables, coefficients, bigIntOf(-3), useLo = true))
+
+        variables[0] = 4
+        coefficients[1] = bigIntOf(0)
+
+        assertTrue(row.variables.contentEquals(intArrayOf(0, 1)))
+        assertEquals(listOf(bigIntOf(1), large), row.coefficients.toList())
+    }
+
+    @Test
     fun `source normalization should combine unordered repeated coordinates in either direction`() {
         for (useLo in listOf(false, true)) {
             val row = requireNotNull(IntegerConflictRow.source(intArrayOf(4, 2, 4, 0, 2),
