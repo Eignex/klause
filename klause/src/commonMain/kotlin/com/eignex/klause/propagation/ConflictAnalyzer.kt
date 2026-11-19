@@ -369,14 +369,16 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (!pb.failed) {
                 state.arithmeticLearningTrace?.record(if (r is AnalysisResult.LearnedPb) "pb.derived" else "pb.clause")
                 if (r is AnalysisResult.LearnedPb) {
-                    state.arithmeticLearningTrace?.clause("pb.literals", r.literals, state)
-                    if (r.weights.size <= 64 && r.weights.all { it.fitsLong() } && r.degree.fitsLong()) {
-                        val weights = LongArray(r.weights.size) { r.weights[it].toLongExact() }
-                        state.arithmeticLearningTrace?.record("pb.weights", *weights)
-                        state.arithmeticLearningTrace?.record("pb.target", r.degree.toLongExact(),
-                            r.backjumpLevel.toLong())
-                    } else {
-                        state.arithmeticLearningTrace?.omitPayload("pb.weights", r.weights.size)
+                    state.arithmeticLearningTrace?.let { trace ->
+                        trace.clause("pb.literals", r.literals, state)
+                        if (trace.accepting && r.weights.size <= trace.payloadTermLimit &&
+                            r.weights.all { it.fitsLong() } && r.degree.fitsLong()) {
+                            val weights = LongArray(r.weights.size) { r.weights[it].toLongExact() }
+                            trace.record("pb.weights", *weights)
+                            trace.record("pb.target", r.degree.toLongExact(), r.backjumpLevel.toLong())
+                        } else {
+                            trace.omitPayload("pb.weights", r.weights.size)
+                        }
                     }
                 } else if (r is AnalysisResult.Learned) {
                     state.arithmeticLearningTrace?.clause("pb.clause-result", r.literals, state)

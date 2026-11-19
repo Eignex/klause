@@ -466,6 +466,9 @@ a satisfied endpoint literal cannot discharge the row or certify a root contradi
 
 A rolling capture can focus on the first admitted integer or PB row, retaining its
 derivation and later consumers inside the fixed event and word allowances.
+Focused PB literal and weight payloads share a term allowance derived from the word
+capacity; oversized payloads are omitted without suppressing later consumers.
+PB weight serialization requires an attached, accepting trace.
 
 Single-core finite source execution can attach a native-session observer through
 the ordinary portfolio factories. The hook wraps each selected recipe's selector

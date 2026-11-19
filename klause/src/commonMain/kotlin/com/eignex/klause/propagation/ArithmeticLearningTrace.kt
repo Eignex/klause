@@ -24,6 +24,7 @@ internal class ArithmeticLearningTrace(
         private set
     var captureFirstInteger = false
     var captureFirstPb = false
+    val payloadTermLimit: Int get() = if (captureFirstPb) minOf(1024, maxWords / 6) else 64
     var collectDeclines = false
     private val declineNames = ArrayList<String>()
     private val declineIndices = HashMap<String, Int>()
@@ -124,7 +125,7 @@ internal class ArithmeticLearningTrace(
 
     fun clause(kind: String, literals: IntArray, state: PropagationState) {
         if (!accepting || omitFocusedDetails()) return
-        if (literals.size > 64) {
+        if (literals.size > payloadTermLimit) {
             omitPayload(kind, literals.size)
             return
         }
