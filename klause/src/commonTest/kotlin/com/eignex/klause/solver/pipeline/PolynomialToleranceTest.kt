@@ -227,7 +227,7 @@ class PolynomialToleranceTest {
 
     private companion object {
         // Less native work than the widened refutation of the product takes.
-        const val WIDENING_LIMIT = 20_000L
+        const val WIDENING_LIMIT = 100L
 
         val SLACK: BigFraction = BigFraction.of(bigIntOf(1L), bigIntOf(10_000_000L))
     }

@@ -48,7 +48,7 @@ class CliModeSmtTest {
     @Test
     fun `SMT integer cell reuse should report avoided completions without an unsat claim`() {
         val source = File.createTempFile("nia-cells", ".smt2").apply {
-            writeText("(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2)) (check-sat)")
+            writeText("(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2)) (check-sat)")
             deleteOnExit()
         }
 
@@ -69,9 +69,9 @@ class CliModeSmtTest {
     }
 
     @Test
-    fun `SMT integer root admission should report the refuted rootless square`() {
+    fun `SMT integer root admission should report the refuted rootless cubic`() {
         val source = File.createTempFile("nia-roots", ".smt2").apply {
-            writeText("(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2)) (check-sat)")
+            writeText("(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2)) (check-sat)")
             deleteOnExit()
         }
 
@@ -319,7 +319,7 @@ class CliModeSmtTest {
     @Test
     fun `SMT incomplete integer candidate exhaustion should publish unknown`() {
         val source = File.createTempFile("nia-budget", ".smt2").apply {
-            writeText("(declare-const n Int) (assert (= (* n n) 2)) (check-sat)")
+            writeText("(declare-const n Int) (assert (= (* n n n) 2)) (check-sat)")
             deleteOnExit()
         }
 

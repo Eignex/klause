@@ -137,6 +137,23 @@ internal class NonlinearIntegerCursor(
             }
         }
         condition = problem.integerBounds(condition, arithmetic)
+        val envelopes = arithmetic.execution.handoff { invocation.bounds(condition, coordinates.toSet()) }
+        if (envelopes.stopped) return unknown()
+        if (envelopes.infeasible) return QfNraResult.Unsatisfiable(polynomialStats())
+        val lower = condition.lower.toMutableMap()
+        val upper = condition.upper.toMutableMap()
+        for (id in coordinates) {
+            arithmetic.step()
+            envelopes.lower[id]?.let {
+                val bound = BigFraction.of(it.ceilInteger(), BIG_ONE)
+                if (lower[id]?.let { previous -> bound > previous } != false) lower[id] = bound
+            }
+            envelopes.upper[id]?.let {
+                val bound = BigFraction.of(-it.negated().ceilInteger(), BIG_ONE)
+                if (upper[id]?.let { previous -> bound < previous } != false) upper[id] = bound
+            }
+        }
+        condition = PolynomialCondition(condition.bools, lower, upper)
         if (condition.lower.any { (id, value) -> condition.upper[id]?.let { it < value } == true }) {
             return QfNraResult.Unsatisfiable(polynomialStats())
         }

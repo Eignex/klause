@@ -2,11 +2,14 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.requireVariableCounts
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.saturatedAdd
@@ -90,6 +93,57 @@ internal class PolynomialTheoryInvocation(
         private set
     val workExhausted: Boolean get() = params.maximumWork?.let { stats.workSpent >= it } == true
 
+    fun bounds(
+        condition: PolynomialCondition,
+        variables: Set<Int>,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+    ): PolynomialLpBounds {
+        check(!closed && !active)
+        val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
+        val work = QfNraWork(params.copy(cancellation = queryControls(cancellation), maximumWork = remaining))
+        val arithmetic = PolynomialArithmetic(work, params.polynomialLimits).also { work.execution = it.execution }
+        try {
+            val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
+            conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
+            val normalized = PolynomialFormula.normalize(conditioned, arithmetic)
+            val atoms = normalized.forcedAtoms(arithmetic) ?: return PolynomialLpBounds(infeasible = true)
+            val relaxation = PolynomialLpRelaxation.prepare(atoms, realCount, arithmetic, work)
+                ?: return PolynomialLpBounds()
+            return relaxation.use {
+                val tightening = relaxation.tightenSquares { work.envelopeQueries++ }
+                if (tightening.infeasible) {
+                    work.envelopeRefutations++
+                    return@use PolynomialLpBounds(infeasible = true)
+                }
+                val lower = HashMap<Int, BigFraction>()
+                val upper = HashMap<Int, BigFraction>()
+                for (variable in variables) {
+                    require(variable in 0 until realCount)
+                    for (isUpper in listOf(false, true)) {
+                        val solved = relaxation.solve(variable, isUpper)
+                        work.envelopeQueries++
+                        arithmetic.step()
+                        if (solved?.verdict == LpVerdict.INFEASIBLE) {
+                            work.envelopeRefutations++
+                            return@use PolynomialLpBounds(infeasible = true)
+                        }
+                        solved?.lowerBound?.let { bound ->
+                            if (isUpper) upper[variable] = bound.negated() else lower[variable] = bound
+                        }
+                    }
+                }
+                PolynomialLpBounds(lower, upper)
+            }
+        } catch (_: PolynomialInterrupted) {
+            return PolynomialLpBounds(stopped = true)
+        } catch (_: PolynomialResourceLimit) {
+            return PolynomialLpBounds()
+        } finally {
+            arithmetic.execution.flush()
+            completedStats = combine(completedStats, work.snapshot())
+        }
+    }
+
     fun check(
         condition: PolynomialCondition = PolynomialCondition(),
         cancellation: ExecutionControl = ExecutionControl.Never,
@@ -133,6 +187,7 @@ internal class PolynomialTheoryInvocation(
                     return result
                 } catch (failure: Throwable) {
                     completedStats = combine(completedStats, query.stats)
+                    query.close()
                     pending = null
                     active = false
                     finished = true
@@ -163,7 +218,10 @@ internal class PolynomialTheoryInvocation(
     }
 
     override fun close() {
-        pending?.let { completedStats = combine(completedStats, it.stats) }
+        pending?.let {
+            completedStats = combine(completedStats, it.stats)
+            it.close()
+        }
         pending = null
         active = false
         witness = null
@@ -195,6 +253,16 @@ private fun combine(left: QfNraStats, right: QfNraStats): QfNraStats = QfNraStat
     else saturatedAdd(left.equationalSections ?: 0, right.equationalSections ?: 0),
     if (left.equationalRootLevels == null && right.equationalRootLevels == null) null
     else saturatedAdd(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0),
+    saturatedAdd(left.envelopeQueries, right.envelopeQueries),
+    saturatedAdd(left.envelopeRefutations, right.envelopeRefutations),
+    saturatedAdd(left.envelopeRefinements, right.envelopeRefinements),
+)
+
+internal class PolynomialLpBounds(
+    val lower: Map<Int, BigFraction> = emptyMap(),
+    val upper: Map<Int, BigFraction> = emptyMap(),
+    val infeasible: Boolean = false,
+    val stopped: Boolean = false,
 )
 
 private class PolynomialRetainedQuery(
@@ -255,4 +323,6 @@ private class PolynomialRetainedQuery(
     }.iterator()
 
     fun next(): QfNraResult? = preparation.next()
+
+    fun close() = query?.close() ?: Unit
 }
