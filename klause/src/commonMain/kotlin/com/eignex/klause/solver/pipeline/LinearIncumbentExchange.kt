@@ -67,8 +67,15 @@ internal class LinearIncumbentExchange private constructor(
             cancellation: ExecutionControl, claim: () -> Boolean,
             observe: (String, Long) -> Unit): LinearIncumbentExchange? {
             if (center.numBoolVars != 0 || center.numIntVars !in 1..4096 || center.numRealVars == 0 ||
+                source.coordinateCount > 4096 ||
                 cancellation()) return null
             val funding = budget.funding ?: return null
+            val snapshotWork = 1L + source.coordinateCount
+            val snapshotBytes = 128L * source.coordinateCount
+            if (funding.availableWork <= snapshotWork || funding.remainingAllocation <= snapshotBytes) return null
+            budget.observe(preparation = snapshotWork)
+            funding.charge(0L, snapshotBytes)
+            val objective = source.objective
             val best = ArrayList<Pair<Int, BigFraction>>()
             val maximize = source.scope.objective?.sense == ObjectiveSense.MAXIMIZE
             for (id in 0 until center.numIntVars) {
@@ -77,9 +84,9 @@ internal class LinearIncumbentExchange private constructor(
                 if (value.signum() < 0 || value > BIG_ONE) return null
                 val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, id)
                 val opposite = if (value.signum() == 0) BigFraction.ONE else BigFraction.ZERO
-                if (source.scope.condition.lower[coordinate]?.let { it > opposite } == true ||
-                    source.scope.condition.upper[coordinate]?.let { it < opposite } == true) continue
-                var cost = source.objective[coordinate] ?: BigFraction.ZERO
+                if (source.scope.condition.boundValue(coordinate, upper = false)?.let { it > opposite } == true ||
+                    source.scope.condition.boundValue(coordinate, upper = true)?.let { it < opposite } == true) continue
+                var cost = objective[coordinate] ?: BigFraction.ZERO
                 if ((value.signum() > 0) != maximize) cost = cost.negated()
                 val bits = cost.num.magnitudeBitLength().toLong() + cost.den.magnitudeBitLength()
                 val work = 16L + bits * bits / 8L

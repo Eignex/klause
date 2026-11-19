@@ -71,7 +71,7 @@ class LinearIncumbentExchangeTest : RuntimeInitializedTest() {
             val source = if (pinned) original.atScope(original.scope.copy(condition =
                 original.scope.condition.bound(SourceCoordinate(SourceCoordinate.Kind.Integer, 0),
                     BigFraction.ONE, upper = false))) else original
-            val center = Sample(booleanArrayOf(), if (wide) longArrayOf() else longArrayOf(1, 1), doubleArrayOf(0.0),
+            val center = Sample(booleanArrayOf(), longArrayOf(1, 1), doubleArrayOf(0.0),
                 exactReals = listOf(BigFraction.ZERO), exactInts = if (wide) listOf(BIG_ONE, BIG_ONE) else null)
             val funding = SourceLpFunding(100_000_000, 100_000_000).also { it.grant(100_000_000) }
             val budget = SourceLpBudget(funding = funding)
@@ -90,6 +90,33 @@ class LinearIncumbentExchangeTest : RuntimeInitializedTest() {
             assertEquals(BigFraction.ofLong(if (pinned) 3 else 2), objective.evaluateExact(point))
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
                 SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness)))
+        }
+    }
+
+    @Test
+    fun `joint exchange completion should share its query operation ceiling`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
+            factors = arrayOf(Linear(intArrayOf(0, 1), doubleArrayOf(3.0, 1.0),
+                intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 3.0)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(3, 1), realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1, maxFlips = 8),
+            external = { center }, incumbentProximity = true,
+            incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                assertEquals(1L, repair.stats.smt.sourceLp.operations)
+                assertTrue(done)
+            }
         }
     }
 

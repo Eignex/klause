@@ -678,7 +678,7 @@ internal class JointLinearRepair(
                             refutedConditions.clear()
                         }
                     }
-                }, state = state, borrowedAuthority = authority,
+                }, state = state, borrowedAuthority = authority, borrowedBudget = budget,
                 boundOrdered = boundOrdered, guidance = true, funding = funding,
                 onNumericalFeedback = if (refutationGuidance) { feedback ->
                     guideRefutation(captured, querySource, feedback)
