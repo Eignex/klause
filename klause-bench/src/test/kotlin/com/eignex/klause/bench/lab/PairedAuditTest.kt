@@ -64,15 +64,17 @@ class PairedAuditTest {
 
     @ParameterizedTest
     @CsvSource(
-        "record.sourceHashes.model, plain source identity differs between arms",
-        "record.comparisonControls.runtimeFingerprint, undeclared runtime difference",
-        "record.gitSha, undeclared revision difference",
-        "problem.benchCase.parameters.presolve, undeclared parameter difference presolve",
+        "record.sourceHashes.model, plain source identity differs between arms, drifted",
+        "record.comparisonControls.runtimeFingerprint, undeclared runtime difference, drifted",
+        "record.gitSha, undeclared revision difference, drifted",
+        "problem.benchCase.parameters.presolve, undeclared parameter difference presolve, drifted",
+        "record.labCheck.policy, undeclared checker difference, drifted",
+        "record.labCheck, undeclared checker difference,",
     )
-    fun `undeclared drift between arms invalidates the row`(path: String, reason: String) {
+    fun `undeclared drift between arms invalidates the row`(path: String, reason: String, value: String?) {
         val (base, candidate) = row()
 
-        val report = audit(listOf(base, candidate.with(path, "drifted")))
+        val report = audit(listOf(base, candidate.with(path, value)))
 
         assertTrue(reason in report.rows.single().reasons, report.rows.single().reasons.toString())
         assertFalse(report.accepted)
@@ -157,16 +159,6 @@ class PairedAuditTest {
         val report = audit(listOf(unknown, candidate))
 
         assertTrue(report.accepted, report.rows.single().reasons.toString())
-    }
-
-    @ParameterizedTest
-    @CsvSource("record.labCheck.policy, other", "record.labCheck,")
-    fun `feasible arms with different checker policies should invalidate their row`(path: String, value: String?) {
-        val (base, candidate) = row()
-
-        val report = audit(listOf(base, candidate.with(path, value)))
-
-        assertTrue("undeclared checker difference" in report.rows.single().reasons)
     }
 
     @Test
