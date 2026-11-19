@@ -21,13 +21,15 @@ internal class LinearIncumbentExchange private constructor(
     private val completion = LinearIncumbentCompletion(budget, observe = observe)
     private var cursor = 0
     private var pending: Sample? = null
+    private val singles = minOf(3, columns.size)
+    private val attempts = singles + if (columns.size > 1) 1 else 0
     var finished = false
         private set
 
     fun advance(cancellation: ExecutionControl): Sample? {
         while (!finished && !cancellation() && budget.funding?.paused != true) {
             if (pending == null) {
-                if (cursor == columns.size || !claim()) {
+                if (cursor == attempts || !claim()) {
                     finished = true
                     return null
                 }
@@ -41,8 +43,10 @@ internal class LinearIncumbentExchange private constructor(
                 budget.observe(preparation = center.numIntVars.toLong() + center.numRealVars)
                 funding.charge(0L, bytes)
                 val integers = LongArray(center.numIntVars) { center.exactIntValue(it).signum().toLong() }
-                val id = columns[cursor]
-                integers[id] = 1L - integers[id]
+                if (cursor < singles) {
+                    val id = columns[cursor]
+                    integers[id] = 1L - integers[id]
+                } else for (id in columns) integers[id] = 1L - integers[id]
                 pending = center.copy(ints = integers, exactInts = null, exactReals = null,
                     algebraicReals = null, symbolicReals = null)
                 observe("Attempts", 1L)

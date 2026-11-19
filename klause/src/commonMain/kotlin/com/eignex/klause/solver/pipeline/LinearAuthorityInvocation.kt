@@ -272,6 +272,9 @@ internal class LinearAuthorityInvocation(
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
             else TerminationReason.Cancelled)
             if (paused()) return null
+            if (proximityCenter != null && proximityCenter.numRealVars != 0) {
+                return if (exchange?.finished != false) finish(null, TerminationReason.Unsupported) else null
+            }
             if (!initialized) {
                 initialized = true
                 if (session.initialize() !is ComponentResult.Consistent) {

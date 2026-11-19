@@ -509,14 +509,15 @@ LP operation/work/allocation ledger and containing decision/check allowances.
 The private search dives toward its checked center at each integer split, retaining
 the sibling alternatives; the ordinary frontier retains bound order. Private receiving
 conditions encode the checked center separately from feasible query incumbents.
-For a mixed binary query, up to four concrete one-bit exchanges precede its integer
-traversal. Original integer-cost savings order those exchanges; receiving pins
+For a mixed binary query, at most three concrete one-bit exchanges and one combined
+exchange use the four best integer-cost savings. Receiving pins
 remain fixed and continuous completion optimizes the residual at each proposed
 discrete point. Every attempt spends a containing decision and check, and its LP
 work and allocation share the query ledger. A paused completion retains its one
 pending proposal. This completion cache belongs only to the private query and
-cannot exhaust the external-incumbent cache. The ordinary private traversal follows
-if these exchanges supply no checked witness.
+cannot exhaust the external-incumbent cache. A mixed query retires after those
+bounded exchanges, returning its remaining allowance to the ordinary proof frontier.
+Pure binary private queries retain integer traversal.
 Private query progress supplies no root-fixing or learned-clause reward. A private
 witness passes original-source completion and the receiving frontier's checks
 before it can improve the source incumbent; private proofs never enter its coverage.
