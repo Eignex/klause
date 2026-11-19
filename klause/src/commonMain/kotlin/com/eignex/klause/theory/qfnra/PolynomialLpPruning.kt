@@ -50,9 +50,11 @@ internal class PolynomialLpPruning(
             return if (pending.isEmpty()) PolynomialLpStep.Refuted else PolynomialLpStep.Pending
         }
         val point = solved?.exactPrimal ?: return unavailable()
-        witnessCheck(point)?.let {
+        witnessCheck(point)?.let { original ->
+            val centered = relaxation.center(point) { work.envelopeQueries++ }
+            val witness = witnessCheck(centered) ?: original
             close()
-            return PolynomialLpStep.Witness(it)
+            return PolynomialLpStep.Witness(witness)
         }
         if (relaxation.refine(point)) {
             work.envelopeRefinements++

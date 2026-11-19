@@ -22,11 +22,49 @@ internal class PolynomialLpRelaxation private constructor(
     private val products: List<PolynomialEnvelopeProduct>,
     private val bounds: MutableList<EnvelopeInterval>,
     private val arithmetic: PolynomialArithmetic,
+    private val sourceVariables: Int,
 ) : AutoCloseable {
     private val tangents = HashSet<Pair<Int, BigFraction>>()
 
     fun solve(column: Int? = null, upper: Boolean = false): CertifiedLpResult? =
         arithmetic.execution.handoff { lp.solve(column, upper) }
+
+    fun center(point: List<BigFraction>, onQuery: () -> Unit): List<BigFraction> {
+        val nonlinear = HashSet<Int>()
+        for (product in products) {
+            arithmetic.step()
+            nonlinear += product.left
+            nonlinear += product.right
+            nonlinear += product.result
+        }
+        val free = (0 until sourceVariables).filter {
+            arithmetic.step()
+            it !in nonlinear && (bounds[it].lower == null || bounds[it].lower != bounds[it].upper)
+        }
+        if (free.isEmpty()) return point
+        for (column in nonlinear) {
+            arithmetic.step()
+            val value = point[column]
+            if (!arithmetic.execution.handoff { lp.narrow(column, EnvelopeInterval(value, value)) }) return point
+        }
+        var centered = point
+        for (column in free) {
+            arithmetic.step()
+            val lower = solve(column)?.exactPrimal
+            onQuery()
+            val upper = solve(column, upper = true)?.exactPrimal
+            onQuery()
+            if (lower == null || upper == null) continue
+            // Convex combinations preserve every LP row; fixed product columns preserve nonlinear values.
+            centered = point.indices.map { id ->
+                arithmetic.step(lower[id], upper[id])
+                (lower[id] + upper[id]) * BigFraction.ofLong(2).reciprocal()
+            }
+            val value = centered[column]
+            if (!arithmetic.execution.handoff { lp.narrow(column, EnvelopeInterval(value, value)) }) return point
+        }
+        return centered
+    }
 
     fun refine(point: List<BigFraction>): Boolean {
         val rows = ArrayList<ExactRationalInequality>()
@@ -133,7 +171,7 @@ internal class PolynomialLpRelaxation private constructor(
             val lp = arithmetic.execution.handoff {
                 CertifiedEnvelopeLp.prepare(builder.bounds, builder.rows, control)
             } ?: return null
-            return PolynomialLpRelaxation(lp, builder.squares, builder.products, builder.bounds, arithmetic)
+            return PolynomialLpRelaxation(lp, builder.squares, builder.products, builder.bounds, arithmetic, variables)
         }
     }
 }
