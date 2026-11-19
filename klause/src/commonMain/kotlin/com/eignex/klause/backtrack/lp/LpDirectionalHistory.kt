@@ -186,12 +186,15 @@ internal class LpDirectionalHistory(
         return score.takeIf { it.isFinite() } ?: Double.NaN
     }
 
-    fun preferGainDirection(variable: VarRef, value: Double, preferHighGain: Boolean): Boolean? {
+    fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? {
         val history = reliable(variable, value) ?: return null
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
         if (!down.isFinite() || !up.isFinite() || abs(down - up) <= 1e-9 * maxOf(1.0, down, up)) return null
+        val gap = cutoff - objective
+        if (gap.isNaN() || gap <= 0.0) return null
+        val preferHighGain = maxOf(down, up) >= gap
         return if (preferHighGain) up > down else up < down
     }
 
