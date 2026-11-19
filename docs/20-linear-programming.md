@@ -326,8 +326,8 @@ objective-independent region.
 
 Default and aggressive emphasis admit bounded sparse root queries beyond the
 small-LP size budget on compact closed unconditional integer-linear optimization
-sources. Admission
-bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
+sources. Admission screens costly source incidence graphs before allocating a
+relaxation, then bounds source assembly and inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
 retained layout. Custom emitters decline because they reserve no source size. The
 query uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
@@ -344,7 +344,8 @@ row-intersection risk and a sparse pricing estimate. Pricing combines emitted
 nonzeros and dimensions with the smaller dimension of the largest component.
 Source assembly is counted once; the query and continuation estimates are separate.
 Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
-techniques, and automatic sparse admission supplies no additional portfolio slot or slice.
+techniques and caller work policies. Explicit cut and relaxation strategies retain
+their ordinary route. Automatic sparse admission supplies no additional portfolio slot or slice.
 Automatic roots retain ordinary node bounding where the dense size guard permits
 it; a model beyond that guard keeps root-only sparse admission.
 The `+sparse-trial` override requests the bounded route explicitly, including mixed

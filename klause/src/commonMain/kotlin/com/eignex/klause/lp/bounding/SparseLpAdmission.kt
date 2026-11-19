@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactConstant
@@ -19,10 +20,12 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.magnitudeBitLength
@@ -86,7 +89,13 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     }
     val reservation = sparseLpStorage(rows, columns, entries)
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
-    assemblyWork = 32L * (entries + rows + columns)
+    val plannedAssemblyWork = 32L * (entries + rows + columns)
+    if (automatic) {
+        declineSparseSourceWork(problem, plannedAssemblyWork, workAllowance, cancellation) { inspected += it }
+            ?.let { return SparseLpAdmission(it.metrics + ("PreparationWork" to inspected)) }
+    }
+    assemblyWork = plannedAssemblyWork + inspected
+    if (assemblyWork > preparationAllowance) return decline("PreparationWork")
     val relaxation = try {
         val relaxer = CpToLpRelaxation(problem, objective, deferred = true,
             reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
@@ -111,6 +120,115 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         model.extent() * LpNodeOverhead.BUILD <= assemblyWork
     if (cancellation()) return decline("Cancelled")
     return if (reusable) SparseLpAdmission(estimate.metrics, relaxation) else estimate
+}
+
+@Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")
+private fun declineSparseSourceWork(
+    problem: Problem,
+    preparationWork: Long,
+    allowance: Long,
+    cancellation: ExecutionControl,
+    observeWork: (Long) -> Unit,
+): SparseLpAdmission? {
+    val columns = problem.numIntVars
+    if (columns == 0 || problem.intBounds.hasOpenSides) return null
+    val rows = problem.factors.size
+    var work = 5L * columns + rows
+    fun cancelled() = SparseLpAdmission(mapOf("DeclineCancelled" to 1L))
+    try {
+        val partition = IntDisjointSet(columns)
+        val fixed = BooleanArray(columns)
+        val used = BooleanArray(columns)
+        val marks = IntArray(columns) { -1 }
+        val firstColumn = IntArray(rows) { -1 }
+        for (column in 0 until columns) {
+            if (column % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return cancelled()
+            work++
+            val domain = problem.rootDomainOf(column)
+            fixed[column] = domain.min == domain.max
+        }
+        var nonzeros = 0L
+        var activeRows = 0L
+        var fillRisk = 0L
+        for ((index, factor) in problem.factors.withIndex()) {
+            if (cancellation()) return cancelled()
+            work++
+            val compact = factor as? Linear
+            val exact = factor as? ExactLinear
+            if (compact == null && exact == null) continue
+            val size = if (compact != null) compact.vars.size else checkNotNull(exact).size
+            val constants = if (compact != null) checkNotNull(compact.integerConstants)
+            else checkNotNull(exact).constants as IntegerConstants
+            var first = -1
+            var degree = 0L
+            for (k in 0 until size) {
+                if (k % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return cancelled()
+                work++
+                if (constants.coeff(k) == 0L) continue
+                val column = if (compact != null) compact.vars[k] else Term.intVar(checkNotNull(exact).ref(k))
+                if (fixed[column]) continue
+                // Coalescing can erase repeated memberships; emitted admission owns that shape.
+                if (marks[column] == index) return null
+                marks[column] = index
+                if (first < 0) first = column else {
+                    used[first] = true
+                    used[column] = true
+                    partition.union(first, column)
+                    work += 3L
+                }
+                degree++
+            }
+            // Unary rows can be discharged by declared bounds without entering the LP.
+            if (degree < 2L) continue
+            firstColumn[index] = first
+            activeRows++
+            nonzeros += degree
+            fillRisk += degree * (degree - 1L)
+        }
+        work += 2L * columns
+        val componentRows = IntArray(columns)
+        val componentColumns = IntArray(columns)
+        for (column in 0 until columns) {
+            if (column % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return cancelled()
+            work++
+            if (used[column]) {
+                componentColumns[partition.find(column)]++
+                work += 3L
+            }
+        }
+        for (row in firstColumn.indices) {
+            if (row % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return cancelled()
+            work++
+            if (firstColumn[row] >= 0) {
+                componentRows[partition.find(firstColumn[row])]++
+                work += 3L
+            }
+        }
+        var components = 0L
+        var activeColumns = 0L
+        var largestRows = 0L
+        var largestColumns = 0L
+        for (column in 0 until columns) {
+            if (column % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return cancelled()
+            work++
+            if (componentRows[column] == 0) continue
+            components++
+            activeColumns += componentColumns[column]
+            largestRows = maxOf(largestRows, componentRows[column].toLong())
+            largestColumns = maxOf(largestColumns, componentColumns[column].toLong())
+        }
+        val queryWork = fillRisk + (nonzeros + activeRows + activeColumns) * minOf(largestRows, largestColumns)
+        val totalWork = preparationWork + 2L * queryWork
+        if (totalWork <= allowance) return null
+        return SparseLpAdmission(mapOf("DeclineQueryWork" to 1L, "Automatic" to 1L,
+            "SourcePreflight" to 1L, "SourceRows" to activeRows, "SourceColumns" to activeColumns,
+            "SourceNonzeros" to nonzeros, "SourceComponents" to components,
+            "SourceLargestComponentRows" to largestRows, "SourceLargestComponentColumns" to largestColumns,
+            "SourceRowIntersectionRisk" to fillRisk, "SourceEstimatedQueryWork" to queryWork,
+            "SourceEstimatedTotalWork" to totalWork, "QueryWorkAllowance" to allowance.coerceAtLeast(0L)))
+    } finally {
+        observeWork(work)
+    }
 }
 
 // Reserve capped factor storage, CSC, exact authority, temporary maps, transforms and scratch.

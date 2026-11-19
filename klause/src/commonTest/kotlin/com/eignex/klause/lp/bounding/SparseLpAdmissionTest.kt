@@ -606,13 +606,62 @@ class SparseLpAdmissionTest {
             settings = ProblemSettings(lpMaxTableauCells = 1L))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
 
-        for (base in listOf(LpPlan(objectiveCone = true), LpPlan(lbTreeSearch = true))) {
+        for (base in listOf(LpPlan(objectiveCone = true), LpPlan(lbTreeSearch = true),
+            LpPlan(cuts = true), LpPlan(booleanRlt = true))) {
             val ordinary = LpAutoConfig.resolve(problem, LpConfig.parse("default,-sparse-trial"), base, objective)
 
             val automatic = LpAutoConfig.resolve(problem, LpConfig.AUTO, base, objective)
 
             assertEquals(ordinary, automatic)
         }
+    }
+
+    @Test
+    fun `automatic sparse admission retains caller work policy`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val base = LpPlan(boundAdaptiveWork = false, boundMaxOpsPerNode = 123L)
+
+        val automatic = LpAutoConfig.resolve(problem, LpConfig.AUTO, base, objective)
+
+        assertTrue(automatic.bounding)
+        assertFalse(automatic.boundAdaptiveWork)
+        assertEquals(123L, automatic.boundMaxOpsPerNode)
+    }
+
+    @Test
+    fun `expensive automatic sources decline before relaxation assembly`() {
+        val problem = Problem(0, 64, Array(64) { IntDomain(0, 1) },
+            List(32) { Linear(IntArray(64) { 1 }, IntArray(64) { it }, LinearOp.GE, 32) })
+        val objective = LinearObjective(intCoefficients = LongArray(64) { 1L })
+        var result: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            result = prepareSparseLpAdmission(problem, objective, workAllowance = 300_000L, automatic = true)
+        }.forEach { }
+
+        val admission = requireNotNull(result)
+        assertFalse(admission.admitted)
+        assertEquals(1L, admission.metrics["SourcePreflight"])
+        assertEquals(1L, admission.metrics["DeclineQueryWork"])
+        assertTrue(admission.work < 32L * (64L + 32L + 2048L))
+    }
+
+    @Test
+    fun `coalescing source memberships uses emitted admission`() {
+        val problem = Problem(0, 32, Array(32) { IntDomain(0, 1) },
+            List(32) { Linear(IntArray(64) { if (it % 2 == 0) 1 else -1 },
+                IntArray(64) { it / 2 }, LinearOp.LE, 0) })
+        val objective = LinearObjective(intCoefficients = LongArray(32) { 1L })
+        var result: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            result = prepareSparseLpAdmission(problem, objective, workAllowance = 300_000L, automatic = true)
+        }.forEach { }
+
+        assertTrue(requireNotNull(result).admitted)
     }
 
     @Test

@@ -407,8 +407,11 @@ object LpAutoConfig {
             },
         )
         val explicitSparse = config.overrides[LpTechnique.SPARSE_TRIAL] == true
+        val explicitOrdinary = coneRequested || base.lbTreeSearch || base.cuts || base.booleanRlt ||
+            base.impliedBoundCuts || base.flowCoverCuts ||
+            config.overrides.any { (technique, enabled) -> enabled && technique.timing == LpTiming.EXHAUSTIVE }
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
-            (explicitSparse || (!coneRequested && !base.lbTreeSearch && (!plan.bounding || cells > baseCap))) &&
+            (explicitSparse || (!explicitOrdinary && (!plan.bounding || cells > baseCap))) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
@@ -417,7 +420,8 @@ object LpAutoConfig {
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {
-            plan = LpPlan(
+            val admittedBase = if (explicitSparse) LpPlan() else base
+            plan = admittedBase.copy(
                 bounding = true,
                 boundMaxDepth = if (!explicitSparse && plan.bounding) plan.boundMaxDepth else 0,
                 learn = true, probe = true, rootCutHarvest = false,
