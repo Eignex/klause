@@ -11,10 +11,25 @@ import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class IntegerRowReductionTest {
+    @Test
+    fun `wide coefficient magnitudes should spend the optional reduction allowance`() {
+        val large = bigIntOf(1) shl 4096
+        val row = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(large * bigIntOf(-1), bigIntOf(1)), bigIntOf(-1), useLo = true))
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(work = 180))
+
+        val decline = assertFailsWith<ArithmeticLearningDeclined> { row.reduced(state, budget = budget) }
+
+        assertEquals("work", decline.reason)
+        assertEquals(listOf(large * bigIntOf(-1), bigIntOf(1)), row.coefficients.toList())
+    }
+
     @Test
     fun `saturation should retain cancellation after overflowing word degree arithmetic`() {
         val inputs = listOf(longArrayOf(2, -2, 1), longArrayOf(1, 1, -1, -1, 2))
