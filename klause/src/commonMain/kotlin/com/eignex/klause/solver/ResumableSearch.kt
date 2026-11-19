@@ -98,8 +98,8 @@ internal interface ReseedGuard {
 }
 
 // A complete minimization that may prune against an optimality-gap cutoff below its incumbent. gapFloor is the least
-// such cutoff a prune relied on (positive infinity when none did): the search's unseen points and every fact it shared
-// hold only below it. exhaustionBound is what its exhaustion proved, negative infinity until it is exhausted, and NaN
+// proved bound a gap prune supplied (positive infinity otherwise): unseen points and shared facts hold only below it.
+// exhaustionBound is what exhaustion proved, negative infinity until exhausted, and NaN
 // for a wrapped search that reports none, whose exhaustion proves the cutoff it read.
 internal interface GapBoundedSearch {
     val appliedOptimalityGap: Boolean

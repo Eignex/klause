@@ -1652,11 +1652,14 @@ internal class ResumableMinimize(
             lpEngine.fixingCutoff = Double.NaN
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
             // Fixings read the incumbent's own cutoff, so only a prune whose bound stays below that cutoff relies on
-            // the gap; it and everything learned from it hold only for points below the gap cutoff.
+            // the gap; it and everything learned from it hold only for points below the recorded bound.
             val gap = params.optimalityGap
-            if (gapCutoff && pruned && gap != null && gap.proved(lpEngine.lastPruneBound) < effectiveBound) {
-                appliedOptimalityGap = true
-                if (lpBound < gapFloor) gapFloor = lpBound
+            if (gapCutoff && pruned && gap != null) {
+                val proved = gap.proved(lpEngine.lastPruneBound)
+                if (proved < effectiveBound) {
+                    appliedOptimalityGap = true
+                    if (proved < gapFloor) gapFloor = proved
+                }
             }
             if (!pruned) {
                 return SearchNodeDisposition.Expand
