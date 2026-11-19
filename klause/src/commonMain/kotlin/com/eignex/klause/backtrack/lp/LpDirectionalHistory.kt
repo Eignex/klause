@@ -192,6 +192,10 @@ internal class LpDirectionalHistory(
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
+        if (minOf(down, up) <= 0.0) {
+            observe("PASSIVE_VALUE_ZERO_GAIN")
+            return null
+        }
         if (!down.isFinite() || !up.isFinite() || abs(down - up) <= 1e-9 * maxOf(1.0, down, up)) return null
         val gap = cutoff - objective
         if (gap.isNaN() || gap <= 0.0) return null
