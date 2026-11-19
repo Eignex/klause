@@ -591,6 +591,25 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `automatic sparse admission prices a basis refresh in each connected block`() {
+        for (connected in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                repeat(4) { addVar(0L, 10L) }
+                repeat(4) { row ->
+                    val first = if (connected) row else 2 * (row / 2)
+                    val second = if (connected) (row + 1) % 4 else first + 1
+                    addRow(intArrayOf(first, second), longArrayOf(1L, 1L), Relation.LE, 3L)
+                }
+            }.build(Sense.MINIMIZE)
+
+            val admission = estimateSparseLpAdmission(model, workAllowance = 200L, automatic = true)
+
+            assertEquals(!connected, admission.admitted)
+            assertEquals(if (connected) 64L else 16L, admission.metrics["EstimatedFactorWork"])
+        }
+    }
+
+    @Test
     fun `automatic sparse admission preserves an admitted ordinary plan`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))

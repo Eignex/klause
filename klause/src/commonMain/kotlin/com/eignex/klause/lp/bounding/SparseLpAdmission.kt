@@ -210,6 +210,7 @@ private fun declineSparseSourceWork(
         var activeColumns = 0L
         var largestRows = 0L
         var largestColumns = 0L
+        var factorWork = 0L
         for (column in 0 until columns) {
             if (column % CONSTRUCTION_BATCH_SIZE == 0 && cancellation()) return cancelled()
             work++
@@ -218,15 +219,19 @@ private fun declineSparseSourceWork(
             activeColumns += componentColumns[column]
             largestRows = maxOf(largestRows, componentRows[column].toLong())
             largestColumns = maxOf(largestColumns, componentColumns[column].toLong())
+            val width = minOf(componentRows[column], componentColumns[column]).toLong()
+            factorWork += width * width * width
         }
-        val queryWork = fillRisk + (nonzeros + activeRows + activeColumns) * minOf(largestRows, largestColumns)
+        val queryWork = fillRisk + factorWork +
+            (nonzeros + activeRows + activeColumns) * minOf(largestRows, largestColumns)
         val totalWork = preparationWork + 2L * queryWork
         if (totalWork <= allowance) return null
         return SparseLpAdmission(mapOf("DeclineQueryWork" to 1L, "Automatic" to 1L,
             "SourcePreflight" to 1L, "SourceRows" to activeRows, "SourceColumns" to activeColumns,
             "SourceNonzeros" to nonzeros, "SourceComponents" to components,
             "SourceLargestComponentRows" to largestRows, "SourceLargestComponentColumns" to largestColumns,
-            "SourceRowIntersectionRisk" to fillRisk, "SourceEstimatedQueryWork" to queryWork,
+            "SourceRowIntersectionRisk" to fillRisk, "SourceEstimatedFactorWork" to factorWork,
+            "SourceEstimatedQueryWork" to queryWork,
             "SourceEstimatedTotalWork" to totalWork, "QueryWorkAllowance" to allowance.coerceAtLeast(0L)))
     } finally {
         observeWork(work)
@@ -311,15 +316,19 @@ internal fun estimateSparseLpAdmission(
     var components = 0L
     var largestRows = 0L
     var largestColumns = 0L
+    var factorWork = 0L
     for (id in parent.indices) {
         if (componentRows[id] + componentColumns[id] == 0) continue
         components++
         largestRows = maxOf(largestRows, componentRows[id].toLong())
         largestColumns = maxOf(largestColumns, componentColumns[id].toLong())
+        val width = minOf(componentRows[id], componentColumns[id]).toLong()
+        factorWork += width * width * width
     }
     val fillRisk = rowDegree.sumOf { it.toLong() * maxOf(0, it - 1) }
     val storage = sparseLpStorage(model.m.toLong(), model.n.toLong(), entries)
-    val queryWork = fillRisk + (entries + dimensions) * minOf(largestRows, largestColumns)
+    // A query must also afford a dense basis refresh inside each connected block.
+    val queryWork = fillRisk + factorWork + (entries + dimensions) * minOf(largestRows, largestColumns)
     // Root optimization and its downstream query share one source assembly and one admission grant.
     val totalWork = preparationWork + 2L * queryWork
     val decline = when {
@@ -338,6 +347,7 @@ internal fun estimateSparseLpAdmission(
         put("LargestComponentColumns", largestColumns)
         put("ScalarBits", scalarBits.toLong())
         put("RowIntersectionRisk", fillRisk)
+        put("EstimatedFactorWork", factorWork)
         put("EstimatedQueryWork", queryWork)
         put("EstimatedContinuationWork", queryWork)
         put("EstimatedTotalWork", totalWork)

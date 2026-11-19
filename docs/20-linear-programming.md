@@ -340,7 +340,9 @@ results enter the policy's bound check within a 16 MiB checking reservation;
 exhaustion, cancellation or refusal withholds the root bound.
 Automatic admission prices source preparation, root optimization and one downstream
 query against the caller's remaining root grant. Each query includes
-row-intersection risk and a sparse pricing estimate. Pricing combines emitted
+row-intersection risk, a conservative basis-refresh estimate and sparse pricing. The
+refresh estimate sums the cube of each component's smaller dimension, reserving for
+dense fill inside that block without changing component ownership. Pricing combines emitted
 nonzeros and dimensions with the smaller dimension of the largest component.
 Source assembly is counted once; the query and continuation estimates are separate.
 Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
