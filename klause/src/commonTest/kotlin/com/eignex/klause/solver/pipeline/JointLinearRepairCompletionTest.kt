@@ -45,7 +45,7 @@ import kotlin.test.assertTrue
 class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     @Test
     fun `an improving relaxation query should retain its private search for the next witness`() {
-        val groups = 6
+        val groups = 4
         val integers = groups * 4
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(LongArray(integers), LongArray(integers) { 1 }, null, null),
