@@ -370,18 +370,32 @@ class LpHintsTest {
 
     @Test
     fun `cutoff row and objective changes reject pending directional gains`() {
-        for (change in listOf("cutoff", "cut", "scale", "objective", "constant", "mapping")) {
+        for ((change, reason) in listOf(
+            "cutoff" to "INCOMPATIBLE_CUTOFF",
+            "cutoff-mapping" to "INCOMPATIBLE_CUTOFF",
+            "cut" to "INCOMPATIBLE_MODEL",
+            "retire" to "INCOMPATIBLE_ROWS",
+            "scale" to "INCOMPATIBLE_MODEL",
+            "objective" to "INCOMPATIBLE_MODEL",
+            "constant" to "INCOMPATIBLE_OBJECTIVE_CONSTANT",
+            "variable" to "INCOMPATIBLE_VARIABLE_MAPPING",
+            "mapping" to "INCOMPATIBLE_VARIABLE_KIND",
+        )) {
             val b = LpBuilder()
             val x = b.addVar(0, 10, cost = 1)
             b.addRow(intArrayOf(x), longArrayOf(1), Relation.LE, 10L)
             val base = b.build(Sense.MINIMIZE)
             val trail = LpBoundTrail(assertNotNull(base.authoritativeModel()))
             val observations = ArrayList<String>()
-            val hints = LpHints(1, 1, directionalGains = true, observe = observations::add)
-            fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
-                booleanArrayOf(change == "mapping" && trail.state.depth > 0),
-                if (change == "constant" && trail.state.depth > 0) 1L else 0L,
-                intArrayOf(0), IntArray(0))
+            val hints = LpHints(2, 1, directionalGains = true, observe = observations::add)
+            fun relaxation(): LpRelaxation {
+                val boolean = change == "mapping" && trail.state.depth > 0
+                val variable = if (change in listOf("variable", "cutoff-mapping") && trail.state.depth > 0) 1 else 0
+                return LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(variable),
+                    booleanArrayOf(boolean), if (change == "constant" && trail.state.depth > 0) 1L else 0L,
+                    IntArray(2) { if (!boolean && it == variable) 0 else -1 },
+                    intArrayOf(if (boolean) 0 else -1))
+            }
             hints.beginNode(0, 100.0)
             val parent = relaxation()
             hints.record(parent, doubleArrayOf(2.25), DoubleArray(parent.model.m))
@@ -390,6 +404,7 @@ class LpHintsTest {
             hints.commit(SearchDecision.IntAtMost(0, 2), 1)
             assertTrue(trail.push())
             when (change) {
+                "retire" -> assertTrue(trail.deactivate(setOf(0L)))
                 "cut" -> assertTrue(trail.append(
                     LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(2L),
                         ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
@@ -404,13 +419,14 @@ class LpHintsTest {
                     )))
                 }
             }
-            hints.beginNode(1, if (change == "cutoff") 99.0 else 100.0)
+            hints.beginNode(1, if (change.startsWith("cutoff")) 99.0 else 100.0)
             val child = relaxation()
             hints.record(child, doubleArrayOf(2.0), DoubleArray(child.model.m))
 
             hints.recordObjective(child, 11.0)
 
             assertEquals(0, observations.count { it == "DOWN" }, change)
+            assertEquals(listOf(reason), observations.filter { it.startsWith("INCOMPATIBLE_") }, change)
         }
     }
 
@@ -443,42 +459,59 @@ class LpHintsTest {
 
     @Test
     fun `missing or cut changed current optima keep the existing score`() {
-        for (change in listOf("missing", "cut")) {
+        for (change in listOf("missing", "cut", "model", "retire")) {
             val b = LpBuilder()
-            b.addVar(0, 10, cost = 1)
+            val x = b.addVar(0, 10, cost = 1)
+            if (change == "retire") b.addRow(intArrayOf(x), longArrayOf(1), Relation.LE, 10L)
             val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
             val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
                 booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
-            val hints = LpHints(1, 0, directionalGains = true)
+            val observations = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
             repeat(2) {
                 hints.beginNode(0, 100.0)
-                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
                 hints.recordObjective(relaxation, 10.0)
                 hints.branch(VarRef.IntVar(0))
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
-                    hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                    hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
                 }
             }
             assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
 
             hints.beginNode(1, 100.0)
-            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
 
-            if (change == "cut") {
+            if (change != "missing") {
                 hints.recordObjective(relaxation, 10.0)
-                assertTrue(trail.append(
-                    LpScopedRow(0L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
-                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
-                    scoped = false,
-                ))
+                if (change == "retire") {
+                    assertTrue(trail.deactivate(setOf(0L)))
+                } else if (change == "cut") {
+                    assertTrue(trail.append(
+                        LpScopedRow(0L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
+                            ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
+                        scoped = false,
+                    ))
+                } else {
+                    val old = trail.state.model.objective
+                    assertTrue(trail.replaceObjective(ExactLpObjective(
+                        List(old.size) { old.cost(it) }, externalConstant = ExactLpNumber.of(1L),
+                    )))
+                }
                 hints.finishNode(trail.state)
             } else hints.finishNode()
 
             assertTrue(hints.directionalScore(VarRef.IntVar(0)).isNaN())
             assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
+            val reasons = observations.filter { it.startsWith("INCOMPATIBLE_") }
+            assertEquals(when (change) {
+                "retire" -> listOf("INCOMPATIBLE_ROWS")
+                "cut", "model" -> listOf("INCOMPATIBLE_MODEL")
+                else -> emptyList()
+            }, reasons)
         }
     }
 

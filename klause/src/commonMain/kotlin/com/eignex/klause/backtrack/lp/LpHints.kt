@@ -68,11 +68,9 @@ internal class LpHints(
         if (!collect || relaxation.colVarId.size > 8192) return
         val state = relaxation.model.exactState ?: return
         charge(5L)
-        if (scopeModel !== state.baseModel || scopeRows !== state.rows ||
-            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff ||
-            !matchesScope(relaxation.colVarId) || !matchesScope(relaxation.colIsBool)
-        ) {
-            if (scopeModel != null) observe("INCOMPATIBLE")
+        val difference = scopeDifference(relaxation, state)
+        if (difference != null) {
+            if (scopeModel != null) reportScopeDifference(difference)
             history.clear(report = scopeModel != null)
             scopeModel = state.baseModel
             scopeRows = state.rows
@@ -86,6 +84,22 @@ internal class LpHints(
         objectiveRecorded = objective.isFinite()
         if (passiveChoice != null && passivePoint === relaxation) passiveState = state
         history.record(objective)
+    }
+
+    private fun scopeDifference(relaxation: LpRelaxation, state: LpExactState): String? = when {
+        scopeModel !== state.baseModel -> "INCOMPATIBLE_MODEL"
+        scopeRows !== state.rows -> "INCOMPATIBLE_ROWS"
+        scopeConstant != relaxation.objectiveConstant -> "INCOMPATIBLE_OBJECTIVE_CONSTANT"
+        scopeCutoff != cutoff -> "INCOMPATIBLE_CUTOFF"
+        !matchesScope(relaxation.colVarId) -> "INCOMPATIBLE_VARIABLE_MAPPING"
+        !matchesScope(relaxation.colIsBool) -> "INCOMPATIBLE_VARIABLE_KIND"
+        else -> null
+    }
+
+    private fun reportScopeDifference(difference: String) {
+        charge(1L)
+        observe("INCOMPATIBLE")
+        observe(difference)
     }
 
     private fun matchesScope(variables: IntArray): Boolean {
@@ -118,10 +132,14 @@ internal class LpHints(
     fun finishNode(state: LpExactState? = null) {
         passiveChoice?.clear()
         history.finishNode()
-        if (scopeModel != null && state != null &&
-            (scopeModel !== state.baseModel || scopeRows !== state.rows)
-        ) {
-            observe("INCOMPATIBLE")
+        if (scopeModel == null || state == null) return
+        val difference = when {
+            scopeModel !== state.baseModel -> "INCOMPATIBLE_MODEL"
+            scopeRows !== state.rows -> "INCOMPATIBLE_ROWS"
+            else -> null
+        }
+        if (difference != null) {
+            reportScopeDifference(difference)
             resetHistory()
         }
     }
