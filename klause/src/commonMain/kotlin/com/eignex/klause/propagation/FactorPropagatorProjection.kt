@@ -246,27 +246,24 @@ private fun SymmetryHandling.symmetryPropagator(): Propagator {
             for (b in 0 until nBool) out[nInt + b] = nInt + generator.second[b]
         }
     }
-    val strong = PermutationGroup.strongGenerators(unified, nInt + nBool, 64)
+    val order = lexOrder ?: IntArray(nInt + nBool) { it }
+    val strong = PermutationGroup.strongGenerators(unified, nInt + nBool, 64, order)
     return SymmetryPropagator(
         strong.map { permutation ->
-            val movedInts = (0 until nInt).filter { permutation[it] != it }
-            val movedBools = (nInt until nInt + nBool).filter { permutation[it] != it }
-            val left = IntArray(movedInts.size + movedBools.size)
+            val moved = order.filter { permutation[it] != it }
+            val left = IntArray(moved.size)
             val right = IntArray(left.size)
             val isBool = BooleanArray(left.size)
-            var i = 0
-            for (v in movedInts) {
-                left[i] = v
-                right[i++] = permutation[v]
-            }
-            for (v in movedBools) {
-                left[i] = v - nInt
-                right[i] = permutation[v] - nInt
-                isBool[i++] = true
+            moved.forEachIndexed { i, v ->
+                val offset = if (v >= nInt) nInt else 0
+                left[i] = v - offset
+                right[i] = permutation[v] - offset
+                isBool[i] = v >= nInt
             }
             SymmetryPropagator.Generator(left, right, isBool)
         },
         strong,
         nInt,
+        order.filter { v -> strong.any { it[v] != v } }.toIntArray(),
     )
 }
