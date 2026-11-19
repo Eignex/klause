@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
@@ -286,7 +287,8 @@ class SparseLpAdmissionTest {
             var sliceEnd = Long.MAX_VALUE
             lateinit var engine: LpEngine
             val context = LpSolveContext(numericalDeductions = numerical, onQuery = { queries++ })
-            engine = LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
+            val objective = LinearObjective(intCoefficients = LongArray(32) { 1L })
+            engine = LpEngine(problem, objective,
                 LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
                 SolveStatsSink("sparse-sliced-continuation"), context,
                 nodeWorkAllowance = {
@@ -297,14 +299,14 @@ class SparseLpAdmissionTest {
                 val relaxer = requireNotNull(it.lpRelaxer)
                 val token = ExecutionControl { it.totalSolveWork() >= sliceEnd }
 
-                repeat(2) {
-                    sliceEnd = engine.totalSolveWork() + 500L
-                    engine.rootLpRelaxationBound(relaxer, emptyList(), token)
-                }
+                sliceEnd = engine.totalSolveWork() + 500L
+                engine.rootLpRelaxationBound(relaxer, emptyList(), token)
+                sliceEnd = engine.totalSolveWork() + 500L
+                engine.lpRoundingProbe(objective, token)
                 sliceEnd = engine.totalSolveWork() + 1_000_000L
-                val lower = engine.rootLpRelaxationBound(relaxer, emptyList(), token)
+                val sample = engine.lpRoundingProbe(objective, token)
 
-                assertEquals(16.0, lower)
+                assertEquals(16L, requireNotNull(sample).ints.sum())
                 assertEquals(1, queries)
                 assertTrue(engine.totalSolveWork() <= SPARSE_LP_MAX_WORK)
             }
