@@ -510,6 +510,7 @@ class ResumableMinimizeGuidanceTest {
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L, accept)
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
+            assertEquals(1L, search.stats.lp.phases["CLAIM_CONSUMPTION_ROOT"]?.outcomes?.get("BOUND"))
         }
 
         assertEquals(listOf(1L, 0L), offered.single().ints.toList())

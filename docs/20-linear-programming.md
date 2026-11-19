@@ -342,7 +342,9 @@ Automatic admission reserves preparation, row-intersection risk and a sparse pri
 work estimate against the caller's remaining root grant. Pricing combines emitted
 nonzeros and dimensions with the smaller dimension of the largest component.
 Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
-techniques, and sparse admission supplies no additional portfolio slot or slice.
+techniques, and automatic sparse admission supplies no additional portfolio slot or slice.
+Automatic roots retain ordinary node bounding where the dense size guard permits
+it; a model beyond that guard keeps root-only sparse admission.
 The `+sparse-trial` override requests the bounded route explicitly, including mixed
 sources, while `-sparse-trial` disables it. Both retain the resource ceilings.
 The retained owner's preparation and solve lifetime use the remaining cumulative

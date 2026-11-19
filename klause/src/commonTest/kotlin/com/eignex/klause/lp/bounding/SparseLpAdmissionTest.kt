@@ -12,6 +12,8 @@ import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationPolicy
@@ -315,6 +317,46 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `continued root bounds reject a changed assertion scope`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            SolveStatsSink("changed-root-bound-scope")).use { engine ->
+            assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
+            val original = requireNotNull(engine.sourceRootBoundLayout).model
+            assertTrue(engine.propagator.atLevel(1))
+            assertTrue(engine.propagator.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L))))
+            val result = requireNotNull(engine.propagator.solveFloat()?.second)
+
+            engine.checkContinuedRootBound(original, result, ExecutionControl.Never)
+
+            assertEquals(3.0, result.objective)
+            assertNull(engine.continuedRootLowerBound)
+        }
+    }
+
+    @Test
+    fun `continued root bounds honor certification refusal`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            SolveStatsSink("refused-continued-root-bound"), context).use { engine ->
+            assertTrue(engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()).isNaN())
+            val model = requireNotNull(engine.sourceRootBoundLayout).model
+            val result = requireNotNull(engine.propagator.solveFloat()?.second)
+
+            engine.checkContinuedRootBound(model, result, ExecutionControl.Never)
+
+            assertNull(engine.continuedRootLowerBound)
+        }
+    }
+
+    @Test
     fun `checked paused bounds survive a later root consultation stop`() {
         val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
@@ -491,7 +533,7 @@ class SparseLpAdmissionTest {
                 LpParams(lpConfig = LpConfig.parse(spec)), sink,
                 projections = projections).use { engine ->
                 assertTrue(engine.sparseTrialActive)
-                assertEquals(0, engine.params.lpPlan.boundMaxDepth)
+                assertEquals(if (spec == "default") Int.MAX_VALUE else 0, engine.params.lpPlan.boundMaxDepth)
                 engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
 
                 assertTrue(engine.pruneNode(session, 2.0, -1, true))
@@ -533,6 +575,22 @@ class SparseLpAdmissionTest {
 
         assertTrue(automatic.bounding)
         assertEquals(ordinary, automatic)
+    }
+
+    @Test
+    fun `automatic sparse admission preserves explicit relaxation strategies`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        for (base in listOf(LpPlan(objectiveCone = true), LpPlan(lbTreeSearch = true))) {
+            val ordinary = LpAutoConfig.resolve(problem, LpConfig.parse("default,-sparse-trial"), base, objective)
+
+            val automatic = LpAutoConfig.resolve(problem, LpConfig.AUTO, base, objective)
+
+            assertEquals(ordinary, automatic)
+        }
     }
 
     @Test

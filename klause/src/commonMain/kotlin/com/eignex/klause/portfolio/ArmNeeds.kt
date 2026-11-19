@@ -125,11 +125,13 @@ internal class ProblemFacts(
                             factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
                     },
                 relaxation = { emphasis ->
-                    // Sparse admission uses seated workers; it supplies no additional portfolio slot.
                     val config = LpConfig(emphasis).cappedUnder(lpCeiling)
+                    // Automatic sparse admission uses seated workers; explicit requests keep their eligibility.
+                    val eligibility = if (LpTechnique.SPARSE_TRIAL in config.overrides) config else
+                        LpConfig(config.emphasis, config.overrides + (LpTechnique.SPARSE_TRIAL to false),
+                            config.sourcePreparation)
                     LpAutoConfig.resolve(
-                        problem, LpConfig(config.emphasis, config.overrides + (LpTechnique.SPARSE_TRIAL to false),
-                            config.sourcePreparation), LpPlan(), objective,
+                        problem, eligibility, LpPlan(), objective,
                     ).hasDefaultNumericalSettings().not()
                 },
             )

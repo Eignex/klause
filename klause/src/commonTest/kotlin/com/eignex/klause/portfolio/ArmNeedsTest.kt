@@ -39,7 +39,7 @@ class ArmNeedsTest {
             settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
 
-        for (config in listOf(LpConfig.AUTO, LpConfig.parse("default,+sparse-trial"))) {
+        for (config in listOf(LpConfig.AUTO, LpConfig.parse("default,-sparse-trial"))) {
             val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), config, objective)
 
             assertFalse(facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)))

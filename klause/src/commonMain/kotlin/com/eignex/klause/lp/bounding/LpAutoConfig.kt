@@ -408,7 +408,7 @@ object LpAutoConfig {
         )
         val explicitSparse = config.overrides[LpTechnique.SPARSE_TRIAL] == true
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
-            (explicitSparse || !plan.bounding || cells > baseCap) &&
+            (explicitSparse || (!coneRequested && !base.lbTreeSearch && (!plan.bounding || cells > baseCap))) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
@@ -418,7 +418,9 @@ object LpAutoConfig {
         } else null
         if (sparse?.admitted == true) {
             plan = LpPlan(
-                bounding = true, boundMaxDepth = 0, learn = true, probe = true, rootCutHarvest = false,
+                bounding = true,
+                boundMaxDepth = if (!explicitSparse && plan.bounding) plan.boundMaxDepth else 0,
+                learn = true, probe = true, rootCutHarvest = false,
                 rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,

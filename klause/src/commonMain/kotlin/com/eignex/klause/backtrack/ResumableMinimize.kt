@@ -17,6 +17,7 @@ import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveCursor
@@ -46,6 +47,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.SingleIntObjective
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
@@ -1522,6 +1524,7 @@ internal class ResumableMinimize(
         // NaN (no LP structure) carries no information and the sink ignores it.
         params.objectiveLowerBoundSink?.invoke(rootBound)
         provedRootBound = rootBound
+        LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.ROOT))
     }
 
     /**
