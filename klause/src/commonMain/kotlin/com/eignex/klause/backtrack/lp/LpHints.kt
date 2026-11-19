@@ -31,7 +31,7 @@ internal class LpHints(
     private val applyAdvice: Boolean = true,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe)
+    private val history = LpDirectionalHistory(observe, charge = charge)
     private val passiveChoice = if (collect) LpPassiveVariableChoice(applyAdvice, observe, charge) else null
     private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
     private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
@@ -75,7 +75,7 @@ internal class LpHints(
             scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff
         ) {
             if (scopeModel != null) observe("INCOMPATIBLE")
-            charge(history.retainedEntries.toLong() + 2L * relaxation.colVarId.size)
+            charge(2L * relaxation.colVarId.size)
             history.clear(report = scopeModel != null)
             scopeModel = state.baseModel
             scopeRows = state.rows
@@ -117,7 +117,6 @@ internal class LpHints(
         }
         directionalChoice = null
         if (collect && scopeModel != null) {
-            charge(129L)
             history.branch(variable, value(variable))
         }
     }
@@ -127,7 +126,6 @@ internal class LpHints(
         passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         if (collect && scopeModel != null) {
-            charge(129L)
             history.commit(decision, depth)
         }
     }
@@ -228,7 +226,8 @@ internal class LpHints(
                 stamp == solveStamp && passivePointCurrent()
         }
         if (valueReady) {
-            val advised = values.select(variable, value(variable), alternatives, history, stamp, current)
+            val advised = values.select(variable, value(variable), alternatives, history, stamp,
+                preferHighGain = cutoff.isFinite(), fresh = current)
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
@@ -265,7 +264,7 @@ internal class LpHints(
     fun resetHistory() {
         clearPassivePoint()
         if (scopeModel != null) {
-            charge(history.retainedEntries.toLong() + scopeVariables.size + scopeBooleans.size)
+            charge(scopeVariables.size.toLong() + scopeBooleans.size)
             history.clear()
         }
         scopeModel = null

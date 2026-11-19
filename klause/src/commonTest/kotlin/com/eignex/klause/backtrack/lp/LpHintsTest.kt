@@ -52,7 +52,7 @@ class LpHintsTest {
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
                 hints.branch(variable)
-                for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 10.0))) {
+                for ((decision, point, objective) in listOf(Triple(down, 2.0, 10.0), Triple(up, 3.0, 13.0))) {
                     hints.commit(decision, 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
