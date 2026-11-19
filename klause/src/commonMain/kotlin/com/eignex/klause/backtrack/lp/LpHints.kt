@@ -156,11 +156,8 @@ internal class LpHints(
         if (proposal == null || baseline == null) {
             charge(4L)
             observe("PASSIVE_VARIABLE_NO_BASELINE")
-            val usable = proposal != null && !cancelled() && passivePointCurrent() &&
-                (proposal !is VarRef.Bool || value(proposal) in 0.0..1.0) &&
-                history.hasReliableHistory && history.score(proposal, value(proposal)).isFinite()
-            selected(proposal.takeIf { applyAdvice && usable })
-            return directionalChoice ?: baseline
+            selected(null)
+            return baseline
         }
         val point = passivePoint
         val state = passiveState
@@ -174,7 +171,14 @@ internal class LpHints(
         else LpPassiveVariableChoice.Candidate(baseline, value(baseline))
         val selected = choice.select(proposed, reference, stamp,
             fresh = current,
-            reliable = { history.hasReliableHistory && history.score(proposal, value(proposal)).isFinite() })
+            reliable = {
+                charge(2L)
+                val gain = history.score(proposal, proposed.point)
+                val baselineGain = if (proposal == baseline) gain else history.estimate(baseline, reference.point)
+                if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
+                history.hasReliableHistory && gain.isFinite() && baselineGain.isFinite() &&
+                    (proposal == baseline || gain > baselineGain)
+            })
         if (choice.nominatedVariable != null && !current()) {
             choice.clear()
             directionalChoice = null
