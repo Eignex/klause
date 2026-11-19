@@ -274,6 +274,8 @@ class FiniteSolveImprovement(
     val elapsedMs: Long,
     /** Engine-normalized objective value at [sample]. */
     val objective: Double,
+    /** The accepted candidate came from a private incumbent-reuse query. */
+    val privateIncumbentReuse: Boolean = false,
 )
 
 /** Terminal outcome exposed by the finite solve facade. */
@@ -572,6 +574,7 @@ internal fun FinitePipeline.solve(
                         improvement.workerLabel,
                         improvement.elapsedMs,
                         improvement.objective,
+                        improvement.privateIncumbentReuse,
                     ),
                 )
             },
