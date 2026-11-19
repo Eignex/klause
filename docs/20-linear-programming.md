@@ -453,8 +453,10 @@ The same setting dispatches root tableau separation to the owning block. Lifted 
 keep every row multiplier, bound substitution, integrality premise and source
 address for the ordinary source mapper and cut pool. Rows confined to existing
 blocks replace only those children; cross-block rows, new columns and other
-structural edits retire the collection for the ordinary owner. Callers that need one
-retained basis keep the monolithic constructor.
+structural edits retire every child. The replacement may form a fresh collection
+under the same admission policy and remaining work grant; a declined collection
+uses the ordinary owner. Callers that need one retained basis keep the monolithic
+constructor.
 
 ### Cuts
 

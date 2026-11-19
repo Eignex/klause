@@ -720,9 +720,9 @@ internal class LpScopedSolver(
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
-        val initialComponents = componentSplit && solver == null && components == null && compaction == null
+        val prepareComponents = componentSplit && solver == null && compaction == null
         val replacement = prepared(next.state, token, append, warm, replacementWorkLimit,
-            allowComponents = initialComponents) ?: return false
+            allowComponents = prepareComponents) ?: return false
         var published = false
         var failure: Throwable? = null
         try {

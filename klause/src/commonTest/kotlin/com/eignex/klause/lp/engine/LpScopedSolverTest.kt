@@ -237,6 +237,34 @@ class LpScopedSolverTest {
     }
 
     @Test
+    fun `new structural columns should allow later reuse of unchanged components`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), componentSplit = true).use { owner ->
+            assertNotNull(owner.solve())
+            val zero = ExactLpNumber.of(0L)
+            val one = ExactLpNumber.of(1L)
+            val column = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L))))
+            assertTrue(owner.append(listOf(LpStructuralColumn(column, one)), listOf(
+                LpScopedRow(3L, listOf(0 to ExactLpNumber.of(-1L), 3 to ExactLpNumber.of(-1L)),
+                    ExactLpNumber.of(-3L), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            ), false))
+            val changed = assertNotNull(owner.solve())
+            assertEquals(3, assertNotNull(changed.float).blocks)
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(5L), result.lowerBound)
+            assertEquals(2, owner.lastMetrics.componentReuses)
+        }
+    }
+
+    @Test
     fun `a cross block cut should use ordinary replacement without merging retained children`() {
         val builder = LpBuilder()
         repeat(2) {
