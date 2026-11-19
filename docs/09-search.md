@@ -378,8 +378,9 @@ Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
 Each observation ages separately.
-Replacing the ordinary LP variable requires reliable history for that reference
-as well, including measured zero gains, and a strictly greater predicted gain.
+Reliable proposals take precedence over an ordinary LP reference without a reliable
+gain estimate. A measured reference, including measured zero gains, requires a
+strictly greater predicted gain. Missing ordinary LP references keep the configured selector.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that

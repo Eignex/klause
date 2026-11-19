@@ -201,9 +201,9 @@ internal class LpHints(
                 charge(2L)
                 val gain = history.score(proposal, proposed.point)
                 val baselineGain = if (proposal == baseline) gain else history.estimate(baseline, reference.point)
-                if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
-                history.hasReliableHistory && gain.isFinite() && baselineGain.isFinite() &&
-                    (proposal == baseline || gain > baselineGain)
+                if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNOBSERVED")
+                history.hasReliableHistory && gain.isFinite() &&
+                    (proposal == baseline || !baselineGain.isFinite() || gain > baselineGain)
             })
         if (choice.nominatedVariable != null && !current()) {
             choice.clear()
