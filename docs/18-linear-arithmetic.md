@@ -108,6 +108,8 @@ before materializing pending LP bounds. Source activities are cached for that ow
 point, while current Boolean constants, strictness and disequality directions are
 checked on each use. Failed checks flush pending source bounds before another LP
 query; successful reuse leaves them pending and supplies no conflict authority.
+An unresolved disequality requires ordinary source assertion and direction selection
+before the point can be reused, so search cannot repeat an already assigned split.
 For an unchanged point, the prepared Boolean-input index selects rows whose inputs
 changed since the last completed check. Disjunctions and disequalities remain
 eligible on every check; interruption retains the previous completed snapshot.

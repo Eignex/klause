@@ -67,6 +67,31 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
+    fun `complete traversal should resolve a disequality before reusing its point`() {
+        val factor = object : Factor by ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+            doubleArrayOf(1.0), LinearOp.LE, -2.5) {
+            override val linearForm = LinearForm.Conjunction(listOf(TaggedLinearRow(
+                intArrayOf(Term.ofRealVar(0)),
+                RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0)), -2.5, false),
+                LinearOp.EQ, activator = 0,
+            )))
+        }
+        val source = Problem(1, 0, emptyArray(), arrayOf(factor), numRealVars = 1,
+            realLower = doubleArrayOf(0.125), realUpper = doubleArrayOf(0.125))
+        ExactLiraSearchComponent(source).use { component ->
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            session.initialize()
+
+            session.push(SearchDecision.Bool(Lit.make(0, false)))
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+
+            val value = assertNotNull(result.model.valueOf(component.realAssignmentKey)).reals.single()
+            assertEquals(BigFraction.ofLong(8).reciprocal(), value)
+        }
+    }
+
+    @Test
     fun `complete LP witnesses consume a feasible completion claim once`() {
         val stats = LpStatsSink()
         ExactLiraSearchComponent(halfIntegerSource()).use { component ->

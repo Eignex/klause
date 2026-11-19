@@ -1630,7 +1630,9 @@ class ExactLiraSearchComponent private constructor(
             if (prepared.disjunction && prepared.address !in node.rowAssertions) continue
             val truth = node.rowTruth(prepared.address, prepared.row, bools) ?: continue
             val comparison = prepared.form.comparison(truth) { bools[it] == LIRA_TRUE }
-            if (!system.checkedPointSatisfies(comparison, node.disequalityDirections[prepared.address], lpStop)) {
+            val direction = node.disequalityDirections[prepared.address]
+            if (comparison.op == LinearOp.NE && direction == null) return false
+            if (!system.checkedPointSatisfies(comparison, direction, lpStop)) {
                 return false
             }
         }
