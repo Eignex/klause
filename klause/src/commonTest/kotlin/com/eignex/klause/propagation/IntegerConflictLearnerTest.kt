@@ -87,13 +87,15 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     fun `an overwide combination should leave an older compact source eligible`() {
         for (root in listOf(false, true)) {
             val native = PropagationSession(Problem(0, 18,
-                Array(18) { when (it) {
-                    0 -> IntDomain(0, 6)
-                    1, 3 -> IntDomain(0, 12)
-                    2 -> IntDomain(0, 24)
-                    17 -> IntDomain(0, if (root) 11 else 36)
-                    else -> IntDomain(0, 1)
-                } }, arrayOf(
+                Array(18) {
+                    when (it) {
+                        0 -> IntDomain(0, 6)
+                        1, 3 -> IntDomain(0, 12)
+                        2 -> IntDomain(0, 24)
+                        17 -> IntDomain(0, if (root) 11 else 36)
+                        else -> IntDomain(0, 1)
+                    }
+                }, arrayOf(
                     Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
                     Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
                     Linear(IntArray(16) { if (it == 15) -1 else 1 }, IntArray(16) { it + 2 }, LinearOp.LE, 0),
