@@ -428,7 +428,9 @@ nomination and comparison work; the corresponding backtrack setting is
 `BacktrackParams.lpDirectionalAdvice`.
 
 Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
+and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
+replacement arrays are checked element by element. Scope capture borrows those arrays,
+and comparison work charges the visited elements. Changed rows or cuts, layout or objective rescaling invalidate
 history and pending comparisons. Restart and assumption reseeding clear history.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
