@@ -1,2 +1,10 @@
 # Sources reserved as held-outs: no roadmap lane has run them. A lane picks its held-outs here and
 # moves a source to roadmap-exposed when it runs it.
+miplib2017/neos-2328163-agri
+miplib2017/neos-3426132-dieze
+miplib2017/neos-555001
+miplib2017/neos-1171737
+miplib2017/rococoC10-001000
+miplib2017/app3
+miplib2017/b1c1s1
+miplib2017/shiftreg2-7
