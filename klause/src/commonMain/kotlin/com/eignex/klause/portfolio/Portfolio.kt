@@ -462,10 +462,10 @@ class Portfolio(
     /**
      * Branch-and-bound: run arms in scheduled segments, carrying one shared incumbent. Each segment streams
      * against its arm's own objective representation, sees the shared bound (backtrack prunes on it) and the
-     * incumbent assignment (local search warm-starts from it). Returns [MinimizeResult.Optimal] /
-     * [MinimizeResult.Infeasible] only when an arm exhausts its search, otherwise the best incumbent as
-     * [MinimizeResult.BestFound]. `onImprovement` fires once per strict global improvement, tagged with the arm
-     * that produced it, in the order the incumbent installed them.
+     * incumbent assignment (local search warm-starts from it). Complete traversal or a verified shared bound can
+     * establish [MinimizeResult.Optimal]; a source refutation yields [MinimizeResult.Infeasible]. Unfinished work
+     * retains any incumbent as [MinimizeResult.BestFound]. `onImprovement` fires for strict global improvements,
+     * tagged with the producing arm in incumbent installation order.
      */
     override fun minimize(
         cancellation: ExecutionControl,
