@@ -13,7 +13,7 @@ internal data class LpMatrixProjectionStatus(val underflows: Int, val overflows:
 internal class LpProjectionStop : RuntimeException()
 
 internal class LpProjectionMeter(
-    private val workLimit: Long = Long.MAX_VALUE,
+    private var workLimit: Long = Long.MAX_VALUE,
     private val allocationLimit: Long = Long.MAX_VALUE,
     private val cancellation: ExecutionControl = ExecutionControl.Never,
 ) {
@@ -31,6 +31,12 @@ internal class LpProjectionMeter(
 
     fun poll() {
         if (cancellation.pollStop()) throw LpProjectionStop()
+    }
+
+    fun restrictWork(limit: Long) {
+        require(limit >= 0L)
+        workLimit = minOf(workLimit, limit)
+        if (work > workLimit) throw LpProjectionStop()
     }
 
     fun reserveVectors(model: ExactLpModel, materialize: Boolean = true) {

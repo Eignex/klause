@@ -12,6 +12,28 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverProgressTest {
     @Test
+    fun `a declined structural preflight preserves the ordinary projection grant`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val admission = object : LpComponentAdmission {
+            override fun inspect(columns: Int, rows: Int, entries: Int): Boolean = false
+            override fun accepts(shape: LpComponentShape): Boolean = error("preflight declined")
+        }
+        LpScopedSolver(LpExactState(source), workLimit = 100_000L, componentSplit = true,
+            componentAdmission = admission, monolithicPreparationWork = 20L).use { owner ->
+
+            assertFalse(owner.prepare())
+
+            assertTrue(owner.metrics.preparationWork <= 20L)
+            assertEquals(0L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
     fun `declined components cannot borrow their preparation grant for a monolithic owner`() {
         val builder = LpBuilder()
         repeat(2) {

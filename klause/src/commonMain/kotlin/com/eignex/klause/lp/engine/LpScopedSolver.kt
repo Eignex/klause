@@ -881,6 +881,21 @@ internal class LpScopedSolver(
         var constructionBound = 0L
         try {
             if (token() || next.model.m > maxRetainedRows) return null
+            var inspectComponents = allowComponents && warm == null && next.model.n > 0 && next.model.m >= 2 &&
+                declinedComponentMatrix?.sameMatrix(next.model) != true
+            if (inspectComponents && componentAdmission != null) {
+                projection.reserve(next.model.n.toLong() + 1L, 0L, matrix = false)
+                val entries = (0 until next.model.n).sumOf { next.model.columnEntries(it).size.toLong() }
+                if (!componentAdmission.inspect(next.model.n, next.model.m,
+                        entries.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                ) {
+                    declinedComponentMatrix = next.model
+                    inspectComponents = false
+                }
+            }
+            if (!inspectComponents && monolithicPreparationWork != null && monolithicPreparationWork > 0L) {
+                projection.restrictWork(monolithicPreparationWork)
+            }
             val working = next.ownerWorkingModel(projection)?.also {
                 // The numerical owner refreshes its scaled vectors while adopting this state.
                 projection.reserveVectors(next.model)
@@ -890,9 +905,7 @@ internal class LpScopedSolver(
                 constructionBound = bound
             } ?: return null
             if (workBudget > 0L && projection.work >= workBudget) return null
-            candidate = if (allowComponents && warm == null &&
-                declinedComponentMatrix?.sameMatrix(next.model) != true
-            ) {
+            candidate = if (inspectComponents) {
                 componentLpSolverOrNull(
                     working, token, projection,
                     { part, childToken, rowOnlyRows ->
