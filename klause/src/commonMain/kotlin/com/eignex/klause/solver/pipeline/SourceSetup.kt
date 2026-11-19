@@ -49,7 +49,19 @@ class SourceSetupRequest private constructor(
         providers: FactorProjectionProviders = source.providers,
         cancellation: ExecutionControl = ExecutionControl.Never,
         boundCancellation: ExecutionControl = cancellation,
-        linearToleranceEnvelope: Boolean = false,
+    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
+
+    /** Bind a linear source with an explicit absolute-tolerance envelope policy. */
+    constructor(
+        source: SourceAttachment,
+        operation: ExecutionOperation,
+        engine: FiniteEngine,
+        objective: LinearObjective? = null,
+        maximize: Boolean = false,
+        providers: FactorProjectionProviders = source.providers,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+        boundCancellation: ExecutionControl = cancellation,
+        linearToleranceEnvelope: Boolean,
     ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null,
         linearToleranceEnvelope = linearToleranceEnvelope)
 
