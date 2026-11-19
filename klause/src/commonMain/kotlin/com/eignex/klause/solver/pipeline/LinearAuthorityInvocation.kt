@@ -109,6 +109,7 @@ internal class LinearAuthorityInvocation(
             externalOffers[key] = (externalOffers[key] ?: 0L) + count
         } else null
     val isDone: Boolean get() = result != null
+    val hasIncumbent: Boolean get() = incumbent != null
     val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE

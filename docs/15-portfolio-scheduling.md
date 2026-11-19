@@ -553,7 +553,8 @@ checked global bounds retain ordinary coverage and certification. A checked pool
 center starts joint repair without a root
 relaxation. Fixed repair first tries the rounded integers from an available paid
 root point under the checked incumbent's cutoff, retaining the ordinary continuous
-completion. The following repair can use a checked pool point at that same cutoff
+completion. A discrete objective whose rounded value cannot improve that cutoff
+skips the bootstrap. The following repair can use a checked pool point at that same cutoff
 as its center. For binary models, a paid root point selects a private support
 neighborhood around that checked center. Incumbent ones and root values outside
 `1e-6` of zero remain free, so an exchange can remove agreeing incumbent ones.
@@ -577,6 +578,10 @@ authority. Continuous columns stay free, cutoff checks stay exact, and later
 proposals keep their captured conditions. A checked proposal retains its center for
 the matching receiving query, including at the captured cutoff; the query rechecks
 its own source rows and pins before using that point to prune or guide traversal.
+The captured seed enters before newer external offers, which can lie outside its
+private pins. Newer offers still require receiving checks.
+Receiving restrictions capture their coordinate maps together under existing funding,
+preserving original bounds and aggregate rows.
 Imported points remain query incumbents
 and centers and earn no discovery reward: only a point the repair query produces
 enters companion publication and original-source rechecking.
