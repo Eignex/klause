@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
@@ -10,6 +11,7 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.lowering.LinearSourceView
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.lp.finiteRelaxationSupported
+import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStats
@@ -22,6 +24,12 @@ internal class PreparedLinearSource(
     val objective: LinearObjective?,
     val claimsCoverTolerance: Boolean,
     val acceptedObjectiveBound: BigFraction?,
+    val independentChecks: IndependentLinearSourceChecks? = null,
+)
+
+internal class IndependentLinearSourceChecks(
+    val projections: PreparedFactorProjections,
+    val components: List<IndependentOpenComponent>,
 )
 
 internal fun PreparedLinearSource.workingGapTolerance(): OptimalityTolerance? {
@@ -49,16 +57,28 @@ internal fun prepareLinearSource(
     val covers = !numerical || qualification?.verify() == true
     val acceptedBound = if (covers || source.objective == null) null else qualification?.objectiveBound()
     if (stop()) return interrupted()
-    val prepared = PreparedLinearSource(view, objective, covers, acceptedBound)
-    // A row without a finite working projection has no LP authority or finite owner, so it declines at once.
-    if (!view.model.finiteRowsSupported()) {
+    val supported = view.model.finiteRowsSupported()
+    val mayRefute = !numerical && request.engine != FiniteEngine.LOCAL_SEARCH && request.engine != FiniteEngine.ALNS
+    val model = if (!supported && mayRefute) {
+        view.model.withFactors(view.model.factors.take(view.constraintFactorCount))
+    } else view.model
+    val projections = if (supported || mayRefute) request.providers.prepare(model) else null
+    val components = if (!supported && mayRefute) {
+        requireNotNull(projections).independentOpenComponents(stop) { model.factors[it].finiteRowSupported() }
+    } else emptyList()
+    if (stop()) return interrupted()
+    val prepared = PreparedLinearSource(view, objective, covers, acceptedBound,
+        components?.takeIf { it.isNotEmpty() }?.let { IndependentLinearSourceChecks(requireNotNull(projections), it) })
+    if (!supported) {
         return SourceRouteSelection(request,
-            SourceProblemRoute.NativeFormula(null, TerminationReason.Unsupported), stop, prepared)
+            SourceProblemRoute.NativeFormula(null,
+                if (components == null) TerminationReason.BudgetExhausted else TerminationReason.Unsupported),
+            stop, prepared)
     }
     val sense = source.objective?.sense ?: ObjectiveSense.MINIMIZE
     // The lowered view takes the same route as any factor source; the source overlay only qualifies its claims.
     // Purely continuous rows keep the finite LP lane, whose certified tolerance owns their decimal claims.
-    val route = view.model.pipelineRoute(request.providers.prepare(view.model), objective,
+    val route = view.model.pipelineRoute(requireNotNull(projections), objective,
         sense == ObjectiveSense.MAXIMIZE, request.boundCancellation or stop, stop, onLpStats = onLpStats,
         routePureRealToTheory = false)
     if (stop()) return interrupted()
@@ -87,10 +107,10 @@ private fun PreparedLinearSource.bind(route: SourceProblemRoute): SourceProblemR
     }
 }
 
-private fun Problem.finiteRowsSupported(): Boolean = factors.all { factor ->
-    when (factor) {
-        is ExactLinear -> factor.finiteRelaxationSupported()
-        is LinearIndicator -> factor.row.finiteRelaxationSupported()
-        else -> true
-    }
+private fun Problem.finiteRowsSupported(): Boolean = factors.all { it.finiteRowSupported() }
+
+private fun Factor.finiteRowSupported(): Boolean = when (this) {
+    is ExactLinear -> finiteRelaxationSupported()
+    is LinearIndicator -> row.finiteRelaxationSupported()
+    else -> true
 }
