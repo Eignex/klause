@@ -103,6 +103,10 @@ internal class JointLinearRepair(
     private var relaxationProposal: ExactNeighborhoodCondition? = null
     private var retainedProposal: ExactNeighborhoodCondition? = null
     private var publishedQueryIncumbent: Sample? = null
+    private var bootstrapHint: LinearRepairGuidance.Hint? = null
+    private var bootstrapPending = false
+    private var bootstrapTried = false
+    private var relaxationAttempted = false
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
         if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
@@ -185,11 +189,12 @@ internal class JointLinearRepair(
             phase, raw, completed, cutoff, candidate, disposition))
     }
 
-    private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff): Sample? {
+    private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff, allowEqual: Boolean = false): Sample? {
         val offered = external() ?: return null
         val raw = if (completion != null && offered.exactReals != null && cutoff != null)
             objectiveValue(offered) else comparisonValue(offered)
-        if (completion != null && offered.exactReals != null && cutoff != null && raw != null && raw >= cutoff) {
+        val declined = cutoff != null && raw != null && (if (allowEqual) raw > cutoff else raw >= cutoff)
+        if (completion != null && offered.exactReals != null && declined) {
             compare("external", "not-improving", raw = raw, cutoff = cutoff)
             return null
         }
@@ -200,8 +205,8 @@ internal class JointLinearRepair(
         return completed
     }
 
-    private fun checkedExternalCenter(cutoff: BigFraction? = null): CheckedCenter? {
-        val sample = externalIncumbent(cutoff) ?: return null
+    private fun checkedExternalCenter(cutoff: BigFraction? = null, allowEqual: Boolean = false): CheckedCenter? {
+        val sample = externalIncumbent(cutoff, allowEqual) ?: return null
         if (completion != null) {
             budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
             if (completion.checking(stop)()) return null
@@ -211,7 +216,7 @@ internal class JointLinearRepair(
             observeExternal("MissingExactReals")
             return null
         }
-        if (cutoff != null && (value == null || value >= cutoff)) {
+        if (cutoff != null && (value == null || if (allowEqual) value > cutoff else value >= cutoff)) {
             observeExternal("NotImproving")
             compare("center", "not-improving", completed = value, cutoff = cutoff)
             return null
@@ -287,7 +292,7 @@ internal class JointLinearRepair(
             maximumMoves = params.maxFlips, maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
             maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
             nativeWork = { work }, completionStats = { stats }, onClose = ::close,
-            prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
+            prepareBooleanCenter = { prepare(it, bootstrap = !adaptive) }, rootCoordinateValue = ::center,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
             reviseRefutedCenter = centerProgress?.let { ::reviseRefutedCenter },
@@ -299,10 +304,11 @@ internal class JointLinearRepair(
             },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
                 retainedProposal?.let { return@ExactNeighborhoodProposal it }
+                val bootstrap = bootstrapPending
                 val checked = preparedCenter?.takeIf {
                     round == 0L &&
                         (cutoff == null || it.value?.let { value -> value < cutoff } == true)
-                } ?: checkedExternalCenter(cutoff)
+                } ?: checkedExternalCenter(cutoff, allowEqual = bootstrapTried && !relaxationAttempted)
                 checked?.sample?.let { sample ->
                     observe("jointRepairImportedCenters")
                     if (sample !== importedCenter) {
@@ -314,11 +320,13 @@ internal class JointLinearRepair(
                     refreshedCenter(checked) else checked
                 val pooled = current?.sample
                 if (centerProgress != null) proposalHasCheckedCenter = pooled != null
-                val from = pooled?.let { sample ->
+                pooled?.let { sample ->
                     if (sample !== importedCenter) {
                         importedCenter = sample
                         onIncumbentImport?.invoke()
                     }
+                }
+                val from = pooled?.takeUnless { bootstrap }?.let { sample ->
                     List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                         sample.exactReals.orEmpty()
                 } ?: centers
@@ -328,8 +336,9 @@ internal class JointLinearRepair(
                     focusedRemaining = sourceIntegers?.size ?: model.numIntVars
                     observe("jointRepairSourceInputPasses")
                 }
-                val checkedStart = pooled != null && completion != null && round == 0L
-                if (round == 0L && completion != null) incumbentTrialPending = checkedStart
+                val checkedStart = pooled != null && completion != null && !bootstrap &&
+                    (round == 0L || (bootstrapTried && !relaxationAttempted))
+                if (round == 0L && completion != null) incumbentTrialPending = pooled != null
                 val width = if (enlargedTrialAfterWitness) checkedTrialWidth + 1 else if (checkedStart) {
                     observe("jointRepairCheckedCenterStarts")
                     minOf(count, 2)
@@ -343,7 +352,7 @@ internal class JointLinearRepair(
                     onIncumbentUse?.invoke()
                 }
                 // A checked center needs no all-pinned rounded-root bootstrap.
-                val proposalRound = if (pooled != null && completion != null)
+                val proposalRound = if (bootstrap) 0L else if (pooled != null && completion != null)
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
                 val size = if (enlargedTrialPending && width > checkedTrialWidth)
                     minOf(width, checkedTrialWidth + 1) else width
@@ -351,17 +360,29 @@ internal class JointLinearRepair(
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
                 val relaxation = if (checkedStart) requireNotNull(selection).relaxationNeighborhood(
                     hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
+                if (checkedStart && hint != null) relaxationAttempted = true
                 if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
                 (relaxation ?: requireNotNull(selection).propose(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
+                        if (bootstrap) {
+                            bootstrapPending = false
+                            bootstrapTried = true
+                            bootstrapHint = null
+                            observe("jointRepairPaidRootBootstraps")
+                        }
                         relaxationProposal = condition.takeIf { relaxation != null }
-                        checkedProposal = pooled?.takeIf { completion != null }?.let { CheckedProposal(condition, it) }
+                        checkedProposal = pooled?.takeIf { completion != null && !bootstrap }
+                            ?.let { CheckedProposal(condition, it) }
                         if (observation != null) {
                             proposalSequence++
                             observationQuery = 0L
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
-                                proposalRound, count, size, if (pooled == null) "stored" else "checked-pooled",
+                                proposalRound, count, size, when {
+                                    bootstrap -> "rounded-paid-root"
+                                    pooled == null -> "stored"
+                                    else -> "checked-pooled"
+                                },
                                 from, model.numIntVars, sourceIntegers, observedRoots, condition)
                         }
                         guidedProposal = condition.takeIf { guided }
@@ -389,7 +410,7 @@ internal class JointLinearRepair(
         }
     }
 
-    private fun prepare(cancellation: ExecutionControl): Boolean {
+    private fun prepare(cancellation: ExecutionControl, bootstrap: Boolean): Boolean {
         check(!closed)
         if (stop() || exhausted || cancellation()) return false
         if (selection == null) {
@@ -417,6 +438,8 @@ internal class JointLinearRepair(
                 preparedCenter = preparedCenter ?: checkedExternalCenter()
                 if (stop() || exhausted || cancellation()) return false
                 if (preparedCenter != null) {
+                    bootstrapHint = repairGuidance?.find(source)?.takeIf { bootstrap }
+                    bootstrapPending = bootstrapHint != null
                     rootPoint = emptyMap()
                     observe("jointRepairCheckedCenterPreparations")
                     return true
@@ -454,10 +477,12 @@ internal class JointLinearRepair(
 
     private fun center(index: Int): BigFraction? {
         if (index >= model.numIntVars) return null
-        preparedCenter?.let { return BigFraction.of(it.sample.exactIntValue(index), BIG_ONE) }
+        val prepared = preparedCenter?.let { BigFraction.of(it.sample.exactIntValue(index), BIG_ONE) }
+        if (!bootstrapPending && prepared != null) return prepared
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, index)
-        var value = rootPoint?.get(coordinate)?.takeIf { it.isFinite() }?.let { BigFraction.ofDouble(round(it)) }
-            ?: BigFraction.ZERO
+        val hint = bootstrapHint?.integer(index) ?: rootPoint?.get(coordinate)
+        var value = hint?.takeIf { it.isFinite() }?.let { BigFraction.ofDouble(round(it)) }
+            ?: prepared ?: BigFraction.ZERO
         val bounds = model.intBounds
         if (bounds.hasLower(index)) {
             val lower = BigFraction.ofLong(bounds.lower(index))
@@ -837,6 +862,7 @@ internal class JointLinearRepair(
         checkedTrialCenter = null
         checkedProposal = null
         relaxationProposal = null
+        bootstrapHint = null
         guidedProposal = null
         readyCenterStep = null
         selection?.clearRefutation()
