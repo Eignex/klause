@@ -36,17 +36,15 @@ internal fun projectEnvelopeRows(
             val terms = row.columns.indices.map {
                 LpRowBoundTerm(row.columns[it], row.coefficients[it], null)
             } + LpRowBoundTerm(state.model.n + index, BigFraction.ONE, 1L)
+            // Logical slacks have no upper side, so only minima project structural bounds.
             val minimum = rowEndpointSum(state, terms, true, meter)
-            val maximum = rowEndpointSum(state, terms, false, meter)
             settle()
             for (term in terms.dropLast(1)) {
-                for ((sum, lower) in listOf(minimum to true, maximum to false)) {
-                    val bound = projectRowBound(state, index, term, terms, sum, lower, meter)
-                    settle()
-                    if (bound != null && !trail.assertBound(bound.column, bound.upper,
-                            ExactLpSide(ExactLpNumber.of(bound.value), bound.strict), nextWitness(), control)) {
-                        return trail.state
-                    }
+                val bound = projectRowBound(state, index, term, terms, minimum, true, meter)
+                settle()
+                if (bound != null && !trail.assertBound(bound.column, bound.upper,
+                        ExactLpSide(ExactLpNumber.of(bound.value), bound.strict), nextWitness(), control)) {
+                    return trail.state
                 }
             }
         }
