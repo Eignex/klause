@@ -674,6 +674,9 @@ sides, and pop restores bounds and deactivates scoped rows.
 Trail edits borrow owned immutable assertion lists for reading. An empty scope
 push shares its predecessor's captured list; changed assertions receive a fresh
 capture, and caller snapshots remain independent copies.
+Adjacent states with the same base region and active rows expose their changed
+bound columns through an identity token. This token retains no predecessor state;
+unrelated states require a full check instead of borrowing the delta.
 Exact trail edits do not require a floating projection. An incompatible projection
 retires the floating owner, while crossed sides are certified directly against the
 exact state and acceptance policy. A later projectable state can prepare a fresh owner.

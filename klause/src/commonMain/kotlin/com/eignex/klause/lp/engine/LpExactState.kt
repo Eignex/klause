@@ -100,6 +100,8 @@ internal class LpExactState internal constructor(
     // Tokens identify adjacent scalar revisions without retaining a predecessor's state or cached vectors.
     private val scalarIdentity = Any()
     private var scalarPredecessor: Any? = null
+    private val boundPredecessor: Any?
+    private val changedBounds: Set<Int>
 
     // Whether every right-hand side, cost, bound and origin projects to a finite double; null until checked.
     private var scalarsProjectable: Boolean? = null
@@ -159,8 +161,10 @@ internal class LpExactState internal constructor(
         require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
         require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
         val source = previous?.takeIf { it.baseModel.sharesRegion(baseModel) && it.rows === rows }
+        boundPredecessor = source?.scalarIdentity
         val firstConflict: Int
         if (source == null) {
+            changedBounds = emptySet()
             trailStorageUnits = activeAssertions.sumOf { it.storageUnits() } + scopeMarks.size
             validateRows()
             validateAssertions(0)
@@ -184,6 +188,7 @@ internal class LpExactState internal constructor(
             val touched = HashSet<Int>()
             for (index in shared until source.activeAssertions.size) touched.add(source.activeAssertions[index].column)
             for (index in shared until activeAssertions.size) touched.add(activeAssertions[index].column)
+            changedBounds = touched
             val appended = if (source.baseModel === baseModel && shared == source.activeAssertions.size &&
                 activeAssertions.size == shared + 1
             ) activeAssertions.last() else null
@@ -341,6 +346,11 @@ internal class LpExactState internal constructor(
         matrixRevision == other.matrixRevision && boundRevision == other.boundRevision &&
         objectiveRevision == other.objectiveRevision && popRevision == other.popRevision &&
         rowRevision == other.rowRevision && rows.sameAuthority(other.rows)
+
+    internal fun checkChangedBounds(previous: LpExactState, check: (Int) -> Boolean): Boolean? {
+        if (boundPredecessor !== previous.scalarIdentity) return null
+        return changedBounds.all(check)
+    }
 
     internal fun inheritProjection(previous: LpExactState) {
         projection = previous.projection

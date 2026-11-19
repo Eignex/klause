@@ -150,6 +150,24 @@ class QfLraSystemTest {
     }
 
     @Test
+    fun `retained affine points should reject tightening across checked and unchecked states`() {
+        for (skipState in listOf(false, true)) {
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source(), lp)
+                assertTrue(system.install())
+                val point = listOf(BigFraction.ZERO, BigFraction.ZERO)
+                assertTrue(system.assertRow(row(listOf(1, -1), 1), axiom))
+                assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+
+                assertTrue(system.assertRow(row(listOf(1, -1), -1), axiom))
+                if (skipState) assertTrue(system.assertRow(row(listOf(1, 0), 1), axiom))
+
+                assertFalse(system.acceptsPoint(point, ExecutionControl.Never))
+            }
+        }
+    }
+
+    @Test
     fun `retained affine values should follow changes to a supplied point`() {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source(), lp)
