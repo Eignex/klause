@@ -375,7 +375,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `a gain in only one child keeps ordinary scoring`() {
+    fun `measured one child gains retain a weak directional score`() {
         for (improvingUp in listOf(false, true)) {
             val history = LpDirectionalHistory({})
             history.beginNode(0)
@@ -389,8 +389,32 @@ class LpDirectionalHistoryTest {
                 }
             }
 
-            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+            assertTrue(history.hasReliableHistory)
+            assertEquals(0.1, history.score(VarRef.Bool(0), 0.5), 1e-9)
         }
+    }
+
+    @Test
+    fun `directional ranking floors scale with objective units`() {
+        val scores = ArrayList<Double>()
+        for (scale in listOf(0.001, 1.0, 1000.0)) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 100.0 * scale else 0.0)
+                }
+            }
+
+            val score = history.score(VarRef.Bool(0), 0.5)
+
+            scores.add(score / scale)
+        }
+        for (score in scores) assertEquals(scores.first(), score, 1e-9)
     }
 
     @Test
