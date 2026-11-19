@@ -334,7 +334,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             (fallback as? AnalysisResult.Learned)?.let {
                 state.arithmeticLearningTrace?.clause("integer.fallback", it.literals, state)
             }
-            val row = (fallback as? AnalysisResult.Learned)?.let {
+            val row = (fallback as? AnalysisResult.Learned)?.takeIf {
+                state.hasIntegerArithmeticSource(seedFactorId).also { supported ->
+                    if (!supported) state.arithmeticLearningTrace?.record("integer.decline.seed-source")
+                }
+            }?.let {
                 IntegerConflictLearner(state).learn(seedFactorId, currentLevel, it)
             }
             if (fallback !is AnalysisResult.Learned) {

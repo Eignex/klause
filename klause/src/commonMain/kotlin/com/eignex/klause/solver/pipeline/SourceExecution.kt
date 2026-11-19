@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.effortStats
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -91,6 +92,7 @@ class SourceExecutionRequest private constructor(
     internal val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     internal val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     internal val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    internal val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
 ) {
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
@@ -101,7 +103,7 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair)
+            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession)
     }
 
     internal fun withPortfolioGuidanceObserver(
@@ -113,7 +115,7 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair)
+            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair, onPortfolioSession)
     }
 
     internal fun withPortfolioJointRepairObserver(
@@ -125,7 +127,19 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer, onPortfolioSession)
+    }
+
+    internal fun withPortfolioSessionObserver(
+        observer: (String, PropagationSession) -> Unit,
+    ): SourceExecutionRequest {
+        require(cores == 1 && invocation.request.engine in setOf(FiniteEngine.BACKTRACK, FiniteEngine.MIXED) &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+            "native session observation requires single-core finite portfolio execution"
+        }
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+            presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, observer)
     }
 
     internal fun withValidationCancellation(stop: ExecutionControl): SourceExecutionRequest {
@@ -137,7 +151,7 @@ class SourceExecutionRequest private constructor(
                 it.copy(polynomial = it.polynomial.copy(cancellation = it.polynomial.cancellation or stop))
             },
             transcendental?.let { it.copy(cancellation = it.cancellation or stop) }, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession)
     }
 
     /**
@@ -501,7 +515,8 @@ private fun executeCapturedSource(
             )
             val result = FinitePipeline.solve(finite, callbacks.finite, finite.lpSolveContext,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
-                request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair)
+                request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair,
+                request.onPortfolioSession)
             SourceExecutionResult.Finite(invocation, result)
         }
 
