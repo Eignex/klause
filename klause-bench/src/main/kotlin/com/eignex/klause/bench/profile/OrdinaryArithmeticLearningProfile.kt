@@ -31,16 +31,16 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
 
 internal object OrdinaryArithmeticLearningProfile {
     @JvmStatic
@@ -48,7 +48,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "learning")
+                "attribution", "learning", "route", "seed")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -104,6 +104,14 @@ internal object OrdinaryArithmeticLearningProfile {
         check(observedHash == hash) { "source hash mismatch: expected $hash, observed $observedHash" }
         val ref = catalogRef ?: ProblemRef(name, format, ProblemSource.Prepared(sourceFile),
             Category.CSP, Expected.Unknown)
+        val route = options["route"] ?: "single"
+        require(route in setOf("single", "catalog"))
+        if (route == "catalog") {
+            require(!attribution && "nodes" !in options)
+            PortfolioArithmeticLearningCapture.inspect(options, ref, bytes, out, fingerprint)
+            return
+        }
+        require("seed" !in options)
         val codec = ProblemJson()
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
             for (learning in listOf(false, true)) {

@@ -21,6 +21,13 @@ import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.subExact
 
+internal fun PropagationState.hasIntegerArithmeticSource(factorId: Int): Boolean =
+    factorId in 0 until totalFactorCount && when (factorAt(factorId)) {
+        is LinearPropagator, is WideLinearPropagator, is ReifiedLinearPropagator,
+        is WideReifiedLinearPropagator, is LearnedIntegerPropagator, is ElementPropagator -> true
+        else -> false
+    }
+
 internal class IntegerSourceRow private constructor(
     val linear: LinearPropagator?,
     private val retained: IntegerConflictRow?,

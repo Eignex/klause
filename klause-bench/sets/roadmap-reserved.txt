@@ -1,6 +1,9 @@
 # Sources reserved as held-outs: no roadmap lane has run them. A lane picks its held-outs here and
 # moves a source to roadmap-exposed when it runs it.
 miplib2017/neos-3068746-nene
+# #3843 ordinary-arithmetic confirmation owns neos-3068746-nene and the underlying
+# subsetcard random4reg-75 group, including all related encodings and permutations.
+pb-comp/normalized-PB24/DEC-LIN/nordstrom/CombinatorialBenchmarksPBsolvers/subsetcard/random4reg_opb_shuffle/normalized-subsetcard-geq-random4reg-75.shuf-3
 miplib2017/neos-3665875-lesum
 miplib2017/neos-4736745-arroux
 miplib2017/neos-831188
