@@ -11,6 +11,61 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `parent bookkeeping pays allocation without repeatedly charging unused capacity`() {
+        var work = 0L
+        val history = LpDirectionalHistory({}, charge = { work += it })
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        assertTrue(work >= 128L)
+        val before = work
+
+        history.commit(SearchDecision.Bool(0), 1)
+        history.beginNode(1)
+        history.record(12.0)
+        history.branch(VarRef.Bool(1), 0.5)
+
+        assertTrue(work - before in 1L until 128L)
+    }
+
+    @Test
+    fun `clearing sparse parents pays the ancestor slots it visits`() {
+        var work = 0L
+        val history = LpDirectionalHistory({}, charge = { work += it })
+        for (level in listOf(0, 100)) {
+            history.beginNode(level)
+            history.record(10.0)
+            history.branch(VarRef.Bool(level), 0.5)
+        }
+        val before = work
+
+        history.clear()
+
+        assertTrue(work - before >= 101L)
+        assertEquals(0, history.retainedEntries)
+    }
+
+    @Test
+    fun `reliable child preference follows the requested gain direction`() {
+        for (cheaperUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.75)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up == cheaperUp) 10.0 else 13.0)
+                }
+            }
+
+            assertEquals(cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, preferHighGain = false))
+            assertEquals(!cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, preferHighGain = true))
+        }
+    }
+
+    @Test
     fun `collection prefers only a recent under observed direction`() {
         for (firstUp in listOf(false, true)) {
             val history = LpDirectionalHistory({}, maxAge = 4L)
