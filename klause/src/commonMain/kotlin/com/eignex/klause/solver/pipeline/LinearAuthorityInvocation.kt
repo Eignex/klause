@@ -26,6 +26,9 @@ import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchFrontierRun
+import com.eignex.klause.solver.search.SearchExecutionAccounting
+import com.eignex.klause.solver.search.SearchExecutionControlAdapter
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
@@ -73,11 +76,15 @@ internal class LinearAuthorityInvocation(
     useSourceGap: Boolean = true,
     gapTolerance: OptimalityTolerance? = context.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = params.sourceIncumbentCompletion,
+    private val incumbentProximity: Boolean = false,
+    borrowedBudget: SourceLpBudget? = null,
+    private val recordProgress: Boolean = true,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
             "borrowed linear authority has another work allowance"
         }
+        require(borrowedBudget == null || borrowedBudget.funding === funding)
     }
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
@@ -101,7 +108,9 @@ internal class LinearAuthorityInvocation(
     private var importedIncumbent: Sample? = null
     private var consumedIncumbent: Sample? = null
     private var result: LinearInvocationResult? = null
-    private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
+    private var proximity: LinearAuthorityInvocation? = null
+    private var proximityTurn = false
+    private val budget = borrowedBudget ?: SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val completion = if (params.sourceIncumbentCompletion)
         LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
@@ -158,7 +167,12 @@ internal class LinearAuthorityInvocation(
             context.coordinates.filter {
                 it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
             }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
-        it.bindOpenTheoryWork(state.work)
+        val accounting = OpenTheoryExecutionAccounting(state.work)
+        it.attachExecutionControls(SearchExecutionControlAdapter(stop, object : SearchExecutionAccounting by accounting {
+            override fun canCommitDecision(): Boolean = state.remainingDecisions() > 0 && accounting.canCommitDecision()
+            override fun consumeCheck(): Boolean = state.work.acceptedChecks < params.maxLeaves &&
+                accounting.consumeCheck()
+        }))
     }
     private var initialized = false
     private val branching = if (params.openBranching != OpenBranching.Activity)
@@ -226,6 +240,7 @@ internal class LinearAuthorityInvocation(
                     importedIncumbents++
                     importedIncumbent = incumbent
                     onIncumbentImport?.invoke()
+                    if (incumbentProximity && completion != null) prepareProximity()
                 }
             }
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
@@ -237,7 +252,16 @@ internal class LinearAuthorityInvocation(
                     return finish(null, TerminationReason.Unsupported)
                 }
             }
+            if (proximityTurn && proximity != null) {
+                proximityTurn = false
+                advanceProximity()
+                if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
+                else TerminationReason.Cancelled)
+                if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
+                if (paused()) return null
+            }
             val event = frontier?.next() ?: checkNotNull(run).next()
+            proximityTurn = proximity != null
             if (boundOrdered) component.updateGlobalBound()
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
             if (component.gapBound() != null) return finish(null, TerminationReason.SearchExhausted, gapClosed = true)
@@ -273,6 +297,51 @@ internal class LinearAuthorityInvocation(
     }
 
     private fun paused(): Boolean = work > startWork && (work >= endWork || sliceEnd?.hasPassedNow() == true)
+
+    private fun observeProximity(stage: String, count: Long = 1L) {
+        val key = "numericalProximity$stage"
+        externalOffers[key] = (externalOffers[key] ?: 0L) + count
+    }
+
+    private fun prepareProximity() {
+        proximity?.close()
+        proximity = null
+        val sample = incumbent ?: return
+        val exact = value ?: return
+        val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
+        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop) ?: return
+        if (sample === importedIncumbent && sample !== consumedIncumbent) {
+            consumedIncumbent = sample
+            onIncumbentUse?.invoke()
+        }
+        proximity = LinearAuthorityInvocation(source, params.copy(sourceIncumbentCompletion = false), state = state,
+            boundOrdered = true, funding = funding, useSourceGap = false, guideIncumbent = false,
+            borrowedBudget = budget, recordProgress = false)
+        proximityTurn = true
+        observeProximity("Centers")
+    }
+
+    private fun advanceProximity() {
+        val active = proximity ?: return
+        val remaining = sliceEnd?.let { (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
+            ?.coerceAtLeast(0L) ?: Long.MAX_VALUE
+        if (remaining == 0L || work >= endWork) return
+        val before = work
+        val revision = incumbentRevision
+        val completed = active.runSlice(stop, minOf(remaining, 10L), minOf(endWork - work, 64L)) { sample, _ ->
+            val checked = completion?.complete(context, sample, stop)
+            if (checked != null) offer(checked) else observeProximity("Rejected")
+        }
+        observeProximity("Consultations")
+        observeProximity("Work", (work - before).coerceAtLeast(0L))
+        if (incumbentRevision != revision) observeProximity("Improvements")
+        if (completed != null || incumbentRevision != revision) {
+            proximity = null
+            active.close()
+            if (incumbentRevision != revision) prepareProximity()
+            proximityTurn = false
+        }
+    }
 
     private fun offer(sample: Sample) = offer(sample, external = false)
 
@@ -342,16 +411,17 @@ internal class LinearAuthorityInvocation(
     override fun close() {
         if (closed) return
         closed = true
-        state.capture(session)
-        try {
+        val active = proximity
+        proximity = null
+        callback = { _, _ -> }
+        val resources = SearchInvocationResources()
+        completion?.let(resources::own)
+        resources.own(component)
+        resources.own(AutoCloseable {
+            if (recordProgress) state.capture(session)
             session.popTo(0)
-        } finally {
-            try {
-                component.close()
-            } finally {
-                completion?.close()
-                callback = { _, _ -> }
-            }
-        }
+        })
+        active?.let(resources::own)
+        resources.close()
     }
 }
