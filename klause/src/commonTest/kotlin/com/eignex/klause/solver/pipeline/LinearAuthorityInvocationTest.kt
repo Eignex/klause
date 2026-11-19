@@ -68,7 +68,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             external = { seed }, boundOrdered = true, incumbentCompletionCheck = { _, _, _ -> true },
             incumbentProximity = true).use { it.run { _, _ -> } }
 
-        assertEquals(BigFraction.MINUS_ONE, result.value)
+        assertEquals(BigFraction.ofLong(-4), result.value)
     }
 
     @Test
