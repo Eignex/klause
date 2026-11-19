@@ -137,7 +137,10 @@ internal class LpDirectionalHistory(
         pending = null
     }
 
-    fun score(variable: VarRef, value: Double): Double {
+    fun score(variable: VarRef, value: Double): Double = estimate(variable, value)
+        .takeIf { it > 0.0 } ?: Double.NaN
+
+    fun estimate(variable: VarRef, value: Double): Double {
         if (!value.isFinite()) return Double.NaN
         val history = gains[variable] ?: return Double.NaN
         expire(history.down)
@@ -148,7 +151,7 @@ internal class LpDirectionalHistory(
         val down = history.down.mean * fraction
         val up = history.up.mean * (1.0 - fraction)
         val score = sqrt(down) * sqrt(up)
-        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
+        return score.takeIf { it.isFinite() } ?: Double.NaN
     }
 
     fun preferUnderObservedDirection(variable: VarRef, value: Double): Boolean? {
@@ -160,6 +163,11 @@ internal class LpDirectionalHistory(
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
+        val observed = if (history.up.count < history.down.count) history.down else history.up
+        if (observed.mean <= 0.0) {
+            observe("PASSIVE_COLLECTION_ZERO_GAIN")
+            return null
+        }
         return history.up.count < history.down.count
     }
 

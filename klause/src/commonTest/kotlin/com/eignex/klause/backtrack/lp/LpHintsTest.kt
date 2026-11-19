@@ -46,15 +46,21 @@ class LpHintsTest {
             val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
                 observe = events::add, charge = { work += it })
             repeat(2) {
-                hints.beginNode(0, 100.0)
-                hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
-                hints.recordObjective(relaxation, 10.0)
-                hints.branch(proposal)
-                for (up in listOf(false, true)) {
-                    hints.commit(if (up) SearchDecision.IntAtLeast(1, 4L) else SearchDecision.IntAtMost(1, 3L), 1)
-                    hints.beginNode(1, 100.0)
-                    hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
-                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                for (variable in listOf(baseline, proposal)) {
+                    hints.beginNode(0, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+                    hints.recordObjective(relaxation, 10.0)
+                    hints.branch(variable)
+                    val split = if (variable == baseline) 2L else 3L
+                    for (up in listOf(false, true)) {
+                        hints.commit(if (up) SearchDecision.IntAtLeast(variable.varId, split + 1L)
+                        else SearchDecision.IntAtMost(variable.varId, split), 1)
+                        hints.beginNode(1, 100.0)
+                        val child = doubleArrayOf(2.25, 3.25)
+                        child[variable.varId] = if (up) split + 1.0 else split.toDouble()
+                        hints.record(relaxation, child, DoubleArray(0))
+                        hints.recordObjective(relaxation, if (variable == baseline) 10.0 else if (up) 13.0 else 11.0)
+                    }
                 }
             }
             hints.beginNode(0, 100.0)
@@ -72,11 +78,46 @@ class LpHintsTest {
             assertEquals(if (apply) proposal else baseline, selected)
             val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
             assertEquals(1, events.count { it == event })
-            assertEquals(2, events.count { it == "UP" })
-            assertEquals(2, events.count { it == "DOWN" })
+            assertEquals(4, events.count { it == "UP" })
+            assertEquals(4, events.count { it == "DOWN" })
             costs.add(work - before)
         }
         assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
+    fun `missing reference measurements keep ordinary selection`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+        val baseline = VarRef.IntVar(0)
+        val proposal = VarRef.IntVar(1)
+        val events = ArrayList<String>()
+        val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
+        repeat(2) {
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.branch(proposal)
+            for (up in listOf(false, true)) {
+                hints.commit(if (up) SearchDecision.IntAtLeast(1, 4) else SearchDecision.IntAtMost(1, 3), 1)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
+                hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+            }
+        }
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+        hints.recordObjective(relaxation, 10.0)
+
+        for (reference in listOf(null, baseline)) {
+            val selected = hints.selectVariable(proposal, reference)
+
+            assertEquals(reference, selected)
+        }
+        assertTrue("PASSIVE_VARIABLE_BASELINE_UNRELIABLE" in events)
     }
 
     @Test
