@@ -5,9 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.lp.engine.LpVerdict
 
 internal class PolynomialAffineReduction private constructor(
     val atoms: List<PolynomialAtom>,
@@ -211,18 +209,6 @@ internal class PolynomialAffineReduction private constructor(
                 fibres.add(AffineFibre(variable, null, lower.toList(), upper.toList()))
                 current = next
                 yield(null)
-            }
-            if (!inconsistent) {
-                val relaxation = PolynomialLpRelaxation.prepare(current, realCount, arithmetic,
-                    arithmetic.execution.cancellation)
-                relaxation?.use {
-                    try {
-                        val tightening = it.tightenSquares {}
-                        inconsistent = tightening.infeasible || it.solve()?.verdict == LpVerdict.INFEASIBLE
-                    } catch (_: PolynomialResourceLimit) {
-                        // An optional envelope decline leaves exact regional completion available.
-                    }
-                }
             }
             arithmetic.step()
             yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent,

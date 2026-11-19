@@ -333,6 +333,9 @@ a proved finite source interval; both closed children cover their parent, and on
 certified refutations of every child refute that parent. Child envelopes belong
 only to that numeric scope. Refinement and CAD alternate by cumulative work, so
 algebraic witness construction and complete polynomial decisions retain progress.
+An LP advance receives only the work earned by completed reduction and search
+steps. Exhausting that local allowance retires the optional frontier and resumes
+exact completion; a caller stop remains terminal.
 Numerical or representational declines leave exact completion responsible for the
 remaining scope. A bounded exact witness probe precedes LP construction; unresolved
 regions enter envelope pruning before cylindrical projection. The caller's matrix
