@@ -350,7 +350,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 lastResolvent = clauseResolvent
                 return row
             }
-            if (pbResolvent == null) {
+            if (pbResolvent == null && (!state.pbLearning || !state.historicalTableReasons)) {
                 lastResolvent = clauseResolvent
                 return fallback
             }
