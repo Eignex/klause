@@ -227,6 +227,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintValues: IntArray? = null
     private var pointHintCacheable = false
     private var pointHintPoint: List<BigFraction>? = null
+    private var retainedPointHintRowValues: IntArray? = null
     private var retainedPointHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = ExecutionControl.Never
@@ -430,6 +431,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintRows = null
         pointHintValues = null
         pointHintPoint = null
+        retainedPointHintRowValues = null
         retainedPointHintValues = null
         pointHintCacheable = false
         pointHintLevel = -1
@@ -676,15 +678,33 @@ class ExactLiraSearchComponent private constructor(
             observeCompleteStage("POINT_HINT_REUSE")
             return
         }
-        operationAccounting ?.charge(model.numBoolVars.toLong() + point.size + 1L)
+        operationAccounting?.charge(model.numBoolVars.toLong() + point.size +
+            (if (pointHintCacheable) rows.size else 0) + 1L)
         if (operationStop() || point.any { hintStop.poll() || !hintScalar(it) }) return
         if (operationStop() || pointHintStop()) return
         val values = IntArray(model.numBoolVars) { UNASSIGNED }
-        for (prepared in rows) {
+        val rowValues = if (pointHintCacheable) IntArray(rows.size) { UNASSIGNED } else null
+        val previousPoint = pointHintPoint
+        val previousRows = retainedPointHintRowValues
+        for (index in rows.indices) {
+            val prepared = rows[index]
             operationAccounting?.charge(1)
             if (hintStop.poll()) return
             val variable = prepared.row.activator
             if (values[variable] == DECLINED_HINT) continue
+            val cached = previousRows?.get(index) ?: UNASSIGNED
+            if (rowValues != null && previousPoint != null && cached != UNASSIGNED &&
+                prepared.form.sameNumericInputs(previousPoint, point) {
+                    operationAccounting?.charge(1)
+                    !hintStop.poll()
+                }
+            ) {
+                rowValues[index] = cached
+                values[variable] = if (cached == DECLINED_HINT ||
+                    (values[variable] != UNASSIGNED && values[variable] != cached)
+                ) DECLINED_HINT else cached
+                continue
+            }
             val comparison = if (prepared.disjunction)
                 null else
                 prepared.form.hintComparison(
@@ -693,10 +713,12 @@ class ExactLiraSearchComponent private constructor(
                 )
             val preference = comparison?.let { hintTruth(it, point) }
             if (preference == null) {
+                rowValues?.set(index, DECLINED_HINT)
                 values[variable] = DECLINED_HINT
                 continue
             }
             val value = if (preference) LIRA_TRUE else FALSE
+            rowValues?.set(index, value)
             if (values[variable] != UNASSIGNED && values[variable] != value) {
                 values[variable] = DECLINED_HINT
             } else {
@@ -708,6 +730,7 @@ class ExactLiraSearchComponent private constructor(
             if (hintStop() || operationStop() || pointHintStop()) return
             pointHintPoint = point.toList()
             retainedPointHintValues = values
+            retainedPointHintRowValues = rowValues
         }
         if (hintStop() || operationStop() || pointHintStop()) return
         pointHintLevel = context.decisionLevel
