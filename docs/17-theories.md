@@ -69,6 +69,20 @@ Participation and completeness are separate. A batch service can be sound and
 incomplete; `TheoryCheck.Cancelled` leaves the fragment undecided, and an
 indeterminate required leaf cannot justify source exhaustion.
 
+When an open factor source lacks a whole-source route, complete and mixed execution
+retain complete arithmetic checks for independent connected components. Connectivity
+includes Boolean guards, encoder conditions, and integer and real coordinates. Each compact view
+keeps its source declarations and selected encoders under a fresh remapping scope.
+A component refutation proves the conjunction infeasible, including during
+optimization because these checks carry no objective cutoff. Satisfaction retains
+the complete components' exact coordinates and searches the remaining factors in
+their compact source view. A joined witness requires checked assignments for every
+factor and disjoint coordinate ownership; unused declarations receive an admitted
+value. An undecided component withholds that composition. Optimization keeps its
+whole-source objective search and never promotes component feasibility to an
+optimum. Component checks and fallback divide finite execution allowances and
+share the caller's cancellation, deadline and decision budget.
+
 Relations installed by one linear encoding request share one immutable snapshot
 of its complete integer and Boolean conditions. The snapshot owns its maps, and
 attribution access returns defensive copies. Sharing conditions preserves every

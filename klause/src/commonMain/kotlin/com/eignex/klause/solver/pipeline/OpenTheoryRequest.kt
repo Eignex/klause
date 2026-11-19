@@ -248,8 +248,8 @@ object OpenTheoryPipeline {
     }
 
     /**
-     * Search [model], an open model no theory decides, with local search alone. It can show the model satisfiable
-     * and find incumbents for [objective], minimized, and never shows the model unsatisfiable or an incumbent optimal.
+     * Search [model], an open model no theory decides as a whole. Independent complete fragments can refute it;
+     * local search supplies whole-source witnesses and incumbents for [objective], minimized, without optimality.
      * A model of continuous columns alone is searched only when [searchesContinuousOnly].
      */
     fun searchWithoutTheory(
@@ -259,8 +259,9 @@ object OpenTheoryPipeline {
         cores: Int = 1,
         searchesContinuousOnly: Boolean = false,
     ): OpenTheoryExecution = observed(model.semantics, null) { publication ->
-        heuristicExecution(model, params, objective, cores, searchesContinuousOnly,
-            objective?.let { OpenSourceObjective(it) }, publication)
+        val values = objective?.let { OpenSourceObjective(it) }
+        if (searchesContinuousOnly) heuristicExecution(model, params, objective, cores, true, values, publication)
+        else heuristicObserved(model, params, objective, FiniteEngine.MIXED, cores, values, publication)
     }
 
     private fun heuristicExecution(
@@ -353,9 +354,9 @@ object OpenTheoryPipeline {
         incompleteOpenExecution(objective, TerminationReason.Unsupported)
 
     /**
-     * Search [model], an open model no theory decides, the way [engine] asks: local search under
-     * [FiniteEngine.MIXED] and [FiniteEngine.LOCAL_SEARCH], the latter also over continuous columns alone. A complete
-     * engine has nothing to run on it, so the answer is unknown.
+     * Search [model], an open model no theory decides as a whole, using [engine]. Complete and mixed execution
+     * retain independent arithmetic refutations. Local search supplies checked source witnesses; a complete
+     * engine leaves the source undecided when none of its admitted components refutes it.
      */
     fun searchWithoutTheory(
         model: Problem,
@@ -441,6 +442,53 @@ object OpenTheoryPipeline {
             if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
         val prepared = preparedSource ?: model.preparedWithComponents(checkNotNull(selected),
             objective = values?.original, maximize = values?.maximize ?: false)
+        if (engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS &&
+            prepared.componentPlan?.theoryPipeline == ProblemPipeline.UNSUPPORTED_OPEN
+        ) {
+            val independent = requireNotNull(prepared.factorProjections).independentOpenComponents(stop)
+                ?: return incompleteOpenExecution(objective,
+                    if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
+            if (independent.isNotEmpty()) {
+                return checkIndependentComponents(requireNotNull(prepared.factorProjections),
+                    independent, params, objective) { remaining, residual ->
+                    if (residual == null) {
+                        heuristicSelected(model, remaining, objective, engine, cores, values, publication, prepared)
+                    } else {
+                        val selectedResidual = residual.problem.componentPlan(residual, cancellation = stop)
+                        if (stop() || selectedResidual.encodingDecline == EncoderDecline.RESOURCE) {
+                            return@checkIndependentComponents incompleteOpenExecution(null,
+                                if (stop()) remaining.preparationStopReason(stop)
+                                else TerminationReason.BudgetExhausted)
+                        }
+                        val residualPlan = residual.problem.preparedWithComponents(selectedResidual)
+                        if (selectedResidual.theoryPipeline == ProblemPipeline.FINITE_CP &&
+                            residualPlan.capabilities.admission(
+                                FiniteEngine.BACKTRACK, ExecutionOperation.SATISFY).runnable
+                        ) {
+                            solveIndependentFinite(residual, remaining)
+                        } else {
+                            heuristicSelected(residual.problem, remaining, null, engine, cores, null, publication,
+                                residualPlan)
+                        }
+                    }
+                }
+            }
+        }
+        return heuristicSelected(model, params, objective, engine, cores, values, publication, prepared)
+    }
+
+    private fun heuristicSelected(
+        model: Problem,
+        params: TheoryParams,
+        objective: LinearObjective?,
+        engine: FiniteEngine,
+        cores: Int,
+        values: OpenSourceObjective?,
+        publication: SourcePublicationObserver,
+        prepared: PreparedSourcePlan,
+    ): OpenTheoryExecution {
+        val stop = params.cancellation.includingStop(params.timeout)
+        if (stop()) return incompleteOpenExecution(objective, params.preparationStopReason(stop))
         val operation = if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
         if (!prepared.capabilities.admission(engine, operation).runnable) return unsupportedExecution(objective)
         return when (engine) {
