@@ -17,6 +17,23 @@ import kotlin.test.assertTrue
 
 class NonlinearIntegerCursorTest {
     @Test
+    fun `square bounds should reach an integral candidate within one local attempt`() {
+        val parsed = SmtLibPolynomial.parse("""
+            (declare-const x Int) (declare-const r Real)
+            (assert (and (>= x 0) (<= x 10) (>= r 3) (= (* r r) x)))
+        """.trimIndent(), allowIntegers = true)
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+
+        val result = solveNonlinearIntegers(source, NonlinearIntegerParams(
+            maximumCandidates = 1, strategy = NonlinearIntegerStrategy.LOCAL_SEARCH))
+
+        val witness = assertIs<QfNraResult.Satisfiable>(result.result)
+        assertEquals(BigFraction.ofLong(9), witness.assignment.realValue(0).rational)
+        assertEquals(1L, result.stats.candidates)
+    }
+
+    @Test
     fun `complement steering should preserve charged attempts and reach new allowed tuples`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,

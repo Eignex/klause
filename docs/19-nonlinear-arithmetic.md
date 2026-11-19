@@ -1,8 +1,9 @@
 # 19. Nonlinear arithmetic
 
-Nonlinear services meet at exact polynomial real completion. Nonlinear integer
-search fixes integer candidates before completing reals; the polynomial theory
-uses cylindrical algebraic decomposition (CAD); the transcendental theory weakens
+Nonlinear services meet at certified linear envelopes and exact polynomial real
+completion. Nonlinear integer search fixes integer candidates before completing
+reals; the polynomial theory interleaves envelope refinement with cylindrical
+algebraic decomposition (CAD); the transcendental theory weakens
 functions into polynomial constraints and checks proposals against the originals.
 
 ## Nonlinear integer arithmetic
@@ -40,6 +41,11 @@ Every strategy starts from the same two facts about the source.
 - **Proved unary bounds.** Mandatory conjunctive unary bounds are intersected at
   arbitrary precision, including strict integer floor/ceiling semantics. An empty
   intersection refutes its scope. Guarded bounds do not narrow the source.
+
+Certified envelope objectives also tighten integer windows before candidate
+generation. Exact lower bounds are ceiled and upper bounds floored, without
+rounding a proposed real witness into a proof. Every bound keeps the cursor's
+Boolean and numeric restrictions.
 
 Optional root admission adds the complete integer roots of mandatory unary
 equalities. It expands each conjunctive source equality whose syntax names one
@@ -239,8 +245,8 @@ selectors. Surviving open integers select the
 
 Each strategy uses the plan in its own way:
 
-- **Backtracking** checks interval relaxations at partial states and exact
-  completions at fixed finite branches.
+- **Backtracking** publishes certified integer bounds at partial states and uses
+  exact completions at fixed finite branches.
 - **Local search** pins finite candidates in a theory query before publication.
   Pure-real sources use exact coordinate neighborhoods around rational centers.
 - **ALNS** uses the same completion in bootstrap, finite repair and its inner local
@@ -300,6 +306,32 @@ formula. `PolynomialSearchComponent` consumes shared Boolean facts and integer
 bounds. A query over an unfixed integer interval is a real relaxation: its
 refutation can reject the finite branch, but its witness cannot accept it. Conflicts
 without a clause explanation stay chronological.
+
+Before completion, the component minimizes and maximizes its shared integer
+coordinates over the certified envelopes. Bound publication cites every active
+Boolean pin and both sides of every numeric query restriction through
+`SearchAtomPremise`; root source relations need no trail literal. Retraction
+invalidates the conditioned bound selection. Tolerance sources use their widened
+formula, including private exact function values and residual bands, for the same
+deductions.
+
+#### Certified envelope pruning
+
+The model-facing adapter lifts shared monomials into auxiliary product columns.
+Squares have nonnegative lower bounds, exact endpoint tangents and a secant when
+both endpoints are proved. Bounded bilinear products use McCormick planes; a fixed
+operand gives an exact affine relation. Auxiliary columns remain continuous.
+Strict source comparisons remain strict LP rows, and unsupported comparisons
+weaken the relaxation rather than supply a deduction.
+
+A proposal passes the original conditioned polynomial formula before publication.
+An invalid square proposal adds a tangent. Residual product violations can bisect
+a proved finite source interval; both closed children cover their parent, and only
+certified refutations of every child refute that parent. Child envelopes belong
+only to that numeric scope. Refinement and CAD alternate by cumulative work, so
+algebraic witness construction and complete polynomial decisions retain progress.
+Numerical or representational declines leave exact completion responsible for the
+remaining scope.
 
 #### Quadratic strategy execution
 
@@ -424,7 +456,7 @@ optional probing keeps one cumulative allowance across retries.
 
 The decision procedure has four stages:
 
-1. **Bounded probe.** Necessary sign/magnitude conditions can refute conjunctive
+1. **Bounded probe.** Necessary sign conditions can refute conjunctive
    atoms; rational and algebraic repairs propose points. A proposal reconstructs
    eliminated coordinates and checks the original normalized formula. This optional
    small-formula prefix has a 65,536-unit slice.
