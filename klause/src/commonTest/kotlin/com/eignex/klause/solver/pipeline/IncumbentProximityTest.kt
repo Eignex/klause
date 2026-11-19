@@ -9,13 +9,13 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf

@@ -4,13 +4,13 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.gapAllowance
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -18,9 +18,11 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal object IncumbentProximity {
-    fun candidateStats(stats: SolveStats, privateCandidate: Boolean): SolveStats = if (!privateCandidate) stats
-        else stats.copy(smt = stats.smt.copy(completeSearchStages =
+    fun candidateStats(stats: SolveStats, privateCandidate: Boolean): SolveStats {
+        if (!privateCandidate) return stats
+        return stats.copy(smt = stats.smt.copy(completeSearchStages =
             stats.smt.completeSearchStages.orEmpty() + ("incumbentReusePrivateCandidate" to 1L)))
+    }
 
     fun accepts(bounds: IntBounds, integers: Int): Boolean = integers in 1..4096 &&
         (0 until integers).all {

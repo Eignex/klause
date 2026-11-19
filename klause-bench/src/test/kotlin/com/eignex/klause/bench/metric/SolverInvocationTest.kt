@@ -789,7 +789,8 @@ class SolverInvocationTest {
                 "-c",
                 "printf '%s\\n' " +
                     "'%%%klause-arm: label=integer objective=9007199254740993 time=10' " +
-                    "'%%%klause-arm: label=continuous objective=0 continuousObjective=60.0 time=20 privateIncumbentReuse=true' " +
+                    "'%%%klause-arm: label=continuous objective=0 continuousObjective=60.0 time=20 " +
+                    "privateIncumbentReuse=true' " +
                     "'%%%klause-arm: label=mixed-min objective=-3 continuousObjective=-63.5 time=30' " +
                     "'%%%klause-arm: label=mixed-max objective=3 continuousObjective=63.5 time=40' " +
                     "'%%%klause-arm: label=source objective=-27021597764222978/3 time=50' " +
