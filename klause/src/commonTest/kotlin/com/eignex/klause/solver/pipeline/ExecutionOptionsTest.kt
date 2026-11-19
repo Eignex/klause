@@ -21,6 +21,19 @@ import kotlin.test.assertTrue
 
 class ExecutionOptionsTest {
     @Test
+    fun `numerical component reuse settings should preserve independent root guidance policy`() {
+        for (enabled in listOf(false, true)) {
+            val options = ExecutionOptions.parse(listOf("lp-component-reuse=$enabled"))
+            val edit = backtrackOverride(options.reader(), allowSelectors = true)!!
+
+            val plan = edit(BacktrackParams()).lpPlan
+
+            assertEquals(enabled, plan.componentReuse)
+            assertFalse(plan.componentOwnership)
+        }
+    }
+
+    @Test
     fun `typed weighted search controls should match their parsed scenario`() {
         val typed = ExecutionOptions(ExecutionOption.coreEarly(true),
             ExecutionOption.coreRefinement(CoreRefinementMode.REASONS))

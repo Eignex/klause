@@ -12,6 +12,28 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverProgressTest {
     @Test
+    fun `query replay records the admitted numerical owner rather than a declined split request`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        for (admitted in listOf(false, true)) {
+            val observed = ArrayList<Boolean>()
+            val context = LpSolveContext(onQuery = { observed += it.componentSplit })
+            LpScopedSolver(LpExactState(source), context = context,
+                componentSplit = true, componentAdmission = { admitted }).use { owner ->
+
+                val solved = assertNotNull(owner.solveFloat())
+
+                assertEquals(admitted, solved.first is ComponentLpSolverCapability)
+                assertEquals(listOf(admitted), observed)
+            }
+        }
+    }
+
+    @Test
     fun `floating query capture should retain adopted bounds and numerical limits`() {
         var observed: LpQueryObservation? = null
         var bytes: ByteArray? = null

@@ -514,7 +514,8 @@ internal class LpScopedSolver(
         val model = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return
         check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
         val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
-            allowance?.work ?: workLimit, null, 0.0, false, null, pricing, componentSplit,
+            allowance?.work ?: workLimit, null, 0.0, false, null, pricing,
+            if (componentAdmission == null) componentSplit else current is ComponentLpSolverCapability,
             route, allowance != null, allowance?.iterations ?: iterationLimit, quantum, retainFundingStop,
             refactorUpdateLimit, trackDegeneracy) { current.continuationBasis(model) }
         try {
