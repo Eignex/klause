@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.result.CoreGuidedStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
@@ -14,6 +15,64 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class PortfolioProofTest {
+    @Test
+    fun `funded core turns should keep fresh sibling coverage and bounded work offers`() {
+        for (maximum in listOf(7L, 21L, 35L)) {
+            var completeVisits = 0
+            var lastCompleteVisit = 0
+            val offers = ArrayList<Pair<Long, Long>>()
+            val coverage = ArrayList<Long>()
+            val completeBase = ScriptedSearch({ it == 0 }) { completeVisits++ }
+            val complete = object : ResumableSearch by completeBase {
+                override fun runSlice(
+                    global: ExecutionControl,
+                    sliceMillis: Long,
+                    sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? {
+                    if (offers.isNotEmpty()) coverage += sliceNodes
+                    return completeBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                }
+            }
+            val coreBase = ScriptedSearch({ false }) {
+                assertTrue(completeVisits > lastCompleteVisit)
+                lastCompleteVisit = completeVisits
+            }
+            val core = object : ResumableSearch by coreBase {
+                override val stats: SolveStats get() = SolveStats(coreGuided =
+                    CoreGuidedStats(continuationGrants = if (offers.isEmpty()) 0L else 1L))
+                override fun runSlice(
+                    global: ExecutionControl,
+                    sliceMillis: Long,
+                    sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? {
+                    offers += sliceMillis to sliceNodes
+                    coreBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                    return null
+                }
+            }
+            val workers = listOf(trackingWorker("complete", 0, complete),
+                trackingWorker("core", 1, core).also {
+                    it.auxiliaryProof = true
+                    it.improvementOnly = true
+                    it.retainInitialProofCoverage = true
+                })
+
+            Portfolio.thompson(workers, seed = 0, baseSliceWork = 7L, maxSliceWork = maximum,
+                reseedStaleThreshold = 0).use {
+                it.minimize(ExecutionControl { offers.size >= 3 || completeVisits >= 16 })
+            }
+
+            assertEquals(3, offers.size)
+            assertEquals(7L, offers.first().second)
+            assertTrue(offers.drop(1).all { it.first <= 2_000L })
+            assertTrue(offers.drop(1).all { it.second in minOf(28L, maximum)..maximum })
+            assertTrue(coverage.isNotEmpty())
+            assertTrue(coverage.all { it == 7L })
+        }
+    }
+
     @Test
     fun `proof continuation should follow charged family work without waiting for every sibling`() {
         var ordinaryVisits = 0
