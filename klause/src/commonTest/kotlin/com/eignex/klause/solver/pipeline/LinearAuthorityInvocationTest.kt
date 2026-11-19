@@ -55,13 +55,14 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
             "upper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
         ), mapOf(integer to BigFraction.ONE))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1))
 
         val result = LinearAuthorityInvocation(source,
-            TheoryParams(sourceIncumbentCompletion = true), boundOrdered = true,
-            incumbentCompletionCheck = { _, _, _ -> false }, incumbentProximity = true)
+            TheoryParams(sourceIncumbentCompletion = true), external = { seed }, boundOrdered = true,
+            incumbentCompletionCheck = { sample, _, _ -> sample.intValue(0) == 1L }, incumbentProximity = true)
             .use { it.run { _, _ -> } }
 
-        assertEquals(0L, result.stats.smt.completeSearchStages?.get("numericalProximityCenters") ?: 0L)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalProximityCenters"))
     }
 
     @Test
