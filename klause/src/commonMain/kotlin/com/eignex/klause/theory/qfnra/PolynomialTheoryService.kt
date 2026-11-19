@@ -14,6 +14,8 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.saturatedAdd
 
+private const val INITIAL_BOUND_WORK = 65_536L
+
 internal class PolynomialCondition(
     bools: Map<Int, Boolean> = emptyMap(),
     lower: Map<Int, BigFraction> = emptyMap(),
@@ -97,43 +99,21 @@ internal class PolynomialTheoryInvocation(
         condition: PolynomialCondition,
         variables: Set<Int>,
         cancellation: ExecutionControl = ExecutionControl.Never,
+        workAllowance: Long? = null,
     ): PolynomialLpBounds {
         check(!closed && !active)
+        require(workAllowance == null || workAllowance >= 0L)
         val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
         val work = QfNraWork(params.copy(cancellation = queryControls(cancellation), maximumWork = remaining))
         val arithmetic = PolynomialArithmetic(work, params.polynomialLimits).also { work.execution = it.execution }
         try {
-            val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
-            conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
-            val normalized = PolynomialFormula.normalize(conditioned, arithmetic)
-            val atoms = normalized.forcedAtoms(arithmetic) ?: return PolynomialLpBounds(infeasible = true)
-            val relaxation = PolynomialLpRelaxation.prepare(atoms, realCount, arithmetic, work)
-                ?: return PolynomialLpBounds()
-            return relaxation.use {
-                val tightening = relaxation.tightenSquares { work.envelopeQueries++ }
-                if (tightening.infeasible) {
-                    work.envelopeRefutations++
-                    return@use PolynomialLpBounds(infeasible = true)
-                }
-                val lower = HashMap<Int, BigFraction>()
-                val upper = HashMap<Int, BigFraction>()
-                for (variable in variables) {
-                    require(variable in 0 until realCount)
-                    for (isUpper in listOf(false, true)) {
-                        val solved = relaxation.solve(variable, isUpper)
-                        work.envelopeQueries++
-                        arithmetic.step()
-                        if (solved?.verdict == LpVerdict.INFEASIBLE) {
-                            work.envelopeRefutations++
-                            return@use PolynomialLpBounds(infeasible = true)
-                        }
-                        solved?.lowerBound?.let { bound ->
-                            if (isUpper) upper[variable] = bound.negated() else lower[variable] = bound
-                        }
-                    }
-                }
-                PolynomialLpBounds(lower, upper)
-            }
+            if (work()) return PolynomialLpBounds(stopped = true)
+            val allowance = minOf(INITIAL_BOUND_WORK, workAllowance ?: Long.MAX_VALUE,
+                remaining?.div(4) ?: Long.MAX_VALUE,
+                work.admission.quotaAvailable?.div(4) ?: Long.MAX_VALUE)
+            return work.envelope(allowance) {
+                queryBounds(condition, variables, arithmetic, work)
+            } ?: PolynomialLpBounds()
         } catch (_: PolynomialInterrupted) {
             return PolynomialLpBounds(stopped = true)
         } catch (_: PolynomialResourceLimit) {
@@ -141,6 +121,41 @@ internal class PolynomialTheoryInvocation(
         } finally {
             arithmetic.execution.flush()
             completedStats = combine(completedStats, work.snapshot())
+        }
+    }
+
+    private fun queryBounds(condition: PolynomialCondition, variables: Set<Int>,
+        arithmetic: PolynomialArithmetic, work: QfNraWork): PolynomialLpBounds {
+        val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
+        conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
+        val normalized = PolynomialFormula.normalize(conditioned, arithmetic)
+        val atoms = normalized.forcedAtoms(arithmetic) ?: return PolynomialLpBounds(infeasible = true)
+        val relaxation = PolynomialLpRelaxation.prepare(atoms, realCount, arithmetic, work)
+            ?: return PolynomialLpBounds()
+        return relaxation.use {
+            val tightening = relaxation.tightenSquares { work.envelopeQueries++ }
+            if (tightening.infeasible) {
+                work.envelopeRefutations++
+                return@use PolynomialLpBounds(infeasible = true)
+            }
+            val lower = HashMap<Int, BigFraction>()
+            val upper = HashMap<Int, BigFraction>()
+            for (variable in variables) {
+                require(variable in 0 until realCount)
+                for (isUpper in listOf(false, true)) {
+                    val solved = relaxation.solve(variable, isUpper)
+                    work.envelopeQueries++
+                    arithmetic.step()
+                    if (solved?.verdict == LpVerdict.INFEASIBLE) {
+                        work.envelopeRefutations++
+                        return@use PolynomialLpBounds(infeasible = true)
+                    }
+                    solved?.lowerBound?.let { bound ->
+                        if (isUpper) upper[variable] = bound.negated() else lower[variable] = bound
+                    }
+                }
+            }
+            PolynomialLpBounds(lower, upper)
         }
     }
 

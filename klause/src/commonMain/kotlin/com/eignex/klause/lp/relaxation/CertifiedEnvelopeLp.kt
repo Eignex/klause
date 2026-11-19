@@ -25,7 +25,7 @@ internal class CertifiedEnvelopeLp private constructor(
     private var state: LpExactState,
     val variables: Int,
     private val control: ExecutionControl,
-    private val rowTemplates: MutableList<ExactRationalInequality>,
+    private val projection: EnvelopeLpProjection,
 ) : AutoCloseable {
     private var witness = 0L
     private var owner: LpScopedSolver? = null
@@ -57,7 +57,7 @@ internal class CertifiedEnvelopeLp private constructor(
         })
         val next = LpBoundTrail(state)
         if (!next.replaceObjective(objective, control)) return null
-        val projected = projectEnvelopeRows(next.state, rowTemplates, control) { witness++ }
+        val projected = projection.project(next.state) { witness++ }
         if (!adopt(projected)) return null
         if (state.conflict == null) {
             if (column != null && unboundedDirection(column, upper)) return null
@@ -90,7 +90,10 @@ internal class CertifiedEnvelopeLp private constructor(
                 if (!next.append(addition, false, control)) return false
                 state = next.state
             }
-            rowTemplates += row
+            if (!projection.append(row)) {
+                close()
+                return false
+            }
         }
         return true
     }
@@ -123,24 +126,49 @@ internal class CertifiedEnvelopeLp private constructor(
 
     private fun directPoint(column: Int?, upper: Boolean): CertifiedLpResult? {
         val source = state
+        val proposed = List(variables) { id ->
+            proposalValue(source.model.column(id).bounds)
+        }.toMutableList()
+        if (column != null) {
+            val bounds = source.model.column(column).bounds
+            proposed[column] = (if (upper) bounds.upper else bounds.lower)?.number?.value ?: return null
+        }
+        control.charge(variables.toLong())
+        if (control()) return null
+        if (projection.accepts(proposed)) checkedPoint(source, proposed, column)?.let { return it }
+        if (control()) return null
         var trial = LpBoundTrail(source)
+        var changed: Int? = null
         if (column != null) {
             val bounds = source.model.column(column).bounds
             val endpoint = (if (upper) bounds.upper else bounds.lower)?.number ?: return null
             if (!trial.assertBound(column, !upper, ExactLpSide(endpoint), witness++, control)) return null
+            changed = column
         }
         val point = ArrayList<BigFraction>(variables)
         for (id in 0 until variables) {
             control.charge(1L)
-            val projected = projectEnvelopeRows(trial.state, rowTemplates, control) { witness++ }
+            val projected = changed?.let { projection.project(trial.state, it) { witness++ } } ?: trial.state
             if (control() || projected.conflict != null) return null
             trial = LpBoundTrail(projected)
-            val value = proposalValue(projected.model.column(id).bounds)
+            val bounds = projected.model.column(id).bounds
+            val value = proposalValue(bounds)
             val side = ExactLpSide(ExactLpNumber.of(value))
-            if (!trial.assertBound(id, false, side, witness++, control) ||
-                !trial.assertBound(id, true, side, witness++, control)) return null
+            changed = null
+            if (bounds.lower?.number?.value != value) {
+                if (!trial.assertBound(id, false, side, witness++, control)) return null
+                changed = id
+            }
+            if (bounds.upper?.number?.value != value) {
+                if (!trial.assertBound(id, true, side, witness++, control)) return null
+                changed = id
+            }
             point += value
         }
+        return checkedPoint(source, point, column)
+    }
+
+    private fun checkedPoint(source: LpExactState, point: List<BigFraction>, column: Int?): CertifiedLpResult? {
         val meter = LpProjectionMeter(cancellation = control)
         val model = source.ownerWorkingModel(meter)
         control.charge(meter.work)
@@ -200,8 +228,10 @@ internal class CertifiedEnvelopeLp private constructor(
                 ExactLpObjective(List(bounds.size + rows.size) { zero }),
             )
             if (control()) return null
+            val projection = EnvelopeLpProjection(bounds.size, control)
+            for (row in rows) if (!projection.append(row)) return null
             return CertifiedEnvelopeLp(LpExactState(model), bounds.size, control,
-                rows.toMutableList())
+                projection)
         }
     }
 }

@@ -17,6 +17,22 @@ import kotlin.test.assertTrue
 
 class NonlinearIntegerCursorTest {
     @Test
+    fun `large power deductions should leave funding for an integral witness`() {
+        val parsed = SmtLibPolynomial.parse("""
+            (declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const w Int)
+            (assert (= (+ (^ x 2147483646) (^ y 2147483646) (^ z 2147483646) (^ w 2147483646)) 4))
+        """.trimIndent(), allowIntegers = true)
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
+
+        val result = solveNonlinearIntegers(source,
+            NonlinearIntegerParams(arithmetic = QfNraParams(maximumWork = 1_000_000)))
+
+        assertIs<QfNraResult.Satisfiable>(result.result)
+        assertTrue(result.stats.polynomial.workSpent <= 1_000_000L)
+    }
+
+    @Test
     fun `square bounds should reach an integral candidate within one local attempt`() {
         val parsed = SmtLibPolynomial.parse("""
             (declare-const x Int) (declare-const r Real)

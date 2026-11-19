@@ -282,9 +282,11 @@ before numerical solving. Row
 addition retains exact state until a query needs a numerical owner. A coordinate
 direction without an endpoint that relaxes every inequality supplies no finite
 coordinate bound and needs no numerical objective query. A temporary
-trial pins proposed coordinates in sequence, propagating affine rows between
-choices, but only the exact primal/dual checker against the retained scope can
-certify it; trial pins never narrow that
+trial pins proposed coordinates in sequence. Prepared row terms and incidence
+remain within that owner; changed pins schedule incident rows and their derived
+bounds, with at most two visits per row between choices. A simple proposal that
+already satisfies the rows skips the trial trail. Only the exact primal/dual
+checker against the retained scope can certify it; trial pins never narrow that
 scope. Spatial child boxes create separate owners. Certified LP infeasibility
 refutes the relaxed scope; objective certificates bound source coordinates, while
 LP points require the caller's original nonlinear witness check. Shared search

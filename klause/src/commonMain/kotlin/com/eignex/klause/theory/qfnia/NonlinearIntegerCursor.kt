@@ -137,7 +137,10 @@ internal class NonlinearIntegerCursor(
             }
         }
         condition = problem.integerBounds(condition, arithmetic)
-        val envelopes = arithmetic.execution.handoff { invocation.bounds(condition, coordinates.toSet()) }
+        val deductionWork = params.arithmetic.maximumWork?.let { (it - work.spent).coerceAtLeast(0L) / 4 }
+        val envelopes = arithmetic.execution.handoff {
+            invocation.bounds(condition, coordinates.toSet(), workAllowance = deductionWork)
+        }
         if (envelopes.stopped) return unknown()
         if (envelopes.infeasible) return QfNraResult.Unsatisfiable(polynomialStats())
         val lower = condition.lower.toMutableMap()
