@@ -264,6 +264,7 @@ class ExactLiraSearchComponent private constructor(
     private val lpDelegate: Lazy<LpPropagator> = lazy {
         LpPropagator(
             object : LpSearchPolicy {
+                override val eagerAssertionScopes: Boolean get() = false
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                     accept(decision, context)
                 override fun propagate(context: SearchContext): ComponentResult = relax(context)
@@ -741,7 +742,9 @@ class ExactLiraSearchComponent private constructor(
             if (operationStop()) {
                 ComponentResult.Indeterminate
             } else {
-                if (decision is SearchDecision.Theory && !installSource()) return ComponentResult.Indeterminate
+                if (decision is SearchDecision.Theory &&
+                    (!installSource() || !lp.atLevel(context.decisionLevel, lpStop))
+                ) return ComponentResult.Indeterminate
                 val result = lp.assertWithin(decision, context, operationStop)
                 if (operationStop()) ComponentResult.Indeterminate else result
             }

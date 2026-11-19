@@ -61,6 +61,8 @@ on first use, and siblings reuse it. At the root, fixed columns are substituted 
 constants, keeping the premises of both fixing bounds.
 
 At positive search depth, compatible source sides share one premised bound batch.
+The adapter synchronizes LP scopes when assembling source bounds or asserting a
+theory atom; unrelated Boolean publications require no LP edit.
 Each side retains its work debit and exact witness. Pending sides commit before a
 new definition is appended and before disequality inference reads active bounds.
 Only fully committed source comparisons receive assertion markers; a declined

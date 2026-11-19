@@ -195,7 +195,8 @@ internal class LiveQfLraSystem(
                         } else {
                             comparison.rowsInto(sides)
                         }
-                        for (side in sides) if (side.strict) {
+                        for (side in sides) {
+                            if (!side.strict) continue
                             val expression = side.columns.indices.associate {
                                 side.columns[it] to side.coefficients[it]
                             } + (marginColumn to BigFraction.ONE)
