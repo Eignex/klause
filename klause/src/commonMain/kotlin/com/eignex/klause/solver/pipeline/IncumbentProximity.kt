@@ -18,8 +18,9 @@ import com.eignex.util.numbers.magnitudeBitLength
 
 internal object IncumbentProximity {
     fun accepts(bounds: IntBounds, integers: Int): Boolean = integers in 1..4096 &&
-        (0 until integers).all { bounds.hasLower(it) && bounds.hasUpper(it) &&
-            bounds.lower(it) >= 0L && bounds.upper(it) <= 1L }
+        (0 until integers).all {
+            bounds.hasLower(it) && bounds.hasUpper(it) && bounds.lower(it) >= 0L && bounds.upper(it) <= 1L
+        }
 
     fun prepare(source: SourceProofContext, center: Sample, cutoff: BigFraction,
         budget: SourceLpBudget, cancellation: ExecutionControl): SourceProofContext? {
@@ -30,12 +31,13 @@ internal object IncumbentProximity {
         if (funding.availableWork <= scan) return null
         budget.observe(preparation = scan)
         var entries = 1L + source.coordinateCount + source.premiseCount
-        var interrupted = false
-        source.forEachPremise { _, premise ->
-            if (cancellation()) interrupted = true
-            if (!interrupted) entries += premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
+        val scanned = source.allPremises { _, premise ->
+            if (cancellation()) false else {
+                entries += premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
+                true
+            }
         }
-        if (interrupted) return null
+        if (!scanned) return null
         val work = 16L * entries
         val bytes = 256L * entries
         if (funding.availableWork <= work || funding.remainingAllocation <= bytes) return null

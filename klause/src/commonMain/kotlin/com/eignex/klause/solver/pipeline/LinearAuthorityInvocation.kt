@@ -25,9 +25,9 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
-import com.eignex.klause.solver.search.SearchFrontierRun
 import com.eignex.klause.solver.search.SearchExecutionAccounting
 import com.eignex.klause.solver.search.SearchExecutionControlAdapter
+import com.eignex.klause.solver.search.SearchFrontierRun
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
@@ -110,6 +110,7 @@ internal class LinearAuthorityInvocation(
     private var result: LinearInvocationResult? = null
     private var proximity: LinearAuthorityInvocation? = null
     private var proximityTurn = false
+    private var proximityLatest: Map<String, Long> = emptyMap()
     private val budget = borrowedBudget ?: SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val completion = if (params.sourceIncumbentCompletion)
@@ -128,7 +129,7 @@ internal class LinearAuthorityInvocation(
         smt = state.smt.snapshot().let { snapshot ->
             snapshot.copy(
                 completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
-                    externalOffers +
+                    externalOffers + proximityLatest +
                     mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
                         "numericalImportedIncumbents" to importedIncumbents,
                         "numericalIncumbentFrontierRanks" to guidedFrontierRanks) +
@@ -168,11 +169,14 @@ internal class LinearAuthorityInvocation(
                 it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
             }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
         val accounting = OpenTheoryExecutionAccounting(state.work)
-        it.attachExecutionControls(SearchExecutionControlAdapter(stop, object : SearchExecutionAccounting by accounting {
-            override fun canCommitDecision(): Boolean = state.remainingDecisions() > 0 && accounting.canCommitDecision()
-            override fun consumeCheck(): Boolean = state.work.acceptedChecks < params.maxLeaves &&
-                accounting.consumeCheck()
-        }))
+        it.attachExecutionControls(
+            SearchExecutionControlAdapter(stop, object : SearchExecutionAccounting by accounting {
+                override fun canCommitDecision(): Boolean =
+                    state.remainingDecisions() > 0 && accounting.canCommitDecision()
+                override fun consumeCheck(): Boolean = state.work.acceptedChecks < params.maxLeaves &&
+                    accounting.consumeCheck()
+            }),
+        )
     }
     private var initialized = false
     private val branching = if (params.openBranching != OpenBranching.Activity)
@@ -327,6 +331,9 @@ internal class LinearAuthorityInvocation(
             ?.coerceAtLeast(0L) ?: Long.MAX_VALUE
         if (remaining == 0L || work >= endWork) return
         val before = work
+        val preparation = budget.measuredPreparationWork
+        val floating = budget.measuredFloatWork
+        val certification = budget.measuredBoundCertificationWork
         val revision = incumbentRevision
         val completed = active.runSlice(stop, minOf(remaining, 10L), minOf(endWork - work, 64L)) { sample, _ ->
             val checked = completion?.complete(context, sample, stop)
@@ -334,6 +341,21 @@ internal class LinearAuthorityInvocation(
         }
         observeProximity("Consultations")
         observeProximity("Work", (work - before).coerceAtLeast(0L))
+        observeProximity("PreparationWork", budget.measuredPreparationWork - preparation)
+        observeProximity("FloatWork", budget.measuredFloatWork - floating)
+        observeProximity("CertificationWork", budget.measuredBoundCertificationWork - certification)
+        proximityLatest = active.component.observations().mapKeys { (key, _) ->
+            "numericalProximityLatest" + key.removePrefix("numerical")
+        }
+        if (completed != null) {
+            observeProximity("Finished${completed.reason.name}")
+            observeProximity(when (completed.terminal?.claim) {
+                SourceClaim.Refutation -> "RefutedTargets"
+                is SourceClaim.Optimal -> "OptimalTargets"
+                null -> "UnresolvedTargets"
+                else -> "OtherTargets"
+            })
+        }
         if (incumbentRevision != revision) observeProximity("Improvements")
         if (completed != null || incumbentRevision != revision) {
             proximity = null
