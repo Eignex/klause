@@ -78,7 +78,11 @@ internal class LpExactState internal constructor(
      */
     previous: LpExactState? = null,
 ) {
-    private val activeAssertions = assertions.toList()
+    private val activeAssertions: List<LpBoundAssertion> = if (
+        previous != null && assertions === previous.activeAssertions
+    ) {
+        assertions
+    } else assertions.toList()
     private val scopeMarks = scopes.toList()
     private val changed = changedColumns.toList()
     private val lower: Array<LpBoundAssertion?>
@@ -101,6 +105,7 @@ internal class LpExactState internal constructor(
     private var scalarsProjectable: Boolean? = null
 
     val assertions: List<LpBoundAssertion> get() = activeAssertions.toList()
+    internal val assertionView: List<LpBoundAssertion> get() = activeAssertions
     val scopes: List<Int> get() = scopeMarks.toList()
     val changedColumns: List<Int> get() = changed.toList()
     val depth: Int get() = scopeMarks.size
@@ -255,6 +260,7 @@ internal class LpExactState internal constructor(
     }
 
     private fun sharedPrefix(before: List<LpBoundAssertion>): Int {
+        if (activeAssertions === before) return activeAssertions.size
         val limit = minOf(before.size, activeAssertions.size)
         var k = 0
         while (k < limit && before[k] === activeAssertions[k]) k++
