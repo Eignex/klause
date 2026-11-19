@@ -498,7 +498,7 @@ keeps the identity row layout unless it retains masked cuts. Certificates cite t
 nested rounding derivation, and final source checking repeats Boolean substitution
 independently.
 
-An opt-in absolute-tolerance envelope prepares MPS declarations and each stated row
+An absolute-tolerance envelope prepares MPS declarations and each stated row
 side widened by the captured absolute feasibility slack before lowering and separation.
 It preserves missing sides, exact integrality, indicator activation and the original
 objective. Relative feasibility tolerance is unsupported. Mixed binary/continuous
@@ -513,8 +513,8 @@ band. Source publication still checks the original decimal source. Bound metadat
 the accepted-set envelope separately from nominal-source bounds; neither establishes
 independent proof validation. Exact source requests retain their original model.
 
-Point selection admits at most eight mutually nonparallel additional checked cuts per usable point and
-waits for its completed query before scanning again. A mixed ordinary recipe with
+Point selection admits at most eight mutually nonparallel additional checked cuts per
+usable point and waits for its completed query before scanning again. A mixed ordinary recipe with
 at least one active checked cut per numerical coordinate keeps its ordinary query
 without expanding a point family. This cut-count admission is charged to selection;
 the fallback applies to the matching source family, including integer-bound descendants,
@@ -538,8 +538,12 @@ or interrupted; the base point and split remain guidance for an unfinished node.
 first runs the ordinary checked recipe; a completed point can add one selection
 round, and a successful round retains its checked mask. Scores combine normalized
 violation, inverse square-root support and objective parallelism and guide
-selection only. `source-point-cuts=true` opts the retained frontier into
-this point-based separation; the ordinary default activates all accepted source cuts.
+selection only. Compatible absolute-tolerance MPS binary/continuous optimization
+selects point separation and aggregation automatically. Other source routes activate
+the ordinary checked recipe unless explicitly configured. Explicit true/false controls
+retain their values. The actual post-preparation mapping must preserve the accepted
+authority's coordinates and objective; incompatibility disables only automatically
+supplied settings. Failed authority capture declines companions without nominal retry.
 The containing source request owns these separation, selection and advisory
 branching settings, binds them to its admitted numerical companions and removes them
 from finite worker recipe options.
@@ -547,7 +551,7 @@ from finite worker recipe options.
 Explicit aggregation combines two to four source rows with positive exact weights
 and normalizes the integer activity by its gcd; complete continuous cancellation
 permits integer rounding, otherwise mixed rounding cites an active bound for each
-remaining continuous coordinate. `source-aggregate-cuts=true`, disabled by default,
+remaining continuous coordinate. `source-aggregate-cuts=true`
 adds a template policy that pairs rows of opposite sign on a shared continuous
 coordinate, with at least one integer-activity row, and retains at most 64
 proposals. A nonseparating mixed-row seed can continue greedily along one

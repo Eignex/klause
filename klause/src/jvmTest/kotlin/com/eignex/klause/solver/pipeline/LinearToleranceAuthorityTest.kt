@@ -48,6 +48,112 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
     )
 
     @Test
+    fun `omitted source controls should select the compatible accepted set authority`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
+        val request = SourceExecutionRequest(invocation).withValidationCancellation(ExecutionControl.Never)
+            .withPortfolioGuidanceObserver { _, _ -> }.withPortfolioSessionObserver { _, _ -> }
+
+        assertTrue(assertNotNull(invocation.linearSource).automaticCutSelection)
+        assertSame(source.semantics, invocation.linearSource?.view?.model?.semantics)
+        assertTrue(request.theory.sourcePointCuts)
+        assertTrue(request.theory.sourceAggregateCuts)
+        assertTrue(request.automaticLinearCuts.point)
+        assertTrue(request.automaticLinearCuts.aggregate)
+    }
+
+    @Test
+    fun `an incompatible prepared mapping should disable automatically supplied cuts`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
+        val prepared = assertNotNull(invocation.linearSource)
+        val producer = assertNotNull(prepared.toleranceAuthority)
+        val nominal = prepared.view.model
+        val mapping = SourceMapping(nominal, nominal, TransformationGuarantees.IDENTITY, lift = { it })
+        val request = SourceExecutionRequest(invocation)
+
+        val resolved = FiniteCompanionPolicy(request.theory, request.automaticLinearCuts).resolve(
+            producer.takeIf { it.compatible(mapping, nominal, invocation.selection.finiteObjective) })
+
+        assertFalse(resolved.sourcePointCuts)
+        assertFalse(resolved.sourceAggregateCuts)
+    }
+
+    @Test
+    fun `explicit point controls should survive an unavailable automatic authority`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
+        for (enabled in listOf(false, true)) {
+            val request = SourceExecutionRequest(invocation,
+                ExecutionOptions(ExecutionOption.sourcePointCuts(enabled)))
+
+            val resolved = FiniteCompanionPolicy(request.theory, request.automaticLinearCuts).resolve(null)
+
+            assertEquals(enabled, request.theory.sourceAggregateCuts)
+            assertEquals(enabled, resolved.sourcePointCuts)
+            assertFalse(resolved.sourceAggregateCuts)
+        }
+    }
+
+    @Test
+    fun `public theory values should be explicit when supplied to another request`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
+        val defaults = SourceExecutionRequest(invocation)
+        val explicit = SourceExecutionRequest(invocation, theory = defaults.theory)
+
+        val resolved = FiniteCompanionPolicy(explicit.theory, explicit.automaticLinearCuts).resolve(null)
+
+        assertFalse(explicit.automaticLinearCuts.point)
+        assertFalse(explicit.automaticLinearCuts.aggregate)
+        assertTrue(resolved.sourcePointCuts)
+        assertTrue(resolved.sourceAggregateCuts)
+    }
+
+    @Test
+    fun `an explicit envelope opt out should preserve nominal preparation and cut defaults`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE,
+            linearToleranceEnvelope = false))
+        val request = SourceExecutionRequest(invocation)
+
+        assertNull(invocation.linearSource?.toleranceAuthority)
+        assertFalse(assertNotNull(invocation.linearSource).automaticCutSelection)
+        assertFalse(request.theory.sourcePointCuts)
+        assertFalse(request.theory.sourceAggregateCuts)
+    }
+
+    @Test
+    fun `relative tolerance should retain nominal automatic preparation`() {
+        val relative = LinearSourceProblem(source.variableValues.toList(), source.rowValues.toList(), source.objective,
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance(
+                relative = SemanticRational.ofLong(1))).resolve())
+
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(relative, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
+
+        assertNull(invocation.linearSource?.toleranceAuthority)
+        assertFalse(assertNotNull(invocation.linearSource).acceptedModelExact)
+        assertSame(relative.semantics, invocation.linearSource?.view?.model?.semantics)
+    }
+
+    @Test
+    fun `an incompatible integral real layout should retain nominal automatic execution`() {
+        val integral = LinearSourceProblem(source.variableValues.toList(), listOf(
+            LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(1, SemanticRational.ofLong(-1))), SemanticRational.ZERO, SemanticRational.ZERO)),
+            source.objective, source.semantics)
+
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(integral, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
+
+        assertNull(invocation.linearSource?.toleranceAuthority)
+        assertFalse(assertNotNull(invocation.linearSource).acceptedModelExact)
+        assertFalse(assertNotNull(invocation.linearSource).automaticCutSelection)
+        assertSame(integral.semantics, invocation.linearSource?.view?.model?.semantics)
+    }
+
+    @Test
     fun `separate authority should retain the ordinary working tolerance`() {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE,

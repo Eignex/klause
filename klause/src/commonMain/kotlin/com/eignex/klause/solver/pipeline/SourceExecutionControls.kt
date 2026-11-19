@@ -17,6 +17,7 @@ internal class SourceExecutionControls(
     val nodeBudget: NodeBudget?,
     val presolveConfig: PresolveConfig?,
     val prepareOnly: Boolean,
+    val automaticLinearCuts: AutomaticLinearCuts = AutomaticLinearCuts(),
 )
 
 internal fun bindSourceExecutionControls(
@@ -82,13 +83,19 @@ internal fun bindSourceExecutionControls(
     }
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
         options.validateKnown()
-        val defaults = TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout,
+        val point = reader[ExecutionOption.sourcePointCuts]
+        val aggregate = reader[ExecutionOption.sourceAggregateCuts]
+        val automatic = AutomaticLinearCuts(invocation.linearSource?.automaticCutSelection == true && point == null,
+            invocation.linearSource?.automaticCutSelection == true && aggregate == null)
+        val defaults = defaultSourceTheory(invocation).copy(nodeBudget = budget, randomSeed = seed, timeout = timeout,
             cancellation = stop)
-        val theory = if (companions) defaults.copy(
+        val configured = if (companions) defaults.copy(
             maxDecisions = reader[ExecutionOption.maxDecisions] ?: defaults.maxDecisions,
             maxFlips = reader[ExecutionOption.maxFlips] ?: defaults.maxFlips,
             maxInstructions = reader[ExecutionOption.maxInstructions],
-        ).withSourceCompanionControls(reader) else defaults
+        ).withSourceCompanionControls(reader, point, aggregate) else defaults
+        val theory = if (automatic.aggregate && !configured.sourcePointCuts)
+            configured.copy(sourceAggregateCuts = false) else configured
         return SourceExecutionControls(
             theory,
             PolynomialTheoryParams(),
@@ -98,6 +105,7 @@ internal fun bindSourceExecutionControls(
             budget,
             resolvedPresolve,
             prepareOnly,
+            automatic,
         )
     }
     val decisions = reader[ExecutionOption.maxDecisions] ?: BacktrackParams().maxDecisions
@@ -209,16 +217,18 @@ internal fun bindSourceExecutionControls(
     )
 }
 
-private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionReader): TheoryParams = copy(
+private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionReader,
+    point: Boolean? = reader[ExecutionOption.sourcePointCuts],
+    aggregate: Boolean? = reader[ExecutionOption.sourceAggregateCuts]): TheoryParams = copy(
     sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit,
         sourceLpWorkLimit) ?: Long.MAX_VALUE,
     sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
         sourceLpAllocationLimit) ?: Long.MAX_VALUE,
     sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: sourceLpOperations,
     sourceCuts = reader[ExecutionOption.sourceCuts] ?: sourceCuts,
-    sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: sourcePointCuts,
+    sourcePointCuts = point ?: sourcePointCuts,
     sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: sourceCutBranching,
-    sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: sourceAggregateCuts,
+    sourceAggregateCuts = aggregate ?: sourceAggregateCuts,
     sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
         ?: sourceIncumbentCompletion,
     sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
