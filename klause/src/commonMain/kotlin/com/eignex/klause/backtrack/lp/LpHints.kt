@@ -227,7 +227,7 @@ internal class LpHints(
         }
         if (valueReady) {
             val advised = values.select(variable, value(variable), alternatives, history, stamp,
-                preferHighGain = cutoff.isFinite(), fresh = current)
+                cutoff = cutoff - scopeConstant.toDouble(), fresh = current)
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
