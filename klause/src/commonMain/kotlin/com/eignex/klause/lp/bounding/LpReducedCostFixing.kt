@@ -70,7 +70,10 @@ internal fun LpEngine.applyMixedRowBounds(
             var changed = false
             if (observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
                     applyRowBounds(current, projected, session, sink, learn, cancellation) { changed = true }
-                }) return true
+                }) {
+                recordPruneBound(Double.POSITIVE_INFINITY)
+                return true
+            }
             if (!changed || relaxer == null || pass == 1 || cancellation.pollStop()) return false
             meter.reserve(current.model.numVars.toLong() * 16L + 128L)
             onRefresh()

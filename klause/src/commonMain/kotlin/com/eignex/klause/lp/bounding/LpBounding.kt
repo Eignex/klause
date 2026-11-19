@@ -338,6 +338,7 @@ private fun LpEngine.solveSelectedCuts(
     if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous
     val floatRay = attempt.first.infeasibleRay ?: return previous
     val ray = infeasibilityRay(tightened.model, floatRay, sink) ?: return previous
+    recordPruneBound(Double.POSITIVE_INFINITY)
     sink.lp.observeInfeasiblePrune()
     observeCutRayUse(tightened, ray)
     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -426,6 +427,7 @@ internal fun LpEngine.sparseSafePrune(
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
                 val ray = infeasibilityRay(gatedModel, gatedRay, sink)
                 if (ray != null) {
+                    recordPruneBound(Double.POSITIVE_INFINITY)
                     sink.lp.observeInfeasiblePrune()
                     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
                     hints?.recordInfeasible()
@@ -756,6 +758,7 @@ internal fun LpEngine.sparseSafePrune(
                 observeAcceptedCutBoundUse(boundRel, cert, boundRes.duals, sourceLower, "OBJECTIVE_PROPAGATION")
             }
             if (res is PropagationResult.Unsat) {
+                recordPruneBound(Double.POSITIVE_INFINITY)
                 sink.lp.observePrune()
                 LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
                 return LpNodeOutcome(true, null)
@@ -872,6 +875,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     val cutoff = sourceObjectiveCutoff(relaxation, bound) ?: return LpNodeOutcome(false, null)
     val full = checkNotNull(BigFraction.ofDouble(lb)) + BigFraction.ofLong(relaxation.objectiveConstant)
     return if (full >= cutoff) {
+        recordPruneBound(full.floorDouble())
         sink.lp.observePrune()
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         LpNodeOutcome(true, null)
@@ -918,6 +922,7 @@ private fun LpEngine.strictSourcePrune(
         // Every original row and live bound remains a premise when transformed support is unavailable.
         val conflict = result.rationalConflict
         if (conflict != null && !checkedLpConflict(model, conflict)) return null
+        recordPruneBound(Double.POSITIVE_INFINITY)
         sink.lp.observeInfeasiblePrune()
         LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(
@@ -933,6 +938,7 @@ private fun LpEngine.strictSourcePrune(
     val lower = result.lowerBound
     val cutoff = if (sourceObjectiveRange(relaxation) != null) enclosingCutoff(bound) else null
     if (lower != null && cutoff != null && lower + BigFraction.ofLong(relaxation.objectiveConstant) >= cutoff) {
+        recordPruneBound((lower + BigFraction.ofLong(relaxation.objectiveConstant)).floorDouble())
         sink.lp.observePrune()
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(true, null)

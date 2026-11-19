@@ -263,7 +263,10 @@ integer below the incumbent keeps the incumbent as its cutoff.
 
 `LpEngine` records the bound of each node it prunes: the node's proved objective
 bound, positive infinity for an infeasibility prune, and the cutoff itself where an
-arm records nothing tighter. Only a prune whose recorded bound stays below the
+arm records nothing tighter. Cut infeasibility, strict-source refutations and
+conflicts from objective propagation or mixed-row deductions are independent of
+the pruning cutoff. Strict-source and recovery objective prunes retain their
+proved bound. Only a prune whose recorded bound stays below the
 incumbent's cutoff relies on the gap. The least gap cutoff such a prune read is the
 search's gap floor: every point it left unseen, every clause learned from such a
 prune and every root floor it publishes holds only below it, so a published floor
