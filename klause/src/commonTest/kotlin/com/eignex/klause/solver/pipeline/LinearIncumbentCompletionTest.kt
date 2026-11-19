@@ -370,6 +370,191 @@ class LinearIncumbentCompletionTest {
     }
 
     @Test
+    fun `unchanged exact points should reuse completed original acceptance or rejection`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        for (accepted in listOf(false, true)) {
+            var checks = 0
+            val budget = SourceLpBudget(maxOperations = 0)
+            LinearIncumbentCompletion(budget, originalCheck = { _, _, _ ->
+                checks++
+                accepted
+            }) { _, _ -> }.use { completion ->
+                repeat(3) {
+                    val offered = point.copy()
+                    val result = completion.complete(source, offered, ExecutionControl.Never)
+                    if (accepted) assertSame(offered, result) else assertNull(result)
+                }
+            }
+
+            assertEquals(1, checks)
+            assertEquals(0L, budget.measuredRefinementWork)
+        }
+    }
+
+    @Test
+    fun `exact check reuse should bind the complete source context`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        val contexts = listOf(
+            SourceProofContext(scope.copy(revision = SourceRevision("other", "exact")), source.coordinates,
+                source.premises, source.objective, source.objectiveConstant),
+            SourceProofContext(scope.copy(condition = scope.condition.bound(integer, BigFraction.ONE, true)),
+                source.coordinates, source.premises, source.objective, source.objectiveConstant),
+            SourceProofContext(scope.copy(objective = SourceObjective("other", ObjectiveSense.MAXIMIZE)),
+                source.coordinates, source.premises, source.objective, source.objectiveConstant),
+            SourceProofContext(scope, source.coordinates, source.premises + ("extra" to
+                SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ONE))),
+                source.objective, source.objectiveConstant),
+            SourceProofContext(scope, source.coordinates, source.premises, mapOf(real to BigFraction.MINUS_ONE),
+                source.objectiveConstant),
+            SourceProofContext(scope, source.coordinates, source.premises, source.objective),
+            SourceProofContext(scope, source.coordinates, source.premises, source.objective,
+                source.objectiveConstant, semantics = SourceSemantics(SourceFormat.IR).resolve()),
+        )
+
+        for (context in contexts) {
+            var checks = 0
+            LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ ->
+                checks++
+                true
+            }) { _, _ -> }.use { completion ->
+                assertNotNull(completion.complete(source, point, ExecutionControl.Never))
+                assertNotNull(completion.complete(context, point, ExecutionControl.Never))
+                assertEquals(2, checks)
+            }
+        }
+    }
+
+    @Test
+    fun `exact check reuse should reject changed source rows pins coordinates or checker`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        val rejecting = object : SourceSemanticsChecker {
+            override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl) =
+                SourceEvidenceCheck.Rejected("source domain hole")
+            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl) =
+                SourceEvidenceCheck.Unavailable("no ray")
+        }
+        val contexts = listOf(
+            SourceProofContext(scope, source.coordinates, mapOf("zero" to
+                SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO))),
+                source.objective, source.objectiveConstant),
+            SourceProofContext(scope.copy(condition = scope.condition.bound(integer, BigFraction.ZERO, true)),
+                source.coordinates, source.premises, source.objective, source.objectiveConstant),
+            SourceProofContext(scope, setOf(real), emptyMap(), source.objective, source.objectiveConstant),
+            SourceProofContext(scope, source.coordinates, source.premises, source.objective,
+                source.objectiveConstant, semanticsChecker = rejecting),
+        )
+
+        for (context in contexts) {
+            LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ -> true }) { _, _ -> }
+                .use { completion ->
+                    assertNotNull(completion.complete(source, point, ExecutionControl.Never))
+                    assertNull(completion.complete(context, point, ExecutionControl.Never))
+                }
+        }
+    }
+
+    @Test
+    fun `exact check reuse should bind point values interpretation and coordinate frame`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        val points = listOf(
+            point.copy(ints = longArrayOf(2), reals = doubleArrayOf((third + third).toDouble()),
+                exactReals = listOf(third + third)),
+            point.withSourceSemantics(SourceSemantics(SourceFormat.IR).resolve()),
+            point.withCoordinateFrame(Any()),
+        )
+
+        for (changed in points) {
+            var checks = 0
+            LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ ->
+                checks++
+                checks == 1
+            }) { _, _ -> }.use { completion ->
+                assertNotNull(completion.complete(source, point, ExecutionControl.Never))
+                assertNull(completion.complete(source, changed, ExecutionControl.Never))
+                assertEquals(2, checks)
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled exact checks should retry without retaining acceptance or rejection`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        for (accepted in listOf(false, true)) {
+            var cancelled = false
+            var checks = 0
+            val token = ExecutionControl { cancelled }
+            LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ ->
+                checks++
+                cancelled = checks == 1
+                if (checks == 1) accepted else true
+            }) { _, _ -> }.use { completion ->
+                assertNull(completion.complete(source, point, token))
+                cancelled = false
+                assertNotNull(completion.complete(source, point, token))
+                assertEquals(2, checks)
+            }
+        }
+    }
+
+    @Test
+    fun `exact check reuse should require live cancellation and work allowances`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        for (limit in listOf("cancellation", "work", "allocation")) {
+            val funding = SourceLpFunding(2_000_000L, 1_000_000L).also { it.grant(2_000_000L) }
+            var checks = 0
+            LinearIncumbentCompletion(SourceLpBudget(funding = funding), originalCheck = { _, _, _ ->
+                checks++
+                true
+            }) { _, _ -> }.use { completion ->
+                assertNotNull(completion.complete(source, point, ExecutionControl.Never))
+                if (limit == "work") funding.charge(funding.remainingWork)
+                if (limit == "allocation") funding.charge(0L, funding.remainingAllocation)
+
+                assertNull(completion.complete(source, point, ExecutionControl { limit == "cancellation" }))
+                assertEquals(1, checks)
+            }
+        }
+    }
+
+    @Test
+    fun `unavailable exact source checks should remain retryable`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        var unavailable = true
+        val checker = object : SourceSemanticsChecker {
+            override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl) =
+                if (unavailable) SourceEvidenceCheck.Unavailable("source check paused") else SourceEvidenceCheck.Checked
+            override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl) =
+                SourceEvidenceCheck.Unavailable("no ray")
+        }
+        val context = SourceProofContext(scope, source.coordinates, source.premises, source.objective,
+            source.objectiveConstant, semanticsChecker = checker)
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ -> true }) { _, _ -> }
+            .use { completion ->
+                assertNull(completion.complete(context, point, ExecutionControl.Never))
+                unavailable = false
+
+                assertNotNull(completion.complete(context, point, ExecutionControl.Never))
+            }
+    }
+
+    @Test
+    fun `unaffordable exact retention should preserve uncached checking`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        val funding = SourceLpFunding(2_000_000L, 1L).also { it.grant(2_000_000L) }
+        var checks = 0
+        LinearIncumbentCompletion(SourceLpBudget(funding = funding), originalCheck = { _, _, _ ->
+            checks++
+            true
+        }) { _, _ -> }.use { completion ->
+            repeat(2) { assertNotNull(completion.complete(source, point, ExecutionControl.Never)) }
+        }
+
+        assertEquals(2, checks)
+        assertEquals(0L, funding.allocated)
+    }
+
+    @Test
     fun `cancellation during exact seed checking should withhold the point`() {
         val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
         var cancelled = false

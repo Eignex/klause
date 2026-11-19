@@ -43,8 +43,11 @@ internal class LinearIncumbentCompletion(
         var checked: Sample? = null
     }
 
+    private class ExactCheck(val key: LinearIncumbentSharing.Key, val accepted: Boolean)
+
     // Entries are never evicted: exhausting retention cannot renew a failed attempt.
     private val attempts = ArrayList<Attempt>()
+    private var exactCheck: ExactCheck? = null
     private var closed = false
 
     fun complete(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
@@ -168,10 +171,23 @@ internal class LinearIncumbentCompletion(
     private fun checkedExact(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
         val original = originalCheck ?: return seed
         val checking = metered(cancellation, checking = true)
+        val previous = exactCheck
+        if (previous != null && previous.key.matches(source, seed, original, checking, budget)) {
+            if (checking()) return null
+            observe(if (previous.accepted) "ExactCheckedReused" else "ExactDeclineReused", 1L)
+            return seed.takeIf { previous.accepted }
+        }
+        if (checking()) return null
+        exactCheck = null
+        val key = exactKey(source, seed, checking)
+        if (checking()) return null
         val evidence = SourceEvidence(source.scope, SourceClaim.Witness(seed), SourceDerivation.SourceWitness)
         val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, checking)
         if (checked != SourceEvidenceCheck.Checked) {
             observe(if (checked is SourceEvidenceCheck.Rejected) "ExactPointRejected" else "ExactPointUnavailable", 1L)
+            if (checked is SourceEvidenceCheck.Rejected && !checking() && key != null) {
+                exactCheck = ExactCheck(key, accepted = false)
+            }
             return null
         }
         val value = source.linearValue(seed, checking) ?: return null
@@ -181,7 +197,36 @@ internal class LinearIncumbentCompletion(
             return null
         }
         observe(if (accepted) "ExactOriginalChecked" else "ExactOriginalRejected", 1L)
+        if (key != null) exactCheck = ExactCheck(key, accepted)
         return seed.takeIf { accepted }
+    }
+
+    private fun exactKey(source: SourceProofContext, seed: Sample,
+        checking: ExecutionControl): LinearIncumbentSharing.Key? {
+        if (seed.algebraicReals != null || seed.symbolicReals != null) return null
+        var bytes = 256L + 16L * (seed.numBoolVars.toLong() + seed.numIntVars + seed.numRealVars)
+        for (value in seed.exactInts.orEmpty()) {
+            if (checking()) return null
+            val bits = value.magnitudeBitLength()
+            budget.observe(preparation = 1L + bits / 64L)
+            if (bits > 4096) return null
+            bytes += 64L + bits / 4L
+        }
+        for (value in seed.exactReals.orEmpty()) {
+            if (checking()) return null
+            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
+            budget.observe(preparation = 1L + bits / 64L)
+            if (bits > 4096L) return null
+            bytes += 64L + bits / 4L
+        }
+        val work = 1L + seed.numBoolVars + seed.numIntVars + seed.numRealVars
+        if (checking() || budget.funding?.let {
+                it.availableWork <= work + 2L || it.remainingAllocation <= bytes
+            } == true
+        ) return null
+        budget.observe(preparation = work)
+        budget.funding?.charge(0L, bytes)
+        return LinearIncumbentSharing.Key(source, seed, originalCheck).takeUnless { checking() }
     }
 
     private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl): List<BigFraction>? {
@@ -281,6 +326,7 @@ internal class LinearIncumbentCompletion(
             val sharingWork = shared?.release(this) ?: 0
             budget.observe(preparation = attempts.size.toLong() + sharingWork)
             attempts.clear()
+            exactCheck = null
         }
     }
 
