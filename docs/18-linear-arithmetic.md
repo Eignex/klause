@@ -141,6 +141,9 @@ or premise; changed bounds and every successful proof require fresh evaluation.
 Unchanged inputs reuse their owned snapshot after comparing current exact sides.
 Affine-side snapshots are shared only while both immutable bound assertions
 retain their identities, including their witness and premises.
+Rows with identical exact numeric terms share an input-side snapshot for one
+immutable LP model. Changing the model clears that shared selection; thresholds
+and Boolean contributions remain local to each comparison, and close releases it.
 
 The incremental route also reads bounds on existing normalized affine slack
 columns. The normalization's scale selects the bounding side, and its offset

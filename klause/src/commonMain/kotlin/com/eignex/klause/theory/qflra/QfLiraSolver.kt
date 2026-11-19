@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
+import com.eignex.klause.lp.ExactOrderedTerms
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpEffortProfile
@@ -19,6 +20,7 @@ import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.closeSourceLpOwners
 import com.eignex.klause.lp.engine.ExactBasisMetrics
+import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
@@ -242,6 +244,9 @@ class ExactLiraSearchComponent private constructor(
     private var partialLinearDeferrals = 0L
     private var partialLinearCache = false
     private val partialLinearDeclines = HashMap<PreparedSourceRow, PartialLinearInputs>()
+    private var partialLinearInputModel: ExactLpModel? = null
+    private var partialLinearInputAffine = false
+    private val partialLinearSharedInputs = HashMap<ExactOrderedTerms, List<PartialLinearSide?>>()
     private var partialLinearEvaluations = 0L
     private var partialLinearUnchanged = 0L
     private var partialLinearCost = false
@@ -628,6 +633,26 @@ class ExactLiraSearchComponent private constructor(
         previous: PartialLinearInputs?,
     ): PartialLinearInputs? {
         val state = lp.state ?: return null
+        if (partialLinearInputModel !== state.model || partialLinearInputAffine != incrementalLinearPropagation) {
+            operationAccounting?.charge(partialLinearSharedInputs.size.toLong() + 1L)
+            if (lpStop.poll()) return null
+            partialLinearSharedInputs.clear()
+            partialLinearInputModel = state.model
+            partialLinearInputAffine = incrementalLinearPropagation
+        }
+        operationAccounting?.charge(4L)
+        if (lpStop.poll()) return null
+        partialLinearSharedInputs[comparison.ordered]?.let { sides ->
+            return if (previous != null && previous.bound == comparison.bound && previous.sides === sides) {
+                previous
+            } else PartialLinearInputs(comparison.bound, sides)
+        }
+        fun retain(inputs: PartialLinearInputs): PartialLinearInputs? {
+            operationAccounting?.charge(4L)
+            if (lpStop.poll()) return null
+            partialLinearSharedInputs[comparison.ordered] = inputs.sides
+            return inputs
+        }
         val affine = if (incrementalLinearPropagation && comparison.terms.size > 1) {
             system.affineInputSides(comparison, operationStop) ?: return null
         } else emptyList()
@@ -648,7 +673,7 @@ class ExactLiraSearchComponent private constructor(
                 }
             }
             for (side in affine) if (previous.sides[index++] != side) unchanged = false
-            if (unchanged) return previous
+            if (unchanged) return retain(previous)
         }
         val sides = ArrayList<PartialLinearSide?>(comparison.terms.size * 2)
         for (column in comparison.terms.keys) {
@@ -661,7 +686,7 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         sides += affine
-        return PartialLinearInputs(comparison.bound, sides)
+        return retain(PartialLinearInputs(comparison.bound, sides))
     }
 
     private fun capturePointHints(point: List<BigFraction>, context: SearchContext) {
@@ -948,6 +973,8 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun close() {
         floatCandidate = null
+        partialLinearSharedInputs.clear()
+        partialLinearInputModel = null
         retainedLpPoint = null
         sourceCheckedPoint = null
         sourceCheckedBooleans = null
