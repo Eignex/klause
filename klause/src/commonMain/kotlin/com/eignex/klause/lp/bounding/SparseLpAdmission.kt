@@ -28,7 +28,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.mulExact
 
 internal const val SPARSE_LP_MAX_WORK = 150_000_000L
 internal const val SPARSE_LP_MAX_ALLOCATION = 2L * 1024L * 1024L * 1024L
@@ -93,6 +95,8 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
     val plannedAssemblyWork = 32L * (entries + rows + columns)
     if (automatic) {
+        if (objective != null && objectiveCornerSatisfiesSource(problem, objective, cancellation,
+                preparationAllowance - inspected) { inspected += it }) return decline("ObjectiveCorner")
         declineSparseSourceWork(problem, plannedAssemblyWork, workAllowance, cancellation) { inspected += it }
             ?.let { return SparseLpAdmission(it.metrics + ("PreparationWork" to inspected)) }
     }
@@ -122,6 +126,67 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         model.extent() * LpNodeOverhead.BUILD <= assemblyWork
     if (cancellation()) return decline("Cancelled")
     return if (reusable) SparseLpAdmission(estimate.metrics, relaxation) else estimate
+}
+
+@Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")
+private suspend fun SequenceScope<Unit>.objectiveCornerSatisfiesSource(
+    problem: Problem,
+    objective: LinearObjective,
+    cancellation: ExecutionControl,
+    allowance: Long,
+    observeWork: (Long) -> Unit,
+): Boolean {
+    if (problem.numBoolVars != 0) return false
+    var work = problem.numIntVars.toLong()
+    try {
+        if (work > allowance) return false
+        val corner = LongArray(problem.numIntVars)
+        for (column in corner.indices) {
+            if (column % CONSTRUCTION_BATCH_SIZE == 0) {
+                if (cancellation()) return false
+                yield(Unit)
+            }
+            val domain = problem.rootDomainOf(column)
+            corner[column] = if (objective.intCoefficientValues.getOrElse(column) { 0L } < 0L) domain.max
+            else domain.min
+        }
+        for ((index, factor) in problem.factors.withIndex()) {
+            work++
+            if (work > allowance || cancellation()) return false
+            if (index % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            val compact = factor as? Linear
+            val exact = factor as? ExactLinear
+            if (compact == null && exact == null) return false
+            val size = compact?.vars?.size ?: checkNotNull(exact).size
+            val constants = compact?.integerConstants ?: (checkNotNull(exact).constants as? IntegerConstants)
+                ?: return false
+            val relation = compact?.op ?: checkNotNull(exact).relation
+            var sum = 0L
+            for (k in 0 until size) {
+                work += 4L
+                if (work > allowance || cancellation()) return false
+                if (k % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+                val column = if (compact != null) compact.vars[k] else {
+                    val ref = checkNotNull(exact).ref(k)
+                    if (!Term.isInt(ref)) return false
+                    Term.intVar(ref)
+                }
+                sum = addExact(sum, mulExact(constants.coeff(k), corner[column]))
+            }
+            val satisfied = when (relation) {
+                LinearOp.LE -> sum <= constants.bound
+                LinearOp.EQ -> sum == constants.bound
+                LinearOp.GE -> sum >= constants.bound
+                LinearOp.NE -> false
+            }
+            if (!satisfied) return false
+        }
+        return !cancellation()
+    } catch (_: CheckedLongOverflowException) {
+        return false
+    } finally {
+        observeWork(work)
+    }
 }
 
 @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")

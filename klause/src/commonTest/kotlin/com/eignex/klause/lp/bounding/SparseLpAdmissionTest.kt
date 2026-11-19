@@ -645,9 +645,11 @@ class SparseLpAdmissionTest {
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
             settings = ProblemSettings(lpMaxTableauCells = 1L))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
-        val cases = listOf(Triple<Long?, Double, Boolean>(null, 0.25, true),
+        val cases = listOf(
+            Triple<Long?, Double, Boolean>(null, 0.25, true),
             Triple(10_000L, 0.25, false), Triple(30_199L, 0.25, false), Triple(30_200L, 0.25, true),
-            Triple(0L, 0.25, false), Triple(40_000L, 0.0, true), Triple(0L, 0.0, false))
+            Triple(0L, 0.25, false), Triple(40_000L, 0.0, true), Triple(0L, 0.0, false),
+        )
         for ((budget, fraction, admitted) in cases) {
             val base = LpPlan(lpWorkBudgetFraction = fraction)
             val sink = SolveStatsSink("sparse-invocation-capacity")
@@ -659,8 +661,9 @@ class SparseLpAdmissionTest {
                 if (!admitted) {
                     assertEquals(1L, metrics["DeclineInvocationWork"])
                     assertEquals(0L, metrics["PreparationWork"])
-                    assertEquals(LpAutoConfig.resolve(problem, LpConfig.parse("default,-sparse-trial"), base, objective),
-                        engine.params.lpPlan)
+                    val ordinary = LpAutoConfig.resolve(problem,
+                        LpConfig.parse("default,-sparse-trial"), base, objective)
+                    assertEquals(ordinary, engine.params.lpPlan)
                 }
             }
         }
@@ -711,6 +714,23 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `automatic root lifetime follows the admitted query forecast`() {
+        val problem = Problem(0, 32, Array(32) { IntDomain(0, 1) },
+            List(32) { Linear(IntArray(32) { 1 }, IntArray(32) { it }, LinearOp.GE, 16) },
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val sink = SolveStatsSink("forecast-root-lifetime")
+
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
+            LpParams(lpConfig = LpConfig.AUTO), sink).use {
+            val forecast = requireNotNull(sink.snapshot().lp.sparseTrial["EstimatedTotalWork"])
+            assertTrue(it.sparseTrialActive)
+            assertEquals(maxOf(INITIAL_NODE_WORK_OPS, forecast), it.params.lpPlan.rootMaxWork)
+            assertEquals(it.params.lpPlan.rootMaxWork, sink.snapshot().lp.sparseTrial["RootWorkLimit"])
+            assertTrue(it.params.lpPlan.rootMaxWork < SPARSE_LP_MAX_WORK)
+        }
+    }
+
+    @Test
     fun `automatic sparse admission declines open integer declarations before preparation`() {
         val open = Bits(2).also { it.set(0) }
         val problem = Problem(numBoolVars = 0,
@@ -751,7 +771,8 @@ class SparseLpAdmissionTest {
     fun `coalescing source memberships uses emitted admission`() {
         val problem = Problem(0, 32, Array(32) { IntDomain(0, 1) },
             List(32) {
-                Linear(IntArray(64) { if (it % 2 == 0) 1 else -1 }, IntArray(64) { it / 2 }, LinearOp.LE, 0)
+                Linear(IntArray(66) { if (it >= 64 || it % 2 == 0) 1 else -1 },
+                    IntArray(66) { if (it >= 64) it - 64 else it / 2 }, LinearOp.GE, 1)
             })
         val objective = LinearObjective(intCoefficients = LongArray(32) { 1L })
         var result: SparseLpAdmission? = null
@@ -761,6 +782,70 @@ class SparseLpAdmissionTest {
         }.forEach { }
 
         assertTrue(requireNotNull(result).admitted)
+    }
+
+    @Test
+    fun `automatic sparse admission declines a feasible objective corner`() {
+        for (relation in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.GE)) {
+            for (exact in listOf(false, true)) {
+                val row = if (exact) ExactLinear.of(IntArray(3) { Term.ofIntVar(it) },
+                    listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ofLong(-1L)),
+                    relation, BigFraction.ofLong(3L)) else
+                    Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), relation, 3)
+                val problem = Problem(0, 3, arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(7, 7)),
+                    listOf(row), settings = ProblemSettings(lpMaxTableauCells = 1L))
+                val sink = SolveStatsSink("feasible-objective-corner")
+
+                LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, -1, 1)),
+                    LpParams(lpConfig = LpConfig.AUTO), sink).use {
+                    assertFalse(it.sparseTrialActive)
+                }
+
+                assertEquals(1L, sink.snapshot().lp.sparseTrial["DeclineObjectiveCorner"])
+                assertTrue(requireNotNull(sink.snapshot().lp.sparseTrial["PreparationWork"]) > 0L)
+            }
+        }
+    }
+
+    @Test
+    fun `objective corner refusal requires every source row to hold`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 10) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 11),
+        ), settings = ProblemSettings(lpMaxTableauCells = 1L))
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, -1)),
+            LpParams(lpConfig = LpConfig.AUTO), SolveStatsSink("violated-objective-corner")).use {
+            assertTrue(it.sparseTrialActive)
+        }
+    }
+
+    @Test
+    fun `overflow leaves the objective corner scan undecided`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(2, 3) },
+            listOf(ExactLinear.of(IntArray(2) { Term.ofIntVar(it) },
+                listOf(BigFraction.ofLong(Long.MAX_VALUE), BigFraction.ofLong(Long.MAX_VALUE - 1L)),
+                LinearOp.GE, BigFraction.ONE)), settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val sink = SolveStatsSink("overflowed-objective-corner")
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpConfig = LpConfig.AUTO), sink).close()
+
+        assertNull(sink.snapshot().lp.sparseTrial["DeclineObjectiveCorner"])
+        assertTrue(requireNotNull(sink.snapshot().lp.sparseTrial["PreparationWork"]) > 0L)
+    }
+
+    @Test
+    fun `explicit sparse requests retain feasible objective corners`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 0)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            SolveStatsSink("explicit-objective-corner")).use {
+            assertTrue(it.sparseTrialActive)
+        }
     }
 
     @Test

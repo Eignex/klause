@@ -411,7 +411,7 @@ object LpAutoConfig {
         val explicitOrdinary = coneRequested || base.lbTreeSearch || base.cuts || base.booleanRlt ||
             base.impliedBoundCuts || base.flowCoverCuts ||
             config.overrides.any { (technique, enabled) -> enabled && technique.timing == LpTiming.EXHAUSTIVE }
-        val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
+        var sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
             (explicitSparse || (!explicitOrdinary && (!plan.bounding || cells > baseCap))) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
@@ -428,16 +428,20 @@ object LpAutoConfig {
         } else null
         if (sparse?.admitted == true) {
             val admittedBase = if (explicitSparse) LpPlan() else base
+            val rootWorkLimit = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
+                SPARSE_LP_MAX_WORK, if (explicitSparse) SPARSE_LP_MAX_WORK else
+                    maxOf(INITIAL_NODE_WORK_OPS, sparse.metrics.getValue("EstimatedTotalWork")))
             plan = admittedBase.copy(
                 bounding = true,
                 boundMaxDepth = if (!explicitSparse && plan.bounding) plan.boundMaxDepth else 0,
                 learn = true, probe = true, rootCutHarvest = false,
-                rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
+                rootMaxWork = rootWorkLimit,
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
                 boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
                 componentOwnership = base.componentOwnership, sourcePreparation = sourcePreparation,
             )
+            sparse = SparseLpAdmission(sparse.metrics + ("RootWorkLimit" to rootWorkLimit), sparse.sourceLayout)
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
             config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
