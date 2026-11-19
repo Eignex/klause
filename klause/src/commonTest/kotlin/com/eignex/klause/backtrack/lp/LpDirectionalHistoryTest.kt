@@ -5,9 +5,32 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
+    @Test
+    fun `collection prefers only a recent under observed direction`() {
+        for (firstUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({}, maxAge = 4L)
+            val variable = VarRef.IntVar(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 2.25)
+            assertNull(history.preferUnderObservedDirection(variable, 2.25))
+            repeat(2) {
+                history.commit(if (firstUp) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(11.0)
+            }
+
+            assertEquals(!firstUp, history.preferUnderObservedDirection(variable, 2.25))
+            assertTrue(history.score(variable, 2.25).isNaN())
+            repeat(5) { history.beginNode(0) }
+            assertNull(history.preferUnderObservedDirection(variable, 2.25))
+        }
+    }
+
     @Test
     fun `sparse ancestor records retain exact counts across depth trimming`() {
         for (operation in listOf("branch", "commit", "clear")) {
