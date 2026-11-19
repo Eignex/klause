@@ -91,6 +91,7 @@ class SourceExecutionRequest private constructor(
     internal val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     internal val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     internal val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    internal val companionIncumbentReuse: Boolean = false,
 ) {
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
@@ -101,7 +102,7 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair)
+            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair, companionIncumbentReuse)
     }
 
     internal fun withPortfolioGuidanceObserver(
@@ -113,7 +114,7 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair)
+            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair, companionIncumbentReuse)
     }
 
     internal fun withPortfolioJointRepairObserver(
@@ -125,7 +126,7 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer, companionIncumbentReuse)
     }
 
     internal fun withValidationCancellation(stop: ExecutionControl): SourceExecutionRequest {
@@ -137,7 +138,7 @@ class SourceExecutionRequest private constructor(
                 it.copy(polynomial = it.polynomial.copy(cancellation = it.polynomial.cancellation or stop))
             },
             transcendental?.let { it.copy(cancellation = it.cancellation or stop) }, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, companionIncumbentReuse)
     }
 
     /**
@@ -200,6 +201,7 @@ class SourceExecutionRequest private constructor(
         controls.presolveConfig, presolveCancellation, presolveBudget,
         controls.nonlinearInteger, controls.transcendental,
         controls.nodeBudget, policy, controls.prepareOnly,
+        companionIncumbentReuse = controls.companionIncumbentReuse,
     )
 
     /** Bind existing finite, linear or polynomial controls to their captured source. */
@@ -501,7 +503,8 @@ private fun executeCapturedSource(
             )
             val result = FinitePipeline.solve(finite, callbacks.finite, finite.lpSolveContext,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
-                request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair)
+                request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair,
+                companionIncumbentReuse = request.companionIncumbentReuse)
             SourceExecutionResult.Finite(invocation, result)
         }
 

@@ -2,6 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.ir.NumericAuthority
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -17,6 +19,7 @@ internal class SourceExecutionControls(
     val nodeBudget: NodeBudget?,
     val presolveConfig: PresolveConfig?,
     val prepareOnly: Boolean,
+    val companionIncumbentReuse: Boolean = false,
 )
 
 internal fun bindSourceExecutionControls(
@@ -98,6 +101,7 @@ internal fun bindSourceExecutionControls(
             budget,
             resolvedPresolve,
             prepareOnly,
+            companionIncumbentReuse = companions && invocation.automaticCompanionReuse(options.reader()),
         )
     }
     val decisions = reader[ExecutionOption.maxDecisions] ?: BacktrackParams().maxDecisions
@@ -207,6 +211,19 @@ internal fun bindSourceExecutionControls(
     return SourceExecutionControls(
         theory, polynomial, integer, functions, finite, budget, resolvedPresolve, prepareOnly,
     )
+}
+
+private fun PreparedSourceInvocation.automaticCompanionReuse(reader: ExecutionOptionReader): Boolean {
+    val semantics = linearSource?.view?.source?.semantics ?: return false
+    if (operation != ExecutionOperation.OPTIMIZE || semantics.effective.format != SourceFormat.MPS ||
+        semantics.effective.numericAuthority != NumericAuthority.DECIMAL_LITERALS ||
+        !semantics.relaxesFeasibility || semantics.hasOverrides
+    ) return false
+    if (reader[ExecutionOption.sourceIncumbentCompletion] != null ||
+        reader[ExecutionOption.companionIntegers] == true || reader[ExecutionOption.companionAfterIncumbent] == true
+    ) return false
+    return reader[ExecutionOption.companionAdmission].let { it == null || it == "ordinary" } &&
+        reader[ExecutionOption.companionRepair].let { it == null || it == "fixed" }
 }
 
 private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionReader): TheoryParams = copy(

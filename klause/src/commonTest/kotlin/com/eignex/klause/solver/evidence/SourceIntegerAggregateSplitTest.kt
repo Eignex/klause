@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
+import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.ExecutionControl
@@ -11,6 +12,42 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 
 class SourceIntegerAggregateSplitTest {
+    @Test
+    fun `wide signed unit restrictions should enforce their query scope`() {
+        val columns = (0 until 40).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }.toSet()
+        val row = SourceInequality(columns.associateWith { BigFraction.ONE }, BigFraction.ONE)
+        val opening = SourceScope(SourceRevision("binary-neighborhood", "exact"))
+        val branch = opening.copy(condition = opening.condition.integerBound(row))
+        val context = SourceProofContext(branch, columns, emptyMap()).withLinearAuthority()
+        val verifier = SourceEvidenceVerifier(context)
+        val inside = Sample(booleanArrayOf(), LongArray(40))
+        val outside = Sample(booleanArrayOf(), LongArray(40) { 1 })
+
+        assertEquals(SourceEvidenceCheck.Checked, verifier.verify(
+            SourceEvidence(branch, SourceClaim.Witness(inside), SourceDerivation.SourceWitness)))
+        assertIs<SourceEvidenceCheck.Rejected>(verifier.verify(
+            SourceEvidence(branch, SourceClaim.Witness(outside), SourceDerivation.SourceWitness)))
+        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context, maximumSteps = 20).verify(
+            SourceEvidence(branch, SourceClaim.Witness(inside), SourceDerivation.SourceWitness)))
+    }
+
+    @Test
+    fun `wide nonunit restrictions and coverage splits should remain declined`() {
+        val columns = (0 until 40).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }.toSet()
+        val opening = SourceScope(SourceRevision("wide-row", "exact"))
+        val row = SourceInequality(columns.associateWith { BigFraction.ofLong(2) }, BigFraction.ZERO)
+        val branch = opening.copy(condition = opening.condition.integerBound(row))
+        val context = SourceProofContext(branch, columns, emptyMap())
+        val unit = SourceInequality(columns.associateWith { BigFraction.ONE }, BigFraction.ZERO)
+        val split = SourceIntegerAggregateSplit(unit, SourceIntegerRowAssumption(unit),
+            SourceIntegerRowAssumption(unit.adjacentIntegerAbove()))
+
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(
+            SourceEvidence(branch, SourceClaim.Refutation, SourceIntegerRowAssumption(row))))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context.atScope(opening)).verify(
+            SourceEvidence(opening, SourceClaim.Refutation, split)))
+    }
+
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
     private val scope = SourceScope(SourceRevision("aggregate", "exact-affine"))

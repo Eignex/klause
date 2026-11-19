@@ -122,7 +122,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `relaxation disagreement should release a coupled incumbent improvement`() {
+    fun `a binary repair should change root agreements to reach a coupled improvement`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4) { 1 }, null, null),
             factors = arrayOf(
@@ -136,7 +136,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
         val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
         assertTrue(guidance.remember(source, (0..3).associate {
             SourceCoordinate(SourceCoordinate.Kind.Integer, it) to
-                if (it == 3) 0.0 else if (it == 1) 0.8 else 0.2
+                if (it == 3) 0.0 else if (it == 0) 1.0 else if (it == 1) 0.8 else 0.2
         }, budget, ExecutionControl.Never))
         val standing = Sample(booleanArrayOf(), longArrayOf(1, 1, 1, 0), doubleArrayOf(0.0),
             exactReals = listOf(BigFraction.ZERO))
@@ -151,7 +151,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                 val result =
                     assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
-                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairRelaxationNeighborhoods"))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairBinaryNeighborhoods"))
                 assertTrue((repair.stats.smt.completeSearchStages?.get("jointRepairImportedIncumbents") ?: 0L) > 0)
                 assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
                     SourceEvidence(source.scope, SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))

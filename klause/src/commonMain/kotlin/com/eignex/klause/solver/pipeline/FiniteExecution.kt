@@ -358,6 +358,7 @@ internal fun FinitePipeline.solve(
     onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    companionIncumbentReuse: Boolean = false,
 ): FiniteSolveResult {
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == request.lpSolveContext) {
         "custom LP dependencies require the fixed finite route"
@@ -550,6 +551,7 @@ internal fun FinitePipeline.solve(
             sourceMapping = preparation.sourceMapping,
             sourceControls = request.sourceControls,
             numericalCompanionParams = numericalCompanions,
+            companionIncumbentReuse = companionIncumbentReuse,
             objectiveCoordinates = objectiveCoordinates,
             optimalityGap = if (request.shape.optimize) {
                 invocation?.let { sourceOptimalityGap(it, preparation) }
