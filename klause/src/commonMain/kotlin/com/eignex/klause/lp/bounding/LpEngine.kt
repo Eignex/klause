@@ -1256,18 +1256,17 @@ internal class LpEngine(
         queryWorkAllowance = {
             nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { separateNodePreparation }
         },
-        onPreparation = { metrics ->
-            if (separateNodePreparation) {
-                sink.lp.observeEngineCost(LpRoute.NODE, metrics)
-                noteSolveOps(metrics.workOps)
-            }
-        },
-        separatePreparation = { separateNodePreparation },
+        onPreparation = if (separateNodePreparation) ::observeNodePreparation else null,
         continuationAllowance = {
             if (sparseRootWork) retainedRootCumulativeWork() else
                 lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )
+
+    private fun observeNodePreparation(metrics: LpSolveMetrics) {
+        sink.lp.observeEngineCost(LpRoute.NODE, metrics)
+        noteSolveOps(metrics.workOps)
+    }
 
     internal fun nodeRelaxation(
         relaxer: CpToLpRelaxation,
@@ -1891,18 +1890,33 @@ internal class LpEngine(
         if (!deferred) preparation().forEach { }
     }
 
+    private fun sparseAdmissionQueryWork(config: LpConfig): Long {
+        val cumulative = retainedRootCumulativeWork()
+        if (!config.resolved(LpTechnique.SPARSE_TRIAL) || sparseTrialRequested ||
+            params.lpPlan.lpWorkBudgetFraction <= 0.0) return cumulative
+        val remainingMillis = params.cancellation.deadline()?.let {
+            (-it.elapsedNow()).inWholeMilliseconds.coerceAtLeast(0L)
+        } ?: return cumulative
+        return minOf(cumulative,
+            (remainingMillis * params.lpPlan.lpWorkBudgetFraction * LP_WORK_PER_MILLI).toLong().coerceAtLeast(0L))
+    }
+
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
+            val queryWork = sparseAdmissionQueryWork(config)
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork(), sparseTrialQueryWork = retainedRootCumulativeWork(),
+                    sparseTrialWork = retainedRootRemainingWork(), sparseTrialQueryWork = queryWork,
                     sourcePreparation = sourcePreparation) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted
                         automaticOrdinaryNodes = trial.admitted && trial.metrics["Automatic"] == 1L &&
                             admission.withinCeiling
+                        if (trial.admitted && trial.metrics["Automatic"] == 1L) {
+                            propagator.accountPreparation(::observeNodePreparation)
+                        }
                         admittedSourceLayout = trial.sourceLayout.takeIf { trial.admitted }
                         sink.lp.sparseTrial = trial.metrics
                         noteNodeOverhead(trial.work)

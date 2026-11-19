@@ -69,6 +69,10 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         return decline("Shape")
     }
     if (cancellation()) return decline("Cancelled")
+    if (automatic && rows * rows * rows > queryWorkAllowance) {
+        return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
+            "SourceEstimatedQueryWork" to rows * rows * rows, "QueryWorkAllowance" to queryWorkAllowance))
+    }
     if (32L * (columns + rows) > preparationAllowance) return decline("PreparationWork")
     for ((index, factor) in problem.factors.withIndex()) {
         if (cancellation()) return decline("Cancelled")

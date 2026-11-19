@@ -356,6 +356,10 @@ automatic policy declines row-intersection risk above eight million pairs before
 source assembly and checks the emitted risk again afterward. It budgets one
 monolithic basis refresh plus sparse row/column work and fill risk against the
 cumulative root grant; connected blocks do not imply separate numerical owners.
+The row-count cube rejects unaffordable queries before a source scan. Automatic
+admission also caps its grant by the remaining containing deadline's LP work share,
+when that allowance is enabled. Admission fixes the grant once; later slices do not
+resize it against the approaching deadline.
 The
 trial uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
 cuts and expanded hulls stay outside its allowance, and admitted roots enable the

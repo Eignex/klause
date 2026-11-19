@@ -94,9 +94,8 @@ internal class LpPropagator(
     // Each bound edit costs the scoped solver a pass over the model's columns; the engine charges it as LP work.
     private val onEdit: (Long) -> Unit = {},
     private val queryWorkAllowance: () -> Long? = { null },
-    private val onPreparation: ((LpSolveMetrics) -> Unit)? = null,
+    private var onPreparation: ((LpSolveMetrics) -> Unit)? = null,
     private val continuationAllowance: () -> Long? = { null },
-    private val separatePreparation: () -> Boolean = { onPreparation != null },
 ) : SearchComponent,
     SearchBrancher,
     SearchBranchProposal,
@@ -104,6 +103,11 @@ internal class LpPropagator(
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
     private var owner: LpScopedSolver? = null
+    internal fun accountPreparation(observer: (LpSolveMetrics) -> Unit) {
+        check(owner == null)
+        onPreparation = observer
+    }
+
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
 
@@ -406,7 +410,7 @@ internal class LpPropagator(
             edit.commit()
             true
         } finally {
-            if (separatePreparation()) onPreparation?.invoke(takePreparationMetrics(current))
+            onPreparation?.invoke(takePreparationMetrics(current))
         }
     } == true
 
@@ -428,7 +432,7 @@ internal class LpPropagator(
         continuationWorkAllowance: (() -> Long?)? = null,
         queryAllowance: (() -> Long?)? = null,
     ): Pair<LpSolver, FloatLpResult?>? =
-        solveOwned(token.takeIf { separatePreparation() }) { current ->
+        solveOwned(token.takeIf { onPreparation != null }) { current ->
             val standard = queryWorkAllowance()
             val requested = queryAllowance?.invoke()
             val offered = when {

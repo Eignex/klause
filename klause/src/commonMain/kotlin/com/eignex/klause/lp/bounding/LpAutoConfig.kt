@@ -428,7 +428,8 @@ object LpAutoConfig {
             plan = (if (explicitSparse) LpPlan() else plan).copy(
                 bounding = true, boundMaxDepth = if (automaticSparse && plan.bounding) plan.boundMaxDepth else 0,
                 learn = true, probe = true, rootCutHarvest = false,
-                rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
+                rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK,
+                    if (automaticSparse) sparseTrialQueryWork else SPARSE_LP_MAX_WORK),
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
                 boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
