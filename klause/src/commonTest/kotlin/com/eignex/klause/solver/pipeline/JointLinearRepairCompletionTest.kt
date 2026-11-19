@@ -14,9 +14,12 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -39,6 +42,42 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairCompletionTest {
+    @Test
+    fun `relaxation disagreement should release a coupled incumbent improvement`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val guidance = LinearRepairGuidance()
+        val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+        assertTrue(guidance.remember(source, (0..3).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.0
+        }, budget, ExecutionControl.Never))
+        val standing = Sample(booleanArrayOf(), longArrayOf(1, 1, 1, 0), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { standing },
+            incumbentCompletionCheck = { _, _, _ -> true }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairRelaxationNeighborhoods"))
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                    SourceEvidence(source.scope, SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
+                assertTrue(done)
+            }
+        }
+    }
+
     @Test
     fun `a delayed first neighborhood should improve from the newer checked center`() {
         for (sign in listOf(1L, -1L)) {

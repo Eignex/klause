@@ -343,7 +343,11 @@ internal class JointLinearRepair(
                     minOf(width, checkedTrialWidth + 1) else width
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
-                requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
+                val relaxation = if (checkedStart) requireNotNull(selection).relaxationNeighborhood(
+                    hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
+                if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
+                (relaxation ?: requireNotNull(selection).propose(
+                    from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
                         if (observation != null) {
                             proposalSequence++
