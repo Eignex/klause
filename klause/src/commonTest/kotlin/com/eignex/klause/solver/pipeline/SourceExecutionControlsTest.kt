@@ -13,6 +13,8 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.ir.numericalOptimalityTolerance
+import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.solver.result.TerminationReason
@@ -33,7 +35,8 @@ class SourceExecutionControlsTest : RuntimeInitializedTest() {
     @Test
     fun `ordinary numerical MPS reuse should preserve legacy finite scheduling controls`() {
         val semantics = SourceSemantics(SourceFormat.MPS, NumericAuthority.DECIMAL_LITERALS,
-            feasibilityTolerance = SourceTolerance(SemanticRational.ONE)).resolve()
+            feasibilityTolerance = numericalSourceTolerance,
+            optimalityTolerance = numericalOptimalityTolerance).resolve()
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
@@ -41,13 +44,13 @@ class SourceExecutionControlsTest : RuntimeInitializedTest() {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
         for ((options, expected) in listOf(
-            emptyList<String>() to true,
-            listOf("source-incumbent-completion=false") to false,
-            listOf("source-incumbent-completion=true") to false,
-            listOf("companion-integers=true") to false,
-            listOf("companion-after-incumbent=true") to false,
-            listOf("companion-repair=adaptive") to false,
-            listOf("companion-admission=funded") to false,
+            emptyList<String>() to false,
+            listOf("companion-after-incumbent=true") to true,
+            listOf("companion-after-incumbent=true", "source-incumbent-completion=false") to false,
+            listOf("companion-after-incumbent=true", "source-incumbent-completion=true") to false,
+            listOf("companion-after-incumbent=true", "companion-integers=true") to false,
+            listOf("companion-after-incumbent=true", "companion-repair=adaptive") to false,
+            listOf("companion-after-incumbent=true", "companion-admission=funded") to false,
         )) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
@@ -59,7 +62,8 @@ class SourceExecutionControlsTest : RuntimeInitializedTest() {
     @Test
     fun `observer and cancellation copies should retain automatic companion reuse`() {
         val semantics = SourceSemantics(SourceFormat.MPS, NumericAuthority.DECIMAL_LITERALS,
-            feasibilityTolerance = SourceTolerance(SemanticRational.ONE)).resolve()
+            feasibilityTolerance = numericalSourceTolerance,
+            optimalityTolerance = numericalOptimalityTolerance).resolve()
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
@@ -67,7 +71,8 @@ class SourceExecutionControlsTest : RuntimeInitializedTest() {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
 
-        val request = SourceExecutionRequest(invocation, ExecutionOptions())
+        val request = SourceExecutionRequest(invocation,
+            ExecutionOptions.parse(listOf("companion-after-incumbent=true")))
             .withPortfolioLpQueryObserver { _, _, _ -> }
             .withPortfolioGuidanceObserver { _, _ -> }
             .withPortfolioJointRepairObserver { _, _, _ -> }
@@ -75,6 +80,30 @@ class SourceExecutionControlsTest : RuntimeInitializedTest() {
 
         assertTrue(request.companionIncumbentReuse)
         assertFalse(request.theory.sourceIncumbentCompletion)
+    }
+
+    @Test
+    fun `automatic companion reuse should decline unqualified declared numerical policies`() {
+        val nominal = SourceSemantics(SourceFormat.MPS, NumericAuthority.DECIMAL_LITERALS,
+            feasibilityTolerance = numericalSourceTolerance, optimalityTolerance = numericalOptimalityTolerance)
+        for (semantics in listOf(
+            nominal.copy(feasibilityTolerance = SourceTolerance(SemanticRational.ONE)),
+            nominal.copy(feasibilityTolerance = SourceTolerance()),
+            nominal.copy(optimalityTolerance = null),
+        )) {
+            val source = LinearSourceProblem(listOf(
+                LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+            ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))),
+                semantics = semantics.resolve())
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+
+            val request = SourceExecutionRequest(invocation,
+                ExecutionOptions.parse(listOf("companion-after-incumbent=true")))
+
+            assertFalse(request.companionIncumbentReuse)
+        }
     }
 
     @Test

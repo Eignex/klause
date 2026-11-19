@@ -186,15 +186,14 @@ class SourceEvidenceVerifier(
         private fun validCondition(condition: SourceCondition): Boolean =
             condition.bools.keys.all { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in coordinates } &&
                 (condition.lower.keys + condition.upper.keys).all { it in coordinates } &&
-                condition.integerRows.size <= 128 && condition.integerRows.all { validIntegerRow(it, scoped = true) }
+                condition.integerRows.size <= 128 && condition.integerRows.all { validIntegerRow(it) }
 
-        private fun validIntegerRow(row: SourceInequality, scoped: Boolean = false): Boolean =
-            !row.strict && row.supportSize in 1..(if (scoped) 4096 else 32) && row.rhs.den == BIG_ONE &&
-                row.rhs.num.magnitudeBitLength() <= 4096 && row.forEachCoefficient { id, value ->
+        private fun validIntegerRow(row: SourceInequality): Boolean =
+            !row.strict && row.supportSize in 1..32 && row.rhs.den == BIG_ONE &&
+                row.rhs.num.magnitudeBitLength() <= 4096 && row.coefficients.all { (id, value) ->
                     step(0)
                     id.kind == SourceCoordinate.Kind.Integer && id in coordinates && value.den == BIG_ONE &&
-                        value.num.magnitudeBitLength() <= 4096 &&
-                        (row.supportSize <= 32 || value == BigFraction.ONE || value == BigFraction.MINUS_ONE)
+                        value.num.magnitudeBitLength() <= 4096
                 }
 
         private fun claim(
@@ -384,8 +383,7 @@ class SourceEvidenceVerifier(
             return when (derivation) {
                 is SourceIntegerRowAssumption -> {
                     step(depth)
-                    if (!validIntegerRow(derivation.row, scoped = true) ||
-                        derivation.row !in scope.condition.integerRows) {
+                    if (!validIntegerRow(derivation.row) || derivation.row !in scope.condition.integerRows) {
                         rejectProof("integer aggregate assumption is absent from the invocation")
                     }
                     derivation.row

@@ -23,26 +23,23 @@ class JointRepairNeighborhoodTest {
     @Test
     fun `binary neighborhoods should allow coordinated changes to agreeing integers`() {
         val columns = (0 until 40).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-        val source = SourceProofContext(SourceScope(SourceRevision("hamming", "exact")),
+        val source = SourceProofContext(SourceScope(SourceRevision("binary-support", "exact")),
             columns.toSet(), emptyMap())
         val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
         val budget = SourceLpBudget(funding = funding)
         val guidance = LinearRepairGuidance()
-        assertTrue(guidance.remember(source, columns.associateWith { if (it.id < 2) 1.0 else 0.5 },
-            budget, ExecutionControl.Never))
+        assertTrue(guidance.remember(source, columns.associateWith {
+            if (it.id < 2) 1.0 else if (it.id == 39) 0.0 else 0.5
+        }, budget, ExecutionControl.Never))
         val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 40, 0, ExecutionControl.Never))
 
-        val (condition, row) = assertNotNull(repair.binaryNeighborhood(guidance.find(source),
+        val condition = assertNotNull(repair.binaryNeighborhood(guidance.find(source),
             List(40) { if (it < 2) BigFraction.ONE else BigFraction.ZERO },
             IntBounds.fromModelBounds(LongArray(40), LongArray(40) { 1 }, null, null), booleanArrayOf(),
-            BigFraction.ONE, BigFraction.ONE, budget, ExecutionControl.Never))
+            BigFraction.ONE, budget, ExecutionControl.Never))
 
-        assertTrue(condition.lower.isEmpty())
-        assertTrue(condition.upper.isEmpty())
-        assertEquals(40, row.coefficients.size)
-        assertEquals(BigFraction.MINUS_ONE, row.coefficients[columns[0]])
-        assertEquals(BigFraction.ONE, row.coefficients[columns[2]])
-        assertEquals(BigFraction.ofLong(5), row.rhs)
+        assertEquals(mapOf(39 to BigFraction.ZERO), condition.lower)
+        assertEquals(condition.lower, condition.upper)
     }
 
     @Test
