@@ -9,6 +9,12 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
+With a captured exact linear objective, a verified shared floor reaching the
+conservatively rounded upper value of the accepted incumbent closes optimality
+without a positive gap policy. The least gap floor of shared facts still limits
+the conclusion. Unpublished statistics and scalar equality without exact objective
+capture supply no closure authority.
+
 Every worker belongs to a family: backtrack (complete search), local search, or
 large-neighborhood search around the incumbent. A local-search or LNS worker's
 whole state is visible, so a segment without progress is evidence against its

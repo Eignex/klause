@@ -19,6 +19,7 @@ internal class PreparingSatisfaction(
     private val solver: BacktrackSolver,
     private val params: BacktrackParams,
     private val projectAssumptionCore: Boolean = false,
+    private val containingSlice: ExecutionControl = ExecutionControl.Never,
 ) : ResumableSolve {
     private val lifetime = params.cancellation.lifetimeCancellation()
     private var token = params.cancellation
@@ -73,7 +74,7 @@ internal class PreparingSatisfaction(
         if (sliceNodes == 0L) return null
         val deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         val start = work
-        token = lifetime or global or ExecutionControl.until(deadline) or ExecutionControl {
+        token = lifetime or global or containingSlice or ExecutionControl.until(deadline) or ExecutionControl {
             sliceNodes >= 0L && work - start >= sliceNodes
         }
         while (!token()) {
@@ -91,6 +92,7 @@ internal class PreparingSatisfaction(
                 solver, params.copy(cancellation = propagationToken.withLifetime(lifetime)),
                 ownsWorkDebt = false, projectAssumptionCore = projectAssumptionCore,
                 preparedSession = live, preparedSeed = seed,
+                containingSlice = containingSlice,
             )
             query = handle
             preparation = null

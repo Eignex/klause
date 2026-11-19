@@ -840,7 +840,9 @@ class Portfolio(
                 // A bound some arm proved within the gap of the pool's incumbent ends the run like an exhaustion.
                 val gap = optimalityGap
                 val shared = minOf(sharedObjectiveBound?.current() ?: Double.NEGATIVE_INFINITY, gapFloor)
-                if (!exhausted && gap != null && gap.closes(incumbents.bound(), shared)) {
+                val upper = incumbents.bound()
+                val exactClosed = gap == null && exactLinearObjective != null && upper.isFinite() && shared >= upper
+                if (!exhausted && (exactClosed || gap?.closes(upper, shared) == true)) {
                     exhausted = true
                     exhaustionBound = shared
                     run.finish()

@@ -32,6 +32,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ONE
@@ -109,6 +110,9 @@ internal class CoreGuidedSearch(
     private var queryPreparation: Iterator<Unit>? = null
     private var transitionPreparation: Iterator<Unit>? = null
     private var preparationToken: ExecutionControl = ExecutionControl.Never
+    private val querySlice = cancelledWhen({ preparationToken.deadline() }, { preparationToken.workScheduled() }) {
+        preparationToken()
+    }
     private var preparationVisits = factors.size.toLong() + objectiveTerms
     internal val preparationWork: Long get() = preparationVisits
     internal var thresholdVisits = 0L
@@ -185,7 +189,7 @@ internal class CoreGuidedSearch(
         }
         if (allowanceExhausted) return finish(stopped(TerminationReason.BudgetExhausted))
         val remainingMillis = activeMillisLimit?.let {
-            (it.milliseconds - activeTime).inWholeMilliseconds.coerceAtLeast(1L)
+            (it.milliseconds - activeTime).inWholeMilliseconds
         } ?: sliceMillis
         val sliceDuration = minOf(sliceMillis, remainingMillis).milliseconds
         val deadline = TimeSource.Monotonic.markNow() + sliceDuration
@@ -285,8 +289,7 @@ internal class CoreGuidedSearch(
             }
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
-            val traversalToken =
-                token or ExecutionControl.until(deadline) or segment or ExecutionControl { allowanceExhausted }
+            val traversalToken = token or ExecutionControl { allowanceExhausted }
             val result = try {
                 handle.runSlice(traversalToken.withLifetime(lifetime), millis, remaining)
             } catch (failure: SearchInitializationCancelled) {
@@ -551,9 +554,11 @@ internal class CoreGuidedSearch(
             val projected = coreRefinement == CoreRefinementMode.REASONS
             val solver = BacktrackSolver(baked)
             if (!resumableOpening && params.nativeSat != false && baked.isClausal()) {
-                ResumableSatisfaction(solver, queryParams, ownsWorkDebt = false, projectAssumptionCore = projected)
+                ResumableSatisfaction(solver, queryParams, ownsWorkDebt = false, projectAssumptionCore = projected,
+                    containingSlice = querySlice)
             } else {
-                PreparingSatisfaction(solver, queryParams.copy(nativeSat = false), projectAssumptionCore = projected)
+                PreparingSatisfaction(solver, queryParams.copy(nativeSat = false), projectAssumptionCore = projected,
+                    containingSlice = querySlice)
             }.also { queryCount = saturatedAdd(queryCount, 1L) }
         } catch (failure: SearchInitializationCancelled) {
             settleQuery(failure.stats, failure.work)

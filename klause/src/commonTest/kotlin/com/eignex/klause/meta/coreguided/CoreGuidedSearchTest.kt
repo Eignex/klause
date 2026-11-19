@@ -159,11 +159,12 @@ class CoreGuidedSearchTest {
     fun `native segment interruption after a decision should pause the core query`() {
         val clock = TestTimeSource()
         val interrupter = ClockJumpOnDecision(clock)
+        var openings = 0
         val params = BacktrackParams(
             nativeSat = false,
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
-            componentFactory = { listOf(interrupter) },
+            componentFactory = { openings++; listOf(interrupter) },
         )
         val problem = Problem(
             40,
@@ -183,6 +184,7 @@ class CoreGuidedSearchTest {
         assertFalse(search.isDone)
         val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, 1_000L, -1L) {})
         assertEquals(0L, objective.evaluateLong(resumed.sample))
+        assertEquals(1, openings)
         search.close()
     }
 
