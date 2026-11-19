@@ -9,15 +9,24 @@ import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
+import com.eignex.klause.solver.pipeline.SourceAttachment
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.ExecutionControl
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import kotlin.test.Test
@@ -26,6 +35,42 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MpsLpAdmissionTest {
+    @Test
+    fun `interrupted companion inspection should leave structural admission unknown`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        val plan = assertNotNull(invocation.preparedPlan)
+        val preparation = FinitePipelinePreparation(assertNotNull(plan.model).bake(),
+            MpsLpAdmission.preparedObjective(plan), { it }, null)
+
+        val report = MpsLpAdmission.companionAdmission(invocation, preparation, ExecutionControl { true })
+
+        assertEquals(JsonNull, report["automaticPolicyStructurallyAdmitted"])
+    }
+
+    @Test
+    fun `companion inspection should report the missing continuous fragment`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE)),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+        val plan = assertNotNull(invocation.preparedPlan)
+        val preparation = FinitePipelinePreparation(assertNotNull(plan.model).bake(),
+            MpsLpAdmission.preparedObjective(plan), { it }, null)
+
+        val report = MpsLpAdmission.companionAdmission(invocation, preparation, ExecutionControl.Never)
+
+        assertTrue(assertNotNull(report["declines"]).jsonArray.any {
+            it.jsonPrimitive.content == "integer-continuous-fragment-required"
+        })
+    }
+
     @Test
     fun `root inspection retains an emitted row with appended constructor defaults`() {
         val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 2)),
