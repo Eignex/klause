@@ -81,8 +81,9 @@ internal class LpDirectionalHistory(
             return
         }
         val history = gains.getOrPut(child.parent.variable, ::Gains)
+        expire(history.down)
+        expire(history.up)
         val direction = if (child.up) history.up else history.down
-        expire(direction)
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
         direction.latest = normalized

@@ -101,6 +101,28 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
+    fun `aging the opposite direction refreshes collection availability`() {
+        val history = LpDirectionalHistory({}, maxAge = 4L)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        history.commit(SearchDecision.Bool(1), 1)
+        history.beginNode(1)
+        history.record(11.0)
+        repeat(2) { history.beginNode(1) }
+        for (decision in listOf(SearchDecision.Bool(1), SearchDecision.Bool(0), SearchDecision.Bool(0))) {
+            history.commit(decision, 1)
+            history.beginNode(1)
+            history.record(11.0)
+        }
+
+        assertTrue(history.hasCollectionHistory)
+        assertFalse(history.hasReliableHistory)
+        assertEquals(false, history.preferUnderObservedDirection(variable, 0.5))
+    }
+
+    @Test
     fun `zero observed gains keep ordinary child order`() {
         for (up in listOf(false, true)) {
             val history = LpDirectionalHistory({})
