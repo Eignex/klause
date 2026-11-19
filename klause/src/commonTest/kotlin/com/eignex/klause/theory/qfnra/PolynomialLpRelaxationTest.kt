@@ -1,7 +1,7 @@
 package com.eignex.klause.theory.qfnra
 
-import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.util.ExecutionControl
@@ -10,6 +10,7 @@ import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialLpRelaxationTest {
@@ -59,21 +60,31 @@ class PolynomialLpRelaxationTest {
         val work = QfNraWork(QfNraParams())
         val arithmetic = PolynomialArithmetic(work).also { work.execution = it.execution }
         val atoms = requireNotNull(PolynomialFormula.normalize(source.formula, arithmetic).forcedAtoms(arithmetic))
-        val proposal = requireNotNull(PolynomialLpRelaxation.prepare(atoms, 1, arithmetic, work)).use {
-            requireNotNull(it.solve()?.exactPrimal)
+        val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val algebraic = AlgebraicArithmetic(arithmetic)
+        var rejected = 0
+        val result = PolynomialLpPruning(atoms, 1, arithmetic, work).use { pruning ->
+            var step: PolynomialLpStep = PolynomialLpStep.Pending
+            while (step == PolynomialLpStep.Pending) {
+                step = pruning.advance { point ->
+                    checkSample(formula, mapOf(0 to algebraic.rational(point[0])), 0, arithmetic, algebraic)
+                        .also { if (it == null) rejected++ }
+                }
+            }
+            step
         }
-        assertTrue(proposal[0] * proposal[0] != BigFraction.ONE)
 
-        val result = solveQfNra(source.formula, source.boolCount, source.realCount)
-
-        assertIs<QfNraResult.Satisfiable>(result)
-        val algebraic = AlgebraicArithmetic()
-        assertEquals(0, algebraic.compare(algebraic.rational(BigFraction.ONE), result.assignment.realValue(0)))
+        val witness = assertIs<PolynomialLpStep.Witness>(result).assignment
+        assertEquals(0, algebraic.compare(algebraic.rational(BigFraction.ONE), witness.realValue(0)))
+        assertTrue(rejected > 0)
     }
 
     @Test
     fun `a declined envelope matrix should preserve exact algebraic completion`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val arithmetic = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0))
+        val atoms = requireNotNull(PolynomialFormula.normalize(source.formula, arithmetic).forcedAtoms(arithmetic))
+        assertNull(PolynomialLpRelaxation.prepare(atoms, 1, arithmetic, ExecutionControl.Never))
 
         val result = solveQfNra(source.formula, 0, 1,
             QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
@@ -83,6 +94,25 @@ class PolynomialLpRelaxationTest {
         val value = result.assignment.realValue(0)
         assertEquals(0, algebraic.compare(algebraic.multiply(value, value), algebraic.rational(BigFraction.ofLong(2))))
         assertEquals(0L, result.stats.envelopeRefutations)
+    }
+
+    @Test
+    fun `affine fiber centering should preserve exact square values`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (= x 1) (>= y 0) (<= y 2)
+                (>= (- y (* x x)) (- (/ 1 10))) (<= (- y (* x x)) (/ 1 10))))
+        """.trimIndent())
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work).also { work.execution = it.execution }
+        val atoms = requireNotNull(PolynomialFormula.normalize(source.formula, arithmetic).forcedAtoms(arithmetic))
+
+        val centered = requireNotNull(PolynomialLpRelaxation.prepare(atoms, 2, arithmetic, work)).use {
+            it.center(requireNotNull(it.solve()?.exactPrimal)) {}
+        }
+
+        assertEquals(BigFraction.ONE, centered[0])
+        assertEquals(BigFraction.ONE, centered[1])
     }
 
     @Test

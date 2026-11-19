@@ -325,6 +325,9 @@ Strict source comparisons remain strict LP rows, and unsupported comparisons
 weaken the relaxation rather than supply a deduction.
 
 A proposal passes the original conditioned polynomial formula before publication.
+For a source-feasible proposal, fixing every nonlinear product column leaves an
+affine fibre. Midpoints of certified feasible LP points center its free source
+coordinates; the centered point passes the complete source formula again.
 An invalid square proposal adds a tangent. Residual product violations can bisect
 a proved finite source interval; both closed children cover their parent, and only
 certified refutations of every child refute that parent. Child envelopes belong

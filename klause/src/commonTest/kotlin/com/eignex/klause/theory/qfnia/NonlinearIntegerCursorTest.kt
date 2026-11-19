@@ -36,7 +36,7 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `complement steering should preserve charged attempts and reach new allowed tuples`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (^ n 6) 2))", allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
