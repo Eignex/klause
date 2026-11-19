@@ -35,6 +35,36 @@ import kotlin.test.assertTrue
 
 class IncumbentProximityTest : RuntimeInitializedTest() {
     @Test
+    fun `LP agreements should restrict pure binary queries while mixed exchanges remain free`() {
+        for (mixed in listOf(false, true)) {
+            val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+            val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+            val condition = SourceCondition(lower = mapOf(columns[2] to BigFraction.ONE))
+            val source = SourceProofContext(SourceScope(SourceRevision("agreement", "exact"), condition,
+                SourceObjective("cost", ObjectiveSense.MINIMIZE)),
+                columns.toSet() + if (mixed) setOf(real) else emptySet(), emptyMap(),
+                columns.zip(listOf(1L, -2L, 1L, 1L).map(BigFraction::ofLong)).toMap())
+            val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+            val guidance = LinearRepairGuidance()
+            val values = columns.zip(listOf(1.0, 0.5, 0.0, 0.0)).toMap() +
+                if (mixed) mapOf(real to 0.0) else emptyMap()
+            assertTrue(guidance.remember(source, values, budget, ExecutionControl.Never))
+            val center = Sample(booleanArrayOf(), longArrayOf(1, 0, 1, 0),
+                reals = if (mixed) doubleArrayOf(0.0) else doubleArrayOf())
+
+            val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ofLong(2),
+                budget, ExecutionControl.Never, guidance.find(source)))
+
+            if (mixed) assertEquals(condition, query.scope.condition) else {
+                assertEquals(mapOf(columns[0] to BigFraction.ONE, columns[2] to BigFraction.ONE,
+                    columns[3] to BigFraction.ZERO), query.scope.condition.lower)
+                assertEquals(mapOf(columns[0] to BigFraction.ONE, columns[3] to BigFraction.ZERO),
+                    query.scope.condition.upper)
+            }
+        }
+    }
+
+    @Test
     fun `private exchanges should release incumbent coordinates and preserve receiving pins`() {
         val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val condition = SourceCondition(lower = mapOf(columns[2] to BigFraction.ONE))

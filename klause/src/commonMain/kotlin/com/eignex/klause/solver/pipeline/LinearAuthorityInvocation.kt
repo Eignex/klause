@@ -113,6 +113,8 @@ internal class LinearAuthorityInvocation(
     private var proximity: LinearAuthorityInvocation? = null
     private var proximityTurn = false
     private var proximityLatest: Map<String, Long> = emptyMap()
+    private var exchangePrepared = false
+    private var exchange: LinearIncumbentExchange? = null
     private val budget = borrowedBudget ?: SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val completion = if (params.sourceIncumbentCompletion)
@@ -254,6 +256,22 @@ internal class LinearAuthorityInvocation(
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
             else TerminationReason.Cancelled)
             if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
+            if (!exchangePrepared && proximityCenter != null) {
+                exchangePrepared = true
+                exchange = LinearIncumbentExchange.prepare(context, proximityCenter, budget, stop,
+                    claim = {
+                        state.remainingDecisions() > 0 && state.work.acceptedChecks < params.maxLeaves &&
+                            state.work.hasAllowance() && state.decisionBudget.consume() &&
+                            state.work.theoryDecision() && state.work.theoryCheck()
+                    }, observe = { stage, count ->
+                        val key = "numericalExchange$stage"
+                        externalOffers[key] = (externalOffers[key] ?: 0L) + count
+                    })
+            }
+            exchange?.takeUnless { it.finished }?.advance(stop or ExecutionControl { paused() })?.let(::offer)
+            if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
+            else TerminationReason.Cancelled)
+            if (paused()) return null
             if (!initialized) {
                 initialized = true
                 if (session.initialize() !is ComponentResult.Consistent) {
@@ -272,8 +290,10 @@ internal class LinearAuthorityInvocation(
             val event = frontier?.next() ?: checkNotNull(run).next()
             if (incumbentProximity && completion != null && importedIncumbents > 0 &&
                 incumbentRevision != revision) {
-                proximity?.close()
-                proximity = null
+                if (incumbent?.numRealVars == 0) prepareProximity() else {
+                    proximity?.close()
+                    proximity = null
+                }
             }
             proximityTurn = proximity != null
             if (boundOrdered) component.updateGlobalBound()
@@ -323,7 +343,8 @@ internal class LinearAuthorityInvocation(
         proximity = null
         val exact = value ?: return
         val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
-        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop) ?: return
+        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop,
+            repairGuidance?.find(context)) ?: return
         if (sample === importedIncumbent && sample !== consumedIncumbent) {
             consumedIncumbent = sample
             onIncumbentUse?.invoke()
@@ -357,7 +378,7 @@ internal class LinearAuthorityInvocation(
         observeProximity("PreparationWork", budget.measuredPreparationWork - preparation)
         observeProximity("FloatWork", budget.measuredFloatWork - floating)
         observeProximity("CertificationWork", budget.measuredBoundCertificationWork - certification)
-        proximityLatest = active.component.observations().mapKeys { (key, _) ->
+        proximityLatest = (active.component.observations() + active.externalOffers).mapKeys { (key, _) ->
             "numericalProximityLatest" + key.removePrefix("numerical")
         }
         if (completed != null) {
@@ -373,6 +394,7 @@ internal class LinearAuthorityInvocation(
         if (completed != null || incumbentRevision != revision) {
             proximity = null
             active.close()
+            if (incumbentRevision != revision && incumbent?.numRealVars == 0) prepareProximity()
             proximityTurn = false
         }
     }
@@ -450,6 +472,7 @@ internal class LinearAuthorityInvocation(
         proximity = null
         callback = { _, _ -> }
         val resources = SearchInvocationResources()
+        exchange?.let(resources::own)
         completion?.let(resources::own)
         resources.own(component)
         resources.own(AutoCloseable {

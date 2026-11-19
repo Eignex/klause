@@ -651,7 +651,7 @@ internal class JointLinearRepair(
             }
             val querySource = if (condition === proximityProposal && seed != null) {
                 IncumbentProximity.prepare(receiving, requireNotNull(seed), requireNotNull(privateCutoff), budget,
-                    stop or cancellation)?.also {
+                    stop or cancellation, repairGuidance?.find(source))?.also {
                     queryProximity = true
                     queryProximityCutoff = privateCutoff
                     observe("jointRepairProximityCenters")
@@ -744,7 +744,7 @@ internal class JointLinearRepair(
                     bound = bound)
             }
             val accepted = checked == SourceEvidenceCheck.Checked && originalChecked
-            if (privateProximity) proximityCompletedCutoff = if (accepted)
+            if (privateProximity && (!accepted || sample.numRealVars != 0)) proximityCompletedCutoff = if (accepted)
                 requireNotNull(objective).evaluateExact(sample) else queryProximityCutoff
             if (accepted) {
                 compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(sample))
