@@ -1015,7 +1015,7 @@ internal class LpEngine(
         return "${lpState}_${rootState}_${offerState}_$cursorState"
     }
 
-    private fun retainedRootCumulativeWork(): Long {
+    internal fun retainedRootCumulativeWork(): Long {
         val cap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
             SPARSE_LP_MAX_WORK)
         var remaining = (cap - minOf(cap, totalSolveOps)).coerceAtLeast(0L)
@@ -1044,7 +1044,7 @@ internal class LpEngine(
     }
 
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
-        nodeWorkBudget()
+        retainedRootCumulativeWork().coerceAtLeast(1L)
     } else if (separateNodePreparation) {
         val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
             retainedRootRemainingWork().coerceAtLeast(1L)
@@ -1237,7 +1237,7 @@ internal class LpEngine(
             noteSolveOps(metrics.workOps)
         } else null,
         continuationAllowance = {
-            if (sparseTrialActive) retainedRootRemainingWork() else
+            if (sparseTrialActive) retainedRootCumulativeWork() else
                 lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )

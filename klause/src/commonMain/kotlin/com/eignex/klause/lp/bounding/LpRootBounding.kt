@@ -126,7 +126,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
         observeStage("EMPTY_MODEL")
         return Double.NaN
     }
-    val continuation = if (sparseTrialActive) ::retainedRootRemainingWork else null
+    val continuation = if (sparseTrialActive) ::retainedRootCumulativeWork else null
     retainRootPrimalOwner(relaxation)
     var pausedBound = Double.NaN
     try {
