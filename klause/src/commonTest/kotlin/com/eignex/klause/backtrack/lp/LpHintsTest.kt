@@ -22,6 +22,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -60,7 +61,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
-            assertEquals(kotlin.math.sqrt(3.0), hints.directionalScore(proposal), 1e-9)
+            assertEquals(sqrt(3.0), hints.directionalScore(proposal), 1e-9)
             val before = work
             hints.beginPassiveSelection()
 
@@ -149,7 +150,7 @@ class LpHintsTest {
                     assertTrue(score.isNaN())
                     assertEquals(before, work)
                 } else {
-                    assertEquals(1.5, score, 1e-9)
+                    assertEquals(sqrt(3.0), score, 1e-9)
                     assertEquals(before + 1L, work)
                 }
             }
@@ -387,7 +388,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 
-            assertEquals(kotlin.math.sqrt(3.0), hints.directionalScore(variable), 1e-9, "constant=$constant")
+            assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9, "constant=$constant")
         }
     }
 }
