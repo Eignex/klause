@@ -493,6 +493,11 @@ under the same admission policy and remaining work grant; a declined collection
 uses the ordinary owner. Callers that need one retained basis keep the monolithic
 constructor.
 
+Component staging observations count construction attempts separately for unchanged
+ordered row/column selections with scalar authority changes, added local rows and
+joined blocks. Failed and cancelled attempts remain counted; these observations
+establish neither committed owners nor consumed numerical reuse.
+
 ### Cuts
 
 The internal `composeBooleanBranches` traversal option, disabled by default,

@@ -114,6 +114,9 @@ internal class LpPropagator(
     private var nextWitness = 0L
     private var preparedWork = 0L
     private var preparedRefactors = 0L
+    private var preparedScalarStages = 0L
+    private var preparedRowStages = 0L
+    private var preparedJoinStages = 0L
     private var solved = false
     private val witnesses = HashMap<Long, SearchAtomPremise>()
     var sourcePremises: LpSourcePremises? = null
@@ -528,9 +531,15 @@ internal class LpPropagator(
         val preparation = LpSolveMetrics(
             workOps = metrics.preparationWork - preparedWork,
             initialRefactorizations = (metrics.preparationRefactorizations - preparedRefactors).toInt(),
+            componentScalarStages = metrics.componentScalarStages - preparedScalarStages,
+            componentRowStages = metrics.componentRowStages - preparedRowStages,
+            componentJoinStages = metrics.componentJoinStages - preparedJoinStages,
         )
         preparedWork = metrics.preparationWork
         preparedRefactors = metrics.preparationRefactorizations
+        preparedScalarStages = metrics.componentScalarStages
+        preparedRowStages = metrics.componentRowStages
+        preparedJoinStages = metrics.componentJoinStages
         return preparation
     }
 
@@ -619,6 +628,9 @@ internal class LpPropagator(
         solved = false
         preparedWork = 0L
         preparedRefactors = 0L
+        preparedScalarStages = 0L
+        preparedRowStages = 0L
+        preparedJoinStages = 0L
         owner = newOwner(retained)
     }
 
@@ -634,6 +646,9 @@ internal class LpPropagator(
         nextWitness = 0L
         preparedWork = 0L
         preparedRefactors = 0L
+        preparedScalarStages = 0L
+        preparedRowStages = 0L
+        preparedJoinStages = 0L
         lastMetrics = LpSolveMetrics()
         previous?.close()
     }

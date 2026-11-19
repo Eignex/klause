@@ -70,6 +70,9 @@ internal class LpScopedSolver(
     private var appendUnknownWork = 0L
     private var reservedConstructionWork = 0L
     private var constructionWork = 0L
+    private var componentScalarStages = 0L
+    private var componentRowStages = 0L
+    private var componentJoinStages = 0L
     private var pendingAppendSolveWork: Long? = null
     private var pendingAppendSolveWorkComplete = false
     private var pendingAppendSolve = false
@@ -90,6 +93,7 @@ internal class LpScopedSolver(
         preparationWork, preparationRefactorizations, createdOwners, closedOwners, peakOwners,
         state.rows.size, state.rows.activeCount,
         appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork,
+        componentScalarStages, componentRowStages, componentJoinStages,
     )
 
     val primalGuidanceState: String
@@ -773,6 +777,9 @@ internal class LpScopedSolver(
         reservedConstructionWork = saturatedAdd(reservedConstructionWork, components.lastReservedConstructionWork)
         constructionWork = saturatedAdd(constructionWork, components.lastMetrics.preparationOps)
         preparationRefactorizations += components.lastRefactorizations
+        componentScalarStages += components.lastMetrics.componentScalarStages
+        componentRowStages += components.lastMetrics.componentRowStages
+        componentJoinStages += components.lastMetrics.componentJoinStages
     }
 
     private fun recordAppendWork(work: Long?, complete: Boolean = work != null) {

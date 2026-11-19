@@ -317,6 +317,14 @@ internal class ComponentLpSolver(
                 }
                 if (stop()) return false
                 val remaining = if (workLimit > 0L) workLimit - metrics.workOps else 0L
+                val ancestors = plan.ancestors[index]
+                metrics += when {
+                    ancestors.size > 1 -> LpSolveMetrics(componentJoinStages = 1L)
+                    plan.parts[index].rows.contentEquals(parts[ancestors.single()].rows) &&
+                        plan.parts[index].cols.contentEquals(parts[ancestors.single()].cols) ->
+                        LpSolveMetrics(componentScalarStages = 1L)
+                    else -> LpSolveMetrics(componentRowStages = 1L)
+                }
                 val child = engine(plan.parts[index].model, token, remaining)
                 replacements += child
                 nextSolvers += child

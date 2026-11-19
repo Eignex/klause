@@ -280,6 +280,7 @@ class LpScopedSolverTest {
 
             assertTrue(owner.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
                 ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+            assertEquals(1L, owner.metrics.componentJoinStages)
             val result = assertNotNull(owner.solve())
 
             assertEquals(BigFraction.ofLong(7L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)

@@ -48,6 +48,34 @@ class ComponentLpSolverTest {
     }
 
     @Test
+    fun `throwing child construction should retain its staging attempt`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+
+            assertFailsWith<IllegalStateException> {
+                owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { _, _, _ ->
+                    error("construction failed")
+                }
+            }
+
+            assertEquals(1L, owner.lastMetrics.componentJoinStages)
+            assertEquals(0L, owner.lastMetrics.componentScalarStages)
+            assertEquals(0L, owner.lastMetrics.componentRowStages)
+        }
+    }
+
+    @Test
     fun `cancelled joining preparation should retain the original collection`() {
         val builder = LpBuilder()
         repeat(3) {
@@ -77,11 +105,13 @@ class ComponentLpSolverTest {
                     }
                 }
             }
+            val stages = owner.lastMetrics.componentJoinStages
             val raw = assertNotNull(owner.solve())
             val result = certifyLpResult(assertNotNull(state.ownerWorkingModel()), owner, raw)
 
             assertFalse(accepted)
             assertTrue(stagedClosed)
+            assertEquals(1L, stages)
             assertSame(state, raw.exactState)
             assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
         }
@@ -141,6 +171,9 @@ class ComponentLpSolverTest {
             assertTrue(owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
                 newPersistentLpSolver(model, cancellation = token, workLimit = work, factory = factory)
             })
+            assertEquals(1L, owner.lastMetrics.componentScalarStages)
+            assertEquals(1L, owner.lastMetrics.componentRowStages)
+            assertEquals(0L, owner.lastMetrics.componentJoinStages)
             val result = assertNotNull(owner.solve())
             val certified = certifyLpResult(assertNotNull(next.state.ownerWorkingModel()), owner, result)
 
