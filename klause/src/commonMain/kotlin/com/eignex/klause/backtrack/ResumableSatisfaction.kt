@@ -37,6 +37,7 @@ internal class ResumableSatisfaction(
     atRoot: ((PropagationSession) -> Boolean)? = null,
     private val affineFactorId: Int = -1,
     onPropagationWork: ((() -> Long) -> Unit)? = null,
+    private val containingSlice: ExecutionControl = ExecutionControl.Never,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: ExecutionControl = params0.cancellation
@@ -51,8 +52,9 @@ internal class ResumableSatisfaction(
     )
     private val params = params0.copy(
         cancellation = object : ExecutionControl() {
-            override fun isCancelled(): Boolean = globalToken() || slice.expired()
-            override fun deadline() = listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
+            override fun isCancelled(): Boolean = globalToken() || containingSlice() || slice.expired()
+            override fun deadline() =
+                listOfNotNull(globalToken.deadline(), containingSlice.deadline(), slice.deadline).minOrNull()
             override val workScheduled get() = globalToken.workScheduled()
             override val stopPolling get() = globalToken.stopPolling
         },

@@ -32,7 +32,8 @@ data class CoreGuidedStats(
         cores: Long = this.cores,
         largestCore: Int = this.largestCore,
         lowerBound: BigInt? = this.lowerBound,
-    ): CoreGuidedStats = CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit, continuationGrants)
+    ): CoreGuidedStats =
+        CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit, continuationGrants)
 
     /** Copy resource limits while retaining the continuation observations. */
     fun copy(
@@ -41,7 +42,8 @@ data class CoreGuidedStats(
         lowerBound: BigInt? = this.lowerBound,
         workLimit: Long? = this.workLimit,
         activeMillisLimit: Long? = this.activeMillisLimit,
-    ): CoreGuidedStats = CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit, continuationGrants)
+    ): CoreGuidedStats =
+        CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit, continuationGrants)
 
     /** Combine workers of the same objective invocation; floors take their maximum. */
     fun mergedWith(other: CoreGuidedStats): CoreGuidedStats = CoreGuidedStats(

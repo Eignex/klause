@@ -5,6 +5,7 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.solver.GapBoundedSearch
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -20,6 +21,49 @@ class PortfolioOptimalityGapTest {
     private val gap = OptimalityGap(
         OptimalityTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10_000))), integral = true,
     )
+
+    @Test
+    fun `a published exact floor should close its accepted incumbent without a positive gap`() {
+        val bounds = SharedObjectiveBound()
+        val arm = GapScript(listOf(2.0), null, Double.POSITIVE_INFINITY) { bounds.publish(2.0) }
+
+        val result = run(arm, ExecutionControl { arm.slices >= 4 }, bounds, LinearObjective(constant = 2L), null)
+
+        assertIs<MinimizeResult.Optimal>(result)
+    }
+
+    @Test
+    fun `a rounded down incumbent should not meet a lower exact source floor`() {
+        val bounds = SharedObjectiveBound()
+        val arm = GapScript(listOf(9_007_199_254_740_992.0), null, Double.POSITIVE_INFINITY) {
+            bounds.publish(9_007_199_254_740_992.0)
+        }
+
+        val result = run(arm, ExecutionControl { arm.slices >= 4 }, bounds,
+            LinearObjective(constant = 9_007_199_254_740_993L), null)
+
+        assertIs<MinimizeResult.BestFound>(result)
+    }
+
+    @Test
+    fun `a scalar match without exact objective capture should not close the source`() {
+        val bounds = SharedObjectiveBound()
+        val arm = GapScript(listOf(2.0), null, Double.POSITIVE_INFINITY) { bounds.publish(2.0) }
+
+        val result = run(arm, ExecutionControl { arm.slices >= 4 }, bounds, tolerance = null)
+
+        assertIs<MinimizeResult.BestFound>(result)
+    }
+
+    @Test
+    fun `gap scoped facts should not establish an exact source closure`() {
+        val bounds = SharedObjectiveBound()
+        val arm = GapScript(listOf(2.0), null, 1.0) { bounds.publish(2.0) }
+
+        val result = run(arm, ExecutionControl { arm.slices >= 4 }, bounds, LinearObjective(constant = 2L), null)
+
+        assertIs<MinimizeResult.BestFound>(result)
+    }
 
     @Test
     fun `an arm ahead of the pool should be credited only the bound its own search proved`() {
@@ -56,13 +100,16 @@ class PortfolioOptimalityGapTest {
         arm: GapScript,
         stop: ExecutionControl,
         bounds: SharedObjectiveBound? = null,
+        exactObjective: LinearObjective? = null,
+        tolerance: OptimalityGap? = gap,
     ): MinimizeResult {
         val worker = trackingWorker("gap", 0, arm).also {
-            it.optimalityGap = gap
+            it.optimalityGap = tolerance
             if (bounds != null) it.sharedPools = SharedPools(null, null, bounds)
         }
         return Portfolio.thompson(listOf(worker), seed = 0, reseedStaleThreshold = 0).also {
             it.runTimeSource = TestTimeSource()
+            it.exactLinearObjective = exactObjective
         }.use { it.minimize(stop) }
     }
 
