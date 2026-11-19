@@ -38,7 +38,7 @@ import kotlin.test.assertTrue
 class QfLiraSolverDifferenceTest {
     @Test
     fun `a large strict chain should complete through its retained margin LP`() {
-        val chain = Array(129) { column ->
+        val chain = Array<Factor>(129) { column ->
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(column, column + 1),
                 doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0)
         }
