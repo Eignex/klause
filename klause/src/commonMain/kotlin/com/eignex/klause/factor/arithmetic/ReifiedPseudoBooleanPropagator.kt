@@ -11,11 +11,11 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
 internal class ReifiedPseudoBooleanPropagator(
-    private val auxBoolVar: Int,
-    private val weights: LongArray,
-    private val literals: IntArray,
-    private val op: PbOp,
-    private val bound: Long,
+    val auxBoolVar: Int,
+    val weights: LongArray,
+    val literals: IntArray,
+    val op: PbOp,
+    val bound: Long,
     val boolVars: IntArray,
     val intVars: IntArray,
 ) : Propagator {

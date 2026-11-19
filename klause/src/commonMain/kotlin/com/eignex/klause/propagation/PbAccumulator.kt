@@ -1,269 +1,222 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.util.collections.IntArrayList
-import com.eignex.util.collections.MutableIntLongMap
-import com.eignex.util.numbers.addExactOrNull
-import com.eignex.util.numbers.mulExactOrNull
-import com.eignex.util.numbers.subExactOrNull
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.ceilDiv
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.minOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.rem
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.unaryMinus
 
-/**
- * A pseudo-Boolean constraint in signed-per-variable cutting-planes form, used as the accumulating
- * nogood of [PbConflictResolvent]. The constraint is
- *
- *     Σ_v coef(v) · x_v  ≥  rhs        (x_v ∈ {0, 1}, coef(v) may be negative)
- *
- * A clause `ℓ₁ ∨ … ∨ ℓₖ` is the degenerate case `Σ ℓᵢ ≥ 1`; a pseudo-Boolean `Σ wᵢℓᵢ ≥ b` maps in by
- * folding each literal onto its variable (a negative literal `¬x` contributes `w·(1−x)`, i.e. `−w` on
- * `x` and `+w` to the right-hand side after moving the constant).
- *
- * Cutting-planes conflict analysis derives new constraints by *generalized resolution* (Hooker,
- * "Generalized resolution and cutting planes", Ann. Oper. Res. 12, 1988,
- * https://doi.org/10.1007/BF02186368): scale two `≥` constraints by positive multipliers so a pivot
- * variable's coefficients cancel, add them, and saturate. Every such step is a non-negative linear
- * combination plus Chvátal-Gomory rounding, so the result is implied by the inputs — the learned
- * constraint is always sound. All arithmetic is
- * overflow-guarded; an operation that would exceed [Long] range returns false so the caller can fall
- * back to clause resolution instead of producing a corrupt constraint.
- *
- * The "positive-literal degree" — the bound once every term is rewritten over a true-going literal —
- * is `rhs + Σ_{coef(v)<0} |coef(v)|`; the positive-literal coefficient of `v` is `|coef(v)|` and its
- * literal is `x_v` when `coef(v) > 0`, else `¬x_v`. That form is what [materialize] emits and what the
- * slack / saturation reason about.
- */
 internal class PbAccumulator {
-    /** var → signed coefficient on `x_v`. Zero entries are pruned. */
-    private val coef = MutableIntLongMap()
+    private val coefficients = LinkedHashMap<Int, BigInt>()
+    var budget: ArithmeticLearningBudget? = null
+    private var rhs = BIG_ZERO
 
-    /** Invoke [action] for each stored variable. Order is unspecified. */
-    inline fun forEachVar(action: (Int) -> Unit) {
-        coefficients.forEach { variable, _ -> action(variable) }
+    fun forEachVar(action: (Int) -> Unit) {
+        for (variable in coefficients.keys) {
+            budget?.spend()
+            action(variable)
+        }
     }
-
-    /** Exposed for the inline [forEachVar]; not part of the contract. */
-    @PublishedApi internal val coefficients: MutableIntLongMap get() = coef
-    var rhs: Long = 0L
 
     fun clear() {
-        coef.clear()
-        rhs = 0L
+        coefficients.clear()
+        rhs = BIG_ZERO
     }
 
-    fun isEmpty(): Boolean = coef.isEmpty()
+    fun isEmpty(): Boolean = coefficients.isEmpty()
 
-    fun hasSafeActivity(): Boolean {
-        var total = 0L
-        var degree = rhs
-        var safe = true
-        coef.forEach { _, c ->
-            if (safe) {
-                if (c == Long.MIN_VALUE) {
-                    safe = false
-                } else {
-                    val magnitude = if (c < 0L) -c else c
-                    val next = addExactOrNull(total, magnitude)
-                    if (next == null) safe = false else total = next
-                    if (c < 0L) {
-                        val nextDegree = addExactOrNull(degree, magnitude)
-                        if (nextDegree == null) safe = false else degree = nextDegree
-                    }
-                }
-            }
+    fun hasSafeActivity(): Boolean = positiveDegree() > BIG_ZERO
+
+    private fun put(variable: Int, value: BigInt) {
+        if (value == BIG_ZERO) coefficients.remove(variable) else {
+            if (!coefficients.containsKey(variable)) budget?.spend(bytes = 64)
+            coefficients[variable] = value
         }
-        return safe && degree > 0L
     }
 
-    private fun put(v: Int, c: Long) {
-        if (c == 0L) coef.remove(v) else coef.put(v, c)
+    fun positiveDegree(): BigInt {
+        var degree = rhs
+        for (coefficient in coefficients.values) {
+            budget?.scalar(degree, coefficient)
+            if (coefficient < BIG_ZERO) degree -= coefficient
+        }
+        return degree
     }
 
-    /** The all-positive-literal degree; the constraint is infeasible iff this exceeds the total
-     *  available positive weight. */
-    fun positiveDegree(): Long {
-        var d = rhs
-        coef.forEach { _, c -> if (c < 0L) d -= c } // subtract negative ⇒ add magnitude
-        return d
+    fun conflicting(state: PropagationState): Boolean {
+        var available = BIG_ZERO
+        for ((variable, coefficient) in coefficients) {
+            budget?.scalar(available, coefficient)
+            val truth = state.boolValues[variable]
+            if (truth == true || (truth == null && coefficient > BIG_ZERO)) available += coefficient
+        }
+        return available < rhs
     }
 
-    /** Signed coefficient on `x_v` (0 if absent). */
-    fun coefOf(v: Int): Long = coef.getOrDefault(v, 0L)
+    fun coefOf(variable: Int): BigInt = coefficients[variable] ?: BIG_ZERO
 
-    /**
-     * Load this accumulator from a pseudo-Boolean constraint already in `≥` form: `Σ weightsᵢ·literalsᵢ ≥
-     * geBound`. The caller normalizes any `LE` constraint first (flip every literal, set the bound to
-     * `Σweights − bound`). Weights must be positive (a normalized PB or a clause). Returns false on overflow.
-     */
     fun loadPb(weights: LongArray, literals: IntArray, geBound: Long): Boolean {
+        budget?.spend(work = weights.size.toLong(), bytes = weights.size.toLong() * 40)
+        return loadPb(Array(weights.size) { bigIntOf(weights[it]) }, literals, bigIntOf(geBound))
+    }
+
+    fun loadPb(weights: Array<BigInt>, literals: IntArray, geBound: BigInt): Boolean {
         clear()
         rhs = geBound
-        for (i in literals.indices) {
-            val lit = literals[i]
-            val w = weights[i]
-            val v = Lit.variable(lit)
-            if (Lit.isPositive(lit)) {
-                if (!addCoef(v, w)) return false
-            } else {
-                // w·¬x = w − w·x  ⇒ −w on x, and +w moves to the rhs constant (degree drops by w).
-                if (!addCoef(v, -w)) return false
-                rhs = subExactOrNull(rhs, w) ?: return false
+        for (index in literals.indices) {
+            val literal = literals[index]
+            val weight = weights[index]
+            val variable = Lit.variable(literal)
+            budget?.scalar(coefOf(variable), weight)
+            if (Lit.isPositive(literal)) put(variable, coefOf(variable) + weight) else {
+                put(variable, coefOf(variable) - weight)
+                budget?.scalar(rhs, weight)
+                rhs -= weight
             }
         }
         return true
     }
 
-    /** Load a clause `ℓ₁ ∨ … ∨ ℓₖ` as `Σ ℓᵢ ≥ 1`. Returns false on overflow (unreachable for clauses). */
     fun loadClause(literals: IntArray): Boolean {
-        val ones = LongArray(literals.size) { 1L }
-        return loadPb(ones, literals, geBound = 1L)
+        budget?.spend(work = literals.size.toLong(), bytes = literals.size.toLong() * 8)
+        return loadPb(Array(literals.size) { BIG_ONE }, literals, BIG_ONE)
     }
 
-    private fun addCoef(v: Int, delta: Long): Boolean {
-        val cur = coef.getOrDefault(v, 0L)
-        val next = addExactOrNull(cur, delta) ?: return false
-        put(v, next)
+    fun addScaled(other: PbAccumulator, mulSelf: Long, mulOther: Long): Boolean =
+        addScaled(other, bigIntOf(mulSelf), bigIntOf(mulOther))
+
+    fun addScaled(other: PbAccumulator, mulSelf: BigInt, mulOther: BigInt): Boolean {
+        require(mulSelf > BIG_ZERO && mulOther > BIG_ZERO)
+        for ((variable, coefficient) in coefficients) {
+            budget?.scalar(coefficient, mulSelf)
+            coefficients[variable] = coefficient * mulSelf
+        }
+        budget?.scalar(rhs, mulSelf)
+        budget?.scalar(other.rhs, mulOther)
+        rhs = rhs * mulSelf + other.rhs * mulOther
+        for ((variable, coefficient) in other.coefficients) {
+            budget?.scalar(coefficient, mulOther)
+            val scaled = coefficient * mulOther
+            budget?.scalar(coefOf(variable), scaled)
+            put(variable, coefOf(variable) + scaled)
+        }
         return true
     }
 
-    /**
-     * Generalized resolution: `this := mulSelf·this + mulOther·other`, both multipliers > 0, chosen by
-     * the caller so the pivot variable's coefficients cancel. Returns false on overflow (leaving this
-     * accumulator in a partially-updated state the caller must discard).
-     */
-    fun addScaled(other: PbAccumulator, mulSelf: Long, mulOther: Long): Boolean {
-        if (mulSelf != 1L) {
-            var overflowed = false
-            // Rewriting a stored value never rehashes, so this updates in place rather than over a
-            // snapshot of the keys.
-            coef.forEach { v, c ->
-                val scaled = mulExactOrNull(c, mulSelf)
-                if (scaled == null) overflowed = true else coef.put(v, scaled)
-            }
-            if (overflowed) return false
-        }
-        val scaledRhsSelf = mulExactOrNull(rhs, mulSelf) ?: return false
-        val scaledRhsOther = mulExactOrNull(other.rhs, mulOther) ?: return false
-        rhs = addExactOrNull(scaledRhsSelf, scaledRhsOther) ?: return false
-        var failed = false
-        other.coef.forEach { v, c ->
-            if (!failed) {
-                val add = mulExactOrNull(c, mulOther)
-                if (add == null || !addCoef(v, add)) failed = true
-            }
-        }
-        return !failed
+    fun guardedBy(guard: Int) {
+        if (guard == Lit.NONE) return
+        val degree = positiveDegree()
+        if (degree <= BIG_ZERO) return
+        val variable = Lit.variable(guard)
+        budget?.scalar(coefOf(variable), degree)
+        // The inactive guard can pay the complete positive degree, independently of the body.
+        if (Lit.isPositive(guard)) {
+            put(variable, coefOf(variable) - degree)
+            budget?.scalar(rhs, degree)
+            rhs -= degree
+        } else put(variable, coefOf(variable) + degree)
     }
 
-    /**
-     * Saturate: clamp every positive-literal coefficient to the positive degree (a coefficient larger
-     * than the degree can never be the deciding term, so capping it is a sound weakening that also keeps
-     * magnitudes bounded). No-op when the degree is non-positive.
-     */
     fun saturate() {
-        val d = positiveDegree()
-        if (d <= 0L) return
-        coef.forEach { v, c ->
-            if (c > d) {
-                coef.put(v, d)
-            } else if (c < -d) {
-                coef.put(v, -d)
-            }
+        val degree = positiveDegree()
+        if (degree <= BIG_ZERO) return
+        var negatives = BIG_ZERO
+        for ((variable, coefficient) in coefficients) {
+            budget?.scalar(coefficient, degree)
+            val weight = minOf(coefficient.abs(), degree)
+            coefficients[variable] = if (coefficient > BIG_ZERO) weight else -weight
+            if (coefficient < BIG_ZERO) negatives += weight
         }
+        budget?.scalar(degree, negatives)
+        rhs = degree - negatives
     }
 
-    /** Divide through by the gcd of all coefficients and round the degree up (Chvátal-Gomory) — sound,
-     *  and keeps coefficients from growing across resolution steps. No-op when the gcd is 0 or 1. */
     fun normalizeByGcd() {
-        var g = 0L
-        coef.forEach { _, c -> if (g != 1L) g = gcd(g, c) }
-        if (g <= 1L) return
-        coef.forEach { v, c -> coef.put(v, c / g) }
-        // Positive-literal degree divides with ceil; recover rhs from the divided coefficients.
-        val newPosDegree = ceilDiv(positiveDegree(), g)
-        var negSum = 0L
-        coef.forEach { _, c -> if (c < 0L) negSum -= c }
-        rhs = newPosDegree - negSum
+        var divisor = BIG_ZERO
+        for (coefficient in coefficients.values) {
+            budget?.scalar(divisor, coefficient)
+            divisor = divisor.gcd(coefficient.abs())
+        }
+        if (divisor <= BIG_ONE) return
+        val priorDegree = positiveDegree()
+        budget?.scalar(priorDegree, divisor)
+        val degree = ceilDiv(priorDegree, divisor)
+        var negatives = BIG_ZERO
+        for ((variable, coefficient) in coefficients) {
+            budget?.scalar(coefficient, divisor)
+            val next = coefficient / divisor
+            coefficients[variable] = next
+            if (next < BIG_ZERO) negatives -= next
+        }
+        budget?.scalar(degree, negatives)
+        rhs = degree - negatives
     }
 
-    /**
-     * Selective reduction before dividing by [divisor]: weaken away (drop, reducing the degree
-     * by its weight) every literal — except [keepVar] — that is **not currently false** and whose
-     * coefficient is **not divisible** by [divisor]. Those are exactly the literals a subsequent
-     * [divideRoundUp] would round up into spurious slack, so dropping them first keeps the divided
-     * constraint tight (the resolvent stays conflicting). Falsified literals contribute no slack and are
-     * kept; divisible ones divide exactly and are kept — so a unit-weight (`divisor == 1`) reason is left
-     * untouched. Sound: dropping a literal from `Σ aᵢℓᵢ ≥ d` yields `Σ_{i≠j} aᵢℓᵢ ≥ d − aⱼ`.
-     */
-    fun weakenForDivision(keepVar: Int, divisor: Long, isFalse: (Int) -> Boolean) {
-        if (divisor <= 1L) return // everything divides by 1 — nothing to weaken
-        // Removal shifts entries, so the candidates are collected before any of them is dropped.
-        val candidates = IntArrayList(coef.size)
-        coef.forEach { v, _ -> if (v != keepVar) candidates.add(v) }
-        candidates.forEach { v ->
-            val c = coef.getOrDefault(v, 0L)
-            val mag = if (c < 0L) -c else c
-            if (mag % divisor != 0L && !isFalse(Lit.make(v, c > 0L))) {
-                if (c > 0L) rhs -= c // drop the literal, reducing the degree by its weight
-                coef.remove(v)
+    fun weakenForDivision(keepVar: Int, divisor: Long, isFalse: (Int) -> Boolean) =
+        weakenForDivision(keepVar, bigIntOf(divisor), isFalse)
+
+    fun weakenForDivision(keepVar: Int, divisor: BigInt, isFalse: (Int) -> Boolean) {
+        if (divisor <= BIG_ONE) return
+        val iterator = coefficients.iterator()
+        while (iterator.hasNext()) {
+            val (variable, coefficient) = iterator.next()
+            budget?.scalar(coefficient, divisor)
+            if (variable != keepVar && coefficient.abs() % divisor != BIG_ZERO &&
+                !isFalse(Lit.make(variable, coefficient > BIG_ZERO))) {
+                if (coefficient > BIG_ZERO) {
+                    budget?.scalar(rhs, coefficient)
+                    rhs -= coefficient
+                }
+                iterator.remove()
             }
         }
     }
 
-    /**
-     * Divide by [d] > 1 and round up (Chvátal-Gomory): every positive-literal coefficient and the degree
-     * are replaced by their ceil-division. Sound (a valid cutting plane) and the core strengthening step
-     * of cutting-planes learning. [d] is typically the pivot's reason coefficient.
-     */
-    fun divideRoundUp(d: Long) {
-        if (d <= 1L) return
-        coef.forEach { v, c -> coef.put(v, if (c >= 0L) ceilDiv(c, d) else -ceilDiv(-c, d)) }
-        val newPosDegree = ceilDiv(positiveDegree(), d)
-        var negSum = 0L
-        coef.forEach { _, c -> if (c < 0L) negSum -= c }
-        rhs = newPosDegree - negSum
+    fun divideRoundUp(divisor: Long) = divideRoundUp(bigIntOf(divisor))
+
+    fun divideRoundUp(divisor: BigInt) {
+        if (divisor <= BIG_ONE) return
+        val priorDegree = positiveDegree()
+        budget?.scalar(priorDegree, divisor)
+        val degree = ceilDiv(priorDegree, divisor)
+        var negatives = BIG_ZERO
+        for ((variable, coefficient) in coefficients) {
+            budget?.scalar(coefficient, divisor)
+            val weight = ceilDiv(coefficient.abs(), divisor)
+            coefficients[variable] = if (coefficient > BIG_ZERO) weight else -weight
+            if (coefficient < BIG_ZERO) negatives += weight
+        }
+        budget?.scalar(degree, negatives)
+        rhs = degree - negatives
     }
 
-    /**
-     * Materialize to a normalized pseudo-Boolean `Σ wᵢ·literalsᵢ ≥ degree` with all `wᵢ > 0`, or null
-     * when the constraint is trivially true (degree ≤ 0) — nothing to learn. Coefficients are capped at
-     * the degree (saturated) so the emitted constraint is canonical.
-     */
     fun materialize(): PbLearned? {
         saturate()
+        normalizeByGcd()
         val degree = positiveDegree()
-        if (degree <= 0L) return null
-        val n = coef.size
-        val weights = LongArray(n)
-        val literals = IntArray(n)
-        var i = 0
-        coef.forEach { v, c ->
-            if (c != 0L) {
-                weights[i] = if (c > 0L) c else -c
-                literals[i] = Lit.make(v, c > 0L)
-                i++
-            }
+        if (degree <= BIG_ZERO || coefficients.isEmpty()) return null
+        budget?.spend(bytes = coefficients.size.toLong() * 12)
+        val weights = Array(coefficients.size) { BIG_ZERO }
+        val literals = IntArray(coefficients.size)
+        var index = 0
+        for ((variable, coefficient) in coefficients) {
+            budget?.spend()
+            weights[index] = coefficient.abs()
+            literals[index++] = Lit.make(variable, coefficient > BIG_ZERO)
         }
-        if (i == 0) return null
-        return PbLearned(weights.copyOf(i), literals.copyOf(i), degree)
-    }
-
-    private companion object {
-        fun gcd(a: Long, b: Long): Long {
-            var x = if (a < 0) -a else a
-            var y = if (b < 0) -b else b
-            while (y != 0L) {
-                val t = x % y
-                x = y
-                y = t
-            }
-            return x
-        }
-
-        fun ceilDiv(a: Long, b: Long): Long {
-            val q = a / b
-            return if (a % b != 0L && (a xor b) >= 0L) q + 1 else q
-        }
+        return PbLearned(weights, literals, degree)
     }
 }
 
-/** A materialized learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree`, all weights > 0. */
-internal class PbLearned(val weights: LongArray, val literals: IntArray, val degree: Long)
+internal class PbLearned(val weights: Array<BigInt>, val literals: IntArray, val degree: BigInt)
