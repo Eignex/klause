@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.floor
+import kotlin.math.sqrt
 
 internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
@@ -26,8 +27,8 @@ internal class LpDirectionalHistory(
     private var stamp = 0L
     private var depth = 0
     private var objective = Double.NaN
-    private var upSamples = 0
-    private var downSamples = 0
+    private var reliableStamp = -1L
+    private var observed = false
 
     fun beginNode(level: Int) {
         stamp++
@@ -38,17 +39,17 @@ internal class LpDirectionalHistory(
 
     val retainedEntries: Int get() = gains.size + parentCount
 
-    val hasTwoSidedSamples: Boolean get() = upSamples >= RELIABILITY && downSamples >= RELIABILITY
+    val hasReliableHistory: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
-    val hasObservations: Boolean get() = upSamples > 0 || downSamples > 0
+    val hasObservations: Boolean get() = observed
 
     fun clear(report: Boolean = true) {
         gains.clear()
         trimParents(0)
         pending = null
         objective = Double.NaN
-        upSamples = 0
-        downSamples = 0
+        reliableStamp = -1L
+        observed = false
         if (report) observe("RESET")
     }
 
@@ -68,8 +69,10 @@ internal class LpDirectionalHistory(
         direction.count = minOf(direction.count + 1, 8)
         direction.mean += (normalized - direction.mean) / direction.count
         direction.stamp = stamp
-        if (child.up) upSamples = minOf(upSamples + 1, RELIABILITY)
-        else downSamples = minOf(downSamples + 1, RELIABILITY)
+        observed = true
+        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
+            reliableStamp = maxOf(reliableStamp, minOf(history.down.stamp, history.up.stamp))
+        }
         observe(if (child.up) "UP" else "DOWN")
     }
 
@@ -144,7 +147,7 @@ internal class LpDirectionalHistory(
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
         val down = history.down.mean * fraction
         val up = history.up.mean * (1.0 - fraction)
-        val score = minOf(down, up) + maxOf(down, up) / 6.0
+        val score = sqrt(down) * sqrt(up)
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
