@@ -512,7 +512,7 @@ numerical witness search. The numerical companions capture their own exact envel
 rows and root sides, without importing propagated nominal sides. Their source scope
 alone identifies accepted-set bounds; nominal bounds keep their nominal scope.
 An opaque reconstruction or changed objective withholds that separate authority.
-Different coordinate layouts retain exact envelope execution, with no second feasibility
+Explicit envelope requests with different coordinate layouts retain exact envelope execution, with no second feasibility
 band. Source publication still checks the original decimal source. Bound metadata identifies
 the accepted-set envelope separately from nominal-source bounds; neither establishes
 independent proof validation. Exact source requests retain their original model.
