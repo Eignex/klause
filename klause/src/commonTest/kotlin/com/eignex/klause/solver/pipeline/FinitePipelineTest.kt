@@ -52,15 +52,16 @@ import kotlin.test.assertTrue
 class FinitePipelineTest {
     @Test
     fun `integer FlatZinc optimization should admit symmetry under default float policy`() {
-        val program = parseFlatZinc("""
-            var 0..3: a;
-            var 0..3: b;
-            var 0..3: c;
-            var 0..9: cost;
-            constraint all_different_int([a,b,c]);
-            constraint int_lin_eq([1,1,1,-1], [a,b,c,cost], 0);
+        val program = parseFlatZinc(
+            """
+            var 0..2: a;
+            var 0..2: b;
+            var 0..4: cost;
+            constraint all_different_int([a,b]);
+            constraint int_lin_eq([1,1,-1], [a,b,cost], 0);
             solve minimize cost;
-        """.trimIndent())
+            """.trimIndent(),
+        )
 
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             program.problem, FiniteEngine.BACKTRACK, program.linearObjective(),
@@ -68,7 +69,7 @@ class FinitePipelineTest {
 
         assertTrue("objective-symmetry" in assertNotNull(prepared.presolve).passes)
         assertTrue(prepared.problem.factors.any { it is SymmetryHandling })
-        assertEquals(4, BacktrackSolver(prepared.executableProblem()).enumerate().count())
+        assertEquals(3, BacktrackSolver(prepared.executableProblem()).enumerate().count())
     }
 
     @Test

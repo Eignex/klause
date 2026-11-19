@@ -277,6 +277,7 @@ the ordinary scan with objective-column protection. Disabling `objective-symmetr
 also restores that scan. Counting, sampling and enumeration retain their solution
 set. Discovery and verification share the preparation allowance, with structural
 size and refinement-work limits; singleton domain/cost seeds skip refinement.
+One source-bound incidence snapshot serves all individualization leaves in a scan.
 Typed integer and Boolean rows remain exact under a format's floating-point
 tolerance policy; that unused real tolerance does not exclude their symmetry scan.
 
