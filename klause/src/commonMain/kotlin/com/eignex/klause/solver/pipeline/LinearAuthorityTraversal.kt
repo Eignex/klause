@@ -620,8 +620,13 @@ internal class LinearAuthorityTraversal(
             budget.observe(preparation = 1L)
             (proximityCenter ?: incumbent()?.first)?.let { sample ->
                 if (split.coordinate.id !in 0 until sample.numIntVars) false
-                else BigFraction.of(sample.exactIntValue(split.coordinate.id), BIG_ONE) >
-                    split.threshold
+                else {
+                    val above = BigFraction.of(sample.exactIntValue(split.coordinate.id), BIG_ONE) > split.threshold
+                    if (proximityCenter == null) above else {
+                        observe("numericalProximityBranchPreferences")
+                        !above
+                    }
+                }
             } ?: false
         } else false
         if (preferUpper) observe("numericalIncumbentBranchPreferences")
