@@ -210,6 +210,21 @@ internal class LinearAuthority(
             val baselineFamily = family
             val baselineQuery = prepared
             val currentRows = checkNotNull(family.cuts).rows
+            if (baselineMask == null && prepared.activeMixedCuts > 0) {
+                cutLifecycle.containing("POINT_SELECTION") { cutCost(1L, 0L) }
+                if (cancellation() || budget.funding?.paused == true) {
+                    return base.copy(paused = budget.funding?.paused == true)
+                }
+                policy.observe("AdmissionChecks")
+                policy.observe("AdmissionActiveCutsSum", prepared.activeCuts.toLong())
+                policy.observe("AdmissionCoordinatesSum", prepared.coordinates.size.toLong())
+                if (prepared.activeCuts >= prepared.coordinates.size) {
+                    pointFallback = family
+                    policy.observe("DeclinedCutCount")
+                    return base
+                }
+                policy.observe("AdmittedCutCount")
+            }
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
             if (!generatedRecipe && !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
