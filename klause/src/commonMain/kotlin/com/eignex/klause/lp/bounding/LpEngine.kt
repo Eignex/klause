@@ -165,6 +165,7 @@ internal class LpEngine(
     internal val sourcePreparation: LpSourcePreparation =
         params0.lpConfig?.sourcePreparation ?: params0.lpPlan.sourcePreparation,
     private val eagerSourcePreparation: Boolean = false,
+    private val automaticSparseBudgetMillis: Long? = params0.solveBudgetMillis,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -1888,7 +1889,10 @@ internal class LpEngine(
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation) { admission ->
+                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation,
+                    automaticSparseWorkAllowance = automaticSparseBudgetMillis?.let {
+                        lpWorkAllowance(it, requestedPlan.lpWorkBudgetFraction)
+                    }) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted
@@ -2010,7 +2014,7 @@ private const val MIN_NODE_WORK_OPS = 10_000L
 private const val MAX_NODE_WORK_OPS = 100_000_000L
 
 /** Where the adaptive budget starts, before any solve has reported. */
-private const val INITIAL_NODE_WORK_OPS = 1_000_000L
+internal const val INITIAL_NODE_WORK_OPS = 1_000_000L
 
 /** Divisor on the size-derived work baseline: `columns / 40` iterations. */
 private const val SIZE_BUDGET_DIVISOR = 40L

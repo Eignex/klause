@@ -162,6 +162,7 @@ object LpAutoConfig {
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
         sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,
+        automaticSparseWorkAllowance: Long? = null,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -414,7 +415,13 @@ object LpAutoConfig {
             (explicitSparse || (!explicitOrdinary && (!plan.bounding || cells > baseCap))) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
-            if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
+            val rootCeiling = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK)
+            val required = rootCeiling + INITIAL_NODE_WORK_OPS
+            if (!explicitSparse && automaticSparseWorkAllowance != null && automaticSparseWorkAllowance < required) {
+                SparseLpAdmission(mapOf("DeclineInvocationWork" to 1L, "Automatic" to 1L,
+                    "InvocationWorkAllowance" to automaticSparseWorkAllowance, "RequiredInvocationWork" to required,
+                    "PreparationWork" to 0L))
+            } else if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
                 minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
                 sourcePreparation, automatic = !explicitSparse)
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))

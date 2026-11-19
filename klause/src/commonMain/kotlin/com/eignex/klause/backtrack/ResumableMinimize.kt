@@ -697,6 +697,9 @@ internal class ResumableMinimize(
         lpEngine = resources.own(
             LpEngine(
                 problem, objective, params.lpParams(), sink, slackContext(), deferred = true,
+                automaticSparseBudgetMillis = runDeadline()?.let {
+                    (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds
+                } ?: params.solveBudgetMillis?.let { it - startMark.elapsedNow().inWholeMilliseconds },
                 nodeWorkAllowance = {
                     if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()

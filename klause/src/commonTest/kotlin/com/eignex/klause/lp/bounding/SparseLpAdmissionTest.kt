@@ -640,6 +640,62 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `automatic sparse admission requires allocated capacity when the invocation budget is known`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val cases = listOf(Triple<Long?, Double, Boolean>(null, 0.25, true),
+            Triple(10_000L, 0.25, false), Triple(30_199L, 0.25, false), Triple(30_200L, 0.25, true),
+            Triple(0L, 0.25, false), Triple(40_000L, 0.0, false))
+        for ((budget, fraction, admitted) in cases) {
+            val base = LpPlan(lpWorkBudgetFraction = fraction)
+            val sink = SolveStatsSink("sparse-invocation-capacity")
+            LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO, lpPlan = base), sink,
+                automaticSparseBudgetMillis = budget).use { engine ->
+                val metrics = sink.snapshot().lp.sparseTrial
+
+                assertEquals(admitted, metrics["Admitted"] == 1L)
+                if (!admitted) {
+                    assertEquals(1L, metrics["DeclineInvocationWork"])
+                    assertEquals(0L, metrics["PreparationWork"])
+                    assertEquals(LpAutoConfig.resolve(problem, LpConfig.parse("default,-sparse-trial"), base, objective),
+                        engine.params.lpPlan)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `explicit sparse admission retains its resource policy under a short invocation`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val sink = SolveStatsSink("explicit-sparse-invocation")
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink,
+            automaticSparseBudgetMillis = 0L).use {
+            assertEquals(1L, sink.snapshot().lp.sparseTrial["Admitted"])
+        }
+    }
+
+    @Test
+    fun `automatic invocation capacity follows a smaller caller root ceiling`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+        val sink = SolveStatsSink("sparse-caller-invocation-capacity")
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)),
+            LpParams(lpConfig = LpConfig.AUTO, lpPlan = LpPlan(rootMaxWork = 1000L)), sink,
+            automaticSparseBudgetMillis = 1000L).use { engine ->
+            assertEquals(1L, sink.snapshot().lp.sparseTrial["Admitted"])
+            assertEquals(1000L, engine.params.lpPlan.rootMaxWork)
+        }
+    }
+
+    @Test
     fun `automatic sparse admission retains caller work policy`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),

@@ -334,10 +334,11 @@ query uses the ordinary bound, fixing and conflict consumers under the solve's c
 cuts and expanded hulls stay outside its allowance, and admitted roots enable the
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
-and root scopes. The owner advances its floating cursor in adaptive work quanta; a
-pause publishes nothing and authority edits discard the cursor. Completed floating
-results enter the policy's bound check within a 16 MiB checking reservation;
-exhaustion, cancellation or refusal withholds the root bound.
+and root scopes. The owner advances its floating cursor in adaptive work quanta;
+authority edits discard the cursor. A numerical pause alone supplies no bound authority.
+Paused dual proposals and completed floating results enter the policy's bound check
+within a 16 MiB checking reservation;
+an exhausted, cancelled or refused check supplies no new bound.
 Automatic admission prices source preparation, root optimization and one downstream
 query against the caller's remaining root grant. Each query includes
 row-intersection risk, a conservative basis-refresh estimate and sparse pricing. The
@@ -348,6 +349,12 @@ Source assembly is counted once; the query and continuation estimates are separa
 Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
 techniques and caller work policies. Explicit cut and relaxation strategies retain
 their ordinary route. Automatic sparse admission supplies no additional portfolio slot or slice.
+When the whole invocation has a known deadline, its remaining LP work share must
+fund the capped root grant and an initial downstream query quantum before automatic
+source inspection begins. Insufficient or disabled known capacity declines without
+preparation. Unknown capacity retains the bounded work policy. This admission input
+reads the whole-run deadline once; it changes neither slice nor lifetime grants and
+does not alter ordinary LP funding.
 Automatic roots retain ordinary node bounding where the dense size guard permits
 it; a model beyond that guard keeps root-only sparse admission.
 The `+sparse-trial` override requests the bounded route explicitly, including mixed
