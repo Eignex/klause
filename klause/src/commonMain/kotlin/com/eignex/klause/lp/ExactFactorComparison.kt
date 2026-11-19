@@ -149,6 +149,9 @@ internal class ExactRowForm(
     private val ordered = ExactOrderedTerms(terms)
     val hasBooleanTerms get() = booleanLiterals.isNotEmpty()
 
+    fun sameNumericInputs(previous: List<BigFraction>, current: List<BigFraction>, visit: () -> Boolean): Boolean =
+        terms.keys.all { visit() && previous[it] == current[it] }
+
     fun hintComparison(
         booleanValue: (Int) -> Boolean?,
         admit: (BigFraction) -> Boolean,

@@ -217,6 +217,10 @@ compound clause preferences, and zero disables steering.
 For rows without Boolean terms, completed preferences are reusable for the same
 owned point values. Rows with Boolean terms require fresh evaluation, and closing
 the component releases the retained point and preferences.
+When the point changes, a row without Boolean terms can retain its preference if
+all its numeric coordinates are equal to the preceding completed point's values.
+Rows sharing an activator still need agreeing preferences. Interrupted evaluation
+publishes no hint snapshot.
 
 The incremental route shares bounded cancellation checkpoints across source and
 point-hint scans, independently of accounting. Every debit is recorded directly.
