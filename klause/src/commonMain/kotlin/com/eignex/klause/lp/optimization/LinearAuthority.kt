@@ -165,7 +165,9 @@ internal class LinearAuthority(
         retainBasePoint: Boolean = false, preserveUncutBound: Boolean = false): LinearAuthorityResult =
         if (!preserveUncutBound) advancePointRecipe(source, cancellation, retainBasePoint) else
             boundBaseline.advance(source, cancellation, baseline = {
-                advanceBound(source, cancellation)
+                advanceBound(source, cancellation).also {
+                    if (!it.paused) cutLifecycle.containing("UNCUT_BASELINE") { lp.close() }
+                }
             }, ordinary = { advancePointRecipe(source, cancellation, retainBasePoint) })
 
     private fun advancePointRecipe(source: SourceProofContext, cancellation: ExecutionControl,

@@ -14,7 +14,8 @@ internal class LinearAuthorityBoundBaseline(
         fun matches(other: SourceProofContext): Boolean = source === other ||
             (source.scope.revision == other.scope.revision && source.scope.objective == other.scope.objective &&
                 source.scope.condition.bools == other.scope.condition.bools && source.hasSameLinearData(other) &&
-                source.affineObjectiveAvailable == other.affineObjectiveAvailable && source.semantics == other.semantics &&
+                source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
+                source.semantics == other.semantics &&
                 source.semanticsChecker === other.semanticsChecker)
     }
     private var completed: Completed? = null
