@@ -33,8 +33,8 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
     @Test
-    fun `incumbent guidance should visit the incumbent side of the existing split first`() {
-        for (registered in listOf(false, true)) {
+    fun `incumbent guidance should order splits only within available funding`() {
+        for ((registered, limited) in listOf(false to false, true to false, false to true, true to true)) {
             val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
             val scope = SourceScope(SourceRevision("incumbent-order", "exact-affine"),
                 objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
@@ -51,14 +51,17 @@ class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
                     atoms = if (registered) SearchAtomRegistry(0) else null)
                 assertEquals(ComponentResult.Consistent, session.initialize())
                 assertEquals(SearchNodeDisposition.Expand, component.beforeBranch(session))
+                if (limited) funding.grant(1L)
 
                 val alternatives = assertNotNull(component.nextBranch(session))
                 assertEquals(ComponentResult.Consistent, session.push(alternatives.first()))
+                funding.grant(1_000_000L)
                 assertEquals(SearchNodeDisposition.Prune, component.beforeBranch(session))
 
-                assertEquals(1L, offers.single().ints.single())
+                if (limited) assertTrue(offers.isEmpty()) else assertEquals(1L, offers.single().ints.single())
                 assertEquals(2, alternatives.size)
-                assertEquals(1L, component.observations()["numericalIncumbentBranchPreferences"])
+                assertEquals(if (limited) null else 1L,
+                    component.observations()["numericalIncumbentBranchPreferences"])
             }
         }
     }

@@ -531,9 +531,10 @@ scalar limit and keys beyond the remaining allocation are refused before retenti
 Sharing completions grants no work, lifetime, bound or terminal authority. The
 control changes neither worker admission nor lifetimes.
 
-With completion enabled, the numerical traversal visits the accepted incumbent's
-side of an existing integer split first; both alternatives retain ordinary coverage
-and certification. A checked pooled center starts joint repair without a root
+With completion enabled, an accepted incumbent guides a depth-first numerical dive,
+visiting its side of each existing integer split first. Pending alternatives and
+checked global bounds retain ordinary coverage and certification. A checked pooled
+center starts joint repair without a root
 relaxation. When the frontier's paid root point is available, the first repair pins
 only eligible integers agreeing with that point within `1e-6`, releasing every
 disagreement and leaving continuous columns free. Agreement selects a private
@@ -551,7 +552,10 @@ existing funding; a missing, closed or unaffordable hint falls back to ordinary 
 order without delaying a start or requesting a relaxation, and the repair owner
 releases the snapshot on retirement. Guidance carries no witness, bound or proof
 authority. Continuous columns stay free, cutoff checks stay exact, and later
-proposals keep their captured conditions. Imported points remain query incumbents
+proposals keep their captured conditions. A checked proposal retains its center for
+the matching receiving query, including at the captured cutoff; the query rechecks
+its own source rows and pins before using that point to prune or guide traversal.
+Imported points remain query incumbents
 and centers and earn no discovery reward: only a point the repair query produces
 enters companion publication and original-source rechecking.
 
