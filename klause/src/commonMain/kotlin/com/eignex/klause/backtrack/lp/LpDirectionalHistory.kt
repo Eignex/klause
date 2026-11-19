@@ -19,6 +19,8 @@ internal class LpDirectionalHistory(
         var previousStamp = 0L
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
+
+        val stable: Boolean get() = count >= RELIABILITY && minOf(latest, previous) >= maxOf(latest, previous) * 0.5
     }
 
     private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
@@ -87,13 +89,19 @@ internal class LpDirectionalHistory(
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
         observed = true
-        if (history.down.count > 0 && history.up.count > 0 && (history.down.gain > 0.0 || history.up.gain > 0.0)) {
-            collectionStamp = maxOf(collectionStamp, minOf(history.down.stamp, history.up.stamp))
+        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
+            val majority = if (history.down.count > history.up.count) history.down else history.up
+            val minority = if (majority === history.down) history.up else history.down
+            if (majority.stable && majority.gain > 0.0) {
+                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
+            }
         }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
-            val pairStamp = minOf(history.down.previousStamp, history.up.previousStamp)
-            if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
-            if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
+            if (history.down.stable && history.up.stable) {
+                val pairStamp = minOf(history.down.previousStamp, history.up.previousStamp)
+                if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
+                if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
+            } else observe("UNSTABLE")
         }
         observe(if (child.up) "UP" else "DOWN")
     }
@@ -192,7 +200,7 @@ internal class LpDirectionalHistory(
         val history = gains[variable] ?: return null
         expire(history.down)
         expire(history.up)
-        if (history.down.count < RELIABILITY || history.up.count < RELIABILITY) return null
+        if (!history.down.stable || !history.up.stable) return null
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         return history
@@ -209,6 +217,7 @@ internal class LpDirectionalHistory(
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
+        if (!sampledDirection.stable) return null
         if (sampledDirection.gain <= 0.0) {
             observe("PASSIVE_COLLECTION_ZERO_GAIN")
             return null

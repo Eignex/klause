@@ -414,9 +414,11 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `one large observation cannot replace the smaller recent gain`() {
+    fun `disagreeing gains withhold advice until recent observations stabilize`() {
         val history = LpDirectionalHistory({})
-        for ((gain, expected) in listOf(4.0 to Double.NaN, 8.0 to 4.0, 100.0 to 8.0, 6.0 to 6.0)) {
+        for ((gain, expected) in listOf(
+            4.0 to Double.NaN, 8.0 to 4.0, 100.0 to Double.NaN, 6.0 to Double.NaN, 6.0 to 6.0,
+        )) {
             history.beginNode(0)
             history.record(10.0)
             history.branch(VarRef.Bool(0), 0.5)
