@@ -164,7 +164,10 @@ class CoreGuidedSearchTest {
             nativeSat = false,
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
-            componentFactory = { openings++; listOf(interrupter) },
+            componentFactory = {
+                openings++
+                listOf(interrupter)
+            },
         )
         val problem = Problem(
             40,
