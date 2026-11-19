@@ -94,7 +94,7 @@ class QfLiraSolverLpTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            val point = assertNotNull(session.model().valueOf(component.realAssignmentKey))
+            val point = assertNotNull(session.model().valueOf(component.assignmentKey))
             assertEquals(BigFraction.of(point.ints.single(), BIG_ONE), point.reals.single())
         }
     }
@@ -122,7 +122,7 @@ class QfLiraSolverLpTest {
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
             assertIs<ComponentCheck.Feasible>(component.check(session))
-            val point = assertNotNull(session.model().valueOf(component.realAssignmentKey))
+            val point = assertNotNull(session.model().valueOf(component.assignmentKey))
             assertTrue(point.ints.single() >= BIG_ONE)
             assertEquals(BigFraction.of(point.ints.single(), BIG_ONE), point.reals.single())
         }

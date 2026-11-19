@@ -109,7 +109,7 @@ complete point still passes the selected source-row check before publication.
 Mixed components can reuse a continuous point after checking the asserted integer
 bounds; source integrality, finite-domain membership and all selected rows remain
 required before publishing a complete witness.
-Complete traversal can recheck that point against the selected source comparisons
+Pure-real complete traversal can recheck that point against the selected source comparisons
 before materializing pending LP bounds. Source activities are cached for that owned
 point, while current Boolean constants, strictness and disequality directions are
 checked on each use. Failed checks flush pending source bounds before another LP
