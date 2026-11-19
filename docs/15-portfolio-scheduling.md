@@ -558,6 +558,11 @@ its own source rows and pins before using that point to prune or guide traversal
 Imported points remain query incumbents
 and centers and earn no discovery reward: only a point the repair query produces
 enters companion publication and original-source rechecking.
+A live relaxation-induced query survives publication of an improving point. Later
+ordinary selections resume that same pinned subproblem and retain its branch tree,
+LP state and private incumbent until completion or the existing allowance ends.
+An unchanged query incumbent is not republished. Publication ends the initial
+continuation trial; retaining the query grants no scheduling priority or allowance.
 
 From the availability of a dimension-compatible incumbent through root and center
 preparation and the first proposal, joint repair receives continuation after owed
