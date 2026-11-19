@@ -392,7 +392,7 @@ internal class JointLinearRepair(
                         pooled.bools, limit, budget, stop) else null
                 val relaxation = if (proximity == null && checkedStart && binary == null)
                     requireNotNull(selection).relaxationNeighborhood(
-                    hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
+                        hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
                 if (checkedStart && hint != null) relaxationAttempted = true
                 if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
                 if (binary != null) observe("jointRepairBinarySupportNeighborhoods")

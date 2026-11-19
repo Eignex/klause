@@ -110,10 +110,13 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     @Test
     fun `private and proof traversals should share the containing decision limit`() {
         val columns = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-        val rows = columns.flatMapIndexed { index, column -> listOf(
-            "lower$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "upper$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.ONE), BigFraction.ONE)),
-        ) }.toMap() + ("cover" to SourcePremise(SourceInequality(
+        val rows = columns.flatMapIndexed { index, column ->
+            listOf(
+                "lower$index" to SourcePremise(SourceInequality(
+                    mapOf(column to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.ONE), BigFraction.ONE)),
+            )
+        }.toMap() + ("cover" to SourcePremise(SourceInequality(
             columns.associateWith { BigFraction.ofLong(-2) }, BigFraction.MINUS_ONE)))
         val source = SourceProofContext(scope, columns.toSet(), rows, columns.associateWith { BigFraction.ONE })
         val seed = Sample(booleanArrayOf(), longArrayOf(1, 1))
