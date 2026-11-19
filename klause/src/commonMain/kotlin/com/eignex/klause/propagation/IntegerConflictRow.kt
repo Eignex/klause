@@ -1,6 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.LinearPropagator
+import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
+import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.SharingMemoryObservation
@@ -21,6 +23,7 @@ import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.mulExactOrNull
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.subExactOrNull
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
@@ -68,10 +71,7 @@ internal class IntegerConflictRow private constructor(
             val coefficient = coefficients[i]
             val endpoint = if ((coefficient > BIG_ZERO) != maximum) domain.min else domain.max
             if (wide == null && coefficient.fitsLong()) {
-                if (budget == null) {
-                    state.checkFiniteWork()
-                    state.checkFiniteWork()
-                } else budget.spend(work = 2, bytes = 64)
+                wordWork(state, budget)
                 val contribution = mulExactOrNull(coefficient.toLongExact(), endpoint)
                 val next = contribution?.let { addExactOrNull(narrow, it) }
                 if (next != null) {
@@ -105,6 +105,7 @@ internal class IntegerConflictRow private constructor(
             visit(state, budget)
             domain(state, variables[it], trail)
         }
+        narrowAssertion(state, trail, domains, budget)?.let { return it }
         val contributions = Array(variables.size) { BIG_ZERO }
         var minimum = BIG_ZERO
         for (index in variables.indices) {
@@ -127,6 +128,40 @@ internal class IntegerConflictRow private constructor(
             // Admission certifies a raw bound assertion, without relying on sparse snapping.
             if (tightens && next.fitsLong() &&
                 state.inDomainAt(variables[index], next.toLongExact(), trail, domain)) return true
+        }
+        return false
+    }
+
+    private fun narrowAssertion(state: PropagationState, trail: Int, domains: Array<IntDomain>,
+        budget: ArithmeticLearningBudget?): Boolean? {
+        if (!bound.fitsLong()) return null
+        budget?.spend(bytes = variables.size.toLong() * Long.SIZE_BYTES)
+        val contributions = LongArray(variables.size)
+        var minimum = 0L
+        for (index in variables.indices) {
+            visit(state, budget)
+            val coefficient = coefficients[index]
+            if (!coefficient.fitsLong()) return null
+            val value = if (coefficient > BIG_ZERO) domains[index].min else domains[index].max
+            wordWork(state, budget)
+            val contribution = mulExactOrNull(coefficient.toLongExact(), value) ?: return null
+            minimum = addExactOrNull(minimum, contribution) ?: return null
+            contributions[index] = contribution
+        }
+        val upper = bound.toLongExact()
+        if (minimum > upper) return false
+        for (index in variables.indices) {
+            visit(state, budget)
+            wordWork(state, budget)
+            val other = subExactOrNull(minimum, contributions[index]) ?: return null
+            val residual = subExactOrNull(upper, other) ?: return null
+            val coefficient = coefficients[index].toLongExact()
+            if (residual == Long.MIN_VALUE && coefficient == -1L) return null
+            visit(state, budget)
+            val next = if (coefficient > 0) floorDivLong(residual, coefficient) else ceilDivLong(residual, coefficient)
+            val domain = domains[index]
+            val tightens = if (coefficient > 0) next < domain.max else next > domain.min
+            if (tightens && state.inDomainAt(variables[index], next, trail, domain)) return true
         }
         return false
     }
@@ -283,6 +318,13 @@ internal class IntegerConflictRow private constructor(
 
         private fun visit(state: PropagationState, budget: ArithmeticLearningBudget?) {
             if (budget == null) state.checkFiniteWork() else budget.spend()
+        }
+
+        private fun wordWork(state: PropagationState, budget: ArithmeticLearningBudget?) {
+            if (budget == null) {
+                state.checkFiniteWork()
+                state.checkFiniteWork()
+            } else budget.spend(work = 2, bytes = 64)
         }
     }
 }

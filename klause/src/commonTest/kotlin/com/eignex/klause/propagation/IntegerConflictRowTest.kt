@@ -20,6 +20,56 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `assertion should retain an exact tightening after word activity overflow`() {
+        val inputs = listOf(
+            longArrayOf(2, -2, 1) to longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, 0),
+            longArrayOf(1, 1, -1, 1) to longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, 0),
+        )
+        for ((coefficients, values) in inputs) {
+            val bound = if (values.size == 3) 0L else Long.MAX_VALUE
+            val row = requireNotNull(IntegerConflictRow.source(IntArray(values.size) { it },
+                Array(values.size) { bigIntOf(coefficients[it]) }, bigIntOf(bound), useLo = true))
+            val state = PropagationState(Problem(0, values.size, Array(values.size) {
+                if (it == values.lastIndex) IntDomain(0, 1) else IntDomain(values[it], values[it])
+            }, emptyArray()), Assumptions.None)
+
+            assertTrue(row.assertsAt(state, 0))
+        }
+    }
+
+    @Test
+    fun `overflowing assertion residuals should not invent a tightening`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(1), bigIntOf(1)), bigIntOf(Long.MAX_VALUE - 1), useLo = true))
+        val state = PropagationState(Problem(0, 2,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 5), IntDomain(Long.MAX_VALUE, Long.MAX_VALUE)),
+            emptyArray()), Assumptions.None)
+
+        assertFalse(row.assertsAt(state, 0))
+    }
+
+    @Test
+    fun `assertion should retain a coefficient beyond signed words`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(1) shl 256, bigIntOf(1)), bigIntOf(0), useLo = true))
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+
+        assertTrue(row.assertsAt(state, 0))
+    }
+
+    @Test
+    fun `assertion should decline an exhausted word allocation grant`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0), arrayOf(bigIntOf(1)),
+            bigIntOf(0), useLo = true))
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()), Assumptions.None)
+        val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(allocationBytes = 56))
+
+        val decline = assertFailsWith<ArithmeticLearningDeclined> { row.assertsAt(state, 0, budget) }
+
+        assertEquals("allocation", decline.reason)
+    }
+
+    @Test
     fun `a primitive source should fund wide coefficient hashing before retention`() {
         val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
         val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(work = 32))

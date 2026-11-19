@@ -388,6 +388,8 @@ keeps the bound without further gcd or identity divisions. Activity accumulates 
 signed words and promotes the partial sum at the first product or sum overflow.
 Wide coefficients enter exact accumulation directly; failed word attempts remain
 charged to the containing allowance.
+Historical assertion checks use checked words for contributions and residuals when
+they fit, and retry exact arithmetic on overflow without changing raw-target or hole checks.
 Saturation expresses the row as a positive cover over integer distances from declared
 box endpoints and caps each weight at its degree. If ordinary cancellation loses the
 conflict, scaled mixed-integer rounding can reduce the reason before another
