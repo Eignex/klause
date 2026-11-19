@@ -33,7 +33,9 @@ internal class LpHints(
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
     private val passiveChoice = if (collect) LpPassiveVariableChoice(applyAdvice, observe, charge) else null
-    private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
+    private val passiveValues = if (collect) LpPassiveValueChoice(
+        applyAdvice = false, observe = observe, charge = charge,
+    ) else null
     private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
     private var passivePoint: LpRelaxation? = null
     private var passiveState: LpExactState? = null

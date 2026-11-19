@@ -74,7 +74,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable value advice reaches matching applied and withheld commitments`() {
+    fun `variable advice leaves reliable value proposals withheld at equal cost`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -111,9 +111,9 @@ class LpHintsTest {
             val selected = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
             hints.commit(selected.first(), 1)
 
-            assertEquals(if (apply) listOf(up, down) else listOf(down, up), selected)
-            val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
+            assertEquals(listOf(down, up), selected)
+            assertEquals(1, events.count { it == "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED" })
+            assertFalse("PASSIVE_VALUE_COMMIT_CHANGED" in events)
             assertFalse("PASSIVE_COLLECTION_COMMIT_CHANGED" in events)
             costs.add(work - before)
         }
