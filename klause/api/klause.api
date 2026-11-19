@@ -6734,8 +6734,8 @@ public final class com/eignex/klause/lp/bounding/LpParams {
 
 public final class com/eignex/klause/lp/bounding/LpPlan {
 	public fun <init> ()V
-	public fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;)V
-	public synthetic fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;)V
+	public synthetic fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component10 ()Z
 	public final fun component11 ()Z
@@ -6782,13 +6782,14 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun component49 ()Z
 	public final fun component5 ()Z
 	public final fun component50 ()Z
-	public final fun component51 ()Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
+	public final fun component51 ()Z
+	public final fun component52 ()Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
 	public final fun component6 ()J
 	public final fun component7 ()J
 	public final fun component8 ()Z
 	public final fun component9 ()Z
-	public final fun copy (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;)Lcom/eignex/klause/lp/bounding/LpPlan;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lp/bounding/LpPlan;ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;IILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public final fun copy (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lp/bounding/LpPlan;ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;IILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAutoOffReprobe ()Z
 	public final fun getBooleanRlt ()Z
@@ -6801,6 +6802,7 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun getBranching ()Z
 	public final fun getCircuit ()Z
 	public final fun getComponentOwnership ()Z
+	public final fun getComponentReuse ()Z
 	public final fun getComponentSplit ()Z
 	public final fun getCumulative ()Z
 	public final fun getCumulativeFlow ()Z
@@ -12698,6 +12700,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getLpBoundMaxPivots ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getLpBranching ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getLpComponentOwnership ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getLpComponentReuse ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getLpComponentSplit ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getLpDirectionalGains ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getLpKnapsackLagrangian ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;

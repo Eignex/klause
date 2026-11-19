@@ -410,7 +410,7 @@ data class LpPlan(
     val booleanRlt: Boolean = false,
     /** Harvest globally valid cuts before search. Node separation remains independent. */
     val rootCutHarvest: Boolean = true,
-    /** Retain immutable component owners for node bounds and dispatch tableau cuts within each block. */
+    /** Retain root component guidance and private rounding alongside numerical component owners. */
     val componentOwnership: Boolean = false,
     /** Admit selective numerical child reuse independently of root component guidance and rounding. */
     val componentReuse: Boolean = false,
@@ -434,6 +434,7 @@ internal fun LpPlan.hasDefaultNumericalSettings(): Boolean =
 
 private object DefaultNumericalPlans {
     val byPreparation = LpSourcePreparation.entries.map {
-        arrayOf(LpPlan(sourcePreparation = it, componentReuse = false), LpPlan(sourcePreparation = it, componentReuse = true))
+        arrayOf(LpPlan(sourcePreparation = it, componentReuse = false),
+            LpPlan(sourcePreparation = it, componentReuse = true))
     }
 }

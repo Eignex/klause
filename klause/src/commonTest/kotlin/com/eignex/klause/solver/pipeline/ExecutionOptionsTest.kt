@@ -30,6 +30,7 @@ class ExecutionOptionsTest {
 
             assertEquals(enabled, plan.componentReuse)
             assertFalse(plan.componentOwnership)
+            assertFalse(plan.bounding)
         }
     }
 

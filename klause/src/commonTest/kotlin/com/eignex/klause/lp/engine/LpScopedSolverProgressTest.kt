@@ -21,7 +21,10 @@ class LpScopedSolverProgressTest {
         val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         var admissions = 0
         LpScopedSolver(LpExactState(source), workLimit = 100_000L, componentSplit = true,
-            componentAdmission = { admissions++; false }, monolithicPreparationWork = 1L).use { owner ->
+            componentAdmission = {
+                admissions++
+                false
+            }, monolithicPreparationWork = 1L).use { owner ->
 
             repeat(2) { assertFalse(owner.prepare()) }
 

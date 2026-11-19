@@ -890,7 +890,9 @@ internal class LpScopedSolver(
                 constructionBound = bound
             } ?: return null
             if (workBudget > 0L && projection.work >= workBudget) return null
-            candidate = if (allowComponents && warm == null && declinedComponentMatrix?.sameMatrix(next.model) != true) {
+            candidate = if (allowComponents && warm == null &&
+                declinedComponentMatrix?.sameMatrix(next.model) != true
+            ) {
                 componentLpSolverOrNull(
                     working, token, projection,
                     { part, childToken, rowOnlyRows ->

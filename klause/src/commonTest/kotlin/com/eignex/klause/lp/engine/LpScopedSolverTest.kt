@@ -189,7 +189,8 @@ class LpScopedSolverTest {
                     ): PersistentLpSolver {
                         limits += pricing.basisEntryLimit
                         return ProductionLpEngineFactory.newPersistentSolver(
-                            model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                            model, cancellation, refactorUpdateLimit, iterationLimit, workLimit,
+                            trackDegeneracy, pricing,
                         )
                     }
                 }
