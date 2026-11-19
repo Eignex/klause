@@ -189,7 +189,9 @@ internal class CoreGuidedSearch(
         }
         if (allowanceExhausted) return finish(stopped(TerminationReason.BudgetExhausted))
         val remainingMillis = activeMillisLimit?.let {
-            (it.milliseconds - activeTime).inWholeMilliseconds
+            val remaining = (it.milliseconds - activeTime).inWholeMilliseconds
+            if (remaining <= 0L) return finish(stopped(TerminationReason.BudgetExhausted))
+            remaining
         } ?: sliceMillis
         val sliceDuration = minOf(sliceMillis, remainingMillis).milliseconds
         val deadline = TimeSource.Monotonic.markNow() + sliceDuration

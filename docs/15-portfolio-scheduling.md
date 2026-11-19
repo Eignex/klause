@@ -781,6 +781,8 @@ allowance described in [resources](06-sessions.md#resource-allowances); parallel
 admit it immediately, and `core-guided` selects it directly.
 
 An automatically deferred worker starts with two seconds of cumulative active time.
+An active remainder below one millisecond retires the worker because it cannot fund
+another native slice.
 After a completed core raises its exact floor, an accepted incumbent within that
 last floor increment can fund continuation when at least eight seconds remain on
 the caller deadline. Each fresh completed-core epoch can extend the active limit
