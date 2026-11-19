@@ -392,13 +392,16 @@ internal class ComponentLpSolver(
             val part = parts[index]
             projection.reserve(part.cols.size.toLong() + part.rows.size, 0L, matrix = false)
             if (added[index].size == 0) {
-                // Simultaneous edits to other blocks take the ordinary replacement route.
-                val rebound = part.rebindExact(state, token) ?: return localRowsDeclined(
+                val rebound = part.rebindExact(state, token, projection) ?: return localRowsDeclined(
                     if (token() || token.admission?.exhausted == true) LpComponentEditDecline.STOPPED
                     else LpComponentEditDecline.REBIND_UNAVAILABLE,
                 )
-                if (rebound !== part) return localRowsDeclined(LpComponentEditDecline.SCALARS)
-                nextParts += part
+                if (rebound !== part) {
+                    val construction = LpScalingView.constructionWorkBound(rebound.model)
+                    projection.reserve(construction, 0L, matrix = true)
+                    lastReservedConstructionWork += construction
+                }
+                nextParts += rebound
             } else {
                 val columns = IntArrayList().apply { addAll(part.cols) }
                 val selected = IntArrayList().apply {
@@ -1001,8 +1004,17 @@ private fun LpNeighborhood.readsScalarChange(changes: LpProjectedScalarChanges, 
 }
 
 internal enum class LpComponentEditDecline {
-    COLUMNS, ROW_COUNT, MATRIX, ROW_IDENTITY, ROW_ONLY, CROSS_BLOCK, SCALARS,
-    STOPPED, PROJECTION_LIMIT, REBIND_UNAVAILABLE, CONSTRUCTION, UNAVAILABLE,
+    COLUMNS,
+    ROW_COUNT,
+    MATRIX,
+    ROW_IDENTITY,
+    ROW_ONLY,
+    CROSS_BLOCK,
+    STOPPED,
+    PROJECTION_LIMIT,
+    REBIND_UNAVAILABLE,
+    CONSTRUCTION,
+    UNAVAILABLE,
 }
 
 // Structural decisions stay fixed for an owner so scalar edits can retain a declined inspection.

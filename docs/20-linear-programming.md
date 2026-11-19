@@ -458,8 +458,10 @@ aggregate. Returned child coordinates can feed a masked rounding guide.
 The same setting dispatches root tableau separation to the owning block. Lifted cuts
 keep every row multiplier, bound substitution, integrality premise and source
 address for the ordinary source mapper and cut pool. Rows confined to existing
-blocks replace only those children; cross-block rows, new columns and other
-structural edits retire every child. The replacement may form a fresh collection
+blocks replace those children and any others whose scalar authority changes.
+Replacements validate their own bases using private retained bases as warm hints;
+unchanged children keep their checked evidence. Cross-block rows, new columns and
+other structural edits retire every child. The replacement may form a fresh collection
 under the same admission policy and remaining work grant; a declined collection
 uses the ordinary owner. Callers that need one retained basis keep the monolithic
 constructor.

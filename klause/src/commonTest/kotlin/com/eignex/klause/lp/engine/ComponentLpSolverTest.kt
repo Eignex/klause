@@ -15,6 +15,36 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `a local row and a bound in another block should retain the unaffected child`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val factory = RecordingLpEngineFactory()
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = factory)).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            assertTrue(next.assertBound(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+            val zero = ExactLpNumber.of(0L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+
+            assertTrue(owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
+                newPersistentLpSolver(model, cancellation = token, workLimit = work, factory = factory)
+            })
+            val result = assertNotNull(owner.solve())
+            val certified = certifyLpResult(assertNotNull(next.state.ownerWorkingModel()), owner, result)
+
+            assertEquals(BigFraction.ofLong(15L) * BigFraction.ofLong(2L).reciprocal(), certified.lowerBound)
+            assertEquals(1, owner.lastMetrics.componentReuses)
+            assertEquals(5, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        }
+    }
+
+    @Test
     fun `advancing component cursors withhold returned guidance`() {
         val builder = LpBuilder()
         repeat(3) {
