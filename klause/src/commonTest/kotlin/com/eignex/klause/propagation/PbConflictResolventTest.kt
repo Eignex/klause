@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -22,6 +23,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import kotlin.test.Test
@@ -30,6 +32,40 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PbConflictResolventTest {
+    @Test
+    fun `guarded counting rows should be consumed without strengthening inactive siblings`() {
+        for (scale in listOf(bigIntOf(1), bigIntOf(Long.MAX_VALUE) + bigIntOf(1))) {
+            for (truth in listOf(false, true)) {
+                val bound = scale * bigIntOf(2) - bigIntOf(if (truth) 0 else 1)
+                val native = PropagationSession(Problem(6, 0, emptyArray(), arrayOf(
+                    ReifiedPseudoBoolean(5, Array(4) { scale }, intArrayOf(Lit.make(0, false),
+                        Lit.make(2, true), Lit.make(3, true), Lit.make(4, true)),
+                        if (truth) PbOp.GE else PbOp.LE, bound),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+                    Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))),
+                )), pbLearning = true)
+                val shared = SearchSession(listOf(CpSearchComponent(native)), atoms = SearchAtomRegistry(6))
+                assertIs<ComponentResult.Consistent>(shared.initialize())
+                assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(5, truth))))
+                val brancher = BooleanBranching { context ->
+                    (0 until 5).firstOrNull { context.boolValue(it) == null }?.let { variable ->
+                        val first = variable == 0
+                        listOf(SearchDecision.Bool(Lit.make(variable, first)),
+                            SearchDecision.Bool(Lit.make(variable, !first)))
+                    }
+                }
+
+                assertIs<SearchResult.Satisfied>(shared.solve(6, booleanBranching = brancher))
+
+                assertTrue(native.learnedLifecycle().getValue("learningPbConsumed") > 0L)
+                shared.popTo(0)
+                assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(5, !truth))))
+                assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(1, false))))
+            }
+        }
+    }
+
     @Test
     fun `wide original sources should produce arithmetic learning in ordinary traversal`() {
         val weight = bigIntOf(Long.MAX_VALUE) + bigIntOf(1)

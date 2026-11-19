@@ -54,6 +54,16 @@ internal class PbAccumulator {
         return degree
     }
 
+    fun conflicting(state: PropagationState): Boolean {
+        var available = BIG_ZERO
+        for ((variable, coefficient) in coefficients) {
+            budget?.scalar(available, coefficient)
+            val truth = state.boolValues[variable]
+            if (truth == true || (truth == null && coefficient > BIG_ZERO)) available += coefficient
+        }
+        return available < rhs
+    }
+
     fun coefOf(variable: Int): BigInt = coefficients[variable] ?: BIG_ZERO
 
     fun loadPb(weights: LongArray, literals: IntArray, geBound: Long): Boolean {
@@ -99,6 +109,19 @@ internal class PbAccumulator {
             put(variable, coefOf(variable) + coefficient * mulOther)
         }
         return true
+    }
+
+    fun guardedBy(guard: Int) {
+        if (guard == Lit.NONE) return
+        val degree = positiveDegree()
+        if (degree <= BIG_ZERO) return
+        val variable = Lit.variable(guard)
+        budget?.scalar(coefOf(variable), degree)
+        // The inactive guard can pay the complete positive degree, independently of the body.
+        if (Lit.isPositive(guard)) {
+            put(variable, coefOf(variable) - degree)
+            rhs -= degree
+        } else put(variable, coefOf(variable) + degree)
     }
 
     fun saturate() {

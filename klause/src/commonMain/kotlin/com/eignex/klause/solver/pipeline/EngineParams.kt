@@ -174,7 +174,9 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
-    "pb-learning", "pb-objective-cutoff", "propagation-attribution", "historical-table-reasons",
+    "pb-learning", "pb-objective-cutoff", "integer-row-learning",
+    "arithmetic-learning-work", "arithmetic-learning-allocation-bytes",
+    "propagation-attribution", "historical-table-reasons",
     "objective-guided-values",
     "var-selector", "val-selector",
 )

@@ -329,7 +329,10 @@ the pivot. Weakening and saturation keep coefficients bounded and canonical. The
 nonnegative combinations with Chvátal-Gomory rounding preserve implication. Exact
 coefficients and degrees survive scaling, weakening, division and retention; degree
 reduction uses the positive-literal degree captured before changing signed terms.
-Mandatory arbitrary-precision PB projections can supply arithmetic sources. Retained
+Mandatory arbitrary-precision and reified PB projections can supply arithmetic sources.
+A reified side adds its inactive indicator with the body's complete positive degree,
+so it remains conditional after undo. Indicator deductions use the opposite
+implication's contrapositive. Negated equalities keep clause fallback. Retained
 rows whose complete activity fits signed-word propagation use covering watches;
 wider rows propagate exact slack with a static watch on each literal. Both expose
 arithmetic reasons to later conflicts and use ordinary clause retention.
@@ -429,8 +432,9 @@ Rows share the learned store and integer bounds propagation. A successful row
 assertion also keeps its first-UIP clause in the native store; the two constraints
 can prune different branches, publish their deductions together from the undo
 position before either assertion, and follow their own retention policies. Retained
-row deductions record lazy historical arithmetic reasons. Their clause explanations
-reconstruct only the driving bounds at that deduction, with the row's signed guard.
+row deductions freeze eager historical clause premises, including the signed guard,
+without compactable factor IDs. Arithmetic reuse reconstructs their deduction boundary
+from the bound journal and validates the retained row's raw historical consequence.
 Integer bound event subscriptions wake rows after undo and are remapped or removed on
 forgetting. A live bound reason or a reason saved in undo protects its row from
 retirement; after those references retract, retirement removes its guard and endpoint

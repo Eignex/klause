@@ -22,10 +22,10 @@ class EngineParamsTest {
     @Test
     fun `integer learning allowances should reach fixed and portfolio workers`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
-        val settings = EngineParams(listOf("arithmetic-learning-work=0", "arithmetic-learning-allocation-bytes=4096"))
+        val settings = listOf("arithmetic-learning-work=0", "arithmetic-learning-allocation-bytes=4096")
 
-        val workers = listOf(applyFixedBacktrackParams(base, settings, allowSelectors = true),
-            applyBacktrackParams(base, settings))
+        val workers = listOf(applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true),
+            applyBacktrackParams(base, EngineParams(settings)))
 
         for (worker in workers) {
             assertEquals(0L, worker.arithmeticLearningWork)

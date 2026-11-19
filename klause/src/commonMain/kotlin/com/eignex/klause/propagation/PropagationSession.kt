@@ -1035,13 +1035,9 @@ class PropagationSession private constructor(
         state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
     }
 
-    /**
-     * Enable exact mandatory integer-row learning for subsequent finite conflicts.
-     * [workLimit] and [allocationBytes] bound each optional analysis within the containing propagation scope.
-     */
-    fun enableIntegerRowLearning(workLimit: Long = 262_144, allocationBytes: Long = 8L * 1024 * 1024) {
+    /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
+    fun enableIntegerRowLearning() {
         check(!state.incremental)
-        state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
         state.integerRowLearning = true
         state.integerLearningTrailAtLevel = { level ->
             if (level in 0 until levelTop) levelStates[level]?.undoSize else null

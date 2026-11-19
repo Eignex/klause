@@ -1,7 +1,11 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
@@ -9,6 +13,46 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PbAccumulatorTest {
+    @Test
+    fun `guard saturation should preserve every conditional Boolean assignment`() {
+        for (scale in listOf(BIG_ONE, bigIntOf(Long.MAX_VALUE) + BIG_ONE)) {
+            for (positive in listOf(false, true)) {
+                for (guardVariable in 0..1) {
+                    for (truth in listOf(false, true)) {
+                        val weights = arrayOf(bigIntOf(3) * scale, bigIntOf(2) * scale)
+                        val literals = intArrayOf(Lit.make(1, positive), Lit.make(2, true))
+                        val bound = bigIntOf(4) * scale
+                        val guard = Lit.make(guardVariable, truth)
+                        val target = PbAccumulator()
+                        target.loadPb(weights, literals, bound)
+
+                        target.guardedBy(guard)
+                        val row = requireNotNull(target.materialize())
+
+                        for (mask in 0..7) {
+                            val assignment = BooleanArray(3) { mask and (1 shl it) != 0 }
+                            var body = BIG_ZERO
+                            for (index in literals.indices) {
+                                if (Lit.evaluate(literals[index], assignment[Lit.variable(literals[index])])) {
+                                    body += weights[index]
+                                }
+                            }
+                            if (Lit.evaluate(guard, assignment[guardVariable]) && body < bound) continue
+                            var activity = BIG_ZERO
+                            for (index in row.literals.indices) {
+                                val literal = row.literals[index]
+                                if (Lit.evaluate(literal, assignment[Lit.variable(literal)])) {
+                                    activity += row.weights[index]
+                                }
+                            }
+                            assertTrue(activity >= row.degree)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     fun `negative literal saturation should preserve the positive degree`() {
         val value = acc { loadPb(longArrayOf(100, 1), intArrayOf(Lit.make(0, false), Lit.make(1, true)), 2) }

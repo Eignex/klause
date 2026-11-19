@@ -33,6 +33,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.toLongExact
 import kotlin.random.Random
 import kotlin.test.Test
@@ -88,14 +89,12 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
                 })
             }, factors),
             pbLearning = false).apply { enableIntegerRowLearning() }
-        val trace = ArithmeticLearningTrace(4096, 131072)
-        native.explanationState.arithmeticLearningTrace = trace
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(width + 1, 200))
 
         val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 5))
 
-        assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
-        assertTrue(trace.events.count { it.kind == "integer.pivot-row" } > 16)
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertTrue(learned.row.coefficient(0) > bigIntOf(32))
     }
 
     @Test
@@ -173,19 +172,19 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     @Test
     fun `a combination beyond sixteen terms should produce a consumed consequence`() {
         for (root in listOf(false, true)) {
-            val native = PropagationSession(Problem(0, 18,
-                Array(18) {
+            val native = PropagationSession(Problem(0, 19,
+                Array(19) {
                     when (it) {
                         0 -> IntDomain(0, 6)
                         1, 3 -> IntDomain(0, 12)
                         2 -> IntDomain(0, 24)
-                        17 -> IntDomain(0, if (root) 11 else 36)
+                        18 -> IntDomain(0, if (root) 11 else 36)
                         else -> IntDomain(0, 1)
                     }
                 }, arrayOf(
                     Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
                     Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
-                    Linear(IntArray(16) { if (it == 15) -1 else 1 }, IntArray(16) { it + 2 }, LinearOp.LE, 0),
+                    Linear(IntArray(17) { if (it == 16) -1 else 1 }, IntArray(17) { it + 2 }, LinearOp.LE, 0),
                     Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                 )), pbLearning = false).apply { enableIntegerRowLearning() }
             val trace = ArithmeticLearningTrace(1024, 65536)
@@ -193,13 +192,13 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
             val cp = CpSearchComponent(native)
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
             assertIs<ComponentResult.Consistent>(shared.initialize())
-            if (!root) assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(17, 11)))
+            if (!root) assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(18, 11)))
 
             assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
 
             val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
-            assertContentEquals(intArrayOf(0, 1) + IntArray(15) { it + 3 }, learned.row.variables)
-            assertContentEquals(longArrayOf(2, 1) + LongArray(15) { if (it == 14) -1 else 1 },
+            assertContentEquals(intArrayOf(0, 1) + IntArray(15) { it + 4 }, learned.row.variables)
+            assertContentEquals(longArrayOf(4, 1) + LongArray(15) { if (it == 14) -1 else 1 },
                 learned.row.coefficients.map { it.toLongExact() }.toLongArray())
             assertEquals(if (root) 0 else 1, learned.backjumpLevel)
             val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
@@ -647,17 +646,10 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
                 longArrayOf(1), intArrayOf(3), LinearOp.LE, 6L + index), useLo = true))
             native.addLearnedIntegerRow(row, lbd = 3)
         }
+        assertEquals(80, native.explanationState.learned.integerRows?.size)
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
-        val capped = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
-        assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(capped.learnedClause)
-        native.popToLevel(0)
-        native.forgetLearnedClauses { index, _ -> index != 0 }
-        assertEquals(80 - 1, native.explanationState.learned.integerRows?.size)
-        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
-
-        val retried = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
-
-        assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(retried.learnedClause)
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+        assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBooleanPropagator
 import com.eignex.klause.factor.bool.CardinalityPropagator
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.ExactPseudoBooleanPropagator
@@ -197,6 +198,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         state.arithmeticLearningTrace?.record("pb.source", fid.toLong(), forcedLit.toLong())
         if (fid < 0 || fid >= state.totalFactorCount) return false
         return when (val f = state.factorAt(fid)) {
+            is ReifiedPseudoBooleanPropagator ->
+                admitSource(f.literals) && f.loadArithmeticReason(target, forcedLit, state, budget)
             is ExactPseudoBooleanPropagator ->
                 admitSource(f.literals) && f.loadArithmeticReason(target, forcedLit, state, budget)
             is LearnedExactPbPropagator -> admitSource(f.literals) && target.loadPb(f.weights, f.literals, f.degree)

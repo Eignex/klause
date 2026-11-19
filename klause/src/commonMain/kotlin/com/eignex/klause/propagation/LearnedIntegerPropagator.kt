@@ -1,8 +1,6 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.LinearPropagator
-import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
-import com.eignex.klause.factor.arithmetic.internals.linearLazyReason
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -30,7 +28,7 @@ internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPr
         if (!state.integerGuardTrueAt(row.guard)) return true
         compact?.let {
             return propagateLinearBounds(state, it.coeffs, intVars, LinearOp.LE, it.bound,
-                extraLit = row.guard xor 1, includeExtraLit = row.guard != Lit.NONE, factorId = factorId)
+                extraLit = row.guard xor 1, includeExtraLit = row.guard != Lit.NONE, factorId = -1)
         }
         val minimum = row.minimum(state)
         if (minimum > row.bound) return false
@@ -47,21 +45,13 @@ internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPr
             if (!next.fitsLong()) continue
             val value = next.toLongExact()
             if (if (lower) value <= domain.min else value >= domain.max) continue
-            val reason = if (state.undoLogging) {
-                linearLazyReason(state, factorId, index, useLo = true, slack = 0,
-                    extraLit = row.guard xor 1, includeExtraLit = row.guard != Lit.NONE)
-            } else explainRow(state, index, state.undo.size)
+            val reason = explainRow(state, index, state.undo.size)
             if (lower) {
                 if (!state.tightenIntMin(variable, value, reason)) return false
             } else if (!state.tightenIntMax(variable, value, reason)) return false
         }
         return true
     }
-
-    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int,
-        atLevel: Int): IntArray? = compact?.let {
-        explainLinearBound(state, it.coeffs, intVars, payload, atTrail, atLevel)
-    } ?: explainRow(state, payload[0], atTrail)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray =
         explainRow(state, -1, state.undo.size)

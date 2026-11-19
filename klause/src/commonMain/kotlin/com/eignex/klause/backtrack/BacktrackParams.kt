@@ -429,10 +429,6 @@ data class BacktrackParams(
     val pbLearning: Boolean? = null,
     /** Learn exact mandatory integer rows from finite conflicts; disabled by default. */
     val integerRowLearning: Boolean = false,
-    /** Per-conflict work allowance for optional cutting-planes learning, inside propagation work. */
-    val arithmeticLearningWork: Long = 262_144,
-    /** Per-conflict cumulative modeled allocation allowance for optional integer arithmetic learning. */
-    val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
     /**
      * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
      * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a
@@ -488,8 +484,13 @@ data class BacktrackParams(
     val rootProbeBinaryGate: Boolean = false,
     /** Explore one global batch, then prefer learned neighborhoods in Boolean General states without root signals. */
     val rootProbeGeneralGate: Boolean = false,
+    /** Per-conflict work allowance for optional cutting-planes learning, inside propagation work. */
+    val arithmeticLearningWork: Long = 262_144,
+    /** Per-conflict cumulative modeled allocation allowance for optional cutting-planes learning. */
+    val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
 ) : SolverParams {
     init {
+        require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
         require(privateRebuildWork in -1L..1_048_576L) {
             "private rebuild work must be -1 (automatic) or in 0..1048576"
