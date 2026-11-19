@@ -83,6 +83,11 @@ row stays an explicit contradiction.
 Witness checks use the original decimals with exact rational arithmetic. Rows
 permit `max(absolute, relative * max(abs(bound), sum(abs(a(i) * x(i)))))` and
 column bounds `max(absolute, relative * abs(bound))`; integrality stays exact.
+The opt-in absolute-tolerance envelope states those widened sides as exact rational
+rows before source separation. It requires zero relative tolerance, retains open
+sides and indicators, and uses exact completion without adding another slack.
+Its native accepted-set bounds have scope `absolute-tolerance-envelope`; nominal
+source bounds keep their separate scope.
 Under the default policy both reduce to the absolute slack, so a row whose terms
 are large but cancel is held to the same slack as a row of small terms; a relative
 component makes the slack grow with that scale. `LinearSourceWitness.exact` records whether the accepted point satisfies every row and

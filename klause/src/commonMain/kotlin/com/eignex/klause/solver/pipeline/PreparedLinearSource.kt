@@ -25,6 +25,7 @@ internal class PreparedLinearSource(
     val claimsCoverTolerance: Boolean,
     val acceptedObjectiveBound: BigFraction?,
     val independentChecks: IndependentLinearSourceChecks? = null,
+    val acceptedModelExact: Boolean = false,
 )
 
 internal class IndependentLinearSourceChecks(
@@ -51,7 +52,14 @@ internal fun prepareLinearSource(
         SourceRouteSelection(request, SourceProblemRoute.NativeFormula(null), stop)
     if (stop()) return interrupted()
     val numerical = source.semantics.effective.feasibilityTolerance?.isExact == false
-    val view = lowerLinearSource(source, request.source.settings, numerical, stop) ?: return interrupted()
+    val envelope = request.linearToleranceEnvelope && numerical
+    val working = if (request.linearToleranceEnvelope) source.absoluteToleranceEnvelope(stop) ?: return interrupted()
+    else source
+    val lowered = lowerLinearSource(working, request.source.settings, numerical && !envelope, stop)
+        ?: return interrupted()
+    val view = if (!envelope) lowered else LinearSourceView(source, lowered.model, lowered.objective,
+        lowered.columns, lowered.sourceIntegerCoordinates, lowered.sourceRealCoordinates, false, false,
+        lowered.objectiveScale, lowered.constraintFactorCount)
     val objective = view.objective?.toLinearObjective()
     val qualification = if (numerical) source.toleranceQualification(stop) else null
     val covers = !numerical || qualification?.verify() == true
@@ -68,7 +76,8 @@ internal fun prepareLinearSource(
     } else emptyList()
     if (stop()) return interrupted()
     val prepared = PreparedLinearSource(view, objective, covers, acceptedBound,
-        components?.takeIf { it.isNotEmpty() }?.let { IndependentLinearSourceChecks(requireNotNull(projections), it) })
+        components?.takeIf { it.isNotEmpty() }?.let { IndependentLinearSourceChecks(requireNotNull(projections), it) },
+        acceptedModelExact = envelope && lowered.exact)
     if (!supported) {
         return SourceRouteSelection(request,
             SourceProblemRoute.NativeFormula(null,

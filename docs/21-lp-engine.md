@@ -114,6 +114,8 @@ other formats, sources without a declared tolerance and `--exact`, which zeroes 
 tolerance, keep exact certification. Real leaf completion reads it only when the caller
 also permits tolerance acceptance. Open theories and source LP optimization keep exact
 certification; leaf witnesses follow the source tolerance.
+An explicitly widened absolute MPS tolerance envelope uses exact deductions and
+completion throughout, because its working rows already state the accepted set.
 
 Numerical deductions compute no certificate. `FloatDeductionCertificate` sums the
 Lagrangian `L(y)` from the float duals in binary64 and lowers it by that summation's

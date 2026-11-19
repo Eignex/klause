@@ -465,6 +465,15 @@ keeps the identity row layout unless it retains masked cuts. Certificates cite t
 nested rounding derivation, and final source checking repeats Boolean substitution
 independently.
 
+An opt-in absolute-tolerance envelope prepares MPS declarations and each stated row
+side widened by the captured absolute feasibility slack before lowering and separation.
+It preserves missing sides, exact integrality, indicator activation and the original
+objective. Relative feasibility tolerance is unsupported. Its working model requires
+exact deductions and exact leaf completion, so no second band enlarges the accepted set.
+Source publication still checks the original decimal source. Bound metadata identifies
+the accepted-set envelope separately from nominal-source bounds; neither establishes
+independent proof validation. Exact source requests retain their original model.
+
 Point selection admits at most one additional checked cut per usable point and
 waits for its completed query before scanning again. Only a strictly stronger
 checked bound, a checked incumbent or terminal evidence enables the next scan

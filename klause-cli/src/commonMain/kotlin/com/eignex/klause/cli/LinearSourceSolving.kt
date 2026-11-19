@@ -120,13 +120,14 @@ internal fun solveLinearSource(
     )
     if (!common.statistics) return
     qualified.nativeObjectiveBound?.let { bound ->
+        val prefix = if (bound.toleranceEnvelope) "nativeAcceptedObjectiveBound" else "nativeNominalObjectiveBound"
         output.onAllowanceStatistics(listOf(
-            "nativeNominalObjectiveBound" to bound.value.toString(),
-            "nativeNominalObjectiveBoundDirection" to if (bound.sense == ObjectiveSense.MINIMIZE)
+            prefix to bound.value.toString(),
+            "${prefix}Direction" to if (bound.sense == ObjectiveSense.MINIMIZE)
                 "lower" else "upper",
-            "nativeNominalObjectiveBoundStrict" to bound.strict.toString(),
-            "nativeNominalObjectiveBoundScope" to "nominal-source",
-            "nativeNominalObjectiveBoundCoversTolerance" to qualified.claimsCoverTolerance.toString(),
+            "${prefix}Strict" to bound.strict.toString(),
+            "${prefix}Scope" to if (bound.toleranceEnvelope) "absolute-tolerance-envelope" else "nominal-source",
+            "${prefix}CoversTolerance" to (bound.toleranceEnvelope || qualified.claimsCoverTolerance).toString(),
         ))
     }
     output.onAllowanceStatistics(

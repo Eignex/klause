@@ -155,6 +155,7 @@ internal fun linearSourceSolvable(
             maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,
             cancellation = stop,
             boundCancellation = common.routingCancellation(),
+            linearToleranceEnvelope = common.sourceOptions.linearToleranceEnvelope,
         )
         SourceSetup.prepare(request, onLpStats = { lpStats = it })
     }

@@ -7,6 +7,7 @@ import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceSemantics
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -18,6 +19,7 @@ import kotlin.math.abs
 internal enum class SourceFloatMode { CONTINUOUS }
 
 internal class SourceOptions {
+    var linearToleranceEnvelope = false
     var floatMode: SourceFloatMode? = null
     var absoluteTolerance: SemanticRational? = null
     var relativeTolerance: SemanticRational? = null
@@ -28,6 +30,9 @@ internal class SourceOptions {
 internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticOverrides {
     var resolved = semanticOverrides
     val fields = sourceOptions
+    require(!fields.linearToleranceEnvelope || declared.format == SourceFormat.MPS) {
+        "linear tolerance envelopes require an MPS source"
+    }
     if (fields.floatMode == SourceFloatMode.CONTINUOUS) {
         resolved = resolved.copy(floats = FloatSemantics.Continuous)
     }
@@ -76,6 +81,13 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
 }
 
 internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
+    sourceFlag("--source-tolerance-envelope", "true|false", "exact LP cuts over an absolute MPS tolerance envelope") {
+        options.sourceOptions.linearToleranceEnvelope = when (it) {
+            "true" -> true
+            "false" -> false
+            else -> usageError("--source-tolerance-envelope expects true or false")
+        }
+    },
     sourceFlag("--unbounded-int-lo", "integer|open", "default lower bound for undeclared integers") {
         val bounds = options.semanticOverrides.undeclaredIntegers ?: BoundsOverride()
         options.semanticOverrides = options.semanticOverrides.copy(undeclaredIntegers = bounds.copy(
