@@ -27,6 +27,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
@@ -63,12 +64,15 @@ class SourceExecutionTest {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
         val observer: (String, Long, JointRepairObservation) -> Unit = { _, _, _ -> }
-        val request = SourceExecutionRequest(invocation).withPortfolioJointRepairObserver(observer)
+        val sessionObserver: (String, PropagationSession) -> Unit = { _, _ -> }
+        val request = SourceExecutionRequest(invocation).withPortfolioSessionObserver(sessionObserver)
+            .withPortfolioJointRepairObserver(observer)
             .withPortfolioLpQueryObserver { _, _, _ -> }.withPortfolioGuidanceObserver { _, _ -> }
 
         assertSame(observer, request.onPortfolioJointRepair)
         assertNotNull(request.onPortfolioLpQuery)
         assertNotNull(request.onPortfolioGuidance)
+        assertSame(sessionObserver, request.withValidationCancellation(ExecutionControl.Never).onPortfolioSession)
     }
 
     @Test

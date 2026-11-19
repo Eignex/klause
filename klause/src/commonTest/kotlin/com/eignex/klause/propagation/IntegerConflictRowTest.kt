@@ -20,6 +20,181 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `assertion should retain an exact tightening after word activity overflow`() {
+        val inputs = listOf(
+            longArrayOf(2, -2, 1) to longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, 0),
+            longArrayOf(1, 1, -1, 1) to longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, 0),
+        )
+        for ((coefficients, values) in inputs) {
+            val bound = if (values.size == 3) 0L else Long.MAX_VALUE
+            val row = requireNotNull(IntegerConflictRow.source(IntArray(values.size) { it },
+                Array(values.size) { bigIntOf(coefficients[it]) }, bigIntOf(bound), useLo = true))
+            val state = PropagationState(Problem(0, values.size, Array(values.size) {
+                if (it == values.lastIndex) IntDomain(0, 1) else IntDomain(values[it], values[it])
+            }, emptyArray()), Assumptions.None)
+
+            assertTrue(row.assertsAt(state, 0))
+        }
+    }
+
+    @Test
+    fun `overflowing assertion residuals should not invent a tightening`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(1), bigIntOf(1)), bigIntOf(Long.MAX_VALUE - 1), useLo = true))
+        val state = PropagationState(Problem(0, 2,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 5), IntDomain(Long.MAX_VALUE, Long.MAX_VALUE)),
+            emptyArray()), Assumptions.None)
+
+        assertFalse(row.assertsAt(state, 0))
+    }
+
+    @Test
+    fun `assertion should retain a coefficient beyond signed words`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(1) shl 256, bigIntOf(1)), bigIntOf(0), useLo = true))
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+
+        assertTrue(row.assertsAt(state, 0))
+    }
+
+    @Test
+    fun `assertion should decline an exhausted word allocation grant`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0), arrayOf(bigIntOf(1)),
+            bigIntOf(0), useLo = true))
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()), Assumptions.None)
+        val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(allocationBytes = 56))
+
+        val decline = assertFailsWith<ArithmeticLearningDeclined> { row.assertsAt(state, 0, budget) }
+
+        assertEquals("allocation", decline.reason)
+    }
+
+    @Test
+    fun `a primitive source should fund wide coefficient hashing before retention`() {
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(work = 32))
+        val coefficients = arrayOf(bigIntOf(1), bigIntOf(1) shl 4096)
+
+        val decline = assertFailsWith<ArithmeticLearningDeclined> {
+            IntegerConflictRow.source(intArrayOf(0, 1), coefficients, bigIntOf(0), useLo = true, budget = budget)
+        }
+
+        assertEquals("work", decline.reason)
+    }
+
+    @Test
+    fun `a primitive source should preserve its complete row in either coordinate order`() {
+        val sources = listOf(
+            intArrayOf(0, 1, 2, 3) to longArrayOf(6, 10, 1, 7),
+            intArrayOf(3, 0, 2, 1) to longArrayOf(7, 6, 1, 10),
+        )
+        for ((variables, coefficients) in sources) {
+            for (useLo in listOf(false, true)) {
+                val row = requireNotNull(IntegerConflictRow.source(variables,
+                    Array(coefficients.size) { bigIntOf(coefficients[it]) }, bigIntOf(-9), useLo))
+                val sign = if (useLo) 1L else -1L
+
+                assertTrue(row.variables.contentEquals(intArrayOf(0, 1, 2, 3)))
+                assertEquals(listOf(6L, 10L, 1L, 7L).map { bigIntOf(it * sign) }, row.coefficients.toList())
+                assertEquals(bigIntOf(-9L * sign), row.bound)
+            }
+        }
+    }
+
+    @Test
+    fun `a primitive source should capture its coordinate and coefficient arrays`() {
+        val variables = intArrayOf(0, 1)
+        val large = bigIntOf(1) shl 256
+        val coefficients = arrayOf(bigIntOf(1), large)
+        val row = requireNotNull(IntegerConflictRow.source(variables, coefficients, bigIntOf(-3), useLo = true))
+
+        variables[0] = 4
+        coefficients[1] = bigIntOf(0)
+
+        assertTrue(row.variables.contentEquals(intArrayOf(0, 1)))
+        assertEquals(listOf(bigIntOf(1), large), row.coefficients.toList())
+    }
+
+    @Test
+    fun `source normalization should combine unordered repeated coordinates in either direction`() {
+        for (useLo in listOf(false, true)) {
+            val row = requireNotNull(IntegerConflictRow.source(intArrayOf(4, 2, 4, 0, 2),
+                arrayOf(bigIntOf(6), bigIntOf(2), bigIntOf(-2), bigIntOf(8), bigIntOf(-2)),
+                bigIntOf(-3), useLo))
+
+            assertTrue(row.variables.contentEquals(intArrayOf(0, 4)))
+            assertEquals(if (useLo) listOf(bigIntOf(2), bigIntOf(1))
+            else listOf(bigIntOf(-2), bigIntOf(-1)), row.coefficients.toList())
+            assertEquals(bigIntOf(if (useLo) -1 else 0), row.bound)
+        }
+    }
+
+    @Test
+    fun `an exhausted allocation grant should decline before word arithmetic`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(Long.MAX_VALUE), bigIntOf(1)), bigIntOf(0), useLo = true))
+        val state = PropagationState(Problem(0, 2,
+            arrayOf(IntDomain(2, 2), IntDomain(3, 3)), emptyArray()), Assumptions.None)
+        val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(allocationBytes = 0))
+
+        val decline = assertFailsWith<ArithmeticLearningDeclined> { row.minimum(state, budget = budget) }
+
+        assertEquals("allocation", decline.reason)
+    }
+
+    @Test
+    fun `activity should promote overflowing word operations without losing terms`() {
+        val inputs = listOf(
+            longArrayOf(Long.MAX_VALUE, 1) to longArrayOf(2, 3),
+            longArrayOf(Long.MAX_VALUE, 1) to longArrayOf(1, 1),
+            longArrayOf(Long.MIN_VALUE, 1) to longArrayOf(-1, 0),
+            longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, 1) to longArrayOf(1, 1, -Long.MAX_VALUE),
+        )
+        for ((coefficients, values) in inputs) {
+            val row = requireNotNull(IntegerConflictRow.source(IntArray(values.size) { it },
+                Array(values.size) { bigIntOf(coefficients[it]) }, bigIntOf(0), useLo = true))
+            val state = PropagationState(Problem(0, values.size,
+                Array(values.size) { IntDomain(values[it], values[it]) }, emptyArray()), Assumptions.None)
+            var expected = bigIntOf(0)
+            for (index in values.indices) expected += bigIntOf(coefficients[index]) * bigIntOf(values[index])
+
+            val minimum = row.minimum(state)
+            val maximum = row.maximum(state)
+
+            assertEquals(expected, minimum)
+            assertEquals(expected, maximum)
+        }
+    }
+
+    @Test
+    fun `endpoint reconstruction should retain overflowing activity cancellation`() {
+        val large = bigIntOf(Long.MAX_VALUE)
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1, 2),
+            arrayOf(bigIntOf(1), large, bigIntOf(1)), large * bigIntOf(2) + bigIntOf(3), useLo = true))
+        val state = PropagationState(Problem(0, 3,
+            arrayOf(IntDomain(0, 10), IntDomain(2, 2), IntDomain(1, 1)), emptyArray()), Assumptions.None)
+
+        val endpoint = row.boundFor(state, 0, 0)
+
+        assertEquals(2L, endpoint)
+    }
+
+    @Test
+    fun `resolution should combine interleaved terms and remove every cancellation`() {
+        val left = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 2, 4, 6),
+            arrayOf(bigIntOf(2), bigIntOf(3), bigIntOf(5), bigIntOf(7)), bigIntOf(-1), useLo = true))
+        val right = requireNotNull(IntegerConflictRow.source(intArrayOf(1, 2, 5, 6),
+            arrayOf(bigIntOf(11), bigIntOf(-6), bigIntOf(13), bigIntOf(-14)), bigIntOf(-2), useLo = true))
+
+        val combined = requireNotNull(left.resolve(right, 2))
+
+        assertTrue(combined.variables.contentEquals(intArrayOf(0, 1, 4, 5)))
+        assertEquals(listOf(bigIntOf(4), bigIntOf(11), bigIntOf(10), bigIntOf(13)),
+            combined.coefficients.toList())
+        assertEquals(bigIntOf(-4), combined.bound)
+    }
+
+    @Test
     fun `large coefficient arithmetic should observe cancellation before its primitive`() {
         val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
             arrayOf(bigIntOf(1) shl 4096, bigIntOf(1)), bigIntOf(0), useLo = true))

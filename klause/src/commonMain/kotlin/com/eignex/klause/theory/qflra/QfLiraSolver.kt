@@ -227,6 +227,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintValues: IntArray? = null
     private var pointHintCacheable = false
     private var pointHintPoint: List<BigFraction>? = null
+    private var retainedPointHintRowValues: IntArray? = null
     private var retainedPointHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = ExecutionControl.Never
@@ -430,6 +431,7 @@ class ExactLiraSearchComponent private constructor(
         pointHintRows = null
         pointHintValues = null
         pointHintPoint = null
+        retainedPointHintRowValues = null
         retainedPointHintValues = null
         pointHintCacheable = false
         pointHintLevel = -1
@@ -558,7 +560,7 @@ class ExactLiraSearchComponent private constructor(
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == LIRA_TRUE }
                 val inputs = if (partialLinearCache) {
-                    partialLinearInputs(comparison)
+                    partialLinearInputs(comparison, partialLinearDeclines[prepared])
                 } else
                     null
                 if (inputs != null && partialLinearDeclines[prepared] == inputs) {
@@ -621,8 +623,33 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun partialLinearInputs(comparison: ExactComparison): PartialLinearInputs? {
+    private fun partialLinearInputs(
+        comparison: ExactComparison,
+        previous: PartialLinearInputs?,
+    ): PartialLinearInputs? {
         val state = lp.state ?: return null
+        val affine = if (incrementalLinearPropagation && comparison.terms.size > 1) {
+            system.affineInputSides(comparison, operationStop) ?: return null
+        } else emptyList()
+        if (previous != null && previous.bound == comparison.bound &&
+            previous.sides.size == comparison.terms.size * 2 + affine.size
+        ) {
+            var unchanged = true
+            var index = 0
+            for (column in comparison.terms.keys) {
+                operationAccounting?.charge(3)
+                if (lpStop.poll()) return null
+                val metadata = state.model.column(column)
+                if (metadata.tag != column || !metadata.origin.value.isZero) return null
+                for (upper in 0..1) {
+                    val side = state.activeSide(column, upper == 1)?.side
+                    val retained = previous.sides[index++]
+                    if (retained?.value != side?.number?.value || retained?.strict != side?.strict) unchanged = false
+                }
+            }
+            for (side in affine) if (previous.sides[index++] != side) unchanged = false
+            if (unchanged) return previous
+        }
         val sides = ArrayList<PartialLinearSide?>(comparison.terms.size * 2)
         for (column in comparison.terms.keys) {
             operationAccounting?.charge(3)
@@ -633,9 +660,7 @@ class ExactLiraSearchComponent private constructor(
                 sides += state.activeSide(column, upper)?.side?.let { PartialLinearSide(it.number.value, it.strict) }
             }
         }
-        if (incrementalLinearPropagation && comparison.terms.size > 1) {
-            sides += system.affineInputSides(comparison, operationStop) ?: return null
-        }
+        sides += affine
         return PartialLinearInputs(comparison.bound, sides)
     }
 
@@ -653,15 +678,33 @@ class ExactLiraSearchComponent private constructor(
             observeCompleteStage("POINT_HINT_REUSE")
             return
         }
-        operationAccounting ?.charge(model.numBoolVars.toLong() + point.size + 1L)
+        operationAccounting?.charge(model.numBoolVars.toLong() + point.size +
+            (if (pointHintCacheable) rows.size else 0) + 1L)
         if (operationStop() || point.any { hintStop.poll() || !hintScalar(it) }) return
         if (operationStop() || pointHintStop()) return
         val values = IntArray(model.numBoolVars) { UNASSIGNED }
-        for (prepared in rows) {
+        val rowValues = if (pointHintCacheable) IntArray(rows.size) { UNASSIGNED } else null
+        val previousPoint = pointHintPoint
+        val previousRows = retainedPointHintRowValues
+        for (index in rows.indices) {
+            val prepared = rows[index]
             operationAccounting?.charge(1)
             if (hintStop.poll()) return
             val variable = prepared.row.activator
             if (values[variable] == DECLINED_HINT) continue
+            val cached = previousRows?.get(index) ?: UNASSIGNED
+            if (rowValues != null && previousPoint != null && cached != UNASSIGNED &&
+                prepared.form.sameNumericInputs(previousPoint, point) {
+                    operationAccounting?.charge(1)
+                    !hintStop.poll()
+                }
+            ) {
+                rowValues[index] = cached
+                values[variable] = if (cached == DECLINED_HINT ||
+                    (values[variable] != UNASSIGNED && values[variable] != cached)
+                ) DECLINED_HINT else cached
+                continue
+            }
             val comparison = if (prepared.disjunction)
                 null else
                 prepared.form.hintComparison(
@@ -670,10 +713,12 @@ class ExactLiraSearchComponent private constructor(
                 )
             val preference = comparison?.let { hintTruth(it, point) }
             if (preference == null) {
+                rowValues?.set(index, DECLINED_HINT)
                 values[variable] = DECLINED_HINT
                 continue
             }
             val value = if (preference) LIRA_TRUE else FALSE
+            rowValues?.set(index, value)
             if (values[variable] != UNASSIGNED && values[variable] != value) {
                 values[variable] = DECLINED_HINT
             } else {
@@ -685,6 +730,7 @@ class ExactLiraSearchComponent private constructor(
             if (hintStop() || operationStop() || pointHintStop()) return
             pointHintPoint = point.toList()
             retainedPointHintValues = values
+            retainedPointHintRowValues = rowValues
         }
         if (hintStop() || operationStop() || pointHintStop()) return
         pointHintLevel = context.decisionLevel
@@ -1523,7 +1569,7 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val retained = retainedLpPoint
-        if (retained != null && model.numIntVars == 0 &&
+        if (retained != null && (model.numIntVars == 0 || model.numRealVars > 0) &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
             system.acceptsPoint(retained, lpStop)
         ) {

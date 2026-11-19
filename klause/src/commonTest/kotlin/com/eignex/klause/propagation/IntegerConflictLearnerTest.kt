@@ -48,6 +48,45 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     @Test
+    fun `a table endpoint should preserve an available arithmetic assertion`() {
+        val native = PropagationSession(Problem(0, 4,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Table(intArrayOf(3, 2), longArrayOf(0, 0, 1, 0), longArrayOf(0, 7, 1, 24)),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(3, 0))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
+        assertEquals(1L, native.intDomain(0).max)
+    }
+
+    @Test
+    fun `an unsupported conflict should preserve the clause result without arithmetic work`() {
+        val results = listOf(false, true).map { enabled ->
+            val state = PropagationState(Problem(3, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+                Clause(IntArray(3) { Lit.make(it, true) }),
+            )), Assumptions.None)
+            state.integerRowLearning = enabled
+            state.integerLearningTrailAtLevel = { 0 }
+            assertTrue(state.pinBool(0, false))
+            assertTrue(state.pinBool(1, false))
+            state.currentLevel = 1
+            assertTrue(state.pinBool(2, false))
+
+            val result = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(ConflictAnalyzer(state).analyze(0))
+
+            result to state.work
+        }
+
+        assertEquals(results[0], results[1])
+    }
+
+    @Test
     fun `retained arithmetic rows should supply both seeds and reusable endpoint reasons`() {
         for (retainedSeed in listOf(false, true)) {
             val original = if (retainedSeed)

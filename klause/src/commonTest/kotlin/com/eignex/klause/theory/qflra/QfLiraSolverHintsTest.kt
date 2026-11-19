@@ -113,6 +113,39 @@ class QfLiraSolverHintsTest {
     }
 
     @Test
+    fun `point preferences should follow a changed coordinate across sibling scopes`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(0.0, 2.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(2, intArrayOf(), doubleArrayOf(), intArrayOf(1), doubleArrayOf(1.0),
+                    LinearOp.GE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never)).second
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertEquals(true, hints.preferredBool(0))
+            assertEquals(false, hints.preferredBool(1))
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertEquals(true, hints.preferredBool(0))
+            assertEquals(false, hints.preferredBool(2))
+        }
+    }
+
+    @Test
     fun `interrupted integer point preparation should retain its registration debit`() {
         var stopped = false
         var charged = 0L

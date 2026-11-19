@@ -1,13 +1,17 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.LinearPropagator
+import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
+import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.addExactOrNull
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
@@ -17,7 +21,9 @@ import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.mulExactOrNull
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.subExactOrNull
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
@@ -55,35 +61,38 @@ internal class IntegerConflictRow private constructor(
     fun maximum(state: PropagationState): BigInt = activity(state, null, maximum = true, null)
 
     private fun activity(state: PropagationState, trail: Int?, maximum: Boolean,
-        budget: ArithmeticLearningBudget?): BigInt {
-        var sum = BIG_ZERO
+        budget: ArithmeticLearningBudget?, excluded: Int = -1): BigInt {
+        var narrow = 0L
+        var wide: BigInt? = null
         for (i in variables.indices) {
             visit(state, budget)
+            if (i == excluded) continue
             val domain = domain(state, variables[i], trail)
             val coefficient = coefficients[i]
             val endpoint = if ((coefficient > BIG_ZERO) != maximum) domain.min else domain.max
+            if (wide == null && coefficient.fitsLong()) {
+                state.checkIntegerWordWork(budget)
+                val contribution = mulExactOrNull(coefficient.toLongExact(), endpoint)
+                val next = contribution?.let { addExactOrNull(narrow, it) }
+                if (next != null) {
+                    narrow = next
+                    continue
+                }
+            }
+            val sum = wide ?: bigIntOf(narrow)
             scalar(state, budget, coefficient, bigIntOf(endpoint))
             val contribution = coefficient * bigIntOf(endpoint)
             scalar(state, budget, sum, contribution)
-            sum += contribution
+            wide = sum + contribution
         }
-        return sum
+        if (wide == null) budget?.spend(bytes = 48)
+        return wide ?: bigIntOf(narrow)
     }
 
     fun boundFor(state: PropagationState, variable: Int, trail: Int, budget: ArithmeticLearningBudget? = null): Long? {
         val pivot = variables.binarySearchInt(variable)
         if (pivot < 0) return null
-        var other = BIG_ZERO
-        for (i in variables.indices) {
-            visit(state, budget)
-            if (i == pivot) continue
-            val domain = domain(state, variables[i], trail)
-            val endpoint = if (coefficients[i] > BIG_ZERO) domain.min else domain.max
-            scalar(state, budget, coefficients[i], bigIntOf(endpoint))
-            val contribution = coefficients[i] * bigIntOf(endpoint)
-            scalar(state, budget, other, contribution)
-            other += contribution
-        }
+        val other = activity(state, trail, maximum = false, budget, excluded = pivot)
         scalar(state, budget, bound, other)
         val next = endpoint(bound - other, coefficients[pivot])
         return if (next.fitsLong()) next.toLongExact() else null
@@ -96,6 +105,7 @@ internal class IntegerConflictRow private constructor(
             visit(state, budget)
             domain(state, variables[it], trail)
         }
+        narrowAssertion(state, trail, domains, budget)?.let { return it }
         val contributions = Array(variables.size) { BIG_ZERO }
         var minimum = BIG_ZERO
         for (index in variables.indices) {
@@ -122,6 +132,40 @@ internal class IntegerConflictRow private constructor(
         return false
     }
 
+    private fun narrowAssertion(state: PropagationState, trail: Int, domains: Array<IntDomain>,
+        budget: ArithmeticLearningBudget?): Boolean? {
+        if (!bound.fitsLong()) return null
+        budget?.spend(bytes = variables.size.toLong() * Long.SIZE_BYTES)
+        val contributions = LongArray(variables.size)
+        var minimum = 0L
+        for (index in variables.indices) {
+            visit(state, budget)
+            val coefficient = coefficients[index]
+            if (!coefficient.fitsLong()) return null
+            val value = if (coefficient > BIG_ZERO) domains[index].min else domains[index].max
+            state.checkIntegerWordWork(budget)
+            val contribution = mulExactOrNull(coefficient.toLongExact(), value) ?: return null
+            minimum = addExactOrNull(minimum, contribution) ?: return null
+            contributions[index] = contribution
+        }
+        val upper = bound.toLongExact()
+        if (minimum > upper) return false
+        for (index in variables.indices) {
+            visit(state, budget)
+            state.checkIntegerWordWork(budget)
+            val other = subExactOrNull(minimum, contributions[index]) ?: return null
+            val residual = subExactOrNull(upper, other) ?: return null
+            val coefficient = coefficients[index].toLongExact()
+            if (residual == Long.MIN_VALUE && coefficient == -1L) return null
+            visit(state, budget)
+            val next = if (coefficient > 0) floorDivLong(residual, coefficient) else ceilDivLong(residual, coefficient)
+            val domain = domains[index]
+            val tightens = if (coefficient > 0) next < domain.max else next > domain.min
+            if (tightens && state.inDomainAt(variables[index], next, trail, domain)) return true
+        }
+        return false
+    }
+
     fun resolve(other: IntegerConflictRow, variable: Int,
         budget: ArithmeticLearningBudget? = null): IntegerConflictRow? {
         if (guard != Lit.NONE && other.guard != Lit.NONE && guard != other.guard) return null
@@ -132,23 +176,41 @@ internal class IntegerConflictRow private constructor(
         val divisor = a.abs().gcd(b.abs())
         val left = b.abs() / divisor
         val right = a.abs() / divisor
-        budget?.spend(bytes = (variables.size.toLong() + other.variables.size) * 80)
-        val terms = mutableMapOf<Int, BigInt>()
-        for (i in variables.indices) {
-            budget?.scalar(coefficients[i], left)
-            terms[variables[i]] = coefficients[i] * left
-        }
-        for (i in other.variables.indices) {
-            budget?.scalar(other.coefficients[i], right)
-            val v = other.variables[i]
-            val contribution = other.coefficients[i] * right
-            budget?.scalar(terms[v] ?: BIG_ZERO, contribution)
-            val next = (terms[v] ?: BIG_ZERO) + contribution
-            if (next == BIG_ZERO) terms.remove(v) else terms[v] = next
+        val required = variables.size.toLong() + other.variables.size
+        budget?.spend(bytes = required * 16)
+        if (required > Int.MAX_VALUE) return null
+        val capacity = required.toInt()
+        val mergedVariables = IntArray(capacity)
+        val mergedCoefficients = Array(capacity) { BIG_ZERO }
+        var first = 0
+        var second = 0
+        var size = 0
+        while (first < variables.size || second < other.variables.size) {
+            budget?.spend()
+            val firstVariable = variables.getOrElse(first) { Int.MAX_VALUE }
+            val secondVariable = other.variables.getOrElse(second) { Int.MAX_VALUE }
+            val nextVariable = minOf(firstVariable, secondVariable)
+            var coefficient = BIG_ZERO
+            if (first < variables.size && firstVariable == nextVariable) {
+                budget?.scalar(coefficients[first], left)
+                coefficient = coefficients[first] * left
+                first++
+            }
+            if (second < other.variables.size && secondVariable == nextVariable) {
+                budget?.scalar(other.coefficients[second], right)
+                val contribution = other.coefficients[second] * right
+                budget?.scalar(coefficient, contribution)
+                coefficient += contribution
+                second++
+            }
+            if (coefficient != BIG_ZERO) {
+                mergedVariables[size] = nextVariable
+                mergedCoefficients[size++] = coefficient
+            }
         }
         budget?.scalar(bound, left)
         budget?.scalar(other.bound, right)
-        return normalized(terms, bound * left + other.bound * right,
+        return normalizedSorted(mergedVariables, mergedCoefficients, size, bound * left + other.bound * right,
             if (guard != Lit.NONE) guard else other.guard, budget)
     }
 
@@ -165,6 +227,23 @@ internal class IntegerConflictRow private constructor(
 
         fun source(variables: IntArray, coefficients: Array<BigInt>, bound: BigInt, useLo: Boolean,
             guard: Int = Lit.NONE, budget: ArithmeticLearningBudget? = null): IntegerConflictRow? {
+            var ordered = true
+            for (index in variables.indices) {
+                budget?.spend()
+                if (coefficients[index] == BIG_ZERO || (index > 0 && variables[index - 1] >= variables[index])) {
+                    ordered = false
+                    break
+                }
+            }
+            if (ordered && variables.isNotEmpty()) {
+                if (useLo) return normalizedSorted(variables, coefficients, variables.size, bound, guard, budget)
+                budget?.spend(bytes = variables.size.toLong() * 16 + 64)
+                val reversed = Array(variables.size) {
+                    budget?.scalar(coefficients[it])
+                    -coefficients[it]
+                }
+                return normalizedSorted(variables, reversed, variables.size, -bound, guard, budget)
+            }
             budget?.spend(bytes = variables.size.toLong() * 80)
             val terms = mutableMapOf<Int, BigInt>()
             for (i in variables.indices) {
@@ -184,6 +263,7 @@ internal class IntegerConflictRow private constructor(
             for (coefficient in terms.values) {
                 budget?.scalar(divisor, coefficient)
                 divisor = divisor.gcd(coefficient.abs())
+                if (divisor == BIG_ONE) break
             }
             val height = Int.SIZE_BITS - terms.size.countLeadingZeroBits()
             budget?.spend(work = terms.size.toLong() * height, bytes = terms.size.toLong() * 16)
@@ -191,11 +271,39 @@ internal class IntegerConflictRow private constructor(
             variables.sort()
             val coefficients = Array(variables.size) {
                 val coefficient = terms.getValue(variables[it])
-                budget?.scalar(coefficient, divisor)
-                coefficient / divisor
+                if (divisor == BIG_ONE) {
+                    budget?.scalar(coefficient, BIG_ONE)
+                    coefficient
+                } else {
+                    budget?.scalar(coefficient, divisor)
+                    coefficient / divisor
+                }
             }
+            if (divisor == BIG_ONE) return IntegerConflictRow(variables, coefficients, bound, guard)
             budget?.scalar(bound, divisor)
             return IntegerConflictRow(variables, coefficients, floorDiv(bound, divisor), guard)
+        }
+
+        private fun normalizedSorted(variables: IntArray, coefficients: Array<BigInt>, size: Int,
+            bound: BigInt, guard: Int, budget: ArithmeticLearningBudget?): IntegerConflictRow? {
+            if (size == 0) return null
+            var divisor = BIG_ZERO
+            for (index in 0 until size) {
+                budget?.scalar(divisor, coefficients[index])
+                divisor = divisor.gcd(coefficients[index].abs())
+                if (divisor == BIG_ONE) break
+            }
+            budget?.spend(work = size.toLong(), bytes = size.toLong() * 16)
+            if (divisor == BIG_ONE) {
+                for (index in 0 until size) budget?.scalar(coefficients[index], BIG_ONE)
+                return IntegerConflictRow(variables.copyOf(size), coefficients.copyOfRange(0, size), bound, guard)
+            }
+            val normalized = Array(size) {
+                budget?.scalar(coefficients[it], divisor)
+                coefficients[it] / divisor
+            }
+            budget?.scalar(bound, divisor)
+            return IntegerConflictRow(variables.copyOf(size), normalized, floorDiv(bound, divisor), guard)
         }
 
         internal fun endpoint(residual: BigInt, coefficient: BigInt): BigInt =

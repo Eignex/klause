@@ -1222,6 +1222,22 @@ Native completion flags do not independently validate proofs.
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
 sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off learning=integer|pb|both trace=first-integer|first-pb|initial
 attribution=false|true`.
+`route=catalog seed=N` instead runs the ordinary single-core automatic CP catalog
+through source setup and execution. This mode rejects `nodes` and attribution;
+the ordinary elapsed schedule and recipe settings supply their own controls.
+`route=single` is the default fixed-seed backtrack traversal below and rejects `seed`.
+Catalog capture records at most four native sessions in creation order, with worker
+labels, initial levels and learned counts, canonical source and actual worker models,
+their digests, and bounded traces. `native-capture` records carry no repeated timing
+totals; one `arm-result` holds containing execution and process CPU, including observer
+attachment, and reports omitted session callbacks. At most sixteen callbacks attempt
+model snapshots, and each model admits 256 KiB. Missing factor codecs and oversized
+snapshots report explicit export declines; they do not erase available worker traces
+or establish zero activity. Generated preparation factors can therefore remain
+unexported while a worker's actual model and derivation are retained.
+The hook delegates recipe selectors and observes before branching; it does not replace
+the ordinary catalog with a diagnostic recipe. Native counters, captured consequences,
+source checking and uninstrumented performance remain separate observations.
 It runs clause and opt-in
 arithmetic arms through ordinary finite preparation and backtrack traversal,
 without a decision replay. The existing bounded arithmetic trace records source

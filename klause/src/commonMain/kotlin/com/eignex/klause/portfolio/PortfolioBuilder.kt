@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EngineInvocation
@@ -102,6 +103,7 @@ object PortfolioBuilder {
         onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
         acceptedIncumbents: IncumbentSource<Sample, Double>? = null,
         onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
+        onSession: ((String, PropagationSession) -> Unit)? = null,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
@@ -167,8 +169,10 @@ object PortfolioBuilder {
                     .withCoreRefinement(scenario.coreRefinement)
                 val queried = if (onLpQuery != null && tuned is BacktrackWorkerConfig)
                     tuned.withLpQueryObserver(onLpQuery) else tuned
-                val bounded = if (onGuidance != null && queried is BacktrackWorkerConfig)
+                val guided = if (onGuidance != null && queried is BacktrackWorkerConfig)
                     queried.withGuidanceObserver(onGuidance) else queried
+                val bounded = if (onSession != null && guided is BacktrackWorkerConfig)
+                    guided.withSessionObserver(onSession) else guided
                 val privateCoordinates = objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&

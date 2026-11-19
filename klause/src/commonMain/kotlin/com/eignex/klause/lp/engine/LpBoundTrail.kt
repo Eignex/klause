@@ -25,7 +25,7 @@ internal class LpBoundTrail(initial: LpExactState) {
 
     fun push(token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || state.depth == Int.MAX_VALUE) return false
-        val next = snapshot(scopes = state.scopes + state.assertions.size)
+        val next = snapshot(scopes = state.scopes + state.assertionView.size)
         return commit(next, token)
     }
 
@@ -38,12 +38,12 @@ internal class LpBoundTrail(initial: LpExactState) {
     ): Boolean {
         if (token.admission?.exhausted == true || token.pollStop() || column !in 0 until state.model.numVars ||
             (column >= state.model.n && !state.rows.row(column - state.model.n).active) || witness < 0L ||
-            state.assertions.any { it.witness == witness } || state.boundRevision == Long.MAX_VALUE
+            state.assertionView.any { it.witness == witness } || state.boundRevision == Long.MAX_VALUE
         ) {
             return false
         }
         val next = snapshot(
-            assertions = state.assertions + LpBoundAssertion(column, upper, side, witness, state.depth),
+            assertions = state.assertionView + LpBoundAssertion(column, upper, side, witness, state.depth),
             boundRevision = state.boundRevision + 1L,
             changedColumns = listOf(column),
         )
@@ -61,7 +61,7 @@ internal class LpBoundTrail(initial: LpExactState) {
             if (token()) return LpBoundBatchResult.Declined(0)
             return assertUnprojectedBounds(assertions, token)
         }
-        val before = state.assertions
+        val before = state.assertionView
         val witnesses = before.mapTo(HashSet()) { it.witness }
         val lower = Array(state.model.numVars) { state.activeSide(it, false) }
         val upper = Array(state.model.numVars) { state.activeSide(it, true) }
@@ -124,7 +124,7 @@ internal class LpBoundTrail(initial: LpExactState) {
             if (staged.state.conflict != null) break
         }
         val next = snapshot(
-            assertions = staged.state.assertions,
+            assertions = staged.state.assertionView,
             boundRevision = staged.state.boundRevision,
             changedColumns = assertions.take(count).map { it.column }.distinct().sorted(),
         )
@@ -137,7 +137,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (targetDepth == state.depth) return true
         if (state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
         val retained = state.scopes[targetDepth]
-        val assertions = state.assertions.take(retained)
+        val assertions = state.assertionView.take(retained)
         val rows = state.rows.popped(targetDepth)
         val changedRows = (0 until rows.size).filter { rows.row(it) != state.rows.row(it) }
         if (changedRows.isNotEmpty() && state.rowRevision == Long.MAX_VALUE) return false
@@ -155,7 +155,7 @@ internal class LpBoundTrail(initial: LpExactState) {
             boundRevision = state.boundRevision + 1L,
             popRevision = state.popRevision + 1L,
             changedColumns = (
-                state.assertions.drop(retained).map { it.column } +
+                state.assertionView.drop(retained).map { it.column } +
                     changedRows.map { state.model.n + it }
                 ).distinct().sorted(),
         )
@@ -190,7 +190,7 @@ internal class LpBoundTrail(initial: LpExactState) {
                 boundRevision = state.boundRevision + 1L,
                 popRevision = state.popRevision + 1L,
                 changedColumns = (
-                    state.assertions.map { it.column } + changedRows.map { state.model.n + it }
+                    state.assertionView.map { it.column } + changedRows.map { state.model.n + it }
                     ).distinct().sorted(),
             ),
             token,
@@ -201,7 +201,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (token() || origins.size != state.model.n) return false
         if ((0 until state.model.n).all { origins[it] == state.model.column(it).origin }) return true
         if (state.boundRevision == Long.MAX_VALUE || state.objectiveRevision == Long.MAX_VALUE ||
-            state.assertions.any { it.side.number.ieeeBits != null || it.side.premises?.hasIeeeInput == true }
+            state.assertionView.any { it.side.number.ieeeBits != null || it.side.premises?.hasIeeeInput == true }
         ) {
             return false
         }
@@ -210,7 +210,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         } catch (_: IllegalArgumentException) {
             return false
         }
-        val assertions = state.assertions.map { assertion ->
+        val assertions = state.assertionView.map { assertion ->
             if (assertion.column >= state.model.n) return@map assertion
             val delta = origins[assertion.column].value - state.model.column(assertion.column).origin.value
             if (delta.isZero) {
@@ -261,9 +261,9 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (nnz + newM > Int.MAX_VALUE || token()) return false
         val identities = state.rows.append(rows.map { it.id }, if (scoped) state.depth else null, permanentRows)
         val assertions = if (columns.isEmpty()) {
-            state.assertions
+            state.assertionView
         } else {
-            state.assertions.map { assertion ->
+            state.assertionView.map { assertion ->
                 if (assertion.column < state.model.n) {
                     assertion
                 } else {
@@ -317,7 +317,7 @@ internal class LpBoundTrail(initial: LpExactState) {
             state.rows.row(it).active || state.rows.row(it).suspendedAt != null
         }
         if (changed.isEmpty()) return true
-        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(changed, state.assertions)) return false
+        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(changed, state.assertionView)) return false
         return commit(
             snapshot(
                 rows = state.rows.deactivate(changed),
@@ -334,7 +334,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         val indices = rowIndices(ids) ?: return false
         val active = indices.filterTo(HashSet()) { state.rows.row(it).active }
         if (active.isEmpty()) return true
-        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(active, state.assertions)) return false
+        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(active, state.assertionView)) return false
         return commit(
             snapshot(
                 rows = state.rows.suspend(active, state.depth),
@@ -365,8 +365,8 @@ internal class LpBoundTrail(initial: LpExactState) {
             if (remap.column(column) < 0 && !canRemoveColumn(column, remap)) return false
         }
         val assertions = ArrayList<LpBoundAssertion>()
-        val marks = IntArray(state.assertions.size + 1)
-        state.assertions.forEachIndexed { index, assertion ->
+        val marks = IntArray(state.assertionView.size + 1)
+        state.assertionView.forEachIndexed { index, assertion ->
             val column = remap.column(assertion.column)
             if (column >= 0) assertions.add(assertion.copy(column = column))
             marks[index + 1] = assertions.size
@@ -423,7 +423,7 @@ internal class LpBoundTrail(initial: LpExactState) {
 
     private fun snapshot(
         baseModel: ExactLpModel = state.baseModel,
-        assertions: List<LpBoundAssertion> = state.assertions,
+        assertions: List<LpBoundAssertion> = state.assertionView,
         scopes: List<Int> = state.scopes,
         boundRevision: Long = state.boundRevision,
         objectiveRevision: Long = state.objectiveRevision,

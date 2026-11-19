@@ -106,15 +106,14 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
     ): IntegerSourceRow? = sources.source(factorId, trail, forBoundReason)
 
     private fun reason(row: IntegerConflictRow, used: Set<Pair<Int, Int>>): BoundEvent? {
-        budget.spend(bytes = row.variables.size.toLong() * Int.SIZE_BYTES)
-        val trails = IntArray(row.variables.size)
-        var candidates: IntArray? = null
+        var candidates: LongArray? = null
         var count = 0
         for (index in row.variables.indices) {
             budget.spend()
             val variable = row.variables[index]
             val lower = row.coefficients[index] > BIG_ZERO
             val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+            if (!state.hasIntegerArithmeticSource(factorId)) continue
             val marker = endpointMarker(row, index)
             state.arithmeticLearningTrace?.marker(variable, lower, marker)
             marker ?: continue
@@ -124,39 +123,37 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             val key = variable to if (lower) marker[2] else marker[2].inv()
             if (key in used) continue
-            trails[index] = marker[2]
-            val indices = candidates ?: run {
-                budget.spend(bytes = row.variables.size.toLong() * Int.SIZE_BYTES)
-                IntArray(row.variables.size).also { candidates = it }
+            val priorities = candidates ?: run {
+                budget.spend(bytes = row.variables.size.toLong() * Long.SIZE_BYTES)
+                LongArray(row.variables.size).also { candidates = it }
             }
-            indices[count++] = index
+            // Signed high words order trails; complemented low words prefer the earlier coordinate on ties.
+            priorities[count++] = (marker[2].toLong() shl Int.SIZE_BITS) or (index.toLong().inv() and 0xFFFF_FFFFL)
         }
-        val indices = candidates ?: return null
-        fun later(left: Int, right: Int): Boolean {
+        val priorities = candidates ?: return null
+        fun later(left: Long, right: Long): Boolean {
             budget.spend()
-            val l = trails[left]
-            val r = trails[right]
-            return l > r || (l == r && left < right)
+            return left > right
         }
         fun sift(start: Int, size: Int) {
             var root = start
             while (root * 2 + 1 < size) {
                 budget.spend()
                 var child = root * 2 + 1
-                if (child + 1 < size && later(indices[child + 1], indices[child])) child++
-                if (!later(indices[child], indices[root])) return
-                val swap = indices[root]
-                indices[root] = indices[child]
-                indices[child] = swap
+                if (child + 1 < size && later(priorities[child + 1], priorities[child])) child++
+                if (!later(priorities[child], priorities[root])) return
+                val swap = priorities[root]
+                priorities[root] = priorities[child]
+                priorities[child] = swap
                 root = child
             }
         }
         for (root in count / 2 - 1 downTo 0) sift(root, count)
         var remaining = count
         while (remaining > 0) {
-            val index = indices[0]
+            val index = priorities[0].toInt().inv()
             remaining--
-            indices[0] = indices[remaining]
+            priorities[0] = priorities[remaining]
             sift(0, remaining)
             budget.spend()
             qualifiedReason(row, index)?.let { return it }
@@ -248,16 +245,21 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 domain.min, domain.max, marker[2].toLong())
             return null
         }
-        var combination = row.resolve(sourceRow, variable, budget)
-        if (combination == null) {
+        var combination = row.resolve(sourceRow, variable, budget) ?: run {
             state.arithmeticLearningTrace?.record("integer.endpoint-decline.combination-shape-or-guard")
             return null
         }
+        var roundedReason = false
         if (combination.minimum(state, budget = budget) <= combination.bound) {
             val reduced = sourceRow.reduced(state, sourceRow.coefficient(variable).abs(), budget)
-            combination = reduced?.let { row.resolve(it, variable, budget) } ?: combination
+            reduced?.let { row.resolve(it, variable, budget) }?.let {
+                combination = it
+                roundedReason = true
+            }
         }
         if (combination.minimum(state, budget = budget) <= combination.bound) return null
+        state.arithmeticLearningTrace?.record("integer.eliminate", variable.toLong(), factorId.toLong(),
+            marker[2].toLong(), if (roundedReason) 1L else 0L)
         return BoundEvent(sourceRow, marker[2], key, combination)
     }
 

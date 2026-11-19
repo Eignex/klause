@@ -48,7 +48,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "learning")
+                "attribution", "learning", "route", "seed")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -104,6 +104,14 @@ internal object OrdinaryArithmeticLearningProfile {
         check(observedHash == hash) { "source hash mismatch: expected $hash, observed $observedHash" }
         val ref = catalogRef ?: ProblemRef(name, format, ProblemSource.Prepared(sourceFile),
             Category.CSP, Expected.Unknown)
+        val route = options["route"] ?: "single"
+        require(route in setOf("single", "catalog"))
+        if (route == "catalog") {
+            require(!attribution && "nodes" !in options)
+            PortfolioArithmeticLearningCapture.inspect(options, ref, bytes, out, fingerprint)
+            return
+        }
+        require("seed" !in options)
         val codec = ProblemJson()
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
             for (learning in listOf(false, true)) {

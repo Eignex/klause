@@ -379,13 +379,28 @@ their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use arbitrary-precision integer coefficients,
 exact activity and gcd normalization with downward rounding of the upper bound.
+Normalized rows retain sorted coordinates; cancellation merges their terms in linear
+time and removes zero coefficients before normalization.
+Ordered source coordinates use array normalization directly; unordered, repeated or
+zero terms pass through aggregation before normalization.
+Once the coefficient gcd reaches one, normalization copies the canonical terms and
+keeps the bound without further gcd or identity divisions. Activity accumulates checked
+signed words and promotes the partial sum at the first product or sum overflow.
+Wide coefficients enter exact accumulation directly; failed word attempts remain
+charged to the containing allowance.
+Historical assertion checks use checked words for contributions and residuals when
+they fit, and retry exact arithmetic on overflow without changing raw-target or hole checks.
 Saturation expresses the row as a positive cover over integer distances from declared
-box endpoints and caps each weight at its degree. If ordinary cancellation loses the
-conflict, scaled mixed-integer rounding can reduce the reason before another
-combination. These reductions cite only declared domains, never live branch bounds.
+box endpoints and caps each weight at its degree. Box degree accumulation uses checked
+words and promotes the partial sum on overflow; wide coefficients remain exact.
+If ordinary cancellation loses the conflict, scaled mixed-integer rounding can reduce
+the reason before another combination. These reductions cite only declared domains,
+never live branch bounds.
 
 Endpoint discovery uses a heap ordered by historical deduction position, with
-coordinate order breaking ties. An analysis caches validated source identities and
+coordinate order breaking ties. Unsupported projection kinds are excluded before
+marker reconstruction; eligible endpoints share one lazily allocated array of packed
+trail and coordinate priorities. An analysis caches validated source identities and
 normalized inequality sides; every consultation still checks historical guard truth,
 raw requested bounds and membership. Incompatible guards decline before historical
 bound reconstruction. Discovery, arithmetic, candidate ordering and duplicate scans
@@ -395,6 +410,11 @@ for operand word sizes. Exhaustion discards the optional derivation and keeps th
 completed clause fallback; containing interruption withholds unfinished analysis.
 Row width, decision depth, derivation length and retained-row count have no separate
 fixed limits. Retained rows use ordinary learned-store retention.
+
+Unsupported seed projection kinds keep their completed clausal analysis without
+constructing integer discovery state. A box reduction whose degree already covers
+every coefficient and needs no rounding retains its normalized row without rebuilding
+term storage.
 
 Each combination must remain conflicting. A retained row must propagate against the
 session's historical domains at its first-UIP clause's native backjump and at the
@@ -447,6 +467,13 @@ a satisfied endpoint literal cannot discharge the row or certify a root contradi
 A rolling capture can focus on the first admitted integer or PB row, retaining its
 derivation and later consumers inside the fixed event and word allowances.
 
+Single-core finite source execution can attach a native-session observer through
+the ordinary portfolio factories. The hook wraps each selected recipe's selector
+notification, preserving its fresh selector, choices and other notifications. It
+identifies the worker and exposes its actual session before branching, including
+replacement sessions. Observation does not select a recipe or grant source authority;
+its work spends the containing invocation allowance.
+
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction: seed and fallback literals, integer
 endpoints and historical row domains, signed guards, native and shared targets,
@@ -458,6 +485,10 @@ arithmetic value outside its signed-word event format, reads
 existing state without reconstructing reasons or running propagation, and supplies no
 proof or source-mapping authority; an incomplete trace cannot establish exhaustive
 applicability.
+
+Successful integer cancellation records the selected variable, source factor,
+historical deduction position and whether the reason needed mixed-integer rounding.
+These choices bind a long derivation without guessing its pivots from the final row.
 
 ## Learned-clause retention
 

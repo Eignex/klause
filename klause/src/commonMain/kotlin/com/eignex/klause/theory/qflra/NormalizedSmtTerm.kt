@@ -42,9 +42,11 @@ internal fun normalizeSmtTerm(
         }
     }
     val scale = residual.values.firstOrNull() ?: BigFraction.ONE
-    val inverse = scale.reciprocal()
     return NormalizedSmtTerm(
-        residual.mapValues { (_, coefficient) -> coefficient * inverse },
+        if (scale == BigFraction.ONE) residual else {
+            val inverse = scale.reciprocal()
+            residual.mapValues { (_, coefficient) -> coefficient * inverse }
+        },
         scale,
         offset,
         substitutions,

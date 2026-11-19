@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +15,50 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class IntegerRowReductionTest {
+    @Test
+    fun `saturation should retain cancellation after overflowing word degree arithmetic`() {
+        val inputs = listOf(longArrayOf(2, -2, 1), longArrayOf(1, 1, -1, -1, 2))
+        for (coefficients in inputs) {
+            val bound = if (coefficients.size == 3) 0L else 1L
+            val row = assertNotNull(IntegerConflictRow.source(IntArray(coefficients.size) { it },
+                Array(coefficients.size) { bigIntOf(coefficients[it]) }, bigIntOf(bound), useLo = true))
+            val state = PropagationState(Problem(0, coefficients.size, Array(coefficients.size) {
+                if (it == coefficients.lastIndex) IntDomain(0, 1) else IntDomain(Long.MAX_VALUE, Long.MAX_VALUE)
+            }, emptyArray()), Assumptions.None)
+
+            val reduced = assertNotNull(row.reduced(state))
+
+            assertEquals(coefficients.map { bigIntOf(if (it < 0) -1 else 1) }, reduced.coefficients.toList())
+            assertEquals(bigIntOf(0), reduced.bound)
+        }
+    }
+
+    @Test
+    fun `saturation should cancel a bound and coefficient beyond signed words`() {
+        val large = bigIntOf(1) shl 256
+        val row = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(large, bigIntOf(1)), large, useLo = true))
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+
+        val reduced = assertNotNull(row.reduced(state))
+
+        assertEquals(listOf(bigIntOf(1), bigIntOf(1)), reduced.coefficients.toList())
+        assertEquals(bigIntOf(1), reduced.bound)
+    }
+
+    @Test
+    fun `box degree should negate the minimum signed bound exactly`() {
+        val row = assertNotNull(IntegerConflictRow.source(intArrayOf(0), arrayOf(bigIntOf(1)),
+            bigIntOf(Long.MIN_VALUE), useLo = true))
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1)),
+            emptyArray()), Assumptions.None)
+
+        val reduced = assertNotNull(row.reduced(state))
+
+        assertEquals(bigIntOf(Long.MIN_VALUE), reduced.bound)
+        assertEquals(bigIntOf(1), reduced.coefficient(0))
+    }
+
     @Test
     fun `saturation should cap weights at the required integer distance`() {
         val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),

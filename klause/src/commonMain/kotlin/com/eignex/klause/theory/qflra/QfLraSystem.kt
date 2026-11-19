@@ -20,6 +20,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -159,14 +160,24 @@ internal class LiveQfLraSystem(
     private val canonicalTerms = HashMap<Map<Int, BigFraction>, Map<Int, BigFraction>>()
     private val initialTerms = HashSet<SmtTermKey>()
     private val preparedTerms = buildMap {
+        val shared = HashMap<SmtTermKey, SmtRowKeys>()
         for ((factorIndex, forms) in rowForms.withIndex()) {
             val factor = source.factors[factorIndex]
             val rows = factor.linearRows
             for ((rowIndex, form) in forms.withIndex()) {
+                preparationStop.charge(rows[rowIndex].size.toLong() + 1L)
+                if (preparationStop.pollStop()) return@buildMap
                 val comparison = form.comparison(true) { false }
-                val keys = SmtRowKeys(comparison.terms)
+                val positive = SmtTermKey(comparison.ordered.row(BigFraction.ZERO, false))
+                val keys = shared.getOrPut(positive) {
+                    SmtRowKeys(positive, SmtTermKey(comparison.ordered.negatedRow(BigFraction.ZERO, false)))
+                }
                 put(comparison.ordered, keys)
                 val row = rows[rowIndex]
+                if (marginColumn != null) {
+                    keys.includeStrictSides(comparison)
+                    if (row.activator != LinearRow.ALWAYS) keys.includeStrictSides(form.comparison(false) { false })
+                }
                 if (factor.linearForm !is LinearForm.Disjunction && row.activator == LinearRow.ALWAYS &&
                     (0 until row.size).none { Term.isBool(row.ref(it)) }
                 ) {
@@ -175,35 +186,33 @@ internal class LiveQfLraSystem(
             }
         }
     }
-    private val normalized = preparedTerms.values.associateTo(HashMap()) { keys ->
-        keys.positive to SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
+    private val normalized = HashMap<SmtTermKey, SmtTermSlot>().apply {
+        for (keys in preparedTerms.values) {
+            preparationStop.charge(1L)
+            if (preparationStop.pollStop()) return@apply
+            getOrPut(keys.positive) {
+                preparationStop.charge(16L * (keys.positive.columns.size + 1L))
+                SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
+            }
+        }
     }
     private val terms = buildList {
         addAll(normalized.filterKeys { strictMargin || it in initialTerms }.values.map { it.term.coefficients })
         if (marginColumn != null) {
-            for ((factorIndex, forms) in rowForms.withIndex()) {
-                val rows = source.factors[factorIndex].linearRows
-                for ((rowIndex, form) in forms.withIndex()) {
-                    val truths = if (rows[rowIndex].activator == LinearRow.ALWAYS) listOf(true) else listOf(true, false)
-                    for (truth in truths) {
-                        val sides = ArrayList<ExactRationalInequality>(2)
-                        val comparison = form.comparison(truth) { false }
-                        preparationStop.charge(16L * (comparison.terms.size + 1L))
-                        if (preparationStop.pollStop()) return@buildList
-                        if (comparison.op == LinearOp.NE) {
-                            comparison.rowsInto(sides, LinearOp.LE)
-                            comparison.rowsInto(sides, LinearOp.GE)
-                        } else {
-                            comparison.rowsInto(sides)
-                        }
-                        for (side in sides) {
-                            if (!side.strict) continue
-                            val expression = side.columns.indices.associate {
-                                side.columns[it] to side.coefficients[it]
-                            } + (marginColumn to BigFraction.ONE)
-                            add(intern(expression, declaredFixed).coefficients)
-                        }
+            val installed = HashSet<SmtTermKey>()
+            for (keys in preparedTerms.values) {
+                preparationStop.charge(1L)
+                if (preparationStop.pollStop()) return@buildList
+                for (key in keys.strictSides()) {
+                    if (!installed.add(key)) continue
+                    preparationStop.charge(16L * (key.columns.size + 1L))
+                    if (preparationStop.pollStop()) return@buildList
+                    val interior = key.withMargin(marginColumn, true)
+                    val slot = normalized.getOrPut(interior) {
+                        SmtTermSlot(intern(interior.expression(), declaredFixed))
                     }
+                    interior.slot = slot
+                    add(slot.term.coefficients)
                 }
             }
         }
@@ -242,7 +251,11 @@ internal class LiveQfLraSystem(
             definitionPoint.clear()
             sourcePoint.clear()
         }
-        if (state === checkedState) return !stop()
+        if (state.model === checkedState?.model) {
+            val accepted = !stop()
+            if (accepted) checkedState = state
+            return accepted
+        }
         fun holds(column: Int, value: BigFraction): Boolean {
             stop.charge(2L)
             if (stop.pollStop()) return false
@@ -352,7 +365,7 @@ internal class LiveQfLraSystem(
 
     fun assertComparison(comparison: ExactComparison, direction: LinearOp?, premise: SearchAtomPremise): Boolean {
         // Only source layouts are retained; transient comparisons must not grow a search-wide cache.
-        val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
+        val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison)
         val rows = ArrayList<ExactRationalInequality>(2)
         comparison.rowsInto(rows, direction)
         for ((index, row) in rows.withIndex()) {
@@ -384,7 +397,7 @@ internal class LiveQfLraSystem(
             // Direct source bounds can expose root fixings to the next comparison's normalization.
             if (lp.state?.depth == 0 && batch.hasBoundsBelow(pointColumns) && !batch.flush()) return batch.conflict
             val comparison = input.comparison
-            val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
+            val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison)
             val rows = ArrayList<ExactRationalInequality>(2)
             comparison.rowsInto(rows)
             for ((side, row) in rows.withIndex()) {
@@ -408,15 +421,24 @@ internal class LiveQfLraSystem(
         stop.charge(comparison.terms.size.toLong() + 1L)
         if (stop.pollStop()) return null
         val key = preparedTerms[comparison.ordered]?.positive
-        val term = key?.let { (it.slot ?: normalized[it])?.term }
-        val column = term?.let { definitions[it.coefficients] }
+        val slot = key?.let { it.slot ?: normalized[it] }
+        val column = slot?.term?.let { definitions[it.coefficients] }
         val state = lp.state ?: return null
-        return listOf(false, true).map { upper ->
-            val active = column?.let { state.activeSide(it, upper) } ?: return@map null
-            val premise = lp.activeBoundPremise(column, upper) ?: return null
+        if (column == null) return EMPTY_AFFINE_INPUTS
+        val lower = state.activeSide(column, false)
+        val upper = state.activeSide(column, true)
+        val retained = slot.inputSides
+        if (retained != null && lower === slot.inputLower && upper === slot.inputUpper) return retained
+        val sides = listOf(lower, upper).mapIndexed { index, active ->
+            if (active == null) return@mapIndexed null
+            val premise = lp.activeBoundPremise(column, index == 1) ?: return null
             if (premise === SearchAtomPremise.Unavailable) return null
             PartialLinearSide(active.side.number.value, active.side.strict)
         }
+        slot.inputLower = lower
+        slot.inputUpper = upper
+        slot.inputSides = sides
+        return sides
     }
 
     fun affineImplication(comparison: ExactComparison, stop: ExecutionControl): PartialLinearImplication? {
@@ -549,8 +571,7 @@ internal class LiveQfLraSystem(
         val original = prepareBound(key, upper, threshold, strict, premise, beforeDefinition) ?: return null
         val margin = marginColumn ?: return listOf(original)
         if (!strict) return listOf(original)
-        val expression = key.expression() + (margin to if (upper) BigFraction.ONE else BigFraction.MINUS_ONE)
-        val interior = prepareBound(SmtTermKey.of(expression), upper, threshold, false, premise, beforeDefinition)
+        val interior = prepareBound(key.withMargin(margin, upper), upper, threshold, false, premise, beforeDefinition)
             ?: return null
         return listOf(original, interior)
     }
@@ -676,8 +697,18 @@ internal data class DerivedDisequalitySide(val direction: LinearOp, val premise:
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.
 private class SmtTermKey(val columns: IntArray, private val coefficients: List<BigFraction>) {
+    constructor(row: ExactRationalInequality) : this(row.columns, row.coefficients)
+
     private val hash = 31 * columns.contentHashCode() + coefficients.hashCode()
     var slot: SmtTermSlot? = null
+    private var upperMargin: SmtTermKey? = null
+    private var lowerMargin: SmtTermKey? = null
+
+    fun withMargin(column: Int, upper: Boolean): SmtTermKey = if (upper) {
+        upperMargin ?: of(expression() + (column to BigFraction.ONE)).also { upperMargin = it }
+    } else {
+        lowerMargin ?: of(expression() + (column to BigFraction.MINUS_ONE)).also { lowerMargin = it }
+    }
 
     fun expression(): Map<Int, BigFraction> = columns.indices.associate { columns[it] to coefficients[it] }
 
@@ -702,11 +733,38 @@ private class SmtTermKey(val columns: IntArray, private val coefficients: List<B
     }
 }
 
-private class SmtRowKeys(terms: Map<Int, BigFraction>) {
-    val positive = SmtTermKey.of(terms)
-    val negative = SmtTermKey.of(terms.mapValues { (_, coefficient) -> coefficient.negated() })
+private class SmtRowKeys(val positive: SmtTermKey, val negative: SmtTermKey) {
+    constructor(comparison: ExactComparison) : this(
+        SmtTermKey(comparison.ordered.row(BigFraction.ZERO, false)),
+        SmtTermKey(comparison.ordered.negatedRow(BigFraction.ZERO, false)),
+    )
+
+    private val strict = ArrayList<SmtTermKey>(2)
+
+    fun includeStrictSides(comparison: ExactComparison) {
+        if (positive.columns.isEmpty()) return
+        fun include(key: SmtTermKey) {
+            if (key !in strict) strict += key
+        }
+        when (comparison.op) {
+            LinearOp.LE -> if (comparison.strict) include(positive)
+            LinearOp.GE -> if (comparison.strict) include(negative)
+            LinearOp.NE -> if (comparison.hasReals) {
+                include(positive)
+                include(negative)
+            }
+            LinearOp.EQ -> Unit
+        }
+    }
+
+    fun strictSides(): List<SmtTermKey> = strict
 }
 
 private class SmtTermSlot(val term: NormalizedSmtTerm) {
     var column: Int = -1
+    var inputLower: LpBoundAssertion? = null
+    var inputUpper: LpBoundAssertion? = null
+    var inputSides: List<PartialLinearSide?>? = null
 }
+
+private val EMPTY_AFFINE_INPUTS: List<PartialLinearSide?> = listOf(null, null)

@@ -49,5 +49,12 @@ internal fun PropagationState.checkIntegerScalarWork(left: BigInt, right: BigInt
     work += units
 }
 
+internal fun PropagationState.checkIntegerWordWork(budget: ArithmeticLearningBudget?) {
+    if (budget == null) {
+        checkFiniteWork()
+        checkFiniteWork()
+    } else budget.spend(work = 2, bytes = 64)
+}
+
 private fun integerWords(value: BigInt): Long =
     ((value.magnitudeBitLength().toLong() + 63) / 64).coerceAtLeast(1)

@@ -40,6 +40,72 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `affine input sides should follow strict bounds across sibling scopes`() {
+        val factors = Array<Factor>(2) { guard ->
+            ReifiedRealLinear(guard, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, -1.0), LinearOp.LE, (guard + 1).toDouble(), guard == 1)
+        }
+        val source = source().withFactors(factors)
+        val forms = factors.map { listOf(it.linearRows.single().exactForm(2)) }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, forms)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            val first = forms[0][0].comparison(true) { false }
+            assertEquals(listOf(null, null), system.affineInputSides(first, ExecutionControl.Never))
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(system.assertComparison(first, null, premise(0)))
+            repeat(2) {
+                assertEquals(listOf(null, PartialLinearSide(BigFraction.ONE, false)),
+                    system.affineInputSides(first, ExecutionControl.Never))
+            }
+            session.popTo(0)
+            assertEquals(listOf(null, null), system.affineInputSides(first, ExecutionControl.Never))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            val sibling = forms[1][0].comparison(true) { false }
+
+            assertTrue(system.assertComparison(sibling, null, premise(1)))
+
+            assertEquals(listOf(null, PartialLinearSide(BigFraction.ofLong(2), true)),
+                system.affineInputSides(sibling, ExecutionControl.Never))
+            assertNull(system.affineInputSides(sibling, ExecutionControl { true }))
+        }
+    }
+
+    @Test
+    fun `shared strict terms should retain source thresholds across retraction`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            val factors = Array<Factor>(2) { guard ->
+                ReifiedRealLinear(guard, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -1.0), op, guard.toDouble(), true)
+            }
+            val source = source().withFactors(factors)
+            val forms = factors.map { listOf(it.linearRows.single().exactForm(2)) }
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source, lp, forms, strictMargin = true)
+                assertTrue(system.install())
+                val session = SearchSession(listOf(lp))
+                session.initialize()
+                session.push(SearchDecision.Bool(Lit.make(0, true)))
+                assertTrue(system.assertComparison(forms[0][0].comparison(true) { false }, null, premise(0)))
+                val expected = if (op == LinearOp.GE) BigFraction.ONE else BigFraction.MINUS_ONE
+                val point = listOf(expected, BigFraction.ZERO, BigFraction.ONE)
+                assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+                session.popTo(0)
+                session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+                assertTrue(system.assertComparison(forms[1][0].comparison(true) { false }, null, premise(1)))
+
+                val shifted = listOf(expected + BigFraction.ONE, BigFraction.ZERO, BigFraction.ONE)
+                assertTrue(system.acceptsPoint(shifted, ExecutionControl.Never))
+                val rejected = listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.ONE)
+                assertFalse(system.acceptsPoint(rejected, ExecutionControl.Never))
+            }
+        }
+    }
+
+    @Test
     fun `stopped point rechecks should withhold cached acceptance`() {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source(), lp)
@@ -48,6 +114,22 @@ class QfLraSystemTest {
             assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
 
             val accepted = system.acceptsPoint(point, ExecutionControl { true })
+
+            assertFalse(accepted)
+        }
+    }
+
+    @Test
+    fun `point reuse after an empty scope push should observe cancellation before acceptance`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val point = listOf(BigFraction.ZERO, BigFraction.ZERO)
+            assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+            assertTrue(lp.atLevel(1))
+            var polls = 0
+
+            val accepted = system.acceptsPoint(point, ExecutionControl { ++polls >= 2 })
 
             assertFalse(accepted)
         }

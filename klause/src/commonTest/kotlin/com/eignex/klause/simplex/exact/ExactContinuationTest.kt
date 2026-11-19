@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.withBoundedPolling
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
@@ -10,6 +11,96 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactContinuationTest {
+    @Test
+    fun `multi unit admissions should consume the bounded polling credit`() {
+        val observed = ArrayList<Long>()
+        lateinit var budget: ContinuationBudget
+        budget = ContinuationBudget(ExactContinuationLimits(), ExecutionControl {
+            observed += budget.work
+            false
+        }.withBoundedPolling())
+
+        repeat(5) { budget.step(100L) }
+        budget.checkpoint()
+
+        assertEquals(0L, observed.first())
+        assertEquals(500L, observed.last())
+        assertTrue(observed.zipWithNext().all { (before, after) -> after - before <= 256L })
+    }
+
+    @Test
+    fun `bulk admissions should observe cancellation before and after their debit`() {
+        val observed = ArrayList<Long>()
+        lateinit var budget: ContinuationBudget
+        budget = ContinuationBudget(ExactContinuationLimits(), ExecutionControl {
+            observed += budget.work
+            false
+        }.withBoundedPolling())
+
+        budget.step(1000L)
+
+        assertTrue(0L in observed)
+        assertTrue(1000L in observed)
+    }
+
+    @Test
+    fun `bounded polling should preserve exact continuation costs and values`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
+            listOf(BigFraction.ZERO, BigFraction.ZERO), listOf(null, BigFraction.ZERO),
+            listOf(1), listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC),
+        )
+        var immediateChecks = 0
+        val immediate = ExactContinuation(input).resume(cancellation = ExecutionControl {
+            immediateChecks++
+            false
+        })
+        var boundedChecks = 0
+
+        val bounded = ExactContinuation(input).resume(cancellation = ExecutionControl {
+            boundedChecks++
+            false
+        }.withBoundedPolling())
+
+        assertEquals(assertNotNull(immediate.values), assertNotNull(bounded.values))
+        assertEquals(immediate.metrics.work, bounded.metrics.work)
+        assertEquals(immediate.metrics.allocation, bounded.metrics.allocation)
+        assertEquals(immediate.metrics.workByPhase, bounded.metrics.workByPhase)
+        assertEquals(immediate.metrics.allocationByPhase, bounded.metrics.allocationByPhase)
+        assertTrue(boundedChecks < immediateChecks)
+    }
+
+    @Test
+    fun `bounded cancellation should withhold completed points and retain resumable costs`() {
+        val input = ExactContinuationInput(
+            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
+            listOf(BigFraction.ZERO, BigFraction.ZERO), listOf(null, BigFraction.ZERO),
+            listOf(1), listOf(ContinuationStatus.LOWER, ContinuationStatus.BASIC),
+        )
+        var checks = 0
+        val reference = ExactContinuation(input).resume(cancellation = ExecutionControl {
+            checks++
+            false
+        }.withBoundedPolling())
+        assertNotNull(reference.values)
+        for (cancelAt in 1..checks) {
+            val continuation = ExactContinuation(input)
+            var observed = 0
+
+            val cancelled = continuation.resume(cancellation = ExecutionControl {
+                ++observed == cancelAt
+            }.withBoundedPolling())
+            val completed = continuation.resume()
+
+            assertEquals(ContinuationDecline.CANCELLED, cancelled.metrics.decline)
+            assertNull(cancelled.values)
+            assertNull(cancelled.ray)
+            assertEquals(reference.values, assertNotNull(completed.values))
+            assertEquals(cancelled.metrics.work + completed.metrics.work, continuation.usedWork)
+            assertEquals(cancelled.metrics.allocation + completed.metrics.allocation, continuation.usedAllocation)
+        }
+    }
+
     @Test
     fun `caller funded cell storage should resume a dimension declined authority`() {
         val rows = 256
