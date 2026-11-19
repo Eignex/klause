@@ -120,12 +120,14 @@ class CliModeMpsTest {
             output.onImprovement("continuous", 0L, continuousObjective = 60.0, elapsedMs = 20)
             output.onImprovement("mixed-min", -3L, continuousObjective = -63.5, elapsedMs = 30)
             output.onImprovement("mixed-max", 3L, continuousObjective = 63.5, elapsedMs = 40)
+            output.onImprovement("private", 2L, elapsedMs = 50, privateIncumbentReuse = true)
         }
 
         assertTrue("label=integer objective=9007199254740993 time=10" in out, out)
         assertTrue("label=continuous objective=0 continuousObjective=60.0 time=20" in out, out)
         assertTrue("label=mixed-min objective=-3 continuousObjective=-63.5 time=30" in out, out)
         assertTrue("label=mixed-max objective=3 continuousObjective=63.5 time=40" in out, out)
+        assertTrue("label=private objective=2 time=50 privateIncumbentReuse=true" in out, out)
     }
 
     @Test

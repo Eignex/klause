@@ -503,6 +503,9 @@ Automatic reuse keeps ordinary finite cutoff windows and scheduling; only the
 explicit completion option selects its cutoff accounting and first-proposal trial.
 After importing a checked point, the numerical owner alternates its ordinary
 frontier consultations with a private proximity query inside the same turn offers.
+The private consultation uses at most half the remaining offered time and work;
+an already paid original-objective bound can request half the remaining gap as
+its private improvement target.
 The frontier retains its tree, LP owner and global bounds. Both searches share one
 LP operation/work/allocation ledger and containing decision/check allowances.
 The private search visits integer alternatives away from the center first in depth
@@ -514,6 +517,8 @@ before it can improve the source incumbent; private proofs never enter its cover
 A private query retires as soon as it delivers a checked improvement. Improvements
 from either traversal recenter the private search, while the frontier keeps the next
 consultation and all containing allowances stay cumulative.
+Accepted improvement attribution retains whether its candidate came from the
+private query, including candidates whose source publication was deferred.
 
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
@@ -585,6 +590,9 @@ original-checked strict improvement can leave this search; its distance bounds,
 refutations and optima supply no parent objective or coverage evidence. A failed
 target ends undecided and is not retried at the same cutoff; unavailable preparation
 falls back to ordinary neighborhoods.
+A newer checked shared incumbent replaces the target before its query opens, or
+retires an already pending private query. Its replacement keeps the same containing
+allowance and original receiving conditions.
 The all-pinned rounded-root bootstrap serves a center without that handoff.
 Before a checked center exists, root repair can keep the ordinary
 pre-selection relaxation point for advisory centering and neighborhood order,

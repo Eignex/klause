@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceObjective
@@ -17,13 +18,17 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal object IncumbentProximity {
+    fun candidateStats(stats: SolveStats, privateCandidate: Boolean): SolveStats = if (!privateCandidate) stats
+        else stats.copy(smt = stats.smt.copy(completeSearchStages =
+            stats.smt.completeSearchStages.orEmpty() + ("incumbentReusePrivateCandidate" to 1L)))
+
     fun accepts(bounds: IntBounds, integers: Int): Boolean = integers in 1..4096 &&
         (0 until integers).all {
             bounds.hasLower(it) && bounds.hasUpper(it) && bounds.lower(it) >= 0L && bounds.upper(it) <= 1L
         }
 
     fun prepare(source: SourceProofContext, center: Sample, cutoff: BigFraction,
-        budget: SourceLpBudget, cancellation: ExecutionControl): SourceProofContext? {
+        budget: SourceLpBudget, cancellation: ExecutionControl, aspiration: BigFraction? = null): SourceProofContext? {
         val funding = budget.funding ?: return null
         if (cancellation() || center.numBoolVars != 0 || center.numIntVars !in 1..4096 ||
             !source.affineObjectiveAvailable || source.scope.objective == null) return null
@@ -62,7 +67,7 @@ internal object IncumbentProximity {
         }
         if (original.isEmpty()) return null
         var scale: BigFraction? = null
-        for (value in original.values + listOf(cutoff, source.objectiveConstant)) {
+        for (value in original.values + listOfNotNull(cutoff, source.objectiveConstant, aspiration)) {
             if (cancellation()) return null
             val width = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
             val scalarWork = 1L + width * width / 64L
@@ -84,6 +89,10 @@ internal object IncumbentProximity {
         val relative = magnitude * BigFraction.of(BIG_ONE, bigIntOf(100))
         if (relative > improvement) improvement = relative
         if (gap != null && gap > improvement) improvement = gap
+        if (aspiration != null && aspiration < cutoff) {
+            val halfway = (cutoff - aspiration) * BigFraction.of(BIG_ONE, bigIntOf(2))
+            if (halfway > improvement) improvement = halfway
+        }
         val target = cutoff - improvement - originalConstant
         if (target.num.magnitudeBitLength() + target.den.magnitudeBitLength() > 4096 || cancellation()) return null
         val premises = source.premises.toMutableMap()

@@ -110,7 +110,8 @@ internal class SmtSessionOutput(
     override fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {
         pairs.forEach { (key, value) -> comment("$key=$value") }
     }
-    override fun onImprovement(arm: String, objective: Long, continuousObjective: Double?, elapsedMs: Long) {
+    override fun onImprovement(arm: String, objective: Long, continuousObjective: Double?, elapsedMs: Long,
+        privateIncumbentReuse: Boolean) {
         comment("arm=$arm objective=${continuousObjective ?: objective} time=$elapsedMs")
     }
     override fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long) {

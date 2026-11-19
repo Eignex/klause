@@ -132,6 +132,7 @@ internal class FiniteImprovement(
     val elapsedMs: Long,
     /** Engine-normalized objective value at [sample]. */
     val objective: Double,
+    val privateIncumbentReuse: Boolean = false,
 )
 
 /** Terminal outcome of a finite execution. */
@@ -824,5 +825,6 @@ private fun backtrackDryRun(
 
 private fun AttributedImprovement.toFiniteImprovement(): FiniteImprovement {
     val improvement = result as MinimizeResult.WithSample
-    return FiniteImprovement(improvement.sample, workerLabel, elapsed.inWholeMilliseconds, improvement.objective)
+    return FiniteImprovement(improvement.sample, workerLabel, elapsed.inWholeMilliseconds, improvement.objective,
+        improvement.stats.smt.completeSearchStages?.get("incumbentReusePrivateCandidate") == 1L)
 }

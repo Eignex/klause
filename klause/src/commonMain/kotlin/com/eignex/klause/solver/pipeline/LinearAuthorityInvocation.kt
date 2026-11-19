@@ -17,6 +17,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -108,6 +109,7 @@ internal class LinearAuthorityInvocation(
     private val externalOffers = mutableMapOf<String, Long>()
     private var importedIncumbent: Sample? = null
     private var consumedIncumbent: Sample? = null
+    private var proximityIncumbent: Sample? = null
     private var result: LinearInvocationResult? = null
     private var proximity: LinearAuthorityInvocation? = null
     private var proximityTurn = false
@@ -122,6 +124,7 @@ internal class LinearAuthorityInvocation(
     val isDone: Boolean get() = result != null
     val hasIncumbent: Boolean get() = incumbent != null
     val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent
+    val incumbentIsProximity: Boolean get() = incumbent != null && incumbent === proximityIncumbent
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
     val stats: SolveStats get() = SolveStats(
@@ -318,7 +321,9 @@ internal class LinearAuthorityInvocation(
         proximity = null
         val exact = value ?: return
         val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
-        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop) ?: return
+        val bound = ((component.rootBound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
+        val aspiration = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) bound?.negated() else bound
+        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop, aspiration) ?: return
         if (sample === importedIncumbent && sample !== consumedIncumbent) {
             consumedIncumbent = sample
             onIncumbentUse?.invoke()
@@ -341,10 +346,11 @@ internal class LinearAuthorityInvocation(
         val certification = budget.measuredBoundCertificationWork
         val revision = incumbentRevision
         val delivered = ExecutionControl { incumbentRevision != revision }
-        val completed = active.runSlice(stop or delivered, minOf(remaining, 10L),
-            minOf(endWork - work, 64L)) { sample, _ ->
+        val millis = if (remaining == Long.MAX_VALUE) 1_000L else maxOf(1L, remaining / 2L)
+        val instructions = minOf(5_000L, maxOf(1L, (endWork - work) / 2L))
+        val completed = active.runSlice(stop or delivered, millis, instructions) { sample, _ ->
             val checked = completion?.complete(context, sample, stop)
-            if (checked != null) offer(checked) else observeProximity("Rejected")
+            if (checked != null) offer(checked, external = false, privatePoint = true) else observeProximity("Rejected")
         }
         observeProximity("Consultations")
         observeProximity("Work", (work - before).coerceAtLeast(0L))
@@ -381,7 +387,7 @@ internal class LinearAuthorityInvocation(
         }
     }
 
-    private fun offer(sample: Sample, external: Boolean) {
+    private fun offer(sample: Sample, external: Boolean, privatePoint: Boolean = false) {
         val checking = if (external) completion?.checking(stop) ?: stop else stop
         if (checking()) {
             observeExternalOffer(external, "Stopped")
@@ -414,6 +420,7 @@ internal class LinearAuthorityInvocation(
         }
         incumbent = sample
         importedIncumbent = null
+        proximityIncumbent = sample.takeIf { privatePoint }
         value = exact
         incumbentRevision++
         observeExternalOffer(external, "Accepted")

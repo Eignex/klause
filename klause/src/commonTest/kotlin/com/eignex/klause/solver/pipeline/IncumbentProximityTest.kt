@@ -9,6 +9,7 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceObjective
@@ -26,6 +27,37 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IncumbentProximityTest : RuntimeInitializedTest() {
+    @Test
+    fun `private candidate provenance should remain attached to its publication snapshot`() {
+        val stats = SolveStats.EMPTY
+
+        val private = IncumbentProximity.candidateStats(stats, true)
+        val ordinary = IncumbentProximity.candidateStats(stats, false)
+
+        assertEquals(1L, private.smt.completeSearchStages?.get("incumbentReusePrivateCandidate"))
+        assertNull(ordinary.smt.completeSearchStages?.get("incumbentReusePrivateCandidate"))
+        assertNull(stats.smt.completeSearchStages?.get("incumbentReusePrivateCandidate"))
+    }
+
+    @Test
+    fun `paid bound aspiration should request half the remaining original gap`() {
+        val column = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        for (sense in ObjectiveSense.entries) {
+            val maximize = sense == ObjectiveSense.MAXIMIZE
+            val source = SourceProofContext(SourceScope(SourceRevision("aspiration", "exact"),
+                objective = SourceObjective("cost", sense)), setOf(column), emptyMap(),
+                mapOf(column to BigFraction.ofLong(if (maximize) -200 else 200)), BigFraction.ofLong(7))
+            val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+            val constant = if (maximize) -7L else 7L
+
+            val query = assertNotNull(IncumbentProximity.prepare(source, Sample(booleanArrayOf(), longArrayOf(1)),
+                BigFraction.ofLong(200 + constant), SourceLpBudget(funding = funding), ExecutionControl.Never,
+                aspiration = BigFraction.ofLong(100 + constant)))
+
+            assertEquals(BigFraction.ofLong(150), query.premises.values.single().inequality.rhs)
+        }
+    }
+
     @Test
     fun `small declared gaps should retain the coefficient improvement floor`() {
         val column = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)

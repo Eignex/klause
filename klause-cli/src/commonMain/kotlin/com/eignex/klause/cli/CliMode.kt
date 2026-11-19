@@ -645,9 +645,11 @@ internal interface OutputProtocol {
      *  continuous column carries cost, [continuousObjective] carries the whole model-oriented value;
      *  its absence means the exact discrete value is the whole objective. A non-finite value has no
      *  decimal form, so it is omitted rather than printed — read back as "no continuous channel". */
-    fun onImprovement(arm: String, objective: Long, continuousObjective: Double? = null, elapsedMs: Long) {
+    fun onImprovement(arm: String, objective: Long, continuousObjective: Double? = null, elapsedMs: Long,
+        privateIncumbentReuse: Boolean = false) {
         val continuous = continuousObjective?.takeIf(Double::isFinite)?.let { " continuousObjective=$it" }.orEmpty()
-        println("%%%klause-arm: label=$arm objective=$objective$continuous time=$elapsedMs")
+        val reuse = if (privateIncumbentReuse) " privateIncumbentReuse=true" else ""
+        println("%%%klause-arm: label=$arm objective=$objective$continuous time=$elapsedMs$reuse")
     }
 
     fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long) {

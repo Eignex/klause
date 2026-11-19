@@ -46,6 +46,36 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     @Test
+    fun `a newer checked point should replace a private target before opening its query`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        var offered = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { offered }, incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true },
+            onComparison = { event ->
+                if (event.phase == "query") offered = offered.copy(ints = longArrayOf(0, 0, 1))
+            }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val result = assertIs<MinimizeResult.WithSample>(
+                    search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityRecentered"))
+                assertTrue(repair.isProximityDiscovery(result.sample))
+            }
+        }
+    }
+
+    @Test
     fun `an original rejected private target should not restart at the same cutoff`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),

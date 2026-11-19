@@ -494,6 +494,7 @@ internal object SolveCore {
                         objective ?: improvement.objective.toLong(),
                         continuousObjective,
                         improvement.elapsedMs,
+                        improvement.privateIncumbentReuse,
                     )
                 }
             },

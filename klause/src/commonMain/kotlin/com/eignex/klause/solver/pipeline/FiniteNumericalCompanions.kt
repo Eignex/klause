@@ -213,6 +213,7 @@ internal class FiniteNumericalCompanions private constructor(
         return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { incumbentTrials && repair.incumbentTrialPending },
+            privateCandidate = repair::isProximityDiscovery,
             open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
     }
 
@@ -250,7 +251,8 @@ internal class FiniteNumericalCompanions private constructor(
                 result?.let { return it }
                 val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
                     onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(),
-                        TerminationReason.BudgetExhausted, stats))
+                        TerminationReason.BudgetExhausted,
+                        IncumbentProximity.candidateStats(stats, search.incumbentIsProximity)))
                 }.also { objectiveBound = search.objectiveBound } ?: return null
                 val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
                     finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics,
