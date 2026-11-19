@@ -217,6 +217,7 @@ internal class LiveQfLraSystem(
             }
         }
     }.filter { it.size != 1 }.distinct()
+    private val appendedDefinitions = HashMap<Int, Map<Int, BigFraction>>()
     private val definitions = terms.withIndex().associate { (index, term) ->
         term to pointColumns + index
     }.toMutableMap()
@@ -272,15 +273,17 @@ internal class LiveQfLraSystem(
                 value < side.number.value || (value == side.number.value && !side.strict)
             } != false
         }
-        for (column in point.indices) if (!holds(column, point[column])) return false
+
         // Every auxiliary column is defined by its source affine term; retraction changes only its bounds.
-        for ((term, column) in definitions) {
+        fun acceptsColumn(column: Int): Boolean {
+            if (column < pointColumns) return holds(column, point[column])
             stop.charge(2L)
             if (stop.pollStop()) return false
             val metadata = state.model.column(column)
-            if (metadata.bounds.lower == null && metadata.bounds.upper == null) continue
+            if (metadata.bounds.lower == null && metadata.bounds.upper == null) return true
             val previous = checkedState?.model
-            if (previous != null && column < previous.numVars && metadata === previous.column(column)) continue
+            if (previous != null && column < previous.numVars && metadata === previous.column(column)) return true
+            val term = terms.getOrNull(column - pointColumns) ?: appendedDefinitions[column] ?: return false
             val value = definitionPoint[column] ?: run {
                 var negative = BigFraction.ZERO
                 for ((sourceColumn, coefficient) in term) {
@@ -288,7 +291,13 @@ internal class LiveQfLraSystem(
                 }
                 negative.negated().also { definitionPoint[column] = it }
             }
-            if (!holds(column, value)) return false
+            return holds(column, value)
+        }
+        val changed = checkedState?.let { previous -> state.checkChangedBounds(previous, ::acceptsColumn) }
+        if (changed == false) return false
+        if (changed == null) {
+            for (column in point.indices) if (!acceptsColumn(column)) return false
+            for (column in definitions.values) if (!acceptsColumn(column)) return false
         }
         val accepted = !stop()
         if (accepted) checkedState = state
@@ -595,6 +604,7 @@ internal class LiveQfLraSystem(
                 )
             }
             if (!appended) return null
+            appendedDefinitions[next] = coefficients
             definitions[coefficients] = next
             next
         }
