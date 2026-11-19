@@ -428,7 +428,7 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `a full mixed point family should retain a separating aggregate within its layout limit`() {
+    fun `a full ordinary mixed recipe should retain a separating aggregate without replacement`() {
         val premises = (0 until 64).associateTo(linkedMapOf()) { index ->
             "row $index" to SourcePremise(SourceInequality(
                 mapOf(x to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE),
@@ -445,9 +445,10 @@ class LinearAuthorityAggregateCutsTest {
 
             val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
 
-            assertEquals(64L, authority.cutObservations()["numericalMaxRetainedCuts"])
-            assertEquals(64L, authority.cutObservations()["numericalCutSelectionRetainedLayout"])
-            assertEquals(64, capture.records.last().cuts.size)
+            assertEquals(65L, authority.cutObservations()["numericalMaxRetainedCuts"])
+            assertEquals(65L, authority.cutObservations()["numericalCutSelectionRetainedLayout"])
+            assertEquals(65, capture.records.last().cuts.size)
+            assertTrue(capture.records.last().cuts.take(64).all { it.installed })
             assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
             assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
                 assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)

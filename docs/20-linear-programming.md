@@ -501,8 +501,9 @@ independently.
 An opt-in absolute-tolerance envelope prepares MPS declarations and each stated row
 side widened by the captured absolute feasibility slack before lowering and separation.
 It preserves missing sides, exact integrality, indicator activation and the original
-objective. Relative feasibility tolerance is unsupported. Compatible integer sides,
-coordinate layouts and objective units retain the nominal finite model and its ordinary
+objective. Relative feasibility tolerance is unsupported. Mixed binary/continuous
+optimization with compatible integer sides, coordinate layouts and objective units
+retains the nominal finite model and its ordinary
 numerical witness search. The numerical companions capture their own exact envelope
 rows and root sides, without importing propagated nominal sides. Their source scope
 alone identifies accepted-set bounds; nominal bounds keep their nominal scope.
@@ -513,7 +514,11 @@ the accepted-set envelope separately from nominal-source bounds; neither establi
 independent proof validation. Exact source requests retain their original model.
 
 Point selection admits at most one additional checked cut per usable point and
-waits for its completed query before scanning again. Only a strictly stronger
+waits for its completed query before scanning again. Point-directed families retain
+the ordinary checked recipe as a fixed prefix and add at most 64 distinct candidates.
+Candidate caps and aging apply to additions; ordinary rows remain installed when
+their source premises are active. Duplicate inequalities with different source owners
+retain separate definitions. Only a strictly stronger
 checked bound, a checked incumbent or terminal evidence enables the next scan
 immediately; an unchanged or unavailable bound, an unfinished round or a scan
 without an addition starts a seven-query discovery cooldown. Unselected candidates

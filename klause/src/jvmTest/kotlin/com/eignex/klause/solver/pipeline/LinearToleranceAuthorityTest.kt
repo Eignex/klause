@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.LinearSourceObjective
 import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceRow
 import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
@@ -10,8 +11,10 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.presolve.ObjectiveAdjustment
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.solver.evidence.SourceEvidence
@@ -23,6 +26,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -91,9 +95,33 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
         val objective = assertNotNull(invocation.selection.finiteObjective)
         val identity = SourceMapping(nominal, nominal, TransformationGuarantees.IDENTITY)
         val opaque = SourceMapping(nominal, nominal, TransformationGuarantees.IDENTITY, lift = { it })
+        val scaled = SourceMapping(nominal, nominal, TransformationGuarantees.IDENTITY,
+            objectiveAdjustment = ObjectiveAdjustment(BigFraction.ofLong(2)))
 
         assertTrue(producer.compatible(identity, nominal, objective))
         assertFalse(producer.compatible(identity, nominal, objective.copy(constant = objective.constant + 1L)))
         assertFalse(producer.compatible(opaque, nominal, objective))
+        assertFalse(producer.compatible(scaled, nominal, objective))
+        assertNull(producer.capture(nominal, objective.copy(constant = objective.constant + 1L), ExecutionControl.Never))
+    }
+
+    @Test
+    fun `a nominal integral real backing should retain exact envelope execution`() {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(1, SemanticRational.ofLong(-1))), SemanticRational.ZERO, SemanticRational.ZERO)),
+            LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE)), sense = sense),
+            this.source.semantics,
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE,
+            linearToleranceEnvelope = true))
+        val prepared = assertNotNull(invocation.linearSource)
+
+        assertTrue(prepared.acceptedModelExact)
+        assertNull(prepared.toleranceAuthority)
+        assertTrue(Term.isReal(prepared.view.sourceRealCoordinates.single()))
     }
 }
