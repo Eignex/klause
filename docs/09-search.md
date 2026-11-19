@@ -96,6 +96,12 @@ unresolved coverage; retraction and query reset discard the retained check.
 Optimization can retain a leaf whose real completion or optimality proof is
 undecided while publishing a checked incumbent. Such a leaf is retried without
 blocking its discrete assignment or sharing a nogood from its unfinished proof.
+Real-choice optimization also retains unfinished rounds within a worker slice:
+the round owns its cutoff and component search, including the shared trail, branch
+stack and work already charged. Safe search boundaries suspend that owner rather
+than decline its proof; candidate cells, incumbents and unattained infima survive
+the pause. Run-end cancellation retires the unfinished round without a verdict,
+and worker close or reseeding releases its component owners.
 Resolved retry models follow the containing traversal's model-blocking policy at
 the shared root. The selected prefix then replays against that blocker, so overlapping
 retained prefixes cannot repeat an enumerated model.

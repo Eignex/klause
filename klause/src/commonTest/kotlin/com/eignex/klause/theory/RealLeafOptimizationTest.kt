@@ -33,10 +33,12 @@ import com.eignex.klause.solver.validation.RealOptimizationResult
 import com.eignex.klause.solver.validation.RealOptimizationStep
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -305,6 +307,160 @@ class RealLeafOptimizationTest {
         assertTrue(spent > 0L)
         val optimum = assertIs<RealOptimizationResult.Optimum>(assertIs<RealOptimizationStep.Completed>(resumed).result)
         assertEquals(BigFraction.ZERO, optimum.value)
+    }
+
+    @Test
+    fun `small slices should retain the rounds search and cumulative work`() {
+        val objective = costs(0, 0, 1, -1)
+        val expectedQueries = ArrayList<Long>()
+        val uninterrupted = AbsRealCompletion(oppositeMagnitudes).optimize(leaf, objective,
+            LpSolveContext(onQuery = { expectedQueries += it.sequence }))
+        val expected = assertIs<RealOptimizationResult.Optimum>(
+            assertIs<RealOptimizationStep.Completed>(uninterrupted.advance(ExecutionControl.Never)).result)
+
+        for (quantum in listOf(1L, 7L, 64L)) {
+            val queries = ArrayList<Pair<Any, Long>>()
+            var cellStarted = false
+            val context = LpSolveContext(onQuery = { query ->
+                queries += query.owner to query.sequence
+                cellStarted = cellStarted || (0 until query.model.n).any { query.model.costD(it) != 0.0 }
+            })
+            val optimization = AbsRealCompletion(oppositeMagnitudes).optimize(leaf, objective, context)
+            var insideRound = false
+            var slices = 0
+            var previousWork = 0L
+            var step: RealOptimizationStep = RealOptimizationStep.Paused
+            optimization.use {
+                while (step == RealOptimizationStep.Paused && slices++ < 256) {
+                    step = it.advance(ExecutionControl.Never, quantum)
+                    insideRound = insideRound || (step == RealOptimizationStep.Paused && queries.isNotEmpty() &&
+                        !cellStarted)
+                    assertTrue(it.work >= previousWork)
+                    previousWork = it.work
+                }
+            }
+
+            val actual = assertIs<RealOptimizationResult.Optimum>(assertIs<RealOptimizationStep.Completed>(step).result)
+            assertEquals(expected.value, actual.value, "quantum $quantum")
+            assertEquals(expected.reals, actual.reals, "quantum $quantum")
+            assertEquals(uninterrupted.work, optimization.work, "quantum $quantum")
+            assertEquals(expectedQueries, queries.map { it.second }, "quantum $quantum")
+            assertTrue(insideRound, "quantum $quantum")
+            assertTrue(slices > 2, "quantum $quantum")
+            assertTrue(queries.groupBy { it.first }.values.any { group -> group.size > 1 })
+        }
+    }
+
+    @Test
+    fun `slice resumption should not renew the containing work allowance`() {
+        val objective = costs(0, 0, 1, -1)
+        var queried = false
+        val optimization = AbsRealCompletion(oppositeMagnitudes).optimize(leaf, objective,
+            LpSolveContext(onQuery = { queried = true }))
+        var charged = 0L
+        var limit = Long.MAX_VALUE
+        val cancellation = object : ExecutionControl(accounting = WorkMeter { charged += it }) {
+            override fun isCancelled(): Boolean = charged >= limit
+        }
+        optimization.use {
+            repeat(32) {
+                if (!queried) assertEquals(RealOptimizationStep.Paused, optimization.advance(cancellation, 1L))
+            }
+            assertTrue(queried)
+            limit = charged + 1L
+            var step: RealOptimizationStep = RealOptimizationStep.Paused
+            repeat(32) {
+                if (step == RealOptimizationStep.Paused) step = optimization.advance(cancellation, 1L)
+            }
+            val result = assertIs<RealOptimizationStep.Completed>(step).result
+
+            assertIs<RealOptimizationResult.Undecided>(result)
+            assertTrue(charged >= limit)
+            assertEquals(charged, optimization.work)
+            val stoppedWork = charged
+            assertIs<RealOptimizationResult.Undecided>(
+                assertIs<RealOptimizationStep.Completed>(optimization.advance(cancellation, 1L)).result)
+            assertEquals(stoppedWork, charged)
+        }
+    }
+
+    @Test
+    fun `closing a suspended round should reject another slice`() {
+        var queried = false
+        val context = LpSolveContext(onQuery = { queried = true })
+        val pending = AbsRealCompletion(oppositeMagnitudes).optimize(leaf, costs(0, 0, 1, -1), context)
+        repeat(32) {
+            if (!queried) assertEquals(RealOptimizationStep.Paused, pending.advance(ExecutionControl.Never, 1L))
+        }
+        assertTrue(queried)
+
+        pending.close()
+
+        assertFailsWith<IllegalStateException> { pending.advance(ExecutionControl.Never) }
+    }
+
+    @Test
+    fun `a run end after a paused incumbent should retain its point without an optimality proof`() {
+        var cellStarted = false
+        val context = LpSolveContext(onQuery = { query ->
+            cellStarted = cellStarted || (0 until query.model.n).any { query.model.costD(it) != 0.0 }
+        })
+        AbsRealCompletion(oppositeMagnitudes).optimize(leaf, costs(0, 0, 1, -1), context).use { optimization ->
+            repeat(64) {
+                if (!cellStarted) {
+                    assertEquals(RealOptimizationStep.Paused, optimization.advance(ExecutionControl.Never, 1L))
+                }
+            }
+            assertTrue(cellStarted)
+            val stopped = optimization.advance(object : ExecutionControl() {
+                override fun isCancelled(): Boolean = true
+            }, 1L)
+
+            val result = assertIs<RealOptimizationResult.Undecided>(assertIs<RealOptimizationStep.Completed>(stopped).result)
+            assertEquals(BigFraction.ZERO, result.incumbent?.let { it[2] - it[3] })
+            assertEquals(null, result.infimum)
+        }
+    }
+
+    @Test
+    fun `small slices should exhaust a refuted leaf without an incumbent`() {
+        val source = membership(0.0, 1.0)
+        AbsRealCompletion(source).optimize(leaf, costs(0, 1)).use { optimization ->
+            var step: RealOptimizationStep = RealOptimizationStep.Paused
+            var slices = 0
+            while (step == RealOptimizationStep.Paused && slices++ < 128) {
+                step = optimization.advance(ExecutionControl.Never, 1L)
+            }
+
+            assertIs<RealOptimizationResult.Refuted>(assertIs<RealOptimizationStep.Completed>(step).result)
+            assertTrue(slices > 2)
+        }
+    }
+
+    @Test
+    fun `small slices should retain an unattained infimum until its cutoff is refuted`() {
+        val source = Problem(
+            0, 0, emptyArray(),
+            arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE,
+                0.0, strict = true)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val uninterrupted = AbsRealCompletion(source).optimize(leaf, costs(1))
+        val expected = assertIs<RealOptimizationResult.Undecided>(
+            assertIs<RealOptimizationStep.Completed>(uninterrupted.advance(ExecutionControl.Never)).result)
+        AbsRealCompletion(source).optimize(leaf, costs(1)).use { optimization ->
+            var step: RealOptimizationStep = RealOptimizationStep.Paused
+            var slices = 0
+            while (step == RealOptimizationStep.Paused && slices++ < 128) {
+                step = optimization.advance(ExecutionControl.Never, 1L)
+            }
+
+            val actual = assertIs<RealOptimizationResult.Undecided>(assertIs<RealOptimizationStep.Completed>(step).result)
+            assertEquals(BigFraction.ZERO, actual.infimum)
+            assertEquals(expected.incumbent, actual.incumbent)
+            assertEquals(uninterrupted.work, optimization.work)
+            assertTrue(slices > 2)
+        }
     }
 
     // A stop that fires at poll [firing], counting every poll.

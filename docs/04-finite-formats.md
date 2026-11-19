@@ -446,11 +446,15 @@ combined premise bands can combine source sides and move by the sum
 of its multipliers times the slack under the tolerance yet is widened by one slack, so a
 subtree whose improvement lies within the remaining `(sum - 1) * slack` times that row's
 dual can still be pruned or refuted, and its verdict then depends on visiting order. The
-rounds are leaf search work: the minimize path charges them to its slice and
-pauses between rounds, resuming the pending leaf; a round itself runs to completion, so
-a leaf with many choice combinations can overrun its slice and repay the excess from the
-slices that follow. A stopped round decides nothing, and a refutation that finishes as
-the stop fires is not trusted.
+rounds are leaf search work: the minimize path charges them to its slice and can
+pause inside a round. The pending leaf retains its cutoff, shared search trail and
+branch stack, candidate cell, incumbent and least unattained infimum. Resuming advances
+that same round under the cumulative work and containing cancellation scope; it does
+not rebuild the search or renew an allowance. Encoding, propagation and exact cell
+certification are atomic between safe checkpoints, and their overspend is charged to
+later slices. Closing or reseeding the worker releases the pending round. A run-end
+stop retires its unfinished search and decides nothing, and a refutation that finishes
+as the stop fires is not trusted.
 
 A source without integer columns takes the finite lane under a positive tolerance and
 the [linear theory](18-linear-arithmetic.md) at zero tolerance; an MPS source takes the

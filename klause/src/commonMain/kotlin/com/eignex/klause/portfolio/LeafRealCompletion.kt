@@ -132,7 +132,7 @@ internal class LeafRealCompletion(
         val optimization = toleranceFirst(toleranceSearch?.optimize(candidate, costs, context)) {
             choiceSearch?.takeIf { linear !is Completion.Refuted }?.optimize(candidate, costs, context)
         } ?: return unrefuted
-        val step = optimization.advance(cancellation)
+        val step = optimization.use { it.advance(cancellation) }
         val work = linear.work + movesFor(optimization.work.toDouble())
         // A completion the optimization does not improve on keeps the LP's point.
         val kept = (linear as? Completion.Witness)?.let { Completion.Witness(it.sample, work) }

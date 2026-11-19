@@ -23,7 +23,9 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpRefinementLimits
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
@@ -54,7 +56,7 @@ import com.eignex.util.numbers.BigFraction
 // `sum(costs * x) <= infimum` instead, which only another polyhedron can meet; a refutation then leaves the minimum
 // unattained, and an attained value at or below the infimum is the optimum.
 //
-// A round runs to completion under the caller's stop: a stopped round decides nothing and runs again on the next call.
+// Slice pauses retain a round's search, cutoff and cell. A caller stop retires the unfinished round without a proof.
 internal class RealLeafOptimization(
     private val search: AbsRealCompletion,
     private val sample: Sample,
@@ -67,6 +69,7 @@ internal class RealLeafOptimization(
 
     override var work: Long = 0L
         private set
+    private val spent: Long get() = work
     private val tolerant = search.readsTolerance
     private var encoded = false
     private var encoding: Problem? = null
@@ -77,6 +80,16 @@ internal class RealLeafOptimization(
     private var infimum: BigFraction? = null
     private var nearest: List<BigFraction>? = null
     private var decided: RealOptimizationResult? = null
+    private var pending: LpSolveCursor<RealOptimizationResult>? = null
+    private var invocation = ExecutionControl.Never
+    private var closed = false
+    private val cancellation = object : ExecutionControl() {
+        override fun isCancelled(): Boolean = invocation()
+        override fun deadline() = invocation.deadline()
+        override val accounting get() = invocation.accounting
+        override val admission get() = admissionFrom(invocation)
+        override val workScheduled get() = invocation.workScheduled
+    }
 
     override fun advance(
         cancellation: ExecutionControl,
@@ -84,27 +97,47 @@ internal class RealLeafOptimization(
         shouldPause: () -> Boolean,
     ): RealOptimizationStep {
         require(workLimit >= 0L)
-        val start = work
-        val counted = cancellation.counting { units ->
+        decided?.let { return RealOptimizationStep.Completed(it) }
+        check(!closed) { "real optimization is closed" }
+        invocation = cancellation.counting { units ->
             work = if (units > Long.MAX_VALUE - work) Long.MAX_VALUE else work + units
         }
-        var ran = false
-        while (true) {
-            decided?.let { return RealOptimizationStep.Completed(it) }
-            if (ran && (shouldPause() || (workLimit > 0L && work - start >= workLimit))) {
-                return RealOptimizationStep.Paused
+        val cursor = pending ?: LpSolveCursor<RealOptimizationResult> {
+            while (decided == null) {
+                if (this@RealLeafOptimization.cancellation()) return@LpSolveCursor undecided()
+                round()
+                if (decided == null && !this@RealLeafOptimization.cancellation()) checkpoint(spent)
             }
-            if (counted()) return RealOptimizationStep.Completed(undecided())
-            ran = true
-            round(counted)
+            checkNotNull(decided)
+        }.also { pending = it }
+        return try {
+            when (val step = cursor.advance(workLimit, shouldPause)) {
+                LpSolveStep.Paused -> RealOptimizationStep.Paused
+                is LpSolveStep.Completed -> {
+                    pending = null
+                    cursor.close()
+                    RealOptimizationStep.Completed(step.value)
+                }
+            }
+        } finally {
+            invocation = ExecutionControl.Never
         }
     }
 
-    private fun round(cancellation: ExecutionControl) {
+    override fun close() {
+        if (closed) return
+        closed = true
+        val cursor = pending
+        pending = null
+        cursor?.close()
+    }
+
+    private suspend fun LpSolveCursor<RealOptimizationResult>.round() {
         if (!encoded) {
             encoding = search.encoding(sample, cancellation)
             if (cancellation()) return
             encoded = true
+            checkpoint(spent)
         }
 
         // A model with coordinates of its own has points the search does not report in full.
@@ -116,7 +149,19 @@ internal class RealLeafOptimization(
             attained != null -> listOf(objectiveRow(attained, strict = true))
             else -> emptyList()
         }
-        when (val found = search.search(sample, model, cutoff, cancellation, solveContext = context)) {
+        val found = search.openSearch(sample, model, cutoff, cancellation, solveContext = context).use { cursor ->
+            var step = cursor.advance(shouldPause = { shouldPause(spent) })
+            while (step is LpSolveStep.Paused) {
+                pauseAt(spent)
+                if (cancellation()) return
+                step = cursor.advance(shouldPause = { shouldPause(spent) })
+            }
+            (step as LpSolveStep.Completed).value
+        }
+        if (cancellation()) return
+        checkpoint(spent)
+        if (cancellation()) return
+        when (found) {
             // A refutation that finished as the stop fired is not trusted; the round runs again.
             AbsRealCompletion.Result.Refuted -> if (!cancellation()) {
                 decide(
@@ -177,14 +222,22 @@ internal class RealLeafOptimization(
 
     // The exact optimum over the polyhedron of [model] that [point] selects, which contains [point]. A polyhedron with
     // a strict row and no certified optimum is read through its closure, whose optimum is the polyhedron's infimum.
-    private fun cellOptimum(model: Problem, point: List<BigFraction>, cancellation: ExecutionControl): CellOptimum {
+    private suspend fun LpSolveCursor<RealOptimizationResult>.cellOptimum(
+        model: Problem,
+        point: List<BigFraction>,
+        cancellation: ExecutionControl,
+    ): CellOptimum {
         val rows = cellRows(model, point, cancellation) ?: return CellOptimum.Undecided
+        checkpoint(spent)
+        if (cancellation()) return CellOptimum.Undecided
         val columns = model.numRealVars
         fun side(bound: Double) = BigFraction.ofDouble(bound)?.let { ExactLpSide(ExactLpNumber.of(it)) }
 
         val bounds = List(columns) { real -> ExactLpBounds(side(model.realLower[real]), side(model.realUpper[real])) }
         val open = solve(rows, columns, bounds, point, cancellation)
         if (open != CellOptimum.Undecided || rows.none { it.strict } || cancellation()) return open
+        checkpoint(spent)
+        if (cancellation()) return CellOptimum.Undecided
         val closure = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
         return when (val closed = solve(closure, columns, bounds, point, cancellation)) {
             is CellOptimum.Attained ->
