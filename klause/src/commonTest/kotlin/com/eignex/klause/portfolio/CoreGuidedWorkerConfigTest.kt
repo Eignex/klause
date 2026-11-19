@@ -24,6 +24,25 @@ import kotlin.test.assertNull
 
 class CoreGuidedWorkerConfigTest {
     @Test
+    fun `uniform costs ignore zeros and signs across discrete coordinates`() {
+        val cases = listOf(
+            LinearObjective(longArrayOf(1, 0, 1), constant = 7) to true,
+            LinearObjective(longArrayOf(3, -3), intCoefficients = longArrayOf(0, -3)) to true,
+            LinearObjective(intCoefficients = longArrayOf(-5, 5)) to true,
+            LinearObjective(longArrayOf(Long.MIN_VALUE, Long.MIN_VALUE)) to true,
+            LinearObjective(longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE)) to false,
+            LinearObjective(longArrayOf(1, 2)) to false,
+            LinearObjective(longArrayOf(1), intCoefficients = longArrayOf(2)) to false,
+            LinearObjective(longArrayOf(0, 0), constant = 7) to false,
+            LinearObjective() to false,
+        )
+
+        for ((objective, expected) in cases) {
+            assertEquals(expected, objective.uniformCosts, "$objective")
+        }
+    }
+
+    @Test
     fun `selected propagation deletion should attain the source optimum through the core worker`() {
         val problem = Problem(3, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),

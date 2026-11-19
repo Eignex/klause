@@ -294,7 +294,9 @@ the containing token, so a checkpoint can overspend and leave debt for later sli
 
 Core-guided encoding and baking use the propagation currency and spend no
 decisions. An automatically deferred single-lane core worker has one base slice per
-turn and two seconds of cumulative active time; see
+turn and twelve seconds of cumulative active time when all nonzero discrete objective
+coefficients have equal magnitude, or two seconds otherwise. Zero coefficients and
+the objective constant do not affect this choice; see
 [core search](15-portfolio-scheduling.md#boolean-objective-core-search).
 
 ### Preparation progress

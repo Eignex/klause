@@ -179,6 +179,28 @@ class PortfolioBuilderTest {
     }
 
     @Test
+    fun `deferred core lifetime follows the objective cost magnitude`() {
+        val problem = Problem(3, 0, emptyArray(), emptyArray()).bake()
+        val cases = listOf(
+            LinearObjective(longArrayOf(1, 0, 1)) to 12_000L,
+            LinearObjective(longArrayOf(-3, 3, 0)) to 12_000L,
+            LinearObjective(longArrayOf(1, 2, 0)) to 2_000L,
+        )
+
+        for ((objective, expected) in cases) {
+            val workers = PortfolioBuilder.build(problem, PortfolioScenario.sequential(Kind.COP), objective)
+            try {
+                val core = workers.single { it.label == "bt/core-guided" }
+                requireNotNull(core.newResumableSearch({ Double.POSITIVE_INFINITY }, ExecutionControl.Never)).use {
+                    assertEquals(expected, it.stats.coreGuided.activeMillisLimit)
+                }
+            } finally {
+                workers.forEach { it.close() }
+            }
+        }
+    }
+
+    @Test
     fun `early core admission should retain the auxiliary time allowance`() {
         val problem = Problem(2, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(longArrayOf(1, 2))
