@@ -225,6 +225,9 @@ class ExactLiraSearchComponent private constructor(
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
+    private var pointHintCacheable = false
+    private var pointHintPoint: List<BigFraction>? = null
+    private var retainedPointHintValues: IntArray? = null
     private var pointHintLevel = -1
     private var pointHintStop = ExecutionControl.Never
     private var dirty = true
@@ -391,9 +394,10 @@ class ExactLiraSearchComponent private constructor(
             rows += prepared
             variables += prepared.row.activator
         }
-        accounting?.charge(rows.size.toLong() + variables.size + 1L)
+        accounting?.charge(2L * rows.size + variables.size + 1L)
         if (stop() || rows.isEmpty()) return null
         pointHintRows = rows.toList()
+        pointHintCacheable = rows.none { it.form.hasBooleanTerms }
         pointHintStop = stop
         return variables.toIntArray() to SearchCandidateHints { variable ->
             observeCompleteStage("POINT_HINT_CONSULTED")
@@ -425,6 +429,9 @@ class ExactLiraSearchComponent private constructor(
         defaultDisjunctionHints = false
         pointHintRows = null
         pointHintValues = null
+        pointHintPoint = null
+        retainedPointHintValues = null
+        pointHintCacheable = false
         pointHintLevel = -1
         pointHintStop = ExecutionControl.Never
     }
@@ -636,6 +643,16 @@ class ExactLiraSearchComponent private constructor(
         pointHintValues = null
         val rows = pointHintRows ?: return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
+        operationAccounting?.charge(point.size.toLong() + 1L)
+        val retained = retainedPointHintValues
+        if (pointHintCacheable && retained != null && point == pointHintPoint) {
+            if (hintStop() || operationStop() || pointHintStop()) return
+            pointHintLevel = context.decisionLevel
+            pointHintValues = retained
+            smtStats?.observePointHintCapture()
+            observeCompleteStage("POINT_HINT_REUSE")
+            return
+        }
         operationAccounting ?.charge(model.numBoolVars.toLong() + point.size + 1L)
         if (operationStop() || point.any { hintStop.poll() || !hintScalar(it) }) return
         if (operationStop() || pointHintStop()) return
@@ -662,6 +679,12 @@ class ExactLiraSearchComponent private constructor(
             } else {
                 values[variable] = value
             }
+        }
+        if (pointHintCacheable) {
+            operationAccounting?.charge(point.size.toLong() + 1L)
+            if (hintStop() || operationStop() || pointHintStop()) return
+            pointHintPoint = point.toList()
+            retainedPointHintValues = values
         }
         if (hintStop() || operationStop() || pointHintStop()) return
         pointHintLevel = context.decisionLevel

@@ -201,6 +201,9 @@ sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
+For rows without Boolean terms, completed preferences are reusable for the same
+owned point values. Rows with Boolean terms require fresh evaluation, and closing
+the component releases the retained point and preferences.
 
 The incremental route shares bounded cancellation checkpoints across source and
 point-hint scans, independently of accounting. Every debit is recorded directly.
