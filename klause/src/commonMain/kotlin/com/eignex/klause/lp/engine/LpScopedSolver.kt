@@ -759,7 +759,7 @@ internal class LpScopedSolver(
         components: ComponentLpSolver,
         token: ExecutionControl,
     ): Boolean = try {
-        components.appendLocalRows(next, token, workLimit) { part, childToken, childWork ->
+        components.appendLocalRows(next, token, workLimit, componentAdmission) { part, childToken, childWork ->
             newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
                 childWork, trackDegeneracy, context.engineFactory,
                 componentPricing(part, next.model.n, components.rowOnlyRows))

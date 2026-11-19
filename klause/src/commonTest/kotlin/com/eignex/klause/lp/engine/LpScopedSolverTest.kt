@@ -265,7 +265,32 @@ class LpScopedSolverTest {
     }
 
     @Test
-    fun `a cross block cut should use ordinary replacement without merging retained children`() {
+    fun `joining two blocks should retain the other child`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            assertNotNull(owner.solve())
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+
+            assertTrue(owner.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(7L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+            assertEquals(1, owner.lastMetrics.componentReuses)
+            assertEquals(1, owner.lastMetrics.componentSolves)
+            assertEquals(4, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        }
+    }
+
+    @Test
+    fun `a cut joining all blocks should use an ordinary owner`() {
         val builder = LpBuilder()
         repeat(2) {
             val column = builder.addVar(0L, 5L, cost = 1L)

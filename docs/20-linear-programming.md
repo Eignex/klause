@@ -460,8 +460,12 @@ keep every row multiplier, bound substitution, integrality premise and source
 address for the ordinary source mapper and cut pool. Rows confined to existing
 blocks replace those children and any others whose scalar authority changes.
 Replacements validate their own bases using private retained bases as warm hints;
-unchanged children keep their checked evidence. Cross-block rows, new columns and
-other structural edits retire every child. The replacement may form a fresh collection
+unchanged children keep their checked evidence. Rows joining existing blocks form a
+fresh child for each union after admission checks the complete resulting shape.
+Their private basis headings supply a block-triangular warm hint; appended-row
+logicals complete it, and the fresh child validates and refactors it. Other children
+retain their owners and evidence. New columns and unsupported structural edits
+retire every child. The replacement may form a fresh collection
 under the same admission policy and remaining work grant; a declined collection
 uses the ordinary owner. Callers that need one retained basis keep the monolithic
 constructor.
