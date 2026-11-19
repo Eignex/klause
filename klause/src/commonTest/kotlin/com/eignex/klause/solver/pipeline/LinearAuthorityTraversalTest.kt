@@ -34,7 +34,12 @@ import kotlin.test.assertTrue
 class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
     @Test
     fun `incumbent guidance should order splits only within available funding`() {
-        for ((registered, limited) in listOf(false to false, true to false, false to true, true to true)) {
+        for ((registered, limited, private) in listOf(
+            Triple(false, false, false), Triple(true, false, false),
+            Triple(false, true, false), Triple(true, true, false),
+            Triple(false, false, true), Triple(true, false, true),
+            Triple(false, true, true), Triple(true, true, true),
+        )) {
             val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
             val scope = SourceScope(SourceRevision("incumbent-order", "exact-affine"),
                 objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
@@ -45,8 +50,9 @@ class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
             val offers = mutableListOf<Sample>()
             val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
             LinearAuthorityTraversal(source, SourceLpBudget(funding = funding), ExecutionControl.Never,
-                { false }, { offers += it }, { standing }, useRefutationPropagation = registered,
-                guideIncumbent = true).use { component ->
+                { false }, { offers += it }, { standing.takeUnless { private } },
+                useRefutationPropagation = registered, guideIncumbent = !private,
+                proximityCenter = standing.first.takeIf { private }).use { component ->
                 val session = SearchComponentSet(listOf(component)).session(
                     atoms = if (registered) SearchAtomRegistry(0) else null)
                 assertEquals(ComponentResult.Consistent, session.initialize())

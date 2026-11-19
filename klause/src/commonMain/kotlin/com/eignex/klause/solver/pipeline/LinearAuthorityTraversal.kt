@@ -624,7 +624,7 @@ internal class LinearAuthorityTraversal(
                     val above = BigFraction.of(sample.exactIntValue(split.coordinate.id), BIG_ONE) > split.threshold
                     if (proximityCenter == null) above else {
                         observe("numericalProximityBranchPreferences")
-                        !above
+                        above
                     }
                 }
             } ?: false

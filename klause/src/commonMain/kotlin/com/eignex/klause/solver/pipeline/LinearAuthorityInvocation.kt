@@ -328,7 +328,7 @@ internal class LinearAuthorityInvocation(
         }
         proximity = LinearAuthorityInvocation(source, params.copy(sourceIncumbentCompletion = false), state = state,
             boundOrdered = true, funding = funding, useSourceGap = false, guideIncumbent = false,
-            borrowedBudget = budget, recordProgress = false)
+            borrowedBudget = budget, recordProgress = false, proximityCenter = sample)
         proximityTurn = true
         observeProximity("Centers")
     }

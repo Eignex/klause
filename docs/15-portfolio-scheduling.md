@@ -506,7 +506,8 @@ frontier consultations with a private proximity query inside the same turn offer
 The private consultation uses at most half the remaining offered time and work.
 The frontier retains its tree, LP owner and global bounds. Both searches share one
 LP operation/work/allocation ledger and containing decision/check allowances.
-The private search and ordinary frontier retain bound order. Private receiving
+The private search dives toward its checked center at each integer split, retaining
+the sibling alternatives; the ordinary frontier retains bound order. Private receiving
 conditions encode the checked center separately from feasible query incumbents.
 Private query progress supplies no root-fixing or learned-clause reward. A private
 witness passes original-source completion and the receiving frontier's checks
