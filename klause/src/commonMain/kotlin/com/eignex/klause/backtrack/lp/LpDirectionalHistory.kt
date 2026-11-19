@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.sqrt
 
@@ -32,6 +33,7 @@ internal class LpDirectionalHistory(
     private var depth = 0
     private var objective = Double.NaN
     private var reliableStamp = -1L
+    private var valueStamp = -1L
     private var observed = false
 
     fun beginNode(level: Int) {
@@ -45,6 +47,8 @@ internal class LpDirectionalHistory(
 
     val hasReliableHistory: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
+    val hasValueHistory: Boolean get() = valueStamp >= 0L && stamp - valueStamp <= maxAge
+
     val hasObservations: Boolean get() = observed
 
     fun clear(report: Boolean = true) {
@@ -53,6 +57,7 @@ internal class LpDirectionalHistory(
         pending = null
         objective = Double.NaN
         reliableStamp = -1L
+        valueStamp = -1L
         observed = false
         if (report) observe("RESET")
     }
@@ -76,10 +81,10 @@ internal class LpDirectionalHistory(
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
         observed = true
-        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY &&
-            history.down.gain > 0.0 && history.up.gain > 0.0
-        ) {
-            reliableStamp = maxOf(reliableStamp, minOf(history.down.previousStamp, history.up.previousStamp))
+        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
+            val pairStamp = minOf(history.down.previousStamp, history.up.previousStamp)
+            if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
+            if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
         }
         observe(if (child.up) "UP" else "DOWN")
     }
@@ -149,17 +154,32 @@ internal class LpDirectionalHistory(
         .takeIf { it > 0.0 } ?: Double.NaN
 
     fun estimate(variable: VarRef, value: Double): Double {
-        if (!value.isFinite()) return Double.NaN
-        val history = gains[variable] ?: return Double.NaN
-        expire(history.down)
-        expire(history.up)
-        if (history.down.count < RELIABILITY || history.up.count < RELIABILITY) return Double.NaN
+        val history = reliable(variable, value) ?: return Double.NaN
         val fraction = value - floor(value)
-        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
         val score = sqrt(down) * sqrt(up)
         return score.takeIf { it.isFinite() } ?: Double.NaN
+    }
+
+    fun preferLowerGainDirection(variable: VarRef, value: Double): Boolean? {
+        val history = reliable(variable, value) ?: return null
+        val fraction = value - floor(value)
+        val down = history.down.gain * fraction
+        val up = history.up.gain * (1.0 - fraction)
+        if (!down.isFinite() || !up.isFinite() || abs(down - up) <= 1e-9 * maxOf(1.0, down, up)) return null
+        return up < down
+    }
+
+    private fun reliable(variable: VarRef, value: Double): Gains? {
+        if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
+        val history = gains[variable] ?: return null
+        expire(history.down)
+        expire(history.up)
+        if (history.down.count < RELIABILITY || history.up.count < RELIABILITY) return null
+        val fraction = value - floor(value)
+        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        return history
     }
 
     fun preferUnderObservedDirection(variable: VarRef, value: Double): Boolean? {

@@ -395,6 +395,16 @@ an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
+The same recent directional estimates can order the selected variable's two
+existing adjacent alternatives, visiting the lower predicted gain first to seek an
+incumbent. Both directions need two in-age observations; equal or unavailable
+estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
+creates no LP query, charges constant comparison and commitment work to the LP
+allowance, and checks the current point, scope, solve stamp and cancellation.
+Value nominations and matching committed changes have separate counters from
+variable advice and missing-direction collection. Withheld advice retains ordinary
+value order while paying the same comparison work.
+
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
 child first to collect missing passive information. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
@@ -405,7 +415,7 @@ history resets do not renew those limits. It creates no LP query and charges the
 existing LP allowance. Collection comparisons and changed committed splits have
 separate counters from reliable variable advice. Withholding reliable advice keeps
 this collection policy and its costs enabled. `lp-directional-advice=false` keeps
-the ordinary variable choice while retaining enabled directional observation,
+the ordinary variable and value choices while retaining enabled directional observation,
 nomination and comparison work; the corresponding backtrack setting is
 `BacktrackParams.lpDirectionalAdvice`.
 
