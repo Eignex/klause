@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -14,9 +15,12 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -38,7 +42,189 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class JointLinearRepairCompletionTest {
+class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
+    @Test
+    fun `a newer incompatible point should not displace the checked proposal seed`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        var offered = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { offered }, incumbentCompletionCheck = { _, _, _ -> true }, onComparison = { event ->
+                if (event.phase == "query") offered = offered.copy(ints = longArrayOf(0, 0, 0))
+            }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(1L, stages["jointRepairImportedIncumbents"])
+                assertEquals(0L, stages["jointRepairCheckedIncumbents"] ?: 0L)
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
+    fun `a dominated rounded bootstrap should leave the first query for incumbent repair`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val guidance = LinearRepairGuidance()
+        val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+        assertTrue(guidance.remember(source, (0..2).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to if (it == 1) 0.9 else 1.0
+        }, budget, ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { center },
+            incumbentCompletionCheck = { _, _, _ -> true }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val result =
+                    assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates"))
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
+    fun `an improving relaxation query should retain its private search for the next witness`() {
+        val groups = 4
+        val integers = groups * 4
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(integers), LongArray(integers) { 1 }, null, null),
+            factors = Array(groups) { group ->
+                Linear(intArrayOf(2, 3), intArrayOf(group * 2, group * 2 + 1), LinearOp.LE, 3)
+            }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = LongArray(integers) {
+            if (it >= groups * 2) 0 else if (it % 2 == 0) -3 else -4
+        })
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val guidance = LinearRepairGuidance()
+        val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+        assertTrue(guidance.remember(source, (0 until integers).associate { id ->
+            SourceCoordinate(SourceCoordinate.Kind.Integer, id) to
+                if (id >= groups * 2) 0.0 else if (id % 2 == 0) 0.9 else 1.0 / 3.0
+        }, budget, ExecutionControl.Never))
+        var center = Sample(booleanArrayOf(), LongArray(integers), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        val values = mutableListOf<BigFraction>()
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxFlips = 3), external = { center },
+            incumbentCompletionCheck = { _, _, _ -> true }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(96) {
+                    if (!done) done = search.advance(ExecutionControl.Never, 5_000) { sample, value ->
+                        center = sample
+                        values += assertNotNull(value)
+                    }
+                }
+
+                assertEquals(3, values.size)
+                assertTrue(values.zipWithNext().all { (before, after) -> after < before })
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(2L, stages["jointRepairCandidates"])
+                assertTrue((stages["jointRepairRetainedQueryIncumbents"] ?: 0L) > 0)
+                assertFalse(repair.incumbentTrialPending)
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
+    fun `a checked proposal center should seed its query without discovery credit`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { center }, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(1L, stages["jointRepairImportedIncumbents"])
+                assertTrue((stages["jointRepairImportedPointWithheld"] ?: 0L) > 0)
+                assertEquals(1L, stages["jointRepairCutoffClosures"])
+                assertEquals(0L, stages["jointRepairCheckedIncumbents"] ?: 0L)
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
+    fun `a binary repair should change root agreements to reach a coupled improvement`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val guidance = LinearRepairGuidance()
+        val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+        assertTrue(guidance.remember(source, (0..3).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to
+                if (it == 3) 0.0 else if (it == 0) 1.0 else if (it == 1) 0.8 else 0.2
+        }, budget, ExecutionControl.Never))
+        val standing = Sample(booleanArrayOf(), longArrayOf(1, 1, 1, 0), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 2), external = { standing },
+            incumbentCompletionCheck = { _, _, _ -> true }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val result =
+                    assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairBinarySupportNeighborhoods"))
+                assertTrue((repair.stats.smt.completeSearchStages?.get("jointRepairImportedIncumbents") ?: 0L) > 0)
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                    SourceEvidence(source.scope, SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
+                assertTrue(done)
+            }
+        }
+    }
+
     @Test
     fun `a delayed first neighborhood should improve from the newer checked center`() {
         for (sign in listOf(1L, -1L)) {

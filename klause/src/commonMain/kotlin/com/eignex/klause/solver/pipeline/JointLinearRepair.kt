@@ -12,6 +12,7 @@ import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
@@ -28,7 +29,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.toLongExact
 import kotlin.math.round
 import kotlin.time.TimeSource
 
@@ -69,6 +72,7 @@ internal class JointLinearRepair(
     onObservation: ((JointRepairObservation) -> Unit)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
+    private class CheckedProposal(val condition: ExactNeighborhoodCondition, val sample: Sample)
 
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout.withAccounting(params.cancellation) or params.cancellation
@@ -98,6 +102,14 @@ internal class JointLinearRepair(
     private var conditionSequence = 0L
     private var importedCenter: Sample? = null
     private var preparedCenter: CheckedCenter? = null
+    private var checkedProposal: CheckedProposal? = null
+    private var relaxationProposal: ExactNeighborhoodCondition? = null
+    private var retainedProposal: ExactNeighborhoodCondition? = null
+    private var publishedQueryIncumbent: Sample? = null
+    private var bootstrapHint: LinearRepairGuidance.Hint? = null
+    private var bootstrapPending = false
+    private var bootstrapTried = false
+    private var relaxationAttempted = false
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
         if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
@@ -180,11 +192,12 @@ internal class JointLinearRepair(
             phase, raw, completed, cutoff, candidate, disposition))
     }
 
-    private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff): Sample? {
+    private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff, allowEqual: Boolean = false): Sample? {
         val offered = external() ?: return null
         val raw = if (completion != null && offered.exactReals != null && cutoff != null)
             objectiveValue(offered) else comparisonValue(offered)
-        if (completion != null && offered.exactReals != null && cutoff != null && raw != null && raw >= cutoff) {
+        val declined = cutoff != null && raw != null && (if (allowEqual) raw > cutoff else raw >= cutoff)
+        if (completion != null && offered.exactReals != null && declined) {
             compare("external", "not-improving", raw = raw, cutoff = cutoff)
             return null
         }
@@ -195,8 +208,8 @@ internal class JointLinearRepair(
         return completed
     }
 
-    private fun checkedExternalCenter(cutoff: BigFraction? = null): CheckedCenter? {
-        val sample = externalIncumbent(cutoff) ?: return null
+    private fun checkedExternalCenter(cutoff: BigFraction? = null, allowEqual: Boolean = false): CheckedCenter? {
+        val sample = externalIncumbent(cutoff, allowEqual) ?: return null
         if (completion != null) {
             budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
             if (completion.checking(stop)()) return null
@@ -206,7 +219,7 @@ internal class JointLinearRepair(
             observeExternal("MissingExactReals")
             return null
         }
-        if (cutoff != null && (value == null || value >= cutoff)) {
+        if (cutoff != null && (value == null || if (allowEqual) value > cutoff else value >= cutoff)) {
             observeExternal("NotImproving")
             compare("center", "not-improving", completed = value, cutoff = cutoff)
             return null
@@ -254,7 +267,9 @@ internal class JointLinearRepair(
                 "numericalRetainedNodes" -> "jointRepairPeakRetainedNodes"
                 "numericalPendingLeaves" -> "jointRepairUnresolvedLeaves"
                 "numericalFrontierPending" -> "jointRepairFrontierUnresolved"
-                else -> "jointRepair" + key.removePrefix("numerical")
+                else -> if (key.startsWith("numericalExternal"))
+                    "jointRepairQueryExternal" + key.removePrefix("numericalExternal")
+                else "jointRepair" + key.removePrefix("numerical")
             }
         }
 
@@ -282,9 +297,16 @@ internal class JointLinearRepair(
             maximumMoves = params.maxFlips, maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
             maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
             nativeWork = { work }, completionStats = { stats }, onClose = ::close,
-            prepareBooleanCenter = ::prepare, rootCoordinateValue = ::center,
+            prepareBooleanCenter = { prepare(it, bootstrap = !adaptive) }, rootCoordinateValue = ::center,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
+            continuePausedCompletion = {
+                val proposal = checkedProposal
+                val carries = proposal != null && proposal.condition === queryOriginalCondition &&
+                    query?.hasIncumbent == true
+                if (carries) observe("jointRepairGrantedQueryResumeRequests")
+                carries
+            },
             reviseRefutedCenter = centerProgress?.let { ::reviseRefutedCenter },
             onProposalOperator = observation?.let {
                 { operator, round ->
@@ -293,10 +315,12 @@ internal class JointLinearRepair(
                 }
             },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
+                retainedProposal?.let { return@ExactNeighborhoodProposal it }
+                var bootstrap = bootstrapPending
                 val checked = preparedCenter?.takeIf {
                     round == 0L &&
                         (cutoff == null || it.value?.let { value -> value < cutoff } == true)
-                } ?: checkedExternalCenter(cutoff)
+                } ?: checkedExternalCenter(cutoff, allowEqual = bootstrapTried)
                 checked?.sample?.let { sample ->
                     observe("jointRepairImportedCenters")
                     if (sample !== importedCenter) {
@@ -307,12 +331,21 @@ internal class JointLinearRepair(
                 val current = if (round == 0L && checked != null && checked === preparedCenter)
                     refreshedCenter(checked) else checked
                 val pooled = current?.sample
+                if (bootstrap && current != null && dominatedBootstrap(current)) {
+                    bootstrap = false
+                    bootstrapPending = false
+                    bootstrapTried = true
+                    bootstrapHint = null
+                    observe("jointRepairDominatedBootstrapsSkipped")
+                }
                 if (centerProgress != null) proposalHasCheckedCenter = pooled != null
-                val from = pooled?.let { sample ->
+                pooled?.let { sample ->
                     if (sample !== importedCenter) {
                         importedCenter = sample
                         onIncumbentImport?.invoke()
                     }
+                }
+                val from = pooled?.takeUnless { bootstrap }?.let { sample ->
                     List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                         sample.exactReals.orEmpty()
                 } ?: centers
@@ -322,8 +355,9 @@ internal class JointLinearRepair(
                     focusedRemaining = sourceIntegers?.size ?: model.numIntVars
                     observe("jointRepairSourceInputPasses")
                 }
-                val checkedStart = pooled != null && completion != null && round == 0L
-                if (round == 0L && completion != null) incumbentTrialPending = checkedStart
+                val checkedStart = pooled != null && completion != null && !bootstrap &&
+                    (round == 0L || (bootstrapTried && !relaxationAttempted))
+                if (round == 0L && completion != null) incumbentTrialPending = pooled != null
                 val width = if (enlargedTrialAfterWitness) checkedTrialWidth + 1 else if (checkedStart) {
                     observe("jointRepairCheckedCenterStarts")
                     minOf(count, 2)
@@ -337,19 +371,41 @@ internal class JointLinearRepair(
                     onIncumbentUse?.invoke()
                 }
                 // A checked center needs no all-pinned rounded-root bootstrap.
-                val proposalRound = if (pooled != null && completion != null)
+                val proposalRound = if (bootstrap) 0L else if (pooled != null && completion != null)
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
                 val size = if (enlargedTrialPending && width > checkedTrialWidth)
                     minOf(width, checkedTrialWidth + 1) else width
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
-                requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
+                val binary = if (!adaptive && pooled != null && completion != null && !bootstrap)
+                    requireNotNull(selection).binaryNeighborhood(hint, from, model.intBounds,
+                        pooled.bools, limit, budget, stop) else null
+                val relaxation = if (checkedStart && binary == null) requireNotNull(selection).relaxationNeighborhood(
+                    hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
+                if (checkedStart && hint != null) relaxationAttempted = true
+                if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
+                if (binary != null) observe("jointRepairBinarySupportNeighborhoods")
+                (binary ?: relaxation ?: requireNotNull(selection).propose(
+                    from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
+                        if (bootstrap) {
+                            bootstrapPending = false
+                            bootstrapTried = true
+                            bootstrapHint = null
+                            observe("jointRepairPaidRootBootstraps")
+                        }
+                        relaxationProposal = condition.takeIf { relaxation != null || binary != null }
+                        checkedProposal = pooled?.takeIf { completion != null && !bootstrap }
+                            ?.let { CheckedProposal(condition, it) }
                         if (observation != null) {
                             proposalSequence++
                             observationQuery = 0L
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
-                                proposalRound, count, size, if (pooled == null) "stored" else "checked-pooled",
+                                proposalRound, count, size, when {
+                                    bootstrap -> "rounded-paid-root"
+                                    pooled == null -> "stored"
+                                    else -> "checked-pooled"
+                                },
                                 from, model.numIntVars, sourceIntegers, observedRoots, condition)
                         }
                         guidedProposal = condition.takeIf { guided }
@@ -377,7 +433,7 @@ internal class JointLinearRepair(
         }
     }
 
-    private fun prepare(cancellation: ExecutionControl): Boolean {
+    private fun prepare(cancellation: ExecutionControl, bootstrap: Boolean): Boolean {
         check(!closed)
         if (stop() || exhausted || cancellation()) return false
         if (selection == null) {
@@ -405,6 +461,8 @@ internal class JointLinearRepair(
                 preparedCenter = preparedCenter ?: checkedExternalCenter()
                 if (stop() || exhausted || cancellation()) return false
                 if (preparedCenter != null) {
+                    bootstrapHint = repairGuidance?.find(source)?.takeIf { bootstrap }
+                    bootstrapPending = bootstrapHint != null
                     rootPoint = emptyMap()
                     observe("jointRepairCheckedCenterPreparations")
                     return true
@@ -442,10 +500,12 @@ internal class JointLinearRepair(
 
     private fun center(index: Int): BigFraction? {
         if (index >= model.numIntVars) return null
-        preparedCenter?.let { return BigFraction.of(it.sample.exactIntValue(index), BIG_ONE) }
+        val prepared = preparedCenter?.let { BigFraction.of(it.sample.exactIntValue(index), BIG_ONE) }
+        if (!bootstrapPending && prepared != null) return prepared
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, index)
-        var value = rootPoint?.get(coordinate)?.takeIf { it.isFinite() }?.let { BigFraction.ofDouble(round(it)) }
-            ?: BigFraction.ZERO
+        val hint = bootstrapHint?.integer(index) ?: rootPoint?.get(coordinate)
+        var value = hint?.takeIf { it.isFinite() }?.let { BigFraction.ofDouble(round(it)) }
+            ?: prepared ?: BigFraction.ZERO
         val bounds = model.intBounds
         if (bounds.hasLower(index)) {
             val lower = BigFraction.ofLong(bounds.lower(index))
@@ -456,6 +516,29 @@ internal class JointLinearRepair(
             if (value > upper) value = upper
         }
         return value
+    }
+
+    private fun dominatedBootstrap(checked: CheckedCenter): Boolean {
+        val objective = objective ?: return false
+        val cutoff = checked.value ?: return false
+        val entries = model.numBoolVars.toLong() + model.numIntVars + model.numRealVars
+        val work = 32L * (entries + 1L)
+        val bytes = 256L * (entries + 1L)
+        if (sourceIntegers != null || stop() || funding.availableWork <= work ||
+            funding.remainingAllocation <= bytes) return false
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        if (objective.realCoefficientValues.any { it != 0.0 }) return false
+        val integers = LongArray(model.numIntVars)
+        for (id in integers.indices) {
+            if (stop()) return false
+            val value = center(id) ?: return false
+            if (value.den != BIG_ONE || !value.num.fitsLong()) return false
+            integers[id] = value.num.toLongExact()
+        }
+        val rounded = Sample(checked.sample.bools, integers, DoubleArray(model.numRealVars))
+        // With every discrete coordinate fixed, a zero continuous objective cannot repair this cutoff.
+        return objective.evaluateExact(rounded) >= cutoff && !stop() && !funding.exhausted
     }
 
     override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult =
@@ -527,16 +610,10 @@ internal class JointLinearRepair(
                 return JointRepairAttempt(ExactNeighborhoodResult.Refuted, TerminationReason.SearchExhausted)
             }
             val captured = key ?: condition
-            var bounds = source.scope.condition
-            var pinnedIntegers = 0
-            for ((id, value) in captured.bools) bounds = bounds.pin(id, value)
-            for ((upper, entries) in listOf(false to captured.lower, true to captured.upper)) {
-                for ((id, value) in entries) {
-                    if (!upper && id < model.numIntVars && captured.upper[id] == value) pinnedIntegers++
-                    val coordinate = if (id < model.numIntVars) SourceCoordinate(SourceCoordinate.Kind.Integer, id)
-                    else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
-                    bounds = bounds.bound(coordinate, value, upper)
-                }
+            val bounds = queryCondition(captured, cancellation) ?: return if (cancellation() && !stop())
+                JointRepairAttempt(ExactNeighborhoodResult.Paused) else stoppedAttempt()
+            val pinnedIntegers = captured.lower.count { (id, value) ->
+                id < model.numIntVars && captured.upper[id] == value
             }
             pending = captured
             if (onComparison != null || observation != null) conditionSequence++
@@ -550,10 +627,12 @@ internal class JointLinearRepair(
             queryOriginalCondition = condition
             val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
                 condition.cutoff == null
+            val seed = checkedProposal?.takeIf { it.condition === condition }?.sample
             query = LinearAuthorityInvocation(querySource,
                 params.copy(sourceIncumbentCompletion = false, sourceRefutationCenterStep = false),
                 external = {
-                    (externalIncumbent() ?: anchor).also { sample ->
+                    (if (seed != null && query?.hasIncumbent != true) seed
+                    else externalIncumbent() ?: seed ?: anchor).also { sample ->
                         if (sample != null) {
                             querySawExternal = true
                             refutedConditions.clear()
@@ -565,7 +644,8 @@ internal class JointLinearRepair(
                     guideRefutation(captured, querySource, feedback)
                 } else null,
                 feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null,
-                useSourceGap = false)
+                useSourceGap = false, guideIncumbent = seed != null,
+                observeExternalIncumbents = observeExternalIncumbents)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed
             if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
@@ -580,7 +660,7 @@ internal class JointLinearRepair(
         val snapshot = result ?: active.snapshot(TerminationReason.BudgetExhausted)
         val imported = completion != null && active.incumbentIsImported
         if (imported && snapshot.incumbent != null) observe("jointRepairImportedPointWithheld")
-        val sample = snapshot.incumbent?.takeUnless { imported }?.takeIf {
+        val sample = snapshot.incumbent?.takeUnless { imported || it === publishedQueryIncumbent }?.takeIf {
             condition.cutoff == null || requireNotNull(objective).evaluateExact(it) < condition.cutoff
         }
         if (sample != null) {
@@ -614,11 +694,17 @@ internal class JointLinearRepair(
                 return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = sample,
                     bound = snapshot.bound)
             }
-            if (checked == SourceEvidenceCheck.Checked && originalChecked) {
+            val accepted = checked == SourceEvidenceCheck.Checked && originalChecked
+            if (accepted) {
                 compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(sample))
             }
-            retire()
-            if (checked == SourceEvidenceCheck.Checked && originalChecked) {
+            val liveRelaxation = result == null && condition === relaxationProposal
+            if (accepted && liveRelaxation && !stop() && !exhausted) {
+                retainedProposal = condition
+                publishedQueryIncumbent = sample
+                observe("jointRepairRetainedQueryIncumbents")
+            } else retire()
+            if (accepted) {
                 anchor = sample
                 selection?.clearRefutation()
                 refutedConditions.clear()
@@ -672,6 +758,42 @@ internal class JointLinearRepair(
         stop() -> TerminationReason.Cancelled
         else -> TerminationReason.BudgetExhausted
     })
+
+    private fun queryCondition(condition: ExactNeighborhoodCondition,
+        cancellation: ExecutionControl): SourceCondition? {
+        val original = source.scope.condition
+        val entries = 1L + original.coordinateRestrictionCount + condition.bools.size +
+            condition.lower.size + condition.upper.size
+        val work = 16L * entries
+        val bytes = 256L * entries
+        if (stop() || cancellation()) return null
+        if (funding.remainingWork <= work || funding.remainingAllocation <= bytes) {
+            declined = true
+            return null
+        }
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        val bools = original.bools.toMutableMap()
+        val lower = original.lower.toMutableMap()
+        val upper = original.upper.toMutableMap()
+        for ((id, value) in condition.bools) {
+            if (stop() || cancellation()) return null
+            bools[id] = value
+        }
+        for ((isUpper, entries) in listOf(false to condition.lower, true to condition.upper)) {
+            val target = if (isUpper) upper else lower
+            for ((id, value) in entries) {
+                if (stop() || cancellation()) return null
+                val coordinate = if (id < model.numIntVars) SourceCoordinate(SourceCoordinate.Kind.Integer, id)
+                else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
+                val before = target[coordinate]
+                target[coordinate] = if (before == null || (if (isUpper) value < before else value > before))
+                    value else before
+            }
+        }
+        val result = original.copy(bools, lower, upper)
+        return result.takeUnless { stop() || cancellation() || funding.exhausted }
+    }
 
     private fun refutationKey(condition: ExactNeighborhoodCondition,
         cancellation: ExecutionControl): ExactNeighborhoodCondition? {
@@ -792,6 +914,8 @@ internal class JointLinearRepair(
         queryOriginalCondition = null
         queryCenterStep = null
         querySawExternal = false
+        retainedProposal = null
+        publishedQueryIncumbent = null
         active?.close()
     }
 
@@ -814,6 +938,9 @@ internal class JointLinearRepair(
         enlargedTrialAfterWitness = false
         enlargedTrialProposal = null
         checkedTrialCenter = null
+        checkedProposal = null
+        relaxationProposal = null
+        bootstrapHint = null
         guidedProposal = null
         readyCenterStep = null
         selection?.clearRefutation()

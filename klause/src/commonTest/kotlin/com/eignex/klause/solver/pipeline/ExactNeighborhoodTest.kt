@@ -16,6 +16,59 @@ import kotlin.test.assertTrue
 
 class ExactNeighborhoodTest {
     @Test
+    fun `a progressing private pause should retain the remaining instruction grant`() {
+        var work = 0L
+        var checks = 0
+        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { _, _ ->
+            work++
+            if (++checks == 1) ExactNeighborhoodResult.Paused else ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, nativeWork = { work },
+            continuePausedCompletion = { true })
+
+        val done = search.advance(ExecutionControl.Never, 4)
+
+        assertTrue(done)
+        assertEquals(2, checks)
+        assertEquals(4L, search.work)
+        assertEquals(1.0, search.stats.ls.completionsRefuted.sum)
+    }
+
+    @Test
+    fun `a private pause without progress should yield the current grant`() {
+        var checks = 0
+        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Paused
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, continuePausedCompletion = { true })
+
+        val done = search.advance(ExecutionControl.Never, 100)
+
+        assertFalse(done)
+        assertEquals(1, checks)
+        assertEquals(1L, search.work)
+    }
+
+    @Test
+    fun `cancellation should stop private resumption within the same grant`() {
+        var work = 0L
+        var checks = 0
+        var cancelled = false
+        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { _, _ ->
+            work++
+            checks++
+            cancelled = true
+            ExactNeighborhoodResult.Paused
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, nativeWork = { work },
+            continuePausedCompletion = { true })
+
+        val done = search.advance(ExecutionControl { cancelled }, 100)
+
+        assertFalse(done)
+        assertEquals(1, checks)
+        assertEquals(2L, search.work)
+    }
+
+    @Test
     fun `a paused root operation should resume without spending a candidate allowance`() {
         var preparations = 0
         var checks = 0

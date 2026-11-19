@@ -14,6 +14,8 @@ import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -45,6 +47,37 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `a checked incumbent dive should improve before breadth exhausts the decision grant`() {
+        val columns = (0 until 12).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = linkedMapOf<String, SourcePremise>()
+        for (id in columns.indices) {
+            rows["lower$id"] = SourcePremise(SourceInequality(mapOf(columns[id] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+            rows["upper$id"] = SourcePremise(SourceInequality(mapOf(columns[id] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        repeat(6) { group ->
+            rows["group$group"] = SourcePremise(SourceInequality(mapOf(
+                columns[group * 2] to BigFraction.ofLong(-2),
+                columns[group * 2 + 1] to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE))
+        }
+        val source = SourceProofContext(scope, columns.toSet(), rows, columns.associateWith { BigFraction.ONE })
+        val standing = Sample(booleanArrayOf(), LongArray(12) { 1 })
+        val results = listOf(false, true).map { guided ->
+            LinearAuthorityInvocation(source, TheoryParams(maxDecisions = 6, sourceCuts = false),
+                external = { standing }, boundOrdered = true, guideIncumbent = guided).use { it.run { _, _ -> } }
+        }
+
+        assertEquals(BigFraction.ofLong(12), results[0].value)
+        assertEquals(BigFraction.ofLong(6), results[1].value)
+        assertTrue((results[1].stats.smt.completeSearchStages?.get("numericalIncumbentFrontierRanks") ?: 0L) > 0)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(source.scope,
+                SourceClaim.Witness(assertNotNull(results[1].incumbent)),
+                SourceDerivation.SourceWitness)))
+    }
 
     @Test
     fun `a checked global relaxation bound should close the declared gap before integer branching`() {

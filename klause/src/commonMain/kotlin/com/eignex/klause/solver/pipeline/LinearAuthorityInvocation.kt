@@ -72,6 +72,7 @@ internal class LinearAuthorityInvocation(
     gap: OptimalityGap? = null,
     useSourceGap: Boolean = true,
     gapTolerance: OptimalityTolerance? = context.semantics?.effective?.optimalityTolerance,
+    private val guideIncumbent: Boolean = params.sourceIncumbentCompletion,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -95,6 +96,7 @@ internal class LinearAuthorityInvocation(
     private var value: BigFraction? = null
     private var incumbentRevision = 0L
     private var importedIncumbents = 0L
+    private var guidedFrontierRanks = 0L
     private val externalOffers = mutableMapOf<String, Long>()
     private var importedIncumbent: Sample? = null
     private var consumedIncumbent: Sample? = null
@@ -107,6 +109,7 @@ internal class LinearAuthorityInvocation(
             externalOffers[key] = (externalOffers[key] ?: 0L) + count
         } else null
     val isDone: Boolean get() = result != null
+    val hasIncumbent: Boolean get() = incumbent != null
     val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
@@ -118,7 +121,8 @@ internal class LinearAuthorityInvocation(
                 completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
                     externalOffers +
                     mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
-                        "numericalImportedIncumbents" to importedIncumbents) +
+                        "numericalImportedIncumbents" to importedIncumbents,
+                        "numericalIncumbentFrontierRanks" to guidedFrontierRanks) +
                     (frontier?.let {
                         mapOf("numericalFrontierPending" to it.pending.toLong(),
                             "numericalFrontierPeakPending" to it.peakPending.toLong())
@@ -147,7 +151,8 @@ internal class LinearAuthorityInvocation(
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
-        gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance)
+        gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
+        guideIncumbent = guideIncumbent)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {
@@ -168,15 +173,23 @@ internal class LinearAuthorityInvocation(
         booleanBranching = branching, nodePolicy = component)
     private val frontier = if (!boundOrdered) null else SearchFrontierRun(
         session, SearchSolveParams(state.remainingDecisions()), branching, component, state.decisionBudget,
-        component::frontierRank, Comparator { left, right ->
+        ::frontierRank, Comparator { left, right ->
+            val depth = left.first.compareTo(right.first)
             when {
-                left == null && right == null -> 0
-                left == null -> -1
-                right == null -> 1
-                else -> left.compareTo(right)
+                depth != 0 -> depth
+                left.second == null && right.second == null -> 0
+                left.second == null -> -1
+                right.second == null -> 1
+                else -> requireNotNull(left.second).compareTo(requireNotNull(right.second))
             }
         }, ::paused, { incumbentRevision },
     )
+
+    private fun frontierRank(): Pair<Int, BigFraction?> {
+        val depth = if (guideIncumbent && incumbent != null) session.decisionLevel else 0
+        if (depth > 0) guidedFrontierRanks++
+        return -depth to component.frontierRank()
+    }
 
     fun run(onIncumbent: (Sample, BigFraction) -> Unit): LinearInvocationResult {
         while (true) {

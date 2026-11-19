@@ -537,10 +537,24 @@ scalar limit and keys beyond the remaining allocation are refused before retenti
 Sharing completions grants no work, lifetime, bound or terminal authority. The
 control changes neither worker admission nor lifetimes.
 
-With completion enabled, a checked pooled center starts joint repair in a small
-connected integer neighborhood that frees at most two integers, without a root
-relaxation; the all-pinned rounded-root bootstrap serves a center without that
-handoff. Before a checked center exists, root repair can keep the ordinary
+With completion enabled, an accepted incumbent guides a depth-first numerical dive,
+visiting its side of each existing integer split first. Pending alternatives and
+checked global bounds retain ordinary coverage and certification. A checked pooled
+center starts joint repair without a root
+relaxation. Fixed repair first tries the rounded integers from an available paid
+root point under the checked incumbent's cutoff, retaining the ordinary continuous
+completion. A discrete objective whose rounded value cannot improve that cutoff
+skips the bootstrap. The following repair can use a checked pool point at that same cutoff
+as its center. For binary models, a paid root point selects a private support
+neighborhood around that checked center. Incumbent ones and root values outside
+`1e-6` of zero remain free, so an exchange can remove agreeing incumbent ones.
+Common zeros stay pinned. These pins restrict only that query and supply no global
+fixing or coverage. Other integer models can pin the
+eligible integers agreeing with the paid point, releasing every disagreement.
+Continuous columns remain free. Missing guidance, cancellation and unavailable
+funding retain the connected two-integer start.
+The all-pinned rounded-root bootstrap serves a center without that handoff.
+Before a checked center exists, root repair can keep the ordinary
 pre-selection relaxation point for advisory centering and neighborhood order,
 separately from point-selected bounds. Before the first proposal, a newer exact
 pooled point (never an advisory one) can replace the center and tighten the cutoff,
@@ -551,13 +565,28 @@ existing funding; a missing, closed or unaffordable hint falls back to ordinary 
 order without delaying a start or requesting a relaxation, and the repair owner
 releases the snapshot on retirement. Guidance carries no witness, bound or proof
 authority. Continuous columns stay free, cutoff checks stay exact, and later
-proposals keep their captured conditions. Imported points remain query incumbents
+proposals keep their captured conditions. A checked proposal retains its center for
+the matching receiving query, including at the captured cutoff; the query rechecks
+its own source rows and pins before using that point to prune or guide traversal.
+The captured seed enters before newer external offers, which can lie outside its
+private pins. Newer offers still require receiving checks.
+Receiving restrictions capture their coordinate maps together under existing funding,
+preserving original bounds and aggregate rows.
+Imported points remain query incumbents
 and centers and earn no discovery reward: only a point the repair query produces
 enters companion publication and original-source rechecking.
+A live incumbent neighborhood query survives publication of an improving point. Later
+ordinary selections resume that same conditioned subproblem and retain its branch tree,
+LP state and private incumbent until completion or the existing allowance ends.
+An unchanged query incumbent is not republished. Publication ends the initial
+continuation trial; retaining the query grants no scheduling priority or allowance.
+Within an existing repair turn, a checked query that makes native progress can
+resume private pauses while the turn has instructions and time left. A pause without
+progress yields; the turn, active lifetime and global funding keep their original limits.
 
-From the availability of a dimension-compatible incumbent through root and center
-preparation and the first proposal, joint repair receives continuation after owed
-complete-worker coverage, within its active cap, until the proposal finishes or the
+With explicit incumbent completion, from the availability of a dimension-compatible
+incumbent through root and center preparation and the first proposal, joint repair
+receives continuation after owed complete-worker coverage, within its active cap, until the proposal finishes or the
 companion's allowance retires it. This trial earns no incumbent reward and renews no
 work, allocation or active time; a declined center clears the request, and later
 proposals use ordinary selection.
