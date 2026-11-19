@@ -128,6 +128,9 @@ the shared fixpoint before numerical checking, retaining the operation allowance
 An optional decline cache reuses only a failed numerical comparison with the same
 right-hand side and exact bound values and strictness. It retains no consequence
 or premise; changed bounds and every successful proof require fresh evaluation.
+Unchanged inputs reuse their owned snapshot after comparing current exact sides.
+Affine-side snapshots are shared only while both immutable bound assertions
+retain their identities, including their witness and premises.
 
 The incremental route also reads bounds on existing normalized affine slack
 columns. The normalization's scale selects the bounding side, and its offset

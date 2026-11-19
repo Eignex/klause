@@ -20,6 +20,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -416,15 +417,24 @@ internal class LiveQfLraSystem(
         stop.charge(comparison.terms.size.toLong() + 1L)
         if (stop.pollStop()) return null
         val key = preparedTerms[comparison.ordered]?.positive
-        val term = key?.let { (it.slot ?: normalized[it])?.term }
-        val column = term?.let { definitions[it.coefficients] }
+        val slot = key?.let { it.slot ?: normalized[it] }
+        val column = slot?.term?.let { definitions[it.coefficients] }
         val state = lp.state ?: return null
-        return listOf(false, true).map { upper ->
-            val active = column?.let { state.activeSide(it, upper) } ?: return@map null
-            val premise = lp.activeBoundPremise(column, upper) ?: return null
+        if (column == null || slot == null) return EMPTY_AFFINE_INPUTS
+        val lower = state.activeSide(column, false)
+        val upper = state.activeSide(column, true)
+        val retained = slot.inputSides
+        if (retained != null && lower === slot.inputLower && upper === slot.inputUpper) return retained
+        val sides = listOf(lower, upper).mapIndexed { index, active ->
+            if (active == null) return@mapIndexed null
+            val premise = lp.activeBoundPremise(column, index == 1) ?: return null
             if (premise === SearchAtomPremise.Unavailable) return null
             PartialLinearSide(active.side.number.value, active.side.strict)
         }
+        slot.inputLower = lower
+        slot.inputUpper = upper
+        slot.inputSides = sides
+        return sides
     }
 
     fun affineImplication(comparison: ExactComparison, stop: ExecutionControl): PartialLinearImplication? {
@@ -748,4 +758,9 @@ private class SmtRowKeys(val positive: SmtTermKey, val negative: SmtTermKey) {
 
 private class SmtTermSlot(val term: NormalizedSmtTerm) {
     var column: Int = -1
+    var inputLower: LpBoundAssertion? = null
+    var inputUpper: LpBoundAssertion? = null
+    var inputSides: List<PartialLinearSide?>? = null
 }
+
+private val EMPTY_AFFINE_INPUTS: List<PartialLinearSide?> = listOf(null, null)

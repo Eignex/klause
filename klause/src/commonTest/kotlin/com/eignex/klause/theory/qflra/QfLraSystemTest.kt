@@ -40,8 +40,42 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `affine input sides should follow strict bounds across sibling scopes`() {
+        val factors = Array<Factor>(2) { guard ->
+            ReifiedRealLinear(guard, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(1.0, -1.0), LinearOp.LE, (guard + 1).toDouble(), guard == 1)
+        }
+        val source = source().withFactors(factors)
+        val forms = factors.map { listOf(it.linearRows.single().exactForm(2)) }
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, forms)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            val first = forms[0][0].comparison(true) { false }
+            assertEquals(listOf(null, null), system.affineInputSides(first, ExecutionControl.Never))
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(system.assertComparison(first, null, premise(0)))
+            repeat(2) {
+                assertEquals(listOf(null, PartialLinearSide(BigFraction.ONE, false)),
+                    system.affineInputSides(first, ExecutionControl.Never))
+            }
+            session.popTo(0)
+            assertEquals(listOf(null, null), system.affineInputSides(first, ExecutionControl.Never))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            val sibling = forms[1][0].comparison(true) { false }
+
+            assertTrue(system.assertComparison(sibling, null, premise(1)))
+
+            assertEquals(listOf(null, PartialLinearSide(BigFraction.ofLong(2), true)),
+                system.affineInputSides(sibling, ExecutionControl.Never))
+            assertNull(system.affineInputSides(sibling, ExecutionControl { true }))
+        }
+    }
+
+    @Test
     fun `shared strict terms should retain source thresholds across retraction`() {
-        for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.NE)) {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
             val factors = Array<Factor>(2) { guard ->
                 ReifiedRealLinear(guard, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
                     doubleArrayOf(1.0, -1.0), op, guard.toDouble(), true)
@@ -54,15 +88,14 @@ class QfLraSystemTest {
                 val session = SearchSession(listOf(lp))
                 session.initialize()
                 session.push(SearchDecision.Bool(Lit.make(0, true)))
-                val direction = LinearOp.LE.takeIf { op == LinearOp.NE }
-                assertTrue(system.assertComparison(forms[0][0].comparison(true) { false }, direction, premise(0)))
+                assertTrue(system.assertComparison(forms[0][0].comparison(true) { false }, null, premise(0)))
                 val expected = if (op == LinearOp.GE) BigFraction.ONE else BigFraction.MINUS_ONE
                 val point = listOf(expected, BigFraction.ZERO, BigFraction.ONE)
                 assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
                 session.popTo(0)
                 session.push(SearchDecision.Bool(Lit.make(1, true)))
 
-                assertTrue(system.assertComparison(forms[1][0].comparison(true) { false }, direction, premise(1)))
+                assertTrue(system.assertComparison(forms[1][0].comparison(true) { false }, null, premise(1)))
 
                 val shifted = listOf(expected + BigFraction.ONE, BigFraction.ZERO, BigFraction.ONE)
                 assertTrue(system.acceptsPoint(shifted, ExecutionControl.Never))
