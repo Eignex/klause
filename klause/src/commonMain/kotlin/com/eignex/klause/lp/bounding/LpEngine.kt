@@ -1281,7 +1281,7 @@ internal class LpEngine(
         else cpAdapter.sourceRootRelaxation(relaxer, cancellation)
         return base?.let { cpAdapter.sourceRootCuts(it, selectedCuts, cancellation) }
             ?.also {
-                sourceRootBoundLayout = it
+                if (sparseTrialActive) sourceRootBoundLayout = it
                 it.sourceMap?.let(cutPool::remap)
             }
     }
@@ -1351,7 +1351,7 @@ internal class LpEngine(
             if (!token() && base.persistentEligible && !base.model.hasContinuous) {
                 persistentRelaxation = base
                 preparedRootRelaxation = cpAdapter.sourceRootRelaxation(base, token)
-                sourceRootBoundLayout = preparedRootRelaxation
+                if (sparseTrialActive) sourceRootBoundLayout = preparedRootRelaxation
                 if (preparedRootRelaxation == null) cpAdapter.reset() else prepareRootNumericalOwner(token)
             }
             persistentRelaxer = relaxer
