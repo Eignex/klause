@@ -274,6 +274,14 @@ form.
 
 ## Consumers, explanations and cuts
 
+Polynomial adapters use `LinearEnvelopes` and `CertifiedEnvelopeLp` to assemble
+exact square and bilinear relaxations outside the engine. An owner retains its
+matrix for coordinate objectives and tangent additions inside one immutable query
+scope. Spatial child boxes create separate owners. Certified LP infeasibility
+refutes the relaxed scope; objective certificates bound source coordinates, while
+LP points require the caller's original nonlinear witness check. Shared search
+owns integer rounding, antecedents and retraction.
+
 Consumers decide when to request certified bounds, fixings, conflicts or witnesses
 and how to apply and retract them. Their policy stays outside the engine. Floating
 values used as guidance in this chapter (rounding targets, value preferences, source

@@ -6,6 +6,7 @@ import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.lp.engine.LpVerdict
 
 internal class PolynomialAffineReduction private constructor(
     val atoms: List<PolynomialAtom>,
@@ -211,13 +212,13 @@ internal class PolynomialAffineReduction private constructor(
                 yield(null)
             }
             if (!inconsistent) {
-                val magnitudeChecking = preparePolynomialMagnitudeRefutation(current, arithmetic)
-                var magnitudeConflict: Boolean? = null
-                while (magnitudeConflict == null) {
-                    magnitudeConflict = magnitudeChecking.next()
-                    if (magnitudeConflict == null) yield(null)
+                val relaxation = PolynomialLpRelaxation.prepare(current, realCount, arithmetic,
+                    arithmetic.execution.cancellation)
+                relaxation?.use {
+                    val tightening = it.tightenSquares {}
+                    inconsistent = tightening.infeasible ||
+                        it.solve()?.verdict == LpVerdict.INFEASIBLE
                 }
-                inconsistent = magnitudeConflict
             }
             arithmetic.step()
             yield(PolynomialAffineReduction(current.toList(), fibres.toList(), inconsistent,
