@@ -9,6 +9,7 @@ import kotlin.math.sqrt
 internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
+    private val charge: (Long) -> Unit = {},
 ) {
     private class Direction {
         var count = 0
@@ -52,6 +53,7 @@ internal class LpDirectionalHistory(
     val hasObservations: Boolean get() = observed
 
     fun clear(report: Boolean = true) {
+        charge(gains.size.toLong())
         gains.clear()
         trimParents(0)
         pending = null
@@ -90,20 +92,26 @@ internal class LpDirectionalHistory(
     }
 
     fun branch(variable: VarRef, value: Double) {
+        charge(8L)
         trimParents(depth)
         if (depth !in 0 until MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return
-        val records = parents ?: arrayOfNulls<Parent>(MAX_DEPTH).also { parents = it }
+        val records = parents ?: run {
+            charge(MAX_DEPTH.toLong())
+            arrayOfNulls<Parent>(MAX_DEPTH).also { parents = it }
+        }
         records[depth] = Parent(objective, variable, value)
         parentCount++
         parentLimit = depth + 1
     }
 
     private fun trimParents(firstRemoved: Int) {
+        charge(1L)
         if (firstRemoved >= parentLimit) return
         val records = parents ?: return
         val start = firstRemoved.coerceAtLeast(0)
+        charge((parentLimit - start).toLong())
         for (index in start until parentLimit) {
             if (records[index] != null) {
                 records[index] = null
@@ -114,6 +122,7 @@ internal class LpDirectionalHistory(
     }
 
     fun commit(decision: SearchDecision, level: Int) {
+        charge(8L)
         trimParents(level)
         pending = null
         val parent = parents?.getOrNull(level - 1) ?: return
@@ -162,13 +171,13 @@ internal class LpDirectionalHistory(
         return score.takeIf { it.isFinite() } ?: Double.NaN
     }
 
-    fun preferLowerGainDirection(variable: VarRef, value: Double): Boolean? {
+    fun preferGainDirection(variable: VarRef, value: Double, preferHighGain: Boolean): Boolean? {
         val history = reliable(variable, value) ?: return null
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
         if (!down.isFinite() || !up.isFinite() || abs(down - up) <= 1e-9 * maxOf(1.0, down, up)) return null
-        return up < down
+        return if (preferHighGain) up > down else up < down
     }
 
     private fun reliable(variable: VarRef, value: Double): Gains? {
