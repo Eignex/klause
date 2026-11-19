@@ -375,7 +375,9 @@ gain in either direction keeps the fallback. Otherwise reduced-cost/fractionalit
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
 Each direction uses the lower of its latest two in-age normalized gains, so one
-large observation cannot raise its estimate alone. Each observation ages separately.
+large observation cannot raise its estimate alone. The two gains must agree within
+a factor of two; disagreement withholds advice until passive observations stabilize.
+Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
@@ -411,7 +413,8 @@ With a finite incumbent cutoff, the same opt-in path can visit an under-observed
 child first to collect missing passive information. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
 around its fresh fractional LP point. Each direction needs an in-age observation
-before collection can complete a nearly reliable pair. A scope-wide availability
+before collection can complete a nearly reliable pair, and the more observed side
+must have a stable positive estimate. A scope-wide availability
 stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
