@@ -40,5 +40,14 @@ internal object NonlinearIntegerSuite {
         vendored("whole-real-refutation", expected = Expected.Unsat,
             relPath = "nonlinear-integer-v1/whole-real-refutation.smt2", tags = setOf("nonlinear-integer"),
         )
+        vendored("square-bound-sat", expected = Expected.Sat,
+            relPath = "nonlinear-integer-v1/square-bound-sat.smt2", tags = setOf("nonlinear-integer"),
+        )
+        vendored("square-bound-unsat", expected = Expected.Unsat,
+            relPath = "nonlinear-integer-v1/square-bound-unsat.smt2", tags = setOf("nonlinear-integer"),
+        )
+        vendored("square-band-sat", expected = Expected.Sat,
+            relPath = "nonlinear-integer-v1/square-band-sat.smt2", tags = setOf("nonlinear-integer"),
+        )
     }
 }

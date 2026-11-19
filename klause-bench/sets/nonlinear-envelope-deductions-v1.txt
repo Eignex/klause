@@ -1,0 +1,3 @@
+smtlib-nonlinear-integer-v1/square-bound-sat
+smtlib-nonlinear-integer-v1/square-bound-unsat
+smtlib-nonlinear-integer-v1/square-band-sat
