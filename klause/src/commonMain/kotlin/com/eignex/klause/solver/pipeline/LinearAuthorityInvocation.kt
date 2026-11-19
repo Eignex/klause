@@ -268,7 +268,8 @@ internal class LinearAuthorityInvocation(
             }
             val revision = incumbentRevision
             val event = frontier?.next() ?: checkNotNull(run).next()
-            if (incumbentProximity && completion != null && incumbentRevision != revision) prepareProximity()
+            if (incumbentProximity && completion != null && importedIncumbents > 0 &&
+                incumbentRevision != revision) prepareProximity()
             proximityTurn = proximity != null
             if (boundOrdered) component.updateGlobalBound()
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
@@ -312,9 +313,9 @@ internal class LinearAuthorityInvocation(
     }
 
     private fun prepareProximity() {
+        val sample = completion?.complete(context, incumbent ?: return, stop) ?: return
         proximity?.close()
         proximity = null
-        val sample = completion?.complete(context, incumbent ?: return, stop) ?: return
         val exact = value ?: return
         val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
         val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop) ?: return

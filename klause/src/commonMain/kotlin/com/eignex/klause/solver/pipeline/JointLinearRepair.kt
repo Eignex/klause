@@ -728,6 +728,7 @@ internal class JointLinearRepair(
                     bound = bound)
             }
             val accepted = checked == SourceEvidenceCheck.Checked && originalChecked
+            if (privateProximity && !accepted) proximityCompletedCutoff = condition.cutoff
             if (accepted) {
                 compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(sample))
             }

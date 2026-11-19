@@ -46,6 +46,32 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     @Test
+    fun `an original rejected private target should not restart at the same cutoff`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3), external = { center },
+            incumbentProximity = true,
+            incumbentCompletionCheck = { sample, _, _ -> sample.intValue(0) == 1L }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityCenters"))
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
     fun `proximity repair should coordinate binary changes with a free continuous residual`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
