@@ -20,6 +20,7 @@ internal class LpScopedSolver(
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
+    private val componentAdmission: ((LpComponentShape) -> Boolean)? = null,
 ) : AutoCloseable {
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
@@ -601,7 +602,7 @@ internal class LpScopedSolver(
         val scopeToken = cancellation or token
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
-            trackDegeneracy, maxRetainedRows, pricing, componentSplit,
+            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
         workingActive = true
@@ -895,6 +896,7 @@ internal class LpScopedSolver(
                             componentPricing(part, working.n, rowOnlyRows))
                     },
                     ::ComponentLpSolver,
+                    accept = componentAdmission,
                 )
             } else null
             val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L

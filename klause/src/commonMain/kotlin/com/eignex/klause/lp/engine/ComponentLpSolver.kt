@@ -872,6 +872,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     projection: LpProjectionMeter?,
     engine: (LpModel, ExecutionControl, Int) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
+    accept: ((LpComponentShape) -> Boolean)? = null,
 ): T? {
     val n = model.n
     val m = model.m
@@ -919,6 +920,18 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[partition.find(rowIndex.colIdx[from])]
         blockRows[block].add(i)
     }
+    if (accept != null) {
+        projection?.reserve(children.toLong() + 1L, 64L, matrix = false)
+        val cells = blockRows.indices.sumOf { index ->
+            val rows = blockRows[index].size.toLong()
+            rows * (blockCols[index].size + rows + 1L)
+        }
+        val shape = LpComponentShape(
+            blocks, m.toLong() * (n.toLong() + m + 1L), cells,
+            128L * (rowIndex.colIdx.size.toLong() + n + m + children) + 4L * m,
+        )
+        if (!accept(shape) || cancellation()) return null
+    }
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
 
@@ -932,6 +945,13 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         throw primary
     }
 }
+
+internal data class LpComponentShape(
+    val blocks: Int,
+    val monolithicCells: Long,
+    val componentCells: Long,
+    val modeledBytes: Long,
+)
 
 private fun LpModel.componentRestrictions(
     blockCols: Array<IntArrayList>,

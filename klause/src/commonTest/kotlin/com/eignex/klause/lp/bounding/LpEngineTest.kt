@@ -46,6 +46,41 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `admitted numerical components reuse untouched children without root guidance`() {
+        val problem = Problem(0, 32, Array(32) { IntDomain(0, 5) },
+            (0 until 2).flatMap { block ->
+                (0 until 64).map { row ->
+                    val variable = row % 16
+                    Linear(intArrayOf(1, 1), intArrayOf(16 * block + variable, 16 * block + (variable + 1) % 16),
+                        LinearOp.GE, 1)
+                }
+            })
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("automatic-numerical-reuse")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentReuse = true, boundAdaptiveWork = false,
+                probe = false, cuts = false, rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            assertFalse(engine.pruneNode(cp.session, 1000.0, -1, true))
+            val before = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+
+            val pruned = engine.pruneNode(cp.session, 1000.0, -1, true)
+
+            assertFalse(pruned)
+            val after = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
+            assertEquals(1L, checkNotNull(after?.get("SOLVED")) - checkNotNull(before?.get("SOLVED")))
+            assertEquals(1L, checkNotNull(after["REUSED"]) - checkNotNull(before["REUSED"]))
+            assertNull(engine.rootRoundingWarmStart)
+            assertNull(engine.rootPrimalTargets)
+            assertEquals(1L, sink.snapshot().lp.phases["COMPONENT_ADMISSION_NODE"]?.outcomes?.get("ADMITTED"))
+        }
+    }
+
+    @Test
     fun `linear bound should release branch costs when first read after a backtrack`() {
         val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val session = PropagationSession(problem)

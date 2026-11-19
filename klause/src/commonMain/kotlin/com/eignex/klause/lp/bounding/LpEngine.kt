@@ -1224,7 +1224,9 @@ internal class LpEngine(
                 work = nodePreparationWorkBudget(),
                 trackDegeneracy = adaptiveWork,
                 pricing = pricingOptions,
-                componentSplit = params.lpPlan.componentOwnership,
+                componentSplit = params.lpPlan.componentOwnership || params.lpPlan.componentReuse,
+                componentAdmission = if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership)
+                    ::admitRetainedComponents else null,
             )
         },
         solveContext = solveContext,

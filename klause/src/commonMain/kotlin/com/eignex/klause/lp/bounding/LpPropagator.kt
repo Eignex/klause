@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpComponentShape
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
@@ -57,6 +58,7 @@ internal data class LpEffortProfile(
     val continuation: ExactContinuationLimits = ExactContinuationLimits(),
     val fullContinuation: Boolean = true,
     val componentSplit: Boolean = false,
+    val componentAdmission: ((LpComponentShape) -> Boolean)? = null,
 )
 
 internal interface LpSearchPolicy {
@@ -215,6 +217,7 @@ internal class LpPropagator(
             maxRetainedRows = profile.maxRows,
             pricing = profile.pricing,
             componentSplit = profile.componentSplit,
+            componentAdmission = profile.componentAdmission,
         )
     }
 

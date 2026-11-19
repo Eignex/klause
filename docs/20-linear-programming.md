@@ -371,6 +371,12 @@ and target reset, reseed and engine close release the preferences.
 
 ### Immutable component ownership
 
+The independent `lp-component-reuse` setting admits numerical node ownership from
+the completed partition's size, tableau-size reduction and modeled private storage.
+Construction and declined inspection spend the containing LP grant. Admitted
+children retain their numerical state through ordinary node edits; root component
+guidance, ordering and private rounding remain selected by `lp-component-ownership`.
+
 The explicit `lp-component-ownership=true` setting lets finite node bounding retain
 one numerical owner per independent row-coupled block. Each child keeps its basis
 and exact result authority; empty structural rows form one logical-only child that
