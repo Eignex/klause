@@ -82,6 +82,7 @@ internal class LinearAuthorityTraversal(
     private val useSourceGap: Boolean = true,
     private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = false,
+    private val proximityCenter: Sample? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
@@ -614,10 +615,10 @@ internal class LinearAuthorityTraversal(
             return listOf(true, false).map { SearchDecision.Theory(AggregateAlternative(split.row, it)) }
         }
         val split = current.split as? CoverageSplit.Integer ?: return null
-        val preferUpper = if (guideIncumbent && !cancellation() &&
+        val preferUpper = if ((guideIncumbent || proximityCenter != null) && !cancellation() &&
             (budget.funding?.availableWork ?: Long.MAX_VALUE) > 1L) {
             budget.observe(preparation = 1L)
-            incumbent()?.first?.let { sample ->
+            (proximityCenter ?: incumbent()?.first)?.let { sample ->
                 if (split.coordinate.id !in 0 until sample.numIntVars) false
                 else BigFraction.of(sample.exactIntValue(split.coordinate.id), BIG_ONE) >
                     split.threshold

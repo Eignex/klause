@@ -50,6 +50,21 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     )
 
     @Test
+    fun `ordinary points rejected by the original checker should not center private queries`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+
+        val result = LinearAuthorityInvocation(source,
+            TheoryParams(sourceIncumbentCompletion = true), boundOrdered = true,
+            incumbentCompletionCheck = { _, _, _ -> false }, incumbentProximity = true)
+            .use { it.run { _, _ -> } }
+
+        assertEquals(0L, result.stats.smt.completeSearchStages?.get("numericalProximityCenters") ?: 0L)
+    }
+
+    @Test
     fun `a private proximity improvement should retain original optimum authority`() {
         val source = SourceProofContext(scope, setOf(integer), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
