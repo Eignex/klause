@@ -785,12 +785,13 @@ cutoff. Grants preserve the paid query, pins, preparation and traversal.
 
 A funded worker receives at least four base work slices per turn, capped by the
 configured work-slice maximum, or the ordinary growing work slice when larger.
-Its elapsed turn stays at the base slice, and each turn still requires fresh
-complete-sibling coverage. While a funded query waits, the scheduler services that
+Its elapsed turn uses the ordinary growing slice within the containing family
+deadline and active grant. Each turn still requires fresh complete-sibling coverage.
+While a funded query waits, the scheduler services that
 coverage directly with base work offers to the least charged available complete
-worker before returning to the query; unspent offers do not count as fresh coverage. Explicit
-minimum shares retain precedence. Retirement restores ordinary scheduling.
-Cancellation and the containing deadline retain
+worker before returning to the query. Improvement-only arms and unspent offers do
+not count as fresh coverage. Explicit minimum shares retain precedence. Retirement
+restores ordinary scheduling. Cancellation and the containing deadline retain
 precedence. Explicit core workers and diagnostic work schedules keep their selected
 limits. `continuationGrants` reports funding decisions without proof authority.
 

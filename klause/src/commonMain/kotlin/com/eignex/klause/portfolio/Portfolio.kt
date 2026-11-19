@@ -1293,8 +1293,7 @@ class Portfolio(
             }
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
             val probing = initialProbe || (auxiliary && !trialStarted[arm])
-            val fundedCoverage = fundedCore() != null && workers[arm].family == ArmFamily.Backtrack &&
-                !workers[arm].auxiliaryProof
+            val fundedCoverage = fundedCore() != null && isCoreCoverageWorker(arm)
             val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof || fundedCoverage
             val continuingCore = workers[arm].auxiliaryProof &&
                 (liveStats[arm]?.coreGuided?.continuationGrants ?: 0L) > 0L
@@ -1307,7 +1306,7 @@ class Portfolio(
             }
             val allowance = if (diagnostics == null) ordinaryAllowance else
                 minOf(ordinaryAllowance, diagnostics.workLimit - chargedWork)
-            val time = if (baseAllowance) baseSliceMillis else slice
+            val time = if (baseAllowance && !continuingCore) baseSliceMillis else slice
             val remainingTime = if ((handles[arm] as? ResumableSearch)?.preparationPending != false) {
                 preparationTimeLimit - trialPreparationTime[arm]
             } else trialTimeLimit - trialSearchTime[arm]
@@ -1336,6 +1335,9 @@ class Portfolio(
                 (liveStats[it]?.coreGuided?.continuationGrants ?: 0L) > 0L
         }
 
+        private fun isCoreCoverageWorker(arm: Int): Boolean = workers[arm].family == ArmFamily.Backtrack &&
+            !workers[arm].auxiliaryProof && !workers[arm].improvementOnly
+
         private fun initialHeuristicEligibility(eligible: List<Int>): List<Int> {
             if (heuristicSampled || diagnostics != null || lanes != 1) return eligible
             val first = eligible.firstOrNull { it in initialHeuristics && !retired[it] } ?: return eligible
@@ -1351,7 +1353,7 @@ class Portfolio(
             }
             val first = available.filter { !workers[it].improvementOnly }
             val eligible = if (improving || first.all { retired[it] }) available else first
-            val complete = first.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
+            val complete = first.filter(::isCoreCoverageWorker)
             val covered = if (proofStarted) {
                 val active = complete.filter { !retired[it] }
                 var needed = active.fold(0L) { work, _ -> work + minOf(baseSliceWork, Long.MAX_VALUE - work) }
@@ -1374,8 +1376,7 @@ class Portfolio(
             val funded = fundedCore()
             if (funded != null && funded !in eligibleArms) {
                 eligibleArms.filter {
-                    workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof &&
-                        !busy[it] && !retired[it]
+                    isCoreCoverageWorker(it) && !busy[it] && !retired[it]
                 }.minByOrNull { armWork[it] }?.let { return it }
             }
             eligibleArms.firstOrNull {
