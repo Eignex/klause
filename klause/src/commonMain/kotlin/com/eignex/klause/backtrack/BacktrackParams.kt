@@ -355,8 +355,6 @@ data class BacktrackParams(
     val lpPlan: LpPlan = LpPlan(),
     /** Use reliable, recent directional LP gains for finite branching; missing history keeps ordinary LP guidance. */
     val lpDirectionalGains: Boolean = false,
-    /** Apply reliable directional branching advice; false retains its observations, collection and comparison work. */
-    val lpDirectionalAdvice: Boolean = true,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /**
@@ -490,6 +488,8 @@ data class BacktrackParams(
     val arithmeticLearningWork: Long = 262_144,
     /** Per-conflict cumulative modeled allocation allowance for optional cutting-planes learning. */
     val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
+    /** Apply reliable directional branching advice; false retains its observations, collection and comparison work. */
+    val lpDirectionalAdvice: Boolean = true,
 ) : SolverParams {
     init {
         require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)
