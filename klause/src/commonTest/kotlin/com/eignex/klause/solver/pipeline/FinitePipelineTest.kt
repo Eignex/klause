@@ -5,6 +5,8 @@ import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -46,6 +48,48 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+    @Test
+    fun `complete optimization should automatically consume objective symmetry`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2))))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-2, -2, -2), constant = 7)
+
+        for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK)) {
+            val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, engine, objective))
+            val representatives = BacktrackSolver(prepared.executableProblem()).enumerate().toList()
+
+            assertTrue(prepared.problem.factors.any { it is SymmetryHandling }, engine.id)
+            assertEquals(setOf(-5L, -3L, -1L, 1L), representatives.map {
+                objective.evaluateLong(prepared.reconstruct(it))
+            }.toSet())
+            assertEquals(4, representatives.size)
+        }
+    }
+
+    @Test
+    fun `incomplete routes should retain objective permutations`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2))))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+
+        for (engine in listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS)) {
+            val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, engine, objective))
+
+            assertTrue(prepared.problem.factors.none { it is SymmetryHandling }, engine.id)
+            assertEquals(24, BacktrackSolver(prepared.executableProblem()).enumerate().count())
+        }
+    }
+
+    @Test
+    fun `solution sensitive optimization should retain every source assignment`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2))))
+
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+            source, FiniteEngine.BACKTRACK, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+            solutionSetSensitive = true,
+        ))
+
+        assertEquals(24, BacktrackSolver(prepared.executableProblem()).enumerate().count())
+    }
+
     @Test
     fun `disabled source templates should leave presolve LP solving active`() {
         val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
