@@ -163,6 +163,7 @@ internal class CpSatisfactionTraversal(
             onPropagationWork = onPropagationWork,
         )).also {
             if (params.integerRowLearning) it.enableIntegerRowLearning()
+            it.configureArithmeticLearning(params.arithmeticLearningWork, params.arithmeticLearningAllocationBytes)
             it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
                 params.costAwarePropagation, params.reasonPreflight)
         },

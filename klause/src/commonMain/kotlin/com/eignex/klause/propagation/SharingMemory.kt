@@ -183,10 +183,12 @@ private fun PropagationState.learnedSharingMemory(
                 add(propagator.byWeightDesc)
                 addLong(propagator.weights)
             }
+            is LearnedExactPbPropagator -> propagator.sharingMemory(sample, retained)
             is LearnedIntegerPropagator -> {
                 protectedInteger = protectedInteger || retained
                 add(propagator.row.variables)
-                addLong(propagator.row.coefficients)
+                propagator.row.sharingMemory(sample, retained)
+                propagator.compact?.let { addLong(it.coeffs) }
             }
         }
         add(learned.store.payload(i) as? IntArray)

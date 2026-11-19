@@ -30,13 +30,13 @@ import com.eignex.util.numbers.plus
  * reaches the domains, the trail, or the LP.
  */
 internal class WideReifiedLinearPropagator(
-    private val auxBoolVar: Int,
+    val auxBoolVar: Int,
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val coeffs: Array<BigInt>,
-    private val vars: IntArray,
-    private val op: LinearOp,
-    private val bound: BigInt,
+    val coeffs: Array<BigInt>,
+    val vars: IntArray,
+    val op: LinearOp,
+    val bound: BigInt,
 ) : Propagator {
 
     private val singleEquality = vars.size == 1 && (op == LinearOp.EQ || op == LinearOp.NE)

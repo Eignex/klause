@@ -19,7 +19,7 @@ internal enum class FactorFamily { Clause, Pb, Linear, Table, Mdd, Distinct, Sch
 
 internal fun Propagator.propagationFamily(): FactorFamily = when (this) {
     is ClausePropagator -> FactorFamily.Clause
-    is PseudoBooleanPropagator -> FactorFamily.Pb
+    is PseudoBooleanPropagator, is LearnedExactPbPropagator -> FactorFamily.Pb
     is LinearPropagator, is ReifiedLinearPropagator, is WideLinearPropagator,
     is WideReifiedLinearPropagator, -> FactorFamily.Linear
     is TablePropagator -> FactorFamily.Table
