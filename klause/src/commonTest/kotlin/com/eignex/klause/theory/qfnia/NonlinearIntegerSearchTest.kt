@@ -42,7 +42,7 @@ class NonlinearIntegerSearchTest {
 
     @Test
     fun `unsatisfiable integer candidate exhaustion should never refute an open source`() {
-        val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
+        val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x x) 2))", allowIntegers = true)
         val problem = NonlinearIntegerProblem(
             source.formula,
             source.realCount,
@@ -117,7 +117,7 @@ class NonlinearIntegerSearchTest {
     }
 
     @Test
-    fun `whole real relaxation refutation should belong only to the search strategy`() {
+    fun `certified real refutation should terminate search and heuristic strategies`() {
         val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) (- 1)))", allowIntegers = true)
         val problem = NonlinearIntegerProblem(
             source.formula,
@@ -138,12 +138,12 @@ class NonlinearIntegerSearchTest {
         )
 
         assertIs<QfNraResult.Unsatisfiable>(search.result)
-        assertIs<QfNraResult.Unknown>(heuristic.result)
+        assertIs<QfNraResult.Unsatisfiable>(heuristic.result)
     }
 
     @Test
     fun `one work allowance should cover candidate completion and original source checking`() {
-        val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
+        val source = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x x) 2))", allowIntegers = true)
         val problem = NonlinearIntegerProblem(
             source.formula,
             source.realCount,

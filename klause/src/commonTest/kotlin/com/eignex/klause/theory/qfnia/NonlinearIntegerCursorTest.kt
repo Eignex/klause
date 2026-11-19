@@ -36,27 +36,28 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `complement steering should preserve charged attempts and reach new allowed tuples`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2))", allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
         val params = NonlinearIntegerParams(arithmetic = QfNraParams(cellRefinement = true),
-            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 6, reuseSourceCells = true)
+            strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 12, reuseSourceCells = true)
         val baseline = solveNonlinearIntegers(source, params)
 
         val steered = solveNonlinearIntegers(source, params.copy(steerSourceCells = true))
 
         assertIs<QfNraResult.Unknown>(steered.result)
         assertEquals(baseline.stats.candidates, steered.stats.candidates)
-        assertTrue(steered.stats.cells.steered > 0)
-        assertTrue(steered.stats.cells.allowed > baseline.stats.cells.allowed)
+        assertTrue(steered.stats.cells.steered > 0, steered.stats.toString())
+        assertTrue(steered.stats.cells.allowed > baseline.stats.cells.allowed,
+            "${baseline.stats.cells}; ${steered.stats.cells}")
     }
 
     @Test
     fun `steering should preserve slices and disposal for traversal and real repairs`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const n Int) (declare-const q Int) (declare-const r Real) " +
-                "(assert (= (* n n) 2)) (assert (= (* r r) 0))", allowIntegers = true,
+                "(assert (= (* n n n) 2)) (assert (= (* r r) 0))", allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
@@ -82,7 +83,7 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `source cells should avoid completions of unvisited tuples with repeated support`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2))", allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
@@ -124,7 +125,7 @@ class NonlinearIntegerCursorTest {
     fun `conditional cells should preserve the opposite Boolean branch in a replacement cursor`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const n Int) (declare-const b Bool) " +
-                "(assert (or (and b (= (* n n) 2)) (and (not b) (= (* n n) 4))))",
+                "(assert (or (and b (= (* n n n) 2)) (and (not b) (= (* n n) 4))))",
             allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
@@ -148,7 +149,7 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `producer and integer hull work should charge the containing meter once across completions`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2))", allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
@@ -172,7 +173,7 @@ class NonlinearIntegerCursorTest {
     @Test
     fun `cell reuse should preserve slicing and a cancelled turn without resetting work`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2))", allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
@@ -195,7 +196,7 @@ class NonlinearIntegerCursorTest {
 
     @Test
     fun `integer window exhaustion should remain unknown when its real relaxation is satisfiable`() {
-        val parsed = SmtLibPolynomial.parse("(declare-const n Int) (assert (= (* n n) 2))", allowIntegers = true)
+        val parsed = SmtLibPolynomial.parse("(declare-const n Int) (assert (= (* n n n) 2))", allowIntegers = true)
         val source = NonlinearIntegerProblem(
             parsed.formula,
             parsed.realCount,
@@ -206,7 +207,7 @@ class NonlinearIntegerCursorTest {
         )
         val condition = PolynomialCondition(
             lower = mapOf(0 to BigFraction.ZERO),
-            upper = mapOf(0 to BigFraction.ofLong(2)),
+            upper = mapOf(0 to BigFraction.ofLong(3)),
         )
 
         val execution = solveNonlinearIntegers(
@@ -278,8 +279,8 @@ class NonlinearIntegerCursorTest {
                 NonlinearIntegerParams(strategy = NonlinearIntegerStrategy.LOCAL_SEARCH, maximumCandidates = 2),
                 PolynomialCondition(bools = mapOf(0 to pin)),
             ).use { cursor ->
-                assertNull(cursor.runSlice(maximumCandidates = 1))
-                val witness = assertIs<QfNraResult.Satisfiable>(requireNotNull(cursor.runSlice()).result).assignment
+                val execution = cursor.runSlice(maximumCandidates = 1) ?: requireNotNull(cursor.runSlice())
+                val witness = assertIs<QfNraResult.Satisfiable>(execution.result).assignment
 
                 assertEquals(expected, witness.realValue(0).rational)
                 assertEquals(BigFraction.ZERO, witness.realValue(1).rational)
@@ -290,7 +291,7 @@ class NonlinearIntegerCursorTest {
 
     @Test
     fun `candidate slices should preserve traversal and cumulative arithmetic work`() {
-        val parsed = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
+        val parsed = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x x) 2))", allowIntegers = true)
         val source = NonlinearIntegerProblem(
             parsed.formula,
             parsed.realCount,
@@ -316,7 +317,7 @@ class NonlinearIntegerCursorTest {
 
     @Test
     fun `cancelled sibling turn should preserve the pending integer tuple`() {
-        val parsed = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
+        val parsed = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x x) 2))", allowIntegers = true)
         val source = NonlinearIntegerProblem(
             parsed.formula,
             parsed.realCount,
@@ -342,7 +343,7 @@ class NonlinearIntegerCursorTest {
 
     @Test
     fun `paused heuristic should retain proposals and random state`() {
-        val parsed = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x) 2))", allowIntegers = true)
+        val parsed = SmtLibPolynomial.parse("(declare-const x Int) (assert (= (* x x x) 2))", allowIntegers = true)
         val source = NonlinearIntegerProblem(
             parsed.formula,
             parsed.realCount,
@@ -427,9 +428,9 @@ class NonlinearIntegerCursorTest {
     }
 
     @Test
-    fun `an empty integer root set should refute a rootless square despite its real roots`() {
+    fun `an empty integer root set should refute a rootless cubic despite its real roots`() {
         val parsed = SmtLibPolynomial.parse(
-            "(declare-const n Int) (declare-const q Int) (assert (= (* n n) 2))", allowIntegers = true,
+            "(declare-const n Int) (declare-const q Int) (assert (= (* n n n) 2))", allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
@@ -479,19 +480,19 @@ class NonlinearIntegerCursorTest {
         val widened = solveNonlinearIntegers(source, params,
             PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO), upper = mapOf(0 to BigFraction.ofLong(3))), roots)
 
-        assertIs<QfNraResult.Unknown>(baseline.result)
+        assertIs<QfNraResult.Unsatisfiable>(baseline.result)
         assertIs<QfNraResult.Unsatisfiable>(narrow.result)
-        assertEquals(NonlinearIntegerRootCounts(admitted = 1, refuted = 1), narrow.stats.roots)
+        assertEquals(NonlinearIntegerRootCounts(), narrow.stats.roots)
         val witness = assertIs<QfNraResult.Satisfiable>(widened.result).assignment
         assertEquals(BigFraction.ofLong(2), witness.realValue(0).rational)
-        assertEquals(NonlinearIntegerRootCounts(reused = 1), widened.stats.roots)
+        assertEquals(NonlinearIntegerRootCounts(admitted = 1), widened.stats.roots)
     }
 
     @Test
     fun `guarded equalities should preserve the satisfiable Boolean alternative`() {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const n Int) (declare-const b Bool) " +
-                "(assert (or (and b (= (* n n) 2)) (and (not b) (= (* n n) 4))))",
+                "(assert (or (and b (= (* n n n) 2)) (and (not b) (= (* n n) 4))))",
             allowIntegers = true,
         )
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,

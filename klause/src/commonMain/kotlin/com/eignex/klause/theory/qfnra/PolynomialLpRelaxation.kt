@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.LpVerdict
@@ -34,7 +35,7 @@ internal class PolynomialLpRelaxation private constructor(
             if (point[result] >= point[operand] * point[operand]) continue
             if (tangents.add(operand to point[operand])) rows += squareTangent(operand, result, point[operand])
         }
-        return rows.isNotEmpty() && arithmetic.execution.handoff { lp.append(rows) }
+        return rows.isNotEmpty() && append(rows)
     }
 
     fun tightenSquares(onQuery: () -> Unit): PolynomialLpTightening {
@@ -71,10 +72,14 @@ internal class PolynomialLpRelaxation private constructor(
                 )
                 bounds[product.result] = interval
                 if (!arithmetic.execution.handoff { lp.narrow(product.result, interval) }) break
-                rows += if (product.left == product.right) squareEnvelopes(product.left, product.result, bounds[product.left])
-                else productEnvelopes(product.left, product.right, product.result, bounds[product.left], bounds[product.right])
+                rows += if (product.left == product.right) {
+                    squareEnvelopes(product.left, product.result, bounds[product.left])
+                } else {
+                    productEnvelopes(product.left, product.right, product.result,
+                        bounds[product.left], bounds[product.right])
+                }
             }
-            arithmetic.execution.handoff { lp.append(rows) }
+            append(rows)
         }
         return PolynomialLpTightening(changed)
     }
@@ -104,6 +109,12 @@ internal class PolynomialLpRelaxation private constructor(
 
     override fun close() = lp.close()
 
+    private fun append(rows: List<ExactRationalInequality>): Boolean {
+        val count = lp.rows.toLong() + rows.size
+        arithmetic.matrixCells(count, lp.variables.toLong() + count + 1)
+        return arithmetic.execution.handoff { lp.append(rows) }
+    }
+
     companion object {
         fun prepare(
             atoms: List<PolynomialAtom>,
@@ -113,7 +124,12 @@ internal class PolynomialLpRelaxation private constructor(
             windows: Map<Int, EnvelopeInterval> = emptyMap(),
         ): PolynomialLpRelaxation? {
             val builder = PolynomialEnvelopeBuilder(atoms, variables, arithmetic, windows)
-            if (!builder.prepare()) return null
+            try {
+                if (!builder.prepare()) return null
+                arithmetic.matrixCells(builder.rows.size.toLong(), builder.bounds.size.toLong() + builder.rows.size + 1)
+            } catch (_: PolynomialResourceLimit) {
+                return null
+            }
             val lp = arithmetic.execution.handoff {
                 CertifiedEnvelopeLp.prepare(builder.bounds, builder.rows, control)
             } ?: return null
@@ -147,6 +163,7 @@ private class PolynomialEnvelopeBuilder(
             }
         }
         if (!nonlinear) return false
+        arithmetic.matrixCells(1, variables.toLong())
         repeat(variables) { variable ->
             arithmetic.step()
             bounds += EnvelopeInterval()
@@ -164,6 +181,7 @@ private class PolynomialEnvelopeBuilder(
         for (atom in atoms) {
             arithmetic.step()
             if (atom.relation == PolynomialRelation.NE) continue
+            arithmetic.matrixCells(rows.size.toLong() + 2, bounds.size.toLong() + rows.size + 3)
             var constant = BigFraction.ZERO
             val terms = ArrayList<Pair<Int, BigFraction>>()
             for ((monomial, coefficient) in atom.polynomial.terms) {
@@ -222,6 +240,7 @@ private class PolynomialEnvelopeBuilder(
         val right = column(rightMonomial)
         val result = bounds.size
         arithmetic.step()
+        arithmetic.matrixCells(rows.size.toLong() + 4, bounds.size.toLong() + rows.size + 6)
         if (left == right) {
             bounds += bounds[left].square()
             rows += squareEnvelopes(left, result, bounds[left])

@@ -1,6 +1,8 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
@@ -54,12 +56,33 @@ class PolynomialLpRelaxationTest {
             (declare-const x Real)
             (assert (and (>= x (/ 1 2)) (<= x (/ 3 2)) (= (* x x) 1)))
         """.trimIndent())
+        val work = QfNraWork(QfNraParams())
+        val arithmetic = PolynomialArithmetic(work).also { work.execution = it.execution }
+        val atoms = requireNotNull(PolynomialFormula.normalize(source.formula, arithmetic).forcedAtoms(arithmetic))
+        val proposal = requireNotNull(PolynomialLpRelaxation.prepare(atoms, 1, arithmetic, work)).use {
+            requireNotNull(it.solve()?.exactPrimal)
+        }
+        assertTrue(proposal[0] * proposal[0] != BigFraction.ONE)
 
         val result = solveQfNra(source.formula, source.boolCount, source.realCount)
 
         assertIs<QfNraResult.Satisfiable>(result)
-        assertEquals(BigFraction.ONE, result.assignment.realValue(0).rational)
-        assertTrue(result.stats.envelopeQueries > 0)
+        val algebraic = AlgebraicArithmetic()
+        assertEquals(0, algebraic.compare(algebraic.rational(BigFraction.ONE), result.assignment.realValue(0)))
+    }
+
+    @Test
+    fun `a declined envelope matrix should preserve exact algebraic completion`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+
+        val result = solveQfNra(source.formula, 0, 1,
+            QfNraParams(polynomialLimits = PolynomialLimits(maxMatrixCells = 0)))
+
+        assertIs<QfNraResult.Satisfiable>(result)
+        val algebraic = AlgebraicArithmetic()
+        val value = result.assignment.realValue(0)
+        assertEquals(0, algebraic.compare(algebraic.multiply(value, value), algebraic.rational(BigFraction.ofLong(2))))
+        assertEquals(0L, result.stats.envelopeRefutations)
     }
 
     @Test

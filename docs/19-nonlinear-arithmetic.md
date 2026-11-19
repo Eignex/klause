@@ -331,7 +331,10 @@ certified refutations of every child refute that parent. Child envelopes belong
 only to that numeric scope. Refinement and CAD alternate by cumulative work, so
 algebraic witness construction and complete polynomial decisions retain progress.
 Numerical or representational declines leave exact completion responsible for the
-remaining scope.
+remaining scope. A bounded exact witness probe precedes LP construction; unresolved
+regions enter envelope pruning before cylindrical projection. The caller's matrix
+ceiling admits envelope rows, refinement and retained spatial windows. Declining
+an optional envelope allocation leaves exact completion available.
 
 #### Quadratic strategy execution
 

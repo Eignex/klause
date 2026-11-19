@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.EnvelopeInterval
 import com.eignex.util.numbers.BigFraction
@@ -26,7 +27,13 @@ internal class PolynomialLpPruning(
     private var closed = false
     private var tightened = false
 
-    fun advance(witnessCheck: (List<BigFraction>) -> QfNraAssignment?): PolynomialLpStep {
+    fun advance(witnessCheck: (List<BigFraction>) -> QfNraAssignment?): PolynomialLpStep = try {
+        advanceAdmitted(witnessCheck)
+    } catch (_: PolynomialResourceLimit) {
+        unavailable()
+    }
+
+    private fun advanceAdmitted(witnessCheck: (List<BigFraction>) -> QfNraAssignment?): PolynomialLpStep {
         check(!closed)
         val relaxation = current ?: run {
             if (pending.isEmpty()) return PolynomialLpStep.Refuted
@@ -65,6 +72,7 @@ internal class PolynomialLpPruning(
         arithmetic.step()
         if (middle.num.magnitudeBitLength() > 4096 || middle.den.magnitudeBitLength() > 4096) return unavailable()
         val interval = windows[variable] ?: EnvelopeInterval()
+        arithmetic.matrixCells(1, pending.sumOf { it.size.toLong() } + 2L * windows.size + 2)
         pending.addLast(windows + (variable to interval.copy(lower = middle)))
         pending.addLast(windows + (variable to interval.copy(upper = middle)))
         retire()

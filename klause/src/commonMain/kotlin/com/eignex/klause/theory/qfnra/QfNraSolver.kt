@@ -155,11 +155,6 @@ internal class QfNraQuery(
             failureCapture?.scope(normalized, condition, arithmetic)
             val mandatory = normalized.forcedAtoms(arithmetic)
             envelopePruning = mandatory?.let { PolynomialLpPruning(it, realCount, arithmetic, work) }
-            val initialLp = advanceEnvelopes(normalized, fixed, algebraic)
-            if (initialLp != null) {
-                yield(initialLp)
-                return@sequence
-            }
             cellRefinement?.let { refinement ->
                 failureCapture?.operation("cell-refinement", 0, 0, work.spentWork, arithmetic)
                 refinement.prepare(normalized)
@@ -188,7 +183,8 @@ internal class QfNraQuery(
             var startedSearch = false
             var declined: QfNraResult.Unknown? = null
             while (true) {
-                if (envelopePruning != null && envelopeSpent <= progress.rootWork + progress.searchWork) {
+                if (probeCompleted && envelopePruning != null &&
+                    envelopeSpent <= progress.rootWork + progress.searchWork) {
                     val envelope = advanceEnvelopes(normalized, fixed, algebraic)
                     if (envelope != null) {
                         yield(envelope)

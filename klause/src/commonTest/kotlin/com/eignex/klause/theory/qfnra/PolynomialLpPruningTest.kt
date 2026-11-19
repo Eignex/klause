@@ -9,6 +9,27 @@ import kotlin.test.assertTrue
 
 class PolynomialLpPruningTest {
     @Test
+    fun `a spatial refutation should retire both closed children`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real) (declare-const y Real)
+            (assert (and (>= x 0) (<= x 1) (>= y 0) (<= y 1)
+                (= (+ x y) 1) (>= (* x y) (/ 3 10))))
+        """.trimIndent())
+        val work = QfNraWork(QfNraParams(maximumWork = 100_000))
+        val arithmetic = PolynomialArithmetic(work).also { work.execution = it.execution }
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic).forcedAtoms(arithmetic))
+
+        val result = PolynomialLpPruning(atoms, 2, arithmetic, work).use { pruning ->
+            var step = pruning.advance { null }
+            while (step == PolynomialLpStep.Pending) step = pruning.advance { null }
+            step
+        }
+
+        assertIs<PolynomialLpStep.Refuted>(result)
+        assertTrue(work.envelopeRefutations > 1)
+    }
+
+    @Test
     fun `certified square bounds should refute a product beyond an even power sum`() {
         val premises = listOf(
             "(< (+ (* x x) (* y y)) 1)",

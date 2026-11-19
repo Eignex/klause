@@ -15,7 +15,6 @@ import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
-import com.eignex.util.numbers.BigFraction
 
 // The adapter's lifetime is one immutable source/query scope. No envelope or certificate escapes it.
 internal class CertifiedEnvelopeLp private constructor(
@@ -24,6 +23,7 @@ internal class CertifiedEnvelopeLp private constructor(
     private val control: ExecutionControl,
 ) : AutoCloseable {
     private var witness = 0L
+    val rows: Int get() = owner.state.model.m
 
     fun narrow(column: Int, interval: EnvelopeInterval): Boolean {
         require(column in 0 until variables)
