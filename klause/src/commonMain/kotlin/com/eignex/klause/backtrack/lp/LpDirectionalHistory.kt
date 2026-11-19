@@ -35,6 +35,7 @@ internal class LpDirectionalHistory(
     private var objective = Double.NaN
     private var reliableStamp = -1L
     private var valueStamp = -1L
+    private var collectionStamp = -1L
     private var observed = false
 
     fun beginNode(level: Int) {
@@ -50,6 +51,8 @@ internal class LpDirectionalHistory(
 
     val hasValueHistory: Boolean get() = valueStamp >= 0L && stamp - valueStamp <= maxAge
 
+    val hasCollectionHistory: Boolean get() = collectionStamp >= 0L && stamp - collectionStamp <= maxAge
+
     val hasObservations: Boolean get() = observed
 
     fun clear(report: Boolean = true) {
@@ -60,6 +63,7 @@ internal class LpDirectionalHistory(
         objective = Double.NaN
         reliableStamp = -1L
         valueStamp = -1L
+        collectionStamp = -1L
         observed = false
         if (report) observe("RESET")
     }
@@ -83,6 +87,9 @@ internal class LpDirectionalHistory(
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
         observed = true
+        if (history.down.count > 0 && history.up.count > 0 && (history.down.gain > 0.0 || history.up.gain > 0.0)) {
+            collectionStamp = maxOf(collectionStamp, minOf(history.down.stamp, history.up.stamp))
+        }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
             val pairStamp = minOf(history.down.previousStamp, history.up.previousStamp)
             if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
@@ -198,6 +205,7 @@ internal class LpDirectionalHistory(
         expire(history.up)
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        if (history.down.count == 0 || history.up.count == 0) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
