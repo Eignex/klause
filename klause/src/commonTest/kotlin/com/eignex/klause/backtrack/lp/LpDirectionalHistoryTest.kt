@@ -11,6 +11,86 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `observed forecast error uses prior samples at their parent depths`() {
+        for ((prior, observed, result) in listOf(
+            Triple(1.0, 1.0, "WITHIN_FACTOR_TWO"),
+            Triple(1.0, 10.0, "UNDER_PREDICTED"),
+            Triple(1.0, 0.1, "OVER_PREDICTED"),
+            Triple(0.0, 0.0, "WITHIN_FACTOR_TWO"),
+            Triple(0.0, 1.0, "UNDER_PREDICTED"),
+            Triple(Double.MIN_VALUE, 0.0, "OVER_PREDICTED"),
+            Triple(Double.MAX_VALUE / 8.0, Double.MAX_VALUE / 2.0, "UNDER_PREDICTED"),
+        )) {
+            for ((level, band) in listOf(0 to "SAME_DEPTH", 2 to "WITHIN_TWO", 5 to "DISTANT")) {
+                val events = ArrayList<String>()
+                val history = LpDirectionalHistory(events::add)
+                val variable = VarRef.Bool(0)
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                repeat(2) {
+                    history.commit(SearchDecision.Bool(1), 1)
+                    history.beginNode(1)
+                    history.record(prior)
+                }
+                history.beginNode(level)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                history.commit(SearchDecision.Bool(1), level + 1)
+                history.beginNode(level + 1)
+
+                history.record(observed)
+
+                assertEquals(listOf("PASSIVE_FORECAST_${band}_$result"),
+                    events.filter { it.startsWith("PASSIVE_FORECAST_") })
+            }
+        }
+    }
+
+    @Test
+    fun `sample locality measures parent depth instead of child depth`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            history.beginNode(2)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 3)
+                history.beginNode(3)
+                history.record(11.0)
+            }
+        }
+
+        for (level in listOf(0, 2, 4, 7)) {
+            history.beginNode(level)
+
+            assertEquals(kotlin.math.abs(level - 2), history.sampleDepthDistance(variable))
+        }
+    }
+
+    @Test
+    fun `expired or cleared samples provide no locality`() {
+        for (operation in listOf("expire", "clear")) {
+            val history = LpDirectionalHistory({}, maxAge = 4L)
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (literal in listOf(0, 1)) {
+                    history.commit(SearchDecision.Bool(literal), 1)
+                    history.beginNode(1)
+                    history.record(11.0)
+                }
+            }
+            if (operation == "clear") history.clear() else repeat(5) { history.beginNode(0) }
+
+            assertNull(history.sampleDepthDistance(variable))
+        }
+    }
+
+    @Test
     fun `parent bookkeeping pays allocation without repeatedly charging unused capacity`() {
         var work = 0L
         val history = LpDirectionalHistory({}, charge = { work += it })

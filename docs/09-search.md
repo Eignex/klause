@@ -378,6 +378,14 @@ Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
 Each observation ages separately.
+Each retained sample also records its parent's decision depth. Changed variable
+nominations report the maximum distance from the current depth for proposal and
+reference samples, grouped as same depth, within two levels or more distant.
+These observations describe nominations rather than committed changes; depth does
+not filter or rank advice. Storage, updates and observations charge the LP allowance.
+Usable child gains also report whether the prior stable directional estimate
+over-predicted, under-predicted or stayed within a factor of two, grouped by the
+observed parent's depth distance. This comparison precedes the sample update.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains

@@ -17,6 +17,8 @@ internal class LpDirectionalHistory(
         var previous = 0.0
         var stamp = 0L
         var previousStamp = 0L
+        var parentDepth = 0
+        var previousParentDepth = 0
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -80,12 +82,19 @@ internal class LpDirectionalHistory(
             observe("UNUSABLE")
             return
         }
-        val history = gains.getOrPut(child.parent.variable, ::Gains)
+        val history = gains.getOrPut(child.parent.variable) {
+            charge(4L)
+            Gains()
+        }
         expire(history.down)
         expire(history.up)
         val direction = if (child.up) history.up else history.down
+        reportForecast(direction, normalized, child.depth - 1)
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
+        charge(2L)
+        direction.previousParentDepth = direction.parentDepth
+        direction.parentDepth = child.depth - 1
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
@@ -186,6 +195,38 @@ internal class LpDirectionalHistory(
         val score = sqrt(down) * sqrt(up)
         return score.takeIf { it.isFinite() } ?: Double.NaN
     }
+
+    fun sampleDepthDistance(variable: VarRef): Int? {
+        charge(12L)
+        val history = gains[variable] ?: return null
+        expire(history.down)
+        expire(history.up)
+        if (!history.down.stable || !history.up.stable) return null
+        return maxOf(depthDistance(history.down, depth), depthDistance(history.up, depth))
+    }
+
+    private fun reportForecast(direction: Direction, observed: Double, parentDepth: Int) {
+        charge(1L)
+        if (!direction.stable) return
+        charge(9L)
+        val distance = depthDistance(direction, parentDepth)
+        val band = when (distance) {
+            0 -> "SAME_DEPTH"
+            1, 2 -> "WITHIN_TWO"
+            else -> "DISTANT"
+        }
+        val expected = direction.gain
+        val result = when {
+            observed < expected && observed / expected < 0.5 -> "OVER_PREDICTED"
+            observed > expected && expected / observed < 0.5 -> "UNDER_PREDICTED"
+            else -> "WITHIN_FACTOR_TWO"
+        }
+        observe("PASSIVE_FORECAST_${band}_$result")
+    }
+
+    private fun depthDistance(direction: Direction, parentDepth: Int): Int = maxOf(
+        abs(parentDepth - direction.parentDepth), abs(parentDepth - direction.previousParentDepth),
+    )
 
     fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? {
         val history = reliable(variable, value) ?: return null

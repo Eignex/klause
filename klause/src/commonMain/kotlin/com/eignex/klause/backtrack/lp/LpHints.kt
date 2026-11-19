@@ -230,8 +230,23 @@ internal class LpHints(
             observe("PASSIVE_VARIABLE_STALE")
             return baseline
         }
+        if (choice.nominatedVariable != null && proposal != baseline) {
+            reportLocality("PASSIVE_VARIABLE_NOMINATED_PROPOSAL", history.sampleDepthDistance(proposal))
+            reportLocality("PASSIVE_VARIABLE_NOMINATED_REFERENCE", history.sampleDepthDistance(baseline))
+        }
         directionalChoice = choice.nominatedVariable.takeIf { applyAdvice }
         return selected
+    }
+
+    private fun reportLocality(prefix: String, distance: Int?) {
+        val band = when (distance) {
+            null -> "UNAVAILABLE"
+            0 -> "SAME_DEPTH"
+            1, 2 -> "WITHIN_TWO"
+            else -> "DISTANT"
+        }
+        charge(1L)
+        observe("${prefix}_$band")
     }
 
     private fun passivePointCurrent(): Boolean = freshRecord && objectiveRecorded && passiveState != null &&
