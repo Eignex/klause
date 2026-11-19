@@ -67,18 +67,24 @@ internal class FlatZincValues private constructor(
     )
 
     private val printed = HashSet<Int>()
+    private var published: DoubleArray? = null
+
+    fun checked(program: FlatZincProgram): FlatZincValues = apply {
+        published = program.publishedReals(boolValue, intValue, ::nearest, publicationNarrowing())
+    }
 
     // A real coordinate as a decimal literal: an algebraic one narrowed to its nearest binary64 value, and one past
     // binary64 as the largest finite value of its sign, which [rounding] notes.
     fun realValue(id: Int): Double {
         printed += id
-        val value = nearest(id)
+        val value = published?.get(id) ?: nearest(id)
         return if (value.isInfinite()) (if (value > 0) Double.MAX_VALUE else -Double.MAX_VALUE) else value
     }
 
     // Why a printed [realValue] is not the coordinate's nearest binary64 value, or null when it is.
     fun rounding(id: Int): String? = when {
         id !in printed -> null
+        published?.get(id)?.let { it != nearest(id) } == true -> "tolerance"
         displayed.undetermined(id) -> "undetermined"
         nearest(id).isInfinite() -> "overflow"
         else -> null
@@ -104,6 +110,7 @@ private class DisplayedReals(private val narrowing: ExecutionControl, private va
 }
 
 private fun writeFlatZincSolution(program: FlatZincProgram, sample: FlatZincValues, outputObjective: Boolean): String {
+    sample.checked(program)
     val sb = StringBuilder()
     val items = program.outputItems
     if (items != null) {

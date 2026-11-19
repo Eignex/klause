@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.ExecutionControl
@@ -14,6 +16,43 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
+    @Test
+    fun `retained solves should continue exact pivots under an extended caller allowance`() {
+        val source = LpBuilder().apply {
+            addRealVar(0.0, 2.0)
+            addRealRow(intArrayOf(0), doubleArrayOf(1.0), Relation.EQ, 1.0)
+        }.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate {
+                    override val solvedExactState: LpExactState? = null
+                    override fun solve(warm: Basis?): FloatLpResult? = null
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = null
+                    override fun continuationBasis(model: LpModel) =
+                        Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
+                }
+            }
+        }
+        LpSolveSession(LpSolveContext(engineFactory = factory), componentSplit = false).use { owner ->
+            val limits = ExactContinuationLimits(maxPivots = 0)
+            val paused = owner.solve(model, continuationLimits = limits)
+            val repeated = owner.solve(model, continuationLimits = limits)
+            val completed = owner.solve(model, continuationLimits = limits.copy(maxPivots = 1))
+
+            assertEquals(ContinuationDecline.PIVOTS, assertNotNull(paused.continuation).decline)
+            assertEquals(ContinuationDecline.PIVOTS, assertNotNull(repeated.continuation).decline)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, completed.verdict)
+            assertEquals(listOf(BigFraction.ONE), assertNotNull(completed.witness).primal)
+            assertTrue(assertNotNull(completed.continuation).resumed)
+        }
+    }
+
     @Test
     fun `float-only cursors should pause after spending work on a stopped solve`() {
         val builder = LpBuilder()

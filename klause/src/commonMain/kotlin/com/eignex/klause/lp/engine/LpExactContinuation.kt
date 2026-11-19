@@ -173,7 +173,6 @@ internal fun continueExactLp(
                     verification.preflight(value, authority.origins[j])
                     verification.fraction(value + authority.origins[j])
                 }
-                val defaults = ReconstructionLimits()
                 checked = verifyRationalCertificate(
                     model,
                     sourcePrimal = source,
@@ -191,13 +190,12 @@ internal fun continueExactLp(
                             TimeSource.Monotonic.markNow() + (cap - verification.elapsedNs).nanoseconds,
                         )
                     } ?: cancellation,
-                    limits = defaults.copy(
-                        maxWork = minOf(defaults.maxWork, (remaining.maxWork - verification.work).coerceAtLeast(0)),
-                        maxAllocation = minOf(
-                            defaults.maxAllocation,
-                            (remaining.maxAllocation - verification.allocation).coerceAtLeast(0),
-                        ),
-                        maxBits = minOf(defaults.maxBits, remaining.maxBits),
+                    limits = ReconstructionLimits(
+                        maxCoordinates = remaining.maxColumns,
+                        maxEntries = remaining.maxCells,
+                        maxWork = (remaining.maxWork - verification.work).coerceAtLeast(0),
+                        maxAllocation = (remaining.maxAllocation - verification.allocation).coerceAtLeast(0),
+                        maxBits = remaining.maxBits,
                     ),
                 )
                 // Complete proof packages survive a later decline; scoped publication still checks cancellation.

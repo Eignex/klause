@@ -204,6 +204,7 @@ internal class ExactBasisAuthority(val model: LpModel, basis: Basis, val meter: 
     }
 
     fun basisMatrix(): List<List<BigFraction>> {
+        if (model.m.toLong() * model.m > Int.MAX_VALUE) meter.stop(ExactBasisDecline.DIMENSION)
         meter.charge(model.m.toLong() * model.m, model.m.toLong() * model.m * 8L + model.m * 64L)
         val result = List(model.m) { MutableList(model.m) { BigFraction.ZERO } }
         for (slot in headings.indices) {

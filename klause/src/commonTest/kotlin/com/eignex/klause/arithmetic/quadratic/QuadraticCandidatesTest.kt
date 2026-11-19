@@ -1,5 +1,6 @@
 package com.eignex.klause.arithmetic.quadratic
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.QuadraticNativeScope
 import com.eignex.klause.util.ExecutionControl
@@ -11,7 +12,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-class QuadraticCandidatesTest {
+class QuadraticCandidatesTest : RuntimeInitializedTest() {
     @Test
     fun `rational reconstruction should certify a coupled convex stationary point`() {
         val model = QuadraticModel(

@@ -357,17 +357,20 @@ internal class RealLeafOptimization(
     }
 }
 
-// A polyhedron's LP refines and then continues exactly, under the caller's stop and charged to it. Refinement keeps
-// the engine's round maximum, but the exact continuation after it is the complete exact simplex with no limit of its
-// own, so only the stop leaves an optimum uncertified.
+// Refinement seeks an optimum under the caller's stop. Feasibility continuation can recover a missing point,
+// but neither that point nor exhausted refinement rounds establish attainment.
+private const val CELL_EXACT_ALLOCATION = 256L * 1024L * 1024L
+
 private val CELL_REFINEMENT = LpRefinementLimits(
     maxRounds = 64,
     maxCoordinates = Int.MAX_VALUE,
     maxEntries = Int.MAX_VALUE,
     maxBits = Int.MAX_VALUE,
     maxWork = Long.MAX_VALUE,
-    maxAllocation = Long.MAX_VALUE,
+    maxAllocation = CELL_EXACT_ALLOCATION,
     maxPivots = Int.MAX_VALUE,
+    maxBasisDimension = Int.MAX_VALUE,
+    maxBasisFill = Int.MAX_VALUE,
 )
 
 private val CELL_CONTINUATION = ExactContinuationLimits(
@@ -375,7 +378,7 @@ private val CELL_CONTINUATION = ExactContinuationLimits(
     maxCells = Int.MAX_VALUE,
     maxBits = Int.MAX_VALUE,
     maxWork = Long.MAX_VALUE,
-    maxAllocation = Long.MAX_VALUE,
+    maxAllocation = CELL_EXACT_ALLOCATION,
     maxImportPivots = Int.MAX_VALUE,
     maxPivots = Int.MAX_VALUE,
 )

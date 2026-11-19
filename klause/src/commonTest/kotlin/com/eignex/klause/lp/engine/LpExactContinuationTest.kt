@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,6 +13,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
+    @Test
+    fun `continuation verification should admit caller funded columns beyond the default envelope`() {
+        val columns = 4097
+        val zero = ExactLpNumber.of(0L)
+        val column = ExactLpColumn(ExactLpBounds())
+        val source = ExactLpModel(
+            List(columns) { emptyList() }, emptyList(),
+            List(columns) { column },
+            emptyList(), ExactLpObjective(List(columns) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val basis = Basis(intArrayOf(), Array(columns) { VarStatus.FREE })
+
+        val declined = continueExactLp(model, basis)
+        val result = continueExactLp(model, basis, limits = ExactContinuationLimits(maxColumns = columns))
+
+        assertEquals(ContinuationDecline.DIMENSION, declined.metrics.decline)
+        assertEquals(List(columns) { BigFraction.ZERO }, assertNotNull(result.witness).primal)
+        assertNull(result.metrics.decline)
+    }
+
+    @Test
+    fun `continuation verification should honor the caller scalar allowance`() {
+        val tiny = BigFraction.of(BIG_ONE, BIG_ONE shl 4200)
+        val value = ExactLpNumber.of(tiny)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(value), ExactLpSide(value)))),
+            emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.FIXED))
+
+        val result = continueExactLp(model, basis, limits = ExactContinuationLimits(maxBits = 8192))
+
+        assertEquals(listOf(tiny), assertNotNull(result.witness).primal)
+        assertNull(result.metrics.decline)
+    }
+
     @Test
     fun `cell bounded target admission should allow rows beyond a fixed row threshold`() {
         val rows = 149

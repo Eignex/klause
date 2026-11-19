@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactSimplexBound
@@ -15,6 +16,33 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpSolveTest {
+    @Test
+    fun `standalone certification should honor direct basis allowances independently of refinement`() {
+        val model = LpBuilder().apply {
+            val x = addRealVar(0.0, 2.0, cost = 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
+        }.build(Sense.MINIMIZE)
+        for (dimension in listOf(0, 1)) {
+            val context = LpSolveContext(
+                certificationPolicy = LpCertificationPolicy { certifier, success ->
+                    success && certifier != LpCertifier.EXACT_POINT
+                },
+                refinementLimits = LpRefinementLimits(maxRounds = 0, maxAuxiliaries = 0),
+                reconstructionLimits = ReconstructionLimits(maxWork = 0),
+                basisLimits = ExactBasisLimits(RationalBasisLimits(dimension = dimension)),
+                exactContinuationLimits = ExactContinuationLimits(maxCells = 0),
+            )
+
+            val result = solveAndCertify(model, context = context, componentSplit = false)
+
+            if (dimension == 0) assertNull(result.witness)
+            else {
+                assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+                assertEquals(BigFraction.ofLong(3L).reciprocal(), assertNotNull(result.witness).objective)
+            }
+        }
+    }
+
     @Test
     fun `numerical refutations should carry no exact proof package`() {
         val model = LpBuilder().apply {

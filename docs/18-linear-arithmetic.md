@@ -194,7 +194,10 @@ Complete affine source capture uses `LinearAuthorityInvocation` through
 improving rays determine the result. `OpenTheoryOptimum.linearResult` separates
 incumbents from bounds and unattained limits. If numerical authority declines,
 exact strict-improvement rounds continue under the same allowance; a checked
-incumbent survives incomplete optimization.
+incumbent survives incomplete optimization. These fallback rounds retain private
+source conditions and incumbent cutoffs. Their refutations exclude only the
+conditioned query, so an authority decline still withholds source-wide infeasibility
+and optimality; a checked witness remains available without a terminal claim.
 
 A declared positive optimality gap can complete the traversal once a checked source
 incumbent and a checked global bound satisfy it in original objective units.

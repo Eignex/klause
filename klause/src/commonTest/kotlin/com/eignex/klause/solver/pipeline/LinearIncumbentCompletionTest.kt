@@ -350,6 +350,53 @@ class LinearIncumbentCompletionTest {
     }
 
     @Test
+    fun `exact seeds should require original source acceptance without residual completion`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        for (accepted in listOf(false, true)) {
+            val budget = SourceLpBudget(maxOperations = 0)
+            var checkedValue: BigFraction? = null
+            LinearIncumbentCompletion(budget, originalCheck = { _, value, _ ->
+                checkedValue = value
+                accepted
+            }) { _, _ -> }.use { completion ->
+                val completed = completion.complete(source, point, ExecutionControl.Never)
+
+                assertEquals(BigFraction.ONE + third, checkedValue)
+                if (accepted) assertSame(point, completed) else assertNull(completed)
+                assertEquals(0L, budget.measuredRefinementWork)
+                assertTrue(budget.measuredBoundCertificationWork > 0L)
+            }
+        }
+    }
+
+    @Test
+    fun `cancellation during exact seed checking should withhold the point`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        var cancelled = false
+        val token = ExecutionControl { cancelled }
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ ->
+            cancelled = true
+            true
+        }) { _, _ -> }.use { completion ->
+            assertNull(completion.complete(source, point, token))
+        }
+    }
+
+    @Test
+    fun `unfunded exact source checking should withhold the point without invoking the checker`() {
+        val point = seed.copy(reals = doubleArrayOf(third.toDouble()), exactReals = listOf(third))
+        val budget = SourceLpBudget(funding = SourceLpFunding(0L, 0L))
+        var checks = 0
+        LinearIncumbentCompletion(budget, originalCheck = { _, _, _ ->
+            checks++
+            true
+        }) { _, _ -> }.use { completion ->
+            assertNull(completion.complete(source, point, ExecutionControl.Never))
+            assertEquals(0, checks)
+        }
+    }
+
+    @Test
     fun `oversized advisory integers should be refused before retaining their payload`() {
         val wide = bigIntOf(1) shl 4096
         val offered = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactInts = listOf(wide))

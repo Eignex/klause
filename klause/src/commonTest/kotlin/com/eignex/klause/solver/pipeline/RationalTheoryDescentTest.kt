@@ -359,7 +359,7 @@ class RationalTheoryDescentTest {
     }
 
     @Test
-    fun `fallback feasibility should install the original numeric query condition`() {
+    fun `fallback cutoff refutation should withhold original source optimality`() {
         val source = Problem(
             0,
             0,
@@ -391,13 +391,61 @@ class RationalTheoryDescentTest {
             original.semanticsChecker,
         )
         val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8), scoped)
+        val originalWitness = Sample(booleanArrayOf(), longArrayOf(), DoubleArray(129),
+            exactReals = List(129) { BigFraction.ZERO })
+        assertIs<Verification.Accepted<*, *>>(
+            openWitnessVerifier(source, objective).verify(Candidate(originalWitness, 0.0)),
+        )
 
-        descent.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> } }
+        val result = descent.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> } }
 
+        assertEquals(TerminationReason.Unsupported, assertIs<MinimizeResult.BestFound>(result).reason)
+        assertEquals(1.0, result.objective)
         val partial = assertNotNull(descent.linearResult)
         assertEquals(scoped.scope, partial.scope)
         assertEquals(BigFraction.ONE, partial.value)
         assertEquals(BigFraction.ONE, assertNotNull(partial.incumbent).exactReals?.get(0))
+        assertNull(partial.terminal)
+    }
+
+    @Test
+    fun `fallback condition refutation should withhold original source infeasibility`() {
+        val source = Problem(
+            0,
+            0,
+            emptyArray(),
+            emptyArray(),
+            numRealVars = 129,
+            realLower = DoubleArray(129),
+            realUpper = DoubleArray(129) { 1.0 },
+        )
+        val objective = LinearObjective(realCoefficients = DoubleArray(129) { if (it == 0) 1.0 else 0.0 })
+        val original = assertNotNull(
+            source.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, ExecutionControl.Never),
+        )
+        val scoped = SourceProofContext(
+            original.scope.copy(condition = SourceCondition(
+                lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ofLong(2)),
+            )),
+            original.coordinates,
+            original.premises,
+            original.objective,
+            original.objectiveConstant,
+            original.semanticsChecker,
+        )
+        val originalWitness = Sample(booleanArrayOf(), longArrayOf(), DoubleArray(129),
+            exactReals = List(129) { BigFraction.ZERO })
+        assertIs<Verification.Accepted<*, *>>(
+            openWitnessVerifier(source, objective).verify(Candidate(originalWitness, 0.0)),
+        )
+        val descent = RationalTheoryDescent(source, objective, TheoryParams(openWorkLimit = 8), scoped)
+
+        val result = descent.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> } }
+
+        assertEquals(TerminationReason.Unsupported, assertIs<MinimizeResult.Unknown>(result).reason)
+        val partial = assertNotNull(descent.linearResult)
+        assertEquals(scoped.scope, partial.scope)
+        assertNull(partial.incumbent)
         assertNull(partial.terminal)
     }
 

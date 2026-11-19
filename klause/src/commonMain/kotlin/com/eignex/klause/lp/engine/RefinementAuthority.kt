@@ -24,13 +24,16 @@ internal data class LpRefinementLimits(
     val maxWork: Long = 1_000_000L,
     val maxAllocation: Long = 32L * 1024 * 1024,
     val maxPivots: Int = 256,
+    val maxBasisDimension: Int = 128,
+    val maxBasisFill: Int = 16384,
     // Unlimited by default: a clock limit makes whether a certificate stands depend on machine speed and load,
     // which changes the search tree. The deterministic limits bound the work; a caller can still set a time.
     val time: Duration = Duration.INFINITE,
 ) {
     init {
-        require(maxRounds in 0..64 && maxAuxiliaries in 0..2)
+        require(maxRounds >= 0 && maxAuxiliaries in 0..2)
         require(maxCoordinates >= 0 && maxEntries >= 0 && maxBits >= 24)
+        require(maxBasisDimension >= 0 && maxBasisFill >= 0)
         require(maxWork >= 0L && maxAllocation >= 0L && maxPivots >= 0 && time >= Duration.ZERO)
     }
 }
@@ -360,12 +363,16 @@ internal class RefinementMeter(
         maxCoordinates = limits.maxCoordinates,
         maxEntries = limits.maxEntries,
         maxBits = limits.maxBits,
-        maxWork = minOf(250_000L, remainingWork),
-        maxAllocation = minOf(16L * 1024 * 1024, remainingAllocation),
+        maxBasisDimension = limits.maxBasisDimension,
+        maxBasisFill = limits.maxBasisFill,
+        maxWork = remainingWork,
+        maxAllocation = remainingAllocation,
     )
 
     fun basisLimits(): ExactBasisLimits = ExactBasisLimits(
         RationalBasisLimits(
+            dimension = limits.maxBasisDimension,
+            fill = limits.maxBasisFill,
             work = remainingWork,
             allocationBytes = remainingAllocation,
             bits = limits.maxBits,

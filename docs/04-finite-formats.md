@@ -500,8 +500,15 @@ zero tolerance requires the exact defining relation and bound together.
 Exact coordinates are emitted as `% klause-exact:` comments beside
 MiniZinc-compatible decimal assignments. Rational coordinates retain their fraction;
 irrational coordinates use `root(index;[c0,c1,...])`, naming the selected real root
-of the rational polynomial in ascending coefficient order. Decimal assignments are
-display approximations: each prints its nearest binary64 value, an algebraic one once
+of the rational polynomial in ascending coefficient order. Under a positive feasibility
+tolerance, decimal assignments are checked jointly against all source real declarations
+and relations, both as binary64 values and as exact decimal text. If nearest rounding
+fails, the writer tries adjacent binary64 values within a bounded publication allowance;
+`% klause-float-rounding: x = tolerance` identifies an adjusted coordinate. Failure to
+find a checked point withholds the solution block with an explicit publication error.
+Exact-coordinate comments retain the original witness, independently of this decimal point.
+At zero tolerance, decimal assignments are display approximations: each prints its
+nearest binary64 value, an algebraic one once
 its [narrowed interval](22-exact-arithmetic.md#binary64-values-of-algebraic-scalars)
 settles it. `% klause-float-rounding: x = undetermined` marks a coordinate whose
 narrowing ran out of allowance, printed as its interval's rounded midpoint, and

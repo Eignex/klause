@@ -1,5 +1,6 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticVariable
@@ -27,7 +28,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
-class CompiledSchemaTest {
+class CompiledSchemaTest : RuntimeInitializedTest() {
     @Test
     fun `captured source metadata should survive constructor and exported map mutation`() {
         val booleans = linkedMapOf("a" to 0, "b" to 1)

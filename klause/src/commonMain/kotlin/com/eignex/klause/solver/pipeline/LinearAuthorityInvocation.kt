@@ -206,9 +206,9 @@ internal class LinearAuthorityInvocation(
                 work.coerceIn(1L, 150_000L) * LP_WORK_PER_NODE))
             external()?.takeUnless { it === incumbent }?.let { sample ->
                 val before = incumbentRevision
-                val completed = if (sample.exactReals == null && completion != null)
+                val completed = if (completion != null)
                     completion.complete(context, sample, stop) else sample
-                if (completed != null) offer(completed, external = true)
+                if (completed != null && completed !== incumbent) offer(completed, external = true)
                 if (incumbentRevision != before) {
                     importedIncumbents++
                     importedIncumbent = incumbent

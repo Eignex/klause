@@ -61,6 +61,8 @@ single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.
 
 `FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
+Its lab profile build requires both `:klause-cli:installJvmDist` and `:klause-bench:installDist`
+because provenance includes the installed CLI distribution.
 Select `portfolio-policy=ordinary|retained|complete`; omitted policy retains the companion preset.
 The ordinary preset requires `handoff=false` and leaves algorithm controls at source defaults.
 `portfolio-progress=false` disables progress logging; its default is `true`.
@@ -82,7 +84,10 @@ no LP snapshots. Observation spends the existing four-second companion lifetime
 and source funding. `result.json` retains capture counters and callback time, which
 is included in containing execution and core capture time. This diagnostic grants
 no production performance or source-verdict authority.
-`source-refutation-center-step=true|false` is accepted only in `joint-ordinary` mode
+`capture-mode=joint-handoff handoff=true` retains the same bounded proposal journal
+with ordinary binary-only admission and the after-incumbent gate enabled. It uses
+fixed repair, complete proof-worker coverage at share 0.5, and quiet logging.
+`source-refutation-center-step=true|false` is accepted in `joint-ordinary` and `joint-handoff` modes
 and forwards the source option to that producer. Omission leaves its default false.
 The existing observation and companion limits apply.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
@@ -1158,8 +1163,9 @@ remain the downstream evidence. Recovery counters retain preparation, numerical,
 exact and checking work. Compare source-matched on/off arms without changing the
 admission gate, active lifetime, rewards or coverage. A completed point or a pool
 read alone establishes neither consumption nor a performance benefit.
-`*CompletionOriginalChecked` records the reconstructed original-source and adjusted
-objective check before import on ordinary linear-source execution.
+`*CompletionOriginalChecked` and `*CompletionExactOriginalChecked` record the
+reconstructed original-source and adjusted objective check before import for
+completed advisory seeds and exact-coordinate seeds, respectively.
 Completed advisory seeds require the original witness check's exact-feasibility
 result. Ordinary tolerance acceptance alone cannot qualify the exact handoff.
 Repair publication uses the same original-source callback when supplied.

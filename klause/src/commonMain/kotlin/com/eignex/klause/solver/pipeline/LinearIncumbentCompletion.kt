@@ -59,7 +59,7 @@ internal class LinearIncumbentCompletion(
     private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
         check(!closed)
         if (cancellation()) return null
-        if (seed.exactReals != null) return seed
+        if (seed.exactReals != null) return checkedExact(source, seed, cancellation)
         val token = metered(cancellation, checking = false)
         if (token()) return null
         if (seed.algebraicReals != null || seed.symbolicReals != null) {
@@ -163,6 +163,25 @@ internal class LinearIncumbentCompletion(
             observe("SharedRetained", 1L)
         }
         return point
+    }
+
+    private fun checkedExact(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
+        val original = originalCheck ?: return seed
+        val checking = metered(cancellation, checking = true)
+        val evidence = SourceEvidence(source.scope, SourceClaim.Witness(seed), SourceDerivation.SourceWitness)
+        val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, checking)
+        if (checked != SourceEvidenceCheck.Checked) {
+            observe(if (checked is SourceEvidenceCheck.Rejected) "ExactPointRejected" else "ExactPointUnavailable", 1L)
+            return null
+        }
+        val value = source.linearValue(seed, checking) ?: return null
+        val accepted = original(seed, value, checking)
+        if (checking()) {
+            observe("ExactOriginalUnavailable", 1L)
+            return null
+        }
+        observe(if (accepted) "ExactOriginalChecked" else "ExactOriginalRejected", 1L)
+        return seed.takeIf { accepted }
     }
 
     private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl): List<BigFraction>? {
