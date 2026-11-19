@@ -76,6 +76,7 @@ class SourceExecutionControlsTest : RuntimeInitializedTest() {
             .withPortfolioLpQueryObserver { _, _, _ -> }
             .withPortfolioGuidanceObserver { _, _ -> }
             .withPortfolioJointRepairObserver { _, _, _ -> }
+            .withPortfolioSessionObserver { _, _ -> }
             .withValidationCancellation(ExecutionControl.Never)
 
         assertTrue(request.companionIncumbentReuse)
