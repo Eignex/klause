@@ -1293,7 +1293,9 @@ class Portfolio(
             }
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
             val probing = initialProbe || (auxiliary && !trialStarted[arm])
-            val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof
+            val fundedCoverage = fundedCore() != null && workers[arm].family == ArmFamily.Backtrack &&
+                !workers[arm].auxiliaryProof
+            val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof || fundedCoverage
             val continuingCore = workers[arm].auxiliaryProof &&
                 (liveStats[arm]?.coreGuided?.continuationGrants ?: 0L) > 0L
             val twiceBase = saturatedAdd(baseSliceWork, baseSliceWork)
@@ -1327,6 +1329,11 @@ class Portfolio(
                 diagnostics?.onEvent?.invoke(PortfolioEvent.Selected(claim.segment, arm, workers[arm].label,
                     claim.sliceWork))
             }
+        }
+
+        private fun fundedCore(): Int? = if (lanes != 1 || diagnostics != null) null else workers.indices.firstOrNull {
+            !retired[it] && workers[it].auxiliaryProof &&
+                (liveStats[it]?.coreGuided?.continuationGrants ?: 0L) > 0L
         }
 
         private fun initialHeuristicEligibility(eligible: List<Int>): List<Int> {
@@ -1364,6 +1371,13 @@ class Portfolio(
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
             owedCompleteArm(eligibleArms)?.let { return it }
+            val funded = fundedCore()
+            if (funded != null && funded !in eligibleArms) {
+                eligibleArms.firstOrNull {
+                    workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof &&
+                        !busy[it] && !retired[it]
+                }?.let { return it }
+            }
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]
             }?.let { return it }

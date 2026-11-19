@@ -786,7 +786,10 @@ cutoff. Grants preserve the paid query, pins, preparation and traversal.
 A funded worker receives at least four base work slices per turn, capped by the
 configured work-slice maximum, or the ordinary growing work slice when larger.
 Its elapsed turn stays at the base slice, and each turn still requires fresh
-complete-sibling coverage. Cancellation and the containing deadline retain
+complete-sibling coverage. While a funded query waits, the scheduler services that
+coverage directly with base work offers before returning to the query; explicit
+minimum shares retain precedence. Retirement restores ordinary scheduling.
+Cancellation and the containing deadline retain
 precedence. Explicit core workers and diagnostic work schedules keep their selected
 limits. `continuationGrants` reports funding decisions without proof authority.
 
@@ -798,7 +801,7 @@ words and the sum of the objective's absolute coefficients and constant fits the
 exact scalar range below `2^53`. It excludes integer and real columns. Eligibility
 scanning is cancellable and charges the containing invocation; unsupported or
 interrupted eligibility keeps the ordinary delayed, unrefined policy. The trial keeps
-ordinary complete-worker coverage, worker positions, seeds and its auxiliary
+ordinary complete-worker coverage, worker positions, seeds and its initial auxiliary
 allowance, and explicit core settings, arm counts, recipes, annotations, backtrack
 edits and work diagnostics keep their selected policy.
 

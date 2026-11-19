@@ -19,7 +19,8 @@ data class CoreGuidedStats(
     val continuationGrants: Long = 0L,
 ) {
     /** Create core observations with resource limits and no continuations. */
-    constructor(cores: Long, largestCore: Int, lowerBound: BigInt?, workLimit: Long?, activeMillisLimit: Long?) :
+    constructor(cores: Long = 0L, largestCore: Int = 0, lowerBound: BigInt? = null,
+        workLimit: Long? = null, activeMillisLimit: Long? = null) :
         this(cores, largestCore, lowerBound, workLimit, activeMillisLimit, 0L)
 
     /** Create core observations without resource-limit telemetry. */
@@ -31,6 +32,15 @@ data class CoreGuidedStats(
         cores: Long = this.cores,
         largestCore: Int = this.largestCore,
         lowerBound: BigInt? = this.lowerBound,
+    ): CoreGuidedStats = CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit, continuationGrants)
+
+    /** Copy resource limits while retaining the continuation observations. */
+    fun copy(
+        cores: Long = this.cores,
+        largestCore: Int = this.largestCore,
+        lowerBound: BigInt? = this.lowerBound,
+        workLimit: Long? = this.workLimit,
+        activeMillisLimit: Long? = this.activeMillisLimit,
     ): CoreGuidedStats = CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit, continuationGrants)
 
     /** Combine workers of the same objective invocation; floors take their maximum. */
