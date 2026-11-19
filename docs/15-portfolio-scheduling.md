@@ -774,6 +774,22 @@ worker joins after the first incumbent once ordinary complete workers stall, wit
 allowance described in [resources](06-sessions.md#resource-allowances); parallel pools
 admit it immediately, and `core-guided` selects it directly.
 
+An automatically deferred worker starts with two seconds of cumulative active time.
+After a completed core raises its exact floor, an accepted incumbent within that
+last floor increment can fund continuation when at least eight seconds remain on
+the caller deadline. Each fresh completed-core epoch can extend the active limit
+to the time already spent plus three quarters of the remaining caller time. No
+deadline, no incumbent or a wider gap leaves the initial limit in place. The
+incumbent funds scheduling only; query satisfaction never treats it as an objective
+cutoff. Grants preserve the paid query, pins, preparation and traversal.
+
+A funded worker receives at least four base work slices per turn, capped by the
+configured work-slice maximum, or the ordinary growing work slice when larger.
+Its elapsed turn stays at the base slice, and each turn still requires fresh
+complete-sibling coverage. Cancellation and the containing deadline retain
+precedence. Explicit core workers and diagnostic work schedules keep their selected
+limits. `continuationGrants` reports funding decisions without proof authority.
+
 Curated single-lane mixed source execution instead selects an early reason-refined
 core trial for nonuniform Boolean objectives over clauses, cardinalities and
 pseudo-Boolean rows or their reifications only, within fixed size limits on Boolean

@@ -313,6 +313,38 @@ class CoreGuidedSearchTest {
     }
 
     @Test
+    fun `near attainment continuation should preserve its paid query beyond the initial active limit`() {
+        val clock = TestTimeSource()
+        val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val source = Problem(3, 0, emptyArray(), arrayOf(hard,
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+        ))
+        var advanced = false
+        val providers = observingHard(hard) { state ->
+            if (!advanced && state.problem.numBoolVars > source.numBoolVars) {
+                advanced = true
+                clock += 3.seconds
+            }
+        }
+        val search = CoreGuidedSearch(source.bake(providers.prepare(source)),
+            LinearObjective(longArrayOf(1, 1, 1)),
+            BacktrackParams(objectiveBoundSupplier = { 2.0 }),
+            maximumMillis = 2_000L, timeSource = clock, continueProductive = true)
+        val caller = ExecutionControl.after(60.seconds)
+
+        val paused = search.runSlice(caller, 2_000L, -1L) {}
+        val result = paused ?: search.runSlice(caller, 2_000L, -1L) {}
+
+        assertIs<MinimizeResult.Optimal>(result)
+        assertTrue(advanced)
+        assertTrue(search.stats.coreGuided.activeMillisLimit!! > 2_000L)
+        assertEquals(1L, search.stats.coreGuided.continuationGrants)
+        assertEquals(2L, LinearObjective(longArrayOf(1, 1, 1)).evaluateLong(result.sample))
+        search.close()
+    }
+
+    @Test
     fun `active preparation time should not renew after an interrupted opening`() {
         val clock = TestTimeSource()
         val hard = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))

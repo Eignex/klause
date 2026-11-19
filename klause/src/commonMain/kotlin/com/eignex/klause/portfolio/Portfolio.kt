@@ -36,6 +36,7 @@ import com.eignex.klause.util.withStopFlag
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.util.concurrent.Mutex
 import com.eignex.util.concurrent.parallelRun
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
@@ -1293,7 +1294,15 @@ class Portfolio(
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
             val probing = initialProbe || (auxiliary && !trialStarted[arm])
             val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof
-            val ordinaryAllowance = if (baseAllowance) baseSliceWork else sliceWork
+            val continuingCore = workers[arm].auxiliaryProof &&
+                (liveStats[arm]?.coreGuided?.continuationGrants ?: 0L) > 0L
+            val twiceBase = saturatedAdd(baseSliceWork, baseSliceWork)
+            val continuationWork = minOf(maxSliceWork, saturatedAdd(twiceBase, twiceBase))
+            val ordinaryAllowance = when {
+                continuingCore -> maxOf(sliceWork, continuationWork)
+                baseAllowance -> baseSliceWork
+                else -> sliceWork
+            }
             val allowance = if (diagnostics == null) ordinaryAllowance else
                 minOf(ordinaryAllowance, diagnostics.workLimit - chargedWork)
             val time = if (baseAllowance) baseSliceMillis else slice
