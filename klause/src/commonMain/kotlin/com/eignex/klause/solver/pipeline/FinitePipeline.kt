@@ -125,10 +125,15 @@ object FinitePipeline {
     /** Apply finite-route presolve policy and return the model ready for engine construction. */
     fun prepare(request: FinitePipelineRequest): FinitePipelinePreparation {
         val start = TimeSource.Monotonic.markNow()
-        val config = if (request.engine.pureLocalSearch && !request.explicitPresolveConfig) {
+        val requestedConfig = if (request.engine.pureLocalSearch && !request.explicitPresolveConfig) {
             request.presolveConfig.forLocalSearch()
         } else {
             request.presolveConfig
+        }
+        val config = when (request.engine) {
+            FiniteEngine.FIXED, FiniteEngine.BACKTRACK -> requestedConfig
+            FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
+                requestedConfig.withoutObjectiveSymmetry()
         }
         // Source-safe presolve is the one phase before the plan, shared with the open lane. Running it
         // here and handing the result on is what keeps [PresolvePipeline.run] from repeating it.

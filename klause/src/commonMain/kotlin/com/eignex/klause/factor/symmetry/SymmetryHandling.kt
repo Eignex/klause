@@ -23,19 +23,24 @@ import com.eignex.util.collections.toSortedIntArray
  * group's support). Its local-search projection is [NoInvariant]: symmetry breaking is a backtrack-only
  * device, so local search skips it.
  */
-class SymmetryHandling(
+class SymmetryHandling internal constructor(
     /** The generators, each `(intImage, boolImage)` over the current variable ids. */
     val generators: List<Pair<IntArray, IntArray>>,
+    internal val lexOrder: IntArray?,
 ) : Factor {
+
+    /** Construct a restriction comparing integer coordinates before Boolean coordinates. */
+    constructor(generators: List<Pair<IntArray, IntArray>>) : this(generators, null)
 
     init {
         require(generators.isNotEmpty()) { "SymmetryHandling needs at least one generator" }
-    }
-
-    private companion object {
-        /** Cap on the lex-leaders propagated per node: the generators plus stabiliser Schreier
-         *  generators, bounded so per-node propagation stays cheap (one propagator, not one factor each). */
-        const val STRONG_GENERATOR_CAP = 64
+        if (lexOrder != null) {
+            val degree = generators.first().first.size + generators.first().second.size
+            val seen = BooleanArray(degree)
+            require(lexOrder.size == degree && lexOrder.all { v ->
+                (v in 0 until degree && !seen[v]).also { if (it) seen[v] = true }
+            })
+        }
     }
 
     override val variables: VarList = MixedVars(spanInts = support { it.first }, boolVars = support { it.second })
@@ -49,42 +54,6 @@ class SymmetryHandling(
         return if (moved.isEmpty()) emptyIntArray() else moved.toSortedIntArray()
     }
 
-    private val nInt: Int = generators.first().first.size
-    private val nBool: Int = generators.first().second.size
-
-    private fun toUnified(g: Pair<IntArray, IntArray>): IntArray {
-        val out = IntArray(nInt + nBool)
-        for (i in 0 until nInt) out[i] = g.first[i]
-        for (b in 0 until nBool) out[nInt + b] = nInt + g.second[b]
-        return out
-    }
-
-    /** Order a unified permutation's support `[moved ints by id, then moved bools by id]`, pairing each
-     *  variable with its image — the fixed lex order the lex-leader compares over (any fixed order is
-     *  sound). Integer positions are `< nInt`; Boolean positions are shifted back by [nInt]. */
-    private fun toSequence(perm: IntArray): SymmetryPropagator.Generator {
-        val movedInts = (0 until nInt).filter { perm[it] != it }
-        val movedBools = (nInt until nInt + nBool).filter { perm[it] != it }
-        val n = movedInts.size + movedBools.size
-        val left = IntArray(n)
-        val right = IntArray(n)
-        val isBool = BooleanArray(n)
-        var k = 0
-        for (v in movedInts) {
-            left[k] = v
-            right[k] = perm[v]
-            isBool[k] = false
-            k++
-        }
-        for (v in movedBools) {
-            left[k] = v - nInt
-            right[k] = perm[v] - nInt
-            isBool[k] = true
-            k++
-        }
-        return SymmetryPropagator.Generator(left, right, isBool)
-    }
-
     override fun remap(mapping: VarRemap): Factor {
         // Conjugate each generator by the remap: σ' = m ∘ σ ∘ m⁻¹. A remap that is not injective on a
         // generator's support (variable elimination / column merge) cannot carry the permutation, so
@@ -94,7 +63,21 @@ class SymmetryHandling(
             val identity = IntArray(mapping.intCount) { it } to IntArray(mapping.boolCount) { it }
             return SymmetryHandling(listOf(identity))
         }
-        return SymmetryHandling(remapped)
+        val order = lexOrder?.let { original ->
+            val nInt = generators.first().first.size
+            val degree = mapping.intCount + mapping.boolCount
+            val mapped = original.map { v ->
+                when {
+                    v < nInt && v < mapping.intCount -> mapping.int(v).takeIf { it in 0 until mapping.intCount }
+                    v >= nInt && v - nInt < mapping.boolCount ->
+                        mapping.bool(v - nInt).takeIf { it in 0 until mapping.boolCount }?.plus(mapping.intCount)
+                    else -> null
+                }
+            }.filterNotNull().distinct()
+            val present = mapped.toHashSet()
+            (mapped + (0 until degree).filter { it !in present }).toIntArray()
+        }
+        return SymmetryHandling(remapped, order)
     }
 
     private fun conjugate(g: Pair<IntArray, IntArray>, mapping: VarRemap): Pair<IntArray, IntArray>? {
@@ -130,6 +113,10 @@ class SymmetryHandling(
         for (g in generators) {
             ints(g.first)
             ints(g.second)
+        }
+        if (lexOrder != null) {
+            int(-1)
+            ints(lexOrder)
         }
     }
 }

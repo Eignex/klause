@@ -55,18 +55,20 @@ internal object SymmetryBreaking {
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
 
+    fun supportsObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): Boolean =
+        context.linearObjective != null && !context.solutionSetSensitive && !context.modelBreaksSymmetry &&
+            problem.numRealVars == 0 && !problem.semantics.relaxesRows(0) &&
+            context.linearObjective.realCoefficientValues.all { it == 0.0 }
+
     fun breakObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): PassDelta {
-        val objective = context.linearObjective ?: return PassDelta()
-        if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
-            problem.semantics.relaxesFeasibility || objective.realCoefficientValues.any { it != 0.0 }
-        ) return PassDelta()
+        if (!supportsObjectiveSymmetries(problem, context)) return PassDelta()
+        val objective = requireNotNull(context.linearObjective)
         val ints = objective.intCoefficientValues
         val bools = objective.boolWeightValues
         context.cancellation.charge(ints.size.toLong() + bools.size)
         if (context.cancellation()) return PassDelta()
         val objectiveInts = ints.indices.filter { ints[it] != 0L }.toSet()
         val objectiveBools = bools.indices.filter { bools[it] != 0L }.toSet()
-        if (objectiveInts.isEmpty() && objectiveBools.isEmpty()) return PassDelta()
         val extra = breakings(
             problem, FiniteSymmetryColumns(problem), objectiveInts, objectiveBools,
             context.cancellation, objective,
@@ -149,7 +151,17 @@ internal object SymmetryBreaking {
         )
         val valuePins = breakValueSymmetry(problem, active, heldInts, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
-        if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
+        if (generators.isNotEmpty()) {
+            val order = objective?.let { cost ->
+                val nInt = problem.numIntVars
+                (0 until nInt + problem.numBoolVars).sortedBy { v ->
+                    val coefficient = if (v < nInt) cost.intCoefficientValues.getOrElse(v) { 0L }
+                    else cost.boolWeightValues.getOrElse(v - nInt) { 0L }
+                    coefficient == 0L
+                }.toIntArray()
+            }
+            extra.add(SymmetryHandling(generators, order))
+        }
         extra.addAll(scalarLex)
         extra.addAll(valuePins)
         return extra
@@ -537,7 +549,6 @@ internal object SymmetryBreaking {
 
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return emptyList()
 
-        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
             if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
                 .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
@@ -547,15 +558,23 @@ internal object SymmetryBreaking {
                 .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
         }
 
+        // Singleton seeds cannot share an orbit; avoid keying and refining an asymmetric cost vector.
+        if (seedIntBase.toSet().size == nInt && seedBoolBase.toSet().size == nBool) return emptyList()
+
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
 
         // Cells of the base equitable partition: only same-colour variables can be interchangeable.
-        val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase, budget, cancellation)
+        val incidence = SymmetryIncidence(problem)
+        val (intColour, boolColour) = equitablePartition(
+            problem, seedIntBase, seedBoolBase, budget, cancellation, incidence,
+        )
         val cells = MutableIntObjectMap<MutableList<Int>>()
         for (v in 0 until nInt) if (v !in objectiveIntVars) cells.getOrPut(intColour[v]) { ArrayList() }.add(v)
         for (v in 0 until nBool) {
             if (v !in objectiveBoolVars) cells.getOrPut(boolColour[v]) { ArrayList() }.add(nInt + v)
         }
+        if (cancellation() || budget[0] <= 0) return emptyList()
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
 
         val gens = ArrayList<Pair<IntArray, IntArray>>()
         val cellMembers = ArrayList<MutableList<Int>>(cells.size)
@@ -565,7 +584,8 @@ internal object SymmetryBreaking {
             if (members.size < 2 || members.size > MAX_VERIFIED_GROUP) continue
             val sorted = members.sorted()
             val r = sorted[0]
-            val refLeaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, r, budget, cancellation) ?: continue
+            val refLeaf = refineToDiscrete(problem, incidence, intColour, boolColour, r, budget, cancellation)
+                ?: continue
             // Disjoint set over this cell's members tracks r's orbit under generators found so far, so
             // a member already in the orbit is skipped (it would only re-derive an existing element).
             val index = MutableIntIntMap()
@@ -574,7 +594,8 @@ internal object SymmetryBreaking {
             for (v in sorted) {
                 if (v == r || budget[0] <= 0 || cancellation()) continue
                 if (orbit.connected(index.getOrDefault(r, 0), index.getOrDefault(v, 0))) continue
-                val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget, cancellation) ?: continue
+                val leaf = refineToDiscrete(problem, incidence, intColour, boolColour, v, budget, cancellation)
+                    ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
                 // A permutation maps solutions to solutions only if it also maps every column's values onto
                 // its image's, which the factor check below does not see; the seeds are those values.
@@ -605,8 +626,9 @@ internal object SymmetryBreaking {
     @Suppress("ReturnCount")
     private fun refineToDiscrete(
         problem: Problem,
-        seedIntBase: Array<RefineKey>,
-        seedBoolBase: Array<RefineKey>,
+        incidence: SymmetryIncidence,
+        intBaseColour: IntArray,
+        boolBaseColour: IntArray,
         firstIndiv: Int,
         budget: IntArray,
         cancellation: ExecutionControl = ExecutionControl.Never,
@@ -614,8 +636,8 @@ internal object SymmetryBreaking {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
         val n = nInt + nBool
-        val seedInt = seedIntBase.copyOf()
-        val seedBool = seedBoolBase.copyOf()
+        val seedInt = Array(nInt) { partitionSeed(SPACE_INT, intBaseColour[it]) }
+        val seedBool = Array(nBool) { partitionSeed(SPACE_BOOL, boolBaseColour[it]) }
         fun individualize(globalV: Int, step: Int) {
             if (globalV < nInt) {
                 seedInt[globalV] = RefineKey(longArrayOf(SPACE_INT, SEED_INDIVIDUALIZED, step.toLong()))
@@ -630,7 +652,7 @@ internal object SymmetryBreaking {
             // cancellation) means the partition below may be partial, so abandon this leaf.
             if (budget[0] <= 0 || cancellation()) return null
             val before = budget[0]
-            val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget)
+            val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget, incidence = incidence)
             cancellation.charge(before.toLong() - budget[0])
             val leaf = IntArray(n) { -1 }
             val cellSize = IntArray(n)
@@ -653,6 +675,9 @@ internal object SymmetryBreaking {
             var chosen = Int.MAX_VALUE
             for (v in 0 until nInt) if (ic[v] == target && v < chosen) chosen = v
             for (v in 0 until nBool) if (bc[v] == target && nInt + v < chosen) chosen = nInt + v
+            // Refinement only splits cells; retain those splits instead of reconstructing them from the root seeds.
+            for (v in 0 until nInt) seedInt[v] = partitionSeed(SPACE_INT, ic[v])
+            for (v in 0 until nBool) seedBool[v] = partitionSeed(SPACE_BOOL, bc[v])
             individualize(chosen, step)
             step++
         }

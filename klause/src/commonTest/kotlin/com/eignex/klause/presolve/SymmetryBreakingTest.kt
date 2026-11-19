@@ -253,11 +253,28 @@ class SymmetryBreakingTest {
         )) {
             assertTrue(pass.applyFinite(problem, context).isEmpty)
         }
-        assertFalse(PresolveConfig.DEFAULT.resolved(pass, exact))
+        assertTrue(PresolveConfig.DEFAULT.resolved(pass, exact))
         assertFalse(PresolveConfig.parse("default,+objective-symmetry").forLocalSearch().resolved(pass, exact))
         assertFalse(PresolveConfig.parse("off,+objective-symmetry").resolved(
             pass, exact.copy(solutionSetSensitive = true),
         ))
+    }
+
+    @Test
+    fun `automatic optimization should schedule only one symmetry scan`() {
+        val context = PresolveContext.of(
+            LinearObjective(intCoefficients = longArrayOf(1, 1)), transformObjective = true,
+        )
+
+        val automatic = PresolveConfig.DEFAULT.problemPasses(context)
+        val protected = PresolveConfig.parse("default,-objective-symmetry").problemPasses(context)
+
+        assertTrue(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES in automatic)
+        assertFalse(PresolvePass.BREAK_SYMMETRIES in automatic)
+        assertFalse(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES in protected)
+        assertTrue(PresolvePass.BREAK_SYMMETRIES in protected)
+        assertFalse(PresolvePass.BREAK_OBJECTIVE_SYMMETRIES in PresolveConfig.DEFAULT.problemPasses(context,
+            PresolvePass.Capability.SOURCE))
     }
 
     @Test
