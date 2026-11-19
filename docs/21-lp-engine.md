@@ -272,6 +272,11 @@ columns. Admission counts `m * (n + m + 1)` stored cells under the 65,536-cell
 ceiling and 4,096 total columns. Callers may impose a row limit; the default
 uses the cell envelope. Work, allocation, scalar size and pivot limits also
 apply to the complete operation, including import and current-source verification.
+Target export, identity admission and source capture spend the same remaining caller
+allowance as the tableau and verification. Admission has no separate work or allocation
+ceiling. Declined attempts and discarded incompatible checkpoints retain their work,
+allocation and time charges until the owner is retired. Dimension checks precede basis
+export and source capture, and each copy must fit the remaining allocation allowance.
 Verification inherits the continuation's coordinate, entry and scalar allowances
 and spends its remaining work and allocation. Increasing a retained allowance
 preserves earlier costs and complete pivots; it grants no authority to an unchecked

@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ContinuationPhase
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
@@ -13,6 +14,223 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpExactContinuationTest {
+    @Test
+    fun `target admission should spend caller funding beyond fixed work and allocation envelopes`() {
+        val rows = 128
+        val zero = ExactLpNumber.of(0L)
+        val premises = ExactLpPremises(emptyList(), List(8192) { it })
+        val source = ExactLpModel(
+            listOf(emptyList()), List(rows) { zero },
+            List(rows + 1) { ExactLpColumn(ExactLpBounds()) },
+            List(rows) { ExactLpRow(premises = premises) },
+            ExactLpObjective(List(rows + 1) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        var exports = 0
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel): Basis {
+                exports++
+                return Basis(IntArray(rows) { it + 1 },
+                    Array(rows + 1) { if (it == 0) VarStatus.FREE else VarStatus.BASIC })
+            }
+        }
+        val limits = ExactContinuationLimits(maxWork = 4_000_000L, maxAllocation = 16L * 1024L * 1024L)
+        val cases = listOf(
+            limits.copy(maxWork = 1_000_000L) to ContinuationDecline.WORK,
+            limits.copy(maxAllocation = 4L * 1024L * 1024L) to ContinuationDecline.ALLOCATION,
+        )
+        for ((grant, reason) in cases) {
+            val refused = captureContinuationTarget(model, solver, null, grant, ExecutionControl.Never)
+            assertEquals(reason, refused.metrics.decline)
+            assertNull(refused.basis)
+        }
+        assertEquals(0, exports)
+
+        val target = captureContinuationTarget(model, solver, null, limits, ExecutionControl.Never)
+
+        assertNotNull(target.basis)
+        assertNull(target.metrics.decline)
+        assertTrue(target.metrics.work > 1_000_000L)
+        assertTrue(target.metrics.allocation > 4L * 1024L * 1024L)
+        assertEquals(1, exports)
+    }
+
+    @Test
+    fun `continuation admission and source capture should share the caller grant`() {
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val cases = listOf(
+            ExactContinuationLimits(maxWork = 100L) to ContinuationDecline.WORK,
+            ExactContinuationLimits(maxAllocation = 1500L) to ContinuationDecline.ALLOCATION,
+        )
+        for ((limits, reason) in cases) {
+            val cache = LpExactContinuationCache()
+
+            val result = continueExactLp(model, basis, cache, limits = limits)
+
+            assertNull(result.witness)
+            assertEquals(reason, result.metrics.decline)
+            assertEquals(ContinuationPhase.INPUT, result.metrics.phase)
+            assertTrue(result.metrics.work <= limits.maxWork)
+            assertTrue(result.metrics.allocation <= limits.maxAllocation)
+            assertEquals(result.metrics.work, cache.usedWork)
+            assertEquals(result.metrics.allocation, cache.usedAllocation)
+        }
+    }
+
+    @Test
+    fun `funded identity admission should stop before unaffordable source capture`() {
+        val rows = 128
+        val zero = ExactLpNumber.of(0L)
+        val premises = ExactLpPremises(emptyList(), List(8192) { it })
+        val source = ExactLpModel(
+            listOf(emptyList()), List(rows) { zero },
+            List(rows + 1) { ExactLpColumn(ExactLpBounds()) },
+            List(rows) { ExactLpRow(premises = premises) },
+            ExactLpObjective(List(rows + 1) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val basis = Basis(IntArray(rows) { it + 1 },
+            Array(rows + 1) { if (it == 0) VarStatus.FREE else VarStatus.BASIC })
+        val cache = LpExactContinuationCache()
+        val limits = ExactContinuationLimits(maxWork = 4_000_000L, maxAllocation = 16L * 1024L * 1024L)
+
+        val result = continueExactLp(model, basis, cache, limits = limits)
+
+        assertEquals(ContinuationPhase.INPUT, result.metrics.phase)
+        assertEquals(ContinuationDecline.ALLOCATION, result.metrics.decline)
+        assertNull(result.witness)
+        assertNull(result.conflict)
+        assertEquals(0, result.metrics.builds)
+        assertTrue(result.metrics.work > 1_000_000L && result.metrics.work <= limits.maxWork)
+        assertTrue(result.metrics.allocation > 4L * 1024L * 1024L && result.metrics.allocation <= limits.maxAllocation)
+        assertEquals(result.metrics.work, cache.usedWork)
+        assertEquals(result.metrics.allocation, cache.usedAllocation)
+    }
+
+    @Test
+    fun `failed admission should retain spending when the caller extends its grant`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+        val cache = LpExactContinuationCache()
+        val limited = continueExactLp(model, basis, cache, limits = ExactContinuationLimits(maxWork = 2L))
+
+        val funded = continueExactLp(model, basis, cache, limits = ExactContinuationLimits(maxWork = 50L))
+
+        assertEquals(ContinuationDecline.WORK, limited.metrics.decline)
+        assertEquals(ContinuationPhase.INPUT, funded.metrics.phase)
+        assertEquals(limited.metrics.work + funded.metrics.work, cache.usedWork)
+        assertEquals(limited.metrics.allocation + funded.metrics.allocation, cache.usedAllocation)
+    }
+
+    @Test
+    fun `caller funded admission beyond four mebibytes should reach a verified witness`() {
+        val rows = 64
+        val zero = ExactLpNumber.of(0L)
+        val premises = ExactLpPremises(emptyList(), List(8192) { it })
+        val source = ExactLpModel(
+            listOf(emptyList()), List(rows) { zero },
+            List(rows + 1) { ExactLpColumn(ExactLpBounds()) },
+            List(rows) { ExactLpRow(premises = premises) },
+            ExactLpObjective(List(rows + 1) { zero }),
+        )
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        val cache = LpExactContinuationCache()
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel) = Basis(IntArray(rows) { it + 1 },
+                Array(rows + 1) { if (it == 0) VarStatus.FREE else VarStatus.BASIC })
+        }
+
+        val result = certifyLpResult(model, solver, null, continuationCache = cache,
+            claim = LpClaim.FEASIBLE_COMPLETION)
+
+        assertEquals(listOf(BigFraction.ZERO), assertNotNull(result.witness).primal)
+        val metrics = assertNotNull(result.continuation)
+        assertTrue(assertNotNull(metrics.allocationByPhase[ContinuationPhase.ADMISSION]) > 4L * 1024L * 1024L)
+        assertEquals(metrics.work, cache.usedWork)
+        assertEquals(metrics.allocation, cache.usedAllocation)
+    }
+
+    @Test
+    fun `retained certification should fund target export from the remaining grant`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val model = assertNotNull(LpExactState(source).toWorkingModel())
+        var exports = 0
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel): Basis {
+                exports++
+                return Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            }
+        }
+        val cache = LpExactContinuationCache()
+        cache.accountInput(100L, 0L, 0L)
+
+        val result = certifyLpResult(model, solver, null, continuationCache = cache,
+            continuationLimits = ExactContinuationLimits(maxWork = 100L), claim = LpClaim.FEASIBLE_COMPLETION)
+
+        assertEquals(0, exports)
+        assertNull(result.witness)
+        assertEquals(ContinuationDecline.WORK, assertNotNull(result.continuation).decline)
+        assertEquals(100L, cache.usedWork)
+    }
+
+    @Test
+    fun `cancelled target export should retain the copy cost without publishing the basis`() {
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val cache = LpExactContinuationCache()
+        var cancelled = false
+        val solver = object : LpSolver {
+            override val infeasibleRay: DoubleArray? = null
+            override fun solve(warm: Basis?): FloatLpResult? = null
+            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+            override fun continuationBasis(model: LpModel): Basis {
+                cancelled = true
+                return Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            }
+        }
+
+        val target = captureContinuationTarget(model, solver, null, ExactContinuationLimits(),
+            ExecutionControl { cancelled }, cache)
+
+        assertNull(target.basis)
+        assertEquals(ContinuationDecline.CANCELLED, target.metrics.decline)
+        assertTrue(cache.usedAllocation > 0L)
+        assertEquals(target.metrics.work, cache.usedWork)
+        assertEquals(target.metrics.allocation, cache.usedAllocation)
+    }
+
+    @Test
+    fun `replacing an incompatible checkpoint should retain its costs`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 10L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val basis = Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC))
+        val cache = LpExactContinuationCache()
+        cache.accountInput(0L, 0L, 1_000_000_000L)
+        val first = continueExactLp(model, basis, cache)
+        model.rhs[0] = -2L
+
+        val changed = continueExactLp(model, basis, cache)
+
+        assertTrue(changed.metrics.invalidated)
+        assertEquals(first.metrics.work + changed.metrics.work, cache.usedWork)
+        assertEquals(first.metrics.allocation + changed.metrics.allocation, cache.usedAllocation)
+        assertTrue(cache.usedTimeNs >= 1_000_000_000L)
+    }
+
     @Test
     fun `continuation verification should admit caller funded columns beyond the default envelope`() {
         val columns = 4097
@@ -213,9 +431,10 @@ class LpExactContinuationTest {
         )
         for ((limit, cancellation, reason) in cases) {
             val stopped = captureContinuationTarget(model, solver, null, limit, cancellation)
+            val cache = LpExactContinuationCache()
             val target = captureContinuationTarget(model, solver, null, ExactContinuationLimits(),
-                ExecutionControl.Never)
-            val retried = continueExactLp(model, target.basis, targetMetrics = target.metrics)
+                ExecutionControl.Never, cache)
+            val retried = continueExactLp(model, target.basis, cache, targetMetrics = target.metrics)
 
             assertEquals(reason, stopped.metrics.decline)
             assertNull(stopped.basis)
