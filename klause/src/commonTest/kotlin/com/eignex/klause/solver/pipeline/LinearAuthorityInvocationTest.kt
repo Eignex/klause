@@ -186,13 +186,15 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
         }
         val source = SourceProofContext(scope, columns.toSet(), rows, columns.associateWith { BigFraction.ONE })
         val standing = Sample(booleanArrayOf(), LongArray(12) { 1 })
-        val results = listOf(false, true).map { guided ->
+        val results = listOf(false to false, true to false, false to true).map { (guided, private) ->
             LinearAuthorityInvocation(source, TheoryParams(maxDecisions = 6, sourceCuts = false),
-                external = { standing }, boundOrdered = true, guideIncumbent = guided).use { it.run { _, _ -> } }
+                external = { standing.takeUnless { private } }, boundOrdered = true, guideIncumbent = guided,
+                proximityCenter = standing.takeIf { private }).use { it.run { _, _ -> } }
         }
 
         assertEquals(BigFraction.ofLong(12), results[0].value)
         assertEquals(BigFraction.ofLong(6), results[1].value)
+        assertEquals(BigFraction.ofLong(6), results[2].value)
         assertTrue((results[1].stats.smt.completeSearchStages?.get("numericalIncumbentFrontierRanks") ?: 0L) > 0)
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
             SourceEvidence(source.scope,
