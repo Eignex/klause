@@ -6,6 +6,9 @@ import com.eignex.klause.arithmetic.polynomial.RationalInterval
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -21,13 +24,86 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.times
 import kotlin.math.sqrt
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincSolutionWriterTest {
+    @Test
+    fun `valid decimal coordinates should need no adjustment allowance`() {
+        val program = parseFlatZinc("var 0.0..2.0: x; solve satisfy;")
+
+        val published = program.publishedReals({ error("no booleans") }, { error("no integers") },
+            { 1.0 }, ExecutionControl { true })
+
+        assertContentEquals(doubleArrayOf(1.0), published)
+    }
+
+    @Test
+    fun `tolerance boundary coordinates should publish inside the bound`() {
+        val program = parseFlatZinc("var float: x; constraint float_le(2.0, x); solve minimize x;")
+        val boundary = BigFraction.ofLong(2) - BigFraction.of(BIG_ONE, bigIntOf(10_000_000))
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(boundary.toDouble()), listOf(boundary))
+
+        val output = writeFlatZincSolution(program, sample, outputObjective = true)
+        val printed = output.lineSequence().first { it.startsWith("x = ") }.removePrefix("x = ")
+            .removeSuffix(";").toDouble()
+
+        assertTrue(requireNotNull(BigFraction.ofDouble(printed)) >= boundary, output)
+        assertTrue(decimalValue(printed) >= boundary, output)
+        assertTrue("% klause-exact: x = $boundary;" in output, output)
+    }
+
+    @Test
+    fun `coupled boundary coordinates should retain joint feasibility`() {
+        val source = """
+            var float: x; var float: y;
+            constraint float_le(2.0, x);
+            constraint float_le(2.0, y);
+            constraint float_lin_eq([1000000000.0, -1000000000.0], [x, y], 0.0);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(source)
+        val boundary = BigFraction.ofLong(2) - BigFraction.of(BIG_ONE, bigIntOf(10_000_000))
+        val sample = Sample(BooleanArray(0), LongArray(0), DoubleArray(2) { boundary.toDouble() },
+            List(2) { boundary })
+
+        val output = writeFlatZincSolution(program, sample)
+        val values = output.lineSequence().filter { it.startsWith("x = ") || it.startsWith("y = ") }
+            .map { it.substringAfter(" = ").removeSuffix(";").toDouble() }.toList()
+
+        assertEquals(2, values.size)
+        assertEquals(values[0], values[1], output)
+        assertTrue(values.all { requireNotNull(BigFraction.ofDouble(it)) >= boundary }, output)
+    }
+
+    @Test
+    fun `output model bindings should use the checked tolerance coordinates`() {
+        val program = parseFlatZinc("var float: x; constraint float_le(2.0, x); solve minimize x;")
+        val boundary = BigFraction.ofLong(2) - BigFraction.of(BIG_ONE, bigIntOf(10_000_000))
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(boundary.toDouble()), listOf(boundary))
+
+        val output = OznApplier("float: x; output [show(x), \"\\n\"];").render(program, sample)
+
+        assertTrue(requireNotNull(BigFraction.ofDouble(output.lineSequence().first().toDouble())) >= boundary, output)
+    }
+
+    @Test
+    fun `unrepresentable tolerance coordinates should withhold the decimal block`() {
+        val program = parseFlatZinc("var float: x; constraint float_lin_eq([3.0], [x], 1.0); solve satisfy;",
+            semanticOverrides = SemanticOverrides(feasibilityTolerance = SourceTolerance(
+                SemanticRational.of(BIG_ONE, bigIntOf(10_000_000_000).let { it * it }))))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(third.toDouble()), listOf(third))
+
+        assertFailsWith<IllegalArgumentException> { writeFlatZincSolution(program, sample) }
+    }
+
     @Test
     fun `irrational source coordinates should retain their selected exact root`() {
         val program = parseFlatZinc("var 0.0..2.0: x :: output_var; solve minimize x;", exactFloats = true)
