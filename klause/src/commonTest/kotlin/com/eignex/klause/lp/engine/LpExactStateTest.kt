@@ -15,6 +15,28 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
+    fun `assertion captures should remain independent across empty scopes and later edits`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val assertion = LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(4L)), 1L, 0)
+        val supplied = mutableListOf(assertion)
+        val parent = LpExactState(source, supplied)
+        val trail = LpBoundTrail(parent)
+        assertTrue(trail.push())
+        val emptyScope = trail.state
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(7L)), 2L))
+
+        supplied.clear()
+
+        assertEquals(listOf(assertion), parent.assertions)
+        assertEquals(listOf(assertion), emptyScope.assertions)
+        assertEquals(2, trail.state.assertions.size)
+        assertEquals(BigFraction.ofLong(7L), trail.state.activeSide(0, false)?.side?.number?.value)
+        assertTrue(trail.pop(0))
+        assertEquals(listOf(assertion), trail.state.assertions)
+    }
+
+    @Test
     fun `single appended bounds match a fresh exact replay`() {
         val source = assertNotNull(LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
             .build(Sense.MINIMIZE).authoritativeModel())

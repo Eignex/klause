@@ -665,6 +665,9 @@ index premises. In every case the original source rows decide publication.
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
+Trail edits borrow owned immutable assertion lists for reading. An empty scope
+push shares its predecessor's captured list; changed assertions receive a fresh
+capture, and caller snapshots remain independent copies.
 Exact trail edits do not require a floating projection. An incompatible projection
 retires the floating owner, while crossed sides are certified directly against the
 exact state and acceptance policy. A later projectable state can prepare a fresh owner.
