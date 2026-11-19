@@ -277,9 +277,11 @@ form.
 Polynomial adapters use `LinearEnvelopes` and `CertifiedEnvelopeLp` to assemble
 exact square and bilinear relaxations outside the engine. An owner retains its
 matrix for coordinate objectives and tangent additions inside one immutable query
-scope. Exact row certificates tighten its bounds before numerical solving. A
-temporary endpoint trial may propose a point, but only the exact primal/dual
-checker against the retained scope can certify it; trial pins never narrow that
+scope. Exact row certificates tighten its bounds before numerical solving. Row
+addition retains exact state until a query needs a numerical owner. A temporary
+trial pins proposed coordinates in sequence, propagating affine rows between
+choices, but only the exact primal/dual checker against the retained scope can
+certify it; trial pins never narrow that
 scope. Spatial child boxes create separate owners. Certified LP infeasibility
 refutes the relaxed scope; objective certificates bound source coordinates, while
 LP points require the caller's original nonlinear witness check. Shared search
