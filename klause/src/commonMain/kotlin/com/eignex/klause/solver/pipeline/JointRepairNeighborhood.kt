@@ -219,7 +219,7 @@ internal class JointRepairNeighborhood private constructor(
         val pins = linkedMapOf<Int, BigFraction>()
         for (id in 0 until integers) {
             if (!payRefutation(budget, token, 16L, 256L) ||
-                !bounds.hasLower(id) || !bounds.hasUpper(id) || bounds.lower(id) != 0L || bounds.upper(id) != 1L
+                !bounds.hasLower(id) || !bounds.hasUpper(id) || bounds.lower(id) < 0L || bounds.upper(id) > 1L
             ) return null
             val center = centers[id]
             if (center != BigFraction.ZERO && center != BigFraction.ONE) return null

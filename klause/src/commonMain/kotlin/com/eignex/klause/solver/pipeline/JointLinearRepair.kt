@@ -12,6 +12,7 @@ import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
@@ -28,7 +29,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.toLongExact
 import kotlin.math.round
 import kotlin.time.TimeSource
 
@@ -264,7 +267,9 @@ internal class JointLinearRepair(
                 "numericalRetainedNodes" -> "jointRepairPeakRetainedNodes"
                 "numericalPendingLeaves" -> "jointRepairUnresolvedLeaves"
                 "numericalFrontierPending" -> "jointRepairFrontierUnresolved"
-                else -> "jointRepair" + key.removePrefix("numerical")
+                else -> if (key.startsWith("numericalExternal"))
+                    "jointRepairQueryExternal" + key.removePrefix("numericalExternal")
+                else "jointRepair" + key.removePrefix("numerical")
             }
         }
 
@@ -304,7 +309,7 @@ internal class JointLinearRepair(
             },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
                 retainedProposal?.let { return@ExactNeighborhoodProposal it }
-                val bootstrap = bootstrapPending
+                var bootstrap = bootstrapPending
                 val checked = preparedCenter?.takeIf {
                     round == 0L &&
                         (cutoff == null || it.value?.let { value -> value < cutoff } == true)
@@ -319,6 +324,13 @@ internal class JointLinearRepair(
                 val current = if (round == 0L && checked != null && checked === preparedCenter)
                     refreshedCenter(checked) else checked
                 val pooled = current?.sample
+                if (bootstrap && current != null && dominatedBootstrap(current)) {
+                    bootstrap = false
+                    bootstrapPending = false
+                    bootstrapTried = true
+                    bootstrapHint = null
+                    observe("jointRepairDominatedBootstrapsSkipped")
+                }
                 if (centerProgress != null) proposalHasCheckedCenter = pooled != null
                 pooled?.let { sample ->
                     if (sample !== importedCenter) {
@@ -499,6 +511,29 @@ internal class JointLinearRepair(
         return value
     }
 
+    private fun dominatedBootstrap(checked: CheckedCenter): Boolean {
+        val objective = objective ?: return false
+        val cutoff = checked.value ?: return false
+        val entries = model.numBoolVars.toLong() + model.numIntVars + model.numRealVars
+        val work = 32L * (entries + 1L)
+        val bytes = 256L * (entries + 1L)
+        if (sourceIntegers != null || stop() || funding.availableWork <= work ||
+            funding.remainingAllocation <= bytes) return false
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        if (objective.realCoefficientValues.any { it != 0.0 }) return false
+        val integers = LongArray(model.numIntVars)
+        for (id in integers.indices) {
+            if (stop()) return false
+            val value = center(id) ?: return false
+            if (value.den != BIG_ONE || !value.num.fitsLong()) return false
+            integers[id] = value.num.toLongExact()
+        }
+        val rounded = Sample(checked.sample.bools, integers, DoubleArray(model.numRealVars))
+        // With every discrete coordinate fixed, a zero continuous objective cannot repair this cutoff.
+        return objective.evaluateExact(rounded) >= cutoff && !stop() && !funding.exhausted
+    }
+
     override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult =
         attempt(condition, cancellation).result
 
@@ -568,16 +603,10 @@ internal class JointLinearRepair(
                 return JointRepairAttempt(ExactNeighborhoodResult.Refuted, TerminationReason.SearchExhausted)
             }
             val captured = key ?: condition
-            var bounds = source.scope.condition
-            var pinnedIntegers = 0
-            for ((id, value) in captured.bools) bounds = bounds.pin(id, value)
-            for ((upper, entries) in listOf(false to captured.lower, true to captured.upper)) {
-                for ((id, value) in entries) {
-                    if (!upper && id < model.numIntVars && captured.upper[id] == value) pinnedIntegers++
-                    val coordinate = if (id < model.numIntVars) SourceCoordinate(SourceCoordinate.Kind.Integer, id)
-                    else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
-                    bounds = bounds.bound(coordinate, value, upper)
-                }
+            val bounds = queryCondition(captured, cancellation) ?: return if (cancellation() && !stop())
+                JointRepairAttempt(ExactNeighborhoodResult.Paused) else stoppedAttempt()
+            val pinnedIntegers = captured.lower.count { (id, value) ->
+                id < model.numIntVars && captured.upper[id] == value
             }
             pending = captured
             if (onComparison != null || observation != null) conditionSequence++
@@ -595,7 +624,8 @@ internal class JointLinearRepair(
             query = LinearAuthorityInvocation(querySource,
                 params.copy(sourceIncumbentCompletion = false, sourceRefutationCenterStep = false),
                 external = {
-                    (externalIncumbent() ?: seed ?: anchor).also { sample ->
+                    (if (seed != null && query?.hasIncumbent != true) seed
+                    else externalIncumbent() ?: seed ?: anchor).also { sample ->
                         if (sample != null) {
                             querySawExternal = true
                             refutedConditions.clear()
@@ -607,7 +637,8 @@ internal class JointLinearRepair(
                     guideRefutation(captured, querySource, feedback)
                 } else null,
                 feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null,
-                useSourceGap = false, guideIncumbent = seed != null)
+                useSourceGap = false, guideIncumbent = seed != null,
+                observeExternalIncumbents = observeExternalIncumbents)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed
             if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
@@ -720,6 +751,42 @@ internal class JointLinearRepair(
         stop() -> TerminationReason.Cancelled
         else -> TerminationReason.BudgetExhausted
     })
+
+    private fun queryCondition(condition: ExactNeighborhoodCondition,
+        cancellation: ExecutionControl): SourceCondition? {
+        val original = source.scope.condition
+        val entries = 1L + original.coordinateRestrictionCount + condition.bools.size +
+            condition.lower.size + condition.upper.size
+        val work = 16L * entries
+        val bytes = 256L * entries
+        if (stop() || cancellation()) return null
+        if (funding.remainingWork <= work || funding.remainingAllocation <= bytes) {
+            declined = true
+            return null
+        }
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        val bools = original.bools.toMutableMap()
+        val lower = original.lower.toMutableMap()
+        val upper = original.upper.toMutableMap()
+        for ((id, value) in condition.bools) {
+            if (stop() || cancellation()) return null
+            bools[id] = value
+        }
+        for ((isUpper, entries) in listOf(false to condition.lower, true to condition.upper)) {
+            val target = if (isUpper) upper else lower
+            for ((id, value) in entries) {
+                if (stop() || cancellation()) return null
+                val coordinate = if (id < model.numIntVars) SourceCoordinate(SourceCoordinate.Kind.Integer, id)
+                else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
+                val before = target[coordinate]
+                target[coordinate] = if (before == null || (if (isUpper) value < before else value > before))
+                    value else before
+            }
+        }
+        val result = original.copy(bools, lower, upper)
+        return result.takeUnless { stop() || cancellation() || funding.exhausted }
+    }
 
     private fun refutationKey(condition: ExactNeighborhoodCondition,
         cancellation: ExecutionControl): ExactNeighborhoodCondition? {
