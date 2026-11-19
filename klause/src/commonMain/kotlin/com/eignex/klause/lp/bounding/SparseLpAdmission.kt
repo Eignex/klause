@@ -63,7 +63,9 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     val preparationAllowance = minOf(SPARSE_LP_MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to maxOf(inspected, assemblyWork)))
-    if (automatic && (objective == null || problem.numRealVars != 0)) return decline("Source")
+    if (automatic && (objective == null || problem.numRealVars != 0 || problem.intBounds.hasOpenSides)) {
+        return decline("Source")
+    }
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
         return decline("Shape")

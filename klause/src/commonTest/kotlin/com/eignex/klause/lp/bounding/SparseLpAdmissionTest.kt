@@ -3,6 +3,7 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -40,6 +41,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -321,19 +323,21 @@ class SparseLpAdmissionTest {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
             settings = ProblemSettings(lpCeilingTableauCells = 1L))
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
-            SolveStatsSink("changed-root-bound-scope")).use { engine ->
-            assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
-            val original = requireNotNull(engine.sourceRootBoundLayout).model
-            assertTrue(engine.propagator.atLevel(1))
-            assertTrue(engine.propagator.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L))))
-            val result = requireNotNull(engine.propagator.solveFloat()?.second)
+        for (depth in listOf(0, 1)) {
+            LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
+                LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+                SolveStatsSink("changed-root-bound-scope")).use { engine ->
+                assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
+                val original = requireNotNull(engine.sourceRootBoundLayout).model
+                assertTrue(engine.propagator.atLevel(depth))
+                assertTrue(engine.propagator.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L))))
+                val result = requireNotNull(engine.propagator.solveFloat()?.second)
 
-            engine.checkContinuedRootBound(original, result, ExecutionControl.Never)
+                engine.checkContinuedRootBound(original, result, ExecutionControl.Never)
 
-            assertEquals(3.0, result.objective)
-            assertNull(engine.continuedRootLowerBound)
+                assertEquals(3.0, result.objective)
+                assertNull(engine.continuedRootLowerBound)
+            }
         }
     }
 
@@ -632,6 +636,25 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `automatic sparse admission declines open integer declarations before preparation`() {
+        val open = Bits(2).also { it.set(0) }
+        val problem = Problem(numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), Bits(2), open),
+            factors = arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        var result: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            result = prepareSparseLpAdmission(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)),
+                automatic = true)
+        }.forEach { }
+
+        val admission = requireNotNull(result)
+        assertFalse(admission.admitted)
+        assertEquals(1L, admission.metrics["DeclineSource"])
+        assertEquals(0L, admission.work)
+    }
+
+    @Test
     fun `expensive automatic sources decline before relaxation assembly`() {
         val problem = Problem(0, 64, Array(64) { IntDomain(0, 1) },
             List(32) { Linear(IntArray(64) { 1 }, IntArray(64) { it }, LinearOp.GE, 32) })
@@ -652,8 +675,9 @@ class SparseLpAdmissionTest {
     @Test
     fun `coalescing source memberships uses emitted admission`() {
         val problem = Problem(0, 32, Array(32) { IntDomain(0, 1) },
-            List(32) { Linear(IntArray(64) { if (it % 2 == 0) 1 else -1 },
-                IntArray(64) { it / 2 }, LinearOp.LE, 0) })
+            List(32) {
+                Linear(IntArray(64) { if (it % 2 == 0) 1 else -1 }, IntArray(64) { it / 2 }, LinearOp.LE, 0)
+            })
         val objective = LinearObjective(intCoefficients = LongArray(32) { 1L })
         var result: SparseLpAdmission? = null
 

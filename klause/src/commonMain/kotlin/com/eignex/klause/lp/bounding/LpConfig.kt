@@ -236,7 +236,7 @@ class LpConfig(
          *    techniques on/off on top of it — e.g. `aggressive,-cuts` (full LP but no cut rounds),
          *    `off,+cumulative-flow` (no LP except the flow prune). This is what enables/disables a
          *    single technique, which a bare list cannot;
-         *  - `all` — ordinary techniques forced on, with automatic sparse admission;
+         *  - `all` — ordinary techniques forced on; sparse admission retains automatic intent;
          *  - a bare comma-separated technique-id list — each forced on, all others off (force-exactly).
          *
          * `preparation=disabled|object|index|admitted` selects source-template policy independently
