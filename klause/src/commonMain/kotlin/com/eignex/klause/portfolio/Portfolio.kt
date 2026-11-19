@@ -1373,10 +1373,10 @@ class Portfolio(
             owedCompleteArm(eligibleArms)?.let { return it }
             val funded = fundedCore()
             if (funded != null && funded !in eligibleArms) {
-                eligibleArms.firstOrNull {
+                eligibleArms.filter {
                     workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof &&
                         !busy[it] && !retired[it]
-                }?.let { return it }
+                }.minByOrNull { armWork[it] }?.let { return it }
             }
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]

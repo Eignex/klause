@@ -16,6 +16,80 @@ import kotlin.time.TestTimeSource
 
 class PortfolioProofTest {
     @Test
+    fun `retiring a funded core should restore ordinary work growth`() {
+        val offers = ArrayList<Long>()
+        var coreVisits = 0
+        val completeBase = ScriptedSearch({ it == 0 }) {}
+        val complete = object : ResumableSearch by completeBase {
+            override fun runSlice(
+                global: ExecutionControl,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? {
+                if (coreVisits >= 2) offers += sliceNodes
+                return completeBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+            }
+        }
+        val coreBase = ScriptedSearch({ false }) { coreVisits++ }
+        val core = object : ResumableSearch by coreBase {
+            override val stats: SolveStats get() = SolveStats(coreGuided = CoreGuidedStats(continuationGrants = 1L))
+            override fun runSlice(
+                global: ExecutionControl,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? {
+                coreBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                return if (coreVisits == 2) MinimizeResult.Unknown(TerminationReason.BudgetExhausted) else null
+            }
+        }
+        val workers = listOf(trackingWorker("complete", 0, complete), trackingWorker("core", 1, core).also {
+            it.auxiliaryProof = true
+            it.improvementOnly = true
+            it.retainInitialProofCoverage = true
+        })
+
+        Portfolio.thompson(workers, baseSliceWork = 7L, maxSliceWork = 21L, reseedStaleThreshold = 0).use {
+            it.minimize(ExecutionControl { offers.size >= 3 })
+        }
+
+        assertTrue(offers.last() > 7L)
+    }
+
+    @Test
+    fun `funded core coverage should advance through a sibling with unspent offers`() {
+        var visits = 0
+        var coreVisits = 0
+        var lastCoverage = 0L
+        val idleBase = ScriptedSearch({ it == 0 }) { visits++ }
+        val idle = object : ResumableSearch by idleBase {
+            override val work: Long get() = minOf(5_000L, idleBase.work)
+        }
+        val complete = ScriptedSearch({ false }) { visits++ }
+        val coreBase = ScriptedSearch({ false }) {
+            if (coreVisits > 0) assertTrue(complete.work - lastCoverage >= 10_000L)
+            lastCoverage = complete.work
+            coreVisits++
+        }
+        val core = object : ResumableSearch by coreBase {
+            override val stats: SolveStats get() = SolveStats(coreGuided = CoreGuidedStats(continuationGrants = 1L))
+        }
+        val workers = listOf(trackingWorker("idle", 0, idle), trackingWorker("complete", 1, complete),
+            trackingWorker("core", 2, core).also {
+                it.auxiliaryProof = true
+                it.improvementOnly = true
+                it.retainInitialProofCoverage = true
+            })
+
+        Portfolio.thompson(workers, seed = 0, maxSliceWork = 20_000L, reseedStaleThreshold = 0).use {
+            it.minimize(ExecutionControl { coreVisits >= 3 || visits >= 32 })
+        }
+
+        assertEquals(3, coreVisits)
+    }
+
+    @Test
     fun `funded core turns should keep fresh sibling coverage and bounded work offers`() {
         for (maximum in listOf(7L, 21L, 35L)) {
             var completeVisits = 0
