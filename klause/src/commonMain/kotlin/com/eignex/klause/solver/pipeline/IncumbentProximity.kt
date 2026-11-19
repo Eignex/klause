@@ -106,7 +106,7 @@ internal object IncumbentProximity {
         if (key in premises || radiusKey in premises) return null
         premises[key] = SourcePremise(SourceInequality(original, target))
         val radius = minOf(center.numIntVars, ((center.numIntVars + 9) / 10).coerceIn(4, 32))
-        if (hint == null) premises[radiusKey] =
+        if (agreements.isEmpty()) premises[radiusKey] =
             SourcePremise(SourceInequality(costs, BigFraction.ofLong(radius.toLong()) - constant))
         val lower = source.scope.condition.lower.toMutableMap()
         val upper = source.scope.condition.upper.toMutableMap()

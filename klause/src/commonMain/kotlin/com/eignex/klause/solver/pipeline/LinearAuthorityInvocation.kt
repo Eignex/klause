@@ -71,7 +71,7 @@ internal class LinearAuthorityInvocation(
     private val observeExternalIncumbents: Boolean = false,
     sharedCompletions: LinearIncumbentSharing? = null,
     incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
-    repairGuidance: LinearRepairGuidance? = null,
+    private val repairGuidance: LinearRepairGuidance? = null,
     gap: OptimalityGap? = null,
     useSourceGap: Boolean = true,
     gapTolerance: OptimalityTolerance? = context.semantics?.effective?.optimalityTolerance,

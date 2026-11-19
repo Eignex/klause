@@ -581,7 +581,7 @@ Fixed binary companion repair instead searches near a checked center under the
 original pins. A paid LP point pins binary coordinates agreeing exactly with that
 center, leaving disagreements, fractional coordinates and continuous residuals free.
 Those advisory pins supply no source refutation authority. Its private objective
-retains the original cost. Without a paid point, a Hamming row bounds changed binary
+retains the original cost. Without an agreeing coordinate, a Hamming row bounds changed binary
 coordinates to ten percent of the integer columns rounded up, clamped between four
 and thirty-two changes and limited by the integer count. A separate original-cost
 row requests improvement by the largest of the declared positive objective allowance,
