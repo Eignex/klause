@@ -52,12 +52,11 @@ internal class ResumableSatisfaction(
     )
     private val params = params0.copy(
         cancellation = object : ExecutionControl() {
-            override fun isCancelled(): Boolean = globalToken() || containingSlice() || slice.expired()
-            override fun deadline() =
-                listOfNotNull(globalToken.deadline(), containingSlice.deadline(), slice.deadline).minOrNull()
+            override fun isCancelled(): Boolean = globalToken() || slice.expired()
+            override fun deadline() = listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
             override val workScheduled get() = globalToken.workScheduled()
             override val stopPolling get() = globalToken.stopPolling
-        },
+        } or containingSlice,
     )
     private var assumptions = params0.assumptions
     private var retiredAffineStatistics: Map<String, Long> = emptyMap()
