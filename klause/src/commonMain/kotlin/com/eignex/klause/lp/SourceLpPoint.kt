@@ -24,8 +24,8 @@ internal fun sourceLpPoint(
     if (variables < 0 || cancellation()) return null
     val policy = SparseSourceLpPolicy()
     return budget.runSparse(cancellation, { token ->
-        SparseSourceLp.prepare(rows, List(variables) { ExactLpColumn(ExactLpBounds(), integral = false) },
-            List(variables) { BigFraction.ZERO }, BigFraction.ZERO, policy, token)
+        SparseSourceLp.prepare(rows, ConstantList(variables, ExactLpColumn(ExactLpBounds(), integral = false)),
+            ConstantList(variables, BigFraction.ZERO), BigFraction.ZERO, policy, token)
     }) { prepared, token ->
         val observer = object : LpCertificationObserver {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
@@ -51,11 +51,26 @@ internal fun sourceLpPoint(
         try {
             val result = owner.solve(token = token, observer = observer, sparsePointRecovery = true,
                 claim = LpClaim.FEASIBLE_COMPLETION)
-            val point = result?.exactPrimal?.take(variables) ?: return@runSparse null
-            point.takeIf { it.admittedSourcePoint() && it.satisfiesSourceRows(rows, token) && !token() }
+            val primal = result?.exactPrimal ?: return@runSparse null
+            val validationWork = variables.toLong() + rows.sumOf { it.columns.size.toLong() + 1L }
+            token.charge(validationWork)
+            budget.observe(refinement = validationWork)
+            if (token()) return@runSparse null
+            val point = primal.take(variables)
+            point.takeIf {
+                it.size == variables && it.admittedSourcePoint() && it.satisfiesSourceRows(rows, token) && !token()
+            }
         } finally {
             budget.observe(preparation = owner.metrics.preparationWork, floatWork = owner.lastMetrics.workOps)
             budget.closeOwner(owner)
         }
+    }
+}
+
+// Sparse admission reserves the metadata before a dimension-sized list is materialized.
+private class ConstantList<T>(override val size: Int, private val value: T) : AbstractList<T>() {
+    override fun get(index: Int): T {
+        require(index in indices)
+        return value
     }
 }

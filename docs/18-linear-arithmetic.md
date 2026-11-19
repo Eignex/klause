@@ -78,6 +78,11 @@ A check proceeds in four steps:
 
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
+The invocation can retain a certified point as a guess across edits and retraction.
+Before reuse, the linear adapter reconstructs every affine definition and checks
+all current LP bounds, including strict sides, under the current operation allowance.
+A failed recheck requests another LP solve; reuse supplies no conflict, and a
+complete point still passes the selected source-row check before publication.
 
 A partial-state probe can imply a uniquely represented comparison guard
 from exact intervals over its terms. Coefficient signs select the bounding sides;

@@ -12,6 +12,17 @@ import kotlin.test.assertTrue
 
 class SourceLpPointTest {
     @Test
+    fun `unsafe sparse dimensions should decline before allocating column metadata`() {
+        val budget = SourceLpBudget()
+
+        val point = sourceLpPoint(emptyList(), Int.MAX_VALUE, budget, ExecutionControl.Never)
+
+        assertNull(point)
+        assertTrue(budget.measuredPreparationWork > 0L)
+        assertEquals(0L, budget.measuredFloatWork)
+    }
+
+    @Test
     fun `fractional strict sides should yield an exact interior point`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
