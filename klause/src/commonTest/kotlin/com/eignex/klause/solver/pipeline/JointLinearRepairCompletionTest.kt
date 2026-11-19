@@ -61,27 +61,28 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
         val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
         assertTrue(guidance.remember(source, (0 until integers).associate { id ->
             SourceCoordinate(SourceCoordinate.Kind.Integer, id) to
-                if (id >= groups * 2) 0.0 else if (id % 2 == 0) 1.0 else 1.0 / 3.0
+                if (id >= groups * 2) 0.0 else if (id % 2 == 0) 0.9 else 1.0 / 3.0
         }, budget, ExecutionControl.Never))
-        val center = Sample(booleanArrayOf(), LongArray(integers), doubleArrayOf(0.0),
+        var center = Sample(booleanArrayOf(), LongArray(integers), doubleArrayOf(0.0),
             exactReals = listOf(BigFraction.ZERO))
         val values = mutableListOf<BigFraction>()
 
         JointLinearRepair(model, source, objective,
-            TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxFlips = 2), external = { center },
+            TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxFlips = 3), external = { center },
             incumbentCompletionCheck = { _, _, _ -> true }, repairGuidance = guidance).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
                 repeat(96) {
-                    if (!done) done = search.advance(ExecutionControl.Never, 5_000) { _, value ->
+                    if (!done) done = search.advance(ExecutionControl.Never, 5_000) { sample, value ->
+                        center = sample
                         values += assertNotNull(value)
                     }
                 }
 
-                assertEquals(2, values.size)
-                assertTrue(values[1] < values[0])
+                assertEquals(3, values.size)
+                assertTrue(values.zipWithNext().all { (before, after) -> after < before })
                 val stages = repair.stats.smt.completeSearchStages.orEmpty()
-                assertEquals(1L, stages["jointRepairCandidates"])
+                assertEquals(2L, stages["jointRepairCandidates"])
                 assertTrue((stages["jointRepairRetainedQueryIncumbents"] ?: 0L) > 0)
                 assertFalse(repair.incumbentTrialPending)
                 assertTrue(done)
@@ -134,13 +135,14 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
         val guidance = LinearRepairGuidance()
         val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
         assertTrue(guidance.remember(source, (0..3).associate {
-            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.0
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to
+                if (it == 3) 0.0 else if (it == 1) 0.8 else 0.2
         }, budget, ExecutionControl.Never))
         val standing = Sample(booleanArrayOf(), longArrayOf(1, 1, 1, 0), doubleArrayOf(0.0),
             exactReals = listOf(BigFraction.ZERO))
 
         JointLinearRepair(model, source, objective,
-            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { standing },
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 2), external = { standing },
             incumbentCompletionCheck = { _, _, _ -> true }, repairGuidance = guidance).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false

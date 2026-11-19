@@ -535,7 +535,10 @@ With completion enabled, an accepted incumbent guides a depth-first numerical di
 visiting its side of each existing integer split first. Pending alternatives and
 checked global bounds retain ordinary coverage and certification. A checked pooled
 center starts joint repair without a root
-relaxation. When the frontier's paid root point is available, the first repair pins
+relaxation. Fixed repair first tries the rounded integers from an available paid
+root point under the checked incumbent's cutoff, retaining the ordinary continuous
+completion. The following repair can use a checked pool point at that same cutoff
+as its center. When the frontier's paid root point is available, that repair pins
 only eligible integers agreeing with that point within `1e-6`, releasing every
 disagreement and leaving continuous columns free. Agreement selects a private
 neighborhood, not a source fixing or bound. Empty or full agreement, missing guidance,
