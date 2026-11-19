@@ -134,7 +134,10 @@ An unattained limit also requires approach and nonattainment derivations.
 minimization results, keeping source assignments and exact objective values. A
 caller can supply bound or traversal derivations; without them optimum and
 refutation coverage stays unavailable. Recapture cannot erase a result's existing
-scope or restrictions. `PreparedSourcePlan.sourceResultCapture` uses the plan's
+scope or restrictions. Cancellation of optional capture preserves the completed
+result. A cancelled verification yields unavailable evidence without rewriting that
+result or preventing a later verification under a fresh allowance.
+`PreparedSourcePlan.sourceResultCapture` uses the plan's
 original IR, explicit pins and objective direction; narrowed execution bounds are
 not original premises.
 

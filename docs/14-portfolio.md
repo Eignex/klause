@@ -9,6 +9,8 @@ When every arm retires undecided, satisfaction and optimization retain the same
 stop reason: `Unsupported` takes precedence over `RepresentationDeclined`, followed
 by the other recorded worker reasons. An unfinished optimization keeps its verified
 incumbent with that reason; an arm decline alone does not imply budget exhaustion.
+An admitted terminal or clean exhaustion takes precedence over those stop reasons,
+including cancellation observed while the final retained handle closes.
 
 ## Invocations and recipes
 

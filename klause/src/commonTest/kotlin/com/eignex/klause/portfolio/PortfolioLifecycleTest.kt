@@ -35,6 +35,67 @@ import kotlin.time.TestTimeSource
 
 class PortfolioLifecycleTest {
     @Test
+    fun `retiring every satisfaction arm should retain an accepted verdict through cancellation`() {
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        for (terminal in listOf(SolveResult.Sat(sample), SolveResult.Unsat())) {
+            var cancelled = false
+            val closed = IntArray(2)
+            val workers = listOf(SolveResult.Unknown(TerminationReason.Unsupported), terminal)
+                .mapIndexed { index, verdict ->
+                    val handle = object : ResumableSolve {
+                        override val isDone: Boolean get() = true
+                        override val stats: SolveStats get() = SolveStats.EMPTY
+                        override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long) = verdict
+                        override fun close() {
+                            closed[index]++
+                            if (index == 1) cancelled = true
+                        }
+                    }
+                    PortfolioWorker.ofSolve("worker-$index", index, resumable = { handle }) { _, _ ->
+                        error("the retained handle must run")
+                    }
+                }
+
+            val result = Portfolio.thompson(workers).use { it.solve(ExecutionControl { cancelled }) }
+
+            assertEquals(terminal::class, result::class)
+            if (result is SolveResult.Sat) assertEquals(sample, result.assignment)
+            assertEquals(listOf(1, 1), closed.toList())
+            assertTrue(cancelled)
+        }
+    }
+
+    @Test
+    fun `retiring every optimization arm should retain an accepted terminal through cancellation`() {
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        val terminals = listOf(
+            MinimizeResult.Optimal(sample, 0.0),
+            MinimizeResult.Infeasible(),
+            MinimizeResult.Unbounded(sample, 0.0, emptyList()),
+        )
+        for (terminal in terminals) {
+            var cancelled = false
+            val declined = TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.Unsupported))
+            val completed = TrackingResumableSearch(terminal)
+            val handle = object : ResumableSearch by completed {
+                override fun close() {
+                    completed.close()
+                    cancelled = true
+                }
+            }
+            val workers = listOf(trackingWorker("declined", 0, declined), trackingWorker("completed", 1, handle))
+
+            val result = Portfolio.thompson(workers).use { it.minimize(ExecutionControl { cancelled }) }
+
+            assertEquals(terminal::class, result::class)
+            assertEquals(terminal.assignment, result.assignment)
+            assertEquals(1, declined.closes)
+            assertEquals(1, completed.closes)
+            assertTrue(cancelled)
+        }
+    }
+
+    @Test
     fun `satisfaction reduction should preserve recorded unknown reasons`() {
         for (reason in TerminationReason.entries) {
             val result = PortfolioReduction.verdict(listOf(SolveResult.Unknown(reason)))

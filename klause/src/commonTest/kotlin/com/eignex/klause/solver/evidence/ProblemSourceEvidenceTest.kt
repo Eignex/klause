@@ -11,12 +11,14 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
@@ -37,6 +39,23 @@ class ProblemSourceEvidenceTest {
             Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
         ),
     )
+
+    @Test
+    fun `cancelled source verification should preserve a captured witness for a later check`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf(Product(0, 1, 2)))
+        val context = assertNotNull(source.sourceProofContext(scope))
+        val point = Sample(booleanArrayOf(), longArrayOf(2, 3, 6))
+        val result = SourceResultCapture(context).solve(SolveResult.Sat(point), "fixture-engine")
+        val evidence = assertNotNull(result.evidence)
+        val claim = SourceClaim.Witness(point)
+        assertEquals(SourceEvidenceCheck.Checked, evidence.verify(claim, context))
+
+        val interrupted = evidence.verify(claim, context, cancellation = ExecutionControl { true })
+
+        assertIs<SourceEvidenceCheck.Unavailable>(interrupted)
+        assertEquals(point, assertIs<SolveResult.Sat>(result).assignment)
+        assertEquals(SourceEvidenceCheck.Checked, evidence.verify(claim, context))
+    }
 
     @Test
     fun `nonaffine source evidence should check the entire original point`() {
