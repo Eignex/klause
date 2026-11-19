@@ -1,0 +1,86 @@
+package com.eignex.klause.lp.relaxation
+
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutProvenance
+import com.eignex.klause.lp.engine.CutSource
+import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.util.numbers.BigFraction
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+class CutSourceMapTest {
+    @Test
+    fun `source maps capture borrowed input collections`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val terms = mutableMapOf(source to BigFraction.ONE)
+        val lower = CutPremise.Bound(CutExpression(terms), false, BigFraction.ZERO)
+        val globals = mutableSetOf<CutPremise>(lower)
+        val columns = mutableListOf<CutColumnSource?>(CutColumnSource(source))
+        val map = CutSourceMap(Any(), 0, columns, globalPremises = globals)
+
+        terms.clear()
+        globals.clear()
+        columns.clear()
+
+        assertTrue(map.isGlobal(CutPremise.Bound(CutExpression(mapOf(source to BigFraction.ONE)),
+            false, BigFraction.ZERO)))
+        assertEquals(source, map.column(0)?.source)
+    }
+
+    @Test
+    fun `sibling bounds do not inherit each others active premises`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(source to BigFraction.ONE))
+        val root = CutSourceMap(Any(), 0, listOf(CutColumnSource(source)))
+        val firstBuilder = LpBuilder().apply { addVar(2L, 7L) }
+        val secondBuilder = LpBuilder().apply { addVar(6L, 9L) }
+
+        val first = root.withBounds(firstBuilder.build(Sense.MINIMIZE))
+        val second = root.withBounds(secondBuilder.build(Sense.MINIMIZE))
+
+        val upper = CutPremise.Bound(expression, true, BigFraction.ofLong(7L))
+        assertTrue(first.isActive(upper))
+        assertFalse(second.isActive(upper))
+        assertFalse(root.isActive(upper))
+    }
+
+    @Test
+    fun `derived row parents capture their input without changing the source map`() {
+        val root = CutSourceMap(Any(), 0, emptyList())
+        val proof = CutProvenance(root.model, 0, emptyList())
+        val parents = mutableMapOf(0 to proof)
+
+        val derived = root.withParentRows(parents)
+        parents.clear()
+
+        assertSame(proof, derived.parent(0))
+        assertNull(root.parent(0))
+    }
+
+    @Test
+    fun `cp bounds retain source units when an lp column is affine`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList())
+        val session = PropagationSession(problem)
+        session.implyIntAtLeast(0, 3L)
+        val map = CutSourceMap(problem, 0,
+            listOf(CutColumnSource(source, BigFraction.ofLong(2L), BigFraction.ONE)))
+        val builder = LpBuilder().apply { addVar(1L, 2L) }
+
+        val rebound = map.withCpBounds(builder.build(Sense.MINIMIZE), session)
+
+        val expression = CutExpression(mapOf(source to BigFraction.ONE))
+        assertTrue(rebound.isActive(CutPremise.Bound(expression, false, BigFraction.ofLong(3L))))
+        assertFalse(rebound.isActive(CutPremise.Bound(expression, false, BigFraction.ofLong(4L))))
+    }
+}

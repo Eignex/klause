@@ -371,6 +371,10 @@ and target reset, reseed and engine close release the preferences.
 
 ### Immutable component ownership
 
+Cut-source maps capture incoming collections once. Derived maps share immutable
+column expressions, global premises and source definitions while owning their active
+premises and row-parent mappings. Source identities and epochs keep their existing scope.
+
 The independent `lp-component-reuse` setting rejects small or oversized owners before
 partition allocation, then admits numerical node ownership from the partition's size,
 tableau-size reduction and modeled child-model storage. A finite shared basis-entry

@@ -24,7 +24,8 @@ internal data class CutColumnSource(
     init {
         require(!scale.isZero)
     }
-    fun expression(): CutExpression = CutExpression(mapOf(source to scale), offset)
+    private val expression = CutExpression(mapOf(source to scale), offset)
+    fun expression(): CutExpression = expression
 }
 
 internal class LpAuxiliarySources {
@@ -60,24 +61,38 @@ internal class LpAuxiliarySources {
     }
 }
 
-internal class CutSourceMap(
+internal class CutSourceMap private constructor(
     val model: Any,
     val epoch: Long,
     columns: List<CutColumnSource?>,
-    globalPremises: Set<CutPremise> = emptySet(),
-    activePremises: Set<CutPremise> = emptySet(),
-    fixed: Map<CutSource, BigFraction> = emptyMap(),
-    assumptions: Set<String> = emptySet(),
-    parentRows: Map<Int, CutProvenance> = emptyMap(),
-    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
+    globalPremises: Set<CutPremise>,
+    activePremises: Set<CutPremise>,
+    fixed: Map<CutSource, BigFraction>,
+    assumptions: Set<String>,
+    parentRows: Map<Int, CutProvenance>,
+    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition>,
+    owned: Boolean,
 ) {
-    private val columnSnapshot = columns.toList()
-    private val globalSnapshot = globalPremises.toSet()
-    private val activeSnapshot = activePremises.toSet()
-    private val fixedSnapshot = fixed.toMap()
-    private val assumptionSnapshot = assumptions.toSet()
-    private val parentSnapshot = parentRows.toMap()
-    private val auxiliarySnapshot = auxiliaryDefinitions.toMap()
+    constructor(
+        model: Any,
+        epoch: Long,
+        columns: List<CutColumnSource?>,
+        globalPremises: Set<CutPremise> = emptySet(),
+        activePremises: Set<CutPremise> = emptySet(),
+        fixed: Map<CutSource, BigFraction> = emptyMap(),
+        assumptions: Set<String> = emptySet(),
+        parentRows: Map<Int, CutProvenance> = emptyMap(),
+        auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
+    ) : this(model, epoch, columns, globalPremises, activePremises, fixed, assumptions,
+        parentRows, auxiliaryDefinitions, false)
+
+    private val columnSnapshot = if (owned) columns else columns.toList()
+    private val globalSnapshot = if (owned) globalPremises else globalPremises.toSet()
+    private val activeSnapshot = if (owned) activePremises else activePremises.toSet()
+    private val fixedSnapshot = if (owned) fixed else fixed.toMap()
+    private val assumptionSnapshot = if (owned) assumptions else assumptions.toSet()
+    private val parentSnapshot = if (owned) parentRows else parentRows.toMap()
+    private val auxiliarySnapshot = if (owned) auxiliaryDefinitions else auxiliaryDefinitions.toMap()
     private val auxiliaryByDefinition: Map<CutAuxiliaryDefinition, CutSource?> by lazy(
         LazyThreadSafetyMode.PUBLICATION,
     ) {
@@ -158,16 +173,17 @@ internal class CutSourceMap(
         assumptionSnapshot,
         parentSnapshot,
         auxiliarySnapshot,
+        true,
     )
 
     fun withParentRows(parents: Map<Int, CutProvenance>): CutSourceMap = CutSourceMap(
         model, epoch, columnSnapshot, globalSnapshot, activeSnapshot, fixedSnapshot, assumptionSnapshot,
-        parents, auxiliarySnapshot,
+        parents.toMap(), auxiliarySnapshot, true,
     )
 
     fun withActivePremises(premises: Set<CutPremise>): CutSourceMap = CutSourceMap(
         model, epoch, columnSnapshot, globalSnapshot, activeSnapshot + premises, fixedSnapshot, assumptionSnapshot,
-        parentSnapshot, auxiliarySnapshot,
+        parentSnapshot, auxiliarySnapshot, true,
     )
 }
 
@@ -176,13 +192,17 @@ internal fun CutSourceMap.withCpBounds(
     session: com.eignex.klause.propagation.PropagationSession,
 ): CutSourceMap {
     val facts = HashSet<CutPremise>()
+    val expressions = columns.filterNotNull().filter {
+        it.source.kind == CutSourceKind.INTEGER && it.scale == BigFraction.ONE && it.offset.isZero
+    }.associate { it.source.id to it.expression() }
     for (variable in 0 until session.problem.numBoolVars) {
         val value = session.boolValue(variable) ?: continue
         facts.add(CutPremise.Literal((variable shl 1) or if (value) 0 else 1))
     }
     for (variable in 0 until session.problem.numIntVars) {
         val domain = session.intDomain(variable)
-        val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
+        val expression = expressions[variable]
+            ?: CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
         facts.add(CutPremise.Bound(expression, false, BigFraction.ofLong(domain.min)))
         facts.add(CutPremise.Bound(expression, true, BigFraction.ofLong(domain.max)))
     }
