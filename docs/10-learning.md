@@ -396,7 +396,9 @@ conflict, scaled mixed-integer rounding can reduce the reason before another
 combination. These reductions cite only declared domains, never live branch bounds.
 
 Endpoint discovery uses a heap ordered by historical deduction position, with
-coordinate order breaking ties. An analysis caches validated source identities and
+coordinate order breaking ties. Unsupported projection kinds are excluded before
+marker reconstruction; eligible endpoints share one lazily allocated array of packed
+trail and coordinate priorities. An analysis caches validated source identities and
 normalized inequality sides; every consultation still checks historical guard truth,
 raw requested bounds and membership. Incompatible guards decline before historical
 bound reconstruction. Discovery, arithmetic, candidate ordering and duplicate scans
