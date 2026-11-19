@@ -110,8 +110,9 @@ columns. The normalization's scale selects the bounding side, and its offset
 reconstructs source activity under the same rational-size and operation limits.
 Each successful implication uses the current active bound premise and the
 normalization's declared-fixing premises. Probing creates no LP definition and
-retains no reason. It precedes individual-coordinate decline reuse, so an unchanged
-coordinate interval cannot hide a newly bounded affine expression.
+retains no reason. Decline reuse includes both the individual-coordinate bounds
+and the affine column's exact sides, so an unchanged coordinate interval cannot
+hide a newly bounded affine expression.
 
 The incremental route indexes prepared rows by their Boolean activators and
 coefficient inputs. A literal change schedules only those source rows; retraction

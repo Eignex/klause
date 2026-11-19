@@ -178,7 +178,9 @@ internal class LiveQfLraSystem(
     }
     private val terms = normalized.filterKeys { it in initialTerms }.values
         .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
-    private val definitions = terms.withIndex().associate { (index, term) -> term to pointColumns + index }.toMutableMap()
+    private val definitions = terms.withIndex().associate { (index, term) ->
+        term to pointColumns + index
+    }.toMutableMap()
     var batchSourceBounds = true
     var observeAssertionCost = false
     val assertionCost = SmtSourceAssertionCost()
@@ -247,7 +249,9 @@ internal class LiveQfLraSystem(
                 List(terms.size) { ExactLpNumber.of(0L) },
                 structural + logical,
                 List(terms.size) { ExactLpRow() },
-                ExactLpObjective(List(pointColumns + terms.size) { ExactLpNumber.of(if (it == marginColumn) -1L else 0L) }),
+                ExactLpObjective(List(pointColumns + terms.size) {
+                    ExactLpNumber.of(if (it == marginColumn) -1L else 0L)
+                }),
             ),
         )
     }
@@ -310,6 +314,21 @@ internal class LiveQfLraSystem(
             batch.complete(index)
         }
         return !stop() && (batch.flush() || batch.conflict)
+    }
+
+    fun affineInputSides(comparison: ExactComparison, stop: ExecutionControl): List<PartialLinearSide?>? {
+        stop.charge(comparison.terms.size.toLong() + 1L)
+        if (stop()) return null
+        val key = preparedTerms[comparison.ordered]?.positive
+        val term = key?.let { (it.slot ?: normalized[it])?.term }
+        val column = term?.let { definitions[it.coefficients] }
+        val state = lp.state ?: return null
+        return listOf(false, true).map { upper ->
+            val active = column?.let { state.activeSide(it, upper) } ?: return@map null
+            val premise = lp.activeBoundPremise(column, upper) ?: return null
+            if (premise === SearchAtomPremise.Unavailable) return null
+            PartialLinearSide(active.side.number.value, active.side.strict)
+        }
     }
 
     fun affineImplication(comparison: ExactComparison, stop: ExecutionControl): PartialLinearImplication? {

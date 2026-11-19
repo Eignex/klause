@@ -1,8 +1,8 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.lp.sourceLpPoint
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
+import com.eignex.klause.lp.sourceLpPoint
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntDisjointSet

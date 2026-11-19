@@ -544,19 +544,19 @@ class ExactLiraSearchComponent private constructor(
                 if (prepared.booleans.any { it != variable && bools[it] == UNASSIGNED }) continue
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == LIRA_TRUE }
-                val affine = if (incrementalLinearPropagation && comparison.terms.size > 1) {
-                    affineProbes++
-                    system.affineImplication(comparison, operationStop)
-                } else
-                    null
-                val inputs = if (affine == null && partialLinearCache) {
-                    partialLinearInputs(comparison) ?: continue
+                val inputs = if (partialLinearCache) {
+                    partialLinearInputs(comparison)
                 } else
                     null
                 if (inputs != null && partialLinearDeclines[prepared] == inputs) {
                     partialLinearUnchanged++
                     continue
                 }
+                val affine = if (incrementalLinearPropagation && comparison.terms.size > 1) {
+                    affineProbes++
+                    system.affineImplication(comparison, operationStop)
+                } else
+                    null
                 var unavailable = false
                 partialLinearEvaluations++
                 val implication = affine ?: partialLinearImplication(comparison, { column, upper ->
@@ -619,6 +619,9 @@ class ExactLiraSearchComponent private constructor(
             for (upper in listOf(false, true)) {
                 sides += state.activeSide(column, upper)?.side?.let { PartialLinearSide(it.number.value, it.strict) }
             }
+        }
+        if (incrementalLinearPropagation && comparison.terms.size > 1) {
+            sides += system.affineInputSides(comparison, operationStop) ?: return null
         }
         return PartialLinearInputs(comparison.bound, sides)
     }

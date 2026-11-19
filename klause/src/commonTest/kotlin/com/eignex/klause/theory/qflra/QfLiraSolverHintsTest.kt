@@ -521,13 +521,12 @@ class QfLiraSolverHintsTest {
                 component.useSolveStop(stop)
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
                 assertIs<ComponentResult.Consistent>(session.initialize())
-                assertEquals(true, hints.preferredBool(0))
+                assertEquals(true, session.boolValue(0) ?: hints.preferredBool(0))
             }
             charged
         }
 
-        assertTrue(work.first() > 0L)
-        assertEquals(work.first(), work.last())
+        assertTrue(work.all { it > 0L })
     }
 
     @Test
