@@ -102,7 +102,8 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
         assertFalse(producer.compatible(identity, nominal, objective.copy(constant = objective.constant + 1L)))
         assertFalse(producer.compatible(opaque, nominal, objective))
         assertFalse(producer.compatible(scaled, nominal, objective))
-        assertNull(producer.capture(nominal, objective.copy(constant = objective.constant + 1L), ExecutionControl.Never))
+        assertNull(producer.capture(nominal, objective.copy(constant = objective.constant + 1L),
+            ExecutionControl.Never))
     }
 
     @Test
