@@ -46,7 +46,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `reliable child preference follows the requested gain direction`() {
+    fun `reliable child preference seeks lower gains unless a child can reach the cutoff`() {
         for (cheaperUp in listOf(false, true)) {
             val history = LpDirectionalHistory({})
             history.beginNode(0)
@@ -60,8 +60,13 @@ class LpDirectionalHistoryTest {
                 }
             }
 
-            assertEquals(cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, preferHighGain = false))
-            assertEquals(!cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, preferHighGain = true))
+            history.beginNode(0)
+            history.record(10.0)
+
+            assertEquals(cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75))
+            assertEquals(cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 14.0))
+            assertEquals(!cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 12.0))
+            assertNull(history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 10.0))
         }
     }
 
