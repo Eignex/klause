@@ -512,9 +512,11 @@ conditions encode the checked center separately from feasible query incumbents.
 Private query progress supplies no root-fixing or learned-clause reward. A private
 witness passes original-source completion and the receiving frontier's checks
 before it can improve the source incumbent; private proofs never enter its coverage.
-A private query retires as soon as it delivers a checked improvement. Improvements
-from either traversal recenter the private search, while the frontier keeps the next
-consultation and all containing allowances stay cumulative.
+A private query retires as soon as it delivers a checked improvement. An ordinary
+frontier improvement also retires an obsolete private query. Only a newly imported
+checked improvement starts another private query, so a query's own improvement
+returns its remaining allowance to ordinary traversal. All containing allowances
+stay cumulative.
 Accepted improvement attribution retains whether its candidate came from the
 private query, including candidates whose source publication was deferred.
 Objective-coordinate conversion retains the producer's candidate statistics while
@@ -579,10 +581,8 @@ eligible integers agreeing with the paid point, releasing every disagreement.
 Continuous columns remain free. Missing guidance, cancellation and unavailable
 funding retain the connected two-integer start.
 Fixed binary companion repair instead searches near a checked center under the
-original pins. A paid LP point pins binary coordinates agreeing exactly with that
-center, leaving disagreements, fractional coordinates and continuous residuals free.
-Those advisory pins supply no source refutation authority. Its private objective
-retains the original cost. Without an agreeing coordinate, a Hamming row bounds changed binary
+original pins. Its private objective retains the original cost and continuous
+residuals remain free. A Hamming row bounds changed binary
 coordinates to ten percent of the integer columns rounded up, clamped between four
 and thirty-two changes and limited by the integer count. A separate original-cost
 row requests improvement by the largest of the declared positive objective allowance,
@@ -594,6 +594,8 @@ original-checked strict improvement can leave this search; its private objective
 refutations and optima supply no parent objective or coverage evidence. A failed
 target ends undecided and is not retried at the same cutoff; unavailable preparation
 falls back to ordinary neighborhoods.
+After a checked private improvement, joint repair leaves the improved cutoff to
+ordinary neighborhoods until a better shared center arrives.
 A newer checked shared incumbent replaces the target before its query opens, or
 retires an already pending private query. Its replacement keeps the same containing
 allowance and original receiving conditions.

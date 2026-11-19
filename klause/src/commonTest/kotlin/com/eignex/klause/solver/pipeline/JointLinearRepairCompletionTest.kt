@@ -131,6 +131,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                 assertContentEquals(longArrayOf(0, 0, 0), result.sample.ints)
                 assertEquals(listOf(BigFraction.ONE), result.sample.exactReals)
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityImprovements"))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityCenters"))
                 assertTrue(done)
             }
         }

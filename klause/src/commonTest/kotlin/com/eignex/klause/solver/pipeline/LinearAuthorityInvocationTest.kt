@@ -103,6 +103,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
 
         assertEquals(BigFraction.ZERO, result.value)
         assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalProximityImprovements"))
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalProximityCenters"))
         assertEquals(1, uses)
         val terminal = assertNotNull(result.terminal)
         assertEquals(source.scope, terminal.scope)
