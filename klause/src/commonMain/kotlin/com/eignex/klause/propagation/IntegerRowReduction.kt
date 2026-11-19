@@ -32,11 +32,16 @@ internal fun IntegerConflictRow.reduced(
         val origin = if (coefficient > BIG_ZERO) declared.max else declared.min
         origins[index] = origin
         budget?.scalar(coefficient, bigIntOf(origin))
-        degree += coefficient * bigIntOf(origin)
+        val contribution = coefficient * bigIntOf(origin)
+        budget?.scalar(degree, contribution)
+        degree += contribution
     }
     if (degree <= BIG_ZERO) return null
+    budget?.scalar(degree, divisor)
     val remainder = degree % divisor
-    val nextDegree = if (remainder == BIG_ZERO) degree else remainder * ceilDiv(degree, divisor)
+    val quotient = ceilDiv(degree, divisor)
+    budget?.scalar(remainder, quotient)
+    val nextDegree = if (remainder == BIG_ZERO) degree else remainder * quotient
     var nextBound = -nextDegree
     val nextCoefficients = Array(variables.size) { index ->
         val coefficient = coefficients[index]
@@ -46,7 +51,10 @@ internal fun IntegerConflictRow.reduced(
         val reduced = if (remainder == BIG_ZERO) weight else
             remainder * (weight / divisor) + minOf(weight % divisor, remainder)
         val signed = if (coefficient > BIG_ZERO) reduced else -reduced
-        nextBound += signed * bigIntOf(origins[index])
+        budget?.scalar(signed, bigIntOf(origins[index]))
+        val contribution = signed * bigIntOf(origins[index])
+        budget?.scalar(nextBound, contribution)
+        nextBound += contribution
         signed
     }
     return IntegerConflictRow.source(variables, nextCoefficients, nextBound, useLo = true, guard, budget)

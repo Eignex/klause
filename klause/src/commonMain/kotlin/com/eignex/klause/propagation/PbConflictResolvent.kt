@@ -183,6 +183,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         if (failed) return false
         // Fallback: reconstruct the reason clause. The driver's antecedents omit the forced literal;
         // add it back so the clause mentions the pivot and cancellation can proceed.
+        budget.spend(work = fallbackReasonLits.size.toLong() + 1,
+            bytes = (fallbackReasonLits.size.toLong() + 1) * Int.SIZE_BYTES)
         val lits = IntArray(fallbackReasonLits.size + 1)
         fallbackReasonLits.copyInto(lits)
         lits[fallbackReasonLits.size] = forced
@@ -265,6 +267,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
             if (lvl > 0) seen.add(lvl)
         }
         val out = seen.toIntArray()
+        budget.spend(work = out.size.toLong() * (Int.SIZE_BITS - out.size.countLeadingZeroBits()))
         out.sort()
         return out
     }
@@ -309,8 +312,12 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
             while (position < order.size && levels[order[position]] <= level) {
                 budget.spend()
                 val index = order[position++]
-                if (state.litFalse(literals[index])) available -= weights[index]
+                if (state.litFalse(literals[index])) {
+                    budget.scalar(available, weights[index])
+                    available -= weights[index]
+                }
             }
+            budget.scalar(available, degree)
             val slack = available - degree
             if (slack >= BIG_ZERO && suffix[position] > slack) return level to true
             if (position == order.size) break

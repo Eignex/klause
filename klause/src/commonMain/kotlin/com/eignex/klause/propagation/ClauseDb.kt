@@ -159,9 +159,11 @@ internal fun PropagationState.addLearnedPb(
     var largest = total
     for (weight in weights) {
         checkFiniteWork()
+        checkIntegerScalarWork(total, weight)
         total += weight
         if (weight > largest) largest = weight
     }
+    checkIntegerScalarWork(degree, largest)
     if (total.fitsLong() && (degree + largest).fitsLong()) {
         return addLearnedPb(LongArray(weights.size) { weights[it].toLongExact() }, literals,
             degree.toLongExact(), lbd, permanent)

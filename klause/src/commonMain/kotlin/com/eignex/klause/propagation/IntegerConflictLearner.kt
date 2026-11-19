@@ -76,7 +76,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
                 if (asserts) 1 else 0)
             if (!asserts) continue
+            val metadataSize = row.variables.size.toLong() + fallback.decisionLevels.size
+            budget.spend(work = metadataSize * (Long.SIZE_BITS - metadataSize.countLeadingZeroBits()),
+                bytes = metadataSize * 40)
             val levels = row.variables.indices.map { index ->
+                budget.spend()
                 val variable = row.variables[index]
                 val lower = row.coefficients[index] > BIG_ZERO
                 val domain = state.intDomains[variable]
@@ -102,6 +106,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
     ): IntegerSourceRow? = sources.source(factorId, trail, forBoundReason)
 
     private fun reason(row: IntegerConflictRow, used: Set<Pair<Int, Int>>): BoundEvent? {
+        budget.spend(bytes = row.variables.size.toLong() * Int.SIZE_BYTES)
+        val trails = IntArray(row.variables.size)
         var candidates: IntArray? = null
         var count = 0
         for (index in row.variables.indices) {
@@ -118,6 +124,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             val key = variable to if (lower) marker[2] else marker[2].inv()
             if (key in used) continue
+            trails[index] = marker[2]
             val indices = candidates ?: run {
                 budget.spend(bytes = row.variables.size.toLong() * Int.SIZE_BYTES)
                 IntArray(row.variables.size).also { candidates = it }
@@ -127,8 +134,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val indices = candidates ?: return null
         fun later(left: Int, right: Int): Boolean {
             budget.spend()
-            val l = checkNotNull(endpointMarker(row, left))[2]
-            val r = checkNotNull(endpointMarker(row, right))[2]
+            val l = trails[left]
+            val r = trails[right]
             return l > r || (l == r && left < right)
         }
         fun sift(start: Int, size: Int) {
@@ -188,9 +195,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         if (lo == 0) return null
         val trail = moves[lo - 1]
         val source = sourceFactor(factorId, trail, forBoundReason = true) ?: return null
+        budget.spend(source.variables.size.toLong())
         val position = source.variables.indexOf(variable)
         if (position < 0) return null
-        val positive = source.row(source.op != LinearOp.GE, budget)?.coefficient(variable) ?: return null
+        val positive = normalizedSource(source, source.op != LinearOp.GE)?.coefficient(variable) ?: return null
         val useLo = if (source.op == LinearOp.GE) false else (positive > BIG_ZERO) != lower
         return linearLazyReason(state, factorId, position, useLo, 0,
             source.guard xor 1, source.guard != Lit.NONE).also {

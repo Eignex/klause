@@ -67,7 +67,7 @@ internal class PbAccumulator {
     fun coefOf(variable: Int): BigInt = coefficients[variable] ?: BIG_ZERO
 
     fun loadPb(weights: LongArray, literals: IntArray, geBound: Long): Boolean {
-        budget?.spend(bytes = weights.size.toLong() * 40)
+        budget?.spend(work = weights.size.toLong(), bytes = weights.size.toLong() * 40)
         return loadPb(Array(weights.size) { bigIntOf(weights[it]) }, literals, bigIntOf(geBound))
     }
 
@@ -81,6 +81,7 @@ internal class PbAccumulator {
             budget?.scalar(coefOf(variable), weight)
             if (Lit.isPositive(literal)) put(variable, coefOf(variable) + weight) else {
                 put(variable, coefOf(variable) - weight)
+                budget?.scalar(rhs, weight)
                 rhs -= weight
             }
         }
@@ -88,7 +89,7 @@ internal class PbAccumulator {
     }
 
     fun loadClause(literals: IntArray): Boolean {
-        budget?.spend(bytes = literals.size.toLong() * 8)
+        budget?.spend(work = literals.size.toLong(), bytes = literals.size.toLong() * 8)
         return loadPb(Array(literals.size) { BIG_ONE }, literals, BIG_ONE)
     }
 
@@ -106,7 +107,9 @@ internal class PbAccumulator {
         rhs = rhs * mulSelf + other.rhs * mulOther
         for ((variable, coefficient) in other.coefficients) {
             budget?.scalar(coefficient, mulOther)
-            put(variable, coefOf(variable) + coefficient * mulOther)
+            val scaled = coefficient * mulOther
+            budget?.scalar(coefOf(variable), scaled)
+            put(variable, coefOf(variable) + scaled)
         }
         return true
     }
@@ -120,6 +123,7 @@ internal class PbAccumulator {
         // The inactive guard can pay the complete positive degree, independently of the body.
         if (Lit.isPositive(guard)) {
             put(variable, coefOf(variable) - degree)
+            budget?.scalar(rhs, degree)
             rhs -= degree
         } else put(variable, coefOf(variable) + degree)
     }
@@ -134,6 +138,7 @@ internal class PbAccumulator {
             coefficients[variable] = if (coefficient > BIG_ZERO) weight else -weight
             if (coefficient < BIG_ZERO) negatives += weight
         }
+        budget?.scalar(degree, negatives)
         rhs = degree - negatives
     }
 
@@ -144,7 +149,9 @@ internal class PbAccumulator {
             divisor = divisor.gcd(coefficient.abs())
         }
         if (divisor <= BIG_ONE) return
-        val degree = ceilDiv(positiveDegree(), divisor)
+        val priorDegree = positiveDegree()
+        budget?.scalar(priorDegree, divisor)
+        val degree = ceilDiv(priorDegree, divisor)
         var negatives = BIG_ZERO
         for ((variable, coefficient) in coefficients) {
             budget?.scalar(coefficient, divisor)
@@ -152,6 +159,7 @@ internal class PbAccumulator {
             coefficients[variable] = next
             if (next < BIG_ZERO) negatives -= next
         }
+        budget?.scalar(degree, negatives)
         rhs = degree - negatives
     }
 
@@ -166,7 +174,10 @@ internal class PbAccumulator {
             budget?.scalar(coefficient, divisor)
             if (variable != keepVar && coefficient.abs() % divisor != BIG_ZERO &&
                 !isFalse(Lit.make(variable, coefficient > BIG_ZERO))) {
-                if (coefficient > BIG_ZERO) rhs -= coefficient
+                if (coefficient > BIG_ZERO) {
+                    budget?.scalar(rhs, coefficient)
+                    rhs -= coefficient
+                }
                 iterator.remove()
             }
         }
@@ -176,7 +187,9 @@ internal class PbAccumulator {
 
     fun divideRoundUp(divisor: BigInt) {
         if (divisor <= BIG_ONE) return
-        val degree = ceilDiv(positiveDegree(), divisor)
+        val priorDegree = positiveDegree()
+        budget?.scalar(priorDegree, divisor)
+        val degree = ceilDiv(priorDegree, divisor)
         var negatives = BIG_ZERO
         for ((variable, coefficient) in coefficients) {
             budget?.scalar(coefficient, divisor)
@@ -184,6 +197,7 @@ internal class PbAccumulator {
             coefficients[variable] = if (coefficient > BIG_ZERO) weight else -weight
             if (coefficient < BIG_ZERO) negatives += weight
         }
+        budget?.scalar(degree, negatives)
         rhs = degree - negatives
     }
 

@@ -85,7 +85,8 @@ private class PbArithmeticSource(
                 budget.scalar(total, weight)
                 total += weight
             }
-            budget.spend(bytes = literals.size.toLong() * Int.SIZE_BYTES)
+            budget.spend(work = literals.size.toLong(), bytes = literals.size.toLong() * Int.SIZE_BYTES)
+            budget.scalar(total, rhs)
             target.loadPb(weights, IntArray(literals.size) { literals[it] xor 1 }, total - rhs)
         }
         target.guardedBy(guard)

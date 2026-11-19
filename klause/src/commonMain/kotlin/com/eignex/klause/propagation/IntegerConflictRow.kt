@@ -63,7 +63,9 @@ internal class IntegerConflictRow private constructor(
             val coefficient = coefficients[i]
             val endpoint = if ((coefficient > BIG_ZERO) != maximum) domain.min else domain.max
             scalar(state, budget, coefficient, bigIntOf(endpoint))
-            sum += coefficient * bigIntOf(endpoint)
+            val contribution = coefficient * bigIntOf(endpoint)
+            scalar(state, budget, sum, contribution)
+            sum += contribution
         }
         return sum
     }
@@ -78,7 +80,9 @@ internal class IntegerConflictRow private constructor(
             val domain = domain(state, variables[i], trail)
             val endpoint = if (coefficients[i] > BIG_ZERO) domain.min else domain.max
             scalar(state, budget, coefficients[i], bigIntOf(endpoint))
-            other += coefficients[i] * bigIntOf(endpoint)
+            val contribution = coefficients[i] * bigIntOf(endpoint)
+            scalar(state, budget, other, contribution)
+            other += contribution
         }
         scalar(state, budget, bound, other)
         val next = endpoint(bound - other, coefficients[pivot])
@@ -100,6 +104,7 @@ internal class IntegerConflictRow private constructor(
             scalar(state, budget, coefficients[index], bigIntOf(value))
             val contribution = coefficients[index] * bigIntOf(value)
             contributions[index] = contribution
+            scalar(state, budget, minimum, contribution)
             minimum += contribution
         }
         if (minimum > bound) return false
@@ -136,7 +141,9 @@ internal class IntegerConflictRow private constructor(
         for (i in other.variables.indices) {
             budget?.scalar(other.coefficients[i], right)
             val v = other.variables[i]
-            val next = (terms[v] ?: BIG_ZERO) + other.coefficients[i] * right
+            val contribution = other.coefficients[i] * right
+            budget?.scalar(terms[v] ?: BIG_ZERO, contribution)
+            val next = (terms[v] ?: BIG_ZERO) + contribution
             if (next == BIG_ZERO) terms.remove(v) else terms[v] = next
         }
         budget?.scalar(bound, left)
@@ -161,7 +168,7 @@ internal class IntegerConflictRow private constructor(
             budget?.spend(bytes = variables.size.toLong() * 80)
             val terms = mutableMapOf<Int, BigInt>()
             for (i in variables.indices) {
-                budget?.scalar(coefficients[i])
+                budget?.scalar(terms[variables[i]] ?: BIG_ZERO, coefficients[i])
                 val coefficient = if (useLo) coefficients[i] else -coefficients[i]
                 val variable = variables[i]
                 val next = (terms[variable] ?: BIG_ZERO) + coefficient

@@ -371,6 +371,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                         state.arithmeticLearningTrace?.record("pb.weights", *weights)
                         state.arithmeticLearningTrace?.record("pb.target", r.degree.toLongExact(),
                             r.backjumpLevel.toLong())
+                    } else {
+                        state.arithmeticLearningTrace?.omitPayload("pb.weights", r.weights.size)
                     }
                 } else if (r is AnalysisResult.Learned) {
                     state.arithmeticLearningTrace?.clause("pb.clause-result", r.literals, state)

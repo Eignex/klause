@@ -121,8 +121,7 @@ internal class ArithmeticLearningTrace(
     fun clause(kind: String, literals: IntArray, state: PropagationState) {
         if (!accepting || omitFocusedDetails()) return
         if (literals.size > 64) {
-            omittedPayloads++
-            record("$kind.omitted", literals.size.toLong())
+            omitPayload(kind, literals.size)
             return
         }
         record(kind, *LongArray(literals.size * 5) { index ->
@@ -146,6 +145,12 @@ internal class ArithmeticLearningTrace(
                 }
             }
         })
+    }
+
+    fun omitPayload(kind: String, size: Int) {
+        if (!accepting || omitFocusedDetails()) return
+        omittedPayloads++
+        record("$kind.omitted", size.toLong())
     }
 
     fun row(kind: String, row: IntegerConflictRow, state: PropagationState, trail: Int? = null) {
