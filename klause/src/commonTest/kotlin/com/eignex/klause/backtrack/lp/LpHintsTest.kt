@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.SearchDecision
@@ -31,6 +32,55 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpHintsTest {
+    @Test
+    fun `shared column layouts keep scope checks independent of width`() {
+        val costs = ArrayList<Long>()
+        for (width in listOf(1, 256)) {
+            val builder = LpBuilder()
+            repeat(width) { builder.addVar(0, 10, cost = 1L) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), IntArray(width) { it },
+                BooleanArray(width), 0L, IntArray(width) { it }, IntArray(0))
+            var work = 0L
+            val hints = LpHints(width, 0, directionalGains = true, charge = { work += it })
+            hints.beginNode(0, 100.0)
+            hints.recordObjective(relaxation, 10.0)
+            val rebound = relaxation.withModel(assertNotNull(trail.state.ownerWorkingModel()))
+            val before = work
+
+            hints.recordObjective(rebound, 10.0)
+
+            costs.add(work - before)
+        }
+        assertTrue(costs.first() > 0L)
+        assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
+    fun `replacement column arrays charge the entries compared`() {
+        val costs = ArrayList<Long>()
+        for (width in listOf(1, 256)) {
+            val builder = LpBuilder()
+            repeat(width) { builder.addVar(0, 10, cost = 1L) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val model = assertNotNull(trail.state.ownerWorkingModel())
+            val relaxation = LpRelaxation(model, IntArray(width) { it }, BooleanArray(width),
+                0L, IntArray(width) { it }, IntArray(0))
+            var work = 0L
+            val hints = LpHints(width, 0, directionalGains = true, charge = { work += it })
+            hints.beginNode(0, 100.0)
+            hints.recordObjective(relaxation, 10.0)
+            val replacement = LpRelaxation(model, relaxation.colVarId.copyOf(), relaxation.colIsBool.copyOf(),
+                0L, relaxation.intColOf, relaxation.boolColOf)
+            val before = work
+
+            hints.recordObjective(replacement, 10.0)
+
+            costs.add(work - before)
+        }
+        assertTrue(costs.last() - costs.first() >= 2L * (256 - 1))
+    }
+
     @Test
     fun `reliable value advice reaches matching applied and withheld commitments`() {
         val builder = LpBuilder()
