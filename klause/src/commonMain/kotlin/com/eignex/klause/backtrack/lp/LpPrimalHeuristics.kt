@@ -755,8 +755,10 @@ private fun LpEngine.solveRetainedPrimalRelaxationBody(
         })
         if (attempt == null) observeSparsePausedProgress()
         val result = attempt?.second
-        observed = true
-        observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
+        if (sparseTrialActive) {
+            observed = true
+            observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
+        }
         if (result != null) checkContinuedRootBound(model, result, token)
         val termination = propagator.floatTermination
         outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {

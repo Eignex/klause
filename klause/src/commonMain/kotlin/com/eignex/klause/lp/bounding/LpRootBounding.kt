@@ -244,7 +244,7 @@ private fun LpEngine.retainedRootLowerBound(
     val snapshotWork = if (pausedProposal) 8L * model.m else 0L
     if (retainedRootRemainingWork() <= projectionWork + snapshotWork || cancellation.pollStop()) return null
     // Source-range and objective projection scans share the existing whole-model overhead charge.
-    if (!pausedProposal) model.alsoCharged(this)
+    if (!pausedProposal && (!numericalDeductions || sparseTrialActive)) model.alsoCharged(this)
     val defaults = ReconstructionLimits()
     val storage = if (sparseTrialActive) sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L else
         SPARSE_LP_CHECKING_ALLOCATION
@@ -255,7 +255,7 @@ private fun LpEngine.retainedRootLowerBound(
         noteNodeOverhead(snapshotWork)
         val copied = propagator.pausedDualProposal(cancellation) ?: return null
         if (cancellation.pollStop()) return null
-        model.alsoCharged(this)
+        if (!numericalDeductions || sparseTrialActive) model.alsoCharged(this)
         copied
     } else null
     val remaining = retainedRootRemainingWork()

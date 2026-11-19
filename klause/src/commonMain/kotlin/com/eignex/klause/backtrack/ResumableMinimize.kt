@@ -1515,7 +1515,9 @@ internal class ResumableMinimize(
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
             preparationCancellation = rootLpPreparationBudget())
-        publishRootLpBound(rootBound)
+        sink.lp.observeRootBound(0, rootBound)
+        if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
+        if (rootBound > provedRootBound) provedRootBound = rootBound
         return true
     }
 
