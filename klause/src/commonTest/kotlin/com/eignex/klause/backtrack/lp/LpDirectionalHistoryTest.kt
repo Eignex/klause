@@ -441,11 +441,11 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `disagreeing gains withhold advice until recent observations stabilize`() {
+    fun `an outlier withholds advice until the recent window stabilizes`() {
         val history = LpDirectionalHistory({})
-        for ((gain, expected) in listOf(
-            4.0 to Double.NaN, 8.0 to 4.0, 100.0 to Double.NaN, 6.0 to Double.NaN, 6.0 to 6.0,
-        )) {
+        val observations = listOf(4.0 to Double.NaN, 8.0 to 4.0, 100.0 to Double.NaN) +
+            List(7) { 6.0 to Double.NaN } + listOf(6.0 to 6.0)
+        for ((gain, expected) in observations) {
             history.beginNode(0)
             history.record(10.0)
             history.branch(VarRef.Bool(0), 0.5)
@@ -459,5 +459,64 @@ class LpDirectionalHistoryTest {
 
             if (expected.isNaN()) assertTrue(score.isNaN()) else assertEquals(expected, score, 1e-9)
         }
+    }
+
+    @Test
+    fun `a recent window can estimate recurring zero and positive gains`() {
+        val history = LpDirectionalHistory({})
+        repeat(8) { sample ->
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(if (sample % 2 == 0) 0.0 else 6.0)
+            }
+        }
+
+        assertTrue(history.hasReliableHistory)
+        assertEquals(3.0 - 3.0 / sqrt(7.0), history.score(VarRef.Bool(0), 0.5), 1e-9)
+    }
+
+    @Test
+    fun `window estimates remain finite across objective scales`() {
+        for (scale in listOf(1e-200, 1.0, 1e200)) {
+            val history = LpDirectionalHistory({})
+            for (gain in listOf(4.0, 8.0)) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(VarRef.Bool(0), 0.5)
+                for (literal in listOf(0, 1)) {
+                    history.commit(SearchDecision.Bool(literal), 1)
+                    history.beginNode(1)
+                    history.record(gain * scale)
+                }
+            }
+
+            val score = history.score(VarRef.Bool(0), 0.5)
+
+            assertTrue(score.isFinite())
+            assertEquals(4.0, score / scale, 1e-9)
+        }
+    }
+
+    @Test
+    fun `aging older window entries preserves a pair of fresh samples`() {
+        val history = LpDirectionalHistory({}, maxAge = 8L)
+        repeat(4) {
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(1.0)
+            }
+        }
+        repeat(3) { history.beginNode(0) }
+
+        assertTrue(history.hasReliableHistory)
+        assertEquals(1.0, history.score(VarRef.Bool(0), 0.5), 1e-9)
     }
 }

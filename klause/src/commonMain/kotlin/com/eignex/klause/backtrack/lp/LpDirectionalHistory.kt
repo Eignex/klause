@@ -11,19 +11,73 @@ internal class LpDirectionalHistory(
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
 ) {
-    private class Direction {
+    private class Direction(private val charge: (Long) -> Unit) {
+        private val values = DoubleArray(WINDOW)
+        private val stamps = LongArray(WINDOW)
+        private var first = 0
         var count = 0
-        var latest = 0.0
-        var previous = 0.0
-        var stamp = 0L
-        var previousStamp = 0L
+            private set
+        var gain = 0.0
+            private set
+        var stable = false
+            private set
 
-        val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
+        val stamp: Long get() = if (count == 0) 0L else stamps[(first + count - 1) % WINDOW]
+        val pairStamp: Long get() = if (count < RELIABILITY) 0L else stamps[(first + count - RELIABILITY) % WINDOW]
 
-        val stable: Boolean get() = count >= RELIABILITY && minOf(latest, previous) >= maxOf(latest, previous) * 0.5
+        fun add(value: Double, stamp: Long) {
+            charge(5L)
+            val index = (first + count) % WINDOW
+            if (count == WINDOW) first = (first + 1) % WINDOW else count++
+            values[index] = value
+            stamps[index] = stamp
+            summarize()
+        }
+
+        fun expire(stamp: Long, maxAge: Long): Boolean {
+            var expired = false
+            while (count > 0) {
+                charge(1L)
+                if (stamp - stamps[first] <= maxAge) break
+                values[first] = 0.0
+                stamps[first] = 0L
+                first = (first + 1) % WINDOW
+                count--
+                expired = true
+            }
+            if (expired) summarize()
+            return expired
+        }
+
+        private fun summarize() {
+            charge(5L + 3L * count)
+            var maximum = 0.0
+            repeat(count) { maximum = maxOf(maximum, values[(first + it) % WINDOW]) }
+            if (count < RELIABILITY || maximum == 0.0) {
+                gain = maximum
+                stable = count >= RELIABILITY
+                return
+            }
+
+            // Scaling keeps finite samples from overflowing the sums and squared deviations.
+            var sum = 0.0
+            repeat(count) { sum += values[(first + it) % WINDOW] / maximum }
+            val mean = sum / count
+            var squared = 0.0
+            repeat(count) {
+                val residual = values[(first + it) % WINDOW] / maximum - mean
+                squared += residual * residual
+            }
+            val error = sqrt(squared / (count.toDouble() * (count - 1)))
+            stable = error <= 0.5 * mean
+            gain = maximum * maxOf(0.0, mean - error)
+        }
     }
 
-    private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
+    private class Gains(charge: (Long) -> Unit) {
+        val down = Direction(charge)
+        val up = Direction(charge)
+    }
     private class Parent(val objective: Double, val variable: VarRef, val value: Double)
     private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
@@ -80,26 +134,27 @@ internal class LpDirectionalHistory(
             observe("UNUSABLE")
             return
         }
-        val history = gains.getOrPut(child.parent.variable, ::Gains)
+        val history = gains.getOrPut(child.parent.variable) {
+            charge(4L * WINDOW)
+            Gains(charge)
+        }
         expire(history.down)
         expire(history.up)
         val direction = if (child.up) history.up else history.down
-        direction.previous = direction.latest
-        direction.previousStamp = direction.stamp
-        direction.latest = normalized
-        direction.count = minOf(direction.count + 1, RELIABILITY)
-        direction.stamp = stamp
+        direction.add(normalized, stamp)
         observed = true
-        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
+        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count &&
+            minOf(history.down.count, history.up.count) < RELIABILITY
+        ) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
             if (majority.stable && majority.gain > 0.0) {
-                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
+                collectionStamp = maxOf(collectionStamp, minOf(majority.pairStamp, minority.stamp))
             }
         }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
             if (history.down.stable && history.up.stable) {
-                val pairStamp = minOf(history.down.previousStamp, history.up.previousStamp)
+                val pairStamp = minOf(history.down.pairStamp, history.up.pairStamp)
                 if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
                 if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
             } else observe("UNSTABLE")
@@ -230,21 +285,13 @@ internal class LpDirectionalHistory(
     }
 
     private fun expire(direction: Direction) {
-        if (direction.count > 0 && stamp - direction.stamp > maxAge) {
-            direction.count = 0
-            direction.latest = 0.0
-            direction.previous = 0.0
-            observe("EXPIRED")
-        } else if (direction.count >= RELIABILITY && stamp - direction.previousStamp > maxAge) {
-            direction.count = 1
-            direction.previous = 0.0
-            observe("EXPIRED")
-        }
+        if (direction.expire(stamp, maxAge)) observe("EXPIRED")
     }
 
     private companion object {
         const val MAX_DEPTH = 128
         const val RELIABILITY = 2
+        const val WINDOW = 8
         const val DISTANCE_TOL = 1e-6
     }
 }

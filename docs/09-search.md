@@ -374,14 +374,18 @@ in each direction permit the geometric mean of the predicted child gains; a zero
 gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
-Each direction uses the lower of its latest two in-age normalized gains, so one
-large observation cannot raise its estimate alone. The two gains must agree within
-a factor of two; disagreement withholds advice until passive observations stabilize.
+Each direction retains at most eight in-age normalized gains. Its estimate is the
+mean minus the sample standard error, with at least two observations and a standard
+error no greater than half the mean. This is a bounded variability rule for advisory
+ranking, not a statistical independence assumption or a certified bound. Samples
+are scaled before summing deviations so finite objective scales do not overflow.
+High variability withholds advice until passive observations stabilize.
 Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
-The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
-and skips history lookups until such a variable has been observed, or after all
+The scope retains the newest witness stamp from a variable with reliable positive gains.
+A witness uses the oldest of that variable's two newest samples per direction.
+The scope skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that
 gate. Passing it still requires the variable's own recent samples; it grants no
 score or authority. History reset clears the prerequisite.
