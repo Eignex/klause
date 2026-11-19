@@ -69,7 +69,8 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                 var done = false
                 repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
-                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                val result =
+                    assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ONE, objective.evaluateExact(result.sample))
                 assertContentEquals(longArrayOf(0, 0, 0), result.sample.ints)
                 assertEquals(listOf(BigFraction.ONE), result.sample.exactReals)
