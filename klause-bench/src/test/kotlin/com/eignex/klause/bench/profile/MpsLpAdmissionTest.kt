@@ -18,6 +18,8 @@ import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import kotlin.test.Test
@@ -26,6 +28,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MpsLpAdmissionTest {
+    @Test
+    fun `component cost accounts for each row coupled block`() {
+        val problem = Problem.of(0, 4, Array(4) { IntDomain(0, 3) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 1),
+        ))
+
+        val report = MpsLpAdmission.shape(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            false, ExecutionControl.Never)
+
+        assertEquals(13L, assertNotNull(report["componentDenseProxy"]).jsonPrimitive.long)
+    }
+
     @Test
     fun `root inspection retains an emitted row with appended constructor defaults`() {
         val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 2)),

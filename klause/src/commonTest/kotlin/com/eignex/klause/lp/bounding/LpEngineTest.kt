@@ -2,6 +2,8 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.lp.LpHints
+import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Element
@@ -48,6 +50,22 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 
 class LpEngineTest {
+    @Test
+    fun `branch selection spends the shared LP work allowance`() {
+        val problem = boundedLpEngineProblem()
+        val hints = LpHints(problem.numIntVars, 0)
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(problem.numIntVars) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true), solveBudgetMillis = 1L),
+            SolveStatsSink("branch-guidance-work")).use { engine ->
+            engine.noteNodeOverhead(4_999L)
+            assertFalse(engine.lpWorkAllowanceSpent())
+
+            engine.lpBranchPick(PropagationSession(problem), hints)
+
+            assertTrue(engine.lpWorkAllowanceSpent())
+        }
+    }
+
     @Test
     fun `admitted numerical components reuse untouched children to prune without root guidance`() {
         val problem = Problem(0, 32, Array(32) { IntDomain(0, 5) },

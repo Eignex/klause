@@ -241,7 +241,7 @@ internal object MpsLpAdmission {
         return build.invoke(relaxer, domains, emptyList<Any>(), stop)
     }
 
-    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean,
+    internal fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean,
         stop: ExecutionControl): JsonObject {
         val relaxation = rootRelaxation(problem, objective, cone, stop)
         val model = get(relaxation, "Model")
@@ -266,11 +266,20 @@ internal object MpsLpAdmission {
         }
         val rowCounts = (0 until rows).groupingBy(::root).eachCount()
         val columnCounts = (0 until columns).groupingBy { root(rows + it) }.eachCount()
+        val coupled = rowCounts.keys.filter { it in columnCounts }
+        val rowOnly = rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count }
+        val childCells = coupled.sumOf { root ->
+            val count = rowCounts.getValue(root).toLong()
+            count * (columnCounts.getValue(root) + count + 1L)
+        } + rowOnly.toLong() * (rowOnly + 1L)
+        val children = coupled.size + if (rowOnly > 0) 1 else 0
         return buildJsonObject {
             put("rows", rows)
             put("columns", columns)
             put("nonzeros", rowIndices.size)
             put("emittedDenseProxy", rows.toLong() * (columns.toLong() + rows + 1))
+            put("componentDenseProxy", childCells)
+            put("modeledComponentBytes", 128L * (rowIndices.size.toLong() + columns + rows + children) + 4L * rows)
             put("rowComponents", rowCounts.size)
             put("rowCoupledComponents", rowCounts.keys.count { (columnCounts[it] ?: 0) > 0 })
             put("rowOnlyRows", rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count })
