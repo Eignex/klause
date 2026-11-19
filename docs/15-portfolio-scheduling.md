@@ -517,6 +517,8 @@ from either traversal recenter the private search, while the frontier keeps the 
 consultation and all containing allowances stay cumulative.
 Accepted improvement attribution retains whether its candidate came from the
 private query, including candidates whose source publication was deferred.
+Objective-coordinate conversion retains the producer's candidate statistics while
+replacing its objective and proof authority.
 
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
