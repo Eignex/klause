@@ -16,16 +16,21 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
+import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchExecutionControls
-import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchNodeDisposition
+import com.eignex.klause.solver.search.SearchNodePolicy
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.RealCompletionOptimization
 import com.eignex.klause.solver.validation.ToleranceRealSearch
@@ -103,38 +108,44 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
         controls: SearchExecutionControls? = null,
         solveContext: LpSolveContext = LpSolveContext.Production,
     ): Result {
-        val containing = controls ?: SearchExecutionControlAdapter(cancellation)
-        val metered = object : SearchExecutionControls by containing {
-            override val cancellation: ExecutionControl = cancellation
+        return openSearch(sample, encoding, extra, cancellation,
+            controls ?: SearchExecutionControlAdapter(cancellation), solveContext).use { cursor ->
+            (cursor.advance() as LpSolveStep.Completed).value
         }
-        return completeWith(sample, cancellation, metered, solveContext, encoding, extra)
     }
 
-    private fun completeWith(
+    fun openSearch(
         sample: Sample,
-        cancellation: ExecutionControl,
-        controls: SearchExecutionControls,
-        solveContext: LpSolveContext,
         encoding: Problem?,
         extra: List<Factor>,
-    ): Result {
-        val encoded = encoding ?: return Result.Undecided
+        cancellation: ExecutionControl,
+        controls: SearchExecutionControls = SearchExecutionControlAdapter(cancellation),
+        solveContext: LpSolveContext = LpSolveContext.Production,
+    ): LpSolveCursor<Result> = LpSolveCursor {
+        var work = 0L
+        val counted = cancellation.counting { units ->
+            work = if (units > Long.MAX_VALUE - work) Long.MAX_VALUE else work + units
+        }
+        val metered = object : SearchExecutionControls by controls {
+            override val cancellation: ExecutionControl = counted
+        }
+        val encoded = encoding ?: return@LpSolveCursor Result.Undecided
         val factors = ArrayList<Factor>()
         factors.addAll(encoded.factors)
         factors.addAll(extra)
         for (id in 0 until source.numBoolVars) {
-            if (cancellation()) return Result.Undecided
-            cancellation.charge(1)
+            if (counted()) return@LpSolveCursor Result.Undecided
+            counted.charge(1)
             factors += Clause(intArrayOf(Lit.make(id, sample.boolValue(id))))
         }
         for (id in 0 until source.numIntVars) {
-            if (cancellation()) return Result.Undecided
-            cancellation.charge(1)
+            if (counted()) return@LpSolveCursor Result.Undecided
+            counted.charge(1)
             factors += ExactSearchRow.of(intArrayOf(Term.ofIntVar(id)), listOf(BigFraction.ONE), LinearOp.EQ,
                 BigFraction.of(sample.exactIntValue(id), BIG_ONE))
         }
         val model = encoded.rebindEncoding(encoded, factors.toTypedArray(), null)
-        val factory = prepareExactLiraSource(model, cancellation) ?: return Result.Undecided
+        val factory = prepareExactLiraSource(model, counted) ?: return@LpSolveCursor Result.Undecided
         factory.open { assignment, values ->
             assignment.ints.forEachIndexed { id, value ->
                 values.contribute(SearchExactIntValue(SourceIntId(id)), value)
@@ -144,19 +155,33 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
             }
         }.use { component ->
             component.solveWith(solveContext)
-            val session = SearchComponentSet(listOf(component)).session(cancellation = cancellation,
-                atoms = SearchAtomRegistry(model.numBoolVars), executionControls = controls)
-            return when (session.initialize()) {
+            val session = SearchComponentSet(listOf(component)).session(cancellation = counted,
+                atoms = SearchAtomRegistry(model.numBoolVars), executionControls = metered)
+            when (session.initialize()) {
                 is ComponentResult.Conflict -> Result.Refuted
                 ComponentResult.Indeterminate -> Result.Undecided
-                ComponentResult.Consistent -> when (val result = session.solve(model.numBoolVars)) {
-                    SearchResult.Exhausted -> Result.Refuted
-                    SearchResult.Indeterminate -> Result.Undecided
-                    is SearchResult.Satisfied -> {
-                        val reals = List(source.numRealVars) { id ->
-                            result.model.valueOf(SearchExactRealValue(SourceRealId(id))) ?: return Result.Undecided
+                ComponentResult.Consistent -> {
+                    val run = session.openRun(model.numBoolVars, nodePolicy = object : SearchNodePolicy {
+                        override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                            if (shouldPause(work)) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
+                    })
+                    run.pauseBeforeDecision = { shouldPause(work) }
+                    var result = run.next()
+                    while (result == SearchRunEvent.Paused) {
+                        pauseAt(work)
+                        if (counted()) return@LpSolveCursor Result.Undecided
+                        result = run.next()
+                    }
+                    when (val found = result) {
+                        SearchRunEvent.Exhausted -> Result.Refuted
+                        is SearchRunEvent.Indeterminate, SearchRunEvent.Paused -> Result.Undecided
+                        is SearchRunEvent.Satisfied -> {
+                            val reals = List(source.numRealVars) { id ->
+                                found.model.valueOf(SearchExactRealValue(SourceRealId(id)))
+                                    ?: return@LpSolveCursor Result.Undecided
+                            }
+                            if (counted()) Result.Undecided else Result.Witness(reals)
                         }
-                        if (cancellation()) Result.Undecided else Result.Witness(reals)
                     }
                 }
             }

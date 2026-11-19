@@ -42,18 +42,20 @@ internal interface ToleranceRealSearch {
 }
 
 // A minimization over the real coordinates of a fixed discrete point, run in rounds that each end at a point that
-// beats the previous one. A caller pauses it between rounds and resumes it with the next call.
-internal interface RealCompletionOptimization {
+// beats the previous one. A slice can retain unfinished work inside a round without renewing its allowance.
+internal interface RealCompletionOptimization : AutoCloseable {
     // Work charged so far, across every call.
     val work: Long
 
     // Runs rounds until the optimization ends, or until [shouldPause] holds or [workLimit] units have been charged by
-    // this call; a positive limit is checked between rounds, and every call runs at least one round.
+    // this call. Safe checkpoints within rounds retain the same search and cumulative accounting.
     fun advance(
         cancellation: ExecutionControl,
         workLimit: Long = 0L,
         shouldPause: () -> Boolean = { false },
     ): RealOptimizationStep
+
+    override fun close() = Unit
 }
 
 internal sealed interface RealOptimizationStep {
@@ -125,10 +127,13 @@ private class ToleranceFirstOptimization(
             exact = null
             val next = fallback() ?: return step
             settled += active.work
+            active.close()
             active = next
             if (shouldPause() || (workLimit > 0L && work - start >= workLimit)) return RealOptimizationStep.Paused
         }
     }
+
+    override fun close() = active.close()
 }
 
 // This context with its numerical refutations and bounds held over every side widened by [problem]'s source slack,

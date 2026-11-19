@@ -219,8 +219,7 @@ internal class ResumableMinimize(
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
 
-    // Work of the leaf searches, charged to slices as LP work. A search runs to completion like an LP factorization:
-    // a slice it overruns repays the excess from the slices that follow.
+    // Leaf searches spend LP work; atomic overspend remains as debt against later slices.
     private var leafSearchWork = 0L
     private val slice = SliceBudget(
         {
@@ -314,6 +313,7 @@ internal class ResumableMinimize(
 
     private val resources = SearchInvocationResources().also { owner ->
         owner.own(AutoCloseable { sink.stop() })
+        owner.own(AutoCloseable { clearOptimization() })
     }
 
     // Built once; persists across slices, so warm starts roll forward. Always constructed so the
@@ -392,6 +392,12 @@ internal class ResumableMinimize(
         if (realCosts != null && problem.statesRealChoices()) AbsRealCompletion(problem) else null
     private var pendingOptimization: RealCompletionOptimization? = null
 
+    private fun clearOptimization() {
+        val pending = pendingOptimization
+        pendingOptimization = null
+        pending?.close()
+    }
+
     // The LP context of nodes and leaves. Leaves decide within the source tolerance, so a refutation and a bound hold
     // over every side widened by the slack: otherwise a subtree whose only improvement or only point lies inside the
     // slack is pruned, or kept, by visiting order.
@@ -434,7 +440,7 @@ internal class ResumableMinimize(
         } else optimization.advance(stop)
         leafSearchWork += optimization.work - before
         val result = (step as? RealOptimizationStep.Completed)?.result ?: return null
-        pendingOptimization = null
+        clearOptimization()
         val searched = optimizedLeaf(sample, real, result)
         if (!stop()) cacheSearched(searched)
         return searched
@@ -934,7 +940,7 @@ internal class ResumableMinimize(
         val pending = pendingRealLeaf
         pendingRealLeaf = null
         pendingRealResult = null
-        pendingOptimization = null
+        clearOptimization()
         pending?.close()
         searchSession.popTo(0)
         val seeded = session.reseedFrom(assumptions)
@@ -1736,7 +1742,7 @@ internal class ResumableMinimize(
                 }
             }
             pendingRealResult = null
-            pendingOptimization = null
+            clearOptimization()
             pendingIncumbent = incumbent
             return when {
                 unboundedLeaf != null -> SearchModelDisposition.Surface
@@ -1762,7 +1768,7 @@ internal class ResumableMinimize(
                     ?.takeIf { params.toleranceCheck?.invoke(it) == true }
             if (pausable && params.cancellation()) return SearchModelDisposition.Pause
             pendingRealResult = null
-            pendingOptimization = null
+            clearOptimization()
             pendingIncumbent = point?.let { recordIfImproving(it, objective.evaluate(it)) }
             return SearchModelDisposition.Skip
         }
