@@ -334,19 +334,26 @@ cuts and expanded hulls stay outside its allowance, and admitted roots enable th
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
 and root scopes. The owner advances its floating cursor in adaptive work quanta; a
-pause publishes nothing and authority edits discard the cursor. Completed floating
-results enter the policy's bound check within a 16 MiB checking reservation;
-exhaustion, cancellation or refusal withholds the root bound.
+numerical pause alone supplies no authority, and authority edits discard the cursor.
+Paused dual proposals and completed results enter the policy's bound check within a
+16 MiB checking reservation; exhaustion, cancellation or refusal supplies no new bound.
 The retained owner's preparation and solve lifetime use the remaining cumulative
 root and LP grants. A worker's current slice offer limits only the numerical query
 quantum; resuming a cursor keeps its original lifetime grant and charges each slice's
 actual work to the same ledger.
 
+Primal consultations check the preceding paused dual before advancing and completed
+results before rounding. Numerical work, checking and source projection spend the
+same cumulative allowance. Only the identical source-root model and exact state
+qualify; later CP assertions supply no global bound. Search publishes accepted
+bounds to its objective floor and retains them in its terminal bound.
+
 Sparse-trial preparation is capped at eight million modeled work units; root and
 node LP work stop at 150 million units or the containing invocation's smaller
 allowance, and tighter caller deadlines and work shares remain in force. Bounded
 atomic numerical operations can finish past a work boundary; the ledger keeps their
-actual cost.
+actual cost. An exhausted root grant cannot restart an unchanged root query through
+the node consumer.
 The two-GiB modeled storage envelope covers source authority, sparse owners,
 scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;

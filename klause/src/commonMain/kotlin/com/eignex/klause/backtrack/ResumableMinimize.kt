@@ -17,6 +17,7 @@ import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveCursor
@@ -46,6 +47,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.SingleIntObjective
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
@@ -1454,6 +1456,7 @@ internal class ResumableMinimize(
         }
         val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
         val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
+        lpEngine.continuedRootLowerBound?.let(::publishRootLpBound)
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
         lpEngine.rootRoundingWarmStart = null
@@ -1517,6 +1520,14 @@ internal class ResumableMinimize(
         if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
         if (rootBound > provedRootBound) provedRootBound = rootBound
         return true
+    }
+
+    private fun publishRootLpBound(rootBound: Double) {
+        if (!rootBound.isFinite() || rootBound <= provedRootBound) return
+        sink.lp.observeRootBound(0, rootBound)
+        params.objectiveLowerBoundSink?.invoke(rootBound)
+        provedRootBound = rootBound
+        LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.ROOT))
     }
 
     /**

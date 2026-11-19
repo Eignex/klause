@@ -467,6 +467,7 @@ class ResumableMinimizeGuidanceTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
         var constructions = 0
         var queries = 0
+        val published = ArrayList<Double>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
@@ -494,6 +495,7 @@ class ResumableMinimizeGuidanceTest {
             }
         }
         val params = BacktrackParams(maxDecisions = 0L,
+            objectiveLowerBoundSink = published::add,
             lpConfig = LpConfig.parse("default,+sparse-trial"),
             lpPlan = LpPlan(rootCutHarvest = false))
         val offered = ArrayList<Sample>()
@@ -508,11 +510,13 @@ class ResumableMinimizeGuidanceTest {
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L, accept)
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
+            assertEquals(1L, search.stats.lp.phases["CLAIM_CONSUMPTION_ROOT"]?.outcomes?.get("BOUND"))
         }
 
         assertEquals(listOf(1L, 0L), offered.single().ints.toList())
         assertEquals(1, queries)
         assertEquals(1, constructions)
+        assertEquals(listOf(1.0), published)
     }
 
     @Test
