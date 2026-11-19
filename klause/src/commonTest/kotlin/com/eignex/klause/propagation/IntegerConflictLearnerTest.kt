@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.backtrack.toBacktrackParams
@@ -35,13 +36,164 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-class IntegerConflictLearnerTest {
+class IntegerConflictLearnerTest : RuntimeInitializedTest() {
+    @Test
+    fun `an older compatible source should produce a consumed mapped consequence`() {
+        val native = PropagationSession(Problem(2, 4,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 36)), arrayOf(
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 2, 3), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        val trace = ArithmeticLearningTrace(1024, 65536)
+        native.explanationState.arithmeticLearningTrace = trace
+        val cp = CpSearchComponent(native, intArrayOf(4, 7, 9, 12))
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(1, true))))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(12, 11)))
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(4, 2)))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause,
+            trace.events.joinToString { it.kind + ":" + it.data.joinToString() })
+        assertContentEquals(intArrayOf(0, 2), learned.row.variables)
+        assertContentEquals(longArrayOf(4, -1), learned.row.coefficients)
+        assertEquals(Lit.make(1, true), learned.row.guard)
+        assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
+        assertTrue(trace.events.any { it.kind == "integer.endpoint-decline.incompatible-guard" })
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerAdmitted"])
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerConsumed"])
+        shared.popTo(0)
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(1, true))))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(9, 11)))
+        assertEquals(2L, shared.intUpperBound(4))
+        val state = native.explanationState
+        assertSame(assertNotNull(state.learned.integerRows).single(), state.factorAt(state.intMaxReason[0]))
+    }
+
+    @Test
+    fun `an overwide combination should leave an older compact source eligible`() {
+        for (root in listOf(false, true)) {
+            val native = PropagationSession(Problem(0, 18,
+                Array(18) { when (it) {
+                    0 -> IntDomain(0, 6)
+                    1, 3 -> IntDomain(0, 12)
+                    2 -> IntDomain(0, 24)
+                    17 -> IntDomain(0, if (root) 11 else 36)
+                    else -> IntDomain(0, 1)
+                } }, arrayOf(
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+                    Linear(IntArray(16) { if (it == 15) -1 else 1 }, IntArray(16) { it + 2 }, LinearOp.LE, 0),
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                )), pbLearning = false).apply { enableIntegerRowLearning() }
+            val trace = ArithmeticLearningTrace(1024, 65536)
+            native.explanationState.arithmeticLearningTrace = trace
+            val cp = CpSearchComponent(native)
+            val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(shared.initialize())
+            if (!root) assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(17, 11)))
+
+            assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
+
+            val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+            assertContentEquals(intArrayOf(0, 1) + IntArray(14) { it + 4 }, learned.row.variables)
+            assertContentEquals(longArrayOf(4, 1) + LongArray(14) { if (it == 13) -1 else 1 },
+                learned.row.coefficients)
+            assertEquals(if (root) 0 else 1, learned.backjumpLevel)
+            assertTrue(trace.events.any { it.kind == "integer.endpoint-decline.combination-shape-or-guard" })
+            val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+            shared.popTo(backjump.decisionLevel)
+            assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+            assertEquals(1L, native.learnedLifecycle()["learningIntegerConsumed"])
+        }
+    }
+
+    @Test
+    fun `an eligible newest source should avoid reconstructing older endpoint bounds`() {
+        val native = PropagationSession(Problem(0, 4,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 36)), arrayOf(
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 2, 3), LinearOp.LE, 0),
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        val trace = ArithmeticLearningTrace(1024, 65536)
+        native.explanationState.arithmeticLearningTrace = trace
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(3, 11))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertContentEquals(intArrayOf(0, 1, 3), learned.row.variables)
+        assertContentEquals(longArrayOf(4, 1, -1), learned.row.coefficients)
+        assertEquals(1, trace.events.count { it.kind == "integer.endpoint-row" })
+    }
+
+    @Test
+    fun `an alternative source should not bypass an unavailable mapped premise`() {
+        val native = PropagationSession(Problem(2, 4,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 36)), arrayOf(
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 2, 3), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        val peer = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult =
+                context.publish(SearchDecision.IntAtMost(12, 11))
+        }
+        val cp = CpSearchComponent(native, intArrayOf(4, 7, 9, 12))
+        val shared = SearchSession(listOf(peer, cp), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(0, true))))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(Lit.make(1, true))))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(4, 2)))
+        assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+
+        assertFalse(cp.prefersNativeConflictAnalysis)
+
+        val fallback = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(fallback.decisionLevel)
+        fallback.apply(shared)
+        assertTrue(native.explanationState.learned.integerRows.isNullOrEmpty())
+    }
+
+    @Test
+    fun `an exhausted discovery grant should publish no alternative row`() {
+        val native = PropagationSession(Problem(2, 4,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 36)), arrayOf(
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 2, 3), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinBool(0, true))
+        assertIs<PropagationResult.Implied>(native.pinBool(1, true))
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(3, 11))
+        val state = native.explanationState
+        state.currentLevel = 4
+        assertTrue(state.setIntMinAsDecision(0, 2))
+        assertNotNull(state.runToFixpoint(allFactors = false))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(state.conflictAnalyzer.analyze(2))
+        state.workLimit = state.work + 12
+
+        assertFailsWith<FinitePropagationInterrupted> {
+            IntegerConflictLearner(state).learn(2, 4, learned.fallbackClause)
+        }
+
+        assertTrue(state.learned.integerRows.isNullOrEmpty())
+    }
+
     @Test
     fun `either equality conflict direction should retain the same asserting row`() {
         for (sign in listOf(-1, 1)) {
