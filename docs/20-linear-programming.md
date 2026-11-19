@@ -341,6 +341,12 @@ The retained owner's preparation and solve lifetime use the remaining cumulative
 root and LP grants. A worker's current slice offer limits only the numerical query
 quantum; resuming a cursor keeps its original lifetime grant and charges each slice's
 actual work to the same ledger.
+Primal consultations check the preceding paused dual proposal before advancing
+numerically, and check completed root results before rounding. The check, source
+projection and publication spend the same remaining allowance. Only the identical
+source-root model and exact state qualify; later CP assertions supply no global
+bound through this route. The search publishes accepted bounds to the portfolio's
+objective floor and retains them for its own terminal bound.
 
 Sparse-trial preparation is capped at eight million modeled work units; root and
 node LP work stop at 150 million units or the containing invocation's smaller

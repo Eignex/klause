@@ -244,6 +244,7 @@ internal class LpEngine(
         preparedRootRelaxation = null
         persistentRelaxation = null
         persistentRelaxer = null
+        sourceRootBoundLayout = null
         rootRoundingWarmStart = null
         clearRootPrimalTargets()
         rootRoundingInterrupted = false
@@ -1207,6 +1208,9 @@ internal class LpEngine(
     private var persistentRelaxer: CpToLpRelaxation? = null
     private var persistentRelaxation: LpRelaxation? = null
     private var preparedRootRelaxation: LpRelaxation? = null
+    internal var sourceRootBoundLayout: LpRelaxation? = null
+        private set
+    internal var continuedRootLowerBound: Double? = null
     private var layoutPreparation: Iterator<Unit>? = null
     private var layoutPreparationRelaxer: CpToLpRelaxation? = null
 
@@ -1276,7 +1280,10 @@ internal class LpEngine(
         val base = prepared ?: if (fixed != null) cpAdapter.sourceRootRelaxation(fixed, cancellation)
         else cpAdapter.sourceRootRelaxation(relaxer, cancellation)
         return base?.let { cpAdapter.sourceRootCuts(it, selectedCuts, cancellation) }
-            ?.also { it.sourceMap?.let(cutPool::remap) }
+            ?.also {
+                sourceRootBoundLayout = it
+                it.sourceMap?.let(cutPool::remap)
+            }
     }
 
     internal fun discardRootLayoutPreparation() {
@@ -1344,6 +1351,7 @@ internal class LpEngine(
             if (!token() && base.persistentEligible && !base.model.hasContinuous) {
                 persistentRelaxation = base
                 preparedRootRelaxation = cpAdapter.sourceRootRelaxation(base, token)
+                sourceRootBoundLayout = preparedRootRelaxation
                 if (preparedRootRelaxation == null) cpAdapter.reset() else prepareRootNumericalOwner(token)
             }
             persistentRelaxer = relaxer

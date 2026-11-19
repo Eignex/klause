@@ -307,6 +307,7 @@ class SparseLpAdmissionTest {
                 val sample = engine.lpRoundingProbe(objective, token)
 
                 assertEquals(16L, requireNotNull(sample).ints.sum())
+                assertEquals(16.0, engine.continuedRootLowerBound)
                 assertEquals(1, queries)
                 assertTrue(engine.totalSolveWork() <= SPARSE_LP_MAX_WORK)
             }

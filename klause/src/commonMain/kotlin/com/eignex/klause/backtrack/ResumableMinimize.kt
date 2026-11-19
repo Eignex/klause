@@ -1453,6 +1453,7 @@ internal class ResumableMinimize(
         }
         val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
         val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
+        lpEngine.continuedRootLowerBound?.let(::publishRootLpBound)
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
         lpEngine.rootRoundingWarmStart = null
@@ -1509,13 +1510,18 @@ internal class ResumableMinimize(
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
             preparationCancellation = rootLpPreparationBudget())
+        publishRootLpBound(rootBound)
+        return true
+    }
+
+    private fun publishRootLpBound(rootBound: Double) {
+        if (!rootBound.isFinite() || rootBound <= provedRootBound) return
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
         // NaN (no LP structure) carries no information and the sink ignores it.
-        if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
-        if (rootBound > provedRootBound) provedRootBound = rootBound
-        return true
+        params.objectiveLowerBoundSink?.invoke(rootBound)
+        provedRootBound = rootBound
     }
 
     /**

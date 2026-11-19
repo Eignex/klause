@@ -242,7 +242,7 @@ private fun LpEngine.retainedRootLowerBound(
     val snapshotWork = if (pausedProposal) 8L * model.m else 0L
     if (retainedRootRemainingWork() <= projectionWork + snapshotWork || cancellation.pollStop()) return null
     // Source-range and objective projection scans share the existing whole-model overhead charge.
-    if (!pausedProposal && !numericalDeductions) model.alsoCharged(this)
+    if (!pausedProposal) model.alsoCharged(this)
     val defaults = ReconstructionLimits()
     val storage = if (sparseTrialActive) sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L else
         SPARSE_LP_CHECKING_ALLOCATION
@@ -253,7 +253,7 @@ private fun LpEngine.retainedRootLowerBound(
         noteNodeOverhead(snapshotWork)
         val copied = propagator.pausedDualProposal(cancellation) ?: return null
         if (cancellation.pollStop()) return null
-        if (!numericalDeductions) model.alsoCharged(this)
+        model.alsoCharged(this)
         copied
     } else null
     val remaining = retainedRootRemainingWork()
@@ -277,6 +277,23 @@ private fun LpEngine.retainedRootLowerBound(
     return lower.lowerBoundDouble()
 }
 
+internal fun LpEngine.checkContinuedRootBound(
+    model: LpModel,
+    result: FloatLpResult?,
+    cancellation: ExecutionControl,
+) {
+    if (!sparseTrialActive || cancellation.pollStop()) return
+    val relaxation = sourceRootBoundLayout ?: return
+    // Only the original source-root state supplies a global bound; later CP assertions replace it.
+    if (relaxation.model !== model || !ownsRootPrimalModel(model)) return
+    val paused = result == null && propagator.floatPaused
+    val lower = retainedRootLowerBound(model, result, cancellation, pausedProposal = paused)
+    val bound = projectCertifiedLowerBound(relaxation, lower)
+    if (!bound.isFinite() || cancellation.pollStop()) return
+    continuedRootLowerBound = maxOf(continuedRootLowerBound ?: Double.NEGATIVE_INFINITY, bound)
+    recordRootLowerBound(bound)
+}
+
 private fun LpEngine.checkRetainedRootBound(
     model: LpModel,
     duals: DoubleArray,
@@ -284,7 +301,8 @@ private fun LpEngine.checkRetainedRootBound(
     cancellation: ExecutionControl,
 ): BigFraction? {
     if (numericalDeductions) {
-        return FloatDeductionCertificate.of(model, duals, slack = solveContext.boundSlack)?.lowerBound
+        return FloatDeductionCertificate.of(model, duals, rootCertificationObserver(), slack = solveContext.boundSlack)
+            ?.lowerBound
             ?.let(BigFraction::ofDouble)
     }
     val observer = rootCertificationObserver()
