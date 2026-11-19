@@ -120,6 +120,8 @@ private class ContinuationOverflow : RuntimeException()
 
 internal class ContinuationBudget(val limits: ExactContinuationLimits, val token: ExecutionControl) {
     private val started = Monotonic.markNow()
+    private val boundedPolling = token.stopPolling != null
+    private var pollingCredit = 0L
     var work = 0L
         private set
     var allocation = 0L
@@ -136,10 +138,18 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
 
     @Suppress("ThrowsCount")
     fun step(units: Long = 1L, bytes: Long = 0L) {
-        if (token()) throw ContinuationStop(ContinuationDecline.CANCELLED)
-        limits.maxTimeNs?.let { if (elapsedNs >= it) throw ContinuationStop(ContinuationDecline.TIME) }
-        if (units > limits.maxWork - work) throw ContinuationStop(ContinuationDecline.WORK)
-        if (bytes > limits.maxAllocation - allocation) throw ContinuationStop(ContinuationDecline.ALLOCATION)
+        val observedUnits = units.coerceAtLeast(1L)
+        if (!boundedPolling || observedUnits > pollingCredit || bytes >= 4096L) {
+            checkpoint()
+        }
+        if (units > limits.maxWork - work) {
+            checkpoint()
+            throw ContinuationStop(ContinuationDecline.WORK)
+        }
+        if (bytes > limits.maxAllocation - allocation) {
+            checkpoint()
+            throw ContinuationStop(ContinuationDecline.ALLOCATION)
+        }
         work += units
         allocation += bytes
         val index = phase.ordinal
@@ -149,6 +159,14 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
         }
         phaseWork[index] += units
         phaseAllocation[index] += bytes
+        pollingCredit = (pollingCredit - observedUnits).coerceAtLeast(0L)
+        if (boundedPolling && observedUnits >= 256L) checkpoint()
+    }
+
+    fun checkpoint() {
+        if (token()) throw ContinuationStop(ContinuationDecline.CANCELLED)
+        limits.maxTimeNs?.let { if (elapsedNs >= it) throw ContinuationStop(ContinuationDecline.TIME) }
+        pollingCredit = 256L
     }
 
     private fun phaseSnapshot(values: LongArray): Map<ContinuationPhase, Long> = buildMap {
@@ -170,6 +188,7 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
         val bits = maxOf(a.num.magnitudeBitLength(), a.den.magnitudeBitLength()).toLong() +
             maxOf(b.num.magnitudeBitLength(), b.den.magnitudeBitLength()) + 2L
         if (bits > limits.maxBits * 2L + 2L) throw ContinuationStop(ContinuationDecline.BITS)
+        if (bits > 4096L) checkpoint()
         // Multiplying and gcd-normalising a fraction costs about the square of its word length, so a charge linear
         // in bits lets the work limit admit far more wall time on wide values than on narrow ones.
         val words = bits / Long.SIZE_BITS + 1L
@@ -271,6 +290,13 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
                 }
             }
         } catch (declined: ContinuationStop) {
+            result = null
+            stop = declined.reason
+        }
+        try {
+            budget.checkpoint()
+        } catch (declined: ContinuationStop) {
+            result = null
             stop = declined.reason
         }
         account(budget.work, budget.allocation, budget.elapsedNs)

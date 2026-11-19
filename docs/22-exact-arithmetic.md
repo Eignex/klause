@@ -18,6 +18,14 @@ credit while paused. A stopped operation
 publishes no partial arithmetic result. One arbitrary-precision primitive remains
 cooperative and runs to completion between checkpoints.
 
+Feasibility continuation checks its cumulative work and allocation caps on every
+step. Controls with owned polling observe containing cancellation and explicit
+clock caps before exceeding 256 units of local credit, around bulk admissions,
+before allocations of at least 4 KiB, and before wide rational primitives.
+Every exit makes an immediate observation; a stopped completed point remains
+unpublished and its checkpoint and spent costs remain resumable. Opaque controls
+observe every step.
+
 A unit is one explicit kernel `step`: scalar multiply-accumulate, coefficient visit,
 elimination update or operation admission, according to the kernel. A quadratic
 primitive used by polynomial refutation admits one polynomial unit; a pure
