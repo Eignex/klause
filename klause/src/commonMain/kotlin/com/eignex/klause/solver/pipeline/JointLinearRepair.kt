@@ -69,6 +69,7 @@ internal class JointLinearRepair(
     onObservation: ((JointRepairObservation) -> Unit)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
+    private class CheckedProposal(val condition: ExactNeighborhoodCondition, val sample: Sample)
 
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout.withAccounting(params.cancellation) or params.cancellation
@@ -98,6 +99,7 @@ internal class JointLinearRepair(
     private var conditionSequence = 0L
     private var importedCenter: Sample? = null
     private var preparedCenter: CheckedCenter? = null
+    private var checkedProposal: CheckedProposal? = null
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
         if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
@@ -349,6 +351,7 @@ internal class JointLinearRepair(
                 (relaxation ?: requireNotNull(selection).propose(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
+                        checkedProposal = pooled?.takeIf { completion != null }?.let { CheckedProposal(condition, it) }
                         if (observation != null) {
                             proposalSequence++
                             observationQuery = 0L
@@ -554,10 +557,11 @@ internal class JointLinearRepair(
             queryOriginalCondition = condition
             val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
                 condition.cutoff == null
+            val seed = checkedProposal?.takeIf { it.condition === condition }?.sample
             query = LinearAuthorityInvocation(querySource,
                 params.copy(sourceIncumbentCompletion = false, sourceRefutationCenterStep = false),
                 external = {
-                    (externalIncumbent() ?: anchor).also { sample ->
+                    (externalIncumbent() ?: seed ?: anchor).also { sample ->
                         if (sample != null) {
                             querySawExternal = true
                             refutedConditions.clear()
@@ -569,7 +573,7 @@ internal class JointLinearRepair(
                     guideRefutation(captured, querySource, feedback)
                 } else null,
                 feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null,
-                useSourceGap = false)
+                useSourceGap = false, guideIncumbent = seed != null)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed
             if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
@@ -818,6 +822,7 @@ internal class JointLinearRepair(
         enlargedTrialAfterWitness = false
         enlargedTrialProposal = null
         checkedTrialCenter = null
+        checkedProposal = null
         guidedProposal = null
         readyCenterStep = null
         selection?.clearRefutation()
