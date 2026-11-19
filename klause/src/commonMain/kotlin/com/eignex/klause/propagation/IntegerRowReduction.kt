@@ -4,15 +4,19 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.addExactOrNull
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
+import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.minOf
 import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.mulExactOrNull
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.rem
 import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
 internal fun IntegerConflictRow.reduced(
@@ -21,7 +25,11 @@ internal fun IntegerConflictRow.reduced(
     budget: ArithmeticLearningBudget? = null,
 ): IntegerConflictRow? {
     require(divisor > BIG_ZERO)
-    var degree = -bound
+    if (budget == null) state.checkIntegerScalarWork(bound) else budget.scalar(bound)
+    var wide = -bound
+    var narrow = 0L
+    var promoted = !wide.fitsLong()
+    if (!promoted) narrow = wide.toLongExact()
     var largestWeight = BIG_ZERO
     for (index in variables.indices) {
         if (budget == null) state.checkFiniteWork() else budget.spend()
@@ -31,11 +39,27 @@ internal fun IntegerConflictRow.reduced(
         val origin = if (coefficient > BIG_ZERO) declared.max else declared.min
         val weight = coefficient.abs()
         if (weight > largestWeight) largestWeight = weight
+        if (!promoted && coefficient.fitsLong()) {
+            state.checkIntegerWordWork(budget)
+            val contribution = mulExactOrNull(coefficient.toLongExact(), origin)
+            val next = contribution?.let { addExactOrNull(narrow, it) }
+            if (next != null) {
+                narrow = next
+                continue
+            }
+        }
+        if (!promoted) {
+            budget?.spend(bytes = 48)
+            wide = bigIntOf(narrow)
+            promoted = true
+        }
         budget?.scalar(coefficient, bigIntOf(origin))
         val contribution = coefficient * bigIntOf(origin)
-        budget?.scalar(degree, contribution)
-        degree += contribution
+        budget?.scalar(wide, contribution)
+        wide += contribution
     }
+    if (!promoted) budget?.spend(bytes = 48)
+    val degree = if (promoted) wide else bigIntOf(narrow)
     if (degree <= BIG_ZERO) return null
     budget?.scalar(degree, divisor)
     val remainder = degree % divisor
