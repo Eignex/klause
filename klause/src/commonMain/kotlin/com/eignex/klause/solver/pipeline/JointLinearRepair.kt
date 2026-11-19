@@ -100,6 +100,9 @@ internal class JointLinearRepair(
     private var importedCenter: Sample? = null
     private var preparedCenter: CheckedCenter? = null
     private var checkedProposal: CheckedProposal? = null
+    private var relaxationProposal: ExactNeighborhoodCondition? = null
+    private var retainedProposal: ExactNeighborhoodCondition? = null
+    private var publishedQueryIncumbent: Sample? = null
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
         if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
@@ -295,6 +298,7 @@ internal class JointLinearRepair(
                 }
             },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
+                retainedProposal?.let { return@ExactNeighborhoodProposal it }
                 val checked = preparedCenter?.takeIf {
                     round == 0L &&
                         (cutoff == null || it.value?.let { value -> value < cutoff } == true)
@@ -351,6 +355,7 @@ internal class JointLinearRepair(
                 (relaxation ?: requireNotNull(selection).propose(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
+                        relaxationProposal = condition.takeIf { relaxation != null }
                         checkedProposal = pooled?.takeIf { completion != null }?.let { CheckedProposal(condition, it) }
                         if (observation != null) {
                             proposalSequence++
@@ -588,7 +593,7 @@ internal class JointLinearRepair(
         val snapshot = result ?: active.snapshot(TerminationReason.BudgetExhausted)
         val imported = completion != null && active.incumbentIsImported
         if (imported && snapshot.incumbent != null) observe("jointRepairImportedPointWithheld")
-        val sample = snapshot.incumbent?.takeUnless { imported }?.takeIf {
+        val sample = snapshot.incumbent?.takeUnless { imported || it === publishedQueryIncumbent }?.takeIf {
             condition.cutoff == null || requireNotNull(objective).evaluateExact(it) < condition.cutoff
         }
         if (sample != null) {
@@ -622,11 +627,17 @@ internal class JointLinearRepair(
                 return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = sample,
                     bound = snapshot.bound)
             }
-            if (checked == SourceEvidenceCheck.Checked && originalChecked) {
+            val accepted = checked == SourceEvidenceCheck.Checked && originalChecked
+            if (accepted) {
                 compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(sample))
             }
-            retire()
-            if (checked == SourceEvidenceCheck.Checked && originalChecked) {
+            val liveRelaxation = result == null && condition === relaxationProposal
+            if (accepted && liveRelaxation && !stop() && !exhausted) {
+                retainedProposal = condition
+                publishedQueryIncumbent = sample
+                observe("jointRepairRetainedQueryIncumbents")
+            } else retire()
+            if (accepted) {
                 anchor = sample
                 selection?.clearRefutation()
                 refutedConditions.clear()
@@ -800,6 +811,8 @@ internal class JointLinearRepair(
         queryOriginalCondition = null
         queryCenterStep = null
         querySawExternal = false
+        retainedProposal = null
+        publishedQueryIncumbent = null
         active?.close()
     }
 
@@ -823,6 +836,7 @@ internal class JointLinearRepair(
         enlargedTrialProposal = null
         checkedTrialCenter = null
         checkedProposal = null
+        relaxationProposal = null
         guidedProposal = null
         readyCenterStep = null
         selection?.clearRefutation()
