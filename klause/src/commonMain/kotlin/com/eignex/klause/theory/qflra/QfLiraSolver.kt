@@ -205,7 +205,6 @@ class ExactLiraSearchComponent private constructor(
     private var sourceRowVisits = 0L
     private var sourceRowTouches = 0L
     private var sourceRowInvalidations = 0L
-    private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -244,7 +243,6 @@ class ExactLiraSearchComponent private constructor(
     private var partialLinearNumericalNs = 0L
     private var linearOperationStops = 0L
     private var sourceInstalled = false
-    private var graphFirst = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: ExecutionControl? = null
     private var operationAllowance: ((ExecutionControl) -> ExecutionControl)? = null
@@ -360,7 +358,6 @@ class ExactLiraSearchComponent private constructor(
     internal fun partialPointHints(
         stop: ExecutionControl,
         defaultOpening: Boolean = false,
-        defaultGraphSelections: Boolean = false,
     ): Pair<IntArray, SearchCandidateHints>? {
         check(context == null)
         if (model.numRealVars == 0 && (!defaultOpening || model.numIntVars == 0)) return null
@@ -392,10 +389,6 @@ class ExactLiraSearchComponent private constructor(
             observeCompleteStage("POINT_HINT_CONSULTED")
             if (!partialPointHintAvailable()) {
                 observeCompleteStage("POINT_HINT_UNAVAILABLE")
-                null
-            } else if (defaultOpening && graphFirst && !defaultGraphSelections) {
-                smtStats?.observeDefaultGraphHintRelease()
-                releasePartialPointHints()
                 null
             } else {
                 val preference = when (pointHintValues?.getOrNull(variable)) {
@@ -626,7 +619,7 @@ class ExactLiraSearchComponent private constructor(
         return PartialLinearInputs(comparison.bound, sides)
     }
 
-    private fun capturePointHints(point: List<BigFraction>, context: SearchContext, graph: Boolean = false) {
+    private fun capturePointHints(point: List<BigFraction>, context: SearchContext) {
         pointHintValues = null
         val rows = pointHintRows ?: return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
@@ -660,8 +653,8 @@ class ExactLiraSearchComponent private constructor(
         if (hintStop() || operationStop() || pointHintStop()) return
         pointHintLevel = context.decisionLevel
         pointHintValues = values
-        smtStats?.observePointHintCapture(graph)
-        observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
+        smtStats?.observePointHintCapture()
+        observeCompleteStage("POINT_HINT_LP_CAPTURE")
     }
 
     private fun hintTruth(
@@ -723,10 +716,7 @@ class ExactLiraSearchComponent private constructor(
         pollContextStop = solveStop != null && solveStop !== contextStop
         beginOperation()
         return try {
-            graphFirst = !hasPrivateReals && model.numIntVars == 0 &&
-                solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
-            if (graphFirst) smtStats?.observeRealGraphOpening()
-            if ((!graphFirst && !installSource()) || operationStop()) {
+            if (!installSource() || operationStop()) {
                 ComponentResult.Indeterminate
             } else {
                 lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
@@ -1447,31 +1437,6 @@ class ExactLiraSearchComponent private constructor(
         operationAccounting = parentStop.accounting
     }
 
-    private fun differenceConflict(
-        result: RealDifferenceSystem.Result.Infeasible,
-        context: SearchContext,
-    ): ComponentResult? {
-        if (node.sourceBranches.isNotEmpty() ||
-            solveContext.certificationPolicy !== ProductionLpCertificationPolicy
-        )
-            return null
-        val clause = result.clause ?: return null
-        if (clause.any { literal ->
-                context.boolValue(Lit.variable(literal))?.let { Lit.evaluate(literal, it) } != false
-            }
-        )
-            return null
-        if (operationStop()) return ComponentResult.Indeterminate
-        val explanation = SearchExplanation(clause)
-        dirty = false
-        candidate = null
-        assignment = null
-        pointHintValues = null
-        smtStats?.observeConflict(explanation)
-        outcome = ComponentCheck.Infeasible(explanation)
-        return ComponentResult.Conflict(explanation)
-    }
-
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
@@ -1486,46 +1451,11 @@ class ExactLiraSearchComponent private constructor(
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
         if (impliedDisjunct) return ComponentResult.Consistent
-        if (!graphFirst && bools.any { it == UNASSIGNED } && arithmeticRows.none {
+        if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
         ) {
             return ComponentResult.Consistent
-        }
-        var checked = false
-        // Partial graph consistency needs no numerical guide; complete points still check source rows.
-        if (graphFirst && node.sourceBranches.isEmpty()) {
-            if (!context.consumeCheck()) return ComponentResult.Indeterminate
-            checked = true
-            when (val result = realDifference?.check(bools, operationStop)) {
-                RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
-                is RealDifferenceSystem.Result.Infeasible -> {
-                    differenceConflict(result, context)?.let { return it }
-                }
-                is RealDifferenceSystem.Result.Feasible -> {
-                    if (bools.any { it == UNASSIGNED }) {
-                        if (pointHintRows != null) {
-                            operationAccounting?.charge(model.numRealVars.toLong() + 1L)
-                            if (!operationStop()) capturePointHints(result.point, context, graph = true)
-                        }
-                        if (operationStop()) return ComponentResult.Indeterminate
-                        candidate = null
-                        assignment = null
-                        outcome = null
-                        dirty = false
-                        return ComponentResult.Consistent
-                    }
-                    candidate = result.point
-                    acceptWitness(result.point)?.let {
-                        if (operationStop()) return ComponentResult.Indeterminate
-                        assignment = it
-                        outcome = ComponentCheck.Feasible
-                        dirty = false
-                        return ComponentResult.Consistent
-                    }
-                }
-                else -> Unit
-            }
         }
         val asserted = measurePartialLinearPhase({ partialLinearAssertionNs += it }) { assertSource(context) }
         if (!asserted || operationStop()) {
@@ -1539,7 +1469,7 @@ class ExactLiraSearchComponent private constructor(
                 return ComponentResult.Consistent
             }
         }
-        if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
+        if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {

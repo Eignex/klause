@@ -474,8 +474,8 @@ definitions no surviving constraint needs are dropped after a dependency fixpoin
 For up to eight Boolean inputs, a scalar defined by consistent, complete cases also
 supplies a verified affine row beside the source factors.
 
-The exact real component can certify supported difference fragments with a graph;
-see [real graph admission](17-theories.md#real-graph-admission-and-checks).
+The exact real component certifies difference fragments through the shared
+[linear LP route](18-linear-arithmetic.md#linear-real-arithmetic).
 
 ### Integer division
 

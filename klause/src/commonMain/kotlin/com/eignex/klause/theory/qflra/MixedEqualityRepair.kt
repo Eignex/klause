@@ -154,17 +154,8 @@ internal class MixedEqualityRepair(
             residual += ExactRationalInequality(ordered.toIntArray(), ordered.map(coefficients::getValue), bound,
                 row.strict)
         }
-        val graph = RealDifferenceSystem.prepareRows(pivots.size, residual, stop)
+        val free = realCompletion?.invoke(pivots.size, residual, stop) ?: return null
         if (stop()) return null
-        val free = if (graph == null) {
-            onStage?.invoke("RECOVERY_EQUALITY_GRAPH_UNAVAILABLE")
-            realCompletion?.invoke(pivots.size, residual, stop) ?: return null
-        } else {
-            onStage?.invoke("RECOVERY_EQUALITY_GRAPH_ATTEMPT")
-            val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
-            if (stop()) return null
-            (result as? RealDifferenceSystem.Result.Feasible)?.point ?: return null
-        }
         onStage?.invoke("RECOVERY_EQUALITY_FREE_POINT")
         return point(free)
     }

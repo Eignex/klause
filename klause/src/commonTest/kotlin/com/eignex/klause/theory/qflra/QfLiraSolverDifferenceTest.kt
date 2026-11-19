@@ -37,7 +37,7 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverDifferenceTest {
     @Test
-    fun `partial difference checks and complete source witnesses should need no LP owner`() {
+    fun `partial difference checks and complete source witnesses should share the LP owner`() {
         val model = Problem(
             numBoolVars = 2,
             intBounds = openBounds(0),
@@ -76,12 +76,12 @@ class QfLiraSolverDifferenceTest {
             val witness = assertNotNull(session.model().valueOf(component.realAssignmentKey))
             assertTrue(witness.reals.single() >= BigFraction.ofLong(-2L))
             assertTrue(witness.reals.single() <= BigFraction.ZERO)
-            assertNull(component.lpMetrics)
+            assertNotNull(component.lpMetrics)
         }
     }
 
     @Test
-    fun `fractional difference completion should check source rows without an LP owner`() {
+    fun `fractional difference completion should check exact source rows through the LP owner`() {
         val model = Problem(
             numBoolVars = 2,
             intBounds = openBounds(0),
@@ -120,7 +120,7 @@ class QfLiraSolverDifferenceTest {
             val witness = assertNotNull(session.model().valueOf(component.realAssignmentKey))
             assertTrue(witness.reals.single() >= BigFraction.of(bigIntOf(1), bigIntOf(3)))
             assertTrue(witness.reals.single() <= BigFraction.of(bigIntOf(1), bigIntOf(2)))
-            assertNull(component.lpMetrics)
+            assertNotNull(component.lpMetrics)
         }
     }
 

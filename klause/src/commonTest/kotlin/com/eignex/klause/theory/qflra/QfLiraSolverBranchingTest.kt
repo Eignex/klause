@@ -158,7 +158,7 @@ class QfLiraSolverBranchingTest {
     }
 
     @Test
-    fun `a source bound after a root graph witness should retain conflicts and retraction`() {
+    fun `a source bound after a root LP witness should retain conflicts and retraction`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = openBounds(0),

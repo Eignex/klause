@@ -1,6 +1,6 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.lp.SourceLp
+import com.eignex.klause.lp.sourceLpPoint
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -15,32 +15,43 @@ internal fun completeMixedRealComponents(
     stop: ExecutionControl,
     onStage: ((String) -> Unit)? = null,
 ): List<BigFraction>? {
-    if (columns <= 0 || columns.toLong() * columns > 65536L) return null
-    // Each parent can change at most once per union; the batch covers all compressed walks.
-    stop.charge(8L * columns * columns + columns)
+    if (columns !in 1..10000 || rows.size > 100000) return null
+    stop.charge(4L * columns)
     if (stop()) return null
     val groups = IntDisjointSet(columns)
-    var entries = 0L
+    val sizes = IntArray(columns) { 1 }
+    val depth = Int.SIZE_BITS - columns.countLeadingZeroBits()
     for (row in rows) {
-        entries += row.columns.size + 1L
-        stop.charge(8L * (row.columns.size + 1L))
-        if (entries > 65536L || stop() || row.columns.any { it !in 0 until columns }) return null
+        stop.charge(8L * (row.columns.size + 1L) * depth)
+        if (stop() || row.columns.any { it !in 0 until columns }) return null
         if (!row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()) return null
         val first = row.columns.firstOrNull()
         if (first == null) {
             if (if (row.strict) BigFraction.ZERO >= row.rhs else BigFraction.ZERO > row.rhs) return null
             continue
         }
-        for (column in row.columns) groups.union(first, column)
+        for (column in row.columns) {
+            val left = groups.find(first)
+            val right = groups.find(column)
+            if (left == right) continue
+            // Linking the smaller tree bounds every uncompressed walk by log2(columns).
+            if (sizes[left] <= sizes[right]) {
+                groups.union(left, right)
+                sizes[right] += sizes[left]
+            } else {
+                groups.union(right, left)
+                sizes[left] += sizes[right]
+            }
+        }
     }
     val byRoot = HashMap<Int, MutableList<ExactRationalInequality>>()
     for (row in rows) {
-        stop.charge(4L)
+        stop.charge(4L * depth)
         if (stop()) return null
         val first = row.columns.firstOrNull() ?: continue
         byRoot.getOrPut(groups.find(first)) { ArrayList() } += row
     }
-    stop.charge(4L * columns)
+    stop.charge(4L * columns * depth)
     if (stop()) return null
     val members = groups.groups()
     val point = MutableList(columns) { BigFraction.ZERO }
@@ -57,24 +68,8 @@ internal fun completeMixedRealComponents(
             localRows += ExactRationalInequality(row.columns.map { local.getValue(it) }.toIntArray(),
                 row.coefficients, row.rhs, row.strict)
         }
-        val graph = RealDifferenceSystem.prepareRows(component.size, localRows, stop)
-        if (stop()) return null
-        val values = if (graph != null) {
-            onStage?.invoke("RECOVERY_REAL_COMPONENT_GRAPH")
-            val result = graph.check(intArrayOf(), stop) { stop.charge(it) }
-            if (stop()) return null
-            (result as? RealDifferenceSystem.Result.Feasible)?.point
-        } else {
-            onStage?.invoke("RECOVERY_REAL_COMPONENT_SHAPE_${component.size}_${localRows.size}")
-            if (!budget.admitsDimensions(component.size, localRows.size.toLong())) {
-                onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_DIMENSION")
-                return null
-            }
-            onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
-            SourceLp(localRows, component.size, budget).use { owner ->
-                owner.solve(stop)?.exactPrimal?.take(component.size)
-            }
-        }
+        onStage?.invoke("RECOVERY_REAL_COMPONENT_LP_REQUEST")
+        val values = sourceLpPoint(localRows, component.size, budget, stop)
         if (values == null || values.size != component.size || stop()) {
             onStage?.invoke("RECOVERY_REAL_COMPONENT_NO_POINT")
             return null

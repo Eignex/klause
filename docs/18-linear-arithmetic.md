@@ -20,9 +20,7 @@ The pure-real route requires real variables, no source integer variables, and
 factors wholly represented by admitted exact linear forms. Source bounds,
 reification, disjunction and strictness remain authoritative. Nonconstant real
 products belong to [polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic).
-[Difference logic](17-theories.md#real-graph-admission-and-checks) handles an
-admitted pure-real subfragment; a graph decline does not reject a supported
-linear source.
+Real difference rows use the same certified LP owner as general linear rows.
 
 ### Solving and composition
 
@@ -66,8 +64,7 @@ A check proceeds in four steps:
    activator is assigned; the row's truth selects the row or its exact complement.
    Each asserted bound carries the literals that justify it. Disjunction rows stay
    out until search selects a disjunct.
-2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
-   the LP solves the asserted system with exact certification. Partial Boolean
+2. **Check.** The LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
    Partial states retain a 128-row exact-continuation allowance. Boolean-complete
    checks in complete search use the [kernel's storage admission](21-lp-engine.md#certification-mechanisms)
@@ -165,7 +162,7 @@ declines rather than failing the candidate.
 
 #### Polarity guidance
 
-While Booleans remain open, a completed partial point from the LP or the graph can
+While Booleans remain open, a completed partial point from the LP can
 guide which polarity search tries first for a primitive comparison. Every row
 sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
@@ -217,8 +214,7 @@ Exact feasibility keeps exact termination.
 Immutable row addresses, forms and Boolean dependencies can be shared by fresh
 components over one canonical fragment. `prepareExactLiraSource` returns an opaque
 factory only after complete, uncancelled preparation; each opening binds fresh
-callbacks, cancellation and mutable arithmetic owners. Scoped assertions, graph
-potentials, LP bases and candidates remain invocation-owned. Optional hint storage
+callbacks, cancellation and mutable arithmetic owners. Scoped assertions, LP bases and candidates remain invocation-owned. Optional hint storage
 admits at most 65,536 entries and 4,096-bit normalized rationals.
 
 ### Implementation
@@ -385,7 +381,7 @@ integer coordinates.
 Finite integers count as decided only when their finite owner fixes them. A completed
 point can guide an equality-first split followed by lower and upper remainders;
 finite propagation enforces holes and unrelated factors on each branch. Optional
-LP or graph hints order exhaustive disjuncts and disequality sides without supplying
+LP hints order exhaustive disjuncts and disequality sides without supplying
 witness or proof authority.
 
 #### Witness recovery
@@ -401,9 +397,11 @@ tries to turn that float point into an exact witness:
 3. If neither passes, repair the real prefix through paired opposite source
    equations using bounded sparse elimination.
 4. Complete the free real coordinates per connected component, grouped by shared
-   rows: by the difference checker where the rows form a difference graph,
-   otherwise by an exact point from the [source LP owner](20-linear-programming.md).
-   Completion is attempted only up to 65,536 row entries.
+   rows, through an exact point from the [source LP owner](20-linear-programming.md).
+   Small residuals use its dense admission; larger residuals use sparse preparation
+   and the same certification policy and caller allowance.
+   Recovery retains the input bounds of 10,000 real columns and 100,000 rows;
+   sparse preparation applies the shared work, allocation and scalar guards.
 
 The full rows, strictness, integrality and source reconstruction still gate
 acceptance. A failed guess supplies no conflict or bound; the component returns to
