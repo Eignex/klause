@@ -325,7 +325,7 @@ Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
 Default and aggressive emphasis admit bounded sparse root queries beyond the
-ordinary dense size guard on compact closed unconditional integer-linear optimization
+small-LP size budget on compact closed unconditional integer-linear optimization
 sources. Admission
 bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
@@ -341,7 +341,7 @@ exhaustion, cancellation or refusal withholds the root bound.
 Automatic admission reserves preparation, row-intersection risk and a sparse pricing
 work estimate against the caller's remaining root grant. Pricing combines emitted
 nonzeros and dimensions with the smaller dimension of the largest component.
-Scalar and storage declines remain explicit. An admitted ordinary plan keeps its
+Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
 techniques, and sparse admission supplies no additional portfolio slot or slice.
 The `+sparse-trial` override requests the bounded route explicitly, including mixed
 sources, while `-sparse-trial` disables it. Both retain the resource ceilings.

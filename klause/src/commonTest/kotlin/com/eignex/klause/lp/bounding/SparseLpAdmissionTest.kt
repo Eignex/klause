@@ -473,14 +473,14 @@ class SparseLpAdmissionTest {
     }
 
     @Test
-    fun `root bounding consumes sparse certificates beyond the size proxy`() {
+    fun `root bounding consumes sparse certificates beyond the small LP budget`() {
         val problem = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },
             listOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
                 Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            ), settings = ProblemSettings(lpCeilingTableauCells = 1L),
+            ), settings = ProblemSettings(lpMaxTableauCells = 1L),
         )
         for (spec in listOf("default", "default,+sparse-trial")) {
             val session = PropagationSession(problem)

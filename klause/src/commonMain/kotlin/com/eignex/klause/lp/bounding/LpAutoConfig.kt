@@ -91,7 +91,7 @@ internal data class LpAdmission(
  * accepted smallest-first, so a stack of hulls is shed rather than allowed to defeat the guard. The Lagrangian and
  * energetic bounds have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
  * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
- * [LpTechnique.SPARSE_TRIAL] admits a resource-bounded sparse root plan beyond the ordinary size guard after
+ * [LpTechnique.SPARSE_TRIAL] admits a resource-bounded sparse root plan beyond the small-LP size budget after
  * inspecting the emitted linear relaxation. It does not expand node admission or dense exact continuation.
  *
  * `LpEngine` resolves [LpParams.lpConfig] through this; the portfolio calls [resolve] directly to ask
@@ -408,7 +408,7 @@ object LpAutoConfig {
         )
         val explicitSparse = config.overrides[LpTechnique.SPARSE_TRIAL] == true
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
-            (explicitSparse || !plan.bounding) &&
+            (explicitSparse || !plan.bounding || cells > baseCap) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,

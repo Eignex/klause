@@ -40,7 +40,7 @@ enum class LpTiming {
  * @property timing the cost tier gating which emphasis levels may run this technique.
  */
 enum class LpTechnique(val id: String, val timing: LpTiming) {
-    /** Bounded sparse root admission beyond the ordinary dense size guard. */
+    /** Bounded sparse root admission beyond the small-LP size budget. */
     SPARSE_TRIAL("sparse-trial", LpTiming.MEDIUM),
 
     /** Cumulative / Disjunctive energetic over-subscription feasibility check. */
