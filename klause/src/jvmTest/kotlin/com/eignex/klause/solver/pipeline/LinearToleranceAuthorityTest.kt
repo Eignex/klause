@@ -20,6 +20,7 @@ import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import org.junit.BeforeClass
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -33,6 +34,14 @@ import kotlin.test.assertTrue
 @RunWith(Parameterized::class)
 class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
     companion object {
+        @JvmStatic
+        @BeforeClass
+        fun warmup() {
+            val fixture = LinearToleranceAuthorityTest(ObjectiveSense.MINIMIZE)
+            fixture.`an explicit envelope opt out should preserve nominal preparation and cut defaults`()
+            fixture.`accepted set bounds should require the separate authority scope`()
+        }
+
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun directions(): List<ObjectiveSense> = ObjectiveSense.entries
