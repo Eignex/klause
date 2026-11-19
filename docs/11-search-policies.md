@@ -300,7 +300,8 @@ rows, whose terms do not count as Boolean learned literals; `learningIntegerSess
 counts sessions with integer-row learning enabled, independently of learned objects.
 Missing metrics stay absent, including root theory results that never enter
 traversal. Live solve snapshots include presolve LP work once and keep the observed LP
-snapshot when no aggregation is needed, and directional branch counters are copied
+snapshot when no aggregation is needed. Sparse admission counters retain a zero
+floor independently of presolve aggregation, and directional branch counters are copied
 into snapshots, isolated from later observations. Complete open-theory search adds
 `smtCompleteSearch*` observations of assignment depth, LP checks and stages; they stay
 absent until observed and overlap, so they are not a work total. The CLI also exports

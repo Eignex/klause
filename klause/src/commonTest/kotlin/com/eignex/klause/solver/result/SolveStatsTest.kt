@@ -303,7 +303,7 @@ class SolveStatsTest {
             solves = SumResult(3.0), phases = mapOf("PRESOLVE" to
                 LpPhaseStats(calls = 1L, outcomes = mapOf("ACCEPTED" to 1L)))))
         for (presolveLp in prepared) {
-            for (sparse in listOf(emptyMap(), mapOf("Pending" to -1L, "Rows" to 3L))) {
+            for (sparse in listOf(emptyMap(), mapOf("Rows" to 3L), mapOf("Pending" to -1L, "Rows" to 3L))) {
                 val sink = SolveStatsSink("backtrack")
                 repeat(2) { sink.lp.observeSolve() }
                 sink.lp.observeDirectionalBranch("PASSIVE_VARIABLE_COMMITTED")
