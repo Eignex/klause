@@ -30,15 +30,19 @@ class LpHintsCollectionTest {
             val variable = VarRef.IntVar(0)
             val down = SearchDecision.IntAtMost(0, 2)
             val up = SearchDecision.IntAtLeast(0, 3)
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
-            hints.branch(variable)
-            hints.commit(down, 1)
-            hints.beginNode(1, 100.0)
-            hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
-            hints.recordObjective(relaxation, 11.0)
-            hints.finishNode(trail.state)
+            for ((decision, point, objective) in listOf(
+                Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0), Triple(down, 2.0, 11.0),
+            )) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                hints.commit(decision, 1)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                hints.recordObjective(relaxation, objective)
+                hints.finishNode(trail.state)
+            }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
@@ -53,8 +57,8 @@ class LpHintsCollectionTest {
 
             assertEquals(listOf(up, down), selected)
             assertEquals(1, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
-            assertEquals(1, events.count { it == "UP" })
-            assertEquals(1, events.count { it == "DOWN" })
+            assertEquals(2, events.count { it == "UP" })
+            assertEquals(2, events.count { it == "DOWN" })
             costs.add(work)
         }
         assertTrue(costs.first() > 0L)
@@ -74,14 +78,19 @@ class LpHintsCollectionTest {
             val variable = VarRef.IntVar(0)
             val alternatives = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
             val bound = if (condition == "unbounded") Double.POSITIVE_INFINITY else 100.0
-            hints.beginNode(0, bound)
-            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
-            hints.branch(variable)
-            hints.commit(alternatives.first(), 1)
-            hints.beginNode(1, bound)
-            hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
-            hints.recordObjective(relaxation, 11.0)
+            for ((decision, point, objective) in listOf(
+                Triple(alternatives.first(), 2.0, 11.0), Triple(alternatives.last(), 3.0, 13.0),
+                Triple(alternatives.first(), 2.0, 11.0),
+            )) {
+                hints.beginNode(0, bound)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                hints.commit(decision, 1)
+                hints.beginNode(1, bound)
+                hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                hints.recordObjective(relaxation, objective)
+            }
             hints.beginNode(0, bound)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             if (condition != "missing") hints.recordObjective(relaxation, 10.0)
