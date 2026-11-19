@@ -91,8 +91,8 @@ internal data class LpAdmission(
  * accepted smallest-first, so a stack of hulls is shed rather than allowed to defeat the guard. The Lagrangian and
  * energetic bounds have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
  * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
- * An explicit [LpTechnique.SPARSE_TRIAL] request can instead select a resource-bounded root plan after inspecting
- * the emitted linear relaxation. This does not expand ordinary node admission or dense exact continuation.
+ * [LpTechnique.SPARSE_TRIAL] admits a resource-bounded sparse root plan beyond the ordinary size guard after
+ * inspecting the emitted linear relaxation. It does not expand node admission or dense exact continuation.
  *
  * `LpEngine` resolves [LpParams.lpConfig] through this; the portfolio calls [resolve] directly to ask
  * whether an arm's emphasis enables any LP technique.
@@ -406,12 +406,14 @@ object LpAutoConfig {
                 base.energeticEvery
             },
         )
+        val explicitSparse = config.overrides[LpTechnique.SPARSE_TRIAL] == true
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
+            (explicitSparse || !plan.bounding) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
                 minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
-                sourcePreparation)
+                sourcePreparation, automatic = !explicitSparse)
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {

@@ -10,6 +10,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -31,6 +32,20 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ArmNeedsTest {
+    @Test
+    fun `sparse root admission does not change portfolio relaxation eligibility`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        for (config in listOf(LpConfig.AUTO, LpConfig.parse("default,+sparse-trial"))) {
+            val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), config, objective)
+
+            assertFalse(facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)))
+        }
+    }
+
     @Test
     fun `curated eligibility should identify the missing objective without changing explicit recipes`() {
         val facts = ProblemFacts.assumed(Kind.CSP)

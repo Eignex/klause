@@ -324,12 +324,13 @@ fixing allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoin
 Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
-The explicit `+sparse-trial` LP option selects a bounded root trial for compact
-closed unconditional linear sources; emphasis levels leave it disabled. Admission
+Default and aggressive emphasis admit bounded sparse root queries beyond the
+ordinary dense size guard on compact closed unconditional integer-linear optimization
+sources. Admission
 bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
 retained layout. Custom emitters decline because they reserve no source size. The
-trial uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
+query uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
 cuts and expanded hulls stay outside its allowance, and admitted roots enable the
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
@@ -337,6 +338,13 @@ and root scopes. The owner advances its floating cursor in adaptive work quanta;
 pause publishes nothing and authority edits discard the cursor. Completed floating
 results enter the policy's bound check within a 16 MiB checking reservation;
 exhaustion, cancellation or refusal withholds the root bound.
+Automatic admission reserves preparation, row-intersection risk and a sparse pricing
+work estimate against the caller's remaining root grant. Pricing combines emitted
+nonzeros and dimensions with the smaller dimension of the largest component.
+Scalar and storage declines remain explicit. An admitted ordinary plan keeps its
+techniques, and sparse admission supplies no additional portfolio slot or slice.
+The `+sparse-trial` override requests the bounded route explicitly, including mixed
+sources, while `-sparse-trial` disables it. Both retain the resource ceilings.
 The retained owner's preparation and solve lifetime use the remaining cumulative
 root and LP grants. A worker's current slice offer limits only the numerical query
 quantum; resuming a cursor keeps its original lifetime grant and charges each slice's

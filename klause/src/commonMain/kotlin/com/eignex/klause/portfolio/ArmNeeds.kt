@@ -10,6 +10,7 @@ import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.presolve.binaryChannelLiteral
@@ -124,8 +125,11 @@ internal class ProblemFacts(
                             factor.xs.all { problem.rootIntDomain(it).spanOrNull(32L) != null }
                     },
                 relaxation = { emphasis ->
+                    // Sparse admission uses seated workers; it supplies no additional portfolio slot.
+                    val config = LpConfig(emphasis).cappedUnder(lpCeiling)
                     LpAutoConfig.resolve(
-                        problem, LpConfig(emphasis).cappedUnder(lpCeiling), LpPlan(), objective,
+                        problem, LpConfig(config.emphasis, config.overrides + (LpTechnique.SPARSE_TRIAL to false),
+                            config.sourcePreparation), LpPlan(), objective,
                     ).hasDefaultNumericalSettings().not()
                 },
             )

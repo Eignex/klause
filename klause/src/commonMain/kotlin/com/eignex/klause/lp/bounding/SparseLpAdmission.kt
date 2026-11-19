@@ -50,6 +50,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     cancellation: ExecutionControl = ExecutionControl.Never,
     workAllowance: Long = SPARSE_LP_MAX_WORK,
     sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+    automatic: Boolean = false,
 ): SparseLpAdmission {
     val columns = problem.numIntVars.toLong() + problem.numBoolVars + problem.numRealVars
     val rows = problem.factors.size.toLong()
@@ -59,6 +60,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     val preparationAllowance = minOf(SPARSE_LP_MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to maxOf(inspected, assemblyWork)))
+    if (automatic && (objective == null || problem.numRealVars != 0)) return decline("Source")
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
         return decline("Shape")
@@ -103,7 +105,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     }
     if (cancellation()) return decline("Cancelled")
     val model = relaxation.model
-    val estimate = estimateSparseLpAdmission(model, assemblyWork, cancellation)
+    val estimate = estimateSparseLpAdmission(model, assemblyWork, cancellation, workAllowance, automatic)
     val reusable = estimate.admitted && problem.numRealVars == 0 && relaxation.persistentEligible &&
         !model.hasContinuous && relaxation.colVarId.all { it >= 0 } &&
         model.extent() * LpNodeOverhead.BUILD <= assemblyWork
@@ -122,6 +124,8 @@ internal fun estimateSparseLpAdmission(
     model: LpModel,
     preparationWork: Long = 0L,
     cancellation: ExecutionControl = ExecutionControl.Never,
+    workAllowance: Long = SPARSE_LP_MAX_WORK,
+    automatic: Boolean = false,
 ): SparseLpAdmission {
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to preparationWork))
@@ -195,10 +199,12 @@ internal fun estimateSparseLpAdmission(
     }
     val fillRisk = rowDegree.sumOf { it.toLong() * maxOf(0, it - 1) }
     val storage = sparseLpStorage(model.m.toLong(), model.n.toLong(), entries)
+    val queryWork = preparationWork + fillRisk + (entries + dimensions) * minOf(largestRows, largestColumns)
     val decline = when {
         scalarBits > 128 -> "ScalarWidth"
         storage > SPARSE_LP_MAX_ALLOCATION -> "Storage"
         preparationWork > SPARSE_LP_MAX_PREPARATION_WORK -> "PreparationWork"
+        automatic && queryWork > workAllowance -> "QueryWork"
         else -> null
     }
     return SparseLpAdmission(buildMap {
@@ -210,6 +216,8 @@ internal fun estimateSparseLpAdmission(
         put("LargestComponentColumns", largestColumns)
         put("ScalarBits", scalarBits.toLong())
         put("RowIntersectionRisk", fillRisk)
+        put("EstimatedQueryWork", queryWork)
+        put("Automatic", if (automatic) 1L else 0L)
         put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
         put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)
         put("ReservedBytes", storage)

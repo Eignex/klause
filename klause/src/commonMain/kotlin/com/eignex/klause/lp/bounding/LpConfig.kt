@@ -40,7 +40,7 @@ enum class LpTiming {
  * @property timing the cost tier gating which emphasis levels may run this technique.
  */
 enum class LpTechnique(val id: String, val timing: LpTiming) {
-    /** Explicit bounded sparse root trial; emphasis levels leave it disabled. */
+    /** Bounded sparse root admission beyond the ordinary dense size guard. */
     SPARSE_TRIAL("sparse-trial", LpTiming.MEDIUM),
 
     /** Cumulative / Disjunctive energetic over-subscription feasibility check. */
@@ -200,7 +200,7 @@ class LpConfig(
 
     /** Whether [technique] is permitted: an explicit override wins, else its tier ≤ the emphasis. */
     fun resolved(technique: LpTechnique): Boolean = overrides[technique]
-        ?: (technique != LpTechnique.SPARSE_TRIAL && technique.timing in emphasis.timings)
+        ?: (technique.timing in emphasis.timings)
 
     /** This config capped under [ceiling] for a portfolio arm: the lower emphasis, with the ceiling's
      *  per-technique overrides applied on top (so a `--lp aggressive,-cuts` ceiling forces cuts off on
@@ -236,7 +236,7 @@ class LpConfig(
          *    techniques on/off on top of it — e.g. `aggressive,-cuts` (full LP but no cut rounds),
          *    `off,+cumulative-flow` (no LP except the flow prune). This is what enables/disables a
          *    single technique, which a bare list cannot;
-         *  - `all` — every ordinary technique forced on; sparse trials require their explicit option;
+         *  - `all` — every technique forced on;
          *  - a bare comma-separated technique-id list — each forced on, all others off (force-exactly).
          *
          * `preparation=disabled|object|index|admitted` selects source-template policy independently
@@ -258,7 +258,7 @@ class LpConfig(
             val s = spec?.trim()?.lowercase().orEmpty()
             if (s.isEmpty()) return AUTO
             if (s == "all") return LpConfig(LpEmphasis.AGGRESSIVE,
-                LpTechnique.entries.associateWith { it != LpTechnique.SPARSE_TRIAL })
+                LpTechnique.entries.filter { it != LpTechnique.SPARSE_TRIAL }.associateWith { true })
             val tokens = s.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             // Emphasis-base form: first token is a level, the rest are +/- deltas.
             LpEmphasis.fromId(tokens.first())?.let { base ->

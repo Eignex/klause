@@ -290,7 +290,10 @@ internal fun LpEngine.checkContinuedRootBound(
     val lower = retainedRootLowerBound(model, result, cancellation, pausedProposal = paused)
     val bound = projectCertifiedLowerBound(relaxation, lower)
     if (!bound.isFinite() || cancellation.pollStop()) return
-    continuedRootLowerBound = maxOf(continuedRootLowerBound ?: Double.NEGATIVE_INFINITY, bound)
+    if (bound <= (continuedRootLowerBound ?: Double.NEGATIVE_INFINITY)) return
+    continuedRootLowerBound = bound
+    val outcome = if (paused) "ContinuedPausedBounds" else "ContinuedCompletedBounds"
+    sink.lp.sparseTrial = sink.lp.sparseTrial + (outcome to ((sink.lp.sparseTrial[outcome] ?: 0L) + 1L))
     recordRootLowerBound(bound)
 }
 

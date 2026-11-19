@@ -473,7 +473,7 @@ class SparseLpAdmissionTest {
     }
 
     @Test
-    fun `ordinary root bounding consumes a sparse trial certificate beyond the size proxy`() {
+    fun `root bounding consumes sparse certificates beyond the size proxy`() {
         val problem = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },
             listOf(
@@ -482,24 +482,57 @@ class SparseLpAdmissionTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
             ), settings = ProblemSettings(lpCeilingTableauCells = 1L),
         )
-        val session = PropagationSession(problem)
-        val sink = SolveStatsSink("sparse-trial")
-        val projections = FactorProjectionProviders.Default.prepare(problem)
+        for (spec in listOf("default", "default,+sparse-trial")) {
+            val session = PropagationSession(problem)
+            val sink = SolveStatsSink("sparse-root")
+            val projections = FactorProjectionProviders.Default.prepare(problem)
 
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink,
-            projections = projections).use { engine ->
-            assertTrue(engine.sparseTrialActive)
-            assertEquals(0, engine.params.lpPlan.boundMaxDepth)
-            engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
+            LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
+                LpParams(lpConfig = LpConfig.parse(spec)), sink,
+                projections = projections).use { engine ->
+                assertTrue(engine.sparseTrialActive)
+                assertEquals(0, engine.params.lpPlan.boundMaxDepth)
+                engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
 
-            assertTrue(engine.pruneNode(session, 2.0, -1, true))
+                assertTrue(engine.pruneNode(session, 2.0, -1, true))
+            }
+
+            assertEquals(1L, sink.snapshot().lp.sparseTrial["Admitted"])
+            assertTrue(sink.snapshot().lp.pruned.sum > 0.0)
+            assertTrue(sink.snapshot().lp.workOps.sum > 0.0)
+            assertTrue((sink.snapshot().lp.sparseTrial["PreparationWork"] ?: 0L) > 0L)
         }
+    }
 
-        assertEquals(1L, sink.snapshot().lp.sparseTrial["Admitted"])
-        assertTrue(sink.snapshot().lp.pruned.sum > 0.0)
-        assertTrue(sink.snapshot().lp.workOps.sum > 0.0)
-        assertTrue((sink.snapshot().lp.sparseTrial["PreparationWork"] ?: 0L) > 0L)
+    @Test
+    fun `automatic sparse admission reserves query work within the caller allowance`() {
+        val model = LpBuilder().apply {
+            repeat(5) { addVar(0L, 10L) }
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 3L)
+            addRow(intArrayOf(2, 3), longArrayOf(2L, 1L), Relation.LE, 4L)
+        }.build(Sense.MINIMIZE)
+        val estimated = requireNotNull(estimateSparseLpAdmission(model).metrics["EstimatedQueryWork"])
+
+        for (funded in listOf(false, true)) {
+            val admission = estimateSparseLpAdmission(model,
+                workAllowance = estimated - if (funded) 0L else 1L, automatic = true)
+
+            assertEquals(funded, admission.admitted)
+            assertEquals(if (funded) null else 1L, admission.metrics["DeclineQueryWork"])
+        }
+    }
+
+    @Test
+    fun `automatic sparse admission preserves an admitted ordinary plan`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val ordinary = LpAutoConfig.resolve(problem, LpConfig.parse("default,-sparse-trial"), LpPlan(), objective)
+
+        val automatic = LpAutoConfig.resolve(problem, LpConfig.AUTO, LpPlan(), objective)
+
+        assertTrue(automatic.bounding)
+        assertEquals(ordinary, automatic)
     }
 
     @Test

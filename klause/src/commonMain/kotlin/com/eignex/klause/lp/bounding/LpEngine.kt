@@ -177,7 +177,7 @@ internal class LpEngine(
     internal var sparseTrialActive = false
         private set
     private var admittedSourceLayout: LpRelaxation? = null
-    private val sparseTrialRequested = params0.lpConfig?.resolved(LpTechnique.SPARSE_TRIAL) == true
+    private val sparseTrialRequested = params0.lpConfig?.overrides?.get(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
@@ -1145,7 +1145,8 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
+    private val separateNodePreparation: Boolean get() = sparseTrialActive || sparseTrialRequested ||
+        requestedPlan.componentOwnership ||
         rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
