@@ -132,8 +132,11 @@ class LinearAuthorityAggregateCutsTest {
                 if (pause) {
                     assertTrue(initial.paused)
                     assertNull(initial.advisoryPoint)
+                    val attempts = authority.cutObservations()["numericalCutAggregatePairAttempts"]
                     funding.grant(4_000_000L)
-                    authority.advanceWithPointCuts(source, ExecutionControl.Never, retainBasePoint = true)
+                    authority.advanceWithPointCuts(source, ExecutionControl.Never, retainBasePoint = true).also {
+                        assertEquals(attempts, authority.cutObservations()["numericalCutAggregatePairAttempts"])
+                    }
                 } else initial
             }
 

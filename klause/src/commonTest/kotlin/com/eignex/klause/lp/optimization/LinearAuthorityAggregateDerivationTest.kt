@@ -36,6 +36,29 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateDerivationTest {
     @Test
+    fun `either aggregate owner should retract its cut while an independent cut remains active`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val root = SourceProofContext(scope, setOf(x, y, real, z), linkedMapOf(
+            "left" to SourcePremise(left, guards = mapOf(0 to true)),
+            "right" to SourcePremise(right, guards = mapOf(1 to true)),
+            "independent" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ))
+        val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
+        ), ExecutionControl.Never))
+        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(root, ExecutionControl.Never,
+            cuts = true)).withAdditional(listOf(cut), ExecutionControl.Never))
+
+        val active = listOf(true to true, false to true, true to false, true to true).map { (a, b) ->
+            val current = root.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to a, 1 to b))))
+            assertNotNull(LinearAuthorityQuery.prepare(current, template, ExecutionControl.Never,
+                cutMask = setOf(0, 1), checkUnselectedCuts = true, retainMaskedCuts = true)).checkedCuts
+        }
+
+        assertEquals(listOf(setOf(0, 1), setOf(0), setOf(0), setOf(0, 1)), active)
+    }
+
+    @Test
     fun `opposite bound projection should strengthen a checked sparse bound before mixed rounding`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope.copy(objective = SourceObjective("projection", ObjectiveSense.MINIMIZE)),

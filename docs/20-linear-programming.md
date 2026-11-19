@@ -517,7 +517,7 @@ band. Source publication still checks the original decimal source. Bound metadat
 the accepted-set envelope separately from nominal-source bounds; neither establishes
 independent proof validation. Exact source requests retain their original model.
 
-Point selection admits at most one additional checked cut per usable point and
+Point selection admits at most eight mutually nonparallel additional checked cuts per usable point and
 waits for its completed query before scanning again. A mixed ordinary recipe with
 at least one active checked cut per numerical coordinate keeps its ordinary query
 without expanding a point family. This cut-count admission is charged to selection;
@@ -556,7 +556,11 @@ adds a template policy that pairs rows of opposite sign on a shared continuous
 coordinate, with at least one integer-activity row, and retains at most 64
 proposals. A nonseparating mixed-row seed can continue greedily along one
 opposite-sign continuous incidence path through at most four original rows.
-Point and unseeded pair generation share a 500,000-work, 8 MiB family allowance;
+Point selection generates up to eight point-seeded proposals, then fills the remaining
+pool from unseeded source pairs. Seeded proposals precede unseeded proposals; these
+aggregate proposals precede directed rounding proposals within the 64-addition cap.
+The ordinary prefix is separate. Both generators share a 500,000-work, 8 MiB family
+allowance; seeded discovery uses at most 65,536 work and 1 MiB of it.
 each derivation remains bounded by 65,536 work and 1 MiB within that allowance.
 Pure-integer points also try half rounding, two-row combinations and half scaling
 whose odd coefficients cite established endpoint premises. An established

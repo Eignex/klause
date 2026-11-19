@@ -46,7 +46,7 @@ internal data class LinearAuthorityAggregateProbeResult(
 
 internal object LinearAuthorityAggregateCuts {
     val sourcePairLimits = LinearAuthorityAggregateLimits(work = 500_000L, allocation = 8_388_608L)
-    val pointSourcePairLimits = sourcePairLimits
+    val pointSourcePairLimits = LinearAuthorityAggregateLimits()
 
     fun prepareSourcePairs(
         source: SourceProofContext, cancellation: ExecutionControl,
