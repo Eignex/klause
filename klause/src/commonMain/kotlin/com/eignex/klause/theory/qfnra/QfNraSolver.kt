@@ -682,6 +682,7 @@ internal class QfNraWork(params: QfNraParams) : ArithmeticBudget(params.cancella
     override val reservationLimit get() =
         (minOf(probeEnd ?: Long.MAX_VALUE, coupledEnd ?: Long.MAX_VALUE,
             envelopeEnd ?: Long.MAX_VALUE) - spent).coerceAtLeast(0L)
+    @Suppress("ThrowingExceptionFromFinally", "ThrowsCount") // primary failures survive cleanup; caller stops stay terminal
     fun <T> envelope(allowance: Long, block: () -> T): T? {
         execution?.flush()
         check(envelopeEnd == null)
