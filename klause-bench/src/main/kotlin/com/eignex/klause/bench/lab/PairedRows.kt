@@ -96,7 +96,10 @@ internal object PairedRows {
             .forEach { (revision, _) -> add("arms declaring revision $revision differ in build identity") }
         for (facet in facets.flatMap { it.keys }.distinct().sorted()) {
             val allowed = facet in declaration.allowed || facet.removePrefix(CONTROLS) in declaration.treatments
-            if (!allowed && facets.map { it[facet] }.distinct().size > 1) add("undeclared $facet difference")
+            val compared = if (facet == "checker") done.zip(facets)
+                .filter { (case, _) -> case.record?.feasible == true || case.checkPolicy != null }
+                .map { it.second } else facets
+            if (!allowed && compared.map { it[facet] }.distinct().size > 1) add("undeclared $facet difference")
         }
         val parameters = done.map { it.parameters }
         for (parameter in parameters.flatMap { it.keys }.distinct().sorted()) {
