@@ -8,6 +8,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -48,6 +50,27 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+    @Test
+    fun `integer FlatZinc optimization should admit symmetry under default float policy`() {
+        val program = parseFlatZinc("""
+            var 0..3: a;
+            var 0..3: b;
+            var 0..3: c;
+            var 0..9: cost;
+            constraint all_different_int([a,b,c]);
+            constraint int_lin_eq([1,1,1,-1], [a,b,c,cost], 0);
+            solve minimize cost;
+        """.trimIndent())
+
+        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+            program.problem, FiniteEngine.BACKTRACK, program.linearObjective(),
+        ))
+
+        assertTrue("objective-symmetry" in assertNotNull(prepared.presolve).passes)
+        assertTrue(prepared.problem.factors.any { it is SymmetryHandling })
+        assertEquals(4, BacktrackSolver(prepared.executableProblem()).enumerate().count())
+    }
+
     @Test
     fun `complete optimization should automatically consume objective symmetry`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2))))

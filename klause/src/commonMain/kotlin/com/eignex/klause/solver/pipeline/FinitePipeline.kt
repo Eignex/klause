@@ -132,7 +132,8 @@ object FinitePipeline {
         }
         val config = when (request.engine) {
             FiniteEngine.FIXED, FiniteEngine.BACKTRACK -> requestedConfig
-            FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS -> requestedConfig.withoutObjectiveSymmetry()
+            FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
+                requestedConfig.withoutObjectiveSymmetry()
         }
         // Source-safe presolve is the one phase before the plan, shared with the open lane. Running it
         // here and handing the result on is what keeps [PresolvePipeline.run] from repeating it.

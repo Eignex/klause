@@ -277,6 +277,8 @@ the ordinary scan with objective-column protection. Disabling `objective-symmetr
 also restores that scan. Counting, sampling and enumeration retain their solution
 set. Discovery and verification share the preparation allowance, with structural
 size and refinement-work limits; singleton domain/cost seeds skip refinement.
+Typed integer and Boolean rows remain exact under a format's floating-point
+tolerance policy; that unused real tolerance does not exclude their symmetry scan.
 
 Boolean probing retains failed-literal units and bounds implied by both polarities;
 integer and open-range probing extend this to bounds and holes. Compilation, incidence,
