@@ -137,8 +137,40 @@ class LpDirectionalHistoryTest {
             }
             history.commit(SearchDecision.Bool(if (up) 1 else 0), 1)
             history.beginNode(1)
+            history.record(10.0)
+
+            assertNull(history.preferUnderObservedDirection(variable, 0.5))
+        }
+    }
+
+    @Test
+    fun `collection can complete a positive minority beside a stable zero direction`() {
+        for (firstUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(if (firstUp) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(10.0)
+            }
+            history.commit(SearchDecision.Bool(if (firstUp) 1 else 0), 1)
+            history.beginNode(1)
             history.record(13.0)
 
+            assertTrue(history.hasCollectionHistory)
+            assertEquals(!firstUp, history.preferUnderObservedDirection(variable, 0.5))
+            assertFalse(history.hasReliableHistory)
+            assertTrue(history.score(variable, 0.5).isNaN())
+
+            history.commit(SearchDecision.Bool(if (firstUp) 1 else 0), 1)
+            history.beginNode(1)
+            history.record(13.0)
+
+            assertTrue(history.hasReliableHistory)
+            assertEquals(0.003, history.score(variable, 0.5), 1e-9)
             assertNull(history.preferUnderObservedDirection(variable, 0.5))
         }
     }

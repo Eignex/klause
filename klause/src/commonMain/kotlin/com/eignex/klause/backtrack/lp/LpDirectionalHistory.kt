@@ -93,7 +93,7 @@ internal class LpDirectionalHistory(
         if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
-            if (majority.stable && majority.gain > 0.0) {
+            if (majority.stable && (majority.gain > 0.0 || minority.gain > 0.0)) {
                 collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
             }
         }
@@ -224,7 +224,7 @@ internal class LpDirectionalHistory(
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
         if (!sampledDirection.stable) return null
-        if (sampledDirection.gain <= 0.0) {
+        if (history.down.gain <= 0.0 && history.up.gain <= 0.0) {
             observe("PASSIVE_COLLECTION_ZERO_GAIN")
             return null
         }
