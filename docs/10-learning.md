@@ -391,12 +391,16 @@ charged to the containing allowance.
 Historical assertion checks use checked words for contributions and residuals when
 they fit, and retry exact arithmetic on overflow without changing raw-target or hole checks.
 Saturation expresses the row as a positive cover over integer distances from declared
-box endpoints and caps each weight at its degree. If ordinary cancellation loses the
-conflict, scaled mixed-integer rounding can reduce the reason before another
-combination. These reductions cite only declared domains, never live branch bounds.
+box endpoints and caps each weight at its degree. Box degree accumulation uses checked
+words and promotes the partial sum on overflow; wide coefficients remain exact.
+If ordinary cancellation loses the conflict, scaled mixed-integer rounding can reduce
+the reason before another combination. These reductions cite only declared domains,
+never live branch bounds.
 
 Endpoint discovery uses a heap ordered by historical deduction position, with
-coordinate order breaking ties. An analysis caches validated source identities and
+coordinate order breaking ties. Unsupported projection kinds are excluded before
+marker reconstruction; eligible endpoints share one lazily allocated array of packed
+trail and coordinate priorities. An analysis caches validated source identities and
 normalized inequality sides; every consultation still checks historical guard truth,
 raw requested bounds and membership. Incompatible guards decline before historical
 bound reconstruction. Discovery, arithmetic, candidate ordering and duplicate scans

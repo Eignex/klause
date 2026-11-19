@@ -71,7 +71,7 @@ internal class IntegerConflictRow private constructor(
             val coefficient = coefficients[i]
             val endpoint = if ((coefficient > BIG_ZERO) != maximum) domain.min else domain.max
             if (wide == null && coefficient.fitsLong()) {
-                wordWork(state, budget)
+                state.checkIntegerWordWork(budget)
                 val contribution = mulExactOrNull(coefficient.toLongExact(), endpoint)
                 val next = contribution?.let { addExactOrNull(narrow, it) }
                 if (next != null) {
@@ -143,7 +143,7 @@ internal class IntegerConflictRow private constructor(
             val coefficient = coefficients[index]
             if (!coefficient.fitsLong()) return null
             val value = if (coefficient > BIG_ZERO) domains[index].min else domains[index].max
-            wordWork(state, budget)
+            state.checkIntegerWordWork(budget)
             val contribution = mulExactOrNull(coefficient.toLongExact(), value) ?: return null
             minimum = addExactOrNull(minimum, contribution) ?: return null
             contributions[index] = contribution
@@ -152,7 +152,7 @@ internal class IntegerConflictRow private constructor(
         if (minimum > upper) return false
         for (index in variables.indices) {
             visit(state, budget)
-            wordWork(state, budget)
+            state.checkIntegerWordWork(budget)
             val other = subExactOrNull(minimum, contributions[index]) ?: return null
             val residual = subExactOrNull(upper, other) ?: return null
             val coefficient = coefficients[index].toLongExact()
@@ -318,13 +318,6 @@ internal class IntegerConflictRow private constructor(
 
         private fun visit(state: PropagationState, budget: ArithmeticLearningBudget?) {
             if (budget == null) state.checkFiniteWork() else budget.spend()
-        }
-
-        private fun wordWork(state: PropagationState, budget: ArithmeticLearningBudget?) {
-            if (budget == null) {
-                state.checkFiniteWork()
-                state.checkFiniteWork()
-            } else budget.spend(work = 2, bytes = 64)
         }
     }
 }
