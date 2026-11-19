@@ -363,7 +363,13 @@ clause reasons and cannot supply a numerical endpoint reason. Repeated cells kee
 their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer gcd
-normalization. One analysis keeps only its most recent normalized source, keyed by
+normalization. Endpoint discovery orders historical markers newest first, preserving
+coordinate order on ties, and validates sources only until a compatible combination
+is found. A source with a different signed guard is rejected before reconstructing
+its historical bound. A combination outside the compact row shape leaves the next
+endpoint eligible; failed numerical trials spend the same 16-combination allowance
+as successful ones. Marker ordering and candidate visits charge the containing work
+and poll cancellation. One analysis keeps only its most recent normalized source, keyed by
 projection identity, signed guard and inequality side, and releases it with the
 analysis; reusing it still validates each endpoint's historical guard, raw requested
 bound and membership. Each combination must remain conflicting. A retained row must
@@ -377,8 +383,8 @@ combinations, 64 native levels and 64 stored rows. A retained row with the same
 normalized coefficients and a stronger bound suppresses a new consequence only when
 its guard is unconditional or identical.
 
-Rows keep at most one distinct signed guard; combinations needing different guards
-keep clause fallback. A guarded row asserts only where its guard already holds at both
+Rows keep at most one distinct signed guard; a source needing a different guard
+cannot join the combination. A guarded row asserts only where its guard already holds at both
 the native and mapped shared target. An inactive guard withholds arithmetic
 propagation, its activation wakes the row through a literal watch, and guard
 negations remain premises of every retained-row deduction and conflict.
