@@ -66,6 +66,11 @@ cap SMT suites at eight cases each, giving SMT and CSP/COP comparable aggregate 
 single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.
 
+`MpsLpAdmission` accepts `batch64` source descriptors with `suite`, `problem` and decoded
+`sha256`. An optional `engine=mixed` reports automatic source selection, prepared authority
+compatibility and numerical companion eligibility without running selection or search.
+Preparation can solve LP bounds; this diagnostic supplies no source verdict or quality evidence.
+
 `FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
 Its lab profile build requires both `:klause-cli:installJvmDist` and `:klause-bench:installDist`
 because provenance includes the installed CLI distribution.
