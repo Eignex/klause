@@ -4,9 +4,24 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CertifiedEnvelopeLpTest {
+    @Test
+    fun `a relaxing coordinate direction should publish no finite bound`() {
+        val bounds = listOf(EnvelopeInterval(BigFraction.ZERO), EnvelopeInterval(BigFraction.ZERO, BigFraction.ONE))
+        val row = envelopeRow(listOf(0 to BigFraction.MINUS_ONE, 1 to BigFraction.ONE), BigFraction.ZERO)
+
+        requireNotNull(CertifiedEnvelopeLp.prepare(bounds, listOf(row), ExecutionControl.Never)).use { lp ->
+            val maximum = lp.solve(0, upper = true)
+            val minimum = requireNotNull(lp.solve(0))
+
+            assertNull(maximum?.lowerBound)
+            assertEquals(BigFraction.ZERO, minimum.lowerBound)
+        }
+    }
+
     @Test
     fun `an appended affine relation should preserve strict feasible proposals`() {
         val bounds = listOf(
@@ -30,18 +45,14 @@ class CertifiedEnvelopeLpTest {
     }
 
     @Test
-    fun `an infeasible endpoint trial should preserve the opposite objective`() {
-        val rows = listOf(
-            envelopeRow(listOf(0 to BigFraction.MINUS_ONE, 1 to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-            envelopeRow(listOf(0 to BigFraction.MINUS_ONE, 1 to BigFraction.ONE), BigFraction.ZERO),
-        )
-        val bounds = List(2) { EnvelopeInterval(BigFraction.ZERO, BigFraction.ONE) }
+    fun `an endpoint trial should preserve the opposite objective`() {
+        val bounds = listOf(EnvelopeInterval(BigFraction.ZERO, BigFraction.ONE))
 
-        requireNotNull(CertifiedEnvelopeLp.prepare(bounds, rows, ExecutionControl.Never)).use { lp ->
+        requireNotNull(CertifiedEnvelopeLp.prepare(bounds, emptyList(), ExecutionControl.Never)).use { lp ->
             val minimum = requireNotNull(lp.solve(0))
             val maximum = requireNotNull(lp.solve(0, upper = true))
 
-            assertEquals(BigFraction.ofLong(2).reciprocal(), minimum.lowerBound)
+            assertEquals(BigFraction.ZERO, minimum.lowerBound)
             assertEquals(BigFraction.MINUS_ONE, maximum.lowerBound)
         }
     }

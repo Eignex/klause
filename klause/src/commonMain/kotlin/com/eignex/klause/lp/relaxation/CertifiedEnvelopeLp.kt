@@ -59,7 +59,10 @@ internal class CertifiedEnvelopeLp private constructor(
         if (!next.replaceObjective(objective, control)) return null
         val projected = projectEnvelopeRows(next.state, rowTemplates, control) { witness++ }
         if (!adopt(projected)) return null
-        if (state.conflict == null) directPoint(column, upper)?.let { return it }
+        if (state.conflict == null) {
+            if (column != null && unboundedDirection(column, upper)) return null
+            directPoint(column, upper)?.let { return it }
+        }
         val numerical = owner ?: LpScopedSolver(state, control).also { owner = it }
         return numerical.solve(token = control,
             claim = if (column == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM)
@@ -102,6 +105,19 @@ internal class CertifiedEnvelopeLp private constructor(
     private fun adopt(next: LpExactState): Boolean {
         if (closed || control() || owner?.adopt(next, control) == false) return false
         state = next
+        return true
+    }
+
+    private fun unboundedDirection(column: Int, upper: Boolean): Boolean {
+        val bounds = state.model.column(column).bounds
+        if ((if (upper) bounds.upper else bounds.lower) != null) return false
+        for (entry in state.model.columnEntries(column)) {
+            control.charge(1L)
+            if (control()) return true
+            val sign = entry.number.value.signum()
+            if (if (upper) sign > 0 else sign < 0) return false
+        }
+        // Every row is a*x + s = b with s unbounded above; this direction only increases its slack.
         return true
     }
 
