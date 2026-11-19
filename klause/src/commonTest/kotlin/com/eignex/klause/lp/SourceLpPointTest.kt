@@ -13,13 +13,14 @@ import kotlin.test.assertTrue
 class SourceLpPointTest {
     @Test
     fun `strict residual chains should complete beyond tableau cell admission`() {
-        val columns = 8
+        val columns = 1024
+        val chain = 64
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO, strict = true),
-        ) + List(columns - 1) {
+        ) + List(chain - 1) {
             ExactRationalInequality(intArrayOf(it, it + 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
                 BigFraction.ZERO, strict = true)
-        } + List(252) { exactColumnUpper(columns - 1, BigFraction.ONE) }
+        } + exactColumnUpper(chain - 1, BigFraction.ONE)
 
         val point = assertNotNull(sourceLpPoint(rows, columns, SourceLpBudget(), ExecutionControl.Never))
 

@@ -252,7 +252,9 @@ stall heuristics only schedule work; they never authorize proofs.
 | Rational basis verification | Exact FTRAN gives basics; BTRAN gives duals or Farkas candidates. Singularity requests repair. |
 | Exact continuation | Import the numerical basis pivot by pivot, repairing unseatable basics with logicals, then run Bland feasibility. |
 
-Rational work escalates from `Frac128` to `BigFraction`. Production exact
+Rational work escalates from `Frac128` to `BigFraction`. Fixed-width arithmetic
+reuses zero and unit operands and combines equal denominators without cross
+multiplication, retaining normalization and the overflow latch. Production exact
 continuation promotes a retained complete tableau on fixed-width overflow; other
 bounded operations restart from authority. Every attempt is charged. An internal
 consumer context or continuation request can opt into arbitrary precision before

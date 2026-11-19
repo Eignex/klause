@@ -306,6 +306,8 @@ internal class Frac128Ops : FracOps<Frac128> {
 
     private fun addSub(a: Frac128, b: Frac128, negateB: Boolean): Frac128 {
         if (latched) return Frac128.ZERO
+        if (b.isZero) return a
+        if (a.isZero) return if (negateB) negated(b) else b
         // n = na·db ± nb·da over d = da·db, then normalize.
         val da = U128(a.dHi.toULong(), a.dLo.toULong())
         val db = U128(b.dHi.toULong(), b.dLo.toULong())
@@ -316,7 +318,11 @@ internal class Frac128Ops : FracOps<Frac128> {
         val p1 = U128(0uL, 0uL)
         val p2 = U128(0uL, 0uL)
         val d = U128(0uL, 0uL)
-        if (!mulU(na, db, p1) || !mulU(nb, da, p2) || !mulU(da, db, d)) return latch()
+        if (a.dHi == b.dHi && a.dLo == b.dLo) {
+            p1.set(na)
+            p2.set(nb)
+            d.set(da)
+        } else if (!mulU(na, db, p1) || !mulU(nb, da, p2) || !mulU(da, db, d)) return latch()
         val negOut: Boolean
         val mag: U128
         if (negA == negB) {
@@ -344,6 +350,14 @@ internal class Frac128Ops : FracOps<Frac128> {
     override fun times(a: Frac128, b: Frac128): Frac128 {
         if (latched) return Frac128.ZERO
         if (a.isZero || b.isZero) return zero
+        if (a.dHi == 0L && a.dLo == 1L) {
+            if (a.nHi == 0L && a.nLo == 1L) return b
+            if (a.nHi == -1L && a.nLo == -1L) return negated(b)
+        }
+        if (b.dHi == 0L && b.dLo == 1L) {
+            if (b.nHi == 0L && b.nLo == 1L) return a
+            if (b.nHi == -1L && b.nLo == -1L) return negated(a)
+        }
         val na = magOf(a.nHi, a.nLo)
         val nb = magOf(b.nHi, b.nLo)
         val da = U128(a.dHi.toULong(), a.dLo.toULong())
@@ -352,6 +366,12 @@ internal class Frac128Ops : FracOps<Frac128> {
         val d = U128(0uL, 0uL)
         if (!mulU(na, nb, n) || !mulU(da, db, d)) return latch()
         return normalized((a.nHi < 0L) xor (b.nHi < 0L), n, d) ?: latch()
+    }
+
+    private fun negated(value: Frac128): Frac128 {
+        if (value.nHi == Long.MIN_VALUE && value.nLo == 0L) return latch()
+        return Frac128(value.nHi.inv() + if (value.nLo == 0L) 1L else 0L, -value.nLo,
+            value.dHi, value.dLo)
     }
 
     override fun reciprocal(a: Frac128): Frac128 {
@@ -370,6 +390,10 @@ internal class Frac128Ops : FracOps<Frac128> {
     /** Reduce `±mag / den` by the gcd and re-sign; null when the signed numerator cannot fit. */
     private fun normalized(negative: Boolean, mag: U128, den: U128): Frac128? {
         if (mag.isZero()) return zero
+        if (den.hi == 0uL && den.lo == 1uL) {
+            val num = signedOf(negative, mag) ?: return null
+            return Frac128(num.hi, num.lo, 0L, 1L)
+        }
         val g = mag.copy()
         gcdU(g, den)
         val one = U128(0uL, 1uL)
