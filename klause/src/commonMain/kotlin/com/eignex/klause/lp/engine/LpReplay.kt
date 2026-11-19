@@ -627,18 +627,10 @@ private class PollBudgetCancellation(private val pollLimit: Int) : ExecutionCont
 private class ReplayContinuationBudget(var remaining: ExactContinuationLimits) {
     val cache = LpExactContinuationCache()
 
-    // Target admission, identity admission and execution each receive a separately capped envelope.
-    fun limits(): ExactContinuationLimits = remaining.copy(
-        maxWork = remaining.maxWork / 3L,
-        maxAllocation = remaining.maxAllocation / 3L,
-        maxTimeNs = remaining.maxTimeNs?.let { it / 3L },
-    )
+    fun limits(): ExactContinuationLimits = remaining
 
     fun charge(metrics: ExactContinuationMetrics) {
         remaining = remaining.copy(
-            maxWork = (remaining.maxWork - metrics.work).coerceAtLeast(0L),
-            maxAllocation = (remaining.maxAllocation - metrics.allocation).coerceAtLeast(0L),
-            maxTimeNs = remaining.maxTimeNs?.let { (it - metrics.elapsedNs).coerceAtLeast(0L) },
             maxPivots = (remaining.maxPivots - metrics.pivots).coerceAtLeast(0),
             maxImportPivots = (remaining.maxImportPivots - metrics.imports).coerceAtLeast(0),
         )
