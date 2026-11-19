@@ -20,6 +20,33 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `source normalization should combine unordered repeated coordinates in either direction`() {
+        for (useLo in listOf(false, true)) {
+            val row = requireNotNull(IntegerConflictRow.source(intArrayOf(4, 2, 4, 0, 2),
+                arrayOf(bigIntOf(6), bigIntOf(2), bigIntOf(-2), bigIntOf(8), bigIntOf(-2)),
+                bigIntOf(-3), useLo))
+
+            assertTrue(row.variables.contentEquals(intArrayOf(0, 4)))
+            assertEquals(if (useLo) listOf(bigIntOf(2), bigIntOf(1))
+            else listOf(bigIntOf(-2), bigIntOf(-1)), row.coefficients.toList())
+            assertEquals(bigIntOf(if (useLo) -1 else 0), row.bound)
+        }
+    }
+
+    @Test
+    fun `an exhausted allocation grant should decline before word arithmetic`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(Long.MAX_VALUE), bigIntOf(1)), bigIntOf(0), useLo = true))
+        val state = PropagationState(Problem(0, 2,
+            arrayOf(IntDomain(2, 2), IntDomain(3, 3)), emptyArray()), Assumptions.None)
+        val budget = ArithmeticLearningBudget(state, ArithmeticLearningLimits(allocationBytes = 0))
+
+        val decline = assertFailsWith<ArithmeticLearningDeclined> { row.minimum(state, budget = budget) }
+
+        assertEquals("allocation", decline.reason)
+    }
+
+    @Test
     fun `activity should promote overflowing word operations without losing terms`() {
         val inputs = listOf(
             longArrayOf(Long.MAX_VALUE, 1) to longArrayOf(2, 3),
