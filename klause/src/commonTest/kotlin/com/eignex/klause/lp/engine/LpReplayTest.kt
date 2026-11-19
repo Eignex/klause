@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -13,6 +14,44 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpReplayTest {
+    @Test
+    fun `replay should fund admission and charge repeated continuation events once`() {
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(
+                model: LpModel,
+                cancellation: ExecutionControl,
+                workLimit: Long,
+                pricing: LpPricingOptions,
+            ): LpSolver = object : LpSolver {
+                override val infeasibleRay: DoubleArray? = null
+                override fun solve(warm: Basis?): FloatLpResult? = null
+                override fun solvePrimal(warm: Basis?): FloatLpResult? = null
+                override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
+            }
+        }
+        val capture = LpCapture.capture(
+            model,
+            LpReplaySettings("continuation funding", 7L, LpReplaySolverKind.GENERAL, componentSplit = false),
+            listOf(LpReplayEvent.Solve(), LpReplayEvent.Solve()),
+        )
+        val context = LpSolveContext(factory)
+        val reference = LpReplay.replay(capture, context = context).steps
+        val work = reference.sumOf { assertNotNull(it.continuation).work }
+        val allocation = reference.sumOf { assertNotNull(it.continuation).allocation }
+
+        val funded = LpReplay.replay(capture, context = context,
+            continuationLimits = ExactContinuationLimits(maxWork = work, maxAllocation = allocation)).steps
+
+        assertEquals(2, funded.size)
+        for (step in funded) {
+            assertEquals(listOf(BigFraction.ZERO), step.exactWitness)
+            assertNull(assertNotNull(step.continuation).decline)
+        }
+        assertEquals(work, funded.sumOf { assertNotNull(it.continuation).work })
+        assertEquals(allocation, funded.sumOf { assertNotNull(it.continuation).allocation })
+    }
+
     @Test
     fun `column compaction replay should preserve exact bounds and rollback after retired rows`() {
         val source = LpBuilder().apply {
