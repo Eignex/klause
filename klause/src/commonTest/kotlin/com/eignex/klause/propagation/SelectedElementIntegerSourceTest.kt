@@ -15,6 +15,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -72,8 +73,8 @@ class SelectedElementIntegerSourceTest {
             assertEquals(AtomKind.EQ, state.atoms.kind[atom])
             assertEquals(5, state.atoms.intVar[atom])
             assertEquals(offset.toLong(), state.atoms.threshold[atom])
-            assertEquals(4L, learned.row.coefficient(0))
-            assertEquals(-1L, learned.row.coefficient(4))
+            assertEquals(4L, learned.row.coefficient(0).toLongExact())
+            assertEquals(-1L, learned.row.coefficient(4).toLongExact())
             val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
             shared.popTo(backjump.decisionLevel)
             assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))

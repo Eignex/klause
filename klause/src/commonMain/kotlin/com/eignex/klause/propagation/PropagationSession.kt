@@ -1,5 +1,10 @@
 package com.eignex.klause.propagation
 
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.maxOf
 import com.eignex.klause.factor.bool.AffineXorPropagator
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
@@ -1014,9 +1019,28 @@ class PropagationSession private constructor(
         }
     }
 
-    /** Enable bounded mandatory integer-row learning for subsequent finite conflicts. */
-    fun enableIntegerRowLearning() {
+    internal fun addLearnedPb(
+        weights: Array<com.eignex.util.numbers.BigInt>,
+        literals: IntArray,
+        degree: com.eignex.util.numbers.BigInt,
+        lbd: Int,
+        permanent: Boolean = false,
+    ): PropagationResult {
+        if (permanent) scopedLearnedAssertion = true
+        return registerAndPropagate(base = state.undoTop) { state.addLearnedPb(weights, literals, degree, lbd, permanent) }
+    }
+
+    internal fun configureArithmeticLearning(workLimit: Long, allocationBytes: Long) {
+        state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
+    }
+
+    /**
+     * Enable exact mandatory integer-row learning for subsequent finite conflicts.
+     * [workLimit] and [allocationBytes] bound each optional analysis within the containing propagation scope.
+     */
+    fun enableIntegerRowLearning(workLimit: Long = 262_144, allocationBytes: Long = 8L * 1024 * 1024) {
         check(!state.incremental)
+        state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
         state.integerRowLearning = true
         state.integerLearningTrailAtLevel = { level ->
             if (level in 0 until levelTop) levelStates[level]?.undoSize else null
@@ -1040,7 +1064,7 @@ class PropagationSession private constructor(
         when (learned) {
             is ConflictAnalyzer.AnalysisResult.Learned -> learned.literals.any { litTruth(it) == true }
             is ConflictAnalyzer.AnalysisResult.LearnedPb -> {
-                var trueWeight = 0L
+                var trueWeight = BIG_ZERO
                 for (index in learned.literals.indices) {
                     if (litTruth(learned.literals[index]) == true) trueWeight += learned.weights[index]
                 }

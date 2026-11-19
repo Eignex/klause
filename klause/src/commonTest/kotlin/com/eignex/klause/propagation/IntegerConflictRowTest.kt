@@ -5,7 +5,11 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -14,6 +18,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
+    @Test
+    fun `exact resolution should retain growth through eighty eliminations`() {
+        var row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+            longArrayOf(Long.MAX_VALUE, 1), intArrayOf(0, 1), LinearOp.LE, 0), useLo = true))
+        var expected = bigIntOf(1)
+        var pivot = 0
+        repeat(80) { step ->
+            val next = step + 2
+            val reason = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(pivot, next),
+                longArrayOf(-2, 1), intArrayOf(pivot, next), LinearOp.LE, 0), useLo = true))
+            row = requireNotNull(row.resolve(reason, pivot))
+            expected *= bigIntOf(2)
+            pivot = next
+        }
+
+        assertEquals(expected, row.coefficient(1))
+        assertEquals(bigIntOf(Long.MAX_VALUE), row.coefficient(pivot))
+    }
+
+    @Test
+    fun `normalization should retain a row with hundreds of distinct terms`() {
+        val width = 256
+        val variables = IntArray(width) { it }
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
+            LongArray(width) { 2 }, variables, LinearOp.LE, 511), useLo = true))
+        val state = PropagationState(Problem(0, width, Array(width) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+
+        assertEquals(width, row.variables.size)
+        assertEquals(bigIntOf(255), row.bound)
+        assertEquals(bigIntOf(256), row.maximum(state))
+    }
+
     @Test
     fun `subsumption should require a stronger bound and an implied guard`() {
         val guards = listOf(Lit.NONE, Lit.make(0, true), Lit.make(0, false), Lit.make(1, true))
@@ -83,22 +119,24 @@ class IntegerConflictRowTest {
     }
 
     @Test
-    fun `an overflowing nonnegative combination should decline`() {
+    fun `a nonnegative combination should preserve coefficients beyond signed long`() {
         val left = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
             longArrayOf(Long.MAX_VALUE, 1), intArrayOf(0, 1), LinearOp.LE, Long.MAX_VALUE), useLo = true))
         val right = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 2),
             longArrayOf(-2, 1), intArrayOf(0, 2), LinearOp.LE, 0), useLo = true))
 
-        assertFailsWith<CheckedLongOverflowException> { left.resolve(right, 0) }
+        val combined = requireNotNull(left.resolve(right, 0))
+        assertEquals(bigIntOf(Long.MAX_VALUE), combined.coefficient(2))
+        assertEquals(bigIntOf(Long.MAX_VALUE) * bigIntOf(2), combined.bound)
     }
 
     @Test
-    fun `an overflowing activity should decline`() {
+    fun `an activity beyond signed long should remain exact`() {
         val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
             longArrayOf(Long.MAX_VALUE, 1), intArrayOf(0, 1), LinearOp.LE, Long.MAX_VALUE), useLo = true))
         val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(1, 1) }, emptyArray()), Assumptions.None)
 
-        assertFailsWith<CheckedLongOverflowException> { row.minimum(state) }
+        assertEquals(bigIntOf(Long.MAX_VALUE) + bigIntOf(1), row.minimum(state))
     }
 
     @Test
@@ -107,27 +145,27 @@ class IntegerConflictRowTest {
 
         val row = requireNotNull(IntegerConflictRow.source(source, useLo = true))
 
-        assertEquals(1L, row.coefficient(0))
-        assertEquals(-2L, row.bound)
+        assertEquals(bigIntOf(1), row.coefficient(0))
+        assertEquals(bigIntOf(-2), row.bound)
     }
 
     @Test
-    fun `minimum coefficient magnitude should decline before normalization`() {
+    fun `minimum signed long coefficients should normalize in either direction`() {
         val source = LinearPropagator(intArrayOf(), intArrayOf(0), longArrayOf(Long.MIN_VALUE),
             intArrayOf(0), LinearOp.LE, 0)
 
-        assertNull(IntegerConflictRow.source(source, useLo = true))
-        assertFailsWith<CheckedLongOverflowException> { IntegerConflictRow.source(source, useLo = false) }
+        assertEquals(bigIntOf(-1), requireNotNull(IntegerConflictRow.source(source, useLo = true)).coefficient(0))
+        assertEquals(bigIntOf(1), requireNotNull(IntegerConflictRow.source(source, useLo = false)).coefficient(0))
     }
 
     @Test
-    fun `an unrepresentable negative unit quotient should decline`() {
+    fun `a bound outside signed long should remain unavailable as an endpoint`() {
         val source = LinearPropagator(intArrayOf(), intArrayOf(0), longArrayOf(-1),
             intArrayOf(0), LinearOp.LE, Long.MIN_VALUE)
         val row = requireNotNull(IntegerConflictRow.source(source, useLo = true))
         val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()), Assumptions.None)
 
-        assertFailsWith<CheckedLongOverflowException> { row.boundFor(state, 0, 0) }
+        assertNull(row.boundFor(state, 0, 0))
     }
 
     @Test
@@ -144,8 +182,8 @@ class IntegerConflictRowTest {
                 for (z in 0L..24L) {
                     if (2 * x + y <= z && 2 * x - y <= 0) {
                         val assignment = longArrayOf(x, y, z)
-                        var activity = 0L
-                        for (i in row.variables.indices) activity += row.coefficients[i] * assignment[row.variables[i]]
+                        var activity = bigIntOf(0)
+                        for (i in row.variables.indices) activity += row.coefficients[i] * bigIntOf(assignment[row.variables[i]])
                         assertTrue(activity <= row.bound)
                     }
                 }

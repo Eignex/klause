@@ -1,5 +1,10 @@
 package com.eignex.klause.propagation
 
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.maxOf
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
@@ -156,8 +161,8 @@ class CpSearchComponent(
             }
         }
         val state = session.explanationState
-        var available = 0L
-        var maxFree = 0L
+        var available = BIG_ZERO
+        var maxFree = BIG_ZERO
         for (i in learned.literals.indices) {
             if (context.cancelled()) return false
             val literal = learned.literals[i]
@@ -173,7 +178,7 @@ class CpSearchComponent(
             if (freed) maxFree = maxOf(maxFree, learned.weights[i])
         }
         val slack = available - learned.degree
-        return slack >= 0 && maxFree > slack
+        return slack >= BIG_ZERO && maxFree > slack
     }
 
     /** Align shared decision level zero with CP's post-seed root. */

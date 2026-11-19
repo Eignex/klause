@@ -326,10 +326,21 @@ in the CP store. Other mixed conflicts keep shared clause analysis.
 The resolvent is a linear `≥` nogood seeded from the violated bound. Each step
 rounds the reason up after division by its pivot coefficient, then adds it to cancel
 the pivot. Weakening and saturation keep coefficients bounded and canonical. These
-nonnegative combinations with Chvátal-Gomory rounding preserve implication. A step
-that declines, including signed-word overflow, falls back to clause resolution.
-Learned pseudo-Boolean constraints share clause retention. A permanent-retention
-mark prevents forgetting; it does not establish logical scope. Source-valid atom
+nonnegative combinations with Chvátal-Gomory rounding preserve implication. Exact
+coefficients and degrees survive scaling, weakening, division and retention; degree
+reduction uses the positive-literal degree captured before changing signed terms.
+Mandatory arbitrary-precision PB projections can supply arithmetic sources. Retained
+rows whose complete activity fits signed-word propagation use covering watches;
+wider rows propagate exact slack with a static watch on each literal. Both expose
+arithmetic reasons to later conflicts and use ordinary clause retention.
+
+PB analysis and integer-row analysis each receive a work and cumulative modeled
+allocation allowance from `arithmetic-learning-work` and
+`arithmetic-learning-allocation-bytes`, inside the containing propagation scope.
+Operand sizes price exact arithmetic. A local decline keeps clause resolution;
+containing cancellation withholds the unfinished result. PB assertion sorts literals
+by retained level and scans exact available weight and suffix maxima. A permanent
+retention mark prevents forgetting; it does not establish logical scope. Source-valid atom
 channeling clauses and incumbent restrictions can both have that mark. Observers
 of enforcing incidence read complete PB terms and established values, because the
 weighted covering watch set is only a propagation wakeup index. Unknown constraint
@@ -340,20 +351,21 @@ kinds or unnameable atoms withhold a complete-incidence claim.
 `integerRowLearning` is opt-in and independent of pseudo-Boolean learning. Mandatory
 finite `Linear` inequalities and the explaining half of equalities provide integer
 rows. Mandatory `ExactLinear` rows provide the same source when every coordinate is
-integer and the complete compact projection preserves their word-sized constants,
-term order and relation. Wide, real or activated exact rows keep clause fallback.
+integer and the complete compact or arbitrary-precision projection preserves their
+constants, term order and relation. Real or activated exact rows keep clause fallback.
 Reified integer rows preserve the signed indicator selecting the inequality or
 equality side, including the strict integer complement of an inequality. Each
-resolved endpoint must name an unextended historical linear reason from the same
-source row, with its exact guard false-literal and historical guard truth.
+resolved endpoint must name a historical arithmetic source with its exact guard
+false-literal and historical guard truth. Compact lazy markers retain their deduction
+boundary; eager arithmetic endpoints reconstruct that boundary from the bound journal.
+Original and retained arithmetic rows can supply both conflict seeds and endpoint reasons.
 
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
 fallback. Interior holes in the remaining terms stay in the actual domains and do
 not prevent a source-implied combination. Historical exclusions clipped by a pivot
 move remain conservative: a bounded tail walk uses historical membership to exclude
-later carves. Disequalities, wide constants and unsupported projections keep clause
-fallback.
+later carves. Disequalities and unsupported projections keep clause fallback.
 
 A selected variable-array `Element` can seed a conflict from either side of its
 selected equality. Its positive index-equality atom keeps the source index, offset
@@ -362,26 +374,33 @@ a bound conflict of that equality is arithmetic; Element support explanations re
 clause reasons and cannot supply a numerical endpoint reason. Repeated cells keep
 their selected index guard, and a result alias supplies no arithmetic row.
 
-Opposite-sign nonnegative combinations use checked signed arithmetic and integer gcd
-normalization. Endpoint discovery orders historical markers newest first, preserving
-coordinate order on ties, and validates sources only until a compatible combination
-is found. A source with a different signed guard is rejected before reconstructing
-its historical bound. A combination outside the compact row shape leaves the next
-endpoint eligible; failed numerical trials spend the same 16-combination allowance
-as successful ones. Marker ordering and candidate visits charge the containing work
-and poll cancellation. One analysis keeps only its most recent normalized source, keyed by
-projection identity, signed guard and inequality side, and releases it with the
-analysis; reusing it still validates each endpoint's historical guard, raw requested
-bound and membership. Each combination must remain conflicting. A retained row must
-propagate against the session's historical domains at its first-UIP clause's native
-backjump and at the mapped shared target, preserving clausal backjump selection. The
-raw assertion target must have been a member of its historical domain: a later carve
-cannot remove that earlier membership, and a historical hole cannot supply a raw
-bound assertion. Literal counts do not establish assertion, and foreign unavailable
-bound premises keep clause analysis. The producer admits at most 16 terms, 16
-combinations, 64 native levels and 64 stored rows. A retained row with the same
-normalized coefficients and a stronger bound suppresses a new consequence only when
-its guard is unconditional or identical.
+Opposite-sign nonnegative combinations use arbitrary-precision integer coefficients,
+exact activity and gcd normalization with downward rounding of the upper bound.
+Saturation expresses the row as a positive cover over integer distances from declared
+box endpoints and caps each weight at its degree. If ordinary cancellation loses the
+conflict, scaled mixed-integer rounding can reduce the reason before another
+combination. These reductions cite only declared domains, never live branch bounds.
+
+Endpoint discovery uses a heap ordered by historical deduction position, with
+coordinate order breaking ties. An analysis caches validated source identities and
+normalized inequality sides; every consultation still checks historical guard truth,
+raw requested bounds and membership. Incompatible guards decline before historical
+bound reconstruction. Discovery, arithmetic, candidate ordering and duplicate scans
+share a per-analysis work allowance and cumulative modeled allocation allowance,
+inside the containing propagation work and cancellation scope. Scalar work accounts
+for operand word sizes. Exhaustion discards the optional derivation and keeps the
+completed clause fallback; containing interruption withholds unfinished analysis.
+Row width, decision depth, derivation length and retained-row count have no separate
+fixed limits. Retained rows use ordinary learned-store retention.
+
+Each combination must remain conflicting. A retained row must propagate against the
+session's historical domains at its first-UIP clause's native backjump and at the
+mapped shared target, preserving clausal backjump selection. The raw assertion target
+must have been a member of its historical domain: a later carve cannot remove that
+earlier membership, and a historical hole cannot supply a raw bound assertion.
+Foreign unavailable bound premises keep clause analysis. A retained row suppresses a
+new consequence only with identical normalized coefficients, a stronger bound and an
+unconditional or identical guard; a duplicate intermediate can continue its derivation.
 
 Rows keep at most one distinct signed guard; a source needing a different guard
 cannot join the combination. A guarded row asserts only where its guard already holds at both
@@ -409,8 +428,9 @@ integer endpoints keep the shared premise without reconstructing a native proof.
 Rows share the learned store and integer bounds propagation. A successful row
 assertion also keeps its first-UIP clause in the native store; the two constraints
 can prune different branches, publish their deductions together from the undo
-position before either assertion, and follow their own retention policies. Eager
-reasons freeze the historical clause premises without a compactable lazy factor id.
+position before either assertion, and follow their own retention policies. Retained
+row deductions record lazy historical arithmetic reasons. Their clause explanations
+reconstruct only the driving bounds at that deduction, with the row's signed guard.
 Integer bound event subscriptions wake rows after undo and are remapped or removed on
 forgetting. A live bound reason or a reason saved in undo protects its row from
 retirement; after those references retract, retirement removes its guard and endpoint
@@ -426,7 +446,8 @@ endpoints and historical row domains, signed guards, native and shared targets,
 decline categories and stored arithmetic consumers. Historical domain holes exclude
 later carves, and storage identities survive factor compaction and retire with their
 constraint; only changed bounds or Boolean pins count as consumer events. The trace
-is absent by default, stops with explicit truncation at its fixed limits, reads
+is absent by default, stops with explicit truncation at its fixed limits or an
+arithmetic value outside its signed-word event format, reads
 existing state without reconstructing reasons or running propagation, and supplies no
 proof or source-mapping authority; an incomplete trace cannot establish exhaustive
 applicability.

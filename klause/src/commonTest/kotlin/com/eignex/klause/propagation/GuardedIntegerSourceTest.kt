@@ -16,6 +16,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -66,7 +67,7 @@ class GuardedIntegerSourceTest {
     }
 
     @Test
-    fun `a wide exact projection should retain clause fallback`() {
+    fun `a wide exact projection should supply a normalized integer source`() {
         val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 6)), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ofLong(Long.MIN_VALUE)),
                 LinearOp.LE, BigFraction.ZERO),
@@ -74,7 +75,7 @@ class GuardedIntegerSourceTest {
 
         val source = GuardedIntegerSource(state).source(0)
 
-        assertNull(source)
+        assertEquals(-1L, assertNotNull(assertNotNull(source).row(true)).coefficient(0).toLongExact())
     }
 
     @Test
@@ -122,8 +123,8 @@ class GuardedIntegerSourceTest {
             assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(4, 2)))
             val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
             assertEquals(guard, learned.row.guard)
-            assertEquals(4L, learned.row.coefficient(0))
-            assertEquals(-1L, learned.row.coefficient(2))
+            assertEquals(4L, learned.row.coefficient(0).toLongExact())
+            assertEquals(-1L, learned.row.coefficient(2).toLongExact())
             val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
             shared.popTo(backjump.decisionLevel)
             assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))

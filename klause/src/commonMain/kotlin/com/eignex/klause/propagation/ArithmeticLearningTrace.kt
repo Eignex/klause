@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 import com.eignex.klause.ir.Lit
 
 private const val DECLINE_CENSUS_KINDS = 64
@@ -148,7 +150,12 @@ internal class ArithmeticLearningTrace(
 
     fun row(kind: String, row: IntegerConflictRow, state: PropagationState, trail: Int? = null) {
         if (!accepting || omitFocusedDetails()) return
-        record(kind, row.bound, (trail ?: -1).toLong())
+        if (!row.bound.fitsLong() || row.coefficients.any { !it.fitsLong() }) {
+            truncationCause = "wide-integer"
+            truncated = true
+            return
+        }
+        record(kind, row.bound.toLongExact(), (trail ?: -1).toLong())
         if (!accepting) return
         record("$kind.guard", row.guard.toLong())
         if (row.guard != Lit.NONE) clause("$kind.guard-literal", intArrayOf(row.guard), state)
@@ -167,7 +174,7 @@ internal class ArithmeticLearningTrace(
                     holes.add(it)
                 }
             }
-            record("$kind.endpoint", variable.toLong(), row.coefficients[index], domain.min, domain.max,
+            record("$kind.endpoint", variable.toLong(), row.coefficients[index].toLongExact(), domain.min, domain.max,
                 holes.size.toLong(), state.intMinReason[variable].toLong(), state.intMaxReason[variable].toLong())
             for (hole in holes) record("$kind.hole", variable.toLong(), hole)
         }

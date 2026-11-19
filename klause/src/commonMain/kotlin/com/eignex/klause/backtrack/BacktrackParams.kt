@@ -427,8 +427,12 @@ data class BacktrackParams(
      * in any reached reason retains clause fallback.
      */
     val pbLearning: Boolean? = null,
-    /** Learn bounded mandatory integer rows from finite conflicts; disabled by default. */
+    /** Learn exact mandatory integer rows from finite conflicts; disabled by default. */
     val integerRowLearning: Boolean = false,
+    /** Per-conflict work allowance for optional cutting-planes learning, inside propagation work. */
+    val arithmeticLearningWork: Long = 262_144,
+    /** Per-conflict cumulative modeled allocation allowance for optional integer arithmetic learning. */
+    val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
     /**
      * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
      * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a

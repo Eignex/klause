@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -19,12 +20,39 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.model.PbOp
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PbConflictResolventTest {
+    @Test
+    fun `wide original sources should produce arithmetic learning in ordinary traversal`() {
+        val weight = bigIntOf(Long.MAX_VALUE) + bigIntOf(1)
+        val native = PropagationSession(Problem(5, 0, emptyArray(), arrayOf(
+            PseudoBoolean(Array(4) { weight }, intArrayOf(Lit.make(0, false), Lit.make(2, true),
+                Lit.make(3, true), Lit.make(4, true)), PbOp.GE, weight * bigIntOf(2)),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))),
+        )), pbLearning = true)
+        val shared = SearchSession(listOf(CpSearchComponent(native)), atoms = SearchAtomRegistry(5))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        val brancher = BooleanBranching { context ->
+            (0 until 5).firstOrNull { context.boolValue(it) == null }?.let { variable ->
+                val first = variable == 0
+                listOf(SearchDecision.Bool(Lit.make(variable, first)), SearchDecision.Bool(Lit.make(variable, !first)))
+            }
+        }
+
+        assertIs<SearchResult.Satisfied>(shared.solve(5, booleanBranching = brancher))
+
+        assertTrue(native.learnedLifecycle().getValue("learningPbConsumed") > 0L)
+    }
+
     @Test
     fun `cancellation should withhold the learned result`() {
         val state = PropagationState(Problem(2, 1, arrayOf(IntDomain(0, 10)), emptyArray()),

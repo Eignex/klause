@@ -1,9 +1,18 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.bool.ExactPseudoBooleanPropagator
 import com.eignex.klause.factor.bool.CardinalityPropagator
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Lit
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.maxOf
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
@@ -14,6 +23,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     private val acc = PbAccumulator()
     private val reason = PbAccumulator()
+    private var budget = ArithmeticLearningBudget(state)
     private val resolvedVars = IntHashSet()
     private val bumped = IntHashSet()
 
@@ -38,7 +48,17 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     override val bumpIntVars = IntArrayList()
     override val offTrailFrontier = IntArrayList()
 
+    fun releaseArithmetic() {
+        acc.clear()
+        reason.clear()
+    }
+
+    fun resourceDecline(reason: String) = decline("resource-$reason")
+
     override fun reset(universe: Int) {
+        budget = ArithmeticLearningBudget(state)
+        acc.budget = budget
+        reason.budget = budget
         acc.clear()
         reason.clear()
         resolvedVars.clear()
@@ -64,9 +84,9 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     override fun isFrontier(v: Int): Boolean {
         if (resolvedVars.contains(v)) return false
         val c = acc.coefOf(v)
-        if (c == 0L) return false
+        if (c == BIG_ZERO) return false
         // The constraint literal of v is (v, c>0); it is a live frontier literal iff currently false.
-        return state.litFalse(Lit.make(v, c > 0L))
+        return state.litFalse(Lit.make(v, c > BIG_ZERO))
     }
 
     override fun resolveOut(pivot: Int) {
@@ -130,12 +150,12 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         val a = acc.coefOf(pivot)
         val b = reason.coefOf(pivot)
         // ExecutionControl needs opposite-sign coefficients on the pivot in the two constraints.
-        if (a == 0L || b == 0L || (a > 0L) == (b > 0L)) {
+        if (a == BIG_ZERO || b == BIG_ZERO || (a > BIG_ZERO) == (b > BIG_ZERO)) {
             decline("pivot-sign")
             return
         }
-        val absA = if (a < 0L) -a else a
-        val absB = if (b < 0L) -b else b
+        val absA = a.abs()
+        val absB = b.abs()
         // Selective reduction: weaken away only the reason's non-falsified literals whose
         // coefficient is not divisible by the pivot coefficient — the ones the rounding below would
         // inflate into spurious slack. Falsified and divisible literals are kept, so unit-weight
@@ -145,7 +165,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         // Divide the reason by its pivot coefficient, rounding up ⇒ its pivot coefficient becomes ±1.
         reason.divideRoundUp(absB)
         // acc + absA·reason cancels the pivot (opposite signs, |reason pivot| now 1). acc is not scaled.
-        if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA) || !acc.hasSafeActivity()) {
+        if (!acc.addScaled(reason, mulSelf = BIG_ONE, mulOther = absA) || !acc.hasSafeActivity()) {
             decline("combination-overflow")
             return
         }
@@ -158,7 +178,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     private fun loadPivotReason(pivot: Int, fallbackReasonLits: IntArray): Boolean {
         val forcingFid = state.boolReason[pivot]
         val forced = Lit.make(pivot, state.boolValueAt(pivot))
-        if (loadFactor(forcingFid, reason, forced) && reason.coefOf(pivot) != 0L) return true
+        if (loadFactor(forcingFid, reason, forced) && reason.coefOf(pivot) != BIG_ZERO) return true
         if (failed) return false
         // Fallback: reconstruct the reason clause. The driver's antecedents omit the forced literal;
         // add it back so the clause mentions the pivot and cancellation can proceed.
@@ -177,6 +197,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         state.arithmeticLearningTrace?.record("pb.source", fid.toLong(), forcedLit.toLong())
         if (fid < 0 || fid >= state.totalFactorCount) return false
         return when (val f = state.factorAt(fid)) {
+            is ExactPseudoBooleanPropagator -> admitSource(f.literals) && f.loadArithmeticReason(target, forcedLit, state, budget)
+            is LearnedExactPbPropagator -> admitSource(f.literals) && target.loadPb(f.weights, f.literals, f.degree)
             is PseudoBooleanPropagator -> admitSource(f.literals) && f.loadReason(target, forcedLit, state)
             is CardinalityPropagator -> admitSource(f.literals) && f.loadReason(target, forcedLit, state)
             is ClausePropagator -> admitSource(f.literals) && target.loadClause(f.literals)
@@ -186,7 +208,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     private fun booleanLiterals(literals: IntArray): Boolean =
         literals.all {
-            state.checkFiniteWork()
+            budget.spend()
             Lit.variable(it) in 0 until state.problem.numBoolVars
         }
 
@@ -196,7 +218,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     private fun bumpAll(a: PbAccumulator) {
         a.forEachVar { v ->
-            if (a.coefOf(v) != 0L && bumped.add(v)) bumpBoolVars.add(v)
+            if (a.coefOf(v) != BIG_ZERO && bumped.add(v)) bumpBoolVars.add(v)
         }
     }
 
@@ -204,10 +226,6 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         if (failed) return ConflictAnalyzer.AnalysisResult.NotApplicable
         val m = acc.materialize() ?: run {
             decline("materialization")
-            return ConflictAnalyzer.AnalysisResult.NotApplicable
-        }
-        if (m.degree > Long.MAX_VALUE - (m.weights.maxOrNull() ?: 0L)) {
-            decline("assertion-overflow")
             return ConflictAnalyzer.AnalysisResult.NotApplicable
         }
         val levels = distinctLevels(m.literals)
@@ -220,7 +238,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
         // A unit-weight, degree-1 constraint is exactly a clause; emit it as one so it flows the clause
         // storage/vivification/glue paths rather than a degenerate PB propagator.
-        if (m.degree == 1L && m.weights.all { it == 1L }) {
+        if (m.degree == BIG_ONE && m.weights.all { it == BIG_ONE }) {
             return ConflictAnalyzer.AnalysisResult.Learned(m.literals, backjump, levels.size, levels, asserting)
         }
         return ConflictAnalyzer.AnalysisResult.LearnedPb(
@@ -235,8 +253,10 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     }
 
     private fun distinctLevels(literals: IntArray): IntArray {
+        budget.spend(bytes = literals.size.toLong() * 24)
         val seen = IntHashSet(literals.size)
         for (lit in literals) {
+            budget.spend()
             val lvl = graph.levelOf(Lit.variable(lit))
             if (lvl > 0) seen.add(lvl)
         }
@@ -256,44 +276,42 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      * level. The candidate levels are the distinct decision levels of the constraint's assigned literals.
      */
     private fun pbAssertion(
-        weights: LongArray,
+        weights: Array<BigInt>,
         literals: IntArray,
-        degree: Long,
+        degree: BigInt,
         currentLevel: Int,
     ): Pair<Int, Boolean> {
-        val cand = IntHashSet(literals.size + 1)
-        cand.add(0)
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (state.boolAssignedAt(v)) {
-                val lvl = state.boolLevel[v]
-                if (lvl in 1 until currentLevel) cand.add(lvl)
-            }
+        budget.spend(bytes = literals.size.toLong() * 48 + 8)
+        val levels = IntArray(literals.size) { index ->
+            budget.spend()
+            val variable = Lit.variable(literals[index])
+            if (state.boolAssignedAt(variable)) state.boolLevel[variable].coerceAtLeast(0) else currentLevel
         }
-        val levelsAsc = cand.toIntArray()
-        levelsAsc.sort()
-        for (l in levelsAsc) {
-            if (propagatesAt(weights, literals, degree, l)) return l to true
+        val order = literals.indices.sortedWith { left, right ->
+            budget.spend()
+            val level = levels[left].compareTo(levels[right])
+            if (level == 0) left.compareTo(right) else level
+        }
+        val suffix = Array(weights.size + 1) { BIG_ZERO }
+        var available = BIG_ZERO
+        for (index in order.indices.reversed()) {
+            budget.scalar(available, weights[order[index]])
+            available += weights[order[index]]
+            suffix[index] = maxOf(suffix[index + 1], weights[order[index]])
+        }
+        var position = 0
+        var level = 0
+        while (level < currentLevel) {
+            while (position < order.size && levels[order[position]] <= level) {
+                budget.spend()
+                val index = order[position++]
+                if (state.litFalse(literals[index])) available -= weights[index]
+            }
+            val slack = available - degree
+            if (slack >= BIG_ZERO && suffix[position] > slack) return level to true
+            if (position == order.size) break
+            level = levels[order[position]]
         }
         return 0 to false
-    }
-
-    /** True iff, after popping to level [l], the constraint has slack ≥ 0 and some freed literal (var
-     *  unassigned or assigned above [l]) has weight exceeding the slack — i.e. it force-propagates. */
-    private fun propagatesAt(weights: LongArray, literals: IntArray, degree: Long, l: Int): Boolean {
-        var available = 0L // Σ weights of literals not falsified-and-kept at levels ≤ l
-        var maxFree = 0L // largest weight among freed literals (candidates to be forced)
-        for (i in literals.indices) {
-            val lit = literals[i]
-            val w = weights[i]
-            val v = Lit.variable(lit)
-            val assigned = state.boolAssignedAt(v)
-            val keptFalsified = assigned && state.boolLevel[v] <= l && state.boolValueAt(v) != Lit.isPositive(lit)
-            if (!keptFalsified) available += w
-            val freed = !assigned || state.boolLevel[v] > l
-            if (freed && w > maxFree) maxFree = w
-        }
-        val slack = available - degree
-        return slack >= 0 && maxFree > slack
     }
 }
