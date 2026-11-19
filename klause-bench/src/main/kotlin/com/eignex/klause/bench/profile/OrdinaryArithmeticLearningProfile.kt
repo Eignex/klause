@@ -48,7 +48,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "learning")
+                "attribution")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -56,12 +56,10 @@ internal object OrdinaryArithmeticLearningProfile {
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val nodes = (options["nodes"] ?: "4096").toLong().also { require(it in 1..100_000L) }
         val traceMode = options["trace"] ?: "first-integer"
-        require(traceMode in setOf("initial", "first-integer", "first-pb"))
+        require(traceMode in setOf("initial", "first-integer"))
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
-        val learningKind = options["learning"] ?: "integer"
-        require(learningKind in setOf("integer", "pb", "both"))
         val allocationBean = (ManagementFactory.getThreadMXBean() as? ThreadMXBean)
             ?.takeIf { it.isThreadAllocatedMemorySupported }?.apply { isThreadAllocatedMemoryEnabled = true }
         val cpuBean = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
@@ -118,7 +116,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     original, FiniteEngine.BACKTRACK, entry.objective,
                     cancellation = stop, solveCancellation = stop, randomSeed = 3L,
                 ))
-                val label = if (learning) learningKind else "clause"
+                val label = if (learning) "integer" else "clause"
                 val originalJson = codec.encodeToString(original)
                 val preparedJson = codec.encodeToString(prepared.problem)
                 require(originalJson.encodeToByteArray().size <= 131_072 &&
@@ -138,9 +136,7 @@ internal object OrdinaryArithmeticLearningProfile {
                         native = session
                         attachment = origin
                         val recorder = PreparedArithmeticLearningProfile.Capture(
-                            session, 1024, 65536,
-                            captureFirstInteger = learning && learningKind != "pb" && traceMode == "first-integer",
-                            captureFirstPb = learning && learningKind != "integer" && traceMode == "first-pb",
+                            session, 1024, 65536, captureFirstInteger = learning && traceMode == "first-integer",
                         )
                         capture = recorder
                         integerRowsAtCapture = recorder.lifecycle()["learningIntegerAdmitted"]
@@ -171,8 +167,7 @@ internal object OrdinaryArithmeticLearningProfile {
                 }
                 val params: BacktrackParams = base.copy(
                     variableSelector = observing(selector), randomSeed = 3L, cancellation = stop,
-                    maxDecisions = nodes, pbLearning = learning && learningKind != "integer",
-                    integerRowLearning = learning && learningKind != "pb",
+                    maxDecisions = nodes, pbLearning = false, integerRowLearning = learning,
                     propagationAttribution = attribution,
                     branchObserver = object : SearchBranchAttemptObserver {
                         override fun onAttempt(decision: SearchDecision, context: SearchContext) {
@@ -230,8 +225,8 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("problem", name)
                     put("sourceSha256", hash)
                     put("sourceMode", if (source64 == null) "catalog" else "frozen")
-                    put("integerRowLearning", params.integerRowLearning)
-                    put("pbLearning", params.pbLearning)
+                    put("integerRowLearning", learning)
+                    put("pbLearning", false)
                     put("propagationAttribution", attribution)
                     put("lp", lp)
                     put("seed", 3)

@@ -248,7 +248,6 @@ internal object PreparedArithmeticLearningProfile {
         private val maxEvents: Int = 128,
         private val maxWords: Int = 8192,
         captureFirstInteger: Boolean = false,
-        captureFirstPb: Boolean = false,
     ) {
         private val field = LivePropagationState.require(native).javaClass.getDeclaredField("arithmeticLearningTrace")
             .apply { isAccessible = true }
@@ -258,8 +257,6 @@ internal object PreparedArithmeticLearningProfile {
         init {
             trace.javaClass.getMethod("setCaptureFirstInteger", Boolean::class.javaPrimitiveType)
                 .invoke(trace, captureFirstInteger)
-            trace.javaClass.getMethod("setCaptureFirstPb", Boolean::class.javaPrimitiveType)
-                .invoke(trace, captureFirstPb)
             field.set(LivePropagationState.require(native), trace)
         }
 
@@ -284,7 +281,6 @@ internal object PreparedArithmeticLearningProfile {
             put("truncationCause", trace.javaClass.getMethod("getTruncationCause").invoke(trace) as String?)
             put("omittedPayloads", trace.javaClass.getMethod("getOmittedPayloads").invoke(trace) as Int)
             put("focusedIntegerId", trace.javaClass.getMethod("getFocusedIntegerId").invoke(trace) as Int?)
-            put("focusedPbId", trace.javaClass.getMethod("getFocusedPbId").invoke(trace) as Int?)
             for (name in listOf("discardedWindows", "discardedEvents", "discardedWords", "omittedObservations")) {
                 val getter = "get" + name.replaceFirstChar { it.uppercase() }
                 put(name, trace.javaClass.getMethod(getter).invoke(trace) as Long)
