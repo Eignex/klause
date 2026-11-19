@@ -7,6 +7,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.PooledGuidanceKind
 import com.eignex.klause.backtrack.PooledGuidanceObservation
 import com.eignex.klause.backtrack.PooledGuidanceObserver
+import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
@@ -16,6 +17,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
@@ -75,6 +77,21 @@ internal class BacktrackWorkerConfig(
     fun withGuidanceObserver(observer: (String, PooledGuidanceObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer,
             numericalLp, optimalityGap)
+
+    fun withSessionObserver(observer: (String, PropagationSession) -> Unit): BacktrackWorkerConfig {
+        fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {
+            override fun fresh(): VariableSelector = observing(delegate.fresh())
+            override fun onSessionCreated(session: PropagationSession) {
+                observer("bt/${recipe.label}", session)
+                delegate.onSessionCreated(session)
+            }
+        }
+        val observed = BacktrackRecipe(recipe.label) { seed, events ->
+            recipe.build(seed, events).let { it.copy(variableSelector = observing(it.variableSelector)) }
+        }
+        return BacktrackWorkerConfig(observed, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery,
+            onGuidance, numericalLp, optimalityGap)
+    }
 
     override val label: String get() = recipe.label
 

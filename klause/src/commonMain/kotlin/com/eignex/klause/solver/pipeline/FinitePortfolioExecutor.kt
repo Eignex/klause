@@ -22,6 +22,7 @@ import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
@@ -93,6 +94,7 @@ internal fun FinitePipeline.portfolioExecutor(
     onLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    onSession: ((String, PropagationSession) -> Unit)? = null,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -134,7 +136,7 @@ internal fun FinitePipeline.portfolioExecutor(
         acceptedIncumbents = companionArms.incumbents?.let { canonical ->
             IncumbentSource { canonical.projected()?.takeIf { it.objective.isFinite() } }
         },
-        onGuidance = onGuidance,
+        onGuidance = onGuidance, onSession = onSession,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(

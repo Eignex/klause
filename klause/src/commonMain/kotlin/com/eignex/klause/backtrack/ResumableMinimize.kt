@@ -970,6 +970,7 @@ internal class ResumableMinimize(
         rootLayoutPending = false
         restartRootTargetsPending = false
         lpEngine.discardRootLayoutPreparation()
+        lpEngine.resetRootBoundSearch()
         lpEngine.rootRoundingWarmStart = null
         lpEngine.rootRoundingInterrupted = false
         lpEngine.clearRootPrimalTargets()
@@ -1438,6 +1439,7 @@ internal class ResumableMinimize(
             lpEngine.rootRoundingWarmStart = null
             return null
         }
+        if (handoffSparseRootBound()) return null
         if (handoffRootTargets(rootToken)) return null
         var installed: MinimizeResult.WithSample? = null
 
@@ -1457,11 +1459,25 @@ internal class ResumableMinimize(
         val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
         val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
         lpEngine.continuedRootLowerBound?.let(::publishRootLpBound)
+        if (handoffSparseRootBound()) return installed
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
         lpEngine.rootRoundingWarmStart = null
         if (rounded == null) lpEngine.lpFeasibilityPump(objective, rootToken, initial = initial, accept = ::accept)
         return installed
+    }
+
+    private fun handoffSparseRootBound(): Boolean {
+        val plan = lpEngine.params.lpPlan
+        if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 || plan.componentOwnership ||
+            plan.lbTreeSearch || !lpEngine.sparseTrialActive || !lpEngine.rootRoundingQueryPaused ||
+            lpEngine.measuredRootLowerBound == null
+        ) return false
+        // A checked global bound survives retirement of its unfinished numerical cursor.
+        rootRoundingPending = false
+        lpEngine.handoffRootBoundSearch()
+        sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "BOUND_SEARCH_HANDOFF", 0L)
+        return true
     }
 
     private fun handoffRootTargets(rootToken: ExecutionControl): Boolean {

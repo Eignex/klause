@@ -110,8 +110,11 @@ internal class CoreGuidedSearch(
     private var queryPreparation: Iterator<Unit>? = null
     private var transitionPreparation: Iterator<Unit>? = null
     private var preparationToken: ExecutionControl = ExecutionControl.Never
-    private val querySlice = cancelledWhen({ preparationToken.deadline() }, { preparationToken.workScheduled() }) {
-        preparationToken()
+
+    // The delegate meters slice work; reading outer work constructs a live query-statistics snapshot.
+    private var querySegment: ExecutionControl = ExecutionControl.Never
+    private val querySlice = cancelledWhen({ querySegment.deadline() }, { querySegment.workScheduled() }) {
+        querySegment()
     }
     private var preparationVisits = factors.size.toLong() + objectiveTerms
     internal val preparationWork: Long get() = preparationVisits
@@ -189,7 +192,9 @@ internal class CoreGuidedSearch(
         }
         if (allowanceExhausted) return finish(stopped(TerminationReason.BudgetExhausted))
         val remainingMillis = activeMillisLimit?.let {
-            (it.milliseconds - activeTime).inWholeMilliseconds
+            val remaining = (it.milliseconds - activeTime).inWholeMilliseconds
+            if (remaining <= 0L) return finish(stopped(TerminationReason.BudgetExhausted))
+            remaining
         } ?: sliceMillis
         val sliceDuration = minOf(sliceMillis, remainingMillis).milliseconds
         val deadline = TimeSource.Monotonic.markNow() + sliceDuration
@@ -221,12 +226,14 @@ internal class CoreGuidedSearch(
         }
         activeSlice = timeSource.markNow()
         preparationToken = preparation
+        querySegment = segment
         try {
             return advance(token, preparation, segment, start, allowance, onIncumbent)
         } finally {
             activeTime += checkNotNull(activeSlice).elapsedNow()
             activeSlice = null
             preparationToken = ExecutionControl.Never
+            querySegment = ExecutionControl.Never
             if (offered >= 0L) workDebt = saturatedAdd(workDebt, (work - start - offered).coerceAtLeast(0L))
         }
     }

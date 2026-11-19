@@ -30,6 +30,7 @@ import com.eignex.klause.portfolio.capLp
 import com.eignex.klause.portfolio.editing
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
@@ -107,6 +108,7 @@ internal class FiniteExecutionRequest(
     val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
     /** Source optimality gap over [objective]; see [BacktrackParams.optimalityGap]. */
     val optimalityGap: OptimalityGap? = null,
 )
@@ -659,6 +661,7 @@ private fun executePortfolio(
         onLpQuery = request.onPortfolioLpQuery,
         onGuidance = request.onPortfolioGuidance,
         onJointRepair = request.onPortfolioJointRepair,
+        onSession = request.onPortfolioSession,
         numericalCompanions = request.numericalCompanionParams,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->

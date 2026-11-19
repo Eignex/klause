@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.tools
 
 import jdk.jfr.consumer.RecordedEvent
+import jdk.jfr.consumer.RecordedObject
 import jdk.jfr.consumer.RecordingFile
 import java.io.File
 import java.io.PrintStream
@@ -58,6 +59,9 @@ internal object CliProfile {
         val cpu = HashMap<String, Long>()
         val phases = HashMap<String, Long>()
         val allocation = HashMap<String, Long>()
+        val allocatedClasses = HashMap<String, Long>()
+        val memoryMaxBytes = HashMap<String, Long>()
+        val collectors = sortedSetOf<String>()
         val cpuCallers = HashMap<String, Long>()
         val allocationCallers = HashMap<String, Long>()
         val cpuModelCallers = HashMap<String, Long>()
@@ -81,6 +85,24 @@ internal object CliProfile {
                     runtimeMillis.merge(type, millis, Long::plus)
                 }
                 when (event.eventType.name) {
+                    "jdk.GCConfiguration" -> collectors.add(
+                        "young=${event.getString("youngCollector")} old=${event.getString("oldCollector")}")
+                    "jdk.GCHeapSummary" -> {
+                        val space = event.getValue<RecordedObject>("heapSpace")
+                        memoryMaxBytes.merge("heap committed", space.getLong("committedSize"), ::maxOf)
+                        memoryMaxBytes.merge("heap reserved", space.getLong("reservedSize"), ::maxOf)
+                        memoryMaxBytes.merge("heap used ${event.getString("when")}", event.getLong("heapUsed"), ::maxOf)
+                    }
+                    "jdk.MetaspaceSummary" -> {
+                        val space = event.getValue<RecordedObject>("metaspace")
+                        memoryMaxBytes.merge("metaspace committed", space.getLong("committed"), ::maxOf)
+                        memoryMaxBytes.merge("metaspace used", space.getLong("used"), ::maxOf)
+                    }
+                    "jdk.CodeCacheStatistics" -> {
+                        val capacity = event.getLong("reservedTopAddress") - event.getLong("startAddress")
+                        memoryMaxBytes.merge("code used ${event.getString("codeBlobType")}",
+                            capacity - event.getLong("unallocatedCapacity"), ::maxOf)
+                    }
                     "jdk.NativeMethodSample" -> nativeCallers.merge(cliOperationCallers(event), 1L, Long::plus)
                     "jdk.ExecutionSample" -> {
                         topMethod(event)?.let { cpu.merge(it, 1L, Long::plus) }
@@ -100,6 +122,7 @@ internal object CliProfile {
                     }
                     "jdk.ObjectAllocationSample" -> {
                         val weight = event.getLong("weight")
+                        allocatedClasses.merge(event.getClass("objectClass").name, weight, Long::plus)
                         allocation.merge(cliPhase(event), weight, Long::plus)
                         allocationCallers.merge(cliOperationCallers(event), weight, Long::plus)
                         allocationModelCallers.merge(cliModelCallers(event), weight, Long::plus)
@@ -109,6 +132,12 @@ internal object CliProfile {
             }
         }
         printTable("$label: event counts", eventCounts, 40, output)
+        output.println("=== $label: recorded GC configuration ===")
+        output.println(collectors.joinToString("; ").ifEmpty { "unknown: no recorded GC configuration" })
+        output.println("=== $label: JVM memory maxima (bytes; recorded events, not RSS) ===")
+        if (memoryMaxBytes.isEmpty()) output.println("unknown: no recorded memory summaries")
+        memoryMaxBytes.toSortedMap().forEach { (key, bytes) -> output.println("  $key=$bytes") }
+        printTable("$label: sampled allocation weight by class (estimated bytes)", allocatedClasses, 40, output)
         printTable("$label: runtime event durations by type (ms; overlapping types)", runtimeMillis, 40, output)
         printTable("$label: maximum runtime event duration by type (ms)", runtimeMaxMillis, 40, output)
         printTable("$label: native-method samples by captured callers", nativeCallers, 60, output)

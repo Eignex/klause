@@ -248,16 +248,21 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 domain.min, domain.max, marker[2].toLong())
             return null
         }
-        var combination = row.resolve(sourceRow, variable, budget)
-        if (combination == null) {
+        var combination = row.resolve(sourceRow, variable, budget) ?: run {
             state.arithmeticLearningTrace?.record("integer.endpoint-decline.combination-shape-or-guard")
             return null
         }
+        var roundedReason = false
         if (combination.minimum(state, budget = budget) <= combination.bound) {
             val reduced = sourceRow.reduced(state, sourceRow.coefficient(variable).abs(), budget)
-            combination = reduced?.let { row.resolve(it, variable, budget) } ?: combination
+            reduced?.let { row.resolve(it, variable, budget) }?.let {
+                combination = it
+                roundedReason = true
+            }
         }
         if (combination.minimum(state, budget = budget) <= combination.bound) return null
+        state.arithmeticLearningTrace?.record("integer.eliminate", variable.toLong(), factorId.toLong(),
+            marker[2].toLong(), if (roundedReason) 1L else 0L)
         return BoundEvent(sourceRow, marker[2], key, combination)
     }
 
