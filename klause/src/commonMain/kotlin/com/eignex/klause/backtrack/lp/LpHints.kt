@@ -128,7 +128,7 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains || !objectiveRecorded || !history.hasTwoSidedSamples) return Double.NaN
+        if (!collect || !directionalGains || !objectiveRecorded || !history.hasReliableHistory) return Double.NaN
         if (!passivePointCurrent()) return Double.NaN
         charge(1L)
         observe("PASSIVE_VARIABLE_SCORE")
@@ -146,7 +146,7 @@ internal class LpHints(
 
     fun beginPassiveSelection() {
         passiveChoice?.clear()
-        if (!collect || !history.hasTwoSidedSamples) return
+        if (!collect || !history.hasReliableHistory) return
         charge(4L)
         observe("PASSIVE_VARIABLE_CHECK")
     }
@@ -158,7 +158,7 @@ internal class LpHints(
             observe("PASSIVE_VARIABLE_NO_BASELINE")
             val usable = proposal != null && !cancelled() && passivePointCurrent() &&
                 (proposal !is VarRef.Bool || value(proposal) in 0.0..1.0) &&
-                history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite()
+                history.hasReliableHistory && history.score(proposal, value(proposal)).isFinite()
             selected(proposal.takeIf { applyAdvice && usable })
             return directionalChoice ?: baseline
         }
@@ -174,7 +174,7 @@ internal class LpHints(
         else LpPassiveVariableChoice.Candidate(baseline, value(baseline))
         val selected = choice.select(proposed, reference, stamp,
             fresh = current,
-            reliable = { history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite() })
+            reliable = { history.hasReliableHistory && history.score(proposal, value(proposal)).isFinite() })
         if (choice.nominatedVariable != null && !current()) {
             choice.clear()
             directionalChoice = null
