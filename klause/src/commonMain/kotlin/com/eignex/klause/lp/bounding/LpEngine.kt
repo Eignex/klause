@@ -2029,6 +2029,7 @@ internal object LpNodeOverhead {
     const val EXACT = 32L
     const val FIXING = 2L
     const val EDIT = 1L
+    const val GUIDANCE = 1L
 }
 
 /** Rows, columns and nonzeros: the size every whole-model pass over [this] is linear in. */

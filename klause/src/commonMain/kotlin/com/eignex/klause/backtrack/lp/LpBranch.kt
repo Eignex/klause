@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 
@@ -17,6 +18,7 @@ import com.eignex.klause.solver.search.VarRef
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
+    noteNodeOverhead((problem.numBoolVars.toLong() + problem.numIntVars) * LpNodeOverhead.GUIDANCE)
     hints.beginPassiveSelection()
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE

@@ -308,6 +308,9 @@ finite search hints after cut re-solves. Only an optimal result supplies an
 objective sample; an unfinished cut solve keeps the preceding point, and cancellation
 withholds publication. [Finite guidance](09-search.md#finite-lp-directional-guidance)
 owns selection and history lifetime.
+Publishing a point charges its model pass, and variable selection charges its bounded
+scan to the same LP effort ledger. These costs join numerical and maintenance work
+in the worker's cumulative allowance and per-node effort observations.
 
 An exact state appending one bound copies only the changed side; tightening can
 introduce a conflict only at that column, so the state combines it with the
