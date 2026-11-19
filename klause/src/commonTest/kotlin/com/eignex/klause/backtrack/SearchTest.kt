@@ -32,6 +32,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SearchTest {
+    @Test
+    fun `pooled point replay keeps precedence over alternative ordering`() {
+        for (replay in listOf(false, true)) {
+            val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin)
+            val brancher = BacktrackBrancher(PropagationSession(problemOf(IntDomain(0, 10))), params,
+                sink = null, restart = RestartSchedule.from(params), branching = object : BacktrackBranching {
+                    override fun orderAlternatives(
+                        variable: VarRef,
+                        alternatives: List<SearchDecision>,
+                    ): List<SearchDecision> = alternatives.reversed()
+                })
+            if (replay) brancher.importPooledSolution(Sample(booleanArrayOf(), longArrayOf(7L)), replay = true)
+
+            val alternatives = brancher.nextBranch(SearchSession(emptyList()))
+
+            val expected = if (replay) SearchDecision.IntAtMost(0, 7L) else SearchDecision.IntAtLeast(0, 1L)
+            assertEquals(expected, alternatives?.first())
+        }
+    }
+
     private fun problemOf(vararg domains: IntDomain): Problem = Problem(
         numBoolVars = 0,
         numIntVars = domains.size,
