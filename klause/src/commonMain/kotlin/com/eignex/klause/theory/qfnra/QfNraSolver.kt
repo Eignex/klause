@@ -183,9 +183,9 @@ internal class QfNraQuery(
             var startedSearch = false
             var declined: QfNraResult.Unknown? = null
             while (true) {
-                if (probeCompleted && envelopePruning != null &&
-                    envelopeSpent <= progress.rootWork + progress.searchWork) {
-                    val envelope = advanceEnvelopes(normalized, fixed, algebraic)
+                if (probeCompleted && envelopePruning != null && envelopeAllowance() > 0L) {
+                    val envelope = advanceEnvelopes(normalized, fixed, algebraic,
+                        envelopeAllowance())
                     if (envelope != null) {
                         yield(envelope)
                         return@sequence
@@ -266,18 +266,23 @@ internal class QfNraQuery(
         }
     }.iterator()
 
+    private fun envelopeAllowance(): Long = (work.spentWork - envelopeSpent - envelopeSpent).coerceAtLeast(0L)
+
     private fun advanceEnvelopes(
         normalized: PolynomialFormula,
         fixed: Map<Int, BigFraction>,
         algebraic: AlgebraicArithmetic,
+        allowance: Long,
     ): QfNraResult? {
         val pruning = envelopePruning ?: return null
         val start = work.spentWork
         val step = try {
-            pruning.advance { point ->
-                val coordinates = (0 until realCount).associateWith { algebraic.rational(fixed[it] ?: point[it]) }
-                checkSample(normalized, coordinates, boolCount, arithmetic, algebraic)
-            }
+            work.envelope(allowance) {
+                pruning.advance { point ->
+                    val coordinates = (0 until realCount).associateWith { algebraic.rational(fixed[it] ?: point[it]) }
+                    checkSample(normalized, coordinates, boolCount, arithmetic, algebraic)
+                }
+            } ?: PolynomialLpStep.Unavailable.also { pruning.close() }
         } finally {
             envelopeSpent += work.spentWork - start
         }
@@ -393,13 +398,19 @@ internal class QfNraQuery(
                     arithmetic.step()
                     reducedFormula.atoms[id].let { if (truth) it else it.complemented() }
                 }
-                val regionalLp = PolynomialLpRelaxation.prepare(regionalAtoms, realCount, arithmetic, work)
-                val infeasible = regionalLp?.use {
-                    val solved = it.solve()
-                    work.envelopeQueries++
-                    arithmetic.step()
-                    solved?.verdict == LpVerdict.INFEASIBLE
-                } == true
+                val beforeLp = work.spentWork
+                val infeasible = try {
+                    work.envelope(envelopeAllowance()) {
+                        PolynomialLpRelaxation.prepare(regionalAtoms, realCount, arithmetic, work)?.use {
+                            val solved = it.solve()
+                            work.envelopeQueries++
+                            arithmetic.step()
+                            solved?.verdict == LpVerdict.INFEASIBLE
+                        }
+                    } == true
+                } finally {
+                    envelopeSpent += work.spentWork - beforeLp
+                }
                 if (infeasible) {
                     work.envelopeRefutations++
                     continue
@@ -654,18 +665,57 @@ internal class QfNraWork(params: QfNraParams) : ArithmeticBudget(params.cancella
     val spentWork: Long get() = spent
     private var probeEnd: Long? = null
     private var coupledEnd: Long? = null
+    private var envelopeEnd: Long? = null
+    private var envelopeParentStopped = false
     private var probeStart: Long = 0
     private var probeSpent: Long = 0
     private var probeParentStopped = false
     override fun isCancelled(): Boolean {
         val stopped = super.isCancelled()
         if (probeEnd != null && stopped) probeParentStopped = true
-        return stopped || probeEnd?.let { spent >= it } == true || coupledEnd?.let { spent >= it } == true
+        if (envelopeEnd != null && stopped) envelopeParentStopped = true
+        return stopped || probeEnd?.let { spent >= it } == true || coupledEnd?.let { spent >= it } == true ||
+            envelopeEnd?.let { spent >= it } == true
     }
     override val exhausted get() = limitReached || probeEnd?.let { spent >= it } == true ||
-        coupledEnd?.let { spent >= it } == true
+        coupledEnd?.let { spent >= it } == true || envelopeEnd?.let { spent >= it } == true
     override val reservationLimit get() =
-        (minOf(probeEnd ?: Long.MAX_VALUE, coupledEnd ?: Long.MAX_VALUE) - spent).coerceAtLeast(0L)
+        (minOf(probeEnd ?: Long.MAX_VALUE, coupledEnd ?: Long.MAX_VALUE,
+            envelopeEnd ?: Long.MAX_VALUE) - spent).coerceAtLeast(0L)
+    fun <T> envelope(allowance: Long, block: () -> T): T? {
+        execution?.flush()
+        check(envelopeEnd == null)
+        if (allowance == 0L) return null
+        envelopeEnd = spent + minOf(allowance, Long.MAX_VALUE - spent)
+        envelopeParentStopped = false
+        var failure: Throwable? = null
+        return try {
+            block()
+        } catch (stop: PolynomialInterrupted) {
+            if (envelopeParentStopped) {
+                failure = stop
+                throw stop
+            }
+            null
+        } catch (_: PolynomialResourceLimit) {
+            null
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
+        } finally {
+            preservingFailure(failure) {
+                try {
+                    execution?.flush()
+                } finally {
+                    envelopeEnd = null
+                }
+                if (failure == null) {
+                    if (envelopeParentStopped) throw PolynomialInterrupted()
+                    execution?.resume()
+                }
+            }
+        }
+    }
     fun probe(block: () -> QfNraAssignment?): QfNraAssignment? {
         execution?.flush()
         check(probeEnd == null)
