@@ -329,13 +329,13 @@ closed unconditional linear sources; emphasis levels leave it disabled. Admissio
 bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
 retained layout. Custom emitters decline because they reserve no source size. The
-trial uses the ordinary bound, fixing and conflict consumers with their exact checks;
+trial uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
 cuts and expanded hulls stay outside its allowance, and admitted roots enable the
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
 and root scopes. The owner advances its floating cursor in adaptive work quanta; a
 pause publishes nothing and authority edits discard the cursor. Completed floating
-results enter the exact bound check within a 16 MiB checking reservation;
+results enter the policy's bound check within a 16 MiB checking reservation;
 exhaustion, cancellation or refusal withholds the root bound.
 The retained owner's preparation and solve lifetime use the remaining cumulative
 root and LP grants. A worker's current slice offer limits only the numerical query
