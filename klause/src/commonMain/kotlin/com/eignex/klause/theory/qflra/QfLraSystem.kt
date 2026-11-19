@@ -262,6 +262,12 @@ internal class LiveQfLraSystem(
         for (column in point.indices) if (!holds(column, point[column])) return false
         // Every auxiliary column is defined by its source affine term; retraction changes only its bounds.
         for ((term, column) in definitions) {
+            stop.charge(2L)
+            if (stop.pollStop()) return false
+            val metadata = state.model.column(column)
+            if (metadata.bounds.lower == null && metadata.bounds.upper == null) continue
+            val previous = checkedState?.model
+            if (previous != null && column < previous.numVars && metadata === previous.column(column)) continue
             val value = definitionPoint[column] ?: run {
                 var negative = BigFraction.ZERO
                 for ((sourceColumn, coefficient) in term) {

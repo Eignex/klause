@@ -95,11 +95,11 @@ rows and discards candidates, so a witness never outlives its premises.
 The invocation can retain a certified point as a guess across edits and retraction.
 Before reuse, the linear adapter checks all current LP bounds, including strict
 sides, under the current operation allowance. Affine values are cached for one
-owned point; a changed point clears those values and new definitions are evaluated
-before their bounds are checked.
+owned point; a changed point clears those values. Definitions with no active bound
+need no evaluation; bounded new definitions are evaluated before acceptance.
 A completed bound check is reusable for the same point values and identical
 immutable LP state or column metadata. Edits and retraction check every changed
-column; newly appended definitions require evaluation before acceptance.
+column; newly appended bounded definitions require evaluation before acceptance.
 Closing the component releases the point, checked state and activity caches.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
