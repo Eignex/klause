@@ -51,6 +51,93 @@ import kotlin.time.Duration.Companion.hours
 
 class LpEngineTest {
     @Test
+    fun `metadata only queries should defer further optional node queries`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("metadata-query-funding")
+        var spent = 0L
+        var cancelAssembly = true
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundMaxOpsPerNode = 1L),
+                cancellation = ExecutionControl { cancelAssembly && spent >= 128L }), sink,
+            containingWork = { spent += it }).use { engine ->
+            val session = PropagationSession(problem)
+            val before = engine.totalSolveWork()
+            engine.pruneNode(session, 100.0, -1, true)
+            val first = sink.snapshot().lp
+            assertTrue(engine.totalSolveWork() - before > 64L)
+            cancelAssembly = false
+
+            engine.pruneNode(session, 100.0, -1, true)
+
+            assertTrue(first.overheadOps.sum > 0.0)
+            assertEquals(0.0, first.workOps.sum)
+            assertEquals(1.0, first.nodePasses.sum)
+            assertEquals(first.nodePasses, sink.snapshot().lp.nodePasses)
+        }
+    }
+
+    @Test
+    fun `required real residual queries should bypass optional query credit`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("residual-query-funding")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, boundMaxOpsPerNode = 1L)),
+            sink).use { engine ->
+            val session = PropagationSession(problem)
+
+            repeat(2) { engine.pruneNode(session, 100.0, -1, true) }
+
+            assertEquals(2.0, sink.snapshot().lp.nodePasses.sum)
+        }
+    }
+
+    @Test
+    fun `unfunded nodes should preserve the configured query cadence`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("query-funding-cadence")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundEvery = 3, boundMaxOpsPerNode = 1L)), sink,
+            nodeWorkAllowance = { 1L }).use { engine ->
+            val session = PropagationSession(problem)
+            val before = engine.totalSolveWork()
+            repeat(3) { engine.pruneNode(session, 100.0, -1, true) }
+            val charged = engine.totalSolveWork() - before
+            assertTrue(charged > 64L)
+            val fundedAfter = charged - 64L + 1L
+            val nextCadence = (fundedAfter + 2L) / 3L * 3L
+
+            repeat((nextCadence - 1L).toInt()) { engine.pruneNode(session, 100.0, -1, true) }
+
+            assertEquals(1.0, sink.snapshot().lp.nodePasses.sum)
+            engine.pruneNode(session, 100.0, -1, true)
+            assertEquals(2.0, sink.snapshot().lp.nodePasses.sum)
+        }
+    }
+
+    @Test
+    fun `failed queries should retain their source assembly debt`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("failed-query-funding")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver = error("query construction")
+        }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundMaxOpsPerNode = 1L)), sink,
+            LpSolveContext(factory)).use { engine ->
+            val session = PropagationSession(problem)
+            assertFailsWith<IllegalStateException> { engine.pruneNode(session, 100.0, -1, true) }
+
+            assertFalse(engine.pruneNode(session, 100.0, -1, true))
+
+            assertEquals(1.0, sink.snapshot().lp.nodePasses.sum)
+            assertTrue(sink.snapshot().lp.overheadOps.sum > 0.0)
+        }
+    }
+
+    @Test
     fun `branch selection spends the shared LP work allowance`() {
         val problem = boundedLpEngineProblem()
         val hints = LpHints(problem.numIntVars, 0)

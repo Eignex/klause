@@ -63,6 +63,8 @@ data class LpPlan(
      * Deterministic ceiling on what the node LP may spend per node the search explores, in [com.eignex.klause.lp.engine.LpWork]
      * operations ([LpEffortGovernor]). Exceeding it, having pruned nothing, demotes the LP to its floor
      * budget; a prune restores it and restarts its evidence window. `0` disables the rule.
+     * Optional query authorization also earns this much credit per observed node, with bounded warmup
+     * credit. Full query cost spends that credit, and a prune cannot forgive the resulting debt.
      *
      * A ratio rather than a wall-clock fraction because it is scale-free and reproducible: it says *the
      * LP is taxing the search* without needing to know how long the run may take or how fast the machine

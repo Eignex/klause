@@ -977,6 +977,8 @@ internal class LpEngine(
     )
     private val componentReuseFunded = componentReuseFundingAvailable(lpEffortGovernor.remainingWork(),
         params.componentReuseWorkHorizon, params.cancellation.deadline() != null)
+    private val nodeQueryFunding = LpNodeQueryFunding(params.lpPlan.boundMaxOpsPerNode,
+        LpEffortLadder.DEFAULT_WARMUP)
     private val automaticComponentReuse: Boolean get() = params.lpPlan.componentReuse && componentReuseFunded
     private var componentFundingDeclineObserved = false
 
@@ -1749,9 +1751,11 @@ internal class LpEngine(
             if (rootBoundHandedOff && session.decisionLevel == 0) return false
             if (sparseTrialActive && session.decisionLevel == 0 && retainedRootCumulativeWork() <= 0L) return false
             lpEffortGovernor.observeNode()
+            nodeQueryFunding.observeNode()
             if (!params.lpPlan.realResidual && (
                     session.decisionLevel > params.lpPlan.boundMaxDepth ||
                         ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
+                        !nodeQueryFunding.available ||
                         !lpLadder.shouldRun()
                     )
             ) {
@@ -1768,19 +1772,28 @@ internal class LpEngine(
                 null
             }
             nodeWorkStoppedAfterProgress = false
-            val outcome = lpBoundAndFix(
-                lpRelaxerL,
-                session,
-                effectiveBound,
-                sink,
-                objectiveVar = objectiveVar,
-                objectiveAscending = objectiveAscending,
-                cancellation = params.cancellation,
-                hints = lpHints,
-                learn = params.lpPlan.learn,
-                warm = warm,
-                cutsAllowed = cutsAllowed,
-            )
+            val beforeQuery = totalSolveWork()
+            val outcome = try {
+                lpBoundAndFix(
+                    lpRelaxerL,
+                    session,
+                    effectiveBound,
+                    sink,
+                    objectiveVar = objectiveVar,
+                    objectiveAscending = objectiveAscending,
+                    cancellation = params.cancellation,
+                    hints = lpHints,
+                    learn = params.lpPlan.learn,
+                    warm = warm,
+                    cutsAllowed = cutsAllowed,
+                )
+            } finally {
+                if (!params.lpPlan.realResidual) {
+                    val afterQuery = totalSolveWork()
+                    nodeQueryFunding.recordWork(if (afterQuery == Long.MAX_VALUE) Long.MAX_VALUE
+                    else afterQuery - beforeQuery)
+                }
+            }
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
             lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
                 nodeWorkStoppedAfterProgress && outcome.basis == null)

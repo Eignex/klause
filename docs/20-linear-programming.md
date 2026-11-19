@@ -330,6 +330,16 @@ Publishing a point charges its model pass, and variable selection charges its bo
 scan to the same LP effort ledger. These costs join numerical and maintenance work
 in the worker's cumulative allowance and per-node effort observations.
 
+Optional node queries earn work credit at the configured per-node effort cap, with
+initial and stored credit bounded by the existing warmup count. Each query spends
+its complete construction, source-refresh, numerical and certification cost;
+an atomic overshoot becomes debt repaid by later observed nodes. Pruning can promote
+the usefulness ladder but cannot erase this debt. Root work outside the query uses
+its separate budget, and required real-residual queries and leaf completion retain
+their completion paths. Unfunded nodes advance the ordinary cadence counter while
+the ladder's re-probe clock waits for funded eligibility. A zero per-node cap disables
+credit gating.
+
 An exact state appending one bound copies only the changed side; tightening can
 introduce a conflict only at that column, so the state combines it with the
 predecessor's first conflict without a scan. A node query that pivots but stops on
