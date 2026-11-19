@@ -78,7 +78,9 @@ internal class LpExactState internal constructor(
      */
     previous: LpExactState? = null,
 ) {
-    private val activeAssertions = if (previous != null && assertions === previous.activeAssertions) {
+    private val activeAssertions: List<LpBoundAssertion> = if (
+        previous != null && assertions === previous.activeAssertions
+    ) {
         assertions
     } else assertions.toList()
     private val scopeMarks = scopes.toList()
