@@ -53,8 +53,10 @@ with `RepresentationDeclined`.
 
 A term is normalized before lookup: zero coefficients are dropped and the first
 remaining coefficient is scaled to one, flipping the bound direction for a negative
-scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column. Terms
-first seen under an activator, branch or disjunct get their definition row appended
+scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column.
+Pure-real openings install prepared affine and strict-margin definitions without
+their guarded bounds, preserving the matrix across source Boolean choices. Other
+terms first seen under a branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
 
@@ -88,8 +90,10 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 The invocation can retain a certified point as a guess across edits and retraction.
-Before reuse, the linear adapter reconstructs every affine definition and checks
-all current LP bounds, including strict sides, under the current operation allowance.
+Before reuse, the linear adapter checks all current LP bounds, including strict
+sides, under the current operation allowance. Affine values are cached for one
+owned point; a changed point clears those values and new definitions are evaluated
+before their bounds are checked.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
 

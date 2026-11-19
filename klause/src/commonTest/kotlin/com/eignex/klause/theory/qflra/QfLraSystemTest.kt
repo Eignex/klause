@@ -40,6 +40,35 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `retained points should check affine definitions appended after their first check`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val point = listOf(BigFraction.ZERO, BigFraction.ZERO)
+            assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+
+            assertTrue(system.assertRow(row(listOf(1, -1), -1), axiom))
+
+            assertFalse(system.acceptsPoint(point, ExecutionControl.Never))
+        }
+    }
+
+    @Test
+    fun `retained affine values should follow changes to a supplied point`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            assertTrue(system.assertRow(row(listOf(1, -1), -1), axiom))
+            val point = mutableListOf(BigFraction.ZERO, BigFraction.ONE)
+            assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+
+            point[1] = BigFraction.ZERO
+
+            assertFalse(system.acceptsPoint(point, ExecutionControl.Never))
+        }
+    }
+
+    @Test
     fun `retained points should follow strict affine bounds and their retraction`() {
         val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
             doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0, true)

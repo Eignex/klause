@@ -142,6 +142,7 @@ internal class LiveQfLraSystem(
         factor.linearRows.map { it.exactForm(source.numRealVars) }
     },
     strictMargin: Boolean = false,
+    private val preparationStop: ExecutionControl = ExecutionControl.Never,
 ) {
     private val columns = source.numRealVars + source.numIntVars
     private val marginColumn = columns.takeIf { strictMargin }
@@ -176,14 +177,43 @@ internal class LiveQfLraSystem(
     private val normalized = preparedTerms.values.associateTo(HashMap()) { keys ->
         keys.positive to SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
     }
-    private val terms = normalized.filterKeys { it in initialTerms }.values
-        .map { it.term.coefficients }.filter { it.size != 1 }.distinct()
+    private val terms = buildList {
+        addAll(normalized.filterKeys { strictMargin || it in initialTerms }.values.map { it.term.coefficients })
+        if (marginColumn != null) {
+            for ((factorIndex, forms) in rowForms.withIndex()) {
+                val rows = source.factors[factorIndex].linearRows
+                for ((rowIndex, form) in forms.withIndex()) {
+                    val truths = if (rows[rowIndex].activator == LinearRow.ALWAYS) listOf(true) else listOf(true, false)
+                    for (truth in truths) {
+                        val sides = ArrayList<ExactRationalInequality>(2)
+                        val comparison = form.comparison(truth) { false }
+                        preparationStop.charge(16L * (comparison.terms.size + 1L))
+                        if (preparationStop.pollStop()) return@buildList
+                        if (comparison.op == LinearOp.NE) {
+                            comparison.rowsInto(sides, LinearOp.LE)
+                            comparison.rowsInto(sides, LinearOp.GE)
+                        } else {
+                            comparison.rowsInto(sides)
+                        }
+                        for (side in sides) if (side.strict) {
+                            val expression = side.columns.indices.associate {
+                                side.columns[it] to side.coefficients[it]
+                            } + (marginColumn to BigFraction.ONE)
+                            add(intern(expression, declaredFixed).coefficients)
+                        }
+                    }
+                }
+            }
+        }
+    }.filter { it.size != 1 }.distinct()
     private val definitions = terms.withIndex().associate { (index, term) ->
         term to pointColumns + index
     }.toMutableMap()
     var batchSourceBounds = true
     var observeAssertionCost = false
     val assertionCost = SmtSourceAssertionCost()
+    private var checkedPoint: List<BigFraction>? = null
+    private val definitionPoint = HashMap<Int, BigFraction>()
 
     fun hasPositiveMargin(point: List<BigFraction>?): Boolean = marginColumn?.let {
         point?.getOrNull(it)?.signum()?.let { sign -> sign > 0 } == true
@@ -193,10 +223,15 @@ internal class LiveQfLraSystem(
         val state = lp.state ?: return false
         if (point.size != pointColumns || !hasPositiveMargin(point) || state.conflict != null || stop()) return false
         val arithmetic = MixedPointArithmetic(stop)
-        if (!point.all(arithmetic::admitted)) return false
+        stop.charge(point.size.toLong())
+        if (point != checkedPoint) {
+            if (!point.all(arithmetic::admitted)) return false
+            checkedPoint = point.toList()
+            definitionPoint.clear()
+        }
         fun holds(column: Int, value: BigFraction): Boolean {
             stop.charge(2L)
-            if (stop()) return false
+            if (stop.pollStop()) return false
             val bounds = state.model.column(column).bounds
             if (bounds.lower?.let { !arithmetic.admitted(it.number.value) } == true ||
                 bounds.upper?.let { !arithmetic.admitted(it.number.value) } == true
@@ -210,16 +245,20 @@ internal class LiveQfLraSystem(
         for (column in point.indices) if (!holds(column, point[column])) return false
         // Every auxiliary column is defined by its source affine term; retraction changes only its bounds.
         for ((term, column) in definitions) {
-            var negative = BigFraction.ZERO
-            for ((sourceColumn, coefficient) in term) {
-                negative = arithmetic.subtractProduct(negative, coefficient, point[sourceColumn]) ?: return false
+            val value = definitionPoint[column] ?: run {
+                var negative = BigFraction.ZERO
+                for ((sourceColumn, coefficient) in term) {
+                    negative = arithmetic.subtractProduct(negative, coefficient, point[sourceColumn]) ?: return false
+                }
+                negative.negated().also { definitionPoint[column] = it }
             }
-            if (!holds(column, negative.negated())) return false
+            if (!holds(column, value)) return false
         }
         return !stop()
     }
 
     fun install(): Boolean {
+        if (preparationStop()) return false
         val structural = sourceColumns.map { column ->
             ExactLpColumn(
                 ExactLpBounds(
@@ -318,7 +357,7 @@ internal class LiveQfLraSystem(
 
     fun affineInputSides(comparison: ExactComparison, stop: ExecutionControl): List<PartialLinearSide?>? {
         stop.charge(comparison.terms.size.toLong() + 1L)
-        if (stop()) return null
+        if (stop.pollStop()) return null
         val key = preparedTerms[comparison.ordered]?.positive
         val term = key?.let { (it.slot ?: normalized[it])?.term }
         val column = term?.let { definitions[it.coefficients] }

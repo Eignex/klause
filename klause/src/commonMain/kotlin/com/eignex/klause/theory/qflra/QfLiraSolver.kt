@@ -311,7 +311,9 @@ class ExactLiraSearchComponent private constructor(
         )
     }
     private val lp: LpPropagator by lpDelegate
-    private val system by lazy { LiveQfLraSystem(model, lp, exactForms, strictMargin = model.numIntVars == 0) }
+    private val system by lazy {
+        LiveQfLraSystem(model, lp, exactForms, strictMargin = model.numIntVars == 0, preparationStop = lpStop)
+    }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
