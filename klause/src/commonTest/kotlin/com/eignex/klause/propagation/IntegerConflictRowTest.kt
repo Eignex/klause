@@ -20,6 +20,29 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `unit resolution scales should preserve complete exact terms`() {
+        val large = bigIntOf(1) shl 256
+        val inputs = listOf(
+            longArrayOf(2, -2, 3, 7, 3, 7, 16).map { bigIntOf(it) },
+            longArrayOf(2, -4, 3, 7, 6, 7, 21).map { bigIntOf(it) },
+            longArrayOf(4, -2, 3, 7, 3, 14, 27).map { bigIntOf(it) },
+            listOf(bigIntOf(1), bigIntOf(-1), large, bigIntOf(1), large, bigIntOf(1), bigIntOf(16)),
+        )
+        for (input in inputs) {
+            val left = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+                arrayOf(input[0], input[2]), bigIntOf(5), useLo = true))
+            val right = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 2),
+                arrayOf(input[1], input[3]), bigIntOf(11), useLo = true))
+
+            val row = requireNotNull(left.resolve(right, 0))
+
+            assertTrue(row.variables.contentEquals(intArrayOf(1, 2)))
+            assertEquals(input.subList(4, 6), row.coefficients.toList())
+            assertEquals(input[6], row.bound)
+        }
+    }
+
+    @Test
     fun `assertion should retain an exact tightening after word activity overflow`() {
         val inputs = listOf(
             longArrayOf(2, -2, 1) to longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE, 0),

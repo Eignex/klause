@@ -173,9 +173,11 @@ internal class IntegerConflictRow private constructor(
         val b = other.coefficient(variable)
         if (a == BIG_ZERO || b == BIG_ZERO || (a > BIG_ZERO) == (b > BIG_ZERO)) return null
         budget?.scalar(a, b)
-        val divisor = a.abs().gcd(b.abs())
-        val left = b.abs() / divisor
-        val right = a.abs() / divisor
+        val aMagnitude = a.abs()
+        val bMagnitude = b.abs()
+        val divisor = aMagnitude.gcd(bMagnitude)
+        val left = if (bMagnitude == divisor) BIG_ONE else bMagnitude / divisor
+        val right = if (aMagnitude == divisor) BIG_ONE else aMagnitude / divisor
         val required = variables.size.toLong() + other.variables.size
         budget?.spend(bytes = required * 16)
         if (required > Int.MAX_VALUE) return null
@@ -193,12 +195,12 @@ internal class IntegerConflictRow private constructor(
             var coefficient = BIG_ZERO
             if (first < variables.size && firstVariable == nextVariable) {
                 budget?.scalar(coefficients[first], left)
-                coefficient = coefficients[first] * left
+                coefficient = if (left == BIG_ONE) coefficients[first] else coefficients[first] * left
                 first++
             }
             if (second < other.variables.size && secondVariable == nextVariable) {
                 budget?.scalar(other.coefficients[second], right)
-                val contribution = other.coefficients[second] * right
+                val contribution = if (right == BIG_ONE) other.coefficients[second] else other.coefficients[second] * right
                 budget?.scalar(coefficient, contribution)
                 coefficient += contribution
                 second++
@@ -210,7 +212,9 @@ internal class IntegerConflictRow private constructor(
         }
         budget?.scalar(bound, left)
         budget?.scalar(other.bound, right)
-        return normalizedSorted(mergedVariables, mergedCoefficients, size, bound * left + other.bound * right,
+        val firstBound = if (left == BIG_ONE) bound else bound * left
+        val secondBound = if (right == BIG_ONE) other.bound else other.bound * right
+        return normalizedSorted(mergedVariables, mergedCoefficients, size, firstBound + secondBound,
             if (guard != Lit.NONE) guard else other.guard, budget)
     }
 
