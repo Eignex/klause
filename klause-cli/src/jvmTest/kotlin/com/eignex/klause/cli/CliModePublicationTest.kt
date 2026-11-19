@@ -579,12 +579,13 @@ class CliModePublicationTest {
     fun `arithmetic FlatZinc publication should keep its solution and terminal separators`() {
         val output = MiniZincOutput()
         val publication = ArithmeticPublication(output)
+        val rendered = "% objective=1\nx = 1;\n----------\n"
 
         val progress = captureStdout {
-            publication.publish("x = 1;\n----------\n", SourceValue.Rational(BigFraction.ONE))
+            publication.publish(rendered, SourceValue.Rational(BigFraction.ONE))
         }
         val terminal = captureStdout {
-            publication.publish("x = 1;\n----------\n", SourceValue.Rational(BigFraction.ONE))
+            publication.publish(rendered, SourceValue.Rational(BigFraction.ONE))
             output.onComplete(Verdict.OPTIMAL)
         }
 

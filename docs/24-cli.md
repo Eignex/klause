@@ -71,6 +71,7 @@ until the terminal status.
 its value in original objective units and direction; it carries no terminal claim.
 SMT retains the checked final interpretation for explicit model queries, and
 MiniZinc keeps its solution separators.
+Its renderer supplies objective metadata under the published coordinate policy.
 `optimizationStatus` and checked bounds arrive separately at completion, so a
 terminal never repeats an emitted model and an incomplete result's incumbent keeps
 `best-found` status.

@@ -207,7 +207,6 @@ internal class MiniZincOutput(
     }
 
     override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
-        println("% objective=${arithmeticObjectiveText(objective)}")
         print(rendered)
         flushStandardOutput()
         return true

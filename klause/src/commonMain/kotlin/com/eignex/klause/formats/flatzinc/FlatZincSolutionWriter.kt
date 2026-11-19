@@ -111,7 +111,7 @@ private class DisplayedReals(private val narrowing: ExecutionControl, private va
 
 private fun writeFlatZincSolution(program: FlatZincProgram, sample: FlatZincValues, outputObjective: Boolean): String {
     sample.checked(program)
-    val sb = StringBuilder()
+    val sb = StringBuilder(writeFlatZincObjective(program, sample))
     val items = program.outputItems
     if (items != null) {
         for (item in items) {
@@ -142,7 +142,7 @@ private fun writeFlatZincSolution(program: FlatZincProgram, sample: FlatZincValu
     if (outputObjective) {
         objectiveVarName(program.solve)?.let { sb.append("_objective = ${renderScalar(program, sample, it)};\n") }
     }
-    sb.append(writeFlatZincExactCoordinates(program, sample, outputObjective))
+    sb.append(writeFlatZincExactCoordinates(program, sample))
     sb.append("----------\n")
     return sb.toString()
 }
@@ -150,7 +150,6 @@ private fun writeFlatZincSolution(program: FlatZincProgram, sample: FlatZincValu
 internal fun writeFlatZincExactCoordinates(
     program: FlatZincProgram,
     sample: FlatZincValues,
-    outputObjective: Boolean = false,
 ): String {
     val sb = StringBuilder()
     if (program.floatVarsByName.isNotEmpty()) {
@@ -180,15 +179,23 @@ internal fun writeFlatZincExactCoordinates(
             val value = sample.exactRealValue(b.varId)
             sb.append("% $prefix: $name = $value;\n")
         }
-        if (outputObjective) {
-            objectiveVarName(program.solve)?.let { name ->
-                val b = program.floatVarsByName[name]
-                val value = if (b != null) sample.exactRealValue(b.varId) else renderScalar(program, sample, name)
-                sb.append("% $prefix: _objective = $value;\n")
-            }
+        objectiveVarName(program.solve)?.let { name ->
+            val b = program.floatVarsByName[name]
+            val value = if (b != null) sample.exactRealValue(b.varId) else renderScalar(program, sample, name)
+            sb.append("% $prefix: _objective = $value;\n")
         }
     }
     return sb.toString()
+}
+
+internal fun writeFlatZincObjective(program: FlatZincProgram, sample: FlatZincValues): String {
+    val name = objectiveVarName(program.solve) ?: return ""
+    val exact = if (program.semantics.effective.feasibilityTolerance?.isExact != false) {
+        program.floatVarsByName[name]?.let { sample.exactRealValue(it.varId) }
+    } else null
+    val value = exact ?: program.boolVarsByName[name]?.let { if (sample.boolValue(it)) "1" else "0" }
+        ?: renderScalar(program, sample, name)
+    return "% objective=$value\n"
 }
 
 private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {

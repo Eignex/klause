@@ -12,6 +12,23 @@ import kotlin.test.assertTrue
 
 class MpsOutputTest {
     @Test
+    fun `a multi term source objective should describe the exact published coordinates`() {
+        val source = assertNotNull(Mps.parse(
+            "ROWS\n N COST\nCOLUMNS\n X COST 0.1\n Y COST 0.2\nBOUNDS\n FR B X\n FR B Y\nENDATA",
+        ).toLinearSourceProblem())
+        val third = BigFraction.ofLong(3).reciprocal()
+        val point = assertNotNull(source.checkMpsWitness(listOf(third, BigFraction.ofLong(2) * third)))
+        val output = MpsOutput()
+
+        val text = captureStdout {
+            output.onArithmeticIncumbent(renderMpsSourceWitness(point, reconstruct = true),
+                SourceValue.Rational(assertNotNull(point.objective)))
+        }
+
+        assertEquals("o 1/6\nv X=1/3 Y=2/3\n", text)
+    }
+
+    @Test
     fun `float rendering should check zero reconstruction against source rows`() {
         val source = assertNotNull(Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R -1\n" +
