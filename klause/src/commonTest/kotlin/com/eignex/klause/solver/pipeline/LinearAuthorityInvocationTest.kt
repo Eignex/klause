@@ -50,6 +50,28 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     )
 
     @Test
+    fun `private traversal should improve the checked center within two checks and one decision`() {
+        val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = columns.flatMapIndexed { index, column ->
+            listOf(
+                "lower$index" to SourcePremise(SourceInequality(
+                    mapOf(column to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.ONE), BigFraction.ONE)),
+            )
+        }.toMap()
+        val source = SourceProofContext(scope, columns.toSet(), rows,
+            columns.associateWith { BigFraction.MINUS_ONE })
+        val seed = Sample(booleanArrayOf(), longArrayOf(0, 0, 0, 0))
+
+        val result = LinearAuthorityInvocation(source,
+            TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxLeaves = 2, maxDecisions = 1),
+            external = { seed }, boundOrdered = true, incumbentCompletionCheck = { _, _, _ -> true },
+            incumbentProximity = true).use { it.run { _, _ -> } }
+
+        assertEquals(BigFraction.MINUS_ONE, result.value)
+    }
+
+    @Test
     fun `ordinary points rejected by the original checker should not center private queries`() {
         val source = SourceProofContext(scope, setOf(integer), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),

@@ -505,9 +505,9 @@ After importing a checked point, the numerical owner alternates its ordinary
 frontier consultations with a private proximity query inside the same turn offers.
 The frontier retains its tree, LP owner and global bounds. Both searches share one
 LP operation/work/allocation ledger and containing decision/check allowances.
-The private search visits center-side integer alternatives in depth order, keeping
-that advisory center separate from its feasible incumbents. The ordinary frontier
-retains its bound order.
+The private search visits integer alternatives away from the center first in depth
+order, keeping that advisory center separate from its feasible incumbents. The
+ordinary frontier retains its bound order.
 Private query progress supplies no root-fixing or learned-clause reward. A private
 witness passes original-source completion and the receiving frontier's checks
 before it can improve the source incumbent; private proofs never enter its coverage.
