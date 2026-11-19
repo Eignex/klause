@@ -1047,7 +1047,11 @@ internal class LpEngine(
         retainedRootCumulativeWork().coerceAtLeast(1L)
     } else if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership) {
         componentReusePreparationWork(lpEffortGovernor.remainingWork())
-    } else if (separateNodePreparation) {
+    } else ordinaryNodePreparationWorkBudget()
+
+    private fun ordinaryNodePreparationWorkBudget(): Long = if (sparseTrialActive) {
+        retainedRootCumulativeWork().coerceAtLeast(1L)
+    } else if (ordinarySeparateNodePreparation) {
         val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
             retainedRootRemainingWork().coerceAtLeast(1L)
         } else nodeWorkBudget()
@@ -1146,8 +1150,10 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
-        requestedPlan.componentReuse || rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
+    private val ordinarySeparateNodePreparation: Boolean get() = sparseTrialRequested ||
+        requestedPlan.componentOwnership || rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
+
+    private val separateNodePreparation: Boolean get() = requestedPlan.componentReuse || ordinarySeparateNodePreparation
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
         rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
@@ -1230,7 +1236,7 @@ internal class LpEngine(
                 componentAdmission = if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership)
                     numericalComponentAdmission else null,
                 monolithicPreparationWork = if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership)
-                    nodeWorkBudget() else null,
+                    ordinaryNodePreparationWorkBudget() else null,
             )
         },
         solveContext = solveContext,

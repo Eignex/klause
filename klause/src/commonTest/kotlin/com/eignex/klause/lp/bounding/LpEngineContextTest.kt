@@ -198,12 +198,13 @@ class LpEngineContextTest {
     @Test
     fun `separate preparation should preserve the adaptive float query cap`() {
         val problem = boundedLpEngineProblem()
-        for (components in listOf(false, true)) {
+        for ((components, reuse) in listOf(false to false, true to false, false to true)) {
             val factory = RecordingLpEngineFactory()
             LpEngine(
                 problem,
                 LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
-                LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components),
+                LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components,
+                    componentReuse = reuse),
                     solveBudgetMillis = 30_000L),
                 SolveStatsSink(backend = "separate-preparation-cap"),
                 LpSolveContext(factory, decline),
@@ -243,10 +244,11 @@ class LpEngineContextTest {
     }
 
     @Test
-    fun `separate preparation should respect both remaining containing allowances`() {
+    fun `preparation should respect the remaining grant under its slice policy`() {
         val problem = boundedLpEngineProblem()
-        for (components in listOf(false, true)) {
-            val plan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components)
+        for ((components, reuse) in listOf(false to false, true to false, false to true)) {
+            val plan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components,
+                componentReuse = reuse)
             var offered: Long? = null
             LpEngine(
                 problem,
@@ -261,7 +263,7 @@ class LpEngineContextTest {
 
                 for ((grant, expected) in listOf(null to 15_000L, 30_000L to 15_000L, 500L to 500L, 0L to 1L)) {
                     offered = grant
-                    assertEquals(expected, engine.nodePreparationWorkBudget())
+                    assertEquals(if (reuse) 15_000L else expected, engine.nodePreparationWorkBudget())
                 }
             }
         }
@@ -314,12 +316,13 @@ class LpEngineContextTest {
     }
 
     @Test
-    fun `sliced LP queries should receive a native slice cap only behind a finite external cutoff`() {
-        for (cutoff in listOf(Double.POSITIVE_INFINITY, 100.0)) {
+    fun `sliced LP queries should cap numerical work independently of component preparation`() {
+        for ((reuse, cutoff) in listOf(false to Double.POSITIVE_INFINITY, false to 100.0,
+            true to Double.POSITIVE_INFINITY, true to 100.0)) {
             val problem = boundedLpEngineProblem()
             val factory = RecordingLpEngineFactory()
             val params = BacktrackParams(
-                lpPlan = LpPlan(bounding = true, rootCutHarvest = false),
+                lpPlan = LpPlan(bounding = true, rootCutHarvest = false, componentReuse = reuse),
                 objectiveBoundSupplier = { cutoff },
             )
             val solver = BacktrackSolver(problem.bake(), LpSolveContext(factory, decline))
@@ -331,7 +334,7 @@ class LpEngineContextTest {
             }
 
             assertTrue(factory.floatAllowances.isNotEmpty())
-            assertEquals(cutoff.isFinite(), factory.floatAllowances.first() != null)
+            assertEquals(reuse || cutoff.isFinite(), factory.floatAllowances.first() != null)
         }
     }
 
