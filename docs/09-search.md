@@ -370,12 +370,15 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
+in each direction permit the geometric mean of the predicted child gains; a zero
+gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
-Saturated scope-wide sample counts skip history lookups while two-sided reliability
-is impossible. Passing that prerequisite still requires the variable's own recent
-samples; it grants no score or authority. History reset clears the prerequisite.
+The scope retains the most recent older-direction stamp of any reliable variable
+and skips history lookups until such a variable has been observed, or after all
+such observations have aged out. Samples from different variables cannot open that
+gate. Passing it still requires the variable's own recent samples; it grants no
+score or authority. History reset clears the prerequisite.
 Selection rechecks that the fractional point and optimum belong to the same current
 relaxation and exact state, and declines on cancellation or stale information. A
 nomination retains only its variable, point and solve stamp. Proposal and
