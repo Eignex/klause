@@ -320,6 +320,8 @@ release separately.
 enablement admits Boolean conflicts in mixed models. The seed, each loaded source
 constraint and each reconstructed reason must contain only Boolean coordinates;
 integer order, equality and hole atoms keep clause fallback before Boolean indexing.
+Models without source Boolean variables skip PB analysis because they cannot supply
+a Boolean premise; explicit enablement retains its containing cancellation checks.
 An asserting native PB result takes precedence over shared clause analysis and stays
 in the CP store. Other mixed conflicts keep shared clause analysis.
 

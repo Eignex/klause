@@ -294,6 +294,41 @@ class ConflictAnalyzerTest {
     private fun varsOf(literals: IntArray): Set<Int> = literals.map { Lit.variable(it) }.toSet()
 
     @Test
+    fun `PB enablement without source Booleans should preserve clause analysis and work`() {
+        for (integerLearning in listOf(false, true)) {
+            val results = listOf(false, true).map { pbLearning ->
+                val state = atomGeState(intArrayOf(1, 2))
+                state.pbLearning = pbLearning
+                state.integerRowLearning = integerLearning
+                state.currentLevel = 2
+                val factor = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
+                val before = state.work
+
+                val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(factor))
+
+                assertEquals(setOf(negAtom(0), negAtom(1)), learned.literals.toSet())
+                assertEquals(1, learned.backjumpLevel)
+                assertTrue(learned.asserting)
+                state.work - before
+            }
+            assertEquals(results[0], results[1])
+        }
+    }
+
+    @Test
+    fun `PB enablement without source Booleans should retain containing cancellation`() {
+        val state = atomGeState(intArrayOf(1, 2))
+        state.pbLearning = true
+        state.currentLevel = 2
+        state.finiteWork.cancellation = ExecutionControl { true }
+
+        val result = state.conflictAnalyzer.analyzeConflictClause(intArrayOf(negAtom(0), negAtom(1)))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.NotApplicable>(result)
+        assertTrue(state.runCancelled)
+    }
+
+    @Test
     fun `1UIP analysis should learn an asserting atom clause backjumping to the lower level`() {
         val state = atomGeState(intArrayOf(1, 2))
         state.currentLevel = 2
