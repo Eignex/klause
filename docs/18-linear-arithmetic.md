@@ -20,9 +20,7 @@ The pure-real route requires real variables, no source integer variables, and
 factors wholly represented by admitted exact linear forms. Source bounds,
 reification, disjunction and strictness remain authoritative. Nonconstant real
 products belong to [polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic).
-[Difference logic](17-theories.md#real-graph-admission-and-checks) handles an
-admitted pure-real subfragment; a graph decline does not reject a supported
-linear source.
+Real difference rows use the same certified LP owner as general linear rows.
 
 ### Solving and composition
 
@@ -39,6 +37,15 @@ normalized multi-column term gets one slack column defined by an equality row, s
 every asserted atom becomes a bound on a single column, and asserting or retracting
 an atom only moves a bound.
 
+Pure-real feasibility retains a private margin column `e` in `[0, 1]` and minimizes
+`-e`. Each strict side `t < b` also asserts the closed side `t + e <= b`; the
+original strict bound stays available to explained interval deductions. A finite
+strict system has an interior point exactly when a common positive margin exists.
+A certified point with positive margin supplies a source candidate. A certified
+lower bound of zero on `-e` refutes strict feasibility and explains the conflict
+with the bound's current source premises. The margin and its affine definitions
+share the primary LP's scopes and basis and are omitted from source coordinates.
+
 Bound intersection retains exact sides even when they have no finite binary64
 projection. Crossed sides yield a conflict with both premises before numerical
 preparation; a consistent unprojectable system can still decline its numerical check
@@ -46,17 +53,22 @@ with `RepresentationDeclined`.
 
 A term is normalized before lookup: zero coefficients are dropped and the first
 remaining coefficient is scaled to one, flipping the bound direction for a negative
-scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column. Terms
-first seen under an activator, branch or disjunct get their definition row appended
+scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column.
+Pure-real openings install prepared affine and strict-margin definitions without
+their guarded bounds, preserving the matrix across source Boolean choices. Other
+terms first seen under a branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
 
 At positive search depth, compatible source sides share one premised bound batch.
+The adapter synchronizes LP scopes when assembling source bounds or asserting a
+theory atom; unrelated Boolean publications require no LP edit.
 Each side retains its work debit and exact witness. Pending sides commit before a
 new definition is appended and before disequality inference reads active bounds.
 Only fully committed source comparisons receive assertion markers; a declined
-batch publishes neither its staged witnesses nor its markers. Root comparisons
-remain sequential so that later rows can substitute earlier root fixings.
+batch publishes neither its staged witnesses nor its markers. Root batches commit
+direct source-column bounds before the next comparison, so its normalization can
+substitute earlier root fixings; affine-column bounds can share a root batch.
 
 #### A check
 
@@ -66,8 +78,7 @@ A check proceeds in four steps:
    activator is assigned; the row's truth selects the row or its exact complement.
    Each asserted bound carries the literals that justify it. Disjunction rows stay
    out until search selects a disjunct.
-2. **Check.** An admitted difference fragment runs the graph check first. Otherwise
-   the LP solves the asserted system with exact certification. Partial Boolean
+2. **Check.** The LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
    Partial states retain a 128-row exact-continuation allowance. Boolean-complete
    checks in complete search use the [kernel's storage admission](21-lp-engine.md#certification-mechanisms)
@@ -81,6 +92,27 @@ A check proceeds in four steps:
 
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
+The invocation can retain a certified point as a guess across edits and retraction.
+Before reuse, the linear adapter checks all current LP bounds, including strict
+sides, under the current operation allowance. Affine values are cached for one
+owned point; a changed point clears those values. Definitions with no active bound
+need no evaluation; bounded new definitions are evaluated before acceptance.
+A completed bound check is reusable for the same point values and identical
+immutable LP state or column metadata. Edits and retraction check every changed
+column; newly appended bounded definitions require evaluation before acceptance.
+Closing the component releases the point, checked state and activity caches.
+A failed recheck requests another LP solve; reuse supplies no conflict, and a
+complete point still passes the selected source-row check before publication.
+Complete traversal can recheck that point against the selected source comparisons
+before materializing pending LP bounds. Source activities are cached for that owned
+point, while current Boolean constants, strictness and disequality directions are
+checked on each use. Failed checks flush pending source bounds before another LP
+query; successful reuse leaves them pending and supplies no conflict authority.
+An unresolved disequality requires ordinary source assertion and direction selection
+before the point can be reused, so search cannot repeat an already assigned split.
+For an unchanged point, the prepared Boolean-input index selects rows whose inputs
+changed since the last completed check. Disjunctions and disequalities remain
+eligible on every check; interruption retains the previous completed snapshot.
 
 A partial-state probe can imply a uniquely represented comparison guard
 from exact intervals over its terms. Coefficient signs select the bounding sides;
@@ -99,8 +131,9 @@ columns. The normalization's scale selects the bounding side, and its offset
 reconstructs source activity under the same rational-size and operation limits.
 Each successful implication uses the current active bound premise and the
 normalization's declared-fixing premises. Probing creates no LP definition and
-retains no reason. It precedes individual-coordinate decline reuse, so an unchanged
-coordinate interval cannot hide a newly bounded affine expression.
+retains no reason. Decline reuse includes both the individual-coordinate bounds
+and the affine column's exact sides, so an unchanged coordinate interval cannot
+hide a newly bounded affine expression.
 
 The incremental route indexes prepared rows by their Boolean activators and
 coefficient inputs. A literal change schedules only those source rows; retraction
@@ -165,12 +198,15 @@ declines rather than failing the candidate.
 
 #### Polarity guidance
 
-While Booleans remain open, a completed partial point from the LP or the graph can
+While Booleans remain open, a completed partial point from the LP can
 guide which polarity search tries first for a primitive comparison. Every row
 sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
+For rows without Boolean terms, completed preferences are reusable for the same
+owned point values. Rows with Boolean terms require fresh evaluation, and closing
+the component releases the retained point and preferences.
 
 The incremental route shares bounded cancellation checkpoints across source and
 point-hint scans, independently of accounting. Every debit is recorded directly.
@@ -217,8 +253,7 @@ Exact feasibility keeps exact termination.
 Immutable row addresses, forms and Boolean dependencies can be shared by fresh
 components over one canonical fragment. `prepareExactLiraSource` returns an opaque
 factory only after complete, uncancelled preparation; each opening binds fresh
-callbacks, cancellation and mutable arithmetic owners. Scoped assertions, graph
-potentials, LP bases and candidates remain invocation-owned. Optional hint storage
+callbacks, cancellation and mutable arithmetic owners. Scoped assertions, LP bases and candidates remain invocation-owned. Optional hint storage
 admits at most 65,536 entries and 4,096-bit normalized rationals.
 
 ### Implementation
@@ -385,7 +420,7 @@ integer coordinates.
 Finite integers count as decided only when their finite owner fixes them. A completed
 point can guide an equality-first split followed by lower and upper remainders;
 finite propagation enforces holes and unrelated factors on each branch. Optional
-LP or graph hints order exhaustive disjuncts and disequality sides without supplying
+LP hints order exhaustive disjuncts and disequality sides without supplying
 witness or proof authority.
 
 #### Witness recovery
@@ -401,9 +436,12 @@ tries to turn that float point into an exact witness:
 3. If neither passes, repair the real prefix through paired opposite source
    equations using bounded sparse elimination.
 4. Complete the free real coordinates per connected component, grouped by shared
-   rows: by the difference checker where the rows form a difference graph,
-   otherwise by an exact point from the [source LP owner](20-linear-programming.md).
-   Completion is attempted only up to 65,536 row entries.
+   rows, through an exact point from the [source LP owner](20-linear-programming.md).
+   Residuals use sparse preparation and the same certification policy and caller allowance.
+   Strict residuals maximize a private common margin bounded between zero and one;
+   only a positive exact margin supplies a point, and source publication omits it.
+   Recovery retains the input bounds of 10,000 real columns and 100,000 rows;
+   sparse preparation applies the shared work, allocation and scalar guards.
 
 The full rows, strictness, integrality and source reconstruction still gate
 acceptance. A failed guess supplies no conflict or bound; the component returns to

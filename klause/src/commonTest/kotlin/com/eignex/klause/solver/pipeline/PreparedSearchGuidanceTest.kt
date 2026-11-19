@@ -311,7 +311,7 @@ class PreparedSearchGuidanceTest {
     }
 
     @Test
-    fun `default graph guidance should use source cardinalities kept by their finite owner`() {
+    fun `default LP guidance should use source cardinalities kept by their finite owner`() {
         for (minimum in listOf(0, 1)) {
             val source = Problem(
                 numBoolVars = 3,
@@ -361,7 +361,7 @@ class PreparedSearchGuidanceTest {
     }
 
     @Test
-    fun `real difference openings should keep default polarity and explicit point guidance`() {
+    fun `real LP openings should use default and explicit point guidance`() {
         val source = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
@@ -412,7 +412,7 @@ class PreparedSearchGuidanceTest {
                 }
                 val usage = stats.hintUsage.snapshot()
                 assertEquals(if (callerWins) 1L else 0L, usage.callerSelections)
-                assertEquals(if (!callerWins && allowance == 1L) 1L else 0L, usage.componentSelections)
+                assertEquals(if (!callerWins && allowance != 0L) 1L else 0L, usage.componentSelections)
             }
         }
     }

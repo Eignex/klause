@@ -323,7 +323,9 @@ class RealLeafOptimizationTest {
             var cellStarted = false
             val context = LpSolveContext(onQuery = { query ->
                 queries += query.owner to query.sequence
-                cellStarted = cellStarted || (0 until query.model.n).any { query.model.costD(it) != 0.0 }
+                cellStarted = cellStarted || (0 until oppositeMagnitudes.numRealVars).any {
+                    query.model.costD(it) != 0.0
+                }
             })
             val optimization = AbsRealCompletion(oppositeMagnitudes).optimize(leaf, objective, context)
             var insideRound = false
@@ -403,7 +405,9 @@ class RealLeafOptimizationTest {
     fun `a run end after a paused incumbent should retain its point without an optimality proof`() {
         var cellStarted = false
         val context = LpSolveContext(onQuery = { query ->
-            cellStarted = cellStarted || (0 until query.model.n).any { query.model.costD(it) != 0.0 }
+            cellStarted = cellStarted || (0 until oppositeMagnitudes.numRealVars).any {
+                query.model.costD(it) != 0.0
+            }
         })
         AbsRealCompletion(oppositeMagnitudes).optimize(leaf, costs(0, 0, 1, -1), context).use { optimization ->
             repeat(64) {

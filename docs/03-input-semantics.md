@@ -67,7 +67,7 @@ The format chapters define source-specific admission and strategy limits.
 | Model family | Mechanisms | Boundary |
 |---|---|---|
 | Boolean and finite integer factors | Finite propagation and backtracking; local search and portfolios | Refutations and optima require completed traversal and proof checks |
-| [Difference logic](17-theories.md#difference-logic) | Integer graph components or real graph checks inside the linear route | Requires complete fragment coverage |
+| [Difference logic](17-theories.md#difference-logic) | Integer graph components or certified real LP checks | Requires complete fragment coverage |
 | [Linear real arithmetic](18-linear-arithmetic.md) | Exact real theory or certified LP completion | Bounds, strictness and Boolean structure stay authoritative |
 | [Linear integer arithmetic](18-linear-arithmetic.md#linear-integer-arithmetic) | Shared search, exact linear checks, integer reductions and branching | Open integer state stays theory-owned |
 | [Linear mixed arithmetic](18-linear-arithmetic.md#linear-mixed-arithmetic) | Exact linear checks with integer branching | Relaxation feasibility alone does not establish integrality |

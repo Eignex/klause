@@ -9,8 +9,8 @@ Boolean/integer domains; arithmetic components own open integers and reals.
 
 | Theory | Source fragment | Main mechanism |
 |---|---|---|
-| [Difference logic](#difference-logic) | Integer or real difference constraints with Boolean guards | Graph potentials and negative cycles |
-| [Linear real arithmetic](18-linear-arithmetic.md) | Linear real constraints with Boolean structure | Exact rational LP checks; the difference graph for admitted fragments |
+| [Difference logic](#difference-logic) | Integer difference constraints with Boolean guards | Graph potentials and negative cycles |
+| [Linear real arithmetic](18-linear-arithmetic.md) | Linear real constraints with Boolean structure | Exact rational LP checks |
 | [Linear integer arithmetic](18-linear-arithmetic.md#linear-integer-arithmetic) | Linear integer constraints with Boolean structure | Linear real checks plus integer reductions and branching |
 | [Linear mixed arithmetic](18-linear-arithmetic.md#linear-mixed-arithmetic) | Coupled linear integer/real constraints | The integer route with real completion and point recovery |
 | [Nonlinear integer arithmetic](19-nonlinear-arithmetic.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search with exact polynomial real completion |
@@ -148,7 +148,7 @@ factors into theory formulas. Each theory lives in its own subpackage:
 
 A difference constraint `x - y <= c` is an edge from `y` to `x` of weight `c`.
 Feasible graph potentials supply coordinates and negative cycles supply conflicts.
-The linear real component reuses the graph for admitted real difference fragments.
+Real difference constraints use the [certified linear real route](18-linear-arithmetic.md).
 
 ### Scope and boundaries
 
@@ -163,7 +163,7 @@ range; otherwise the row stays on the general linear path.
 SMT-LIB lowering represents a reified unit-coefficient integer difference equality
 as the conjunction of its two comparisons, each keeping both signed guarded
 meanings. Pure-real difference rows are handled inside the linear real component
-when they meet its graph admission conditions; other linear rows keep the
+through the certified LP owner; other linear rows keep the
 [linear real](18-linear-arithmetic.md), [linear integer](18-linear-arithmetic.md#linear-integer-arithmetic) or
 [linear mixed](18-linear-arithmetic.md#linear-mixed-arithmetic) route. The theory graph and the finite-domain
 difference propagator have separate state.
@@ -204,31 +204,15 @@ tries first. The default integer pipeline installs no such provider. A numerical
 seed keeps the last completed potential for the next sweep. Neither supplies a
 fact, explanation or verdict.
 
-#### Real graph admission and checks
+#### Finite real propagation
 
-The real component inside the linear theory uses the graph when every arithmetic
-row is a one-column bound or a two-column difference with a rational bound. Strict
-edges are encoded exactly: preparation clears denominators with a common
-denominator `d`, scales bounds by `(n+1)*d` for `n` vertices, and subtracts one
-from each strict edge. That preserves the sign of every simple cycle, including
-zero-weight strict cycles, and the scaled-back potentials are rational witnesses
-that pass the complete source-row check. A verified negative cycle supplies a
-conflict clause of the complements of its active guards.
-
-Admitted pure-real components defer LP construction and check the graph at partial
-and complete Boolean states. Missing cycle evidence, declined source validation and
-private source-bound branches fall back to the shared LP route. Admission is capped
-at 10,000 real variables and 100,000 edges; larger models, unsafe weights,
-disequalities and mixed integer/real models keep the exact LP route.
-
-Finite preparation can also install a redundant real graph from one-term and
+Finite preparation can install a redundant real graph from one-term and
 two-opposite-coefficient `ExactLinear` rows and `RealElement` selections. It can
 publish conflicts and exclusions, never source real coordinates.
 
 ### Results and proof authority
 
-Completed graph feasibility supplies an integer potential sample or a rational real
-assignment. A verified negative cycle justifies a conflict whose explanation negates
+Completed graph feasibility supplies an integer potential sample. A verified negative cycle justifies a conflict whose explanation negates
 every active signed guard. A cycle containing a transient shared integer bound has
 no captured reason, so it keeps chronological conflict handling. A stopped graph
 check is indeterminate. Boolean-only source relations stay enforced by the shared
@@ -260,8 +244,6 @@ runs the reduced-weight path queries.
 participates in shared traversal, and
 [DifferenceFragments](../klause/src/commonMain/kotlin/com/eignex/klause/solver/DifferenceFragments.kt)
 defines source coverage and numerical admission.
-[RealDifferenceSystem](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qflra/RealDifferenceSystem.kt)
-is the real graph used inside the linear component.
 
 ---
 

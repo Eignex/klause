@@ -192,7 +192,8 @@ selected ([numerical and exact deductions](#numerical-and-exact-deductions)); op
 
 Model-facing solves state an explicit claim: bound, contradiction, feasible completion or
 attained optimum. Bound requests use dual-only reconstruction without primal recovery;
-feasible completion stops when a checked point is available, retaining the trivial
+feasible completion stops when a checked point is available, without reconstructing
+unused dual candidates or alternative basis seats, retaining the trivial
 exact bound of a constant objective. Contradiction requests
 may stop on a checked counter-witness and never optimize it. Attainment requires the
 same exact witness–bound equality as the result contract. Tolerance acceptance retains
@@ -214,6 +215,8 @@ inclusive and overlap the certifier ledger. A successful check alone is not
 consumption: separate observations count accepted leaf packages and actual bound or
 conflict pruning. Heuristic LP seeding consumes floating coordinates directly and
 requests no certificate.
+Exact point reconstruction checks every bound, skips zero objective products, and
+reuses converted coordinates where the source origin is zero.
 
 ### Safe objective bounds
 
@@ -250,7 +253,9 @@ stall heuristics only schedule work; they never authorize proofs.
 | Rational basis verification | Exact FTRAN gives basics; BTRAN gives duals or Farkas candidates. Singularity requests repair. |
 | Exact continuation | Import the numerical basis pivot by pivot, repairing unseatable basics with logicals, then run Bland feasibility. |
 
-Rational work escalates from `Frac128` to `BigFraction`. Production exact
+Rational work escalates from `Frac128` to `BigFraction`. Fixed-width arithmetic
+reuses zero and unit operands and combines equal denominators without cross
+multiplication, retaining normalization and the overflow latch. Production exact
 continuation promotes a retained complete tableau on fixed-width overflow; other
 bounded operations restart from authority. Every attempt is charged. An internal
 consumer context or continuation request can opt into arbitrary precision before

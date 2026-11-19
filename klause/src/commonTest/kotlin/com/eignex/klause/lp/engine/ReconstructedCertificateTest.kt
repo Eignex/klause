@@ -15,6 +15,28 @@ import kotlin.test.assertTrue
 
 class ReconstructedCertificateTest {
     @Test
+    fun `feasible completion should retain a checked point without funding an unused dual`() {
+        val model = LpBuilder().apply {
+            addVar(0L, 5L, cost = 1L)
+            addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, 5L)
+        }.build(Sense.MINIMIZE)
+
+        val result = reconstructCertificate(
+            model,
+            doubleArrayOf(3.0),
+            doubleArrayOf(Double.MAX_VALUE),
+            limits = ReconstructionLimits(maxBits = 128),
+            claim = LpClaim.FEASIBLE_COMPLETION,
+        )
+
+        assertEquals(listOf(BigFraction.ofLong(3L)), result.witness?.primal)
+        assertEquals(BigFraction.ofLong(3L), result.witness?.objective)
+        assertNull(result.metrics.decline)
+        assertNull(result.bound)
+        assertFalse(result.complementary)
+    }
+
+    @Test
     fun `a nonoptimal point and a weaker bound should remain independent`() {
         val model = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
 

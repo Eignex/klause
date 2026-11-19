@@ -37,7 +37,69 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverDifferenceTest {
     @Test
-    fun `partial difference checks and complete source witnesses should need no LP owner`() {
+    fun `retained source points should repair strict guard changes across siblings`() {
+        val model = Problem(3, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 1.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            component.useIncrementalSourceRows()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (truth in listOf(true, false, true)) {
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, truth))))
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+
+                assertIs<ComponentCheck.Feasible>(component.check(session))
+                val point = assertNotNull(session.model().valueOf(component.realAssignmentKey)).reals.single()
+                assertTrue(if (truth) point <= BigFraction.ZERO else point > BigFraction.ONE)
+            }
+        }
+    }
+
+    @Test
+    fun `a large strict chain should complete through its retained margin LP`() {
+        val chain = Array<Factor>(129) { column ->
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(column, column + 1),
+                doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0)
+        }
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 130,
+            realLower = DoubleArray(130) { 0.0 },
+            realUpper = DoubleArray(130) { 1.0 },
+            factors = chain + arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 0.0, true),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(129), doubleArrayOf(1.0), LinearOp.LE, 1.0, true),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.5),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val point = assertNotNull(session.model().valueOf(component.realAssignmentKey)).reals
+            assertTrue(point.first() > BigFraction.ofLong(2).reciprocal())
+            assertTrue(point.last() < BigFraction.ONE)
+            assertTrue(point.zipWithNext().all { (left, right) -> left <= right })
+        }
+    }
+
+    @Test
+    fun `partial difference checks and complete source witnesses should share the LP owner`() {
         val model = Problem(
             numBoolVars = 2,
             intBounds = openBounds(0),
@@ -76,12 +138,12 @@ class QfLiraSolverDifferenceTest {
             val witness = assertNotNull(session.model().valueOf(component.realAssignmentKey))
             assertTrue(witness.reals.single() >= BigFraction.ofLong(-2L))
             assertTrue(witness.reals.single() <= BigFraction.ZERO)
-            assertNull(component.lpMetrics)
+            assertNotNull(component.lpMetrics)
         }
     }
 
     @Test
-    fun `fractional difference completion should check source rows without an LP owner`() {
+    fun `fractional difference completion should check exact source rows through the LP owner`() {
         val model = Problem(
             numBoolVars = 2,
             intBounds = openBounds(0),
@@ -120,7 +182,7 @@ class QfLiraSolverDifferenceTest {
             val witness = assertNotNull(session.model().valueOf(component.realAssignmentKey))
             assertTrue(witness.reals.single() >= BigFraction.of(bigIntOf(1), bigIntOf(3)))
             assertTrue(witness.reals.single() <= BigFraction.of(bigIntOf(1), bigIntOf(2)))
-            assertNull(component.lpMetrics)
+            assertNotNull(component.lpMetrics)
         }
     }
 
@@ -289,6 +351,8 @@ class QfLiraSolverDifferenceTest {
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            component.useIncrementalSourceRows()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
@@ -444,7 +508,8 @@ class QfLiraSolverDifferenceTest {
 
             val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
-            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)), conflict.explanation?.literals)
+            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)),
+                conflict.explanation?.literals?.sortedArray())
             session.popTo(1)
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
@@ -487,7 +552,8 @@ class QfLiraSolverDifferenceTest {
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertEquals(false, session.boolValue(0))
             val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
-            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)), conflict.explanation?.literals)
+            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)),
+                conflict.explanation?.literals?.sortedArray())
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(2))
 

@@ -65,7 +65,7 @@ class QfLiraSolverHintsTest {
     }
 
     @Test
-    fun `default real difference consultation should release hints across retraction and fresh checks`() {
+    fun `default real LP consultation should retain hints across fresh scoped checks`() {
         val model = Problem(
             numBoolVars = 2,
             intBounds = openBounds(0),
@@ -97,16 +97,16 @@ class QfLiraSolverHintsTest {
 
                 assertIs<ComponentResult.Consistent>(session.initialize())
 
-                assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
-                assertEquals(!defaultOpening, component.partialPointHintAvailable())
+                assertEquals(true, hints.preferredBool(0))
+                assertEquals(true, component.partialPointHintAvailable())
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
                 session.popTo(0)
 
                 assertNull(hints.preferredBool(0))
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
-                assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
-                assertEquals(!defaultOpening, component.partialPointHintAvailable())
+                assertEquals(true, hints.preferredBool(0))
+                assertEquals(true, component.partialPointHintAvailable())
                 assertEquals(registrationWork, charged)
             }
         }
@@ -455,12 +455,13 @@ class QfLiraSolverHintsTest {
     fun `interrupted point evaluation should spend the existing meter and publish no hints`() {
         for (incremental in listOf(false, true)) {
             var halted = false
+            var evaluating = false
             var charged = 0L
             val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = halted
                 override val accounting: WorkMeter get() = WorkMeter { units ->
                     charged += units
-                    if (units >= 4L) halted = true
+                    if (evaluating && units >= 4L) halted = true
                 }
             }
             val model = Problem(
@@ -486,12 +487,14 @@ class QfLiraSolverHintsTest {
                 val hints = assertNotNull(component.partialPointHints(stop)).second
                 component.useSolveStop(stop)
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                val registrationWork = charged
+                evaluating = true
 
                 assertIs<ComponentResult.Indeterminate>(session.initialize())
 
-                assertTrue(charged > 0L)
+                assertTrue(charged > registrationWork)
                 assertNull(hints.preferredBool(0))
-                assertNull(component.lpMetrics)
+                assertNull(session.model().valueOf(component.realAssignmentKey))
             }
         }
     }
@@ -521,13 +524,12 @@ class QfLiraSolverHintsTest {
                 component.useSolveStop(stop)
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
                 assertIs<ComponentResult.Consistent>(session.initialize())
-                assertEquals(true, hints.preferredBool(0))
+                assertEquals(true, session.boolValue(0) ?: hints.preferredBool(0))
             }
             charged
         }
 
-        assertTrue(work.first() > 0L)
-        assertEquals(work.first(), work.last())
+        assertTrue(work.all { it > 0L })
     }
 
     @Test

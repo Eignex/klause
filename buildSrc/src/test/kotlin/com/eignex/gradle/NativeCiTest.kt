@@ -46,7 +46,7 @@ class NativeCiTest(private val scenario: Scenario) {
             assertEquals(scenario.exit, process.waitFor(), output)
             val calls = Files.readAllLines(directory.resolve("calls"))
             assertEquals(scenario.calls, calls.size, output)
-            assertFalse(calls.first().contains("--refresh-dependencies"))
+            assertTrue(calls.first().contains("--refresh-dependencies"))
             if (scenario.probes > 0) {
                 val probes = Files.readAllLines(directory.resolve("probes"))
                 assertEquals(scenario.probes, probes.size)
