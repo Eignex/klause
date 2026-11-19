@@ -11,6 +11,7 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.lowering.LinearSourceView
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.lp.finiteRelaxationSupported
+import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -60,7 +61,10 @@ internal fun prepareLinearSource(
         ?: return interrupted()
     val nominal = if (envelope) lowerLinearSource(source, request.source.settings, numerical, stop)
         ?: return interrupted() else null
-    val separate = nominal?.sharesToleranceCoordinates(accepted, stop) == true
+    val separate = request.engine == FiniteEngine.MIXED && request.operation == ExecutionOperation.OPTIMIZE &&
+        nominal != null && nominal.model.numBoolVars == 0 && nominal.model.numIntVars > 0 &&
+        nominal.model.numRealVars > 0 && nominal.model.binaryIntegers &&
+        nominal.sharesToleranceCoordinates(accepted, stop)
     val lowered = if (separate) checkNotNull(nominal) else accepted
     val view = if (!envelope || separate) lowered else LinearSourceView(source, lowered.model, lowered.objective,
         lowered.columns, lowered.sourceIntegerCoordinates, lowered.sourceRealCoordinates, false, false,

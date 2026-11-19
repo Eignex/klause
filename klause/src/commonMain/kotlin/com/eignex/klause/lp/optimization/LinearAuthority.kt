@@ -237,18 +237,25 @@ internal class LinearAuthority(
                     policy.observe("PointPrepared")
                 } else policy.observe("PointPreparationUnavailable")
             }
+            val ordinary = if (family.ordinaryCuts == 0) emptySet() else
+                cutLifecycle.containing("POINT_SELECTION") {
+                    cutCost(family.ordinaryCuts.toLong(), 128L + family.ordinaryCuts * 64L)
+                    if (cancellation() || budget.funding?.paused == true) null else
+                        (0 until family.ordinaryCuts).filterTo(HashSet()) { it in prepared.checkedCuts }
+                } ?: return base.copy(paused = budget.funding?.paused == true)
             val selected = cutLifecycle.containing("POINT_SELECTION") {
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
-                    prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
+                    prepared.checkedCuts, observed.second,
+                    pointMask.orEmpty().intersect(prepared.checkedCuts) + ordinary,
                     cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
-                        prepared.activeCuts == checkNotNull(family.cuts).rows.size)
+                        prepared.activeCuts == checkNotNull(family.cuts).rows.size, ordinary = ordinary)
             }
             if (budget.funding?.exhausted == true || cancellation()) return base
             if (policy.adoptedCurrent) {
                 pointMask = selected
                 return base.copy(paused = base.paused || budget.funding?.paused == true)
             }
-            if (baselineMask == null && selected.isEmpty()) {
+            if (baselineMask == null && selected == ordinary) {
                 template = baselineFamily
                 query = baselineQuery
                 pointFamily = baselineFamily
@@ -322,10 +329,13 @@ internal class LinearAuthority(
             point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
         val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
-        val refined = withAdditionalCuts(directed, funded, point) ?: return null
+        val proposed = withAdditionalCuts(directed, funded, point) ?: return null
         if (funded()) return null
-        if (sameCurrentCuts(family, prepared, refined, funded, 65_536L - work)) return family to prepared
+        if (sameCurrentCuts(family, prepared, proposed, funded, 65_536L - work)) return family to prepared
         if (funded()) return null
+        val refined = family.withPointCandidates(proposed, funded, ::cutCost) ?: return null
+        if (funded()) return null
+        if (refined === family) return family to prepared
         val previous = template
         adoptTemplate(refined)
         query = null

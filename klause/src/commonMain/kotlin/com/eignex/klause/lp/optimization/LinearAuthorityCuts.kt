@@ -53,6 +53,9 @@ internal class LinearAuthorityCuts private constructor(
         return LinearAuthorityCuts(combined, work, observations, complementary, pointDirected)
     }
 
+    fun withPointCandidates(additional: List<LinearAuthorityCut>): LinearAuthorityCuts =
+        LinearAuthorityCuts(rows + additional, work, observations, complementary = true, pointDirected = true)
+
     companion object {
         fun replay(rows: List<LinearAuthorityCut>): LinearAuthorityCuts {
             require(rows.size <= 64)

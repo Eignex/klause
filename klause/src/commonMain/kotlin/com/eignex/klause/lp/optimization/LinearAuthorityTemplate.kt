@@ -14,7 +14,34 @@ internal class LinearAuthorityTemplate private constructor(
     val indices: Map<SourceCoordinate, Int>,
     val rows: List<ExactRationalInequality>,
     val cuts: LinearAuthorityCuts?,
+    val ordinaryCuts: Int = 0,
 ) {
+    fun withPointCandidates(
+        candidates: LinearAuthorityTemplate, cancellation: ExecutionControl, onCost: (Long, Long) -> Unit,
+    ): LinearAuthorityTemplate? {
+        require(source === candidates.source)
+        val current = cuts ?: return null
+        val proposals = candidates.cuts?.rows ?: return null
+        require(proposals.size <= 64)
+        onCost(1L + current.rows.size + proposals.size, 128L + 64L * (current.rows.size + proposals.size))
+        if (cancellation()) return null
+        val seen = HashSet<Pair<SourceInequality, Set<Int>>>()
+        for (cut in current.rows) {
+            onCost(1L + cut.inequality.supportSize + cut.owners.size, 64L)
+            if (cancellation()) return null
+            seen += cut.inequality to cut.owners
+        }
+        val additional = ArrayList<LinearAuthorityCut>()
+        for (cut in proposals) {
+            onCost(1L + cut.inequality.supportSize + cut.owners.size, 64L)
+            if (cancellation()) return null
+            if (seen.add(cut.inequality to cut.owners)) additional += cut
+        }
+        if (additional.isEmpty()) return this
+        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows,
+            current.withPointCandidates(additional), current.rows.size)
+    }
+
     fun atPoint(
         point: Map<SourceCoordinate, Double>, cancellation: ExecutionControl,
         onWork: (Long) -> Unit, onCost: (Long, Long) -> Unit,

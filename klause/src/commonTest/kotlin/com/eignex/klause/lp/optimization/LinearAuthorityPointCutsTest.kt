@@ -54,6 +54,41 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
     ), mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `ordinary rows should leave the additional cut allowance available`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ZERO, BigFraction.ofLong(2)), setOf(0), ExecutionControl.Never, ordinary = setOf(0))
+
+        assertEquals(setOf(0, 1), selected)
+    }
+
+    @Test
+    fun `candidate aging should preserve slack ordinary rows`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+        var installed = setOf(0, 1)
+
+        repeat(25) {
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+                List(2) { BigFraction.ZERO }, installed, ExecutionControl.Never, ordinary = setOf(0))
+        }
+
+        assertEquals(setOf(0), installed)
+    }
+
+    @Test
     fun `point policy preparation should include scoring in its containing recipe`() {
         val budget = SourceLpBudget()
         LinearAuthority(budget, retainLp = true).use { authority ->
@@ -731,7 +766,7 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `an empty aged mask should retain its checked relaxation without reinstalling cuts`() {
+    fun `an aged mask should retain ordinary rows without reinstalling retired additions`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
         val triangle = listOf(y, z, w)
@@ -756,7 +791,8 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
             val result = authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
-            assertTrue(capture.records.last().cuts.none { it.installed })
+            assertEquals(capture.records.first().cuts.filter { it.installed }.map { it.inequality },
+                capture.records.last().cuts.filter { it.installed }.map { it.inequality })
             assertEquals(work, authority.cutObservations()["numericalCutSelectionWork"])
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))

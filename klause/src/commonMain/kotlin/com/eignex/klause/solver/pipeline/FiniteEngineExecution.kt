@@ -664,7 +664,7 @@ private fun executePortfolio(
         onSession = request.onPortfolioSession,
         numericalCompanions = request.numericalCompanionParams,
         toleranceAuthority = request.sourceInvocation?.linearSource?.toleranceAuthority
-            ?.takeIf { it.compatible(request.sourceMapping, request.problem, request.objective) },
+            ?.takeIf { it.compatible(request.sourceMapping, request.problem, request.objective, request.cancellation) },
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(
