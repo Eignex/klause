@@ -31,7 +31,7 @@ class LpPassiveCollectionTest {
             exploration.commit(up, 1) { true }
 
             assertEquals(listOf(up, down), selected)
-            assertFalse(history.hasTwoSidedSamples)
+            assertFalse(history.hasReliableHistory)
             assertEquals(1, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
             assertTrue(events.none { it.startsWith("PASSIVE_DIRECTION_") })
             assertEquals(36L, work)
