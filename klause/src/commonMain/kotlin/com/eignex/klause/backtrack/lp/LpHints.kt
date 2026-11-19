@@ -42,6 +42,7 @@ internal class LpHints(
     private var directionalChoice: VarRef? = null
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
+
     // Bound views share the relaxation's read-only structural column maps.
     private var scopeVariables = IntArray(0)
     private var scopeBooleans = BooleanArray(0)
