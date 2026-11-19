@@ -407,7 +407,11 @@ Cut-source maps capture incoming collections once. Derived maps share immutable
 column expressions, global premises and source definitions while owning their active
 premises and row-parent mappings. A bound refresh assembles column bounds, CP bounds,
 Boolean pins and auxiliary exclusions into one fresh owned premise set. Source
-identities and epochs keep their existing scope.
+identities and epochs keep their existing scope. Source-map and retained-layout binding
+report structural traversal and exact premise work separately, including cached bound
+refreshes and failed attempts. The host charges them with the existing construction
+and exact-work weights to the pending node and cumulative allowance. Refreshes
+report on completion; a slice excess remains work debt.
 
 The default `lp-component-reuse` setting requires its bounded owner setup to fit
 within a quarter of the worker's LP work horizon. A remaining node quota supplies

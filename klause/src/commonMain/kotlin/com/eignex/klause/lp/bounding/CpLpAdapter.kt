@@ -135,7 +135,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         } ?: return null
         if (!engine.propagator.install(base, exact, cancellation) || cancellation()) return null
         val model = requireNotNull(engine.propagator.state).ownerWorkingModel() ?: return null
-        val rebound = base.withModel(model)
+        val rebound = base.withModel(model, base.sourceMap?.withBounds(model, onWork = engine::noteSourceWork))
         currentModel = model
         persistentState = true
         sourceRoot = true
@@ -155,7 +155,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (cancellation() || !core.editSources(edit) { _, _ -> SearchAtomPremise.Unavailable } || cancellation()) {
             return null
         }
-        val rebound = retained.relaxation(requireNotNull(core.state), domains)
+        val rebound = retained.relaxation(requireNotNull(core.state), domains, engine::noteSourceWork)
         currentModel = rebound.model
         persistentState = true
         sourceRoot = true
@@ -205,7 +205,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             } ?: return null
         }
         if (!core.editSources(edit) { column, upper -> boundPremise(edit, column, upper, session) }) return null
-        val rebound = retained.relaxation(requireNotNull(core.state), domains)
+        val rebound = retained.relaxation(requireNotNull(core.state), domains, engine::noteSourceWork)
         currentModel = rebound.model
         persistentState = true
         return rebound
@@ -313,7 +313,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (result !is LpBoundBatchResult.Applied) return null
         val state = requireNotNull(core.state)
         val proof = state.ownerWorkingModel() ?: return null
-        val sources = base.sourceMap?.withCpBounds(proof, session)
+        val sources = base.sourceMap?.withCpBounds(proof, session, engine::noteSourceWork)
         val rebound = base.withModel(proof, sources)
         currentModel = proof
         persistentState = true
@@ -326,7 +326,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         selected: List<Cut>? = null,
     ): LpRelaxation? {
         if (currentModel !== base.model || native !== session) return null
-        val map = base.sourceMap?.withCpBounds(base.model, session) ?: return null
+        val map = base.sourceMap?.withCpBounds(base.model, session, engine::noteSourceWork) ?: return null
         return applyCuts(base, map, selected, session, engine.params.cancellation)
     }
 
@@ -360,7 +360,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val state = requireNotNull(core.state)
         val model = if (state === before) base.model else state.ownerWorkingModel() ?: return null
         val parents = cuts.parentRows(state)
-        val rebound = base.withModel(model, map.withParentRows(parents))
+        val rebound = base.withModel(model, map.withParentRows(parents, engine::noteSourceWork))
         val compacted = if (session == null) rebound else compactRelaxation(rebound, session)
         currentModel = compacted.model
         return compacted
@@ -385,8 +385,11 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (!core.compact(before, remap, cutEdit, edit)) return base
         val state = requireNotNull(core.state)
         val model = requireNotNull(state.ownerWorkingModel())
-        val rebound = source?.relaxation(state, SessionDomains(session)) ?: base.withModel(model, remap = remap)
-        val map = rebound.sourceMap?.withCpBounds(model, session)?.withParentRows(cuts.parentRows(state))
+        val rebound = source?.relaxation(state, SessionDomains(session), engine::noteSourceWork) ?: base.withModel(
+            model, base.sourceMap?.withBounds(model, onWork = engine::noteSourceWork), remap = remap,
+        )
+        val map = rebound.sourceMap?.withCpBounds(model, session, engine::noteSourceWork)
+            ?.withParentRows(cuts.parentRows(state), engine::noteSourceWork)
         if (map != null) engine.cutPool.remap(map)
         return rebound.withModel(model, map)
     }

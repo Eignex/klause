@@ -47,6 +47,24 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
+    @Test
+    fun `cut source refresh should debit pending and containing work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList())
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "source-work")).use { engine ->
+            val session = PropagationSession(problem)
+            val base = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), session))
+            val beforeTotal = engine.totalSolveWork()
+            val beforePending = engine.pendingNodeSolveWork()
+
+            assertNotNull(engine.cpAdapter.cutRelaxation(base, session))
+            val charged = engine.totalSolveWork() - beforeTotal
+
+            assertTrue(charged > 0L)
+            assertEquals(charged, engine.pendingNodeSolveWork() - beforePending)
+        }
+    }
+
 
     @Test
     fun `LP pass should catch up skipped CP scopes and restore ancestor bounds`() {

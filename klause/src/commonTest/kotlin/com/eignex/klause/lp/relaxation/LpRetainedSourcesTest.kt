@@ -27,6 +27,28 @@ import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
     @Test
+    fun `cached source binding should charge its bound refresh`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        val domains = RootDomains(problem)
+        val sources = LpRetainedSources(problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1))))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            sources.relaxation(owner.state, domains)
+            var charged: CutSourceWork? = null
+
+            sources.relaxation(owner.state, domains) { charged = it }
+
+            assertTrue(assertNotNull(charged).structural > 0L)
+            assertTrue(assertNotNull(charged).exact > 0L)
+        }
+    }
+
+    @Test
     fun `completed source preparation should charge fresh emissions once`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),

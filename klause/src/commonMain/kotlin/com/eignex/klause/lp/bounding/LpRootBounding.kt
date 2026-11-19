@@ -422,7 +422,7 @@ internal fun LpEngine.harvestRootCuts(
             var resultObserved = false
             var round = 0
             while (round++ < CUT_POOL_ROUNDS && !cancellation.pollStop()) {
-                relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(pool::remap)
+                relaxation.sourceMap?.withCpBounds(relaxation.model, session, ::noteSourceWork)?.let(pool::remap)
                 pool.observe(result.primal)
                 resultObserved = true
                 val ctx = CutContext(problem, relaxation, result.primal, session)

@@ -515,29 +515,63 @@ internal class LpRetainedSources(
         }
     }
 
-    fun relaxation(state: LpExactState, domains: RelaxationDomains): LpRelaxation {
+    fun relaxation(
+        state: LpExactState,
+        domains: RelaxationDomains,
+        onWork: ((CutSourceWork) -> Unit)? = null,
+    ): LpRelaxation = measureCutSourceWork(onWork) { work ->
         require(state.model.n == columns.size)
         val model = requireNotNull(state.ownerWorkingModel())
-        cached?.let { return it.withModel(model) }
-        val vars = columns.map { it.variable }.toIntArray()
-        val bools = BooleanArray(columns.size) { columns[it].boolean }
-        val reals = columns.map { it.real }.toIntArray()
-        val signs = columns.map { it.sign }.toIntArray()
-        val integerColumns = IntArray(problem.numIntVars) { -1 }
-        val booleanColumns = IntArray(problem.numBoolVars) { -1 }
+        cached?.let {
+            return@measureCutSourceWork it.withModel(model, it.sourceMap?.withBounds(model, onWork = work::add))
+        }
+        val vars = IntArray(columns.size) {
+            work.structural()
+            columns[it].variable
+        }
+        val bools = BooleanArray(columns.size) {
+            work.structural()
+            columns[it].boolean
+        }
+        val reals = IntArray(columns.size) {
+            work.structural()
+            columns[it].real
+        }
+        val signs = IntArray(columns.size) {
+            work.structural()
+            columns[it].sign
+        }
+        val integerColumns = IntArray(problem.numIntVars) {
+            work.structural()
+            -1
+        }
+        val booleanColumns = IntArray(problem.numBoolVars) {
+            work.structural()
+            -1
+        }
         for (index in columns.indices) {
+            work.structural()
             val column = columns[index]
             if (column.variable >= 0) {
                 (if (column.boolean) booleanColumns else integerColumns)[column.variable] = index
             }
         }
-        val factors = IntArray(state.model.m) { -1 }
-        val indices = (0 until state.rows.size).associateBy { state.rows.row(it).id }
+        val factors = IntArray(state.model.m) {
+            work.structural()
+            -1
+        }
+        val indices = (0 until state.rows.size).associateBy {
+            work.structural()
+            state.rows.row(it).id
+        }
         val producers = HashSet<Int>()
         val circuits = ArrayList<CircuitArcModel>()
         val hulls = LinkedHashSet<Int>()
-        for (binding in bindings.filterNotNull()) {
+        for (binding in bindings) {
+            work.structural()
+            if (binding == null) continue
             val fragment = binding.emission.relaxation
+            work.structural(binding.columns.size.toLong() + binding.rows.size + fragment.hullFactorIds.size)
             binding.columns.forEach(producers::add)
             for (local in binding.rows.indices) {
                 if (local !in fragment.realUpperRows) {
@@ -546,24 +580,41 @@ internal class LpRetainedSources(
             }
             hulls.addAll(fragment.hullFactorIds.toList())
             for (circuit in fragment.circuitArcs) {
+                work.structural(circuit.cols.size.toLong())
                 circuits.add(CircuitArcModel(
                     circuit.n, circuit.tails, circuit.heads,
                     IntArray(circuit.cols.size) { binding.columns[circuit.cols[it]] },
                 ))
             }
         }
-        val presence = List(columns.size) { if (it in producers) columns[it].definition else null }
-        return LpRelaxation(
-            model, vars, bools, bindings.filterNotNull().firstOrNull()?.emission?.relaxation?.objectiveConstant ?: 0L,
+        val presence = List(columns.size) {
+            work.structural()
+            if (it in producers) columns[it].definition else null
+        }
+        val constant = bindings.firstOrNull {
+            work.structural()
+            it != null
+        }?.emission?.relaxation?.objectiveConstant ?: 0L
+        LpRelaxation(
+            model, vars, bools, constant,
             integerColumns, booleanColumns, circuits,
-            colReq = Array(columns.size) { columns[it].required?.copyOf() },
-            colPresentUpper = LongArray(columns.size) { columns[it].presentUpper }, hullFactorIds = hulls.toIntArray(),
+            colReq = Array(columns.size) {
+                work.structural(1L + (columns[it].required?.size ?: 0))
+                columns[it].required?.copyOf()
+            },
+            colPresentUpper = LongArray(columns.size) {
+                work.structural()
+                columns[it].presentUpper
+            }, hullFactorIds = hulls.toIntArray().also { work.structural(it.size.toLong()) },
             colRealId = reals, colRealSign = signs,
             sourceMap = cpCutSources(
-                model, problem, vars, bools, reals, signs, emptyMap(), presence, auxiliarySources, domains,
+                model, problem, vars, bools, reals, signs, emptyMap(), presence, auxiliarySources, domains, work::add,
             ),
             colPresence = presence, rowFactorIds = factors,
-            realUpperRows = realDefinitions.entries.associate { requireNotNull(indices[it.value]) to it.key },
+            realUpperRows = realDefinitions.entries.associate {
+                work.structural()
+                requireNotNull(indices[it.value]) to it.key
+            },
         ).also { cached = it }
     }
 

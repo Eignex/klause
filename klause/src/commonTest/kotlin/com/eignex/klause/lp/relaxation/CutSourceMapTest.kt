@@ -14,12 +14,51 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CutSourceMapTest {
+    @Test
+    fun `failed source capture should retain its failure and reported work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList())
+        val primary = IllegalStateException("binding")
+        val reporting = IllegalArgumentException("reporting")
+        var charged: CutSourceWork? = null
+
+        val failure = assertFailsWith<IllegalStateException> {
+            cpCutSources(problem, intArrayOf(0), booleanArrayOf(false), intArrayOf(-1), intArrayOf(1),
+                emptyMap(), listOf(null), LpAuxiliarySources(), null, onWork = {
+                    charged = it
+                    throw reporting
+                }) { throw primary }
+        }
+
+        assertSame(primary, failure)
+        assertSame(reporting, failure.suppressedExceptions.single())
+        assertTrue(assertNotNull(charged).structural > 0L)
+        assertTrue(assertNotNull(charged).exact > 0L)
+    }
+
+    @Test
+    fun `a failed work report should withhold a completed bound refresh`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val root = CutSourceMap(Any(), 0L, listOf(CutColumnSource(source)))
+        val expression = CutExpression(mapOf(source to BigFraction.ONE))
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val reporting = IllegalStateException("reporting")
+
+        val failure = assertFailsWith<IllegalStateException> {
+            root.withBounds(model, onWork = { throw reporting })
+        }
+
+        assertSame(reporting, failure)
+        assertFalse(root.isActive(CutPremise.Bound(expression, true, BigFraction.ONE)))
+    }
+
     @Test
     fun `cp rebinding should discard a retracted Boolean pin`() {
         val problem = Problem(1, 0, emptyArray(), emptyList())

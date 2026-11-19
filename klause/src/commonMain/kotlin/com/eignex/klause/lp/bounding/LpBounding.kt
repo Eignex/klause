@@ -40,6 +40,7 @@ import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.lp.engine.observeLpClaim
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.CutSourceWork
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -1005,4 +1006,9 @@ private fun learnedClause(
     sink: SolveStatsSink,
 ): IntArray? = LpExplanation.infeasibilityClause(relaxation, ray, session).also {
     sink.observeDeduction(if (it != null) "FARKAS_CITABLE" else "FARKAS_CLAUSELESS")
+}
+
+internal fun LpEngine.noteSourceWork(work: CutSourceWork) {
+    noteNodeOverhead(work.structural * LpNodeOverhead.BUILD)
+    noteNodeOverhead(work.exact * LpNodeOverhead.EXACT)
 }
