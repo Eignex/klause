@@ -18,7 +18,6 @@ import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
 import com.eignex.klause.lp.relaxation.columnBounds
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.LpPhaseStats

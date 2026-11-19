@@ -361,7 +361,9 @@ internal class ComponentLpSolver(
         for (origin in origins) if (origin >= 0) retained[origin] = true
         val retired = solvers.filterIndexed { index, _ -> !retained[index] }
         val nextReusable = Array(plan.parts.size) { index -> origins[index].takeIf { it >= 0 }?.let { reusable[it] } }
-        val nextChecked = Array(plan.parts.size) { index -> origins[index].takeIf { it >= 0 }?.let { checkedBounds[it] } }
+        val nextChecked = Array(plan.parts.size) { index ->
+            origins[index].takeIf { it >= 0 }?.let { checkedBounds[it] }
+        }
         val nextDeductions = deductions.remapped(origins)
         val nextOrder = plan.parts.indices.sortedWith(
             compareBy<Int> { plan.parts[it].model.m.toLong() + plan.parts[it].model.n }.thenBy { it },

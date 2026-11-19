@@ -22,7 +22,6 @@ import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.util.ExecutionControl

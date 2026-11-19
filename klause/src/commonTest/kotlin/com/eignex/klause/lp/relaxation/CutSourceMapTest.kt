@@ -2,6 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProvenance
@@ -19,6 +20,43 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CutSourceMapTest {
+    @Test
+    fun `cp rebinding should discard a retracted Boolean pin`() {
+        val problem = Problem(1, 0, emptyArray(), emptyList())
+        val session = PropagationSession(problem)
+        val source = CutSource(CutSourceKind.BOOLEAN, 0)
+        val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)))
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        session.pinBool(0, true)
+        val child = root.withCpBounds(model, session)
+        session.popLast()
+
+        val restored = child.withCpBounds(model, session)
+
+        assertTrue(child.isActive(CutPremise.Literal(0)))
+        assertFalse(restored.isActive(CutPremise.Literal(0)))
+    }
+
+    @Test
+    fun `cp rebinding should discard a retracted auxiliary exclusion`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
+        val session = PropagationSession(problem)
+        val source = CutSource(CutSourceKind.AUXILIARY, 0)
+        val definition = CutAuxiliaryDefinition(listOf(0L), listOf(0L, 1L), 1L, true)
+        val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)),
+            auxiliaryDefinitions = mapOf(source to definition))
+        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        session.pinInt(0, 0L)
+        val child = root.withCpBounds(model, session)
+        session.popLast()
+        val excluded = CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, 0), BigFraction.ONE)
+
+        val restored = child.withCpBounds(model, session)
+
+        assertTrue(child.isActive(excluded))
+        assertFalse(restored.isActive(excluded))
+    }
+
     @Test
     fun `source maps capture borrowed input collections`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)

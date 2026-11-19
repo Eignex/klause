@@ -405,7 +405,9 @@ and target reset, reseed and engine close release the preferences.
 
 Cut-source maps capture incoming collections once. Derived maps share immutable
 column expressions, global premises and source definitions while owning their active
-premises and row-parent mappings. Source identities and epochs keep their existing scope.
+premises and row-parent mappings. A bound refresh assembles column bounds, CP bounds,
+Boolean pins and auxiliary exclusions into one fresh owned premise set. Source
+identities and epochs keep their existing scope.
 
 The default `lp-component-reuse` setting requires its bounded owner setup to fit
 within a quarter of the worker's LP work horizon. A remaining node quota supplies
