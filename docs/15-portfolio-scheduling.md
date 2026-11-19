@@ -779,7 +779,7 @@ After a completed core raises its exact floor, an accepted incumbent within that
 last floor increment can fund continuation when at least eight seconds remain on
 the caller deadline. Each fresh completed-core epoch can extend the active limit
 to the time already spent plus three quarters of the remaining caller time. No
-deadline, no incumbent or a wider gap leaves the initial limit in place. The
+finite deadline, no incumbent or a wider gap leaves the initial limit in place. The
 incumbent funds scheduling only; query satisfaction never treats it as an objective
 cutoff. Grants preserve the paid query, pins, preparation and traversal.
 
@@ -787,7 +787,8 @@ A funded worker receives at least four base work slices per turn, capped by the
 configured work-slice maximum, or the ordinary growing work slice when larger.
 Its elapsed turn stays at the base slice, and each turn still requires fresh
 complete-sibling coverage. While a funded query waits, the scheduler services that
-coverage directly with base work offers before returning to the query; explicit
+coverage directly with base work offers to the least charged available complete
+worker before returning to the query; unspent offers do not count as fresh coverage. Explicit
 minimum shares retain precedence. Retirement restores ordinary scheduling.
 Cancellation and the containing deadline retain
 precedence. Explicit core workers and diagnostic work schedules keep their selected

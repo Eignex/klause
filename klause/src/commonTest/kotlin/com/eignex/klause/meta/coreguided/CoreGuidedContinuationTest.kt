@@ -44,17 +44,22 @@ class CoreGuidedContinuationTest {
 
     @Test
     fun `insufficient progress or caller resources should keep the initial limit`() {
-        val budget = CoreGuidedContinuation(2_000L)
         val lower = bigIntOf(1L)
         val rise = bigIntOf(1L)
+        for ((cores, incumbent, remaining) in listOf<Triple<Long, Double, Long?>>(
+            Triple(0L, 2.0, 40_000L),
+            Triple(1L, 3.0, 40_000L),
+            Triple(1L, Double.POSITIVE_INFINITY, 40_000L),
+            Triple(1L, Double.NaN, 40_000L),
+            Triple(1L, 2.0, null),
+            Triple(1L, 2.0, 7_999L),
+            Triple(1L, 1.0, 40_000L),
+        )) {
+            val budget = CoreGuidedContinuation(2_000L)
 
-        assertFalse(budget.fund(0L, lower, rise, 2.0, 0L, 40_000L))
-        assertFalse(budget.fund(1L, lower, rise, 3.0, 0L, 40_000L))
-        assertFalse(budget.fund(1L, lower, rise, Double.POSITIVE_INFINITY, 0L, 40_000L))
-        assertFalse(budget.fund(1L, lower, rise, 2.0, 0L, null))
-        assertFalse(budget.fund(1L, lower, rise, 2.0, 0L, 7_999L))
-        assertFalse(budget.fund(1L, lower, rise, 1.0, 0L, 40_000L))
-        assertEquals(2_000L, budget.maximumMillis)
-        assertEquals(0L, budget.grants)
+            assertFalse(budget.fund(cores, lower, rise, incumbent, 0L, remaining))
+            assertEquals(2_000L, budget.maximumMillis)
+            assertEquals(0L, budget.grants)
+        }
     }
 }

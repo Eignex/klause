@@ -399,9 +399,8 @@ internal class CoreGuidedSearch(
         val budget = continuation ?: return
         if (continuationCaller()) return
         val incumbent = params.objectiveBoundSupplier?.invoke() ?: return
-        val remaining = continuationCaller.deadline()?.let {
-            (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
-        }
+        val remaining = continuationCaller.deadline()?.let { -it.elapsedNow() }?.takeIf { it.isFinite() }
+            ?.inWholeMilliseconds?.coerceAtLeast(0L)
         budget.fund(completedCores, lower, coreWeight, incumbent,
             (activeTime + (activeSlice?.elapsedNow() ?: Duration.ZERO)).inWholeMilliseconds, remaining)
     }
