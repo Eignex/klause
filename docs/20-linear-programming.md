@@ -518,7 +518,11 @@ the accepted-set envelope separately from nominal-source bounds; neither establi
 independent proof validation. Exact source requests retain their original model.
 
 Point selection admits at most one additional checked cut per usable point and
-waits for its completed query before scanning again. Point-directed families retain
+waits for its completed query before scanning again. A mixed ordinary recipe with
+at least one active checked cut per numerical coordinate keeps its ordinary query
+without expanding a point family. This cut-count admission is charged to selection;
+the fallback applies to the matching source family, including integer-bound descendants,
+and avoids repeated generation or scoring. Point-directed families retain
 the ordinary checked recipe as a fixed prefix and add at most 64 distinct candidates.
 Candidate caps and aging apply to additions; ordinary rows remain installed when
 their source premises are active. Duplicate inequalities with different source owners

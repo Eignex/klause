@@ -150,9 +150,14 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
 
     @Test
     fun `complementary mixed rounding should strengthen a bound left unchanged by the preferred side`() {
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
             val current = authority.advance(mixedMaximum, ExecutionControl.Never, cuts = true)
             val candidate = authority.advanceWithPointCuts(mixedMaximum, ExecutionControl.Never)
+            val selected = capture.records.last().cuts
+            assertTrue(selected.size > capture.records.first().cuts.size)
+            assertTrue(selected.take(capture.records.first().cuts.size).all { it.installed })
             val restored = authority.advance(mixedMaximum, ExecutionControl.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
@@ -164,6 +169,28 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
                 .verify(assertNotNull(candidate.bound)))
             assertEquals(0L, authority.cutObservations()["numericalCutSelectionUnchangedPreparations"] ?: 0L)
+        }
+    }
+
+    @Test
+    fun `one ordinary cut per coordinate should decline mixed point expansion`() {
+        val source = SourceProofContext(mixedMaximum.scope, mixedMaximum.coordinates,
+            mixedMaximum.premises + ("second" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(5)))),
+            mixedMaximum.objective)
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, ExecutionControl.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+
+            val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
+
+            assertEquals(2, capture.records.single().cuts.size)
+            assertTrue(capture.records.single().cuts.all { it.installed })
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionDeclinedCutCount"])
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionAdmissionActiveCutsSum"])
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionAdmissionCoordinatesSum"])
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
         }
     }
 
@@ -212,8 +239,13 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
 
     @Test
     fun `a changed source should clear the ordinary fallback`() {
+        val denied = SourceProofContext(nonseparating.scope, nonseparating.coordinates,
+            nonseparating.premises + ("second" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(5)))),
+            nonseparating.objective)
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            authority.advanceWithPointCuts(nonseparating, ExecutionControl.Never)
+            authority.advanceWithPointCuts(denied, ExecutionControl.Never)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionDeclinedCutCount"])
 
             val result = authority.advanceWithPointCuts(mixedMaximum, ExecutionControl.Never)
 

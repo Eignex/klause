@@ -428,7 +428,7 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `a full ordinary mixed recipe should retain a separating aggregate without replacement`() {
+    fun `a dense ordinary mixed recipe should retain its checked query without point expansion`() {
         val premises = (0 until 64).associateTo(linkedMapOf()) { index ->
             "row $index" to SourcePremise(SourceInequality(
                 mapOf(x to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE),
@@ -445,15 +445,21 @@ class LinearAuthorityAggregateCutsTest {
 
             val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
 
-            assertEquals(65L, authority.cutObservations()["numericalMaxRetainedCuts"])
-            assertEquals(65L, authority.cutObservations()["numericalCutSelectionRetainedLayout"])
-            assertEquals(65, capture.records.last().cuts.size)
-            assertTrue(capture.records.last().cuts.take(64).all { it.installed })
-            assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            assertEquals(64L, authority.cutObservations()["numericalMaxRetainedCuts"])
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionDeclinedCutCount"])
+            assertEquals(64, capture.records.last().cuts.size)
+            assertTrue(capture.records.last().cuts.all { it.installed })
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(8) * BigFraction.ofLong(3).reciprocal()),
                 assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
+
+            val preparations = authority.preparations
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
+
+            assertEquals(preparations, authority.preparations)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionDeclinedCutCount"])
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionCurrentFallbackQueries"])
         }
     }
 
