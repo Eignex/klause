@@ -300,6 +300,13 @@ internal class JointLinearRepair(
             prepareBooleanCenter = { prepare(it, bootstrap = !adaptive) }, rootCoordinateValue = ::center,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
+            continuePausedCompletion = {
+                val proposal = checkedProposal
+                val carries = proposal != null && proposal.condition === queryOriginalCondition &&
+                    query?.hasIncumbent == true
+                if (carries) observe("jointRepairGrantedQueryResumeRequests")
+                carries
+            },
             reviseRefutedCenter = centerProgress?.let { ::reviseRefutedCenter },
             onProposalOperator = observation?.let {
                 { operator, round ->
