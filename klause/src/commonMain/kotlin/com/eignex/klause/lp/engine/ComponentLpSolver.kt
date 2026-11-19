@@ -52,6 +52,8 @@ internal class ComponentLpSolver(
         private set
     var lastReservedConstructionWork: Long = 0L
         private set
+    var lastLocalEditDecline: LpComponentEditDecline? = null
+        private set
     private var closed = false
     private var continuationTarget: Basis? = null
     override var recessionDirection: DoubleArray? = null
@@ -263,16 +265,21 @@ internal class ComponentLpSolver(
         check(!closed && activeSolve == null)
         metrics = LpSolveMetrics()
         lastReservedConstructionWork = 0L
+        lastLocalEditDecline = LpComponentEditDecline.UNAVAILABLE
         val projection = LpProjectionMeter(
             workLimit = workLimit.takeIf { it > 0L } ?: Long.MAX_VALUE, cancellation = token,
         )
         val (working, nextParts) = try {
             localRowPlan(state, token, projection) ?: return false
         } catch (_: LpProjectionStop) {
+            lastLocalEditDecline = if (token() || token.admission?.exhausted == true) {
+                LpComponentEditDecline.STOPPED
+            } else LpComponentEditDecline.PROJECTION_LIMIT
             return false
         } finally {
             metrics += LpSolveMetrics(workOps = projection.work)
         }
+        lastLocalEditDecline = LpComponentEditDecline.CONSTRUCTION
         val changed = BooleanArray(parts.size) { nextParts[it] !== parts[it] }
         val replacements = ArrayList<LpSolver>()
         val nextSolvers = solvers.toMutableList()
@@ -317,6 +324,7 @@ internal class ComponentLpSolver(
             clearEvidence()
             published = true
             closeComponentSolvers(retired)
+            lastLocalEditDecline = null
             return true
         } catch (primary: Throwable) {
             failure = primary
@@ -333,6 +341,11 @@ internal class ComponentLpSolver(
         }
     }
 
+    private fun localRowsDeclined(reason: LpComponentEditDecline): Nothing? {
+        lastLocalEditDecline = reason
+        return null
+    }
+
     private fun localRowPlan(
         state: LpExactState,
         token: ExecutionControl,
@@ -340,16 +353,22 @@ internal class ComponentLpSolver(
     ): Pair<LpModel, List<LpNeighborhood>>? {
         val previous = model.exactState ?: return null
         val source = state.model
-        if (source.n != model.n || source.m <= model.m || token()) return null
+        if (token()) return localRowsDeclined(LpComponentEditDecline.STOPPED)
+        if (source.n != model.n) return localRowsDeclined(LpComponentEditDecline.COLUMNS)
+        if (source.m <= model.m) return localRowsDeclined(LpComponentEditDecline.ROW_COUNT)
         var entries = 0L
         for (column in 0 until model.n) {
             val values = source.columnEntries(column)
             entries += values.size
             projection.reserve(values.size.toLong() + 1L, values.size * 16L, matrix = true)
-            if (values.filter { it.row < model.m } != previous.model.columnEntries(column)) return null
+            if (values.filter { it.row < model.m } != previous.model.columnEntries(column)) {
+                return localRowsDeclined(LpComponentEditDecline.MATRIX)
+            }
         }
         projection.reserve(source.m.toLong() + source.n, (source.m.toLong() + source.n) * 16L, matrix = true)
-        if ((0 until model.m).any { previous.rows.row(it).id != state.rows.row(it).id }) return null
+        if ((0 until model.m).any { previous.rows.row(it).id != state.rows.row(it).id }) {
+            return localRowsDeclined(LpComponentEditDecline.ROW_IDENTITY)
+        }
         val owner = IntArray(model.n) { -1 }
         for (index in parts.indices) for (column in parts[index].cols) owner[column] = index
         val added = Array(parts.size) { IntArrayList() }
@@ -360,9 +379,11 @@ internal class ComponentLpSolver(
             projection.poll()
             val from = rows.rowPtr[row]
             val to = rows.rowPtr[row + 1]
-            if (from == to) return null
+            if (from == to) return localRowsDeclined(LpComponentEditDecline.ROW_ONLY)
             val block = owner[rows.colIdx[from]]
-            if (block < 0 || (from until to).any { owner[rows.colIdx[it]] != block }) return null
+            if (block < 0 || (from until to).any { owner[rows.colIdx[it]] != block }) {
+                return localRowsDeclined(LpComponentEditDecline.CROSS_BLOCK)
+            }
             added[block].add(row)
         }
         val nextParts = ArrayList<LpNeighborhood>(parts.size)
@@ -372,7 +393,11 @@ internal class ComponentLpSolver(
             projection.reserve(part.cols.size.toLong() + part.rows.size, 0L, matrix = false)
             if (added[index].size == 0) {
                 // Simultaneous edits to other blocks take the ordinary replacement route.
-                if (part.rebindExact(state, token) !== part) return null
+                val rebound = part.rebindExact(state, token) ?: return localRowsDeclined(
+                    if (token() || token.admission?.exhausted == true) LpComponentEditDecline.STOPPED
+                    else LpComponentEditDecline.REBIND_UNAVAILABLE,
+                )
+                if (rebound !== part) return localRowsDeclined(LpComponentEditDecline.SCALARS)
                 nextParts += part
             } else {
                 val columns = IntArrayList().apply { addAll(part.cols) }
@@ -975,10 +1000,16 @@ private fun LpNeighborhood.readsScalarChange(changes: LpProjectedScalarChanges, 
     return changes.bounds.any(::contains) || changes.costs.any(::contains)
 }
 
+internal enum class LpComponentEditDecline {
+    COLUMNS, ROW_COUNT, MATRIX, ROW_IDENTITY, ROW_ONLY, CROSS_BLOCK, SCALARS,
+    STOPPED, PROJECTION_LIMIT, REBIND_UNAVAILABLE, CONSTRUCTION, UNAVAILABLE,
+}
+
 // Structural decisions stay fixed for an owner so scalar edits can retain a declined inspection.
 internal fun interface LpComponentAdmission {
     fun accepts(shape: LpComponentShape): Boolean
     fun inspect(columns: Int, rows: Int, entries: Int): Boolean = true
+    fun declinedEdit(reason: LpComponentEditDecline) {}
     val basisEntryLimit: Long get() = Long.MAX_VALUE
     val basisWorkLimit: Long get() = Long.MAX_VALUE
 }

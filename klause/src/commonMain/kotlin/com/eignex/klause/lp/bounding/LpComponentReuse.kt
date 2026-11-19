@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.LpComponentAdmission
+import com.eignex.klause.lp.engine.LpComponentEditDecline
 import com.eignex.klause.lp.engine.LpComponentShape
 
 private const val MIN_COMPONENT_CELLS = 4096L
@@ -33,6 +34,10 @@ internal val LpEngine.numericalComponentAdmission: LpComponentAdmission
             val outcome = componentReuseInspection(columns, rows, entries) ?: return true
             sink.lp.observeComponentAdmission(outcome, 0, 0L)
             return false
+        }
+
+        override fun declinedEdit(reason: LpComponentEditDecline) {
+            sink.lp.observeComponentAdmission("EDIT_${reason.name}", 0, 0L)
         }
 
         override fun accepts(shape: LpComponentShape): Boolean {

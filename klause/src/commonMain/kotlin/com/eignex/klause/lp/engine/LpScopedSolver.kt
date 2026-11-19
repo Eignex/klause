@@ -696,6 +696,7 @@ internal class LpScopedSolver(
             }
             solver = null
             closeOwner(components)
+            components.lastLocalEditDecline?.let { componentAdmission?.declinedEdit(it) }
             if (workLimit > 0L) {
                 if (components.lastMetrics.workOps >= workLimit) return false
                 replacementWorkLimit -= components.lastMetrics.workOps
