@@ -33,6 +33,24 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
+    fun `zero observed gains keep ordinary child order`() {
+        for (up in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(10.0)
+            }
+
+            assertNull(history.preferUnderObservedDirection(variable, 0.5))
+        }
+    }
+
+    @Test
     fun `sparse ancestor records retain exact counts across depth trimming`() {
         for (operation in listOf("branch", "commit", "clear")) {
             val history = LpDirectionalHistory({})
