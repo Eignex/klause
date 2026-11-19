@@ -37,6 +37,34 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverDifferenceTest {
     @Test
+    fun `retained source points should repair strict guard changes across siblings`() {
+        val model = Problem(3, intBounds = openBounds(0), numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY), factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 1.0),
+            ))
+        ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (truth in listOf(true, false, true)) {
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, truth))))
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, false))))
+
+                assertIs<ComponentCheck.Feasible>(component.check(session))
+                val point = assertNotNull(session.model().valueOf(component.realAssignmentKey)).reals.single()
+                assertTrue(if (truth) point <= BigFraction.ZERO else point > BigFraction.ONE)
+            }
+        }
+    }
+
+    @Test
     fun `a large strict chain should complete through its retained margin LP`() {
         val chain = Array<Factor>(129) { column ->
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(column, column + 1),

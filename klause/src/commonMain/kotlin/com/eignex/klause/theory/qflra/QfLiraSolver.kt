@@ -1469,6 +1469,16 @@ class ExactLiraSearchComponent private constructor(
         ) {
             return ComponentResult.Consistent
         }
+        if (completeTraversalObserved && acceptsRetainedSourcePoint()) {
+            if (!context.consumeCheck()) return ComponentResult.Indeterminate
+            candidate = checkNotNull(retainedLpPoint).take(model.numRealVars)
+            dirty = false
+            observeCompleteStage("LP_SOURCE_POINT_RECHECK")
+            if (unassignedBooleans > 0) capturePointHints(checkNotNull(candidate), context)
+            else captureCompleteWitness(candidate)
+            return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
+        }
+        if (operationStop()) return ComponentResult.Indeterminate
         val asserted = measurePartialLinearPhase({ partialLinearAssertionNs += it }) { assertSource(context) }
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
@@ -1557,6 +1567,24 @@ class ExactLiraSearchComponent private constructor(
         captureCompleteWitness(candidate)
         // Source integer branching requires an independently checked continuous witness.
         return ComponentResult.Consistent
+    }
+
+    private fun acceptsRetainedSourcePoint(): Boolean {
+        val point = retainedLpPoint ?: return false
+        if (model.numIntVars != 0 || solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
+            !system.acceptsPoint(point, lpStop)
+        ) return false
+        for (prepared in preparedRows) {
+            operationAccounting?.charge(prepared.booleans.size.toLong() + 1L)
+            if (lpStop.poll()) return false
+            if (prepared.disjunction && prepared.address !in node.rowAssertions) continue
+            val truth = node.rowTruth(prepared.address, prepared.row, bools) ?: continue
+            val comparison = prepared.form.comparison(truth) { bools[it] == LIRA_TRUE }
+            if (!system.checkedPointSatisfies(comparison, node.disequalityDirections[prepared.address], lpStop)) {
+                return false
+            }
+        }
+        return !operationStop()
     }
 
     private fun observeCompleteStage(stage: String) {

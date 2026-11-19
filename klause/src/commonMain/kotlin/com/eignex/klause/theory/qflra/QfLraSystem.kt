@@ -215,6 +215,7 @@ internal class LiveQfLraSystem(
     val assertionCost = SmtSourceAssertionCost()
     private var checkedPoint: List<BigFraction>? = null
     private val definitionPoint = HashMap<Int, BigFraction>()
+    private val sourcePoint = HashMap<SmtTermKey, BigFraction>()
 
     fun hasPositiveMargin(point: List<BigFraction>?): Boolean = marginColumn?.let {
         point?.getOrNull(it)?.signum()?.let { sign -> sign > 0 } == true
@@ -229,6 +230,7 @@ internal class LiveQfLraSystem(
             if (!point.all(arithmetic::admitted)) return false
             checkedPoint = point.toList()
             definitionPoint.clear()
+            sourcePoint.clear()
         }
         fun holds(column: Int, value: BigFraction): Boolean {
             stop.charge(2L)
@@ -256,6 +258,28 @@ internal class LiveQfLraSystem(
             if (!holds(column, value)) return false
         }
         return !stop()
+    }
+
+    fun checkedPointSatisfies(
+        comparison: ExactComparison,
+        direction: LinearOp?,
+        stop: ExecutionControl,
+    ): Boolean {
+        val point = checkedPoint ?: return false
+        val key = preparedTerms[comparison.ordered]?.positive ?: return false
+        val arithmetic = MixedPointArithmetic(stop)
+        if (!arithmetic.admitted(comparison.bound)) return false
+        val value = sourcePoint[key] ?: key.valueAt(point, arithmetic)?.also { sourcePoint[key] = it } ?: return false
+        return when (comparison.op) {
+            LinearOp.LE -> if (comparison.strict) value < comparison.bound else value <= comparison.bound
+            LinearOp.GE -> if (comparison.strict) value > comparison.bound else value >= comparison.bound
+            LinearOp.EQ -> value == comparison.bound
+            LinearOp.NE -> when (direction) {
+                LinearOp.LE -> value < comparison.bound
+                LinearOp.GE -> value > comparison.bound
+                else -> value != comparison.bound
+            }
+        }
     }
 
     fun install(): Boolean {
@@ -630,6 +654,14 @@ private class SmtTermKey(val columns: IntArray, private val coefficients: List<B
     var slot: SmtTermSlot? = null
 
     fun expression(): Map<Int, BigFraction> = columns.indices.associate { columns[it] to coefficients[it] }
+
+    fun valueAt(point: List<BigFraction>, arithmetic: MixedPointArithmetic): BigFraction? {
+        var negative = BigFraction.ZERO
+        for (index in columns.indices) {
+            negative = arithmetic.subtractProduct(negative, coefficients[index], point[columns[index]]) ?: return null
+        }
+        return negative.negated()
+    }
 
     override fun hashCode(): Int = hash
 
