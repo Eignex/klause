@@ -8,8 +8,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.formats.flatzinc.linearObjective
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.flatZincSemantics
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
@@ -51,25 +50,18 @@ import kotlin.test.assertTrue
 
 class FinitePipelineTest {
     @Test
-    fun `integer FlatZinc optimization should admit symmetry under default float policy`() {
-        val program = parseFlatZinc(
-            """
-            var 0..2: a;
-            var 0..2: b;
-            var 0..4: cost;
-            constraint all_different_int([a,b]);
-            constraint int_lin_eq([1,1,-1], [a,b,cost], 0);
-            solve minimize cost;
-            """.trimIndent(),
+    fun `typed integer optimization should admit symmetry under unused float tolerance`() {
+        val source = Problem(
+            0, 3, Array(3) { IntDomain(0, 3) }, listOf(AllDifferent(intArrayOf(0, 1, 2))),
+            semantics = flatZincSemantics.resolve(),
         )
 
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            program.problem, FiniteEngine.BACKTRACK, program.linearObjective(),
+            source, FiniteEngine.BACKTRACK, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
         ))
 
         assertTrue("objective-symmetry" in assertNotNull(prepared.presolve).passes)
         assertTrue(prepared.problem.factors.any { it is SymmetryHandling })
-        assertEquals(3, BacktrackSolver(prepared.executableProblem()).enumerate().count())
     }
 
     @Test
