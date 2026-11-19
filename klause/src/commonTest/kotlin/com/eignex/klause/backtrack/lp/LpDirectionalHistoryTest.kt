@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -144,7 +145,7 @@ class LpDirectionalHistoryTest {
             history.record(13.0)
         }
 
-        assertEquals(kotlin.math.sqrt(3.0), history.score(variable, 2.25), 1e-9)
+        assertEquals(sqrt(3.0), history.score(variable, 2.25), 1e-9)
     }
 
     @Test
