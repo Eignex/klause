@@ -381,6 +381,7 @@ Opposite-sign nonnegative combinations use arbitrary-precision integer coefficie
 exact activity and gcd normalization with downward rounding of the upper bound.
 Normalized rows retain sorted coordinates; cancellation merges their terms in linear
 time and removes zero coefficients before normalization.
+Unit cancellation scales retain immutable coefficient values without identity products.
 Ordered source coordinates use array normalization directly; unordered, repeated or
 zero terms pass through aggregation before normalization.
 Once the coefficient gcd reaches one, normalization copies the canonical terms and
