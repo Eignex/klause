@@ -46,7 +46,7 @@ internal data class LinearAuthorityAggregateProbeResult(
 
 internal object LinearAuthorityAggregateCuts {
     val sourcePairLimits = LinearAuthorityAggregateLimits(work = 500_000L, allocation = 8_388_608L)
-    val pointSourcePairLimits = LinearAuthorityAggregateLimits()
+    val pointSourcePairLimits = sourcePairLimits
 
     fun prepareSourcePairs(
         source: SourceProofContext, cancellation: ExecutionControl,
@@ -214,6 +214,7 @@ internal object LinearAuthorityAggregateCuts {
         } catch (stop: AggregateStop) {
             observe("AggregatePair${stop.reason}", 1L)
         }
+        observe("AggregatePairRetainedCandidates", candidates.size.toLong())
         return candidates.toList()
     }
 
