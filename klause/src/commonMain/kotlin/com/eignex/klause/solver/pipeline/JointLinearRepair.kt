@@ -669,6 +669,7 @@ internal class JointLinearRepair(
                 } else null,
                 feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null,
                 useSourceGap = false, guideIncumbent = seed != null && !queryProximity,
+                proximityCenter = seed.takeIf { queryProximity },
                 observeExternalIncumbents = observeExternalIncumbents)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed
@@ -681,7 +682,8 @@ internal class JointLinearRepair(
         val millis = cancellation.deadline()?.let { (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
             ?.coerceIn(1, QUERY_SLICE_MILLIS) ?: QUERY_SLICE_MILLIS
         val before = active.work
-        val result = active.runSlice(ExecutionControl.Never, millis, QUERY_SLICE_WORK) { _, _ -> }
+        val delivered = if (queryProximity) ExecutionControl { active.hasIncumbent } else ExecutionControl.Never
+        val result = active.runSlice(delivered, millis, QUERY_SLICE_WORK) { _, _ -> }
         if (queryProximity) {
             observe("jointRepairProximityConsultations")
             stages["jointRepairProximityWork"] = (stages["jointRepairProximityWork"] ?: 0L) + active.work - before
