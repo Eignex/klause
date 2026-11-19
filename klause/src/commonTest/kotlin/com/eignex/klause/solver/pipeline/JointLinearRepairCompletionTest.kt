@@ -44,6 +44,52 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     @Test
+    fun `an improving relaxation query should retain its private search for the next witness`() {
+        val groups = 6
+        val integers = groups * 4
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(integers), LongArray(integers) { 1 }, null, null),
+            factors = Array(groups) { group ->
+                Linear(intArrayOf(2, 3), intArrayOf(group * 2, group * 2 + 1), LinearOp.LE, 3)
+            }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = LongArray(integers) {
+            if (it >= groups * 2) 0 else if (it % 2 == 0) -3 else -4
+        })
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val guidance = LinearRepairGuidance()
+        val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+        assertTrue(guidance.remember(source, (0 until integers).associate { id ->
+            SourceCoordinate(SourceCoordinate.Kind.Integer, id) to
+                if (id >= groups * 2) 0.0 else if (id % 2 == 0) 1.0 else 1.0 / 3.0
+        }, budget, ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), LongArray(integers), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        val values = mutableListOf<BigFraction>()
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxFlips = 2), external = { center },
+            incumbentCompletionCheck = { _, _, _ -> true }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(96) {
+                    if (!done) done = search.advance(ExecutionControl.Never, 5_000) { _, value ->
+                        values += assertNotNull(value)
+                    }
+                }
+
+                assertEquals(2, values.size)
+                assertTrue(values[1] < values[0])
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(1L, stages["jointRepairCandidates"])
+                assertTrue((stages["jointRepairRetainedQueryIncumbents"] ?: 0L) > 0)
+                assertFalse(repair.incumbentTrialPending)
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
     fun `a checked proposal center should seed its query without discovery credit`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
