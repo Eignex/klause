@@ -273,6 +273,7 @@ internal class LiveQfLraSystem(
                 value < side.number.value || (value == side.number.value && !side.strict)
             } != false
         }
+
         // Every auxiliary column is defined by its source affine term; retraction changes only its bounds.
         fun acceptsColumn(column: Int): Boolean {
             if (column < pointColumns) return holds(column, point[column])
