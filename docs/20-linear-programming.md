@@ -526,6 +526,8 @@ foreign levels keep chronological retreat. Exhausting choices or allowance suppl
 no infeasibility authority, and no partial assignment is a witness. A restart keeps
 one generation of the engine's owned coordinate buffers for replay as soft
 preferences, without a numerical query.
+Compatible masked-guide refresh preserves a paused component trial's pins during
+rounding and repair while its source, objective and root relaxation still match.
 
 Retained discrete root layouts prepare in private chunks before the first numerical
 consultation. A paused builder keeps only its source-root assembly buffers; no partial

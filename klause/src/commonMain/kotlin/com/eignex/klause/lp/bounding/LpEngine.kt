@@ -644,7 +644,7 @@ internal class LpEngine(
         if (previous != null && previous.primal != null && previous.objective === objective &&
             previous.sourceProblem === problem && previous.relaxation === relaxation &&
             rootPrimalTargets?.coordinates === previous.primal && !previous.roundingComplete &&
-            previous.componentRounding?.repair?.active == true && previous.pinning?.fixpointCancelled == false
+            previous.componentRounding != null && previous.pinning?.fixpointCancelled == false
         ) {
             sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "REFRESH_RETAINED", 0L)
             return PartialPrimalRead.PINNING_GUIDANCE
