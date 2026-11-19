@@ -457,69 +457,71 @@ class LpComponentRoundingTest {
     }
 
     @Test
-    fun `partial owner refresh preserves a paused component repair and its earlier pins`() {
-        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it % 4 == 0) 2 else 1) },
-            (0 until 2).flatMap { group ->
-                listOf(1 to 2, 2 to 3, 3 to 1).flatMap { (a, b) ->
-                    val variables = intArrayOf(4 * group, 4 * group + a, 4 * group + b)
-                    listOf(Linear(intArrayOf(1, 1, 1), variables, LinearOp.GE, 2),
-                        Linear(intArrayOf(1, -1, -1), variables, LinearOp.GE, 0))
+    fun `partial owner refresh preserves paused component pins before and during repair`() {
+        for (repairing in listOf(false, true)) {
+            val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it % 4 == 0) 2 else 1) },
+                (0 until 2).flatMap { group ->
+                    listOf(1 to 2, 2 to 3, 3 to 1).flatMap { (a, b) ->
+                        val variables = intArrayOf(4 * group, 4 * group + a, 4 * group + b)
+                        listOf(Linear(intArrayOf(1, 1, 1), variables, LinearOp.GE, 2),
+                            Linear(intArrayOf(1, -1, -1), variables, LinearOp.GE, 0))
+                    }
+                })
+            val objective = LinearObjective(intCoefficients = LongArray(8))
+            val factory = RecordingLpEngineFactory()
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)),
+                SolveStatsSink("refreshed-component-repair"), LpSolveContext(factory)).use { engine ->
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+                val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
+                val primal = DoubleArray(relaxation.model.n)
+                val known = BooleanArray(primal.size)
+                for (v in 0 until 8) {
+                    val column = relaxation.intColOf[v]
+                    known[column] = v % 4 < 2
+                    primal[column] = when (v % 4) {
+                        0 -> 1.0
+                        1 -> 0.5
+                        else -> 123.75
+                    }
                 }
-            })
-        val objective = LinearObjective(intCoefficients = LongArray(8))
-        val factory = RecordingLpEngineFactory()
-        LpEngine(problem, objective,
-            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
-                rootCutHarvest = false)),
-            SolveStatsSink("refreshed-component-repair"), LpSolveContext(factory)).use { engine ->
-            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
-            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
-            val primal = DoubleArray(relaxation.model.n)
-            val known = BooleanArray(primal.size)
-            for (v in 0 until 8) {
-                val column = relaxation.intColOf[v]
-                known[column] = v % 4 < 2
-                primal[column] = when (v % 4) {
-                    0 -> 1.0
-                    1 -> 0.5
-                    else -> 123.75
+                val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
+                    sourceProblem = problem)
+                var expired = false
+                val slice = ExecutionControl {
+                    val pending = guidance.componentRounding
+                    val pinning = guidance.pinning
+                    if (pending?.group == 1 && (pending.repair?.active == true) == repairing &&
+                        pinning?.intDomain(4)?.isFixed == true
+                    ) expired = true
+                    expired
                 }
-            }
-            val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
-                sourceProblem = problem)
-            var expired = false
-            val slice = ExecutionControl {
-                val pending = guidance.componentRounding
-                val pinning = guidance.pinning
-                if (pending?.group == 1 && pending.repair?.active == true &&
-                    pinning?.intDomain(4)?.isFixed == true
-                ) expired = true
-                expired
-            }
-            val constructed = factory.calls.size
-            val queries = factory.floatAllowances.size
-            engine.rootRoundingWarmStart = guidance
-            assertNull(engine.lpRoundingProbe(objective, slice))
-            val prefix = assertNotNull(guidance.pinning)
-            assertTrue(expired)
-            assertEquals(IntDomain(2, 2), prefix.intDomain(0))
-            val paid = engine.primalPropagationWork
+                val constructed = factory.calls.size
+                val queries = factory.floatAllowances.size
+                engine.rootRoundingWarmStart = guidance
+                assertNull(engine.lpRoundingProbe(objective, slice))
+                val prefix = assertNotNull(guidance.pinning)
+                assertTrue(expired)
+                assertEquals(IntDomain(2, 2), prefix.intDomain(0))
+                val paid = engine.primalPropagationWork
 
-            engine.retainRootPartialPrimalGuidance(relaxation, ExecutionControl.Never)
-            assertEquals(IntDomain(2, 2), assertNotNull(engine.rootRoundingWarmStart?.pinning).intDomain(0))
-            val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
+                engine.retainRootPartialPrimalGuidance(relaxation, ExecutionControl.Never)
+                assertEquals(IntDomain(2, 2), assertNotNull(engine.rootRoundingWarmStart?.pinning).intDomain(0))
+                val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
-            assertEquals(2L, sample.ints[0])
-            assertEquals(2L, sample.ints[4])
-            assertIs<Verification.Accepted<*, *>>(
-                finiteWitnessVerifier(problem.bake(), objective)
-                    .verify(Candidate(sample, objective.evaluate(sample))),
-            )
-            assertEquals(prefix.work, engine.primalPropagationWork)
-            assertTrue(engine.primalPropagationWork > paid)
-            assertEquals(constructed, factory.calls.size)
-            assertEquals(queries, factory.floatAllowances.size)
+                assertEquals(2L, sample.ints[0])
+                assertEquals(2L, sample.ints[4])
+                assertIs<Verification.Accepted<*, *>>(
+                    finiteWitnessVerifier(problem.bake(), objective)
+                        .verify(Candidate(sample, objective.evaluate(sample))),
+                )
+                assertEquals(prefix.work, engine.primalPropagationWork)
+                assertTrue(engine.primalPropagationWork > paid)
+                assertEquals(constructed, factory.calls.size)
+                assertEquals(queries, factory.floatAllowances.size)
+            }
         }
     }
 
