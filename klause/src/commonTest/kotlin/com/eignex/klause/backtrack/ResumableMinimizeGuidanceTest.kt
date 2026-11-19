@@ -520,11 +520,11 @@ class ResumableMinimizeGuidanceTest {
     }
 
     @Test
-    fun `automatic sparse handoff waits for an improved integer floor`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+    fun `automatic sparse handoff waits for an improvement over its first checked floor`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 2)),
             settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
         var pauses = 0
         val published = ArrayList<Double>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
@@ -539,7 +539,7 @@ class ResumableMinimizeGuidanceTest {
                     override val currentWork: Long get() = pausedWork
                     override val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(workOps = pausedWork)
                     override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? =
-                        if (cancellation()) null else DoubleArray(model.m) { if (pauses >= 2) -1.0 else 0.0 }
+                        if (cancellation()) null else DoubleArray(model.m) { if (pauses >= 2) -2.0 else -1.0 }
                     override fun openSolve(
                         allowance: LpFloatAllowance?, retainFundingStop: Boolean,
                     ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
@@ -563,7 +563,7 @@ class ResumableMinimizeGuidanceTest {
                 search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
             }
             assertTrue(offered.isEmpty())
-            assertTrue(published.none { it > 0.0 })
+            assertTrue(published.any { it == 2.0 })
 
             repeat(4) {
                 search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
@@ -571,7 +571,7 @@ class ResumableMinimizeGuidanceTest {
 
             assertEquals(1L, search.stats.lp.phases.getValue("PRIMAL_CONTINUATION_ROOT")
                 .outcomes["BOUND_SEARCH_HANDOFF"])
-            assertTrue(published.any { it == 1.0 })
+            assertTrue(published.any { it == 3.0 })
             assertTrue(offered.isNotEmpty())
         }
     }

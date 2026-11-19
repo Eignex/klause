@@ -187,6 +187,7 @@ internal class ResumableMinimize(
     // The root LP relaxation's proved objective bound; it raises the bound an optimality-gap terminal reports.
     private var provedRootBound = Double.NEGATIVE_INFINITY
     private var rootBoundHandoffBaseline: Double? = null
+    private var rootBoundHandoffFloorCaptured = false
 
     // Whether a prune relied on an optimality-gap cutoff below the incumbent's own, and the least such cutoff: every
     // point the search left unseen, and every fact it derived from such a prune, holds only below that cutoff.
@@ -970,6 +971,7 @@ internal class ResumableMinimize(
         learnedMemory.reset()
         firstRun = true
         rootBoundHandoffBaseline = null
+        rootBoundHandoffFloorCaptured = false
         rootRoundingPending = false
         rootLayoutPending = false
         restartRootTargetsPending = false
@@ -1478,6 +1480,7 @@ internal class ResumableMinimize(
             lpEngine.measuredRootLowerBound == null
         ) return false
         if (lpEngine.automaticSparseTrial) {
+            if (!rootBoundHandoffFloorCaptured) return false
             val baseline = rootBoundHandoffBaseline ?: return false
             val lower = lpEngine.measuredRootLowerBound ?: return false
             if (!baseline.isFinite() || ceil(lower) <= ceil(baseline)) return false
@@ -1543,6 +1546,7 @@ internal class ResumableMinimize(
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
             preparationCancellation = rootLpPreparationBudget())
+        captureRootHandoffFloor(rootBound)
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
@@ -1552,7 +1556,14 @@ internal class ResumableMinimize(
         return true
     }
 
+    private fun captureRootHandoffFloor(rootBound: Double) {
+        if (!lpEngine.automaticSparseTrial || rootBoundHandoffFloorCaptured || !rootBound.isFinite()) return
+        rootBoundHandoffBaseline = maxOf(rootBound, rootBoundHandoffBaseline?.takeIf { it.isFinite() } ?: rootBound)
+        rootBoundHandoffFloorCaptured = true
+    }
+
     private fun publishRootLpBound(rootBound: Double) {
+        captureRootHandoffFloor(rootBound)
         if (!rootBound.isFinite() || rootBound <= provedRootBound) return
         sink.lp.observeRootBound(0, rootBound)
         params.objectiveLowerBoundSink?.invoke(rootBound)
