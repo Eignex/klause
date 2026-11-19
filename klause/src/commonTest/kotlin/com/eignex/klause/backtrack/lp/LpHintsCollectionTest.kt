@@ -88,7 +88,8 @@ class LpHintsCollectionTest {
             if (condition == "reset") hints.resetHistory()
             hints.branch(variable)
 
-            val selected = hints.orderAlternatives(variable, alternatives, ExecutionControl { condition == "cancelled" })
+            val cancellation = ExecutionControl { condition == "cancelled" }
+            val selected = hints.orderAlternatives(variable, alternatives, cancellation)
             hints.commit(selected.first(), 1)
 
             assertEquals(alternatives, selected, condition)
