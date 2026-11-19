@@ -30,8 +30,9 @@ class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {
         @JvmStatic
         @BeforeClass
         fun initializeSolver() {
-            LinearSourceBoundPublicationTest(ObjectiveSense.MINIMIZE)
-                .`finite output should publish a nominal bound in original objective units`()
+            val fixture = LinearSourceBoundPublicationTest(ObjectiveSense.MINIMIZE)
+            fixture.`finite output should publish a nominal bound in original objective units`()
+            fixture.`default preparation should retain an accepted set bound without a second tolerance band`()
         }
 
         @JvmStatic
@@ -40,7 +41,7 @@ class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {
     }
 
     @Test
-    fun `an absolute envelope should publish its accepted set bound without a second tolerance band`() {
+    fun `default preparation should retain an accepted set bound without a second tolerance band`() {
         val slack = BigFraction.ofLong(10_000_000).reciprocal()
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
@@ -53,7 +54,6 @@ class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {
             engine = "mixed"
             parallel = 1
             statistics = true
-            presolve = "off"
             sourceOptions.linearToleranceEnvelope = true
         }
         val solvable = linearSourceSolvable(SourceAttachment(source, ProblemSettings()), common, { "point" })
