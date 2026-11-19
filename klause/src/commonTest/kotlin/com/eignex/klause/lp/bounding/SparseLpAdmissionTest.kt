@@ -647,7 +647,7 @@ class SparseLpAdmissionTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
         val cases = listOf(Triple<Long?, Double, Boolean>(null, 0.25, true),
             Triple(10_000L, 0.25, false), Triple(30_199L, 0.25, false), Triple(30_200L, 0.25, true),
-            Triple(0L, 0.25, false), Triple(40_000L, 0.0, false))
+            Triple(0L, 0.25, false), Triple(40_000L, 0.0, true), Triple(0L, 0.0, false))
         for ((budget, fraction, admitted) in cases) {
             val base = LpPlan(lpWorkBudgetFraction = fraction)
             val sink = SolveStatsSink("sparse-invocation-capacity")

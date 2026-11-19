@@ -1891,7 +1891,8 @@ internal class LpEngine(
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
                     sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation,
                     automaticSparseWorkAllowance = automaticSparseBudgetMillis?.let {
-                        lpWorkAllowance(it, requestedPlan.lpWorkBudgetFraction)
+                        if (it <= 0L) 0L else
+                            lpWorkAllowance(it, requestedPlan.lpWorkBudgetFraction).takeIf { work -> work > 0L }
                     }) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->

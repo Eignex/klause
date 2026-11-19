@@ -52,8 +52,26 @@ miplib2017/neos859080
 miplib2017/neos-2624317-amur
 miplib2017/neos-1516309
 miplib2017/neos-3696678-lyvia
+miplib2003/a1c1s1
+miplib2003/qiu
+miplib2010/a1c1s1
+miplib2010/gmu-35-40
+miplib2010/qiu
+miplib2017/a1c1s1
+miplib2017/gmu-35-40
+miplib2017/h80x6320
+miplib2017/h80x6320d
+miplib2017/iis-glass-cov
+miplib2017/neos-3116779-oban
+miplib2017/neos-3734794-moppy
+miplib2017/neos-5261882-treska
+miplib2017/neos-555343
+miplib2017/pigeon-20
+miplib2017/qiu
+miplib2017/sorrell8
+miplib3/qiu
 # Encodings of the MIPLIB sources above in other formats. The pb-comp-2025 archive also carries
-# bell3a, p0201 and pp08aCUTS under `PB24/`, which no suite selects.
+# bell3a, p0201, pp08aCUTS and sorrell8 under `PB24/`, which no suite selects.
 pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu
 pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-mod008
 pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-p0548

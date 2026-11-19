@@ -351,10 +351,11 @@ techniques and caller work policies. Explicit cut and relaxation strategies reta
 their ordinary route. Automatic sparse admission supplies no additional portfolio slot or slice.
 When the whole invocation has a known deadline, its remaining LP work share must
 fund the capped root grant and an initial downstream query quantum before automatic
-source inspection begins. Insufficient or disabled known capacity declines without
+source inspection begins. Insufficient or exhausted known capacity declines without
 preparation. Unknown capacity retains the bounded work policy. This admission input
 reads the whole-run deadline once; it changes neither slice nor lifetime grants and
-does not alter ordinary LP funding.
+does not alter ordinary LP funding. Disabling the caller's cumulative LP cap leaves
+the sparse hard limits in force.
 Automatic roots retain ordinary node bounding where the dense size guard permits
 it; a model beyond that guard keeps root-only sparse admission.
 The `+sparse-trial` override requests the bounded route explicitly, including mixed
