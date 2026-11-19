@@ -159,7 +159,8 @@ internal class LinearAuthority(
 
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: ExecutionControl,
         retainBasePoint: Boolean = false): LinearAuthorityResult {
-        val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
+        val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe,
+            maximumBatchCuts = 8)
             .also { pointPolicy = it }
         if (pointFallback === template && template?.matches(source) == true) {
             policy.observe("CurrentFallbackQueries")
@@ -344,7 +345,7 @@ internal class LinearAuthority(
             point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
         val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
-        val proposed = withAdditionalCuts(directed, funded, point) ?: return null
+        val proposed = withAdditionalCuts(directed, funded, point, maximumCandidates = 64) ?: return null
         if (funded()) return null
         if (sameCurrentCuts(family, prepared, proposed, funded, 65_536L - work)) return family to prepared
         if (funded()) return null
@@ -579,25 +580,44 @@ internal class LinearAuthority(
     private fun withAdditionalCuts(
         prepared: LinearAuthorityTemplate, cancellation: ExecutionControl,
         point: Map<SourceCoordinate, Double>? = null,
+        maximumCandidates: Int = Int.MAX_VALUE,
     ): LinearAuthorityTemplate? {
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty() &&
-            (point == null || prepared.cuts?.rows.orEmpty().size <= 64)) return prepared
+            prepared.cuts?.rows.orEmpty().size <= maximumCandidates) return prepared
         val funded = ExecutionControl { cancellation() || budget.funding?.paused == true }
-        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairs(
-            prepared.numeric, funded, { name, count ->
+        var generatedWork = 0L
+        var generatedAllocation = 0L
+        fun generate(limit: Int, seeded: Boolean): List<LinearAuthorityCut> {
+            val limits = LinearAuthorityAggregateCuts.sourcePairLimits
+            return LinearAuthorityAggregateCuts.prepareSourcePairs(prepared.numeric, funded, { name, count ->
                 when (name) {
-                    "AggregateWork" -> cutCost(count, 0L)
-                    "AggregateAllocation" -> cutCost(0L, count)
+                    "AggregateWork" -> {
+                        generatedWork += count
+                        cutCost(count, 0L)
+                    }
+                    "AggregateAllocation" -> {
+                        generatedAllocation += count
+                        cutCost(0L, count)
+                    }
                     else -> {
                         val key = "numericalCut$name"
                         cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
                     }
                 }
-            }, maximumCandidates = 64 - additionalCuts.size,
-            limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
-            else LinearAuthorityAggregateCuts.pointSourcePairLimits,
-            point = point) else emptyList()
+            }, maximumCandidates = limit,
+                limits = limits.copy(work = minOf(if (seeded) 65_536L else limits.work,
+                    limits.work - generatedWork), allocation = minOf(if (seeded) 1_048_576L else limits.allocation,
+                    limits.allocation - generatedAllocation)), point = if (seeded) point else null)
+        }
+        val generated = if (generateAggregates) {
+            val seeded = if (point == null) emptyList() else generate(minOf(8, 64 - additionalCuts.size), true)
+            if (funded()) return null
+            val unseeded = generate(64 - additionalCuts.size - seeded.size, false)
+            cutCost(1L, 64L + (seeded.size + unseeded.size) * 8L)
+            if (funded()) return null
+            seeded + unseeded
+        } else emptyList()
         if (funded()) return null
         val additional = if (generated.isEmpty()) additionalCuts else {
             cutCost(1L, 64L + (generated.size + additionalCuts.size) * 8L)
@@ -605,7 +625,7 @@ internal class LinearAuthority(
             additionalCuts + generated
         }
         return prepared.withAdditional(additional, funded,
-            maximumCandidates = if (point == null) Int.MAX_VALUE else 64, onCost = ::cutCost)
+            maximumCandidates = maximumCandidates, onCost = ::cutCost)
     }
 
     private fun cutCost(work: Long, allocation: Long) {

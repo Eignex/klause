@@ -16,7 +16,11 @@ internal class LinearAuthorityPointCuts(
     private val maximumCuts: Int = 64,
     private val maximumSupport: Int = 8192,
     private val onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
+    private val maximumBatchCuts: Int = 1,
 ) {
+    init {
+        require(maximumBatchCuts in 1..64)
+    }
     private data class Scored(
         val id: Int, val values: Map<SourceCoordinate, Double>, val norm: Double, val score: Double,
     )
@@ -248,7 +252,7 @@ internal class LinearAuthorityPointCuts(
                 }
             }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
-                .thenBy { it.id }), minOf(1, maximumCuts - additionalInstalled),
+                .thenBy { it.id }), minOf(maximumBatchCuts, maximumCuts - additionalInstalled),
                 1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
                 if (!meter.charge(a.values.size.toLong() + b.values.size)) Double.POSITIVE_INFINITY else {
                     var dot = 0.0

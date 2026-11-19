@@ -264,7 +264,7 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
             LinearAuthorityCut(1, SourceInequality(mapOf(x to BigFraction.ofLong(2)), BigFraction.ZERO),
                 SourceDerivation.Premise("b")),
         )
-        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumBatchCuts = 8)
 
         val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0, 1),
             listOf(BigFraction.ONE), emptySet(), ExecutionControl.Never)
@@ -286,6 +286,22 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
             listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), ExecutionControl.Never)
 
         assertEquals(setOf(0), selected)
+    }
+
+    @Test
+    fun `a batch should retain the strongest nonparallel additions within its capacity`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val rows = listOf(x, y, z).mapIndexed { id, coordinate ->
+            LinearAuthorityCut(id, SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("upper $id"))
+        }
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 2, maximumBatchCuts = 8)
+
+        val selected = selection.select(rows, listOf(x, y, z), List(3) { BigFraction.ZERO }, setOf(0, 1, 2),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ofLong(3)),
+            emptySet(), ExecutionControl.Never)
+
+        assertEquals(setOf(0, 2), selected)
     }
 
     @Test
@@ -394,7 +410,7 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `adding another checked cut should retain the numerical owner`() {
+    fun `a completed batch should retain its checked numerical owner`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
@@ -413,7 +429,7 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
             ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             val first = authority.advanceWithPointCuts(context, ExecutionControl.Never)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
                 (assertNotNull(first.bound).claim as SourceClaim.Bound).value)
             val preparations = authority.preparations
 
@@ -1052,7 +1068,17 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `a paused separation round should retain its completed base bound`() {
+    fun `a paused batch should resume its selected mask without another scan`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val context = SourceProofContext(mixedMaximum.scope, mixedMaximum.coordinates + setOf(y, other),
+            mixedMaximum.premises + mapOf(
+                "other mixed" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                    BigFraction.ofLong(2))),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
         val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
         var blocked = false
         var operations = 0L
@@ -1063,20 +1089,31 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
                 funding.grant(0L)
             }
         })
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(budget, retainLp = true).use { authority ->
-            val paused = authority.advanceWithPointCuts(mixedMaximum, ExecutionControl.Never)
+            authority.capture = capture
+            val paused = authority.advanceWithPointCuts(context, ExecutionControl.Never)
             assertTrue(paused.paused)
             assertNull(authority.cutObservations()["numericalCutSelectionImprovedRounds"])
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5)),
                 (assertNotNull(paused.bound).claim as SourceClaim.Bound).value)
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionSelected"])
+            val preparations = authority.preparations
+            val selectionWork = authority.cutObservations()["numericalCutSelectionWork"]
 
             funding.grant(1_000_000L)
-            val completed = authority.advanceWithPointCuts(mixedMaximum, ExecutionControl.Never)
+            val completed = authority.advanceWithPointCuts(context, ExecutionControl.Never)
 
             assertFalse(completed.paused)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
                 (assertNotNull(completed.bound).claim as SourceClaim.Bound).value)
             assertEquals(2, budget.operations)
+            assertEquals(preparations, authority.preparations)
+            assertEquals(selectionWork, authority.cutObservations()["numericalCutSelectionWork"])
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionSelected"])
+            assertEquals(4, capture.records.last().cuts.count { it.installed })
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
+                .verify(assertNotNull(completed.bound)))
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionImprovedRounds"])
         }
     }
