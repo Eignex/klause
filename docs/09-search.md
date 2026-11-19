@@ -370,8 +370,10 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit the geometric mean of the predicted child gains; a zero
-gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
+in each direction permit a weighted mean of the predicted child gains, with six
+parts of the smaller gain and one of the larger. Both zero gains keep the fallback;
+a measured zero direction contributes zero rather than an artificial gain floor.
+Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
 Each direction retains at most eight in-age normalized gains. Its estimate is the
@@ -383,7 +385,7 @@ High variability withholds advice until passive observations stabilize.
 Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
-The scope retains the newest witness stamp from a variable with reliable positive gains.
+The scope retains the newest witness stamp from a variable with a reliable positive score.
 A witness uses the oldest of that variable's two newest samples per direction.
 The scope skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that

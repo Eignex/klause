@@ -178,7 +178,7 @@ class LpDirectionalHistoryTest {
             history.record(13.0)
         }
 
-        assertEquals(sqrt(3.0), history.score(variable, 2.25), 1e-9)
+        assertEquals(9.0 / 7.0, history.score(variable, 2.25), 1e-9)
     }
 
     @Test
@@ -293,11 +293,12 @@ class LpDirectionalHistoryTest {
             }
         }
 
+        assertFalse(history.hasReliableHistory)
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
     }
 
     @Test
-    fun `a gain in only one child keeps ordinary scoring`() {
+    fun `a measured zero direction retains a weaker weighted score`() {
         for (improvingUp in listOf(false, true)) {
             val history = LpDirectionalHistory({})
             history.beginNode(0)
@@ -311,7 +312,9 @@ class LpDirectionalHistoryTest {
                 }
             }
 
-            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+            assertTrue(history.hasReliableHistory)
+            assertEquals(100.0 / 7.0, history.score(VarRef.Bool(0), 0.5), 1e-9)
+            assertTrue(history.score(VarRef.Bool(0), 0.5) < 100.0)
         }
     }
 
