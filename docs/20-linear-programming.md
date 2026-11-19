@@ -339,6 +339,8 @@ For mixed models, exact node bounding uses the
 It keeps the strongest objective bound and applies only integral consequences
 with complete explanations. For a bound `L`, reduced cost `d(j)` and cutoff `U`, a
 fixing allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoint.
+On Boolean-free models and objectives, exact incumbent dominance uses the checked
+integer box sum when it fits, falling back to rational accumulation on overflow.
 Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
