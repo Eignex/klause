@@ -59,7 +59,7 @@ class LpEngineTest {
         val sink = SolveStatsSink("automatic-numerical-reuse")
         var offeredWork = 1L
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentReuse = true,
+            LpParams(lpPlan = LpPlan(bounding = true,
                 probe = false, cuts = false, rootCutHarvest = false)), sink, LpSolveContext(factory),
             nodeWorkAllowance = { offeredWork }).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))

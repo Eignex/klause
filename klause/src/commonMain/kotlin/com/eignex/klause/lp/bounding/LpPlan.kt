@@ -412,8 +412,8 @@ data class LpPlan(
     val rootCutHarvest: Boolean = true,
     /** Retain root component guidance and private rounding alongside numerical component owners. */
     val componentOwnership: Boolean = false,
-    /** Admit selective numerical child reuse independently of root component guidance and rounding. */
-    val componentReuse: Boolean = false,
+    /** Automatically admit selective numerical child reuse independently of root guidance and rounding. */
+    val componentReuse: Boolean = true,
     /** Source-template retention and admission, independent of the enabled numerical techniques. */
     val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
 ) {

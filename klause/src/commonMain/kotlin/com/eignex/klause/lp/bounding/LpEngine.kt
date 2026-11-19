@@ -595,7 +595,7 @@ internal class LpEngine(
         component: ComponentLpSolverCapability?,
         cancellation: ExecutionControl,
     ) {
-        if (component == null) return
+        if (!params.lpPlan.componentOwnership || component == null) return
         retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_RETAINED") {
             component.partialPrimalGuidance(cancellation)
         }

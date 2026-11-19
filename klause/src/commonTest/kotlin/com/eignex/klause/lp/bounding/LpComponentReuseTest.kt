@@ -8,6 +8,12 @@ import kotlin.test.assertTrue
 
 class LpComponentReuseTest {
     @Test
+    fun `numerical reuse is enabled independently of root component guidance`() {
+        assertTrue(LpPlan().componentReuse)
+        assertEquals(false, LpPlan().componentOwnership)
+    }
+
+    @Test
     fun `owner preparation stays bounded by the cumulative lp grant`() {
         assertEquals(16_000_000L, componentReusePreparationWork(null))
         assertEquals(16_000_000L, componentReusePreparationWork(100_000_000L))
