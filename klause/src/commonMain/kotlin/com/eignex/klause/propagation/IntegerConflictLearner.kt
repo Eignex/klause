@@ -5,16 +5,14 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.CheckedLongOverflowException
-import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.abs
-
+import com.eignex.util.numbers.compareTo
 
 internal class IntegerConflictLearner(private val state: PropagationState) {
     private val budget = ArithmeticLearningBudget(state)
     private val sources = GuardedIntegerSource(state, budget)
     private val normalized = mutableMapOf<Pair<Any, Boolean>, IntegerConflictRow?>()
     private val eagerMarkers = mutableMapOf<Pair<Int, Boolean>, IntArray?>()
-
 
     fun learn(
         factorId: Int,
@@ -52,7 +50,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             LinearOp.GE -> normalizedSource(source, useLo = false)
             LinearOp.EQ -> {
                 val lower = normalizedSource(source, useLo = true) ?: return decline("seed-normalization")
-                if (lower.minimum(state, budget = budget) > lower.bound) lower else normalizedSource(source, useLo = false)
+                if (lower.minimum(state, budget = budget) > lower.bound) lower else
+                    normalizedSource(source, useLo = false)
             }
             LinearOp.NE -> null
         } ?: return decline("seed-normalization")
@@ -68,7 +67,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             row = event.combination.reduced(state, budget = budget) ?: event.combination
             if (row.minimum(state, budget = budget) <= row.bound) return decline("combination-lost-conflict")
             val duplicate = state.learned.integerRows?.any {
-                budget.spend(row.variables.size.toLong() + 1)
+                budget.spend()
+                if (it.row.directionHash == row.directionHash) budget.spend(row.variables.size.toLong())
                 it.row.subsumes(row)
             } == true
             if (duplicate) continue
@@ -175,7 +175,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
         if (factorId < 0) return null
         val moves = state.boundMoves[variable] ?: return null
-        val previous = (if (lower) state.boundMovePriorMin[variable] else state.boundMovePriorMax[variable]) ?: return null
+        val previous =
+            (if (lower) state.boundMovePriorMin[variable] else state.boundMovePriorMax[variable]) ?: return null
         val live = state.intDomains[variable].let { if (lower) it.min else it.max }
         var lo = 0
         var hi = moves.size
@@ -191,7 +192,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         if (position < 0) return null
         val positive = source.row(source.op != LinearOp.GE, budget)?.coefficient(variable) ?: return null
         val useLo = if (source.op == LinearOp.GE) false else (positive > BIG_ZERO) != lower
-        return linearLazyReason(state, factorId, position, useLo, 0, source.guard xor 1, source.guard != Lit.NONE).also {
+        return linearLazyReason(state, factorId, position, useLo, 0,
+            source.guard xor 1, source.guard != Lit.NONE).also {
             it[2] = trail
         }
     }

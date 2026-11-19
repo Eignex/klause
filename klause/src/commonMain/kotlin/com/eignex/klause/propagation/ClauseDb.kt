@@ -9,13 +9,13 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedStage
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.toLongExact
-import com.eignex.util.arrays.emptyIntArray
-import com.eignex.util.collections.IntArrayDeque
-import com.eignex.util.collections.IntArrayList
 
 /**
  * Invoke [action] with the *other* literal of every binary clause that contains [lit].

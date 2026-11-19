@@ -54,7 +54,8 @@ class IntegerRowReductionTest {
                         for (y in -1L..4L) {
                             if (3 * sign * x - 2 * y > offset) continue
                             val activity = reduced.coefficient(0) * bigIntOf(x) + reduced.coefficient(1) * bigIntOf(y)
-                            assertTrue(activity <= reduced.bound, "sign=$sign offset=$offset divisor=$divisor x=$x y=$y")
+                            assertTrue(activity <= reduced.bound,
+                                "sign=$sign offset=$offset divisor=$divisor x=$x y=$y")
                         }
                     }
                 }

@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
@@ -14,8 +15,8 @@ import com.eignex.util.numbers.div
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.gcd
-import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
@@ -27,7 +28,10 @@ internal class IntegerConflictRow private constructor(
     val bound: BigInt,
     val guard: Int = Lit.NONE,
 ) {
+    val directionHash: Int = 31 * variables.contentHashCode() + coefficients.contentHashCode()
+
     fun sharingMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        sample.owned(this, 2L * Int.SIZE_BYTES, protected)
         sample.ownedReferences(coefficients, coefficients.size.toLong(), protected)
         for (value in coefficients) {
             sample.owned(value, 32L + (value.magnitudeBitLength().toLong() + 7) / 8, protected)
@@ -36,12 +40,13 @@ internal class IntegerConflictRow private constructor(
     }
 
     fun coefficient(variable: Int): BigInt {
-        val index = variables.binarySearch(variable)
+        val index = variables.binarySearchInt(variable)
         return if (index < 0) BIG_ZERO else coefficients[index]
     }
 
     fun subsumes(other: IntegerConflictRow): Boolean =
-        (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&
+        directionHash == other.directionHash &&
+            (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&
             variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
 
     fun minimum(state: PropagationState, trail: Int? = null, budget: ArithmeticLearningBudget? = null): BigInt =
@@ -49,7 +54,8 @@ internal class IntegerConflictRow private constructor(
 
     fun maximum(state: PropagationState): BigInt = activity(state, null, maximum = true, null)
 
-    private fun activity(state: PropagationState, trail: Int?, maximum: Boolean, budget: ArithmeticLearningBudget?): BigInt {
+    private fun activity(state: PropagationState, trail: Int?, maximum: Boolean,
+        budget: ArithmeticLearningBudget?): BigInt {
         var sum = BIG_ZERO
         for (i in variables.indices) {
             visit(state, budget)
@@ -63,7 +69,7 @@ internal class IntegerConflictRow private constructor(
     }
 
     fun boundFor(state: PropagationState, variable: Int, trail: Int, budget: ArithmeticLearningBudget? = null): Long? {
-        val pivot = variables.binarySearch(variable)
+        val pivot = variables.binarySearchInt(variable)
         if (pivot < 0) return null
         var other = BIG_ZERO
         for (i in variables.indices) {
@@ -111,7 +117,8 @@ internal class IntegerConflictRow private constructor(
         return false
     }
 
-    fun resolve(other: IntegerConflictRow, variable: Int, budget: ArithmeticLearningBudget? = null): IntegerConflictRow? {
+    fun resolve(other: IntegerConflictRow, variable: Int,
+        budget: ArithmeticLearningBudget? = null): IntegerConflictRow? {
         if (guard != Lit.NONE && other.guard != Lit.NONE && guard != other.guard) return null
         val a = coefficient(variable)
         val b = other.coefficient(variable)
@@ -140,9 +147,14 @@ internal class IntegerConflictRow private constructor(
 
     companion object {
         fun source(factor: LinearPropagator, useLo: Boolean, guard: Int = Lit.NONE,
-            budget: ArithmeticLearningBudget? = null): IntegerConflictRow? =
-            source(factor.vars, Array(factor.coeffs.size) { bigIntOf(factor.coeffs[it]) },
-                bigIntOf(factor.bound), useLo, guard, budget)
+            budget: ArithmeticLearningBudget? = null): IntegerConflictRow? {
+            budget?.spend(bytes = factor.vars.size.toLong() * 40)
+            val coefficients = Array(factor.coeffs.size) {
+                budget?.spend()
+                bigIntOf(factor.coeffs[it])
+            }
+            return source(factor.vars, coefficients, bigIntOf(factor.bound), useLo, guard, budget)
+        }
 
         fun source(variables: IntArray, coefficients: Array<BigInt>, bound: BigInt, useLo: Boolean,
             guard: Int = Lit.NONE, budget: ArithmeticLearningBudget? = null): IntegerConflictRow? {
@@ -166,7 +178,8 @@ internal class IntegerConflictRow private constructor(
                 budget?.scalar(divisor, coefficient)
                 divisor = divisor.gcd(coefficient.abs())
             }
-            budget?.spend(bytes = terms.size.toLong() * 16)
+            val height = Int.SIZE_BITS - terms.size.countLeadingZeroBits()
+            budget?.spend(work = terms.size.toLong() * height, bytes = terms.size.toLong() * 16)
             val variables = terms.keys.toIntArray()
             variables.sort()
             val coefficients = Array(variables.size) {

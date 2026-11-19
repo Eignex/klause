@@ -9,16 +9,16 @@ import com.eignex.klause.factor.arithmetic.WideLinearPropagator
 import com.eignex.klause.factor.arithmetic.WideReifiedLinearPropagator
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.ElementPropagator
-import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.util.numbers.BIG_ONE
-import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.subExact
 
 internal class IntegerSourceRow private constructor(
@@ -39,7 +39,10 @@ internal class IntegerSourceRow private constructor(
             IntegerConflictRow.source(checkNotNull(linear), useLo, guard, budget)
 }
 
-internal class GuardedIntegerSource(private val state: PropagationState, private val budget: ArithmeticLearningBudget = ArithmeticLearningBudget(state)) {
+internal class GuardedIntegerSource(
+    private val state: PropagationState,
+    private val budget: ArithmeticLearningBudget = ArithmeticLearningBudget(state),
+) {
     private val validated = mutableMapOf<Int, IntegerSourceRow>()
 
     private fun decline(cause: String, factorId: Int): Nothing? {
@@ -70,19 +73,23 @@ internal class GuardedIntegerSource(private val state: PropagationState, private
             return IntegerSourceRow(retained.row)
         }
         if (factorId !in 0 until state.baseFactorCount) return decline("not-original", factorId)
-        budget.spend(state.factorAt(factorId).intVars.size.toLong() + 1)
+        budget.spend(state.factorIntVars(factorId).size.toLong() + 1)
         return when (val original = state.problem.factors[factorId]) {
             is ExactLinear -> {
-                if (original.variables.reals.isNotEmpty()) return decline("real-coordinates", factorId)
+                if (original.variables.reals.isNotEmpty() || original.variables.boolVars.isNotEmpty()) {
+                    return decline("non-integer-coordinates", factorId)
+                }
                 if (original.activator != LinearRow.ALWAYS || original.strict) {
                     return decline("exact-activation-or-strictness", factorId)
                 }
                 if (state.factorAt(factorId) is WideLinearPropagator) {
                     val constants = original.constants as? IntegralConstants ?: return decline("constants", factorId)
                     val source = state.factorAt(factorId) as WideLinearPropagator
-                    if (source.op == LinearOp.NE || source.op != original.relation || source.bound != constants.exactBound ||
+                    if (source.op == LinearOp.NE || source.op != original.relation ||
+                        source.bound != constants.exactBound ||
                         source.vars.size != original.size || source.vars.indices.any {
-                            source.vars[it] != Term.intVar(original.ref(it)) || source.coeffs[it] != constants.exactCoeff(it)
+                            source.vars[it] != Term.intVar(original.ref(it)) ||
+                                source.coeffs[it] != constants.exactCoeff(it)
                         }) return decline("projection-identity", factorId)
                     return IntegerSourceRow(source)
                 }
@@ -142,7 +149,9 @@ internal class GuardedIntegerSource(private val state: PropagationState, private
                         LinearOp.GE -> source.bound - BIG_ONE
                         else -> source.bound
                     }
-                    return IntegerSourceRow(WideLinearPropagator(source.intVars, source.vars, source.coeffs, op, bound), guard)
+                    return IntegerSourceRow(
+                        WideLinearPropagator(source.intVars, source.vars, source.coeffs, op, bound), guard,
+                    )
                 }
                 val constants = original.integerConstants ?: return decline("wide-constants", factorId)
                 val source = state.factorAt(factorId) as? ReifiedLinearPropagator

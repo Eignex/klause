@@ -27,7 +27,7 @@ internal fun IntegerConflictRow.reduced(
     for (index in variables.indices) {
         if (budget == null) state.checkFiniteWork() else budget.spend()
         // Only declared domains are unconditional premises; live branch bounds cannot enter a retained cut.
-        val declared = state.problem.intDomains[variables[index]]
+        val declared = state.problem.intDomainOrNull(variables[index]) ?: return null
         val coefficient = coefficients[index]
         val origin = if (coefficient > BIG_ZERO) declared.max else declared.min
         origins[index] = origin

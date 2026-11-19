@@ -32,12 +32,9 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
-import kotlin.random.Random
 import com.eignex.util.numbers.bigIntOf
-import com.eignex.util.numbers.compareTo
-import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -83,7 +80,13 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
             else Linear(intArrayOf(2, -1), intArrayOf(0, index + 1), LinearOp.LE, 0)
         }
         val native = PropagationSession(Problem(0, width + 2,
-            Array(width + 2) { IntDomain(0, when (it) { 0 -> 6; width + 1 -> 288; else -> 12 }) }, factors),
+            Array(width + 2) {
+                IntDomain(0, when (it) {
+                    0 -> 6
+                    width + 1 -> 288
+                    else -> 12
+                })
+            }, factors),
             pbLearning = false).apply { enableIntegerRowLearning() }
         val trace = ArithmeticLearningTrace(4096, 131072)
         native.explanationState.arithmeticLearningTrace = trace
@@ -195,8 +198,8 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
             assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
 
             val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
-            assertContentEquals(intArrayOf(0, 1) + IntArray(14) { it + 4 }, learned.row.variables)
-            assertContentEquals(longArrayOf(4, 1) + LongArray(14) { if (it == 13) -1 else 1 },
+            assertContentEquals(intArrayOf(0, 1) + IntArray(15) { it + 3 }, learned.row.variables)
+            assertContentEquals(longArrayOf(2, 1) + LongArray(15) { if (it == 14) -1 else 1 },
                 learned.row.coefficients.map { it.toLongExact() }.toLongArray())
             assertEquals(if (root) 0 else 1, learned.backjumpLevel)
             val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict

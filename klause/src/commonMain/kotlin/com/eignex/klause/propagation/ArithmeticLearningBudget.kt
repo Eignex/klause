@@ -24,9 +24,13 @@ internal class ArithmeticLearningBudget(
     fun spend(work: Long = 1, bytes: Long = 0) {
         require(work >= 0 && bytes >= 0)
         if (work > 64) state.finiteWork.checkNow() else state.finiteWork.check()
-        if (work > limits.work - (state.work - initialWork)) throw ArithmeticLearningDeclined("work")
-        if (bytes > limits.allocationBytes - allocation) throw ArithmeticLearningDeclined("allocation")
         if (work > state.workLimit - state.work) throw FinitePropagationInterrupted()
+        val reason = when {
+            work > limits.work - (state.work - initialWork) -> "work"
+            bytes > limits.allocationBytes - allocation -> "allocation"
+            else -> null
+        }
+        if (reason != null) throw ArithmeticLearningDeclined(reason)
         state.work += work
         allocation += bytes
     }

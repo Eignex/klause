@@ -5,11 +5,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.times
-import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,6 +20,16 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `large coefficient arithmetic should observe cancellation before its primitive`() {
+        val row = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(1) shl 4096, bigIntOf(1)), bigIntOf(0), useLo = true))
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        state.finiteWork.cancellation = ExecutionControl { true }
+
+        assertFailsWith<FinitePropagationInterrupted> { row.minimum(state) }
+    }
+
+    @Test
     fun `exact resolution should retain growth through eighty eliminations`() {
         var row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
             longArrayOf(Long.MAX_VALUE, 1), intArrayOf(0, 1), LinearOp.LE, 0), useLo = true))
@@ -26,8 +37,9 @@ class IntegerConflictRowTest {
         var pivot = 0
         repeat(80) { step ->
             val next = step + 2
-            val reason = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(pivot, next),
-                longArrayOf(-2, 1), intArrayOf(pivot, next), LinearOp.LE, 0), useLo = true))
+            val reason =
+                requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(pivot, next),
+                    longArrayOf(-2, 1), intArrayOf(pivot, next), LinearOp.LE, 0), useLo = true))
             row = requireNotNull(row.resolve(reason, pivot))
             expected *= bigIntOf(2)
             pivot = next
@@ -43,7 +55,8 @@ class IntegerConflictRowTest {
         val variables = IntArray(width) { it }
         val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
             LongArray(width) { 2 }, variables, LinearOp.LE, 511), useLo = true))
-        val state = PropagationState(Problem(0, width, Array(width) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val state =
+            PropagationState(Problem(0, width, Array(width) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
 
         assertEquals(width, row.variables.size)
         assertEquals(bigIntOf(255), row.bound)
@@ -183,7 +196,9 @@ class IntegerConflictRowTest {
                     if (2 * x + y <= z && 2 * x - y <= 0) {
                         val assignment = longArrayOf(x, y, z)
                         var activity = bigIntOf(0)
-                        for (i in row.variables.indices) activity += row.coefficients[i] * bigIntOf(assignment[row.variables[i]])
+                        for (i in row.variables.indices) {
+                            activity += row.coefficients[i] * bigIntOf(assignment[row.variables[i]])
+                        }
                         assertTrue(activity <= row.bound)
                     }
                 }

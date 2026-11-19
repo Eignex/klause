@@ -6,7 +6,6 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PbAccumulatorTest {

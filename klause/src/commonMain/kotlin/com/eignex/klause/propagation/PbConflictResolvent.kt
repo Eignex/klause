@@ -1,20 +1,20 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.factor.bool.ExactPseudoBooleanPropagator
 import com.eignex.klause.factor.bool.CardinalityPropagator
 import com.eignex.klause.factor.bool.ClausePropagator
+import com.eignex.klause.factor.bool.ExactPseudoBooleanPropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Lit
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.compareTo
-import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.maxOf
-import com.eignex.util.collections.IntArrayList
-import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 
 // Resolves pseudo-Boolean conflicts with coefficient-carrying reasons. If a sound PB derivation is not
 // available, [failed] sends the conflict through [ClauseResolvent].
@@ -197,7 +197,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         state.arithmeticLearningTrace?.record("pb.source", fid.toLong(), forcedLit.toLong())
         if (fid < 0 || fid >= state.totalFactorCount) return false
         return when (val f = state.factorAt(fid)) {
-            is ExactPseudoBooleanPropagator -> admitSource(f.literals) && f.loadArithmeticReason(target, forcedLit, state, budget)
+            is ExactPseudoBooleanPropagator ->
+                admitSource(f.literals) && f.loadArithmeticReason(target, forcedLit, state, budget)
             is LearnedExactPbPropagator -> admitSource(f.literals) && target.loadPb(f.weights, f.literals, f.degree)
             is PseudoBooleanPropagator -> admitSource(f.literals) && f.loadReason(target, forcedLit, state)
             is CardinalityPropagator -> admitSource(f.literals) && f.loadReason(target, forcedLit, state)

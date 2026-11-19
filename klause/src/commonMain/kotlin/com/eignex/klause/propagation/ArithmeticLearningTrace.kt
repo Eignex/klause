@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.Lit
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
-import com.eignex.klause.ir.Lit
 
 private const val DECLINE_CENSUS_KINDS = 64
 private const val DECLINE_CENSUS_NAME_LENGTH = 96

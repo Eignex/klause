@@ -2,8 +2,8 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
-import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.factor.arithmetic.internals.linearLazyReason
+import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.util.arrays.emptyIntArray
@@ -60,8 +60,8 @@ internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPr
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int,
         atLevel: Int): IntArray? = compact?.let {
-            explainLinearBound(state, it.coeffs, intVars, payload, atTrail, atLevel)
-        } ?: explainRow(state, payload[0], atTrail)
+        explainLinearBound(state, it.coeffs, intVars, payload, atTrail, atLevel)
+    } ?: explainRow(state, payload[0], atTrail)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray =
         explainRow(state, -1, state.undo.size)
@@ -92,7 +92,8 @@ internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPr
             val bound = state.boundAt(variable, lower, trail)
             val root = state.rootDomains[variable]
             if (if (lower) bound <= root.min else bound >= root.max) continue
-            literals.add(Lit.make(if (lower) state.atomVarGe(variable, bound) else state.atomVarLe(variable, bound), false))
+            val atom = if (lower) state.atomVarGe(variable, bound) else state.atomVarLe(variable, bound)
+            literals.add(Lit.make(atom, false))
         }
         return literals.toIntArray()
     }

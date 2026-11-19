@@ -1,10 +1,5 @@
 package com.eignex.klause.propagation
 
-import com.eignex.util.numbers.BIG_ZERO
-import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.minus
-import com.eignex.util.numbers.compareTo
-import com.eignex.util.numbers.maxOf
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceIntId
@@ -29,8 +24,13 @@ import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 
 /**
  * The finite-domain participant in a shared search session.

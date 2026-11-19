@@ -1,10 +1,5 @@
 package com.eignex.klause.propagation
 
-import com.eignex.util.numbers.BIG_ZERO
-import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.minus
-import com.eignex.util.numbers.compareTo
-import com.eignex.util.numbers.maxOf
 import com.eignex.klause.factor.bool.AffineXorPropagator
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
@@ -23,7 +18,11 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 import kotlin.math.ln
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
@@ -1027,7 +1026,9 @@ class PropagationSession private constructor(
         permanent: Boolean = false,
     ): PropagationResult {
         if (permanent) scopedLearnedAssertion = true
-        return registerAndPropagate(base = state.undoTop) { state.addLearnedPb(weights, literals, degree, lbd, permanent) }
+        return registerAndPropagate(base = state.undoTop) {
+            state.addLearnedPb(weights, literals, degree, lbd, permanent)
+        }
     }
 
     internal fun configureArithmeticLearning(workLimit: Long, allocationBytes: Long) {
