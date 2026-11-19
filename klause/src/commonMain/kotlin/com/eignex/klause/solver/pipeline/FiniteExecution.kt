@@ -150,7 +150,8 @@ class FiniteSolveRequest(
      * certifies them exactly.
      */
     internal val lpSolveContext: LpSolveContext get() = LpSolveContext.finite(
-        numerical = shape.sourceInvocation?.source?.semantics?.effective?.feasibilityTolerance?.isExact == false,
+        numerical = shape.sourceInvocation?.source?.semantics?.effective?.feasibilityTolerance?.isExact == false &&
+            shape.sourceInvocation?.linearSource?.acceptedModelExact != true,
     )
 
     /** Captured frontend `key=value` parameters; empty for directly typed options. */
@@ -471,7 +472,8 @@ internal fun FinitePipeline.solve(
     val invocation = request.shape.sourceInvocation
     val linearSource = invocation?.linearSource
     val permitsToleranceOptimum = invocation?.let {
-        it.source.semantics.effective.feasibilityTolerance?.isExact == false
+        it.source.semantics.effective.feasibilityTolerance?.isExact == false &&
+            it.linearSource?.acceptedModelExact != true
     } ?: true
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
         (request.toleranceCheck ?: invocation?.let {

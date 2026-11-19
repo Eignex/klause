@@ -8,14 +8,16 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.util.numbers.BigFraction
 
-/** Native global bound over the nominal source, in its original objective units. */
+/** Native global bound in original objective units, with its accepted-set coverage. */
 class LinearSourceBound internal constructor(
     /** Original-unit objective bound. */
     val value: BigFraction,
     /** Minimization supplies a lower bound; maximization supplies an upper bound. */
     val sense: ObjectiveSense,
-    /** Whether every feasible nominal objective lies strictly beyond [value]. */
+    /** Whether every feasible objective in the bound's model scope lies strictly beyond [value]. */
     val strict: Boolean,
+    /** Whether the bound was derived over the explicitly widened tolerance model. */
+    val toleranceEnvelope: Boolean = false,
 )
 
 internal class FiniteObjectiveBound(val evidence: SourceEvidence, val value: BigFraction)
@@ -38,10 +40,11 @@ internal fun PreparedLinearSource.qualifyBound(
     val claim = evidence?.claim as? SourceClaim.Bound ?: return null
     val objective = view.source.objective ?: return null
     val expected = if (finite == null) objective.sense else ObjectiveSense.MINIMIZE
-    if (!view.exact || !unrestricted || evidence.scope.condition != SourceCondition() ||
+    if ((!view.exact && !acceptedModelExact) || !unrestricted || evidence.scope.condition != SourceCondition() ||
         evidence.scope.objective?.sense != expected
     ) return null
     var value = finite?.value ?: (claim.value as? SourceValue.Rational)?.value ?: return null
     if (finite != null && objective.sense == ObjectiveSense.MAXIMIZE) value = value.negated()
-    return LinearSourceBound(value * view.objectiveScale.reciprocal(), objective.sense, claim.strict)
+    return LinearSourceBound(value * view.objectiveScale.reciprocal(), objective.sense, claim.strict,
+        toleranceEnvelope = acceptedModelExact)
 }

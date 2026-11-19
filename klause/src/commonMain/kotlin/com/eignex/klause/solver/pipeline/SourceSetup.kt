@@ -36,6 +36,8 @@ class SourceSetupRequest private constructor(
     /** Original exact quadratic source objective, when the operation supplies one. */
     val quadraticObjective: QuadraticObjectiveSpec?,
     internal val requiresQuadraticCompletion: Boolean = false,
+    /** Opt into exact separation over an absolute-tolerance linear source's accepted set. */
+    val linearToleranceEnvelope: Boolean = false,
 ) {
     /** Bind an affine operation or the objective already embedded in a native formula. */
     constructor(
@@ -47,7 +49,9 @@ class SourceSetupRequest private constructor(
         providers: FactorProjectionProviders = source.providers,
         cancellation: ExecutionControl = ExecutionControl.Never,
         boundCancellation: ExecutionControl = cancellation,
-    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
+        linearToleranceEnvelope: Boolean = false,
+    ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null,
+        linearToleranceEnvelope = linearToleranceEnvelope)
 
     /** Bind an original exact quadratic objective and direction before native preparation. */
     constructor(
@@ -78,6 +82,9 @@ class SourceSetupRequest private constructor(
     )
 
     init {
+        require(!linearToleranceEnvelope || source.formula is AttachedSourceFormula.Linear) {
+            "linear tolerance envelopes require a linear source"
+        }
         val embedded = source.embeddedObjectiveSense
         require(embedded == null || (objective == null && quadraticObjective == null)) {
             "an embedded source objective cannot be replaced by another objective"

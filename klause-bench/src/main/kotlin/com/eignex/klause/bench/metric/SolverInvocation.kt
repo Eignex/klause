@@ -302,8 +302,13 @@ internal object SolverInvocation {
                 add(it)
             }
             for (param in s.params) {
-                add("--param")
-                add(param)
+                if (param.startsWith("source-tolerance-envelope=")) {
+                    add("--source-tolerance-envelope")
+                    add(param.substringAfter('='))
+                } else {
+                    add("--param")
+                    add(param)
+                }
             }
         }
     }

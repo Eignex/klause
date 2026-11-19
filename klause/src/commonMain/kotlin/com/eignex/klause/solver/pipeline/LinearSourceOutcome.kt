@@ -64,7 +64,7 @@ class LinearSourceOutcome internal constructor(
     val nativeClaimsUnrestricted: Boolean,
     /** Positive multiplier from original objective units to the retained working objective. */
     val objectiveScale: BigFraction,
-    /** Native nominal-source global bound; independent proof validation is separate. */
+    /** Native global bound with its model scope; independent proof validation is separate. */
     val nativeObjectiveBound: LinearSourceBound? = null,
     /**
      * Proved original-unit objective bound of an [LinearSourceConclusion.OPTIMAL] [incumbent] that lies within the
