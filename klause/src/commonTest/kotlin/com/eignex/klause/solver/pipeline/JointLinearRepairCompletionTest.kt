@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -41,7 +42,38 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class JointLinearRepairCompletionTest {
+class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
+    @Test
+    fun `a checked proposal center should seed its query without discovery credit`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { center }, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(1L, stages["jointRepairImportedIncumbents"])
+                assertTrue((stages["jointRepairImportedPointWithheld"] ?: 0L) > 0)
+                assertEquals(1L, stages["jointRepairCutoffClosures"])
+                assertEquals(0L, stages["jointRepairCheckedIncumbents"] ?: 0L)
+                assertTrue(done)
+            }
+        }
+    }
+
     @Test
     fun `relaxation disagreement should release a coupled incumbent improvement`() {
         val model = Problem(0,
@@ -68,9 +100,11 @@ class JointLinearRepairCompletionTest {
                 var done = false
                 repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
-                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                val result =
+                    assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairRelaxationNeighborhoods"))
+                assertTrue((repair.stats.smt.completeSearchStages?.get("jointRepairImportedIncumbents") ?: 0L) > 0)
                 assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
                     SourceEvidence(source.scope, SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
                 assertTrue(done)
