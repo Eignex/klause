@@ -188,6 +188,28 @@ internal class JointRepairNeighborhood private constructor(
         return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
     }
 
+    fun relaxationNeighborhood(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
+        bools: BooleanArray, cutoff: BigFraction?, budget: SourceLpBudget,
+        token: ExecutionControl): ExactNeighborhoodCondition? {
+        if (hint == null || cutoff == null || centers.size < integers || token()) return null
+        val pins = linkedMapOf<Int, BigFraction>()
+        var free = 0
+        for (id in inputs?.asIterable() ?: (0 until integers)) {
+            val center = centers[id]
+            val bits = center.num.magnitudeBitLength().toLong() + center.den.magnitudeBitLength()
+            if (bits > MAX_GUIDANCE_SCALAR_BITS ||
+                !payRefutation(budget, token, 1L + bits * bits / 64L, 128L + 8L * bits)) return null
+            val value = center.toDouble()
+            val relaxed = hint.integer(id)
+            if (!value.isFinite()) return null
+            if (relaxed != null && abs(relaxed - value) <= 1e-6) pins[id] = center else free++
+        }
+        if (token() || pins.isEmpty() || free == 0) return null
+        selectedIntegers += free
+        // Agreement selects a subproblem; it proves neither a fixing nor a source bound.
+        return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
+    }
+
     private fun connected(roots: List<Int>, count: Int): Set<Int> {
         val selected = roots.toCollection(linkedSetOf())
         val seenColumns = IntHashSet().also { seen -> roots.forEach { seen.add(it) } }

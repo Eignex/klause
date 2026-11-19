@@ -50,6 +50,7 @@ import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 
 internal class LinearAuthorityTraversal(
@@ -80,6 +81,7 @@ internal class LinearAuthorityTraversal(
     private val gap: OptimalityGap? = null,
     private val useSourceGap: Boolean = true,
     private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
+    private val guideIncumbent: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
@@ -612,10 +614,21 @@ internal class LinearAuthorityTraversal(
             return listOf(true, false).map { SearchDecision.Theory(AggregateAlternative(split.row, it)) }
         }
         val split = current.split as? CoverageSplit.Integer ?: return null
+        val preferUpper = if (guideIncumbent && !cancellation()) {
+            budget.observe(preparation = 1L)
+            incumbent()?.first?.let { sample ->
+                if (split.coordinate.id !in 0 until sample.numIntVars) false
+                else BigFraction.of(sample.exactIntValue(split.coordinate.id), BIG_ONE) >
+                    split.threshold
+            } ?: false
+        } else false
+        if (preferUpper) observe("numericalIncumbentBranchPreferences")
         if (propagateRefutations) {
-            return integerAtom(context, split.coordinate, split.threshold)?.alternatives()
+            return integerAtom(context, split.coordinate, split.threshold)?.alternatives()?.let {
+                if (preferUpper) it.asReversed() else it
+            }
         }
-        return listOf(true, false).map {
+        return (if (preferUpper) listOf(false, true) else listOf(true, false)).map {
             SearchDecision.Theory(IntegerAlternative(split.coordinate, split.threshold, it))
         }
     }

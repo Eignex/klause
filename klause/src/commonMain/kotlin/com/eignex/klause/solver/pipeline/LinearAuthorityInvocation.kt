@@ -147,7 +147,8 @@ internal class LinearAuthorityInvocation(
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
-        gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance)
+        gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
+        guideIncumbent = completion != null)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {
