@@ -420,7 +420,7 @@ internal class LiveQfLraSystem(
         val slot = key?.let { it.slot ?: normalized[it] }
         val column = slot?.term?.let { definitions[it.coefficients] }
         val state = lp.state ?: return null
-        if (column == null || slot == null) return EMPTY_AFFINE_INPUTS
+        if (column == null) return EMPTY_AFFINE_INPUTS
         val lower = state.activeSide(column, false)
         val upper = state.activeSide(column, true)
         val retained = slot.inputSides

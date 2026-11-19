@@ -106,6 +106,9 @@ column; newly appended bounded definitions require evaluation before acceptance.
 Closing the component releases the point, checked state and activity caches.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
+Mixed components can reuse a continuous point after checking the asserted integer
+bounds; source integrality, finite-domain membership and all selected rows remain
+required before publishing a complete witness.
 Complete traversal can recheck that point against the selected source comparisons
 before materializing pending LP bounds. Source activities are cached for that owned
 point, while current Boolean constants, strictness and disequality directions are

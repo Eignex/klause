@@ -1546,7 +1546,7 @@ class ExactLiraSearchComponent private constructor(
         }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val retained = retainedLpPoint
-        if (retained != null && model.numIntVars == 0 &&
+        if (retained != null && (model.numIntVars == 0 || model.numRealVars > 0) &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
             system.acceptsPoint(retained, lpStop)
         ) {
