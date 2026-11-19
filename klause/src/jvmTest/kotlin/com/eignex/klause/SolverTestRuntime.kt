@@ -47,8 +47,14 @@ internal object SolverTestRuntime {
     }
 
     private fun initializeArithmetic() {
-        val model = QuadraticModel(listOf(BigFraction.ZERO), listOf(listOf(BigFraction.ONE)))
-        check(QuadraticCandidates().proposeActiveRows(model, listOf(0.0), iterations = 1) != null)
+        val dimension = 33
+        val model = QuadraticModel(
+            List(dimension) { BigFraction.ZERO },
+            List(dimension) { row ->
+                List(dimension) { column -> if (row == column) BigFraction.ONE else BigFraction.ZERO }
+            },
+        )
+        check(QuadraticCandidates().proposeActiveRows(model, List(dimension) { 0.0 }, iterations = 1) != null)
         val value = ExactRealJson.decodeFromString(
             """{"add":[{"root":{"coefficients":["-2","0","1"],"index":2}},{"pi":{}}]}""",
         )
