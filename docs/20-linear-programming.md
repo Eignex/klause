@@ -536,6 +536,17 @@ Retirement only weakens the relaxation. A query's cut mask names the cut rows it
 activates; managed current masks and fully checked selected families keep
 unselected and retired rows as inactive numerical rows with free logical columns
 and zero multipliers, so a compatible owner survives additions and retirement.
+Point selection with aggregation first pays a no-cut bound-only query on the same
+numerical owner. It checks a certificate without source witness recovery or branching guidance,
+then runs the ordinary recipe and selected additions. The stronger independently
+checked no-cut, ordinary or selected bound survives; a winning no-cut bound has no
+cut attribution. The checkpoint records completion even without a bound and resumes
+unfinished no-cut work before ordinary work. Its bound is returned only under its
+exact captured scope. Integer descendants share completion, while changed source
+data, revision, objective or Boolean conditions require a new checkpoint. Ordinary
+points, splits and advisory points retain their existing ownership. Matching,
+retention, solves, certification and owner transitions spend the containing source
+allowance, and checkpoint bookkeeping has its own recipe attribution.
 Completed base bounds survive a paused or declined separation round. A stronger checked
 selected bound retains its cut-family attribution even when primal completion is unavailable
 or interrupted; the base point and split remain guidance for an unfinished node. A new template

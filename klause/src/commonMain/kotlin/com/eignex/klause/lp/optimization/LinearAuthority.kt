@@ -100,6 +100,9 @@ internal class LinearAuthority(
     private var directedFamily: LinearAuthorityTemplate? = null
     private var pointMask: Set<Int>? = null
     private var deferAggregatePreparation = false
+    private val boundBaseline = LinearAuthorityBoundBaseline(budget) { work, allocation ->
+        cutLifecycle.containing("UNCUT_BASELINE") { cutCost(work, allocation) }
+    }
     private class PointRound(
         val query: LinearAuthorityQuery, val base: LinearAuthorityResult, val mask: Set<Int>,
         val rows: List<LinearAuthorityCut>,
@@ -121,7 +124,7 @@ internal class LinearAuthority(
         "numericalMaxActiveCuts" to activeCutPeak,
         "numericalMaxRetainedMixedCuts" to retainedMixedCutPeak,
         "numericalMaxActiveMixedCuts" to activeMixedCutPeak,
-    ) + cutEligibility + pointPolicy?.observations.orEmpty() + cutLifecycle.snapshot()
+    ) + cutEligibility + pointPolicy?.observations.orEmpty() + boundBaseline.observations + cutLifecycle.snapshot()
     private class PrimalAttempt(
         val query: LinearAuthorityQuery, val point: List<BigFraction>,
     ) {
@@ -147,6 +150,7 @@ internal class LinearAuthority(
         capturedPoint = null
         pointListener = null
         pointRound = null
+        boundBaseline.clear()
         pointPolicy?.releaseCandidates()
         pointFamily = null
         pointFallback = null
@@ -158,6 +162,13 @@ internal class LinearAuthority(
     }
 
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: ExecutionControl,
+        retainBasePoint: Boolean = false, preserveUncutBound: Boolean = false): LinearAuthorityResult =
+        if (!preserveUncutBound) advancePointRecipe(source, cancellation, retainBasePoint) else
+            boundBaseline.advance(source, cancellation, baseline = {
+                advanceBound(source, cancellation)
+            }, ordinary = { advancePointRecipe(source, cancellation, retainBasePoint) })
+
+    private fun advancePointRecipe(source: SourceProofContext, cancellation: ExecutionControl,
         retainBasePoint: Boolean = false): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe,
             maximumBatchCuts = 8)
@@ -297,11 +308,7 @@ internal class LinearAuthority(
         if (!result.paused || budget.funding?.exhausted == true || cancellation()) pointRound = null
         val previousStages = if (pending.reported) emptyMap() else pending.base.primalStages
         pending.reported = true
-        val stages = (previousStages.keys + result.primalStages.keys).associateWith { key ->
-            val before = previousStages[key] ?: 0L
-            val after = result.primalStages[key] ?: 0L
-            if ("Max" in key) maxOf(before, after) else before + after
-        }
+        val stages = mergeLinearPrimalStages(previousStages, result.primalStages)
         val strongest = strongerLinearBound(pending.base.bound, result.bound)
         val boundFamilies = if (strongest != null && strongest === pending.base.bound) {
             pending.base.cutBoundFamilies
@@ -449,8 +456,16 @@ internal class LinearAuthority(
         return cutLifecycle.containing(recipe) { advanceInternal(source, cancellation, cuts, cutMask) }
     }
 
+    private fun advanceBound(source: SourceProofContext, cancellation: ExecutionControl): LinearAuthorityResult {
+        cutLifecycle.families = emptySet()
+        return cutLifecycle.containing("NO_CUT") {
+            advanceInternal(source, cancellation, cuts = false, cutMask = null, boundOnly = true)
+        }
+    }
+
     private fun advanceInternal(
         source: SourceProofContext, cancellation: ExecutionControl, cuts: Boolean, cutMask: Set<Int>?,
+        boundOnly: Boolean = false,
     ): LinearAuthorityResult {
         relaxedPoint = emptyMap()
         capture?.discard()
@@ -463,13 +478,15 @@ internal class LinearAuthority(
             return LinearAuthorityResult()
         }
         if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
-        val result = checkSource(source, cancellation, guidance = true, cuts = cuts, cutMask = cutMask)
+        val result = checkSource(source, cancellation, guidance = true, cuts = cuts, cutMask = cutMask,
+            boundOnly = boundOnly)
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult(bound = result.bound, cutBoundFamilies = result.cutBoundFamilies,
                 incumbent = result.incumbent, primalStages = primalStages.toMap())
         }
-        val completed = result.copy(relaxedPoint = relaxedPoint, primalStages = primalStages.toMap(),
+        val completed = result.copy(relaxedPoint = if (boundOnly) emptyMap() else relaxedPoint,
+            primalStages = primalStages.toMap(),
             paused = result.paused || (result.evidence == null && result.split == null &&
                 result.incumbent == null && budget.funding?.paused == true))
         capture?.record(source, capturedQuery, capturedTemplate, capturedPoint, completed)
@@ -637,6 +654,7 @@ internal class LinearAuthority(
     private fun checkSource(
         source: SourceProofContext, cancellation: ExecutionControl, guidance: Boolean = false, cuts: Boolean = false,
         cutMask: Set<Int>? = null,
+        boundOnly: Boolean = false,
     ): LinearAuthorityResult {
         val cached = if (retainLp || guidance) query?.takeIf {
             it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask))
@@ -746,19 +764,21 @@ internal class LinearAuthority(
                 cutConflictFamilies = conflictFamilies)
             return if (guide != null && budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
                 observePrimal("ConflictExactFallback")
-                checkSource(source, cancellation, cuts = cuts, cutMask = cutMask)
+                checkSource(source, cancellation, cuts = cuts, cutMask = cutMask, boundOnly = boundOnly)
             } else LinearAuthorityResult()
         }
-        guide?.point?.let { point ->
-            val projected = point.map { it.toDouble() }
-            if (projected.all(Double::isFinite)) {
-                relaxedPoint = coordinates.indices.associate { coordinates[it] to projected[it] }
+        if (!boundOnly) {
+            guide?.point?.let { point ->
+                val projected = point.map { it.toDouble() }
+                if (projected.all(Double::isFinite)) {
+                    relaxedPoint = coordinates.indices.associate { coordinates[it] to projected[it] }
+                }
             }
-        }
-        if (guide == null) closure.float?.primal?.takeIf {
-            it.size == coordinates.size && it.all(Double::isFinite)
-        }?.let { point ->
-            relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
+            if (guide == null) closure.float?.primal?.takeIf {
+                it.size == coordinates.size && it.all(Double::isFinite)
+            }?.let { point ->
+                relaxedPoint = coordinates.indices.associate { coordinates[it] to point[it] }
+            }
         }
         val bound = closure.lowerBound?.let { value ->
             fun checkBound(weights: List<BigFraction>): SourceEvidence? =
@@ -770,6 +790,7 @@ internal class LinearAuthority(
             if (retained != null || guidance) retained else
                 combination(costs.map { it.negated() }, constant - value, false)?.let(::checkBound)
         }
+        if (boundOnly) return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies)
         if (guide != null) {
             var point = guide.point
             val fractionalCoordinates = fractional(coordinates, point)

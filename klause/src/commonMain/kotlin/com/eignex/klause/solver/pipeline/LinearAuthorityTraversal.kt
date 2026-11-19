@@ -72,7 +72,7 @@ internal class LinearAuthorityTraversal(
     useSupportBranching: Boolean = false,
     private val pointCuts: Boolean = false,
     private val onNumericalFeedback: ((SourceNumericalFeedbackResult) -> Unit)? = null,
-    aggregateCuts: Boolean = false,
+    private val aggregateCuts: Boolean = false,
     latestFeedback: Boolean = true,
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
     composeBooleanBranches: Boolean = false,
@@ -474,7 +474,8 @@ internal class LinearAuthorityTraversal(
                 queriedNode = current
                 queriedSource = it
             }
-        val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
+        val queried = if (useGuidance && useCuts && pointCuts)
+            authority.advanceWithPointCuts(branch, cancellation, preserveUncutBound = aggregateCuts)
         else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
         else authority.check(branch, cancellation)
         val strongestBound = strongerLinearBound(current.partialBound, queried.bound)
