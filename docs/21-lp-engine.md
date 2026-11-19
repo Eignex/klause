@@ -192,7 +192,8 @@ selected ([numerical and exact deductions](#numerical-and-exact-deductions)); op
 
 Model-facing solves state an explicit claim: bound, contradiction, feasible completion or
 attained optimum. Bound requests use dual-only reconstruction without primal recovery;
-feasible completion stops when a checked point is available, retaining the trivial
+feasible completion stops when a checked point is available, without reconstructing
+unused dual candidates or alternative basis seats, retaining the trivial
 exact bound of a constant objective. Contradiction requests
 may stop on a checked counter-witness and never optimize it. Attainment requires the
 same exact witness–bound equality as the result contract. Tolerance acceptance retains
