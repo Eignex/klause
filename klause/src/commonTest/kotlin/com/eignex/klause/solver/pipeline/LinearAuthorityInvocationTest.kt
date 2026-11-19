@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticRational
@@ -39,7 +40,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class LinearAuthorityInvocationTest {
+class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -47,6 +48,85 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `a private proximity improvement should retain original optimum authority`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1))
+        var uses = 0
+
+        val result = LinearAuthorityInvocation(source,
+            TheoryParams(sourceIncumbentCompletion = true), external = { seed }, boundOrdered = true,
+            incumbentCompletionCheck = { _, _, _ -> true }, incumbentProximity = true,
+            onIncumbentUse = { uses++ }).use { it.run { _, _ -> } }
+
+        assertEquals(BigFraction.ZERO, result.value)
+        assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalProximityImprovements"))
+        assertEquals(1, uses)
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(source.scope, terminal.scope)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+    }
+
+    @Test
+    fun `private points rejected by the original checker should earn no proximity improvement`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1))
+
+        val result = LinearAuthorityInvocation(source,
+            TheoryParams(sourceIncumbentCompletion = true), external = { seed }, boundOrdered = true,
+            incumbentCompletionCheck = { sample, _, _ -> sample.intValue(0) == 1L },
+            incumbentProximity = true).use { it.run { _, _ -> } }
+
+        val stages = result.stats.smt.completeSearchStages.orEmpty()
+        assertEquals(1L, stages["numericalProximityRejected"])
+        assertEquals(0L, stages["numericalProximityImprovements"] ?: 0L)
+    }
+
+    @Test
+    fun `private and proof LPs should share the operation ceiling`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1))
+        val funding = SourceLpFunding(1_000_000, 1_000_000)
+        val budget = SourceLpBudget(maxOperations = 1, funding = funding)
+
+        LinearAuthorityInvocation(source,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1), external = { seed },
+            boundOrdered = true, funding = funding, borrowedBudget = budget,
+            incumbentCompletionCheck = { _, _, _ -> true }, incumbentProximity = true).use { it.run { _, _ -> } }
+
+        assertEquals(1, budget.operations)
+    }
+
+    @Test
+    fun `private and proof traversals should share the containing decision limit`() {
+        val columns = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = columns.flatMapIndexed { index, column -> listOf(
+            "lower$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.ONE), BigFraction.ONE)),
+        ) }.toMap() + ("cover" to SourcePremise(SourceInequality(
+            columns.associateWith { BigFraction.ofLong(-2) }, BigFraction.MINUS_ONE)))
+        val source = SourceProofContext(scope, columns.toSet(), rows, columns.associateWith { BigFraction.ONE })
+        val seed = Sample(booleanArrayOf(), longArrayOf(1, 1))
+
+        val result = LinearAuthorityInvocation(source,
+            TheoryParams(sourceIncumbentCompletion = true, maxDecisions = 1, sourceCuts = false),
+            external = { seed }, boundOrdered = true, incumbentCompletionCheck = { _, _, _ -> true },
+            incumbentProximity = true).use { it.run { _, _ -> } }
+
+        assertEquals(1L, result.stats.openTheory.openTheoryDecisions)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        assertNull(result.terminal)
+    }
 
     @Test
     fun `a checked incumbent dive should improve before breadth exhausts the decision grant`() {
