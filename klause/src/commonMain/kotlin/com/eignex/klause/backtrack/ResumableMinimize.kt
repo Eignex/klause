@@ -14,6 +14,7 @@ import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
+import com.eignex.klause.lp.bounding.linearLowerBound
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
@@ -98,6 +99,7 @@ import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.BigFraction
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.ceil
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -184,6 +186,7 @@ internal class ResumableMinimize(
 
     // The root LP relaxation's proved objective bound; it raises the bound an optimality-gap terminal reports.
     private var provedRootBound = Double.NEGATIVE_INFINITY
+    private var rootBoundHandoffBaseline: Double? = null
 
     // Whether a prune relied on an optimality-gap cutoff below the incumbent's own, and the least such cutoff: every
     // point the search left unseen, and every fact it derived from such a prune, holds only below that cutoff.
@@ -966,6 +969,7 @@ internal class ResumableMinimize(
         inprocessing?.reset()
         learnedMemory.reset()
         firstRun = true
+        rootBoundHandoffBaseline = null
         rootRoundingPending = false
         rootLayoutPending = false
         restartRootTargetsPending = false
@@ -1473,6 +1477,11 @@ internal class ResumableMinimize(
             plan.lbTreeSearch || !lpEngine.sparseTrialActive || !lpEngine.rootRoundingQueryPaused ||
             lpEngine.measuredRootLowerBound == null
         ) return false
+        if (lpEngine.automaticSparseTrial) {
+            val baseline = rootBoundHandoffBaseline ?: return false
+            val lower = lpEngine.measuredRootLowerBound ?: return false
+            if (!baseline.isFinite() || ceil(lower) <= ceil(baseline)) return false
+        }
         // A checked global bound survives retirement of its unfinished numerical cursor.
         rootRoundingPending = false
         lpEngine.handoffRootBoundSearch()
@@ -1526,6 +1535,11 @@ internal class ResumableMinimize(
      * `LpPlan.rootBudgetFraction`.
      */
     private fun initRootLp(token: ExecutionControl): Boolean {
+        if (lpEngine.automaticSparseTrial && rootBoundHandoffBaseline == null) {
+            val domain = lpEngine.linearLowerBound(objective, session).takeUnless { it == Long.MIN_VALUE }?.toDouble()
+            val shared = params.objectiveLowerBoundSupplier?.invoke()?.takeIf { it.isFinite() }
+            rootBoundHandoffBaseline = listOfNotNull(domain, shared).maxOrNull() ?: Double.NaN
+        }
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
             preparationCancellation = rootLpPreparationBudget())

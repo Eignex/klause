@@ -381,6 +381,9 @@ qualify; later CP assertions supply no global bound. Search publishes accepted
 bounds to its objective floor and retains them in its terminal bound.
 With a checked bound and a positive decision allowance, a sliced monolithic finite
 worker can enter discrete search before its root numerical query completes.
+Automatic handoff requires its checked integer objective floor to improve the
+domain and shared floors captured before its first root LP query. A box-bound
+proposal alone leaves the numerical cursor available for further funded slices.
 The handoff retires the unfinished cursor and skips further root consultations for
 that search binding; the accepted global bound remains available.
 Completed-point rounding, component-owned plans and workers without a decision

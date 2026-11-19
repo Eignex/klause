@@ -520,6 +520,63 @@ class ResumableMinimizeGuidanceTest {
     }
 
     @Test
+    fun `automatic sparse handoff waits for an improved integer floor`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        var pauses = 0
+        val published = ArrayList<Double>()
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    private var pausedWork = 0L
+                    override val currentWork: Long get() = pausedWork
+                    override val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(workOps = pausedWork)
+                    override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? =
+                        if (cancellation()) null else DoubleArray(model.m) { if (pauses >= 2) -1.0 else 0.0 }
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        while (true) {
+                            pauses++
+                            pausedWork += 5_000L * LP_WORK_PER_NODE
+                            pauseAt(pausedWork)
+                        }
+                        @Suppress("UNREACHABLE_CODE")
+                        null
+                    }
+                }
+            }
+        }
+        val params = BacktrackParams(maxDecisions = 16L, variableSelector = InputOrder,
+            valueSelector = IndomainMin, lpConfig = LpConfig.AUTO, objectiveLowerBoundSink = published::add,
+            lpPlan = LpPlan(rootCutHarvest = false))
+        val offered = ArrayList<Sample>()
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            repeat(2) {
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+            }
+            assertTrue(offered.isEmpty())
+            assertTrue(published.none { it > 0.0 })
+
+            repeat(4) {
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+            }
+
+            assertEquals(1L, search.stats.lp.phases.getValue("PRIMAL_CONTINUATION_ROOT")
+                .outcomes["BOUND_SEARCH_HANDOFF"])
+            assertTrue(published.any { it == 1.0 })
+            assertTrue(offered.isNotEmpty())
+        }
+    }
+
+    @Test
     fun `checked sparse root bounds allow discrete search before a primal point`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),

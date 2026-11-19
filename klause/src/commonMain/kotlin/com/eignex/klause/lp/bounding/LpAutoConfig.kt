@@ -409,12 +409,14 @@ object LpAutoConfig {
             },
         )
         val explicitSparse = config.overrides[LpTechnique.SPARSE_TRIAL] == true
-        val automaticSparse = !explicitSparse && objective != null && problem.numRealVars == 0 &&
+        val sparsePermitted = config.resolved(LpTechnique.SPARSE_TRIAL)
+        val automaticSparse = !explicitSparse && sparsePermitted && !base.bounding &&
+            objective != null && problem.numRealVars == 0 &&
             !problem.intBounds.hasOpenSides &&
             !base.componentOwnership && !base.lbTreeSearch && !coneRequested && cells > baseCap &&
             !base.cuts && !base.booleanRlt && !base.impliedBoundCuts && !base.flowCoverCuts &&
             config.overrides.none { (technique, enabled) -> enabled && technique.timing == LpTiming.EXHAUSTIVE }
-        val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
+        val sparse = if (sparsePermitted && !base.bounding &&
             (explicitSparse || automaticSparse) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {

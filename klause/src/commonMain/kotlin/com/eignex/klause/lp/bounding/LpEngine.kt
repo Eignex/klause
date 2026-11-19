@@ -47,8 +47,8 @@ import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpPrimalGuidance
 import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolveCursor
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolveStep
@@ -179,9 +179,7 @@ internal class LpEngine(
         private set
     private var rootBoundHandedOff = false
     private var automaticOrdinaryNodes = false
-    private var lpNodeDepth = 0
-    private val sparseRootWork: Boolean
-        get() = sparseTrialActive && (!automaticOrdinaryNodes || lpNodeDepth == 0)
+    private var sparseRootWork = false
     private var admittedSourceLayout: LpRelaxation? = null
     private val sparseTrialRequested = params0.lpConfig?.overrides?.get(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
@@ -211,7 +209,7 @@ internal class LpEngine(
 
     internal fun resetRootBoundSearch() {
         rootBoundHandedOff = false
-        lpNodeDepth = 0
+        sparseRootWork = sparseTrialActive
     }
 
     internal val rootRoundingQueryPaused: Boolean
@@ -760,6 +758,7 @@ internal class LpEngine(
             if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
 
     internal val retainedRootEnabled: Boolean get() = sparseTrialActive || params.lpPlan.componentOwnership
+    internal val automaticSparseTrial: Boolean get() = sparseTrialActive && !sparseTrialRequested
 
     private val auxiliarySources = LpAuxiliarySources()
     private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
@@ -1623,7 +1622,7 @@ internal class LpEngine(
         deferSimplex: Boolean = false,
     ): Boolean {
         requireOpen()
-        lpNodeDepth = session.decisionLevel
+        if (automaticOrdinaryNodes) sparseRootWork = session.decisionLevel == 0
         lpBackjump = null
         lastPruneBound = effectiveBound
         for (b in bounds) {
@@ -1913,6 +1912,7 @@ internal class LpEngine(
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted
+                        sparseRootWork = trial.admitted
                         automaticOrdinaryNodes = trial.admitted && trial.metrics["Automatic"] == 1L &&
                             admission.withinCeiling
                         if (trial.admitted && trial.metrics["Automatic"] == 1L) {
