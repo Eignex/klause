@@ -279,27 +279,25 @@ internal class LinearAuthority(
             val after = result.primalStages[key] ?: 0L
             if ("Max" in key) maxOf(before, after) else before + after
         }
-        if (result.paused && (budget.funding?.exhausted == true || cancellation())) {
-            return pending.base.copy(primalStages = stages)
-        }
-        val completed = !result.paused && budget.funding?.paused != true && !cancellation()
-        if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
-            if (completed) policy.observeRound(pending.rows, improved = false)
-            policy.observe("UnavailableRounds")
-            return pending.base.copy(primalStages = stages)
-        }
         val strongest = strongerLinearBound(pending.base.bound, result.bound)
+        val boundFamilies = if (strongest != null && strongest === pending.base.bound) {
+            pending.base.cutBoundFamilies
+        } else result.cutBoundFamilies
+        fun fallback() = pending.base.copy(bound = strongest, cutBoundFamilies = boundFamilies, primalStages = stages)
+        if (result.paused && (budget.funding?.exhausted == true || cancellation())) return fallback()
+        val completed = !result.paused && budget.funding?.paused != true && !cancellation()
         if (completed) {
             policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
                 (strongest != null && strongest !== pending.base.bound))
         }
-        return result.copy(bound = strongest, primalStages = stages,
+        if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
+            policy.observe("UnavailableRounds")
+            return fallback()
+        }
+        return result.copy(bound = strongest, cutBoundFamilies = boundFamilies, primalStages = stages,
             advisoryPoint = pending.base.relaxedPoint.takeIf {
                 retainBasePoint && completed && result.incumbent == null && result.evidence == null
-            },
-            cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
-                pending.base.cutBoundFamilies
-            } else result.cutBoundFamilies)
+            })
     }
 
     private fun preparePointFamily(
@@ -442,7 +440,8 @@ internal class LinearAuthority(
         val result = checkSource(source, cancellation, guidance = true, cuts = cuts, cutMask = cutMask)
         if (cancellation()) {
             lp.close()
-            return LinearAuthorityResult(incumbent = result.incumbent, primalStages = primalStages.toMap())
+            return LinearAuthorityResult(bound = result.bound, cutBoundFamilies = result.cutBoundFamilies,
+                incumbent = result.incumbent, primalStages = primalStages.toMap())
         }
         val completed = result.copy(relaxedPoint = relaxedPoint, primalStages = primalStages.toMap(),
             paused = result.paused || (result.evidence == null && result.split == null &&
