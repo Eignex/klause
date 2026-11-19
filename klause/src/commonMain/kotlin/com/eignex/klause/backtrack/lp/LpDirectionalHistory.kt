@@ -22,6 +22,7 @@ internal class LpDirectionalHistory(
             private set
 
         val pairStamp: Long get() = if (count < RELIABILITY) 0L else stamps[(first + count - RELIABILITY) % WINDOW]
+        val latestStamp: Long get() = if (count == 0) 0L else stamps[(first + count - 1) % WINDOW]
 
         fun add(value: Double, stamp: Long) {
             charge(5L)
@@ -88,6 +89,7 @@ internal class LpDirectionalHistory(
     private var depth = 0
     private var objective = Double.NaN
     private var reliableStamp = -1L
+    private var collectionStamp = -1L
 
     fun beginNode(level: Int) {
         stamp++
@@ -100,6 +102,8 @@ internal class LpDirectionalHistory(
 
     val hasReliableHistory: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
+    val hasCollectionHistory: Boolean get() = collectionStamp >= 0L && stamp - collectionStamp <= maxAge
+
     fun clear(report: Boolean = true) {
         charge(gains.size.toLong())
         gains.clear()
@@ -107,6 +111,7 @@ internal class LpDirectionalHistory(
         pending = null
         objective = Double.NaN
         reliableStamp = -1L
+        collectionStamp = -1L
         if (report) observe("RESET")
     }
 
@@ -128,6 +133,15 @@ internal class LpDirectionalHistory(
         expire(history.up)
         val direction = if (child.up) history.up else history.down
         direction.add(normalized, stamp)
+        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count &&
+            minOf(history.down.count, history.up.count) < RELIABILITY
+        ) {
+            val majority = if (history.down.count > history.up.count) history.down else history.up
+            val minority = if (majority === history.down) history.up else history.down
+            if (majority.stable && majority.gain > 0.0) {
+                collectionStamp = maxOf(collectionStamp, minOf(majority.pairStamp, minority.latestStamp))
+            }
+        }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
             if (history.down.stable && history.up.stable) {
                 val pairStamp = minOf(history.down.pairStamp, history.up.pairStamp)
@@ -227,6 +241,25 @@ internal class LpDirectionalHistory(
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         return history
+    }
+
+    fun preferUnderObservedDirection(variable: VarRef, value: Double): Boolean? {
+        if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
+        val history = gains[variable] ?: return null
+        expire(history.down)
+        expire(history.up)
+        val fraction = value - floor(value)
+        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        if (history.down.count == 0 || history.up.count == 0) return null
+        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
+        if (history.down.count == history.up.count) return null
+        val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
+        if (!sampledDirection.stable) return null
+        if (sampledDirection.gain <= 0.0) {
+            observe("PASSIVE_COLLECTION_ZERO_GAIN")
+            return null
+        }
+        return history.up.count < history.down.count
     }
 
     private fun expire(direction: Direction) {

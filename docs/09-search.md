@@ -403,13 +403,18 @@ an unconsumed nomination.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
-Only variable selection consumes directional estimates. Values retain ordinary LP
-point preferences and configured order, and observations come from ordinary traversal.
+Only variable selection consumes reliable directional estimates. Bounded collection
+may visit the less sampled adjacent child first when both directions have observations,
+the majority direction is stable and positive, and the minority lacks its second sample.
+Collection requires a finite incumbent cutoff and permits at most 128 checks and 32
+selections per invocation; resets do not renew those limits. Values otherwise retain
+ordinary LP point preferences and configured order.
 The consumer creates no LP query and checks the current point, scope, solve stamp and
 cancellation before committing its nomination. Predicted gains carry no pruning authority.
 `lp-directional-advice=false` keeps the ordinary variable choice while retaining
 enabled passive observation, nomination and comparison work; the corresponding backtrack setting is
 `BacktrackParams.lpDirectionalAdvice`.
+Both advice settings retain identical collection work and complete split alternatives.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
