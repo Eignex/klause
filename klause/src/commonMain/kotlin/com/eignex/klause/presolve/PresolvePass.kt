@@ -329,18 +329,24 @@ enum class PresolvePass(
             Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars, ctx.cancellation)
     },
 
-    /** Verified finite variable symmetry preserving the exact current objective. Opt-in. */
+    /** Verified finite variable symmetry preserving the exact current objective. */
     BREAK_OBJECTIVE_SYMMETRIES(
         "objective-symmetry",
         Stage.PROBLEM,
         Capability.FINITE,
         PresolveTiming.MEDIUM,
         preservesSolutionSet = false,
-        autoEligible = false,
+        autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
-            SymmetryBreaking.breakObjectiveSymmetries(problem, ctx)
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext): PassDelta =
+            if (ctx.solutionSetSensitive || ctx.modelBreaksSymmetry) {
+                PassDelta()
+            } else if (SymmetryBreaking.supportsObjectiveSymmetries(problem, ctx)) {
+                SymmetryBreaking.breakObjectiveSymmetries(problem, ctx)
+            } else {
+                Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars, ctx.cancellation)
+            }
     },
 
     /** Interchangeable-variable / block / value symmetry breaking.

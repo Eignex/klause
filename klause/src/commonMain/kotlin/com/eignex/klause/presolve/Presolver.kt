@@ -85,7 +85,7 @@ internal val PresolvePass.baseWorkWeight: Long
         PresolvePass.REMOVE_REDUNDANT -> 63L
         PresolvePass.FOLD_COMPARISON_CLAUSES -> 18L
         PresolvePass.FUSE_LINEAR_BOUNDS -> 16L
-        PresolvePass.BREAK_SYMMETRIES -> 16L
+        PresolvePass.BREAK_SYMMETRIES, PresolvePass.BREAK_OBJECTIVE_SYMMETRIES -> 16L
         PresolvePass.AGGREGATE_SUB_SUMS -> 11L
         PresolvePass.REDUCE_DIOPHANTINE, PresolvePass.DUAL_FIX -> 10L
         PresolvePass.REDUCE_STRUCTURAL -> 7L

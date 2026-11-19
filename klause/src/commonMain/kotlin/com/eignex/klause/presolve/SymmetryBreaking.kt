@@ -55,18 +55,20 @@ internal object SymmetryBreaking {
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
 
+    fun supportsObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): Boolean =
+        context.linearObjective != null && !context.solutionSetSensitive && !context.modelBreaksSymmetry &&
+            problem.numRealVars == 0 && !problem.semantics.relaxesFeasibility &&
+            context.linearObjective.realCoefficientValues.all { it == 0.0 }
+
     fun breakObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): PassDelta {
-        val objective = context.linearObjective ?: return PassDelta()
-        if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
-            problem.semantics.relaxesFeasibility || objective.realCoefficientValues.any { it != 0.0 }
-        ) return PassDelta()
+        if (!supportsObjectiveSymmetries(problem, context)) return PassDelta()
+        val objective = requireNotNull(context.linearObjective)
         val ints = objective.intCoefficientValues
         val bools = objective.boolWeightValues
         context.cancellation.charge(ints.size.toLong() + bools.size)
         if (context.cancellation()) return PassDelta()
         val objectiveInts = ints.indices.filter { ints[it] != 0L }.toSet()
         val objectiveBools = bools.indices.filter { bools[it] != 0L }.toSet()
-        if (objectiveInts.isEmpty() && objectiveBools.isEmpty()) return PassDelta()
         val extra = breakings(
             problem, FiniteSymmetryColumns(problem), objectiveInts, objectiveBools,
             context.cancellation, objective,
@@ -537,7 +539,6 @@ internal object SymmetryBreaking {
 
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return emptyList()
 
-        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
             if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
                 .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
@@ -546,6 +547,9 @@ internal object SymmetryBreaking {
             if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v)
                 .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
         }
+
+        // Singleton seeds cannot share an orbit; avoid keying and refining an asymmetric cost vector.
+        if (seedIntBase.toSet().size == nInt && seedBoolBase.toSet().size == nBool) return emptyList()
 
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
 
@@ -556,6 +560,8 @@ internal object SymmetryBreaking {
         for (v in 0 until nBool) {
             if (v !in objectiveBoolVars) cells.getOrPut(boolColour[v]) { ArrayList() }.add(nInt + v)
         }
+        if (cancellation() || budget[0] <= 0) return emptyList()
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
 
         val gens = ArrayList<Pair<IntArray, IntArray>>()
         val cellMembers = ArrayList<MutableList<Int>>(cells.size)

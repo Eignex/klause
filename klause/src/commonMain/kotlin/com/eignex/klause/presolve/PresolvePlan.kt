@@ -148,7 +148,9 @@ class PresolveConfig(
     private fun auto(pass: PresolvePass, context: PresolveContext): Boolean = pass.autoEligible &&
         pass.timing in emphasis.timings &&
         (pass.guarantees.bijection || !context.solutionSetSensitive) &&
-        !(pass == PresolvePass.BREAK_SYMMETRIES && context.modelBreaksSymmetry)
+        !((pass == PresolvePass.BREAK_SYMMETRIES || pass == PresolvePass.BREAK_OBJECTIVE_SYMMETRIES) &&
+            context.modelBreaksSymmetry) &&
+        (pass != PresolvePass.BREAK_OBJECTIVE_SYMMETRIES || context.linearObjective != null)
 
     /** Problem-transform passes enabled for [context], in priority order. */
     fun problemPasses(context: PresolveContext): List<PresolvePass> =
@@ -164,8 +166,21 @@ class PresolveConfig(
         // The finite lane probes with [PresolvePass.PROBE] over root domains, and where that pass runs the
         // open-range form would repeat its source half.
         val probesElsewhere = capability == PresolvePass.Capability.FINITE || PresolvePass.PROBE in passes
-        return if (probesElsewhere) passes - PresolvePass.PROBE_OPEN_RANGES else passes
+        val scheduled = if (probesElsewhere) passes - PresolvePass.PROBE_OPEN_RANGES else passes
+        // The objective pass includes protection-only fallback and value symmetry; a second scan would
+        // repeat the same preparation when the first found no generator.
+        return if (PresolvePass.BREAK_OBJECTIVE_SYMMETRIES in scheduled) {
+            scheduled - PresolvePass.BREAK_SYMMETRIES
+        } else {
+            scheduled
+        }
     }
+
+    internal fun withoutObjectiveSymmetry(): PresolveConfig = PresolveConfig(
+        emphasis, overrides + (PresolvePass.BREAK_OBJECTIVE_SYMMETRIES to false),
+        probeBudgetPerVarOverride, probeTotalBudgetOverride, affinePivotOrder, abortFraction, maxRounds,
+        preserveStructure, structuralImpactLimit,
+    )
 
     /** Disable solution-set-collapsing passes for a pure local-search route. */
     fun forLocalSearch(): PresolveConfig = PresolveConfig(
