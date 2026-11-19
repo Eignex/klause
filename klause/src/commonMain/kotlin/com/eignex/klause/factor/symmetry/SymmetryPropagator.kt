@@ -5,8 +5,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.PermutationGroup
 import com.eignex.util.collections.IntArrayList
-import com.eignex.util.collections.IntHashSet
-import com.eignex.util.collections.toSortedIntArray
 
 /**
  * Dynamic symmetry handling: one global propagator for the whole automorphism group rather than an
@@ -17,7 +15,7 @@ import com.eignex.util.collections.toSortedIntArray
  * predicate is a sound symmetry break and at least one representative per orbit always survives.
  *
  * A generator permutes integer and Boolean variables independently (detection is kind-preserving),
- * so the lex sequence orders the integer support in id order, then the Boolean support in id order;
+ * so each position of the captured lex order compares coordinates of the same kind;
  * each position compares a variable against its image of the same kind. The filtering is the `α`/`β`
  * lex rule (α = first undecided position, β = start of the forced `≥` suffix) of Frisch, Hnich,
  * Kiziltan, Miguel and Walsh, "Propagation algorithms for lexicographic ordering constraints",
@@ -31,6 +29,7 @@ internal class SymmetryPropagator(
     private val generators: List<Generator>,
     private val unified: List<IntArray>,
     private val nInt: Int,
+    private val supportOrder: IntArray,
 ) : Propagator {
 
     /** A generator's lex sequence: position `k` compares [leftVar]`[k]` against its image
@@ -39,14 +38,6 @@ internal class SymmetryPropagator(
 
     /** Permutation degree (`nInt + nBool`). */
     private val n: Int = if (unified.isEmpty()) nInt else unified.first().size
-
-    /** The group's support (variables some generator moves), as unified ids in ascending order — the
-     *  fixed total order the orbital-fixing rule walks. */
-    private val supportOrder: IntArray = run {
-        val moved = IntHashSet()
-        for (p in unified) for (i in p.indices) if (p[i] != i) moved.add(i)
-        moved.toSortedIntArray()
-    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         for (g in generators) if (!propagateLexLeader(state, g)) return false

@@ -278,6 +278,10 @@ also restores that scan. Counting, sampling and enumeration retain their solutio
 set. Discovery and verification share the preparation allowance, with structural
 size and refinement-work limits; singleton domain/cost seeds skip refinement.
 One source-bound incidence snapshot serves all individualization leaves in a scan.
+The captured lex order places nonzero-cost coordinates before zero-cost coordinates,
+retaining ID order within each group. Generator lex propagation, stabilizer expansion
+and orbital fixing share that order. Factor remapping, structural keys and codecs
+retain it; every orbit still has a minimum under this fixed order.
 Typed integer and Boolean rows remain exact under a format's floating-point
 tolerance policy; that unused real tolerance does not exclude their symmetry scan.
 

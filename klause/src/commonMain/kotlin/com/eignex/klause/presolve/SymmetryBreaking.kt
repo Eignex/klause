@@ -151,7 +151,17 @@ internal object SymmetryBreaking {
         )
         val valuePins = breakValueSymmetry(problem, active, heldInts, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
-        if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
+        if (generators.isNotEmpty()) {
+            val order = objective?.let { cost ->
+                val nInt = problem.numIntVars
+                (0 until nInt + problem.numBoolVars).sortedBy { v ->
+                    val coefficient = if (v < nInt) cost.intCoefficientValues.getOrElse(v) { 0L }
+                    else cost.boolWeightValues.getOrElse(v - nInt) { 0L }
+                    coefficient == 0L
+                }.toIntArray()
+            }
+            extra.add(SymmetryHandling(generators, order))
+        }
         extra.addAll(scalarLex)
         extra.addAll(valuePins)
         return extra

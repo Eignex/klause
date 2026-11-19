@@ -88,7 +88,7 @@ internal class MddPayload(
 internal class SymmetryGeneratorPayload(val ints: IntArray, val bools: IntArray)
 
 @Serializable
-internal class SymmetryHandlingPayload(val generators: List<SymmetryGeneratorPayload>)
+internal class SymmetryHandlingPayload(val generators: List<SymmetryGeneratorPayload>, val lexOrder: IntArray? = null)
 
 private fun rows(flat: LongArray, arity: Int): List<LongArray> =
     List(flat.size / arity) { row -> flat.copyOfRange(row * arity, (row + 1) * arity) }
@@ -195,7 +195,11 @@ internal fun structureFactorCodecs(): List<FactorCodec<*, *>> = listOf(
     ),
     factorCodec<SymmetryHandling, SymmetryHandlingPayload>(
         "symmetryHandling",
-        { s -> SymmetryHandlingPayload(s.generators.map { (ints, bools) -> SymmetryGeneratorPayload(ints, bools) }) },
-        { p -> SymmetryHandling(p.generators.map { it.ints to it.bools }) },
+        { s ->
+            SymmetryHandlingPayload(
+                s.generators.map { (ints, bools) -> SymmetryGeneratorPayload(ints, bools) }, s.lexOrder,
+            )
+        },
+        { p -> SymmetryHandling(p.generators.map { it.ints to it.bools }, p.lexOrder) },
     ),
 )
