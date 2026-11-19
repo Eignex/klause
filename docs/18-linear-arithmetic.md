@@ -66,8 +66,9 @@ theory atom; unrelated Boolean publications require no LP edit.
 Each side retains its work debit and exact witness. Pending sides commit before a
 new definition is appended and before disequality inference reads active bounds.
 Only fully committed source comparisons receive assertion markers; a declined
-batch publishes neither its staged witnesses nor its markers. Root comparisons
-remain sequential so that later rows can substitute earlier root fixings.
+batch publishes neither its staged witnesses nor its markers. Root batches commit
+direct source-column bounds before the next comparison, so its normalization can
+substitute earlier root fixings; affine-column bounds can share a root batch.
 
 #### A check
 
@@ -96,6 +97,9 @@ Before reuse, the linear adapter checks all current LP bounds, including strict
 sides, under the current operation allowance. Affine values are cached for one
 owned point; a changed point clears those values and new definitions are evaluated
 before their bounds are checked.
+A completed bound check is reusable only for the identical immutable LP state and
+the same point values; edits and retraction require a fresh check.
+Closing the component releases the point, checked state and activity caches.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
 Complete traversal can recheck that point against the selected source comparisons
@@ -103,6 +107,9 @@ before materializing pending LP bounds. Source activities are cached for that ow
 point, while current Boolean constants, strictness and disequality directions are
 checked on each use. Failed checks flush pending source bounds before another LP
 query; successful reuse leaves them pending and supplies no conflict authority.
+For an unchanged point, the prepared Boolean-input index selects rows whose inputs
+changed since the last completed check. Disjunctions and disequalities remain
+eligible on every check; interruption retains the previous completed snapshot.
 
 A partial-state probe can imply a uniquely represented comparison guard
 from exact intervals over its terms. Coefficient signs select the bounding sides;

@@ -48,6 +48,7 @@ class QfLiraSolverDifferenceTest {
             ))
         ExactLiraSearchComponent(model).use { component ->
             component.observeCompleteTraversal()
+            component.useIncrementalSourceRows()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
             assertIs<ComponentResult.Consistent>(session.initialize())
             for (truth in listOf(true, false, true)) {
@@ -350,6 +351,8 @@ class QfLiraSolverDifferenceTest {
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
+            component.observeCompleteTraversal()
+            component.useIncrementalSourceRows()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(4))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))

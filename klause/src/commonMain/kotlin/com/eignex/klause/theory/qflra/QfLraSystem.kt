@@ -21,6 +21,7 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.exactColumnLower
@@ -214,8 +215,16 @@ internal class LiveQfLraSystem(
     var observeAssertionCost = false
     val assertionCost = SmtSourceAssertionCost()
     private var checkedPoint: List<BigFraction>? = null
-    private val definitionPoint = HashMap<Int, BigFraction>()
-    private val sourcePoint = HashMap<SmtTermKey, BigFraction>()
+    private var checkedState: LpExactState? = null
+    private var definitionPoint = HashMap<Int, BigFraction>()
+    private var sourcePoint = HashMap<SmtTermKey, BigFraction>()
+
+    fun releasePoint() {
+        checkedPoint = null
+        checkedState = null
+        definitionPoint = HashMap()
+        sourcePoint = HashMap()
+    }
 
     fun hasPositiveMargin(point: List<BigFraction>?): Boolean = marginColumn?.let {
         point?.getOrNull(it)?.signum()?.let { sign -> sign > 0 } == true
@@ -229,9 +238,11 @@ internal class LiveQfLraSystem(
         if (point != checkedPoint) {
             if (!point.all(arithmetic::admitted)) return false
             checkedPoint = point.toList()
+            checkedState = null
             definitionPoint.clear()
             sourcePoint.clear()
         }
+        if (state === checkedState) return !stop()
         fun holds(column: Int, value: BigFraction): Boolean {
             stop.charge(2L)
             if (stop.pollStop()) return false
@@ -257,7 +268,9 @@ internal class LiveQfLraSystem(
             }
             if (!holds(column, value)) return false
         }
-        return !stop()
+        val accepted = !stop()
+        if (accepted) checkedState = state
+        return accepted
     }
 
     fun checkedPointSatisfies(
@@ -354,11 +367,13 @@ internal class LiveQfLraSystem(
             if (stop.pollStop()) return false
             if (lp.state?.conflict != null) return true
             require(input.comparison.op != LinearOp.NE)
-            if (!batchSourceBounds || lp.state?.depth == 0) {
+            if (!batchSourceBounds) {
                 if (!assertComparison(input.comparison, null, input.premise)) return false
                 committed(index)
                 continue
             }
+            // Direct source bounds can expose root fixings to the next comparison's normalization.
+            if (lp.state?.depth == 0 && batch.hasBoundsBelow(pointColumns) && !batch.flush()) return batch.conflict
             val comparison = input.comparison
             val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
             val rows = ArrayList<ExactRationalInequality>(2)
@@ -615,6 +630,8 @@ private class SmtSourceBoundBatch(
     private val sides = HashMap<Pair<Int, Boolean>, ExactLpSide>()
     var conflict = false
         private set
+
+    fun hasBoundsBelow(columns: Int): Boolean = bounds.any { it.column < columns }
 
     fun add(bound: LpPremisedBound): Boolean {
         val key = bound.column to bound.upper

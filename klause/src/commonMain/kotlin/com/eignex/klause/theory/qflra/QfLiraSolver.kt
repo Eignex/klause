@@ -215,6 +215,8 @@ class ExactLiraSearchComponent private constructor(
     private var outcome: ComponentCheck? = null
     private var unconsumedLpPoint: List<BigFraction>? = null
     private var retainedLpPoint: List<BigFraction>? = null
+    private var sourceCheckedPoint: List<BigFraction>? = null
+    private var sourceCheckedBooleans: IntArray? = null
     private var candidate: List<BigFraction>? = null
         set(value) {
             field = value
@@ -312,9 +314,10 @@ class ExactLiraSearchComponent private constructor(
         )
     }
     private val lp: LpPropagator by lpDelegate
-    private val system by lazy {
+    private val systemDelegate = lazy {
         LiveQfLraSystem(model, lp, exactForms, strictMargin = model.numIntVars == 0, preparationStop = lpStop)
     }
+    private val system by systemDelegate
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -876,6 +879,10 @@ class ExactLiraSearchComponent private constructor(
     }
     override fun close() {
         floatCandidate = null
+        retainedLpPoint = null
+        sourceCheckedPoint = null
+        sourceCheckedBooleans = null
+        if (systemDelegate.isInitialized()) system.releasePoint()
         releasePartialPointHints()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
@@ -1574,7 +1581,27 @@ class ExactLiraSearchComponent private constructor(
         if (model.numIntVars != 0 || solveContext.certificationPolicy !== ProductionLpCertificationPolicy ||
             !system.acceptsPoint(point, lpStop)
         ) return false
-        for (prepared in preparedRows) {
+        val prior = sourceCheckedBooleans
+        val dependencies = sourceRowsByBoolean
+        val selected = if (sourceCheckedPoint === point && prior != null && dependencies != null) {
+            val changed = LinkedHashSet<Int>()
+            operationAccounting?.charge(bools.size.toLong() + 1L)
+            for (variable in bools.indices) {
+                if (prior[variable] == bools[variable]) continue
+                val rows = dependencies[variable].orEmpty()
+                operationAccounting?.charge(rows.size.toLong() + 1L)
+                if (lpStop.poll()) return false
+                changed += rows
+            }
+            operationAccounting?.charge(recurringSourceRows.size.toLong() + 1L)
+            if (lpStop.poll()) return false
+            changed += recurringSourceRows
+            changed
+        } else preparedRows.indices
+        var visited = 0L
+        for (index in selected) {
+            visited++
+            val prepared = preparedRows[index]
             operationAccounting?.charge(prepared.booleans.size.toLong() + 1L)
             if (lpStop.poll()) return false
             if (prepared.disjunction && prepared.address !in node.rowAssertions) continue
@@ -1584,11 +1611,16 @@ class ExactLiraSearchComponent private constructor(
                 return false
             }
         }
-        return !operationStop()
+        operationAccounting?.charge(bools.size.toLong() + 1L)
+        if (operationStop()) return false
+        sourceCheckedPoint = point
+        if (prior == null) sourceCheckedBooleans = bools.copyOf() else bools.copyInto(prior)
+        observeCompleteStage("LP_SOURCE_POINT_ROWS", visited)
+        return true
     }
 
-    private fun observeCompleteStage(stage: String) {
-        if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage)
+    private fun observeCompleteStage(stage: String, count: Long = 1L) {
+        if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage, count)
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {

@@ -40,6 +40,20 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `stopped point rechecks should withhold cached acceptance`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val point = listOf(BigFraction.ZERO, BigFraction.ZERO)
+            assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+
+            val accepted = system.acceptsPoint(point, ExecutionControl { true })
+
+            assertFalse(accepted)
+        }
+    }
+
+    @Test
     fun `retained points should check affine definitions appended after their first check`() {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source(), lp)
