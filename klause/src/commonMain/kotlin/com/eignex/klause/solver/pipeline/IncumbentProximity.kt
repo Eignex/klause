@@ -30,14 +30,16 @@ internal object IncumbentProximity {
         }
 
     fun prepare(source: SourceProofContext, center: Sample, cutoff: BigFraction,
-        budget: SourceLpBudget, cancellation: ExecutionControl): SourceProofContext? {
+        budget: SourceLpBudget, cancellation: ExecutionControl,
+        hint: LinearRepairGuidance.Hint? = null): SourceProofContext? {
         val funding = budget.funding ?: return null
         if (cancellation() || center.numBoolVars != 0 || center.numIntVars !in 1..4096 ||
             !source.affineObjectiveAvailable || source.scope.objective == null) return null
         val scan = 1L + source.premiseCount
         if (funding.availableWork <= scan) return null
         budget.observe(preparation = scan)
-        var entries = 1L + source.coordinateCount + source.premiseCount
+        var entries = 1L + source.coordinateCount + source.premiseCount +
+            source.scope.condition.coordinateRestrictionCount
         val scanned = source.allPremises { _, premise ->
             if (cancellation()) false else {
                 entries += premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
@@ -51,6 +53,7 @@ internal object IncumbentProximity {
         budget.observe(preparation = work)
         funding.charge(0L, bytes)
         val costs = linkedMapOf<SourceCoordinate, BigFraction>()
+        val agreements = linkedMapOf<SourceCoordinate, BigFraction>()
         val bits = StringBuilder(center.numIntVars)
         var constant = BigFraction.ZERO
         for (id in 0 until center.numIntVars) {
@@ -58,8 +61,12 @@ internal object IncumbentProximity {
             val value = center.exactIntValue(id)
             if (value.signum() < 0 || value > BIG_ONE) return null
             val one = value.signum() > 0
-            costs[SourceCoordinate(SourceCoordinate.Kind.Integer, id)] =
+            val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, id)
+            costs[coordinate] =
                 if (one) BigFraction.ONE.negated() else BigFraction.ONE
+            if (hint?.integer(id) == if (one) 1.0 else 0.0) {
+                agreements[coordinate] = if (one) BigFraction.ONE else BigFraction.ZERO
+            }
             bits.append(if (one) '1' else '0')
             if (one) constant += BigFraction.ONE
         }
@@ -99,9 +106,19 @@ internal object IncumbentProximity {
         if (key in premises || radiusKey in premises) return null
         premises[key] = SourcePremise(SourceInequality(original, target))
         val radius = minOf(center.numIntVars, ((center.numIntVars + 9) / 10).coerceIn(4, 32))
-        premises[radiusKey] = SourcePremise(SourceInequality(costs, BigFraction.ofLong(radius.toLong()) - constant))
+        if (hint == null) premises[radiusKey] =
+            SourcePremise(SourceInequality(costs, BigFraction.ofLong(radius.toLong()) - constant))
+        val lower = source.scope.condition.lower.toMutableMap()
+        val upper = source.scope.condition.upper.toMutableMap()
+        for ((coordinate, value) in agreements) {
+            if (cancellation() || lower[coordinate]?.let { it > value } == true ||
+                upper[coordinate]?.let { it < value } == true) return null
+            lower[coordinate] = value
+            upper[coordinate] = value
+        }
         val scope = source.scope.copy(
             revision = source.scope.revision.copy(identity = source.scope.revision.identity + "/incumbent-proximity"),
+            condition = source.scope.condition.copy(lower = lower, upper = upper),
             objective = SourceObjective("${source.scope.objective.identity}/proximity/$bits/$radius/$target",
                 source.scope.objective.sense),
         )

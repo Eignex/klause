@@ -35,6 +35,36 @@ import kotlin.test.assertTrue
 
 class IncumbentProximityTest : RuntimeInitializedTest() {
     @Test
+    fun `paid LP agreement should restrict only agreeing binaries and preserve receiving pins`() {
+        val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val condition = SourceCondition(lower = mapOf(columns[2] to BigFraction.ONE))
+        val source = SourceProofContext(SourceScope(SourceRevision("agreement", "exact"), condition,
+            SourceObjective("cost", ObjectiveSense.MINIMIZE)), columns.toSet(), emptyMap(),
+            columns.zip(listOf(1L, -2L, 1L, 1L).map(BigFraction::ofLong)).toMap())
+        val budget = SourceLpBudget(funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) })
+        val guidance = LinearRepairGuidance()
+        assertTrue(guidance.remember(source, columns.zip(listOf(1.0, 0.5, 0.0, 0.0)).toMap(),
+            budget, ExecutionControl.Never))
+
+        val query = assertNotNull(IncumbentProximity.prepare(source,
+            Sample(booleanArrayOf(), longArrayOf(1, 0, 1, 0)), BigFraction.ofLong(2), budget,
+            ExecutionControl.Never, guidance.find(source)))
+
+        assertEquals(mapOf(columns[0] to BigFraction.ONE, columns[2] to BigFraction.ONE,
+            columns[3] to BigFraction.ZERO), query.scope.condition.lower)
+        assertEquals(mapOf(columns[0] to BigFraction.ONE, columns[3] to BigFraction.ZERO),
+            query.scope.condition.upper)
+        val inside = Sample(booleanArrayOf(), longArrayOf(1, 1, 1, 0))
+        val outside = Sample(booleanArrayOf(), longArrayOf(0, 1, 1, 0))
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(query.withLinearAuthority()).verify(
+            SourceEvidence(query.scope, SourceClaim.Witness(inside), SourceDerivation.SourceWitness)))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(query.withLinearAuthority()).verify(
+            SourceEvidence(query.scope, SourceClaim.Witness(outside), SourceDerivation.SourceWitness)))
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(source.scope, SourceClaim.Witness(outside), SourceDerivation.SourceWitness)))
+    }
+
+    @Test
     fun `private neighborhoods should reject improving points outside their change radius`() {
         for ((size, radius) in listOf(5 to 4, 50 to 5, 400 to 32)) {
             val columns = (0 until size).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }.toSet()

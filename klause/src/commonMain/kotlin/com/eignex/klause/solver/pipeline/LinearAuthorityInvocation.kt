@@ -320,14 +320,15 @@ internal class LinearAuthorityInvocation(
         proximity = null
         val exact = value ?: return
         val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
-        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop) ?: return
+        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop,
+            repairGuidance?.find(context)) ?: return
         if (sample === importedIncumbent && sample !== consumedIncumbent) {
             consumedIncumbent = sample
             onIncumbentUse?.invoke()
         }
         proximity = LinearAuthorityInvocation(source, params.copy(sourceIncumbentCompletion = false), state = state,
             boundOrdered = true, funding = funding, useSourceGap = false, guideIncumbent = false,
-            borrowedBudget = budget, recordProgress = false, proximityCenter = sample)
+            borrowedBudget = budget, recordProgress = false)
         proximityTurn = true
         observeProximity("Centers")
     }

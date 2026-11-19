@@ -651,7 +651,7 @@ internal class JointLinearRepair(
             }
             val querySource = if (condition === proximityProposal && seed != null) {
                 IncumbentProximity.prepare(receiving, requireNotNull(seed), requireNotNull(privateCutoff), budget,
-                    stop or cancellation)?.also {
+                    stop or cancellation, repairGuidance?.find(source))?.also {
                     queryProximity = true
                     queryProximityCutoff = privateCutoff
                     observe("jointRepairProximityCenters")
@@ -685,7 +685,6 @@ internal class JointLinearRepair(
                 } else null,
                 feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null,
                 useSourceGap = false, guideIncumbent = seed != null && !queryProximity,
-                proximityCenter = seed.takeIf { queryProximity },
                 observeExternalIncumbents = observeExternalIncumbents)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed

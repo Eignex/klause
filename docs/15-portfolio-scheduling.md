@@ -506,9 +506,8 @@ frontier consultations with a private proximity query inside the same turn offer
 The private consultation uses at most half the remaining offered time and work.
 The frontier retains its tree, LP owner and global bounds. Both searches share one
 LP operation/work/allocation ledger and containing decision/check allowances.
-The private search visits integer alternatives away from the center first in depth
-order, keeping that advisory center separate from its feasible incumbents. The
-ordinary frontier retains its bound order.
+The private search and ordinary frontier retain bound order. Private receiving
+conditions encode the checked center separately from feasible query incumbents.
 Private query progress supplies no root-fixing or learned-clause reward. A private
 witness passes original-source completion and the receiving frontier's checks
 before it can improve the source incumbent; private proofs never enter its coverage.
@@ -578,9 +577,11 @@ fixing or coverage. Other integer models can pin the
 eligible integers agreeing with the paid point, releasing every disagreement.
 Continuous columns remain free. Missing guidance, cancellation and unavailable
 funding retain the connected two-integer start.
-Fixed binary companion repair instead searches proximity to a checked center with
-every integer and continuous residual free except for the source's original pins.
-Its private objective retains the original cost. A Hamming row bounds changed binary
+Fixed binary companion repair instead searches near a checked center under the
+original pins. A paid LP point pins binary coordinates agreeing exactly with that
+center, leaving disagreements, fractional coordinates and continuous residuals free.
+Those advisory pins supply no source refutation authority. Its private objective
+retains the original cost. Without a paid point, a Hamming row bounds changed binary
 coordinates to ten percent of the integer columns rounded up, clamped between four
 and thirty-two changes and limited by the integer count. A separate original-cost
 row requests improvement by the largest of the declared positive objective allowance,
