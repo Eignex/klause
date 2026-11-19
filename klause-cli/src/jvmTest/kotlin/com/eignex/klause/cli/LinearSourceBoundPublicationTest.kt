@@ -14,15 +14,15 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.util.numbers.BIG_ONE
-import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
+import org.junit.BeforeClass
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
-import org.junit.BeforeClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 
 @RunWith(Parameterized::class)
 class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {

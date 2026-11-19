@@ -76,6 +76,22 @@ class LinearToleranceEnvelopeTest(private val upper: Boolean) {
     }
 
     @Test
+    fun `an equality should retain both edges of its accepted band`() {
+        val source = LinearSourceProblem(listOf(LinearSourceVariable("r", false)),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                lower = SemanticRational.ONE, upper = SemanticRational.ONE)),
+            semantics = SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve())
+        val envelope = assertNotNull(source.absoluteToleranceEnvelope(ExecutionControl.Never))
+        val edge = BigFraction.ONE + if (upper) slack else slack.negated()
+        val outside = edge + if (upper) slack else slack.negated()
+
+        assertEquals(true, checkLinearSourceWitness(envelope, listOf(edge), ExecutionControl.Never)
+            is LinearSourceCheck.Accepted)
+        assertEquals(false, checkLinearSourceWitness(envelope, listOf(outside), ExecutionControl.Never)
+            is LinearSourceCheck.Accepted)
+    }
+
+    @Test
     fun `a relative tolerance should decline an absolute envelope`() {
         val source = LinearSourceProblem(emptyList(), emptyList(), semantics = SourceSemantics(SourceFormat.MPS,
             feasibilityTolerance = tolerance.copy(relative = SemanticRational.ONE)).resolve())

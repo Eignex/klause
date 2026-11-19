@@ -6,8 +6,8 @@ import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
-import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceFormat
+import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
