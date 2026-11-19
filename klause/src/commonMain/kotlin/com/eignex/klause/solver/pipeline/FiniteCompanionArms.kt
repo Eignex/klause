@@ -22,7 +22,6 @@ internal class FiniteCompanionControls(
     val waitForImprovement: Boolean = false,
     val adaptiveRepair: Boolean = false,
     val onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
-    val reuseIncumbents: Boolean = false,
 )
 
 /**
@@ -55,8 +54,7 @@ internal class FiniteCompanionArms private constructor(
 
     /** Put the numerical arm first and joint repair after the finite workers. */
     fun arrange(plan: PreparedSourcePlan, finite: List<PortfolioArmFactory>): List<PortfolioArmFactory> {
-        val additional = companions?.factories(plan, finite.size, gap = gap,
-            incumbentTrials = controls.params?.sourceIncumbentCompletion == true).orEmpty()
+        val additional = companions?.factories(plan, finite.size, gap = gap).orEmpty()
         return additional.take(1) + finite + additional.drop(1)
     }
 
@@ -89,11 +87,9 @@ internal class FiniteCompanionArms private constructor(
             cancellation: ExecutionControl,
             onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         ): FiniteCompanionArms {
-            val params = controls.params?.let {
-                if (controls.reuseIncumbents) it.copy(sourceIncumbentCompletion = true) else it
-            }
+            val params = controls.params
             val eligibility = params?.let { finiteNumericalCompanionEligibility(problem, scenario, objective, it) }
-            if (controls.adaptiveRepair && controls.params?.sourceIncumbentCompletion != true) {
+            if (controls.adaptiveRepair && params?.sourceIncumbentCompletion != true) {
                 pipelineConfigError(
                     "companion-repair=adaptive requires source-incumbent-completion for numerical companions",
                 )

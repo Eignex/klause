@@ -495,17 +495,7 @@ completion.
 
 ### Incumbent completion and repair
 
-With `companion-after-incumbent=true`, ordinary execution options enable incumbent
-reuse for admitted binary companions
-over nominal decimal MPS sources with the default feasibility and optimality
-tolerances and unchanged numerical semantics, fixed repair and ordinary admission.
-`source-incumbent-completion=false` opts out. Ungated starts retain explicit selection.
-Consumer-local completion leaves finite workers' cutoff accounting and the first
-repair trial's scheduling priority at their ordinary settings. Explicit completion
-keeps its selected accounting and priority; exact sources, other formats, supplied
-typed controls and advanced companion modes retain explicit selection.
-
-Incumbent completion lets both companions use an
+`source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
 approximate real coordinates guiding rational reconstruction without authority. A
 reconstructed point must satisfy every active affine row exactly; otherwise

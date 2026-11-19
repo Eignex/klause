@@ -107,7 +107,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true,
-        gap: OptimalityGap? = null, incumbentTrials: Boolean = true): List<PortfolioArmFactory> {
+        gap: OptimalityGap? = null): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
         val binding = EngineInvocation(plan, identity, objective)
         fun factory(arm: Int, family: ArmFamily, create: (PortfolioWorkerSlot) -> PortfolioWorker) =
@@ -147,17 +147,14 @@ internal class FiniteNumericalCompanions private constructor(
                 repairGuidance?.let(slot::own)
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
-                val worker = context?.let {
-                    repairWorker(slot, firstArm + 1, limits, it, sharePoints, incumbentTrials) { companion }
-                }
+                val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion } }
                 companion = PortfolioWorker.ofMinimize(FiniteCompanionArms.JOINT_REPAIR, firstArm + 1,
                     countsInstructions = true,
                     resumable = {
                         val search = if (worker != null) requireNotNull(worker.newResumableSearch(incumbents::bound))
                         else DeferredCompanionSearch({ requireNotNull(admission).declineReason }) { global, millis ->
                             requireNotNull(admission).contextForStart(global, millis)?.let {
-                                requireNotNull(repairWorker(slot, firstArm + 1, limits, it, sharePoints,
-                                    incumbentTrials) { companion }
+                                requireNotNull(repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion }
                                     .newResumableSearch(incumbents::bound))
                             }
                         }
@@ -174,8 +171,7 @@ internal class FiniteNumericalCompanions private constructor(
     }
 
     private fun repairWorker(slot: PortfolioWorkerSlot, arm: Int, limits: TheoryParams,
-        context: SourceProofContext, sharePoints: Boolean, incumbentTrials: Boolean,
-        companion: () -> PortfolioWorker): PortfolioWorker {
+        context: SourceProofContext, sharePoints: Boolean, companion: () -> PortfolioWorker): PortfolioWorker {
         var readVersion = 0L
         var importedVersion = 0L
         val repair = slot.own(JointLinearRepair(model, context, objective, limits,
@@ -211,7 +207,7 @@ internal class FiniteNumericalCompanions private constructor(
             }))
         return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
-            pendingIncumbentTrial = { incumbentTrials && repair.incumbentTrialPending },
+            pendingIncumbentTrial = { repair.incumbentTrialPending },
             open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
     }
 
