@@ -231,6 +231,9 @@ internal class LpHints(
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
+        charge(16L)
+        observe("PASSIVE_COLLECTION_ELIGIBILITY_CHECK")
+        if (history.preferUnderObservedDirection(variable, value(variable)) == null) return alternatives
         return collection.select(variable, value(variable), alternatives, history, stamp, current)
     }
 

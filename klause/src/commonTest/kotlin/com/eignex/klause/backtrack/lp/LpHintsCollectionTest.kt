@@ -15,6 +15,48 @@ import kotlin.test.assertTrue
 
 class LpHintsCollectionTest {
     @Test
+    fun `untrained variables preserve collection comparisons for an eligible split`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+        val events = ArrayList<String>()
+        val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2)
+        val up = SearchDecision.IntAtLeast(0, 3)
+        for ((decision, point, objective) in listOf(
+            Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0), Triple(down, 2.0, 11.0),
+        )) {
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25, 2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.branch(variable)
+            hints.commit(decision, 1)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(point, 2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, objective)
+            hints.finishNode(trail.state)
+        }
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25, 2.25), DoubleArray(0))
+        hints.recordObjective(relaxation, 10.0)
+        hints.finishNode(trail.state)
+        repeat(128) {
+            hints.orderAlternatives(VarRef.IntVar(1),
+                listOf(SearchDecision.IntAtMost(1, 2), SearchDecision.IntAtLeast(1, 3)), ExecutionControl.Never)
+        }
+        hints.branch(variable)
+
+        val selected = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
+        hints.commit(selected.first(), 1)
+
+        assertEquals(listOf(up, down), selected)
+        assertEquals(1, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
+    }
+
+    @Test
     fun `advice withholding preserves collection and its completed child observation`() {
         val costs = ArrayList<Long>()
         for (apply in listOf(false, true)) {
