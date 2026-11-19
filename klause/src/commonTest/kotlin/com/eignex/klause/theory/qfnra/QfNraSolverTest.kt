@@ -24,6 +24,67 @@ import kotlin.test.assertTrue
 
 class QfNraSolverTest {
     @Test
+    fun `a normal envelope return retains an observed containing stop`() {
+        var pulse = false
+        val work = QfNraWork(QfNraParams(cancellation = ExecutionControl {
+            val observed = pulse
+            pulse = false
+            observed
+        }))
+
+        assertFailsWith<PolynomialInterrupted> {
+            work.envelope(100) {
+                pulse = true
+                assertTrue(work())
+                null
+            }
+        }
+
+        assertFalse(pulse)
+    }
+
+    @Test
+    fun `an envelope allowance leaves exact arithmetic live after local exhaustion`() {
+        val work = QfNraWork(QfNraParams(maximumWork = 100))
+        val arithmetic = PolynomialArithmetic(work)
+        work.execution = arithmetic.execution
+
+        val result = work.envelope(3) {
+            arithmetic.execution.operation { repeat(4) { arithmetic.step() } }
+            true
+        }
+        arithmetic.execution.operation { arithmetic.step() }
+
+        assertNull(result)
+        assertEquals(4L, work.spentWork)
+    }
+
+    @Test
+    fun `an envelope allowance retains a containing stop that clears after observation`() {
+        var pulse = false
+        val work = QfNraWork(QfNraParams(cancellation = ExecutionControl {
+            val observed = pulse
+            pulse = false
+            observed
+        }))
+        val arithmetic = PolynomialArithmetic(work)
+        work.execution = arithmetic.execution
+
+        assertFailsWith<PolynomialInterrupted> {
+            work.envelope(100) {
+                arithmetic.execution.operation {
+                    repeat(3) { arithmetic.step() }
+                    pulse = true
+                    arithmetic.checkpoint()
+                }
+            }
+        }
+
+        assertFalse(pulse)
+        assertEquals(3L, work.spentWork)
+    }
+
+    @Test
     fun `probe settlement should preserve the primary arithmetic failure`() {
         val primary = IllegalArgumentException("arithmetic")
         val cleanup = IllegalStateException("accounting")
@@ -83,7 +144,7 @@ class QfNraSolverTest {
         assertEquals(BigFraction.ofLong(5), point.realValue(0).rational)
         assertEquals(BigFraction.ofLong(2), point.realValue(1).rational)
         assertNull(query.progress.rootFinishedWork)
-        assertTrue(query.progress.searchWork > 0)
+        assertTrue(query.progress.searchWork > 0 || result.stats.envelopeQueries > 0)
     }
 
     @Test

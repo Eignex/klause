@@ -107,6 +107,33 @@
       "expected": "unsat",
       "license": "Apache-2.0",
       "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "square-bound-sat",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/square-bound-sat.smt2",
+      "sha256": "b5fb7fb2797cd0f1b3df6698875d3f107abd79891bac2c999cd00a7e637f5028",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "square-bound-unsat",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/square-bound-unsat.smt2",
+      "sha256": "b8871dd312e53bc47ad0ada57bed145a59fdd9ae6ee8deece16829c2e6845cd3",
+      "expected": "unsat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
+    },
+    {
+      "suite": "smtlib-nonlinear-integer-v1",
+      "name": "square-band-sat",
+      "path": "klause-bench/smoke-corpus/nonlinear-integer-v1/square-band-sat.smt2",
+      "sha256": "d5926bd87c8b71cfe6cd20e96d4dee39c1f21022781a603b1b9f25cbc81b8787",
+      "expected": "sat",
+      "license": "Apache-2.0",
+      "attribution": "Self-authored Eignex Klause regression fixture"
     }
   ]
 }
