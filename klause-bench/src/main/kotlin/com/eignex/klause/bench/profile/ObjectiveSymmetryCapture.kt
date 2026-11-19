@@ -10,6 +10,7 @@ import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -78,10 +79,7 @@ internal object ObjectiveSymmetryCapture {
             val model = prepared.problem
             val intCosts = prepared.objective?.intCoefficients ?: LongArray(0)
             val boolCosts = prepared.objective?.boolWeights ?: LongArray(0)
-            val generators = model.factors.filter { it.javaClass.simpleName == "SymmetryHandling" }.flatMap { factor ->
-                @Suppress("UNCHECKED_CAST")
-                factor.javaClass.getMethod("getGenerators").invoke(factor) as List<Pair<IntArray, IntArray>>
-            }
+            val generators = model.factors.filterIsInstance<SymmetryHandling>().flatMap { it.generators }
             buildJsonObject {
                 put("presolve", spec)
                 put("preparationNs", elapsed)

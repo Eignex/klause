@@ -57,7 +57,7 @@ internal object SymmetryBreaking {
 
     fun supportsObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): Boolean =
         context.linearObjective != null && !context.solutionSetSensitive && !context.modelBreaksSymmetry &&
-            problem.numRealVars == 0 && !problem.semantics.relaxesFeasibility &&
+            problem.numRealVars == 0 && !problem.semantics.relaxesRows(0) &&
             context.linearObjective.realCoefficientValues.all { it == 0.0 }
 
     fun breakObjectiveSymmetries(problem: BakedProblem, context: PresolveContext): PassDelta {

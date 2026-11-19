@@ -262,7 +262,9 @@ class SymmetryBreakingTest {
 
     @Test
     fun `automatic optimization should schedule only one symmetry scan`() {
-        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 1)), transformObjective = true)
+        val context = PresolveContext.of(
+            LinearObjective(intCoefficients = longArrayOf(1, 1)), transformObjective = true,
+        )
 
         val automatic = PresolveConfig.DEFAULT.problemPasses(context)
         val protected = PresolveConfig.parse("default,-objective-symmetry").problemPasses(context)
