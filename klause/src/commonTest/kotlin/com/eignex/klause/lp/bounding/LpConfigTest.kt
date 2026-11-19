@@ -61,9 +61,10 @@ class LpConfigTest {
     }
 
     @Test
-    fun `sparse trials require an explicit per invocation option`() {
+    fun `sparse admission follows the numerical emphasis ceiling`() {
         for (emphasis in LpEmphasis.entries) {
-            assertFalse(LpConfig(emphasis).resolved(LpTechnique.SPARSE_TRIAL))
+            assertEquals(LpTiming.MEDIUM in emphasis.timings,
+                LpConfig(emphasis).resolved(LpTechnique.SPARSE_TRIAL))
         }
         assertFalse(LpConfig.parse("all").resolved(LpTechnique.SPARSE_TRIAL))
         assertTrue(LpConfig.parse("default,+sparse-trial").resolved(LpTechnique.SPARSE_TRIAL))

@@ -91,8 +91,9 @@ internal data class LpAdmission(
  * accepted smallest-first, so a stack of hulls is shed rather than allowed to defeat the guard. The Lagrangian and
  * energetic bounds have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
  * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
- * An explicit [LpTechnique.SPARSE_TRIAL] request can instead select a resource-bounded root plan after inspecting
- * the emitted linear relaxation. This does not expand ordinary node admission or dense exact continuation.
+ * [LpTechnique.SPARSE_TRIAL] permits bounded sparse root admission beyond the small-relaxation budget for
+ * finite optimizing linear sources. An admitted source retains its ordinary node plan when it fits the ceiling;
+ * sources beyond the ceiling receive root reasoning only. Dense exact continuation keeps its separate caps.
  *
  * `LpEngine` resolves [LpParams.lpConfig] through this; the portfolio calls [resolve] directly to ask
  * whether an arm's emphasis enables any LP technique.
@@ -161,6 +162,7 @@ object LpAutoConfig {
         cancellation: ExecutionControl = ExecutionControl.Never,
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
+        sparseTrialQueryWork: Long = SPARSE_LP_MAX_WORK,
         sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
@@ -406,17 +408,26 @@ object LpAutoConfig {
                 base.energeticEvery
             },
         )
+        val explicitSparse = config.overrides[LpTechnique.SPARSE_TRIAL] == true
+        val automaticSparse = !explicitSparse && objective != null && problem.numRealVars == 0 &&
+            !problem.intBounds.hasOpenSides &&
+            !base.componentOwnership && !base.lbTreeSearch && !coneRequested && cells > baseCap &&
+            !base.cuts && !base.booleanRlt && !base.impliedBoundCuts && !base.flowCoverCuts &&
+            config.overrides.none { (technique, enabled) -> enabled && technique.timing == LpTiming.EXHAUSTIVE }
         val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
+            (explicitSparse || automaticSparse) &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
                 minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
-                sourcePreparation)
-            else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
+                sourcePreparation, automatic = automaticSparse, queryWorkAllowance = minOf(sparseTrialQueryWork,
+                    base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK))
+            else SparseLpAdmission(mapOf("DeclineProjection" to 1L, "Automatic" to if (automaticSparse) 1L else 0L))
         } else null
         if (sparse?.admitted == true) {
-            plan = LpPlan(
-                bounding = true, boundMaxDepth = 0, learn = true, probe = true, rootCutHarvest = false,
+            plan = (if (explicitSparse) LpPlan() else plan).copy(
+                bounding = true, boundMaxDepth = if (automaticSparse && plan.bounding) plan.boundMaxDepth else 0,
+                learn = true, probe = true, rootCutHarvest = false,
                 rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,

@@ -96,6 +96,7 @@ internal class LpPropagator(
     private val queryWorkAllowance: () -> Long? = { null },
     private val onPreparation: ((LpSolveMetrics) -> Unit)? = null,
     private val continuationAllowance: () -> Long? = { null },
+    private val separatePreparation: () -> Boolean = { onPreparation != null },
 ) : SearchComponent,
     SearchBrancher,
     SearchBranchProposal,
@@ -405,7 +406,7 @@ internal class LpPropagator(
             edit.commit()
             true
         } finally {
-            onPreparation?.invoke(takePreparationMetrics(current))
+            if (separatePreparation()) onPreparation?.invoke(takePreparationMetrics(current))
         }
     } == true
 
@@ -427,7 +428,7 @@ internal class LpPropagator(
         continuationWorkAllowance: (() -> Long?)? = null,
         queryAllowance: (() -> Long?)? = null,
     ): Pair<LpSolver, FloatLpResult?>? =
-        solveOwned(token.takeIf { onPreparation != null }) { current ->
+        solveOwned(token.takeIf { separatePreparation() }) { current ->
             val standard = queryWorkAllowance()
             val requested = queryAllowance?.invoke()
             val offered = when {

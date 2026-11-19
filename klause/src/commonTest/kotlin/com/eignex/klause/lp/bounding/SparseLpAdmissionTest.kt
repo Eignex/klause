@@ -49,6 +49,116 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `automatic root admission uses the cumulative grant beyond a slice quantum`() {
+        val problem = Problem(0, 16, Array(16) { IntDomain(0, 2) },
+            List(16) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpMaxTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(16) { 1L })
+
+        LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO), SolveStatsSink("slice"),
+            nodeWorkAllowance = { 2_048L }).use { engine ->
+            assertTrue(engine.sparseTrialActive)
+        }
+    }
+
+    @Test
+    fun `automatic admission declines an unaffordable monolithic basis before assembly`() {
+        val problem = Problem(0, 600, Array(600) { IntDomain(0, 1) },
+            List(600) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.GE, 0) })
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> { admission = prepareSparseLpAdmission(problem, null, automatic = true) }.forEach { }
+
+        assertEquals(1L, admission?.metrics?.get("DeclineQueryWork"))
+        assertNull(admission?.sourceLayout)
+        assertEquals(600L, admission?.work)
+    }
+
+    @Test
+    fun `automatic admission preserves ordinary finite node funding`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        for (explicit in listOf(false, true)) {
+            val config = LpConfig.parse(if (explicit) "default,+sparse-trial" else "default")
+            val params = LpParams(lpConfig = config, lpPlan = LpPlan(boundAdaptiveWork = false))
+
+            LpEngine(problem, objective, params, SolveStatsSink("funding")).use { engine ->
+                engine.noteSolveOps(SPARSE_LP_MAX_WORK)
+                val session = PropagationSession(problem)
+                session.pinIntAtLeast(0, 1L)
+                engine.pruneNode(session, Double.POSITIVE_INFINITY, -1, true, deferSimplex = true)
+
+                assertTrue(engine.sparseTrialActive)
+                assertEquals(if (explicit) 0 else Int.MAX_VALUE, engine.params.lpPlan.boundMaxDepth)
+                assertEquals(if (explicit) 1L else 0L, engine.nodeWorkBudget())
+                assertEquals(if (explicit) 1L else 0L, engine.nodePreparationWorkBudget())
+            }
+        }
+    }
+
+    @Test
+    fun `automatic root preparation spends its recorded work`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO), SolveStatsSink("preparation")).use { engine ->
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+            engine.propagator.releaseSolver()
+            val before = engine.totalSolveWork()
+
+            assertTrue(engine.propagator.prepare(ExecutionControl.Never, SPARSE_LP_MAX_WORK))
+
+            val preparation = engine.propagator.lastMetrics.workOps
+            assertTrue(preparation > 0L)
+            assertEquals(preparation, engine.totalSolveWork() - before)
+        }
+    }
+
+    @Test
+    fun `automatic admission declines open integer sources`() {
+        for (lower in listOf(false, true)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 5) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+                openIntLo = booleanArrayOf(lower, false), openIntHi = booleanArrayOf(!lower, false),
+                settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+            val plan = LpAutoConfig.resolve(problem, LpConfig.AUTO, LpPlan(), objective)
+
+            assertFalse(plan.bounding)
+        }
+    }
+
+    @Test
+    fun `automatic admission adds only root reasoning beyond the ordinary ceiling`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        val plan = LpAutoConfig.resolve(problem, LpConfig.AUTO, LpPlan(), objective)
+
+        assertTrue(plan.bounding)
+        assertEquals(0, plan.boundMaxDepth)
+    }
+
+    @Test
+    fun `automatic fill risk declines before source assembly`() {
+        val problem = Problem(0, 3_000, Array(3_000) { IntDomain(0, 1) },
+            listOf(Linear(IntArray(3_000) { 1 }, IntArray(3_000) { it }, LinearOp.GE, 1)))
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> { admission = prepareSparseLpAdmission(problem, null, automatic = true) }.forEach { }
+
+        assertEquals(1L, admission?.metrics?.get("DeclineFillRisk"))
+        assertNull(admission?.sourceLayout)
+    }
+
+    @Test
     fun `disabled source preparation should remain disabled during sparse admission`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
@@ -359,24 +469,31 @@ class SparseLpAdmissionTest {
     }
 
     @Test
-    fun `spent sparse root grant prevents another root node query`() {
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
-            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L))
-        var queries = 0
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
-            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial"),
-                lpPlan = LpPlan(rootMaxWork = 20_000L)), SolveStatsSink("spent-sparse-root"),
-            LpSolveContext(onQuery = { queries++ })).use { engine ->
-            assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
-            engine.noteNodeOverhead(engine.retainedRootCumulativeWork())
-            val previousQueries = queries
+    fun `spent sparse root grants preserve only admitted ordinary child queries`() {
+        for (ceiling in listOf(1L, Long.MAX_VALUE)) for (explicit in listOf(false, true)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+                settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = ceiling))
+            var queries = 0
+            val config = LpConfig.parse(if (explicit) "default,+sparse-trial" else "default")
+            LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
+                LpParams(lpConfig = config, lpPlan = LpPlan(rootMaxWork = 20_000L)),
+                SolveStatsSink("spent-sparse-root"), LpSolveContext(onQuery = { queries++ })).use { engine ->
+                assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
+                engine.noteNodeOverhead(engine.retainedRootCumulativeWork())
+                val previousQueries = queries
+                val session = PropagationSession(problem)
+                session.pinIntAtLeast(0, 1L)
 
-            val pruned = engine.pruneNode(PropagationSession(problem), 2.0, -1, true)
+                assertFalse(engine.pruneNode(session, 10.0, -1, true))
 
-            assertFalse(pruned)
-            assertEquals(previousQueries, queries)
-            assertEquals(0L, engine.retainedRootCumulativeWork())
+                val childQueries = queries
+                assertEquals(!explicit && ceiling > 1L, childQueries > previousQueries)
+                session.popLast()
+                assertFalse(engine.pruneNode(session, 10.0, -1, true))
+                assertEquals(childQueries, queries)
+                assertEquals(0L, engine.retainedRootCumulativeWork())
+            }
         }
     }
 

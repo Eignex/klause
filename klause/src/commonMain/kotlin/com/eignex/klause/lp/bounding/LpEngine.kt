@@ -177,8 +177,12 @@ internal class LpEngine(
     internal var sparseTrialActive = false
         private set
     private var rootBoundHandedOff = false
+    private var automaticOrdinaryNodes = false
+    private var lpNodeDepth = 0
+    private val sparseRootWork: Boolean
+        get() = sparseTrialActive && (!automaticOrdinaryNodes || lpNodeDepth == 0)
     private var admittedSourceLayout: LpRelaxation? = null
-    private val sparseTrialRequested = params0.lpConfig?.resolved(LpTechnique.SPARSE_TRIAL) == true
+    private val sparseTrialRequested = params0.lpConfig?.overrides?.get(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
@@ -206,6 +210,7 @@ internal class LpEngine(
 
     internal fun resetRootBoundSearch() {
         rootBoundHandedOff = false
+        lpNodeDepth = 0
     }
 
     internal val rootRoundingQueryPaused: Boolean
@@ -1037,7 +1042,7 @@ internal class LpEngine(
     }
 
     internal fun nodeWorkBudget(): Long {
-        if (sparseTrialActive) return retainedRootRemainingWork().coerceAtLeast(1L)
+        if (sparseRootWork) return retainedRootRemainingWork().coerceAtLeast(1L)
         val budget = when {
             !adaptiveWork -> 0L
             lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
@@ -1049,17 +1054,19 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
-        if (sparseTrialActive) return minOf(retainedRootRemainingWork().coerceAtLeast(1L),
+        if (sparseRootWork) return minOf(retainedRootRemainingWork().coerceAtLeast(1L),
             if (adaptiveWork) lpWorkBudget.ops() else SPARSE_LP_MAX_WORK)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
-    internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
+    internal fun nodePreparationWorkBudget(): Long = if (sparseRootWork) {
         retainedRootCumulativeWork().coerceAtLeast(1L)
     } else if (separateNodePreparation) {
-        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
+        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (sparseRootWork ||
+            params.lpPlan.componentOwnership
+        ) {
             retainedRootRemainingWork().coerceAtLeast(1L)
         } else nodeWorkBudget()
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L)
@@ -1157,7 +1164,8 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
+    private val separateNodePreparation: Boolean get() = sparseTrialActive || sparseTrialRequested ||
+        requestedPlan.componentOwnership ||
         rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
@@ -1248,12 +1256,15 @@ internal class LpEngine(
         queryWorkAllowance = {
             nodeQueryWorkBudget() ?: nodeWorkBudget().takeIf { separateNodePreparation }
         },
-        onPreparation = if (separateNodePreparation) { metrics ->
-            sink.lp.observeEngineCost(LpRoute.NODE, metrics)
-            noteSolveOps(metrics.workOps)
-        } else null,
+        onPreparation = { metrics ->
+            if (separateNodePreparation) {
+                sink.lp.observeEngineCost(LpRoute.NODE, metrics)
+                noteSolveOps(metrics.workOps)
+            }
+        },
+        separatePreparation = { separateNodePreparation },
         continuationAllowance = {
-            if (sparseTrialActive) retainedRootCumulativeWork() else
+            if (sparseRootWork) retainedRootCumulativeWork() else
                 lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )
@@ -1612,6 +1623,7 @@ internal class LpEngine(
         deferSimplex: Boolean = false,
     ): Boolean {
         requireOpen()
+        lpNodeDepth = session.decisionLevel
         lpBackjump = null
         lastPruneBound = effectiveBound
         for (b in bounds) {
@@ -1884,10 +1896,13 @@ internal class LpEngine(
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation) { admission ->
+                    sparseTrialWork = retainedRootRemainingWork(), sparseTrialQueryWork = retainedRootCumulativeWork(),
+                    sourcePreparation = sourcePreparation) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted
+                        automaticOrdinaryNodes = trial.admitted && trial.metrics["Automatic"] == 1L &&
+                            admission.withinCeiling
                         admittedSourceLayout = trial.sourceLayout.takeIf { trial.admitted }
                         sink.lp.sparseTrial = trial.metrics
                         noteNodeOverhead(trial.work)
