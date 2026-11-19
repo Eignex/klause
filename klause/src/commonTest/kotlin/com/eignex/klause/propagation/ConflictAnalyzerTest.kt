@@ -264,7 +264,8 @@ class ConflictAnalyzerTest {
         assertEquals(2, learned.backjumpLevel)
     }
 
-    private fun atomGeState(levels: IntArray, ants: Array<IntArray?>? = null): PropagationState {
+    private fun atomGeState(levels: IntArray, ants: Array<IntArray?>? = null,
+        pbLearning: Boolean = false): PropagationState {
         val n = levels.size
         val problem = Problem(
             numBoolVars = 0,
@@ -272,7 +273,7 @@ class ConflictAnalyzerTest {
             intDomains = Array(n) { IntDomain(0, 10) },
             factors = arrayOf<Factor>(),
         )
-        val state = PropagationState(problem, Assumptions.None)
+        val state = PropagationState(problem, Assumptions.None, pbLearning = pbLearning)
         state.undoLogging = true
         for (v in 0 until n) {
             state.currentLevel = levels[v]
@@ -297,8 +298,7 @@ class ConflictAnalyzerTest {
     fun `PB enablement without source Booleans should preserve clause analysis and work`() {
         for (integerLearning in listOf(false, true)) {
             val results = listOf(false, true).map { pbLearning ->
-                val state = atomGeState(intArrayOf(1, 2))
-                state.pbLearning = pbLearning
+                val state = atomGeState(intArrayOf(1, 2), pbLearning = pbLearning)
                 state.integerRowLearning = integerLearning
                 state.currentLevel = 2
                 val factor = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
@@ -317,8 +317,7 @@ class ConflictAnalyzerTest {
 
     @Test
     fun `PB enablement without source Booleans should retain containing cancellation`() {
-        val state = atomGeState(intArrayOf(1, 2))
-        state.pbLearning = true
+        val state = atomGeState(intArrayOf(1, 2), pbLearning = true)
         state.currentLevel = 2
         state.finiteWork.cancellation = ExecutionControl { true }
 
