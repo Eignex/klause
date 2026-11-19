@@ -8,6 +8,14 @@ import kotlin.test.assertTrue
 
 class LpComponentReuseTest {
     @Test
+    fun `owner preparation stays bounded by the cumulative lp grant`() {
+        assertEquals(16_000_000L, componentReusePreparationWork(null))
+        assertEquals(16_000_000L, componentReusePreparationWork(100_000_000L))
+        assertEquals(7L, componentReusePreparationWork(7L))
+        assertEquals(1L, componentReusePreparationWork(0L))
+    }
+
+    @Test
     fun `inspection declines small or oversized owners before partition allocation`() {
         assertEquals("SMALL_MODEL", componentReuseInspection(8, 8, 16))
         assertEquals("STORAGE", componentReuseInspection(10_000, 10_000, 200_000))

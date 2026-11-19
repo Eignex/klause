@@ -57,13 +57,17 @@ class LpEngineTest {
             })
         val factory = RecordingLpEngineFactory()
         val sink = SolveStatsSink("automatic-numerical-reuse")
+        var offeredWork = 1L
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
-            LpParams(lpPlan = LpPlan(bounding = true, componentReuse = true, boundAdaptiveWork = false,
-                probe = false, cuts = false, rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
+            LpParams(lpPlan = LpPlan(bounding = true, componentReuse = true,
+                probe = false, cuts = false, rootCutHarvest = false)), sink, LpSolveContext(factory),
+            nodeWorkAllowance = { offeredWork }).use { engine ->
             val cp = CpSearchComponent(PropagationSession(problem))
             engine.cpAdapter.attach(cp.session, feasibility = false)
             val shared = SearchSession(listOf(cp, engine.propagator))
             shared.initialize()
+            assertFalse(engine.pruneNode(cp.session, 1000.0, -1, true))
+            offeredWork = 1_000_000L
             assertFalse(engine.pruneNode(cp.session, 1000.0, -1, true))
             val before = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
             shared.push(SearchDecision.IntAtLeast(0, 1L))

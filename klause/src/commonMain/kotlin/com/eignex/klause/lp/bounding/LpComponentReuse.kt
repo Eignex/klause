@@ -6,6 +6,10 @@ import com.eignex.klause.lp.engine.LpComponentShape
 private const val MIN_COMPONENT_CELLS = 4096L
 private const val MAX_COMPONENT_BYTES = 16L * 1024 * 1024
 private const val MAX_COMPONENTS = 1024
+private const val MAX_COMPONENT_PREPARATION_WORK = 16_000_000L
+
+internal fun componentReusePreparationWork(remaining: Long?): Long =
+    minOf(MAX_COMPONENT_PREPARATION_WORK, remaining?.coerceAtLeast(1L) ?: MAX_COMPONENT_PREPARATION_WORK)
 
 internal val LpEngine.numericalComponentAdmission: LpComponentAdmission
     get() = object : LpComponentAdmission {

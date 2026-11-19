@@ -1045,6 +1045,8 @@ internal class LpEngine(
 
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         retainedRootCumulativeWork().coerceAtLeast(1L)
+    } else if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership) {
+        componentReusePreparationWork(lpEffortGovernor.remainingWork())
     } else if (separateNodePreparation) {
         val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
             retainedRootRemainingWork().coerceAtLeast(1L)
