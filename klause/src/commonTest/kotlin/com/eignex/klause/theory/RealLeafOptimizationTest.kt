@@ -416,7 +416,8 @@ class RealLeafOptimizationTest {
                 override fun isCancelled(): Boolean = true
             }, 1L)
 
-            val result = assertIs<RealOptimizationResult.Undecided>(assertIs<RealOptimizationStep.Completed>(stopped).result)
+            val result =
+                assertIs<RealOptimizationResult.Undecided>(assertIs<RealOptimizationStep.Completed>(stopped).result)
             assertEquals(BigFraction.ZERO, result.incumbent?.let { it[2] - it[3] })
             assertEquals(null, result.infimum)
         }
@@ -455,7 +456,8 @@ class RealLeafOptimizationTest {
                 step = optimization.advance(ExecutionControl.Never, 1L)
             }
 
-            val actual = assertIs<RealOptimizationResult.Undecided>(assertIs<RealOptimizationStep.Completed>(step).result)
+            val actual =
+                assertIs<RealOptimizationResult.Undecided>(assertIs<RealOptimizationStep.Completed>(step).result)
             assertEquals(BigFraction.ZERO, actual.infimum)
             assertEquals(expected.incumbent, actual.incumbent)
             assertEquals(uninterrupted.work, optimization.work)

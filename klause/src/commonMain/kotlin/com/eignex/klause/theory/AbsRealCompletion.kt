@@ -107,11 +107,9 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
         cancellation: ExecutionControl,
         controls: SearchExecutionControls? = null,
         solveContext: LpSolveContext = LpSolveContext.Production,
-    ): Result {
-        return openSearch(sample, encoding, extra, cancellation,
-            controls ?: SearchExecutionControlAdapter(cancellation), solveContext).use { cursor ->
-            (cursor.advance() as LpSolveStep.Completed).value
-        }
+    ): Result = openSearch(sample, encoding, extra, cancellation,
+        controls ?: SearchExecutionControlAdapter(cancellation), solveContext).use { cursor ->
+        (cursor.advance() as LpSolveStep.Completed).value
     }
 
     fun openSearch(
