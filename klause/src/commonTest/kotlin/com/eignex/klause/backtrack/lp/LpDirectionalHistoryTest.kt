@@ -82,12 +82,12 @@ class LpDirectionalHistoryTest {
 
             history.record(value)
 
-            assertFalse(history.hasTwoSidedSamples)
+            assertFalse(history.hasReliableHistory)
         }
     }
 
     @Test
-    fun `two sided availability does not establish variable reliability`() {
+    fun `samples from different variables do not admit reliable scoring`() {
         val history = LpDirectionalHistory({})
         for (up in listOf(false, true)) {
             repeat(2) {
@@ -102,7 +102,7 @@ class LpDirectionalHistoryTest {
             }
         }
 
-        assertTrue(history.hasTwoSidedSamples)
+        assertFalse(history.hasReliableHistory)
         assertTrue(history.score(VarRef.IntVar(0), 2.25).isNaN())
         assertTrue(history.score(VarRef.IntVar(1), 2.25).isNaN())
     }
@@ -120,11 +120,11 @@ class LpDirectionalHistoryTest {
                 history.record(if (up) 13.0 else 11.0)
             }
         }
-        assertTrue(history.hasTwoSidedSamples)
+        assertTrue(history.hasReliableHistory)
 
         history.clear()
 
-        assertFalse(history.hasTwoSidedSamples)
+        assertFalse(history.hasReliableHistory)
     }
 
     @Test
@@ -144,7 +144,7 @@ class LpDirectionalHistoryTest {
             history.record(13.0)
         }
 
-        assertEquals(1.5, history.score(variable, 2.25), 1e-9)
+        assertEquals(kotlin.math.sqrt(3.0), history.score(variable, 2.25), 1e-9)
     }
 
     @Test
@@ -205,8 +205,10 @@ class LpDirectionalHistoryTest {
             history.record(12.0)
         }
         assertTrue(history.score(VarRef.Bool(0), 0.5).isFinite())
+        assertTrue(history.hasReliableHistory)
         repeat(3) { history.beginNode(0) }
 
+        assertFalse(history.hasReliableHistory)
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
         assertEquals(2, observations.count { it == "EXPIRED" })
     }
@@ -258,5 +260,48 @@ class LpDirectionalHistoryTest {
         }
 
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+    }
+
+    @Test
+    fun `a gain in only one child keeps ordinary scoring`() {
+        for (improvingUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up == improvingUp) 110.0 else 10.0)
+                }
+            }
+
+            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+        }
+    }
+
+    @Test
+    fun `refreshing one direction cannot renew the scope scoring gate`() {
+        val history = LpDirectionalHistory({}, maxAge = 4L)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        assertTrue(history.hasReliableHistory)
+
+        repeat(5) {
+            history.commit(SearchDecision.Bool(0), 1)
+            history.beginNode(1)
+            history.record(12.0)
+        }
+
+        assertFalse(history.hasReliableHistory)
     }
 }
