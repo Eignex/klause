@@ -180,8 +180,18 @@ internal class ComponentLpSolver(
         val previous = model.exactState ?: return false
         if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
         val nextModel = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
+        val changes = if (state.rows === previous.rows) state.projectedScalarChanges(model, nextModel) else null
         val nextParts = ArrayList<LpNeighborhood>(parts.size)
-        for (part in parts) nextParts += part.rebindExact(state, token) ?: return false
+        for (part in parts) {
+            if (token()) return false
+            fun contains(column: Int): Boolean = if (column < model.n) {
+                part.cols.binarySearch(column) >= 0
+            } else {
+                part.rows.binarySearch(column - model.n) >= 0
+            }
+            val affected = changes == null || changes.bounds.any(::contains) || changes.costs.any(::contains)
+            nextParts += if (affected) part.rebindExact(state, token) ?: return false else part
+        }
         if (token()) return false
         try {
             for (index in solvers.indices) {
