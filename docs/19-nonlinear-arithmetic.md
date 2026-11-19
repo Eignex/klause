@@ -315,6 +315,12 @@ invalidates the conditioned bound selection. Tolerance sources use their widened
 formula, including private exact function values and residual bands, for the same
 deductions.
 
+Initial deductions use a checkpointed allowance capped at 65,536 work units and
+one quarter of a finite remaining invocation or containing grant. Integer cursor
+initialization supplies the same fraction of its remaining arithmetic allowance.
+Completed atomic LP work is charged before the next stop check. A local decline
+discards partial endpoints and retains exact completion; a containing stop remains terminal.
+
 #### Certified envelope pruning
 
 The model-facing adapter lifts shared monomials into auxiliary product columns.

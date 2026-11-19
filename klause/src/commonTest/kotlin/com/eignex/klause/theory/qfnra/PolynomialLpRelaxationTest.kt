@@ -9,6 +9,7 @@ import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -195,7 +196,7 @@ class PolynomialLpRelaxationTest {
     }
 
     @Test
-    fun `exhausted deduction should publish no partial bounds`() {
+    fun `initial deduction should preserve the remaining caller allowance`() {
         val source = SmtLibPolynomial.parse("""
             (declare-const x Real) (declare-const r Real)
             (assert (and (>= x 0) (<= x 10) (>= r 3) (= (* r r) x)))
@@ -205,9 +206,41 @@ class PolynomialLpRelaxationTest {
         service.invocation(QfNraParams(maximumWork = 10)).use { invocation ->
             val bounds = invocation.bounds(PolynomialCondition(), setOf(0))
 
-            assertTrue(bounds.stopped)
+            assertFalse(bounds.stopped)
             assertTrue(bounds.lower.isEmpty() && bounds.upper.isEmpty())
-            assertEquals(10L, invocation.stats.workSpent)
+            assertTrue(invocation.stats.workSpent < 10L)
+        }
+    }
+
+    @Test
+    fun `declined initial deduction should retain exact completion`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+
+        service.invocation(QfNraParams(maximumWork = 100_000)).use { invocation ->
+            invocation.bounds(PolynomialCondition(), setOf(0), workAllowance = 1)
+
+            assertIs<QfNraResult.Satisfiable>(invocation.check())
+            assertTrue(invocation.stats.workSpent <= 100_000L)
+        }
+    }
+
+    @Test
+    fun `a transient caller stop should discard every initial deduction`() {
+        val source = SmtLibPolynomial.parse("""
+            (declare-const x Real) (declare-const r Real)
+            (assert (and (>= x 0) (<= x 10) (>= r 3) (= (* r r) x)))
+        """.trimIndent())
+        val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
+        var polls = 0
+        val control = ExecutionControl { ++polls == 100 }
+
+        service.invocation(QfNraParams(cancellation = control)).use { invocation ->
+            val stopped = invocation.bounds(PolynomialCondition(), setOf(0))
+
+            assertTrue(stopped.stopped)
+            assertTrue(stopped.lower.isEmpty() && stopped.upper.isEmpty())
+            assertEquals(BigFraction.ofLong(9), invocation.bounds(PolynomialCondition(), setOf(0)).lower[0])
         }
     }
 }
