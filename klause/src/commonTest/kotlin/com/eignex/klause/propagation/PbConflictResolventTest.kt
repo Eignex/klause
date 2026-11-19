@@ -33,6 +33,25 @@ import kotlin.test.assertTrue
 
 class PbConflictResolventTest {
     @Test
+    fun `an exhausted arithmetic allowance should preserve clause analysis`() {
+        for (limits in listOf(ArithmeticLearningLimits(work = 0), ArithmeticLearningLimits(allocationBytes = 0))) {
+            val state = PropagationState(Problem(2, 0, emptyArray(), emptyArray()),
+                Assumptions.None, pbLearning = true)
+            state.arithmeticLearningLimits = limits
+            state.arithmeticLearningTrace = ArithmeticLearningTrace()
+            state.currentLevel = 1
+            assertTrue(state.pinBool(0, true))
+            assertTrue(state.pinBool(1, true))
+
+            val result = state.conflictAnalyzer.analyzeConflictClause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
+
+            assertIs<ConflictAnalyzer.AnalysisResult.Learned>(result)
+            assertTrue(!state.runCancelled)
+            assertTrue(state.arithmeticLearningTrace!!.events.any { it.kind.startsWith("pb.decline.resource-") })
+        }
+    }
+
+    @Test
     fun `guarded counting rows should be consumed without strengthening inactive siblings`() {
         for (scale in listOf(bigIntOf(1), bigIntOf(Long.MAX_VALUE) + bigIntOf(1))) {
             for (truth in listOf(false, true)) {
