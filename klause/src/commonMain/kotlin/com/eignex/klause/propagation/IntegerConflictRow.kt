@@ -200,7 +200,11 @@ internal class IntegerConflictRow private constructor(
             }
             if (second < other.variables.size && secondVariable == nextVariable) {
                 budget?.scalar(other.coefficients[second], right)
-                val contribution = if (right == BIG_ONE) other.coefficients[second] else other.coefficients[second] * right
+                val contribution = if (right == BIG_ONE) {
+                    other.coefficients[second]
+                } else {
+                    other.coefficients[second] * right
+                }
                 budget?.scalar(coefficient, contribution)
                 coefficient += contribution
                 second++
