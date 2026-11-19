@@ -9,12 +9,6 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
-With a captured exact linear objective, a verified shared floor reaching the
-conservatively rounded upper value of the accepted incumbent closes optimality
-without a positive gap policy. The least gap floor of shared facts still limits
-the conclusion. Unpublished statistics and scalar equality without exact objective
-capture supply no closure authority.
-
 Every worker belongs to a family: backtrack (complete search), local search, or
 large-neighborhood search around the incumbent. A local-search or LNS worker's
 whole state is visible, so a segment without progress is evidence against its
@@ -809,27 +803,6 @@ worker joins after the first incumbent once ordinary complete workers stall, wit
 allowance described in [resources](06-sessions.md#resource-allowances); parallel pools
 admit it immediately, and `core-guided` selects it directly.
 
-An automatically deferred worker starts with two seconds of cumulative active time.
-After a completed core raises its exact floor, an accepted incumbent within that
-last floor increment can fund continuation when at least eight seconds remain on
-the caller deadline. Each fresh completed-core epoch can extend the active limit
-to the time already spent plus three quarters of the remaining caller time. No
-finite deadline, no incumbent or a wider gap leaves the initial limit in place. The
-incumbent funds scheduling only; query satisfaction never treats it as an objective
-cutoff. Grants preserve the paid query, pins, preparation and traversal.
-
-A funded worker receives at least four base work slices per turn, capped by the
-configured work-slice maximum, or the ordinary growing work slice when larger.
-Its elapsed turn uses the ordinary growing slice within the containing family
-deadline and active grant. Each turn still requires fresh complete-sibling coverage.
-While a funded query waits, the scheduler services that
-coverage directly with base work offers to the least charged available complete
-worker before returning to the query. Improvement-only arms and unspent offers do
-not count as fresh coverage. Explicit minimum shares retain precedence. Retirement
-restores ordinary scheduling. Cancellation and the containing deadline retain
-precedence. Explicit core workers and diagnostic work schedules keep their selected
-limits. `continuationGrants` reports funding decisions without proof authority.
-
 Curated single-lane mixed source execution instead selects an early reason-refined
 core trial for nonuniform Boolean objectives over clauses, cardinalities and
 pseudo-Boolean rows or their reifications only, within fixed size limits on Boolean
@@ -838,7 +811,7 @@ words and the sum of the objective's absolute coefficients and constant fits the
 exact scalar range below `2^53`. It excludes integer and real columns. Eligibility
 scanning is cancellable and charges the containing invocation; unsupported or
 interrupted eligibility keeps the ordinary delayed, unrefined policy. The trial keeps
-ordinary complete-worker coverage, worker positions, seeds and its initial auxiliary
+ordinary complete-worker coverage, worker positions, seeds and its auxiliary
 allowance, and explicit core settings, arm counts, recipes, annotations, backtrack
 edits and work diagnostics keep their selected policy.
 

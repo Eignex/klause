@@ -1482,9 +1482,6 @@ an arm has no terminal verdict within its budget, `INVALID` with reasons, or `MI
 cancelled or absent arms. The script exits 1 when a row is invalid or missing, 3 when rows are
 accepted but the declared experiment is only partly verified, and 0 when it is verified.
 
-Checker identities match between arms reporting feasible witnesses or a checker receipt. An unknown arm
-without either makes no checker identity claim; feasible arms with missing or different policies still differ.
-
 Outcomes keep native claims, checked witnesses and native proofs apart; a valid check whose
 witness digest does not match the retained witness is `valid-unbound`, and no retained record
 carries an independent proof. Cost scopes stay separate because they nest: CLI CPU inside adapter

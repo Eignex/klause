@@ -36,7 +36,6 @@ import com.eignex.klause.util.withStopFlag
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.util.concurrent.Mutex
 import com.eignex.util.concurrent.parallelRun
-import com.eignex.util.numbers.saturatedAdd
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
@@ -462,10 +461,10 @@ class Portfolio(
     /**
      * Branch-and-bound: run arms in scheduled segments, carrying one shared incumbent. Each segment streams
      * against its arm's own objective representation, sees the shared bound (backtrack prunes on it) and the
-     * incumbent assignment (local search warm-starts from it). Complete traversal or a verified shared bound can
-     * establish [MinimizeResult.Optimal]; a source refutation yields [MinimizeResult.Infeasible]. Unfinished work
-     * retains any incumbent as [MinimizeResult.BestFound]. `onImprovement` fires for strict global improvements,
-     * tagged with the producing arm in incumbent installation order.
+     * incumbent assignment (local search warm-starts from it). Returns [MinimizeResult.Optimal] /
+     * [MinimizeResult.Infeasible] only when an arm exhausts its search, otherwise the best incumbent as
+     * [MinimizeResult.BestFound]. `onImprovement` fires once per strict global improvement, tagged with the arm
+     * that produced it, in the order the incumbent installed them.
      */
     override fun minimize(
         cancellation: ExecutionControl,
@@ -840,9 +839,7 @@ class Portfolio(
                 // A bound some arm proved within the gap of the pool's incumbent ends the run like an exhaustion.
                 val gap = optimalityGap
                 val shared = minOf(sharedObjectiveBound?.current() ?: Double.NEGATIVE_INFINITY, gapFloor)
-                val upper = incumbents.bound()
-                val exactClosed = gap == null && exactLinearObjective != null && upper.isFinite() && shared >= upper
-                if (!exhausted && (exactClosed || gap?.closes(upper, shared) == true)) {
+                if (!exhausted && gap != null && gap.closes(incumbents.bound(), shared)) {
                     exhausted = true
                     exhaustionBound = shared
                     run.finish()
@@ -1295,20 +1292,11 @@ class Portfolio(
             }
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
             val probing = initialProbe || (auxiliary && !trialStarted[arm])
-            val fundedCoverage = fundedCore() != null && isCoreCoverageWorker(arm)
-            val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof || fundedCoverage
-            val continuingCore = workers[arm].auxiliaryProof &&
-                (liveStats[arm]?.coreGuided?.continuationGrants ?: 0L) > 0L
-            val twiceBase = saturatedAdd(baseSliceWork, baseSliceWork)
-            val continuationWork = minOf(maxSliceWork, saturatedAdd(twiceBase, twiceBase))
-            val ordinaryAllowance = when {
-                continuingCore -> maxOf(sliceWork, continuationWork)
-                baseAllowance -> baseSliceWork
-                else -> sliceWork
-            }
+            val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof
+            val ordinaryAllowance = if (baseAllowance) baseSliceWork else sliceWork
             val allowance = if (diagnostics == null) ordinaryAllowance else
                 minOf(ordinaryAllowance, diagnostics.workLimit - chargedWork)
-            val time = if (baseAllowance && !continuingCore) baseSliceMillis else slice
+            val time = if (baseAllowance) baseSliceMillis else slice
             val remainingTime = if ((handles[arm] as? ResumableSearch)?.preparationPending != false) {
                 preparationTimeLimit - trialPreparationTime[arm]
             } else trialTimeLimit - trialSearchTime[arm]
@@ -1332,14 +1320,6 @@ class Portfolio(
             }
         }
 
-        private fun fundedCore(): Int? = if (lanes != 1 || diagnostics != null) null else workers.indices.firstOrNull {
-            !retired[it] && workers[it].auxiliaryProof &&
-                (liveStats[it]?.coreGuided?.continuationGrants ?: 0L) > 0L
-        }
-
-        private fun isCoreCoverageWorker(arm: Int): Boolean = workers[arm].family == ArmFamily.Backtrack &&
-            !workers[arm].auxiliaryProof && !workers[arm].improvementOnly
-
         private fun initialHeuristicEligibility(eligible: List<Int>): List<Int> {
             if (heuristicSampled || diagnostics != null || lanes != 1) return eligible
             val first = eligible.firstOrNull { it in initialHeuristics && !retired[it] } ?: return eligible
@@ -1355,7 +1335,7 @@ class Portfolio(
             }
             val first = available.filter { !workers[it].improvementOnly }
             val eligible = if (improving || first.all { retired[it] }) available else first
-            val complete = first.filter(::isCoreCoverageWorker)
+            val complete = first.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
             val covered = if (proofStarted) {
                 val active = complete.filter { !retired[it] }
                 var needed = active.fold(0L) { work, _ -> work + minOf(baseSliceWork, Long.MAX_VALUE - work) }
@@ -1375,12 +1355,6 @@ class Portfolio(
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
             owedCompleteArm(eligibleArms)?.let { return it }
-            val funded = fundedCore()
-            if (funded != null && funded !in eligibleArms) {
-                eligibleArms.filter {
-                    isCoreCoverageWorker(it) && !busy[it] && !retired[it]
-                }.minByOrNull { armWork[it] }?.let { return it }
-            }
             eligibleArms.firstOrNull {
                 workers[it].auxiliaryProof && !busy[it] && !retired[it]
             }?.let { return it }

@@ -616,11 +616,6 @@ A conflict or indeterminate publication result ends the callback immediately.
 Slice polls charge completed native propagation visits before deciding whether the
 slice has expired.
 
-A private satisfaction driver can supply a live containing-slice stop independently
-of its run-end token. Slice stops retain preparation, traversal and learning;
-containing-run cancellation and cumulative exhaustion retire the query. Rounded delegate
-deadlines therefore pause the paid query without becoming lifetime cancellation.
-
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.

@@ -18,7 +18,6 @@ internal class CoreGuidedSolver(
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
-    private val continueProductive: Boolean = false,
 ) :
     Solver<BacktrackParams> by BacktrackSolver(problem),
     ResumableOptimizer<BacktrackParams> {
@@ -26,7 +25,7 @@ internal class CoreGuidedSolver(
 
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
         CoreGuidedSearch(problem, objective, params, maximumWork = maximumWork, maximumMillis = maximumMillis,
-            coreRefinement = coreRefinement, continueProductive = continueProductive)
+            coreRefinement = coreRefinement)
 
     override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult =
         resumable(objective, params).use { handle ->

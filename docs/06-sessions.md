@@ -293,9 +293,8 @@ Leaf encoding, row assembly, factorization and certification stay atomic under
 the containing token, so a checkpoint can overspend and leave debt for later slices.
 
 Core-guided encoding and baking use the propagation currency and spend no
-decisions. An automatically deferred single-lane core worker starts with one base slice per
-turn and two seconds of cumulative active time. Completed near-attainment cores can
-fund bounded continuation from the remaining caller deadline; see
+decisions. An automatically deferred single-lane core worker has one base slice per
+turn and two seconds of cumulative active time; see
 [core search](15-portfolio-scheduling.md#boolean-objective-core-search).
 
 ### Preparation progress
