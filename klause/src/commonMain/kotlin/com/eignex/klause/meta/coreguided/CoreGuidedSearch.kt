@@ -110,6 +110,7 @@ internal class CoreGuidedSearch(
     private var queryPreparation: Iterator<Unit>? = null
     private var transitionPreparation: Iterator<Unit>? = null
     private var preparationToken: ExecutionControl = ExecutionControl.Never
+
     // The delegate meters slice work; reading outer work constructs a live query-statistics snapshot.
     private var querySegment: ExecutionControl = ExecutionControl.Never
     private val querySlice = cancelledWhen({ querySegment.deadline() }, { querySegment.workScheduled() }) {
