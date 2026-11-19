@@ -61,9 +61,7 @@ internal fun LpEngine.rootLpRelaxationBound(
     var stage = "ENTRY"
     return try {
         if (retainedRootEnabled) {
-            withRootWorkAllowance {
-                retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation, preparationCancellation) { stage = it }
-            }
+            retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation, preparationCancellation) { stage = it }
         } else {
             stage = "AT_SOURCE_LAYOUT"
             standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation).also {
@@ -306,8 +304,8 @@ private fun LpEngine.checkRetainedRootBound(
     cancellation: ExecutionControl,
 ): BigFraction? {
     if (numericalDeductions) {
-        return FloatDeductionCertificate.of(model, duals, rootCertificationObserver(), slack = solveContext.boundSlack)
-            ?.lowerBound
+        val observer = if (sparseTrialActive) rootCertificationObserver() else null
+        return FloatDeductionCertificate.of(model, duals, observer, slack = solveContext.boundSlack)?.lowerBound
             ?.let(BigFraction::ofDouble)
     }
     val observer = rootCertificationObserver()

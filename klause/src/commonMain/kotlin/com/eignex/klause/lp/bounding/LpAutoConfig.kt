@@ -91,8 +91,8 @@ internal data class LpAdmission(
  * accepted smallest-first, so a stack of hulls is shed rather than allowed to defeat the guard. The Lagrangian and
  * energetic bounds have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
  * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
- * [LpTechnique.SPARSE_TRIAL] admits a resource-bounded sparse root plan beyond the small-LP size budget after
- * inspecting the emitted linear relaxation. It does not expand node admission or dense exact continuation.
+ * An explicit [LpTechnique.SPARSE_TRIAL] request can instead select a resource-bounded root plan after inspecting
+ * the emitted linear relaxation. This does not expand ordinary node admission or dense exact continuation.
  *
  * `LpEngine` resolves [LpParams.lpConfig] through this; the portfolio calls [resolve] directly to ask
  * whether an arm's emphasis enables any LP technique.
@@ -162,7 +162,6 @@ object LpAutoConfig {
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
         sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,
-        automaticSparseWorkAllowance: Long? = null,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -407,41 +406,23 @@ object LpAutoConfig {
                 base.energeticEvery
             },
         )
-        val explicitSparse = config.overrides[LpTechnique.SPARSE_TRIAL] == true
-        val explicitOrdinary = coneRequested || base.lbTreeSearch || base.cuts || base.booleanRlt ||
-            base.impliedBoundCuts || base.flowCoverCuts ||
-            config.overrides.any { (technique, enabled) -> enabled && technique.timing == LpTiming.EXHAUSTIVE }
-        var sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
-            (explicitSparse || (!explicitOrdinary && (!plan.bounding || cells > baseCap))) &&
+        val sparse = if (config.resolved(LpTechnique.SPARSE_TRIAL) && !base.bounding &&
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
-            val rootCeiling = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK)
-            val required = rootCeiling + INITIAL_NODE_WORK_OPS
-            if (!explicitSparse && automaticSparseWorkAllowance != null && automaticSparseWorkAllowance < required) {
-                SparseLpAdmission(mapOf("DeclineInvocationWork" to 1L, "Automatic" to 1L,
-                    "InvocationWorkAllowance" to automaticSparseWorkAllowance, "RequiredInvocationWork" to required,
-                    "PreparationWork" to 0L))
-            } else if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
+            if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
                 minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
-                sourcePreparation, automatic = !explicitSparse)
+                sourcePreparation)
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {
-            val admittedBase = if (explicitSparse) LpPlan() else base
-            val rootWorkLimit = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
-                SPARSE_LP_MAX_WORK, if (explicitSparse) SPARSE_LP_MAX_WORK else
-                    maxOf(INITIAL_NODE_WORK_OPS, sparse.metrics.getValue("EstimatedTotalWork")))
-            plan = admittedBase.copy(
-                bounding = true,
-                boundMaxDepth = if (!explicitSparse && plan.bounding) plan.boundMaxDepth else 0,
-                learn = true, probe = true, rootCutHarvest = false,
-                rootMaxWork = rootWorkLimit,
+            plan = LpPlan(
+                bounding = true, boundMaxDepth = 0, learn = true, probe = true, rootCutHarvest = false,
+                rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
                 boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
                 componentOwnership = base.componentOwnership, sourcePreparation = sourcePreparation,
             )
-            sparse = SparseLpAdmission(sparse.metrics + ("RootWorkLimit" to rootWorkLimit), sparse.sourceLayout)
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
             config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,

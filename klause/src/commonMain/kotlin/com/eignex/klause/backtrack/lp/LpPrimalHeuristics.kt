@@ -733,14 +733,6 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
     model: LpModel,
     cancellation: ExecutionControl,
     observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)?,
-): FloatLpResult? = withRootWorkAllowance {
-    solveRetainedPrimalRelaxationBody(model, cancellation, observeResult)
-}
-
-private fun LpEngine.solveRetainedPrimalRelaxationBody(
-    model: LpModel,
-    cancellation: ExecutionControl,
-    observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)?,
 ): FloatLpResult? {
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RETAINED_DECLINED"

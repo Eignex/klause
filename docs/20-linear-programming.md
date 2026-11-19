@@ -324,70 +324,36 @@ fixing allows movement at most `(U - L) / abs(d(j))` from the minimizing endpoin
 Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
-Default and aggressive emphasis admit bounded sparse root queries beyond the
-small-LP size budget on compact closed unconditional integer-linear optimization
-sources. Admission screens costly source incidence graphs before allocating a
-relaxation, then bounds source assembly and inspects emitted nonzeros, component dimensions, exact
+The explicit `+sparse-trial` LP option selects a bounded root trial for compact
+closed unconditional linear sources; emphasis levels leave it disabled. Admission
+bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
 retained layout. Custom emitters decline because they reserve no source size. The
-query uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
+trial uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
 cuts and expanded hulls stay outside its allowance, and admitted roots enable the
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
-and root scopes. The owner advances its floating cursor in adaptive work quanta;
-authority edits discard the cursor. A numerical pause alone supplies no bound authority.
-Paused dual proposals and completed floating results enter the policy's bound check
-within a 16 MiB checking reservation;
-an exhausted, cancelled or refused check supplies no new bound.
-Automatic admission prices source preparation, root optimization and one downstream
-query against the caller's remaining root grant. Each query includes
-row-intersection risk, a conservative basis-refresh estimate and sparse pricing. The
-refresh estimate sums the cube of each component's smaller dimension, reserving for
-dense fill inside that block without changing component ownership. Pricing combines emitted
-nonzeros and dimensions with the smaller dimension of the largest component.
-Source assembly is counted once; the query and continuation estimates are separate.
-The automatic root lifetime is capped by that total forecast, with the existing
-initial query quantum as a minimum and the caller and sparse ceilings as maxima.
-An underestimated query stops within that cap; ordinary node funding is separate.
-An exact scan declines speculative setup when the objective-favorable declared
-integer corner satisfies every supported linear row, so the emitted LP cannot
-improve the box objective bound. Propagator-only symmetry restrictions emit no LP
-rows. Overflow leaves that scan undecided. Its bounded work spends source preparation
-and publishes no CP feasibility claim, point or bound.
-Scalar and storage declines remain explicit. Small admitted ordinary plans keep their
-techniques and caller work policies. Explicit cut and relaxation strategies retain
-their ordinary route. Automatic sparse admission supplies no additional portfolio slot or slice.
-When the whole invocation has a known deadline, its remaining LP work share must
-fund the capped root grant and an initial downstream query quantum before automatic
-source inspection begins. Insufficient or exhausted known capacity declines without
-preparation. Unknown capacity retains the bounded work policy. This admission input
-reads the whole-run deadline once; it changes neither slice nor lifetime grants and
-does not alter ordinary LP funding. Disabling the caller's cumulative LP cap leaves
-the sparse hard limits in force.
-Automatic roots retain ordinary node bounding where the dense size guard permits
-it; a model beyond that guard keeps root-only sparse admission.
-The `+sparse-trial` override requests the bounded route explicitly, including mixed
-sources, while `-sparse-trial` disables it. Both retain the resource ceilings.
+and root scopes. The owner advances its floating cursor in adaptive work quanta; a
+numerical pause alone supplies no authority, and authority edits discard the cursor.
+Paused dual proposals and completed results enter the policy's bound check within a
+16 MiB checking reservation; exhaustion, cancellation or refusal supplies no new bound.
 The retained owner's preparation and solve lifetime use the remaining cumulative
 root and LP grants. A worker's current slice offer limits only the numerical query
 quantum; resuming a cursor keeps its original lifetime grant and charges each slice's
 actual work to the same ledger.
-Primal consultations check the preceding paused dual proposal before advancing
-numerically, and check completed root results before rounding. The check, source
-projection and publication spend the same remaining allowance. Only the identical
-source-root model and exact state qualify; later CP assertions supply no global
-bound through this route. The search publishes accepted bounds to the portfolio's
-objective floor and retains them for its own terminal bound.
 
-Sparse preparation is capped at eight million modeled work units; retained root
-queries stop at 150 million units or the containing invocation's smaller
+Primal consultations check the preceding paused dual before advancing and completed
+results before rounding. Numerical work, checking and source projection spend the
+same cumulative allowance. Only the identical source-root model and exact state
+qualify; later CP assertions supply no global bound. Search publishes accepted
+bounds to its objective floor and retains them in its terminal bound.
+
+Sparse-trial preparation is capped at eight million modeled work units; root and
+node LP work stop at 150 million units or the containing invocation's smaller
 allowance, and tighter caller deadlines and work shares remain in force. Bounded
 atomic numerical operations can finish past a work boundary; the ledger keeps their
-actual cost.
-An ordinary admitted non-root query retains its cumulative LP allowance, which
-includes all preceding root work. A spent root grant cannot restart an unchanged
-root query through the node consumer. Explicit root-only sparse plans keep their
-150-million-unit cumulative ceiling throughout.
+actual cost. An exhausted root grant cannot restart an unchanged root query through
+the node consumer.
 The two-GiB modeled storage envelope covers source authority, sparse owners,
 scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;

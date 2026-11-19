@@ -165,7 +165,6 @@ internal class LpEngine(
     internal val sourcePreparation: LpSourcePreparation =
         params0.lpConfig?.sourcePreparation ?: params0.lpPlan.sourcePreparation,
     private val eagerSourcePreparation: Boolean = false,
-    private val automaticSparseBudgetMillis: Long? = params0.solveBudgetMillis,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -178,7 +177,7 @@ internal class LpEngine(
     internal var sparseTrialActive = false
         private set
     private var admittedSourceLayout: LpRelaxation? = null
-    private val sparseTrialRequested = params0.lpConfig?.overrides?.get(LpTechnique.SPARSE_TRIAL) == true
+    private val sparseTrialRequested = params0.lpConfig?.resolved(LpTechnique.SPARSE_TRIAL) == true
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
@@ -1026,7 +1025,7 @@ internal class LpEngine(
     }
 
     internal fun nodeWorkBudget(): Long {
-        if (usesSparseRootAllowance) return retainedRootRemainingWork().coerceAtLeast(1L)
+        if (sparseTrialActive) return retainedRootRemainingWork().coerceAtLeast(1L)
         val budget = when {
             !adaptiveWork -> 0L
             lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
@@ -1038,34 +1037,17 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
-        if (usesSparseRootAllowance) return minOf(retainedRootRemainingWork().coerceAtLeast(1L),
+        if (sparseTrialActive) return minOf(retainedRootRemainingWork().coerceAtLeast(1L),
             if (adaptiveWork) lpWorkBudget.ops() else SPARSE_LP_MAX_WORK)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
         return if (containing == 0L) offered else minOf(containing, offered)
     }
 
-    private var rootConsultation = false
-
-    private val usesSparseRootAllowance: Boolean
-        get() = sparseTrialActive && (rootConsultation || params.lpPlan.boundMaxDepth == 0)
-
-    internal fun <T> withRootWorkAllowance(block: () -> T): T {
-        val previous = rootConsultation
-        rootConsultation = true
-        return try {
-            block()
-        } finally {
-            rootConsultation = previous
-        }
-    }
-
-    internal fun nodePreparationWorkBudget(): Long = if (usesSparseRootAllowance) {
+    internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         retainedRootCumulativeWork().coerceAtLeast(1L)
     } else if (separateNodePreparation) {
-        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled &&
-            !sparseTrialActive
-        ) {
+        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
             retainedRootRemainingWork().coerceAtLeast(1L)
         } else nodeWorkBudget()
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L)
@@ -1163,8 +1145,7 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val separateNodePreparation: Boolean get() = sparseTrialActive || sparseTrialRequested ||
-        requestedPlan.componentOwnership ||
+    private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
         rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
@@ -1260,7 +1241,7 @@ internal class LpEngine(
             noteSolveOps(metrics.workOps)
         } else null,
         continuationAllowance = {
-            if (usesSparseRootAllowance) retainedRootCumulativeWork() else
+            if (sparseTrialActive) retainedRootCumulativeWork() else
                 lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )
@@ -1311,10 +1292,7 @@ internal class LpEngine(
         layoutPreparationRelaxer = null
     }
 
-    internal fun prepareRootLayout(lifetime: ExecutionControl, pause: ExecutionControl): Boolean =
-        withRootWorkAllowance { prepareRootLayoutBody(lifetime, pause) }
-
-    private fun prepareRootLayoutBody(lifetime: ExecutionControl, pause: ExecutionControl): Boolean {
+    internal fun prepareRootLayout(lifetime: ExecutionControl, pause: ExecutionControl): Boolean {
         check(!closed) { "LP engine is closed" }
         val relaxer = lpRelaxer ?: return true
         if (!retainedRootEnabled || !relaxer.persistentLayoutCandidate) return true
@@ -1889,11 +1867,7 @@ internal class LpEngine(
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation,
-                    automaticSparseWorkAllowance = automaticSparseBudgetMillis?.let {
-                        if (it <= 0L) 0L else
-                            lpWorkAllowance(it, requestedPlan.lpWorkBudgetFraction).takeIf { work -> work > 0L }
-                    }) { admission ->
+                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted
@@ -2015,7 +1989,7 @@ private const val MIN_NODE_WORK_OPS = 10_000L
 private const val MAX_NODE_WORK_OPS = 100_000_000L
 
 /** Where the adaptive budget starts, before any solve has reported. */
-internal const val INITIAL_NODE_WORK_OPS = 1_000_000L
+private const val INITIAL_NODE_WORK_OPS = 1_000_000L
 
 /** Divisor on the size-derived work baseline: `columns / 40` iterations. */
 private const val SIZE_BUDGET_DIVISOR = 40L

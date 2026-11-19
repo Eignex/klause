@@ -61,13 +61,11 @@ class LpConfigTest {
     }
 
     @Test
-    fun `sparse root admission follows the numerical cost tier`() {
+    fun `sparse trials require an explicit per invocation option`() {
         for (emphasis in LpEmphasis.entries) {
-            assertEquals(LpTiming.MEDIUM in emphasis.timings,
-                LpConfig(emphasis).resolved(LpTechnique.SPARSE_TRIAL))
+            assertFalse(LpConfig(emphasis).resolved(LpTechnique.SPARSE_TRIAL))
         }
-        assertTrue(LpConfig.parse("all").resolved(LpTechnique.SPARSE_TRIAL))
-        assertFalse(LpConfig.parse("default,-sparse-trial").resolved(LpTechnique.SPARSE_TRIAL))
+        assertFalse(LpConfig.parse("all").resolved(LpTechnique.SPARSE_TRIAL))
         assertTrue(LpConfig.parse("default,+sparse-trial").resolved(LpTechnique.SPARSE_TRIAL))
     }
 

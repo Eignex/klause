@@ -697,9 +697,6 @@ internal class ResumableMinimize(
         lpEngine = resources.own(
             LpEngine(
                 problem, objective, params.lpParams(), sink, slackContext(), deferred = true,
-                automaticSparseBudgetMillis = runDeadline()?.let {
-                    (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds
-                } ?: params.solveBudgetMillis?.let { it - startMark.elapsedNow().inWholeMilliseconds },
                 nodeWorkAllowance = {
                     if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()
@@ -1516,6 +1513,9 @@ internal class ResumableMinimize(
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
             preparationCancellation = rootLpPreparationBudget())
         sink.lp.observeRootBound(0, rootBound)
+        // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
+        // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
+        // NaN (no LP structure) carries no information and the sink ignores it.
         if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
         if (rootBound > provedRootBound) provedRootBound = rootBound
         return true
@@ -1524,9 +1524,6 @@ internal class ResumableMinimize(
     private fun publishRootLpBound(rootBound: Double) {
         if (!rootBound.isFinite() || rootBound <= provedRootBound) return
         sink.lp.observeRootBound(0, rootBound)
-        // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
-        // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
-        // NaN (no LP structure) carries no information and the sink ignores it.
         params.objectiveLowerBoundSink?.invoke(rootBound)
         provedRootBound = rootBound
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.ROOT))

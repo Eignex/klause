@@ -98,3 +98,13 @@ satlib/UUF250.1065.100/uuf250-020
 satlib/UUF250.1065.100/uuf250-032
 satlib/UUF250.1065.100/uuf250-046
 satlib/UUF250.1065.100/uuf250-082
+miplib2010/neos-1171737
+miplib2010/rococoC10-001000
+miplib2017/app3
+miplib2017/b1c1s1
+miplib2017/neos-1171737
+miplib2017/neos-2328163-agri
+miplib2017/neos-3426132-dieze
+miplib2017/neos-555001
+miplib2017/rococoC10-001000
+miplib2017/shiftreg2-7
