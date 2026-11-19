@@ -101,7 +101,8 @@ sides, under the current operation allowance. Affine values are cached for one
 owned point; a changed point clears those values. Definitions with no active bound
 need no evaluation; bounded new definitions are evaluated before acceptance.
 A completed bound check is reusable for the same point values and identical
-immutable LP state or column metadata. Edits and retraction check every changed
+immutable LP model or column metadata. Scope edits that preserve that model reuse
+the completed check. Edits and retraction check every changed
 column; newly appended bounded definitions require evaluation before acceptance.
 Closing the component releases the point, checked state and activity caches.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a

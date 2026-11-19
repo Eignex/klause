@@ -120,6 +120,22 @@ class QfLraSystemTest {
     }
 
     @Test
+    fun `point reuse after an empty scope push should observe cancellation before acceptance`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val point = listOf(BigFraction.ZERO, BigFraction.ZERO)
+            assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+            assertTrue(lp.atLevel(1))
+            var polls = 0
+
+            val accepted = system.acceptsPoint(point, ExecutionControl { ++polls >= 2 })
+
+            assertFalse(accepted)
+        }
+    }
+
+    @Test
     fun `retained points should check affine definitions appended after their first check`() {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source(), lp)

@@ -251,7 +251,11 @@ internal class LiveQfLraSystem(
             definitionPoint.clear()
             sourcePoint.clear()
         }
-        if (state === checkedState) return !stop()
+        if (state.model === checkedState?.model) {
+            val accepted = !stop()
+            if (accepted) checkedState = state
+            return accepted
+        }
         fun holds(column: Int, value: BigFraction): Boolean {
             stop.charge(2L)
             if (stop.pollStop()) return false
