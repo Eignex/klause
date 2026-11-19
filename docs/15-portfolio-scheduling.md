@@ -503,9 +503,7 @@ Automatic reuse keeps ordinary finite cutoff windows and scheduling; only the
 explicit completion option selects its cutoff accounting and first-proposal trial.
 After importing a checked point, the numerical owner alternates its ordinary
 frontier consultations with a private proximity query inside the same turn offers.
-The private consultation uses at most half the remaining offered time and work;
-an already paid original-objective bound can request half the remaining gap as
-its private improvement target.
+The private consultation uses at most half the remaining offered time and work.
 The frontier retains its tree, LP owner and global bounds. Both searches share one
 LP operation/work/allocation ledger and containing decision/check allowances.
 The private search visits integer alternatives away from the center first in depth
@@ -580,13 +578,15 @@ Continuous columns remain free. Missing guidance, cancellation and unavailable
 funding retain the connected two-integer start.
 Fixed binary companion repair instead searches proximity to a checked center with
 every integer and continuous residual free except for the source's original pins.
-Its private objective counts changed binary coordinates. A separate original-cost
+Its private objective retains the original cost. A Hamming row bounds changed binary
+coordinates to ten percent of the integer columns rounded up, clamped between four
+and thirty-two changes and limited by the integer count. A separate original-cost
 row requests improvement by the largest of the declared positive objective allowance,
 one percent of the current variable objective magnitude, and one thousandth of the
 smallest nonzero objective coefficient.
 Source constants and maximization direction stay in that row. Preparation and
 native progress spend the existing query grants. Only a freshly source- and
-original-checked strict improvement can leave this search; its distance bounds,
+original-checked strict improvement can leave this search; its private objective bounds,
 refutations and optima supply no parent objective or coverage evidence. A failed
 target ends undecided and is not retried at the same cutoff; unavailable preparation
 falls back to ordinary neighborhoods.

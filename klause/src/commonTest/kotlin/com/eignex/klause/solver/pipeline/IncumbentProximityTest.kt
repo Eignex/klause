@@ -8,10 +8,16 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
@@ -21,12 +27,36 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IncumbentProximityTest : RuntimeInitializedTest() {
+    @Test
+    fun `private neighborhoods should reject improving points outside their change radius`() {
+        for ((size, radius) in listOf(5 to 4, 50 to 5, 400 to 32)) {
+            val columns = (0 until size).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }.toSet()
+            val source = SourceProofContext(SourceScope(SourceRevision("radius", "exact"),
+                objective = SourceObjective("cost", ObjectiveSense.MINIMIZE)), columns, emptyMap(),
+                columns.associateWith { BigFraction.ONE })
+            val center = Sample(booleanArrayOf(), LongArray(size) { 1L })
+            val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+            val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ofLong(size.toLong()),
+                SourceLpBudget(funding = funding), ExecutionControl.Never))
+            val inside = center.copy(ints = LongArray(size) { if (it < radius) 0L else 1L })
+            val outside = center.copy(ints = LongArray(size) { if (it <= radius) 0L else 1L })
+
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(query.withLinearAuthority()).verify(
+                SourceEvidence(query.scope, SourceClaim.Witness(inside), SourceDerivation.SourceWitness)))
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(query.withLinearAuthority()).verify(
+                SourceEvidence(query.scope, SourceClaim.Witness(outside), SourceDerivation.SourceWitness)))
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                SourceEvidence(source.scope, SourceClaim.Witness(outside), SourceDerivation.SourceWitness)))
+        }
+    }
+
     @Test
     fun `private candidate provenance should remain attached to its publication snapshot`() {
         val stats = SolveStats.EMPTY
@@ -37,25 +67,6 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
         assertEquals(1L, private.smt.completeSearchStages?.get("incumbentReusePrivateCandidate"))
         assertNull(ordinary.smt.completeSearchStages?.get("incumbentReusePrivateCandidate"))
         assertNull(stats.smt.completeSearchStages?.get("incumbentReusePrivateCandidate"))
-    }
-
-    @Test
-    fun `paid bound aspiration should request half the remaining original gap`() {
-        val column = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        for (sense in ObjectiveSense.entries) {
-            val maximize = sense == ObjectiveSense.MAXIMIZE
-            val source = SourceProofContext(SourceScope(SourceRevision("aspiration", "exact"),
-                objective = SourceObjective("cost", sense)), setOf(column), emptyMap(),
-                mapOf(column to BigFraction.ofLong(if (maximize) -200 else 200)), BigFraction.ofLong(7))
-            val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
-            val constant = if (maximize) -7L else 7L
-
-            val query = assertNotNull(IncumbentProximity.prepare(source, Sample(booleanArrayOf(), longArrayOf(1)),
-                BigFraction.ofLong(200 + constant), SourceLpBudget(funding = funding), ExecutionControl.Never,
-                aspiration = BigFraction.ofLong(100 + constant)))
-
-            assertEquals(BigFraction.ofLong(150), query.premises.values.single().inequality.rhs)
-        }
     }
 
     @Test
@@ -72,7 +83,7 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
         val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ZERO,
             SourceLpBudget(funding = funding), ExecutionControl.Never))
 
-        assertEquals(BigFraction.of(bigIntOf(-1), bigIntOf(1000)), query.premises.values.single().inequality.rhs)
+        assertEquals(BigFraction.of(bigIntOf(-1), bigIntOf(1000)), query.premises.getValue("incumbent-proximity-target").inequality.rhs)
     }
 
     @Test
@@ -87,7 +98,7 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
             val query = assertNotNull(IncumbentProximity.prepare(source, Sample(booleanArrayOf(), longArrayOf(1)),
                 BigFraction.ofLong(200 + constant), SourceLpBudget(funding = funding), ExecutionControl.Never))
 
-            assertEquals(BigFraction.ofLong(198), query.premises.values.single().inequality.rhs)
+            assertEquals(BigFraction.ofLong(198), query.premises.getValue("incumbent-proximity-target").inequality.rhs)
         }
     }
 
@@ -105,8 +116,10 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
             SourceLpBudget(funding = funding), ExecutionControl.Never))
 
         assertEquals(listOf(-1, 1, -1).map { BigFraction.ofLong(it.toLong()) },
-            columns.map { query.objective[it] })
-        assertEquals(BigFraction.ofLong(2), query.objectiveConstant)
+            columns.map { query.premises.getValue("incumbent-proximity-radius").inequality.coefficients[it] })
+        assertEquals(source.objective, query.objective)
+        assertEquals(source.objectiveConstant, query.objectiveConstant)
+        assertEquals(BigFraction.ONE, query.premises.getValue("incumbent-proximity-radius").inequality.rhs)
         assertEquals(condition, query.scope.condition)
         assertNotEquals(source.scope, query.scope)
         assertTrue(funding.spent > 0 && funding.allocated > 0)
@@ -124,9 +137,12 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
         val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ofLong(-7),
             SourceLpBudget(funding = funding), ExecutionControl.Never))
 
-        val target = query.premises.values.single().inequality
+        val target = query.premises.getValue("incumbent-proximity-target").inequality
         assertEquals(BigFraction.ofLong(-2), target.coefficients[column])
         assertEquals(BigFraction.of(bigIntOf(-1), bigIntOf(500)), target.rhs)
+        assertEquals(source.objective, query.objective)
+        assertEquals(source.objectiveConstant, query.objectiveConstant)
+        assertEquals(ObjectiveSense.MAXIMIZE, query.scope.objective?.sense)
     }
 
     @Test

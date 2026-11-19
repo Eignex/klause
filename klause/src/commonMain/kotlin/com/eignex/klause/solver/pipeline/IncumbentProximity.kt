@@ -28,7 +28,7 @@ internal object IncumbentProximity {
         }
 
     fun prepare(source: SourceProofContext, center: Sample, cutoff: BigFraction,
-        budget: SourceLpBudget, cancellation: ExecutionControl, aspiration: BigFraction? = null): SourceProofContext? {
+        budget: SourceLpBudget, cancellation: ExecutionControl): SourceProofContext? {
         val funding = budget.funding ?: return null
         if (cancellation() || center.numBoolVars != 0 || center.numIntVars !in 1..4096 ||
             !source.affineObjectiveAvailable || source.scope.objective == null) return null
@@ -67,7 +67,7 @@ internal object IncumbentProximity {
         }
         if (original.isEmpty()) return null
         var scale: BigFraction? = null
-        for (value in original.values + listOfNotNull(cutoff, source.objectiveConstant, aspiration)) {
+        for (value in original.values + listOf(cutoff, source.objectiveConstant)) {
             if (cancellation()) return null
             val width = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
             val scalarWork = 1L + width * width / 64L
@@ -89,26 +89,25 @@ internal object IncumbentProximity {
         val relative = magnitude * BigFraction.of(BIG_ONE, bigIntOf(100))
         if (relative > improvement) improvement = relative
         if (gap != null && gap > improvement) improvement = gap
-        if (aspiration != null && aspiration < cutoff) {
-            val halfway = (cutoff - aspiration) * BigFraction.of(BIG_ONE, bigIntOf(2))
-            if (halfway > improvement) improvement = halfway
-        }
         val target = cutoff - improvement - originalConstant
         if (target.num.magnitudeBitLength() + target.den.magnitudeBitLength() > 4096 || cancellation()) return null
         val premises = source.premises.toMutableMap()
         val key = "incumbent-proximity-target"
-        if (key in premises) return null
+        val radiusKey = "incumbent-proximity-radius"
+        if (key in premises || radiusKey in premises) return null
         premises[key] = SourcePremise(SourceInequality(original, target))
+        val radius = minOf(center.numIntVars, ((center.numIntVars + 9) / 10).coerceIn(4, 32))
+        premises[radiusKey] = SourcePremise(SourceInequality(costs, BigFraction.ofLong(radius.toLong()) - constant))
         val scope = source.scope.copy(
             revision = source.scope.revision.copy(identity = source.scope.revision.identity + "/incumbent-proximity"),
-            objective = SourceObjective("${source.scope.objective.identity}/proximity/$bits/$target",
-                ObjectiveSense.MINIMIZE),
+            objective = SourceObjective("${source.scope.objective.identity}/proximity/$bits/$radius/$target",
+                source.scope.objective.sense),
         )
         val coordinates = source.coordinates
         if (coordinates.count { it.kind == SourceCoordinate.Kind.Integer } != center.numIntVars ||
             costs.keys.any { it !in coordinates }) return null
         // This objective and improvement row belong only to the primal search, never parent coverage.
-        return SourceProofContext(scope, coordinates, premises, costs, constant)
+        return SourceProofContext(scope, coordinates, premises, source.objective, source.objectiveConstant)
             .takeUnless { cancellation() || funding.exhausted }
     }
 }

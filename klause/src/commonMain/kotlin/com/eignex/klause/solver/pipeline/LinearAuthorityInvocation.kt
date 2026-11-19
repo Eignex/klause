@@ -17,7 +17,6 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -321,9 +320,7 @@ internal class LinearAuthorityInvocation(
         proximity = null
         val exact = value ?: return
         val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
-        val bound = ((component.rootBound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
-        val aspiration = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) bound?.negated() else bound
-        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop, aspiration) ?: return
+        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop) ?: return
         if (sample === importedIncumbent && sample !== consumedIncumbent) {
             consumedIncumbent = sample
             onIncumbentUse?.invoke()
