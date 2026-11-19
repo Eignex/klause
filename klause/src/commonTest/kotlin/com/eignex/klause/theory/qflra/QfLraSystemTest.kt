@@ -40,6 +40,39 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `shared strict terms should retain source thresholds across retraction`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.NE)) {
+            val factors = Array<Factor>(2) { guard ->
+                ReifiedRealLinear(guard, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                    doubleArrayOf(1.0, -1.0), op, guard.toDouble(), true)
+            }
+            val source = source().withFactors(factors)
+            val forms = factors.map { listOf(it.linearRows.single().exactForm(2)) }
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source, lp, forms, strictMargin = true)
+                assertTrue(system.install())
+                val session = SearchSession(listOf(lp))
+                session.initialize()
+                session.push(SearchDecision.Bool(Lit.make(0, true)))
+                val direction = LinearOp.LE.takeIf { op == LinearOp.NE }
+                assertTrue(system.assertComparison(forms[0][0].comparison(true) { false }, direction, premise(0)))
+                val expected = if (op == LinearOp.GE) BigFraction.ONE else BigFraction.MINUS_ONE
+                val point = listOf(expected, BigFraction.ZERO, BigFraction.ONE)
+                assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+                session.popTo(0)
+                session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+                assertTrue(system.assertComparison(forms[1][0].comparison(true) { false }, direction, premise(1)))
+
+                val shifted = listOf(expected + BigFraction.ONE, BigFraction.ZERO, BigFraction.ONE)
+                assertTrue(system.acceptsPoint(shifted, ExecutionControl.Never))
+                val rejected = listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.ONE)
+                assertFalse(system.acceptsPoint(rejected, ExecutionControl.Never))
+            }
+        }
+    }
+
+    @Test
     fun `stopped point rechecks should withhold cached acceptance`() {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source(), lp)

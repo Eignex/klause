@@ -55,8 +55,11 @@ A term is normalized before lookup: zero coefficients are dropped and the first
 remaining coefficient is scaled to one, flipping the bound direction for a negative
 scale. `2x + 4y <= 6` and `-x - 2y >= -3` therefore share one slack column.
 Pure-real openings install prepared affine and strict-margin definitions without
-their guarded bounds, preserving the matrix across source Boolean choices. Other
-terms first seen under a branch or disjunct get their definition row appended
+their guarded bounds, preserving the matrix across source Boolean choices.
+Source rows with the same coefficient vector share its prepared keys and
+normalization; strict-margin definitions are prepared once per oriented term.
+Thresholds and premises belong to each asserted source side.
+Other terms first seen under a branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
 
