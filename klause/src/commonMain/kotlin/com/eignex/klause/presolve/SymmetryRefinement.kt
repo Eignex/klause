@@ -29,6 +29,10 @@ private const val SIG_PORT = 4L
 private const val SEED_DOMAIN_SURVIVORS = 5L
 private const val SEED_OPEN_RANGE = 6L
 private const val SEED_BOOL_FIXED = 7L
+private const val SEED_PARTITION = 8L
+
+internal fun partitionSeed(space: Long, colour: Int): RefineKey =
+    RefineKey(longArrayOf(space, SEED_PARTITION, colour.toLong()))
 
 /** The values each integer column admits, as far as the lane running the search knows them. */
 internal interface SymmetryColumns {
