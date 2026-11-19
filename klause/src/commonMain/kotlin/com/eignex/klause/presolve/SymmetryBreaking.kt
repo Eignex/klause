@@ -584,7 +584,7 @@ internal object SymmetryBreaking {
             if (members.size < 2 || members.size > MAX_VERIFIED_GROUP) continue
             val sorted = members.sorted()
             val r = sorted[0]
-            val refLeaf = refineToDiscrete(problem, incidence, seedIntBase, seedBoolBase, r, budget, cancellation)
+            val refLeaf = refineToDiscrete(problem, incidence, intColour, boolColour, r, budget, cancellation)
                 ?: continue
             // Disjoint set over this cell's members tracks r's orbit under generators found so far, so
             // a member already in the orbit is skipped (it would only re-derive an existing element).
@@ -594,7 +594,7 @@ internal object SymmetryBreaking {
             for (v in sorted) {
                 if (v == r || budget[0] <= 0 || cancellation()) continue
                 if (orbit.connected(index.getOrDefault(r, 0), index.getOrDefault(v, 0))) continue
-                val leaf = refineToDiscrete(problem, incidence, seedIntBase, seedBoolBase, v, budget, cancellation)
+                val leaf = refineToDiscrete(problem, incidence, intColour, boolColour, v, budget, cancellation)
                     ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
                 // A permutation maps solutions to solutions only if it also maps every column's values onto
@@ -627,8 +627,8 @@ internal object SymmetryBreaking {
     private fun refineToDiscrete(
         problem: Problem,
         incidence: SymmetryIncidence,
-        seedIntBase: Array<RefineKey>,
-        seedBoolBase: Array<RefineKey>,
+        intBaseColour: IntArray,
+        boolBaseColour: IntArray,
         firstIndiv: Int,
         budget: IntArray,
         cancellation: ExecutionControl = ExecutionControl.Never,
@@ -636,8 +636,8 @@ internal object SymmetryBreaking {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
         val n = nInt + nBool
-        val seedInt = seedIntBase.copyOf()
-        val seedBool = seedBoolBase.copyOf()
+        val seedInt = Array(nInt) { partitionSeed(SPACE_INT, intBaseColour[it]) }
+        val seedBool = Array(nBool) { partitionSeed(SPACE_BOOL, boolBaseColour[it]) }
         fun individualize(globalV: Int, step: Int) {
             if (globalV < nInt) {
                 seedInt[globalV] = RefineKey(longArrayOf(SPACE_INT, SEED_INDIVIDUALIZED, step.toLong()))
@@ -675,6 +675,9 @@ internal object SymmetryBreaking {
             var chosen = Int.MAX_VALUE
             for (v in 0 until nInt) if (ic[v] == target && v < chosen) chosen = v
             for (v in 0 until nBool) if (bc[v] == target && nInt + v < chosen) chosen = nInt + v
+            // Refinement only splits cells; retain those splits instead of reconstructing them from the root seeds.
+            for (v in 0 until nInt) seedInt[v] = partitionSeed(SPACE_INT, ic[v])
+            for (v in 0 until nBool) seedBool[v] = partitionSeed(SPACE_BOOL, bc[v])
             individualize(chosen, step)
             step++
         }

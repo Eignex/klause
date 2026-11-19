@@ -278,6 +278,8 @@ also restores that scan. Counting, sampling and enumeration retain their solutio
 set. Discovery and verification share the preparation allowance, with structural
 size and refinement-work limits; singleton domain/cost seeds skip refinement.
 One source-bound incidence snapshot serves all individualization leaves in a scan.
+Each individualization starts from the refined partition and retains its canonical
+color classes between splits; candidate verification remains independent of coloring.
 The captured lex order places nonzero-cost coordinates before zero-cost coordinates,
 retaining ID order within each group. Generator lex propagation, stabilizer expansion
 and orbital fixing share that order. Factor remapping, structural keys and codecs
