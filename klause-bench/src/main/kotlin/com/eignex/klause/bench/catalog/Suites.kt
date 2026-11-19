@@ -755,6 +755,7 @@ internal object Suites {
         vendored("lira-rational-min", Category.OPTIMIZATION, Expected.Sat)
         vendored("lira-rational-max", Category.OPTIMIZATION, Expected.Sat)
         vendored("lira-wide-rational", Category.CSP, Expected.Sat)
+        vendored("lira-strict-chain", Category.CSP, Expected.Sat, license = "Apache-2.0")
         vendored("lia-unbounded", Category.OPTIMIZATION, Expected.Sat)
         vendored("lia-parity-unsat", Category.CSP, Expected.Unsat)
         vendored("lia-unsat", Category.UNSAT, Expected.Unsat)

@@ -40,6 +40,11 @@ relaxations allow tableau cuts and repeated scoped node-bound controls.
 
 ## Quantifier-free source controls
 
+`smtlib/lira-strict-chain.smt2` is a self-authored Apache-2.0 mixed arithmetic
+fixture with one lower-bounded integer and 300 strictly ordered reals between
+that integer and its successor. The assignment `i = 0`, `x(k) = (k + 1) / 301`
+satisfies every source row.
+
 `set=smt-qf-witness-v1` selects ten self-authored Apache-2.0 single-query sources
 from `smtlib`. They combine arrays, datatypes, 129-bit function arguments and exact
 arithmetic, with paired Euclidean quotient controls, finite-tree cycle rejection,
