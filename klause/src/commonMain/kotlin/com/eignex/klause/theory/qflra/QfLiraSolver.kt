@@ -214,6 +214,7 @@ class ExactLiraSearchComponent private constructor(
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
     private var unconsumedLpPoint: List<BigFraction>? = null
+    private var retainedLpPoint: List<BigFraction>? = null
     private var candidate: List<BigFraction>? = null
         set(value) {
             field = value
@@ -281,6 +282,7 @@ class ExactLiraSearchComponent private constructor(
             cancellation = lpStop,
             certificationObserver = object : LpCertificationObserver {
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                    if (cost is LpCertifierCost.Metered) lpStop.charge(cost.work)
                     primaryLpObserver?.observe(certifier, success, cost)
                 }
                 override fun observeExactInput(accepted: Boolean) {
@@ -293,9 +295,11 @@ class ExactLiraSearchComponent private constructor(
                     primaryLpObserver?.observePhase(metrics)
                 }
                 override fun observeBasisVerification(metrics: ExactBasisMetrics) {
+                    lpStop.charge(metrics.work)
                     primaryLpObserver?.observeBasisVerification(metrics)
                 }
                 override fun observeContinuation(metrics: ExactContinuationMetrics) {
+                    lpStop.charge(metrics.work)
                     primaryLpObserver?.observeContinuation(metrics)
                     smtStats?.observeContinuation(metrics)
                 }
@@ -1451,7 +1455,7 @@ class ExactLiraSearchComponent private constructor(
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
         if (impliedDisjunct) return ComponentResult.Consistent
-        if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
+        if (model.numIntVars > 0 && bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
         ) {
@@ -1470,6 +1474,19 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
+        val retained = retainedLpPoint
+        if (retained != null && model.numIntVars == 0 &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
+            system.acceptsPoint(retained, lpStop)
+        ) {
+            candidate = retained
+            dirty = false
+            observeCompleteStage("LP_POINT_RECHECK")
+            if (bools.any { it == UNASSIGNED }) capturePointHints(retained, context)
+            else captureCompleteWitness(retained)
+            return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
+        }
+        if (operationStop()) return ComponentResult.Indeterminate
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         val result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
@@ -1498,6 +1515,7 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop()) return ComponentResult.Indeterminate
         dirty = false
         candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
+        if (candidate != null) retainedLpPoint = candidate
         unconsumedLpPoint = candidate
         if (result.verdict == LpVerdict.INFEASIBLE) {
             val explanation = lp.explainConflict(result.conflictSupport, context)

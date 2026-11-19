@@ -628,9 +628,7 @@ cutoff. Missing exact coordinates or an unrepresentable result leave coverage
 incomplete; neither a rounded tie nor a declined candidate closes the cutoff.
 
 Mixed witness recovery can submit a connected real residual to `SourceLp` after
-fixing integer guesses, within its `SourceLpBudget`. Small residuals use dense
-admission; larger ones use `SparseSourceLp` preparation and the scoped certified
-solver. Components share the same operation allowance, and preparation, solving,
+fixing integer guesses, within its `SourceLpBudget`. Residuals use `SparseSourceLp` preparation and the scoped certified solver. Components share the same operation allowance, and preparation, solving,
 certification and retirement costs remain charged on a decline. Only exact primal coordinates
 are consumed, and a failed guess supplies no conflict or bound. Real array selection
 emits index-range rows on every build, and a fixed index adds its equality with both

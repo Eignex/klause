@@ -65,7 +65,7 @@ class QfLiraSolverHintsTest {
     }
 
     @Test
-    fun `default real difference consultation should release hints across retraction and fresh checks`() {
+    fun `default real LP consultation should retain hints across fresh scoped checks`() {
         val model = Problem(
             numBoolVars = 2,
             intBounds = openBounds(0),
@@ -97,16 +97,16 @@ class QfLiraSolverHintsTest {
 
                 assertIs<ComponentResult.Consistent>(session.initialize())
 
-                assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
-                assertEquals(!defaultOpening, component.partialPointHintAvailable())
+                assertEquals(true, hints.preferredBool(0))
+                assertEquals(true, component.partialPointHintAvailable())
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
 
                 session.popTo(0)
 
                 assertNull(hints.preferredBool(0))
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
-                assertEquals(if (defaultOpening) null else true, hints.preferredBool(0))
-                assertEquals(!defaultOpening, component.partialPointHintAvailable())
+                assertEquals(true, hints.preferredBool(0))
+                assertEquals(true, component.partialPointHintAvailable())
                 assertEquals(registrationWork, charged)
             }
         }
@@ -491,7 +491,7 @@ class QfLiraSolverHintsTest {
 
                 assertTrue(charged > 0L)
                 assertNull(hints.preferredBool(0))
-                assertNull(component.lpMetrics)
+                assertNull(session.model().valueOf(component.realAssignmentKey))
             }
         }
     }

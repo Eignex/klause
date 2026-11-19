@@ -398,8 +398,7 @@ tries to turn that float point into an exact witness:
    equations using bounded sparse elimination.
 4. Complete the free real coordinates per connected component, grouped by shared
    rows, through an exact point from the [source LP owner](20-linear-programming.md).
-   Small residuals use its dense admission; larger residuals use sparse preparation
-   and the same certification policy and caller allowance.
+   Residuals use sparse preparation and the same certification policy and caller allowance.
    Recovery retains the input bounds of 10,000 real columns and 100,000 rows;
    sparse preparation applies the shared work, allocation and scalar guards.
 

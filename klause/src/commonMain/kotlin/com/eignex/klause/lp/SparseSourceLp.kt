@@ -246,7 +246,8 @@ private class SparsePreparationMeter(private val limits: SparseSourceLpLimits,
         if (decline != null) return false
         work += operations
         allocation += bytes
-        return true
+        cancellation.charge(operations)
+        return poll()
     }
 
     fun number(value: BigFraction): Boolean {

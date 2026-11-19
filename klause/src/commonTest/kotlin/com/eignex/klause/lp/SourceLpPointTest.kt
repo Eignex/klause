@@ -71,10 +71,13 @@ class SourceLpPointTest {
             override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
         val rows = listOf(exactColumnLower(0, BigFraction.ONE))
+        val budget = SourceLpBudget()
 
-        val point = sourceLpPoint(rows, 1, SourceLpBudget(), stop)
+        val point = sourceLpPoint(rows, 1, budget, stop)
 
         assertNull(point)
         assertTrue(spent > 0L)
+        assertEquals(spent, budget.measuredPreparationWork)
+        assertEquals(0L, budget.measuredFloatWork)
     }
 }

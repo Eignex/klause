@@ -40,6 +40,34 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `retained points should follow strict affine bounds and their retraction`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0, true)
+        val source = source().withFactors(arrayOf(factor))
+        val form = factor.linearRows.single().exactForm(2)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(system.assertComparison(form.comparison(true) { false }, null, premise(0)))
+            val boundary = listOf(BigFraction.ZERO, BigFraction.ZERO)
+            val interior = listOf(BigFraction.ZERO, BigFraction.ONE)
+
+            assertFalse(system.acceptsPoint(boundary, ExecutionControl.Never))
+            assertTrue(system.acceptsPoint(interior, ExecutionControl.Never))
+            session.popTo(0)
+            assertTrue(system.acceptsPoint(boundary, ExecutionControl.Never))
+            session.push(SearchDecision.Bool(Lit.make(0, false)))
+            assertTrue(system.assertComparison(form.comparison(false) { false }, null,
+                SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(0, false)))))
+            assertFalse(system.acceptsPoint(interior, ExecutionControl.Never))
+            assertTrue(system.acceptsPoint(boundary, ExecutionControl.Never))
+        }
+    }
+
+    @Test
     fun `batched source sides should keep strict strengthening premises and retract with their scope`() {
         for (upper in listOf(false, true)) {
             LpPropagator(object : LpSearchPolicy {}).use { lp ->

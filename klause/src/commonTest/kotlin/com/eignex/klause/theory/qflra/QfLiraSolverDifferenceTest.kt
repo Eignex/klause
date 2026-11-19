@@ -444,7 +444,8 @@ class QfLiraSolverDifferenceTest {
 
             val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
-            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)), conflict.explanation?.literals)
+            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)),
+                conflict.explanation?.literals?.sortedArray())
             session.popTo(1)
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
@@ -487,7 +488,8 @@ class QfLiraSolverDifferenceTest {
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertEquals(false, session.boolValue(0))
             val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
-            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)), conflict.explanation?.literals)
+            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)),
+                conflict.explanation?.literals?.sortedArray())
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(2))
 

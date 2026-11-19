@@ -179,6 +179,36 @@ internal class LiveQfLraSystem(
     var observeAssertionCost = false
     val assertionCost = SmtSourceAssertionCost()
 
+    fun acceptsPoint(point: List<BigFraction>, stop: ExecutionControl): Boolean {
+        val state = lp.state ?: return false
+        if (point.size != columns || state.conflict != null || stop()) return false
+        val arithmetic = MixedPointArithmetic(stop)
+        if (!point.all(arithmetic::admitted)) return false
+        fun holds(column: Int, value: BigFraction): Boolean {
+            stop.charge(2L)
+            if (stop()) return false
+            val bounds = state.model.column(column).bounds
+            if (bounds.lower?.let { !arithmetic.admitted(it.number.value) } == true ||
+                bounds.upper?.let { !arithmetic.admitted(it.number.value) } == true
+            ) return false
+            return bounds.lower?.let { side ->
+                value > side.number.value || (value == side.number.value && !side.strict)
+            } != false && bounds.upper?.let { side ->
+                value < side.number.value || (value == side.number.value && !side.strict)
+            } != false
+        }
+        for (column in point.indices) if (!holds(column, point[column])) return false
+        // Every auxiliary column is defined by its source affine term; retraction changes only its bounds.
+        for ((term, column) in definitions) {
+            var negative = BigFraction.ZERO
+            for ((sourceColumn, coefficient) in term) {
+                negative = arithmetic.subtractProduct(negative, coefficient, point[sourceColumn]) ?: return false
+            }
+            if (!holds(column, negative.negated())) return false
+        }
+        return !stop()
+    }
+
     fun install(): Boolean {
         val structural = sourceColumns.map { column ->
             ExactLpColumn(
