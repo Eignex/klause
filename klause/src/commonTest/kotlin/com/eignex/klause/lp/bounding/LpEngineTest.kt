@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
-    fun `admitted numerical components reuse untouched children without root guidance`() {
+    fun `admitted numerical components reuse untouched children to prune without root guidance`() {
         val problem = Problem(0, 32, Array(32) { IntDomain(0, 5) },
             (0 until 2).flatMap { block ->
                 (0 until 64).map { row ->
@@ -68,9 +68,9 @@ class LpEngineTest {
             val before = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
             shared.push(SearchDecision.IntAtLeast(0, 1L))
 
-            val pruned = engine.pruneNode(cp.session, 1000.0, -1, true)
+            val pruned = engine.pruneNode(cp.session, 16.0, -1, true)
 
-            assertFalse(pruned)
+            assertTrue(pruned)
             val after = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
             assertEquals(1L, checkNotNull(after?.get("SOLVED")) - checkNotNull(before?.get("SOLVED")))
             assertEquals(1L, checkNotNull(after["REUSED"]) - checkNotNull(before["REUSED"]))

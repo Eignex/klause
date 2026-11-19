@@ -20,7 +20,8 @@ internal class LpScopedSolver(
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
-    private val componentAdmission: ((LpComponentShape) -> Boolean)? = null,
+    private val componentAdmission: LpComponentAdmission? = null,
+    private val monolithicPreparationWork: Long? = null,
 ) : AutoCloseable {
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
@@ -30,6 +31,7 @@ internal class LpScopedSolver(
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
     private var solver: RetainedLpSolver? = null
+    private var declinedComponentMatrix: ExactLpModel? = null
     private class PendingFloat(val cursor: LpSolveCursor<FloatLpResult?>, var allowance: LpFloatAllowance) {
         var reported = LpSolveMetrics()
     }
@@ -109,6 +111,7 @@ internal class LpScopedSolver(
 
     init {
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
+        require(monolithicPreparationWork == null || monolithicPreparationWork >= 0L)
     }
 
     fun prepare(token: ExecutionControl = cancellation): Boolean = prepare(token, null)
@@ -603,7 +606,7 @@ internal class LpScopedSolver(
         val scopeToken = cancellation or token
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
-            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission,
+            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission, monolithicPreparationWork,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
         workingActive = true
@@ -886,7 +889,7 @@ internal class LpScopedSolver(
                 constructionBound = bound
             } ?: return null
             if (workBudget > 0L && projection.work >= workBudget) return null
-            candidate = if (allowComponents && warm == null) {
+            candidate = if (allowComponents && warm == null && declinedComponentMatrix?.sameMatrix(next.model) != true) {
                 componentLpSolverOrNull(
                     working, token, projection,
                     { part, childToken, rowOnlyRows ->
@@ -897,11 +900,27 @@ internal class LpScopedSolver(
                             componentPricing(part, working.n, rowOnlyRows))
                     },
                     ::ComponentLpSolver,
-                    accept = componentAdmission,
+                    accept = componentAdmission?.let { admission ->
+                        object : LpComponentAdmission {
+                            override fun inspect(columns: Int, rows: Int, entries: Int): Boolean =
+                                admission.inspect(columns, rows, entries).also {
+                                    if (!it) declinedComponentMatrix = next.model
+                                }
+
+                            override fun accepts(shape: LpComponentShape): Boolean = admission.accepts(shape).also {
+                                if (!it) declinedComponentMatrix = next.model
+                            }
+                        }
+                    },
                 )
             } else null
-            val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
-            if (workBudget > 0L && remainingWork <= 0L) return null
+            val selectedBudget = if (candidate == null && monolithicPreparationWork != null &&
+                monolithicPreparationWork > 0L
+            ) {
+                if (workBudget > 0L) minOf(workBudget, monolithicPreparationWork) else monolithicPreparationWork
+            } else workBudget
+            val remainingWork = if (selectedBudget > 0L) selectedBudget - projection.work else 0L
+            if (selectedBudget > 0L && remainingWork <= 0L) return null
             if (candidate == null) candidate = newPersistentLpSolver(
                 working,
                 token,

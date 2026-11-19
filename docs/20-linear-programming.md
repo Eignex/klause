@@ -371,9 +371,10 @@ and target reset, reseed and engine close release the preferences.
 
 ### Immutable component ownership
 
-The independent `lp-component-reuse` setting admits numerical node ownership from
-the completed partition's size, tableau-size reduction and modeled private storage.
-Construction and declined inspection spend the containing LP grant. Admitted
+The independent `lp-component-reuse` setting rejects small or oversized owners before
+partition allocation, then admits numerical node ownership from the partition's size,
+tableau-size reduction and modeled private storage. Construction and declined inspection
+spend the containing LP grant separately from each adaptive numerical query. Admitted
 children retain their numerical state through ordinary node edits; root component
 guidance, ordering and private rounding remain selected by `lp-component-ownership`.
 

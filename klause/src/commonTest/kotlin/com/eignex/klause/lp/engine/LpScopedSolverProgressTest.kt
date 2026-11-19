@@ -12,6 +12,25 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverProgressTest {
     @Test
+    fun `declined components cannot borrow their preparation grant for a monolithic owner`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        var admissions = 0
+        LpScopedSolver(LpExactState(source), workLimit = 100_000L, componentSplit = true,
+            componentAdmission = { admissions++; false }, monolithicPreparationWork = 1L).use { owner ->
+
+            repeat(2) { assertFalse(owner.prepare()) }
+
+            assertEquals(1, admissions)
+            assertEquals(0L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
     fun `query replay records the admitted numerical owner rather than a declined split request`() {
         val builder = LpBuilder()
         repeat(2) {

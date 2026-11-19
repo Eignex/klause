@@ -872,11 +872,13 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     projection: LpProjectionMeter?,
     engine: (LpModel, ExecutionControl, Int) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
-    accept: ((LpComponentShape) -> Boolean)? = null,
+    accept: LpComponentAdmission? = null,
 ): T? {
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null
+    if (accept != null) projection?.reserve(1L, 0L, matrix = false)
+    if (accept?.inspect(n, m, model.doubleView?.rowIdx?.size ?: model.csc.rowIdx.size) == false) return null
     val rowIndex = model.rowIndex(projection)
     projection?.reserve(5L * n + 4L * m + 4L * rowIndex.colIdx.size + 1L,
         16L * n + 12L * m, matrix = true)
@@ -908,7 +910,12 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         val root = partition.find(j)
         if (blockOf[root] < 0) blockOf[root] = blocks++
     }
-    if (blocks < 2) return null
+    if (blocks < 2) {
+        accept?.accepts(LpComponentShape(blocks, m.toLong() * (n.toLong() + m + 1L),
+            m.toLong() * (n.toLong() + m + 1L),
+            128L * (rowIndex.colIdx.size.toLong() + n + m + blocks) + 4L * m))
+        return null
+    }
 
     val children = blocks + if (rowOnlyRows > 0) 1 else 0
     projection?.reserve(n.toLong() + m, 128L * children + 8L * (n.toLong() + m), matrix = true)
@@ -930,7 +937,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
             blocks, m.toLong() * (n.toLong() + m + 1L), cells,
             128L * (rowIndex.colIdx.size.toLong() + n + m + children) + 4L * m,
         )
-        if (!accept(shape) || cancellation()) return null
+        if (!accept.accepts(shape) || cancellation()) return null
     }
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
@@ -952,6 +959,11 @@ internal data class LpComponentShape(
     val componentCells: Long,
     val modeledBytes: Long,
 )
+
+internal fun interface LpComponentAdmission {
+    fun accepts(shape: LpComponentShape): Boolean
+    fun inspect(columns: Int, rows: Int, entries: Int): Boolean = true
+}
 
 private fun LpModel.componentRestrictions(
     blockCols: Array<IntArrayList>,

@@ -1145,7 +1145,7 @@ internal class LpEngine(
     }
 
     private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
-        rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
+        requestedPlan.componentReuse || rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
         rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
@@ -1226,7 +1226,9 @@ internal class LpEngine(
                 pricing = pricingOptions,
                 componentSplit = params.lpPlan.componentOwnership || params.lpPlan.componentReuse,
                 componentAdmission = if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership)
-                    ::admitRetainedComponents else null,
+                    numericalComponentAdmission else null,
+                monolithicPreparationWork = if (params.lpPlan.componentReuse && !params.lpPlan.componentOwnership)
+                    nodeWorkBudget() else null,
             )
         },
         solveContext = solveContext,

@@ -1,15 +1,31 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.LpComponentAdmission
 import com.eignex.klause.lp.engine.LpComponentShape
 
 private const val MIN_COMPONENT_CELLS = 4096L
 private const val MAX_COMPONENT_BYTES = 16L * 1024 * 1024
 private const val MAX_COMPONENTS = 1024
 
-internal fun LpEngine.admitRetainedComponents(shape: LpComponentShape): Boolean {
-    val outcome = componentReuseAdmission(shape)
-    sink.lp.observeComponentAdmission(outcome, shape.blocks, shape.modeledBytes)
-    return outcome == "ADMITTED"
+internal val LpEngine.numericalComponentAdmission: LpComponentAdmission
+    get() = object : LpComponentAdmission {
+        override fun inspect(columns: Int, rows: Int, entries: Int): Boolean {
+            val outcome = componentReuseInspection(columns, rows, entries) ?: return true
+            sink.lp.observeComponentAdmission(outcome, 0, 0L)
+            return false
+        }
+
+        override fun accepts(shape: LpComponentShape): Boolean {
+            val outcome = componentReuseAdmission(shape)
+            sink.lp.observeComponentAdmission(outcome, shape.blocks, shape.modeledBytes)
+            return outcome == "ADMITTED"
+        }
+    }
+
+internal fun componentReuseInspection(columns: Int, rows: Int, entries: Int): String? = when {
+    rows.toLong() * (columns.toLong() + rows + 1L) < MIN_COMPONENT_CELLS -> "SMALL_MODEL"
+    128L * (entries.toLong() + columns + rows + 2L) + 4L * rows > MAX_COMPONENT_BYTES -> "STORAGE"
+    else -> null
 }
 
 internal fun componentReuseAdmission(shape: LpComponentShape): String = when {

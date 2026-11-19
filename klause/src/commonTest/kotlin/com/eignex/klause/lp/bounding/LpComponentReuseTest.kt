@@ -3,9 +3,17 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.lp.engine.LpComponentShape
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpComponentReuseTest {
+    @Test
+    fun `inspection declines small or oversized owners before partition allocation`() {
+        assertEquals("SMALL_MODEL", componentReuseInspection(8, 8, 16))
+        assertEquals("STORAGE", componentReuseInspection(10_000, 10_000, 200_000))
+        assertNull(componentReuseInspection(32, 128, 256))
+    }
+
     @Test
     fun `admission declines shapes whose retained cost cannot repay splitting`() {
         for ((shape, expected) in listOf(
