@@ -520,6 +520,55 @@ class ResumableMinimizeGuidanceTest {
     }
 
     @Test
+    fun `checked sparse root bounds allow discrete search before a primal point`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    private var pausedWork = 0L
+                    override val currentWork: Long get() = pausedWork
+                    override val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(workOps = pausedWork)
+                    override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? =
+                        if (cancellation()) null else DoubleArray(model.m)
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        while (true) {
+                            pausedWork += 5_000L * LP_WORK_PER_NODE
+                            pauseAt(pausedWork)
+                        }
+                        @Suppress("UNREACHABLE_CODE")
+                        null
+                    }
+                }
+            }
+        }
+        val params = BacktrackParams(maxDecisions = 16L, variableSelector = InputOrder,
+            valueSelector = IndomainMin, lpConfig = LpConfig.parse("default,+sparse-trial"),
+            lpPlan = LpPlan(rootCutHarvest = false))
+        val offered = ArrayList<Sample>()
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            var result: MinimizeResult? = null
+            repeat(3) {
+                result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+            }
+
+            assertEquals(1L, search.stats.lp.phases.getValue("PRIMAL_CONTINUATION_ROOT")
+                .outcomes["BOUND_SEARCH_HANDOFF"])
+            assertEquals(listOf(listOf(0L, 1L), listOf(1L, 0L)), offered.map { it.ints.toList() })
+            assertTrue(result is MinimizeResult.Optimal)
+        }
+    }
+
+    @Test
     fun `sliced root rounding should resume only while its LP allowance remains`() {
         val charged = 5_000L * LP_WORK_PER_NODE
         for (allowance in listOf(charged, 2L * charged)) {
