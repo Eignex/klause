@@ -358,11 +358,15 @@ source-root model and exact state qualify; later CP assertions supply no global
 bound through this route. The search publishes accepted bounds to the portfolio's
 objective floor and retains them for its own terminal bound.
 
-Sparse-trial preparation is capped at eight million modeled work units; root and
-node LP work stop at 150 million units or the containing invocation's smaller
+Sparse preparation is capped at eight million modeled work units; retained root
+queries stop at 150 million units or the containing invocation's smaller
 allowance, and tighter caller deadlines and work shares remain in force. Bounded
 atomic numerical operations can finish past a work boundary; the ledger keeps their
 actual cost.
+An ordinary admitted non-root query retains its cumulative LP allowance, which
+includes all preceding root work. A spent root grant cannot restart an unchanged
+root query through the node consumer. Explicit root-only sparse plans keep their
+150-million-unit cumulative ceiling throughout.
 The two-GiB modeled storage envelope covers source authority, sparse owners,
 scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;

@@ -61,7 +61,9 @@ internal fun LpEngine.rootLpRelaxationBound(
     var stage = "ENTRY"
     return try {
         if (retainedRootEnabled) {
-            retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation, preparationCancellation) { stage = it }
+            withRootWorkAllowance {
+                retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation, preparationCancellation) { stage = it }
+            }
         } else {
             stage = "AT_SOURCE_LAYOUT"
             standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation).also {

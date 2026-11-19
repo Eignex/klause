@@ -357,6 +357,26 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `automatic node queries retain containing work after the root grant is spent`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L))
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 3)),
+            LpParams(lpConfig = LpConfig.AUTO, lpPlan = LpPlan(rootMaxWork = 20_000L),
+                solveBudgetMillis = 10_000L), SolveStatsSink("funded-sparse-node")).use { engine ->
+            assertEquals(1.0, engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList()))
+            engine.noteNodeOverhead(engine.retainedRootCumulativeWork())
+            assertTrue(engine.propagator.atLevel(1))
+            assertTrue(engine.propagator.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L))))
+
+            val result = engine.propagator.solveFloat()?.second
+
+            assertEquals(3.0, requireNotNull(result).objective)
+            assertEquals(0L, engine.retainedRootCumulativeWork())
+        }
+    }
+
+    @Test
     fun `checked paused bounds survive a later root consultation stop`() {
         val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
