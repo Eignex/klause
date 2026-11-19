@@ -166,7 +166,7 @@ internal fun solvePolynomialObjectiveImage(
                     arithmetic.step()
                     result = when {
                         cell and 1L != 0L -> PolynomialObjectiveResult.Optimum(
-                            value, assignment, evidence, work.snapshot(),
+                            checked.assignment.realValue(0), assignment, evidence, work.snapshot(),
                         )
                         cell == 0L -> PolynomialObjectiveResult.Unbounded(assignment, evidence, work.snapshot())
                         else -> PolynomialObjectiveResult.Infimum(

@@ -5,6 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.lp.engine.LpVerdict
 
@@ -215,9 +216,12 @@ internal class PolynomialAffineReduction private constructor(
                 val relaxation = PolynomialLpRelaxation.prepare(current, realCount, arithmetic,
                     arithmetic.execution.cancellation)
                 relaxation?.use {
-                    val tightening = it.tightenSquares {}
-                    inconsistent = tightening.infeasible ||
-                        it.solve()?.verdict == LpVerdict.INFEASIBLE
+                    try {
+                        val tightening = it.tightenSquares {}
+                        inconsistent = tightening.infeasible || it.solve()?.verdict == LpVerdict.INFEASIBLE
+                    } catch (_: PolynomialResourceLimit) {
+                        // An optional envelope decline leaves exact regional completion available.
+                    }
                 }
             }
             arithmetic.step()

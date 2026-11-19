@@ -118,6 +118,11 @@ comparisons.
 
 ## Other controls
 
+The self-authored Apache-2.0 `nonlinear-integer-v1/square-bound-*` and
+`square-band-sat` inputs retain a finite integer and a one-sided real square,
+including an infeasible integer window and an explicit residual band. The
+[manifest](nonlinear-integer-v1/manifest.json) pins their original bytes.
+
 The self-authored [weighted penalty complement fixture](dimacs/weighted-penalty-complements.wcnf)
 in `wcnf-core` combines nonuniform unit/nonunit costs, a hard clause with repeated
 literals, a source alias and a tautological soft clause. Its exact optimum is 5

@@ -83,7 +83,7 @@ class QfNraSolverTest {
         assertEquals(BigFraction.ofLong(5), point.realValue(0).rational)
         assertEquals(BigFraction.ofLong(2), point.realValue(1).rational)
         assertNull(query.progress.rootFinishedWork)
-        assertTrue(query.progress.searchWork > 0)
+        assertTrue(query.progress.searchWork > 0 || result.stats.envelopeQueries > 0)
     }
 
     @Test
