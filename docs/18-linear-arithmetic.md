@@ -59,6 +59,9 @@ their guarded bounds, preserving the matrix across source Boolean choices.
 Source rows with the same coefficient vector share its prepared keys and
 normalization; strict-margin definitions are prepared once per oriented term.
 Thresholds and premises belong to each asserted source side.
+Prepared source forms share identical exact coefficient maps and ordered arrays
+within one preparation. Each row retains its own threshold, relation, strictness
+and Boolean terms; a fresh source preparation owns a fresh pool.
 Other terms first seen under a branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.

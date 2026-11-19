@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactRowForm
+import com.eignex.klause.lp.ExactRowTermPool
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.util.ArithmeticExecution
@@ -47,7 +48,8 @@ internal class PreparedExactLiraSource(
 )
 
 internal fun legacyExactLiraSource(model: Problem): PreparedExactLiraSource {
-    val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    val terms = ExactRowTermPool()
+    val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars, terms) } }
     val preparedRows = model.factors.flatMapIndexed { factorIndex, factor ->
         factor.linearRows.mapIndexed { index, row ->
             PreparedSourceRow(
@@ -94,6 +96,7 @@ private fun sharedExactLiraSourceWithin(
     charge(1)
     if (model.numIntVars == 0 && model.numRealVars == 0) return null
     val exactForms = ArrayList<List<ExactRowForm>>()
+    val terms = ExactRowTermPool()
     val preparedRows = ArrayList<PreparedSourceRow>()
     val arithmeticRows = ArrayList<LinearRow>()
     val arithmeticVariables = LinkedHashSet<Int>()
@@ -133,7 +136,8 @@ private fun sharedExactLiraSourceWithin(
             }
             // Exact rational conversion and its owned term buffers are one atomic row operation.
             charge(4L * row.size + 4L)
-            val exact = row.exactForm(model.numRealVars)
+            charge(row.size.toLong() + 1L)
+            val exact = row.exactForm(model.numRealVars, terms)
             if (rows.due() && stop()) return null
             forms += exact
             preparedRows += PreparedSourceRow(
