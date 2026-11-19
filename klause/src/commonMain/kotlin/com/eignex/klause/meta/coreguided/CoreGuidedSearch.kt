@@ -73,11 +73,15 @@ internal class CoreGuidedSearch(
     private val maximumMillis: Long? = null,
     private val timeSource: TimeSource = TimeSource.Monotonic,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
+    continueProductive: Boolean = false,
 ) : ResumableSearch,
     ReseedGuard {
     private val opened = timeSource.markNow()
     private var activeTime = Duration.ZERO
     private var activeSlice: TimeMark? = null
+    private val continuation = if (continueProductive) CoreGuidedContinuation(requireNotNull(maximumMillis)) else null
+    private val activeMillisLimit: Long? get() = continuation?.maximumMillis ?: maximumMillis
+    private var continuationCaller: ExecutionControl = ExecutionControl.Never
     private val lifetime = params.cancellation.lifetimeCancellation()
     private var factors = ArrayList<Factor>().apply {
         addAll(base.factors)
@@ -143,7 +147,8 @@ internal class CoreGuidedSearch(
     internal val lowerBound: BigFraction get() = BigFraction.of(lower, BIG_ONE)
     override val isDone: Boolean get() = terminal != null
     override val stats: SolveStats get() = completedStats.mergedWith(query?.stats ?: SolveStats.EMPTY).copy(
-        coreGuided = CoreGuidedStats(completedCores, largestCore, lower, maximumWork, maximumMillis),
+        coreGuided = CoreGuidedStats(completedCores, largestCore, lower, maximumWork, activeMillisLimit,
+            continuation?.grants ?: 0L),
     )
     override val work: Long get() {
         val live = query?.stats?.search?.propagationWork?.sum?.toLong() ?: 0L
@@ -153,7 +158,7 @@ internal class CoreGuidedSearch(
             saturatedAdd(preparationVisits / PROPAGATION_WORK_PER_NODE, carried))
     }
     private val allowanceExhausted: Boolean get() = maximumWork?.let { work >= it } == true ||
-        maximumMillis?.let { activeTime + (activeSlice?.elapsedNow() ?: Duration.ZERO) >= it.milliseconds } == true
+        activeMillisLimit?.let { activeTime + (activeSlice?.elapsedNow() ?: Duration.ZERO) >= it.milliseconds } == true
     override val initialWork: Long = work
     override val canReseed: Boolean get() = false
     override val preparationPending: Boolean
@@ -173,12 +178,14 @@ internal class CoreGuidedSearch(
         check(!closed) { "search is closed" }
         val token = lifetime or global
         if (token()) return null
+        continuationCaller = global
+        fundContinuation()
         if (base.rootDeductions is PropagationResult.Unsat) {
             return finish(MinimizeResult.Infeasible(stats = stats))
         }
         if (allowanceExhausted) return finish(stopped(TerminationReason.BudgetExhausted))
-        val remainingMillis = maximumMillis?.let {
-            (it.milliseconds - activeTime).inWholeMilliseconds.coerceAtLeast(0L)
+        val remainingMillis = activeMillisLimit?.let {
+            (it.milliseconds - activeTime).inWholeMilliseconds.coerceAtLeast(1L)
         } ?: sliceMillis
         val sliceDuration = minOf(sliceMillis, remainingMillis).milliseconds
         val deadline = TimeSource.Monotonic.markNow() + sliceDuration
@@ -385,7 +392,19 @@ internal class CoreGuidedSearch(
         completedCores++
         largestCore = maxOf(largestCore, selected.size)
         publishLowerBound()
+        fundContinuation()
     }.iterator()
+
+    private fun fundContinuation() {
+        val budget = continuation ?: return
+        if (continuationCaller()) return
+        val incumbent = params.objectiveBoundSupplier?.invoke() ?: return
+        val remaining = continuationCaller.deadline()?.let {
+            (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
+        }
+        budget.fund(completedCores, lower, coreWeight, incumbent,
+            (activeTime + (activeSlice?.elapsedNow() ?: Duration.ZERO)).inWholeMilliseconds, remaining)
+    }
 
     private fun prepareObjective(): Iterator<Unit> = sequence {
         while (initialIndex < objectiveTerms) {
@@ -528,6 +547,7 @@ internal class CoreGuidedSearch(
                     ).coerceAtLeast(0L),
                 clauseExchange = null,
                 cutExchange = null,
+                objectiveBoundSupplier = if (continuation == null) params.objectiveBoundSupplier else null,
             )
             val projected = coreRefinement == CoreRefinementMode.REASONS
             val solver = BacktrackSolver(baked)

@@ -362,6 +362,7 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "coreGuidedLargestCore" to "${stats.coreGuided.largestCore}"
         stats.coreGuided.workLimit?.let { limit -> out += "coreGuidedWorkLimit" to "$limit" }
         stats.coreGuided.activeMillisLimit?.let { limit -> out += "coreGuidedActiveMillisLimit" to "$limit" }
+        out += "coreGuidedContinuationGrants" to "${stats.coreGuided.continuationGrants}"
     }
     if (stats.search.clausalPrimalStarts.sum > 0.0) {
         out += "clausalPrimalStarts" to "${stats.search.clausalPrimalStarts.sum.toLong()}"

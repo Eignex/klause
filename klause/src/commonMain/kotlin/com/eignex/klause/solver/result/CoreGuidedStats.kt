@@ -15,7 +15,13 @@ data class CoreGuidedStats(
     val workLimit: Long? = null,
     /** Largest finite core active-time allowance, in milliseconds, among reported workers. */
     val activeMillisLimit: Long? = null,
+    /** Caller-funded continuations following a completed near-attainment core. */
+    val continuationGrants: Long = 0L,
 ) {
+    /** Create core observations with resource limits and no continuations. */
+    constructor(cores: Long, largestCore: Int, lowerBound: BigInt?, workLimit: Long?, activeMillisLimit: Long?) :
+        this(cores, largestCore, lowerBound, workLimit, activeMillisLimit, 0L)
+
     /** Create core observations without resource-limit telemetry. */
     constructor(cores: Long = 0L, largestCore: Int = 0, lowerBound: BigInt? = null) :
         this(cores, largestCore, lowerBound, null, null)
@@ -25,7 +31,7 @@ data class CoreGuidedStats(
         cores: Long = this.cores,
         largestCore: Int = this.largestCore,
         lowerBound: BigInt? = this.lowerBound,
-    ): CoreGuidedStats = CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit)
+    ): CoreGuidedStats = CoreGuidedStats(cores, largestCore, lowerBound, workLimit, activeMillisLimit, continuationGrants)
 
     /** Combine workers of the same objective invocation; floors take their maximum. */
     fun mergedWith(other: CoreGuidedStats): CoreGuidedStats = CoreGuidedStats(
@@ -34,6 +40,7 @@ data class CoreGuidedStats(
         lowerBound?.let { left -> other.lowerBound?.let { if (left > it) left else it } ?: left } ?: other.lowerBound,
         maximumLimit(workLimit, other.workLimit),
         maximumLimit(activeMillisLimit, other.activeMillisLimit),
+        continuationGrants + minOf(other.continuationGrants, Long.MAX_VALUE - continuationGrants),
     )
 }
 
