@@ -456,7 +456,9 @@ a non-root integer decision cannot supply a shared premise and mapped admission
 must decline. Every native conflict cascade repeats the mapped-target assertion
 and complete premise checks before admitting a typed result; an unavailable
 mapping keeps its clausal fallback, including cascades reached through an LP
-consequence. Within one fixpoint publication, complete conjunctions of active
+consequence. Mapped-row admission validates named, active premises through the same
+bounded traversal as clause construction without materializing a discarded clause.
+Within one fixpoint publication, complete conjunctions of active
 named assertions can share bounded proof subgraphs, and conjunctions retain every
 child; an unavailable, unnameable or inactive leaf withholds reuse, and the memo
 ends with the publication callback. Fixpoint facts already implied by shared

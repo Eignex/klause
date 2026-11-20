@@ -22,6 +22,7 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.canExplainAtoms
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ZERO
@@ -126,15 +127,15 @@ class CpSearchComponent(
                     SearchAtomPremise.All(listOf(context.intLowerBoundPremise(source),
                         context.intUpperBoundPremise(source)))
                 }
-                if (context.explainAtoms(premise, maxNodes = 128) == null) {
+                if (!context.canExplainAtoms(premise, maxNodes = 128)) {
                     return false
                 }
             }
             for (variable in learned.row.variables) {
                 if (context.cancelled()) return false
                 val source = sourceIntId(variable)
-                if (context.explainAtoms(context.intLowerBoundPremise(source), maxNodes = 128) == null) return false
-                if (context.explainAtoms(context.intUpperBoundPremise(source), maxNodes = 128) == null) return false
+                if (!context.canExplainAtoms(context.intLowerBoundPremise(source), maxNodes = 128)) return false
+                if (!context.canExplainAtoms(context.intUpperBoundPremise(source), maxNodes = 128)) return false
             }
             return !context.cancelled()
         } catch (_: CheckedLongOverflowException) {
