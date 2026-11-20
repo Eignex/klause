@@ -57,6 +57,18 @@ internal class LpDirectionalHistory(
 
     val hasObservations: Boolean get() = observed
 
+    fun restart() {
+        charge(3L)
+        trimParents(0)
+        pending = null
+        objective = Double.NaN
+        observe("RESTART")
+        if (gains.isNotEmpty()) {
+            charge(1L)
+            observe("RESTART_RETAINED")
+        }
+    }
+
     fun clear(report: Boolean = true) {
         charge(gains.size.toLong())
         gains.clear()
