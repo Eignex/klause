@@ -91,7 +91,10 @@ internal class JointRepairNeighborhood private constructor(
         fun visit(): AdvisorySelection? = when {
             token() -> AdvisorySelection.Unavailable
             visits == MAX_SELECTION_VISITS -> AdvisorySelection.Declined(AdvisorySelection.Limit.Visits)
-            else -> { visits++; null }
+            else -> {
+                visits++
+                null
+            }
         }
         try {
             while (queue.isNotEmpty()) {
@@ -241,11 +244,11 @@ internal class JointRepairNeighborhood private constructor(
     override fun propose(
         centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
         radius: BigFraction, cutoff: BigFraction?,
-    ): ExactNeighborhoodCondition = propose(centers, bools, count, round, radius, cutoff, 0L)
+    ): ExactNeighborhoodCondition = proposeWithinSelectionBudget(centers, bools, count, round, cutoff, 0L)
 
-    fun propose(
+    fun proposeWithinSelectionBudget(
         centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
-        radius: BigFraction, cutoff: BigFraction?, selectionVisitsSpent: Long,
+        cutoff: BigFraction?, selectionVisitsSpent: Long,
     ): ExactNeighborhoodCondition {
         val order = rankedSeeds ?: seeds
         onRefutationRoots?.invoke(emptyList())

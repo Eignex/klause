@@ -476,7 +476,7 @@ internal class JointLinearRepair(
                     else privateLimit != proximityCompletedCutoff) && model.numBoolVars == 0 &&
                     IncumbentProximity.accepts(model.intBounds, model.numIntVars))
                     if (pass != null) when (val selected = requireNotNull(selection).advisoryNeighborhood(
-                            pass.coordinates, pass.next, privateLimit, budget, stop, expand = pass.pair != null)) {
+                        pass.coordinates, pass.next, privateLimit, budget, stop, expand = pass.pair != null)) {
                         is JointRepairNeighborhood.AdvisorySelection.Ready -> {
                             val pair = pass.pair
                             if (pair != null && selected.condition.lower.keys.containsAll(pair.lower.keys)) {
@@ -507,8 +507,8 @@ internal class JointLinearRepair(
                 if (checkedStart && hint != null) relaxationAttempted = true
                 if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
                 if (binary != null) observe("jointRepairBinarySupportNeighborhoods")
-                (proximity ?: binary ?: relaxation ?: requireNotNull(selection).propose(
-                    from, pooled?.bools ?: bools, size, proposalRound, radius, limit,
+                (proximity ?: binary ?: relaxation ?: requireNotNull(selection).proposeWithinSelectionBudget(
+                    from, pooled?.bools ?: bools, size, proposalRound, limit,
                     requireNotNull(selection).visitedEntries - beforeSelection))
                     .also { condition ->
                         if (bootstrap) {

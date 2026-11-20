@@ -90,8 +90,10 @@ class JointRepairNeighborhoodTest {
     fun `declined support and ordinary fallback should share a graph visit allowance`() {
         val columns = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("advisory-visits", "exact")),
-            columns.toSet(), (0 until 4096).associate { id -> id.toString() to SourcePremise(SourceInequality(
-                columns.associateWith { BigFraction.ONE }, BigFraction.ONE)) })
+            columns.toSet(), (0 until 4096).associate { id ->
+                id.toString() to SourcePremise(SourceInequality(
+                    columns.associateWith { BigFraction.ONE }, BigFraction.ONE))
+            })
         val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 0, ExecutionControl.Never))
         val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
 
@@ -100,8 +102,8 @@ class JointRepairNeighborhoodTest {
 
         assertEquals(JointRepairNeighborhood.AdvisorySelection.Declined(
             JointRepairNeighborhood.AdvisorySelection.Limit.Visits), selected)
-        val fallback = repair.propose(List(2) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
-            BigFraction.ONE, BigFraction.ONE, repair.visitedEntries)
+        val fallback = repair.proposeWithinSelectionBudget(List(2) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
+            BigFraction.ONE, repair.visitedEntries)
         assertEquals(mapOf(1 to BigFraction.ZERO), fallback.lower)
         assertTrue(repair.visitedEntries <= 8192)
         assertTrue(funding.spent > 0)
