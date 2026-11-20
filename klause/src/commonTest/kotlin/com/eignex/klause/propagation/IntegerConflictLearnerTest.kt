@@ -327,20 +327,24 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     fun `a selected eager endpoint should retain its grant beside an unselected wide source`() {
         val width = 512
         val native = PropagationSession(Problem(0, width + 4,
-            Array(width + 4) { index -> IntDomain(0, when (index) {
-                0 -> 6
-                1 -> 12
-                2 -> 24
-                3 -> 36
-                else -> 0
-            }) }, arrayOf(Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0))),
+            Array(width + 4) { index ->
+                IntDomain(0, when (index) {
+                    0 -> 6
+                    1 -> 12
+                    2 -> 24
+                    3 -> 36
+                    else -> 0
+                })
+            }, arrayOf(Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0))),
             pbLearning = false).apply { enableIntegerRowLearning() }
         val older = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 1) + IntArray(width) { it + 4 },
-            Array(width + 2) { bigIntOf(when (it) {
-                0 -> 2
-                1 -> -1
-                else -> 1
-            }) }, bigIntOf(0), useLo = true))
+            Array(width + 2) {
+                bigIntOf(when (it) {
+                    0 -> 2
+                    1 -> -1
+                    else -> 1
+                })
+            }, bigIntOf(0), useLo = true))
         val newest = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 2, 3),
             arrayOf(bigIntOf(2), bigIntOf(1), bigIntOf(-1)), bigIntOf(0), useLo = true))
         assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(older, 3))
