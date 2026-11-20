@@ -38,7 +38,7 @@ class LpHintsTest {
             val variable = VarRef.IntVar(0)
             val down = SearchDecision.IntAtMost(0, 2)
             val up = SearchDecision.IntAtLeast(0, 3)
-            repeat(2) {
+            repeat(3) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), doubleArrayOf(0.0))
                 hints.recordObjective(relaxation, 10.0)
@@ -71,8 +71,51 @@ class LpHintsTest {
             if (change == "none") assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9)
             else assertTrue(hints.directionalScore(variable).isNaN())
             assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
-            assertEquals(2, events.count { it == "DOWN" })
-            assertEquals(2, events.count { it == "UP" })
+            assertEquals(3, events.count { it == "DOWN" })
+            assertEquals(3, events.count { it == "UP" })
+        }
+    }
+
+    @Test
+    fun `only separated variable gain support replaces the ordinary reference`() {
+        for (proposalGain in listOf(1.75, 2.25)) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 10, cost = 1L) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
+            val baseline = VarRef.IntVar(0)
+            val proposal = VarRef.IntVar(1)
+            for (referenceGain in listOf(1.0, 2.0, 1.5)) {
+                for (variable in listOf(baseline, proposal)) {
+                    hints.beginNode(0, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, 10.0)
+                    hints.branch(variable)
+                    val split = if (variable == baseline) 2L else 3L
+                    for (up in listOf(false, true)) {
+                        hints.commit(if (up) SearchDecision.IntAtLeast(variable.varId, split + 1L)
+                        else SearchDecision.IntAtMost(variable.varId, split), 1)
+                        hints.beginNode(1, 100.0)
+                        val point = doubleArrayOf(2.5, 3.5)
+                        point[variable.varId] = if (up) split + 1.0 else split.toDouble()
+                        hints.record(relaxation, point, DoubleArray(0))
+                        hints.recordObjective(relaxation, 10.0 + if (variable == baseline) referenceGain else proposalGain)
+                    }
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+
+            val selected = assertNotNull(hints.selectVariable(proposal, baseline))
+            hints.branch(selected)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, if (selected == baseline) 2L else 3L), 1)
+
+            assertEquals(if (proposalGain > 2.0) proposal else baseline, selected)
+            assertEquals(if (proposalGain > 2.0) 1 else 0, events.count { it == "PASSIVE_VARIABLE_COMMIT_CHANGED" })
         }
     }
 
@@ -89,7 +132,7 @@ class LpHintsTest {
         for (apply in listOf(false, true)) {
             val events = ArrayList<String>()
             val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply, observe = events::add)
-            repeat(2) {
+            repeat(3) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
@@ -227,7 +270,7 @@ class LpHintsTest {
             val events = ArrayList<String>()
             val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
                 observe = events::add, charge = { work += it })
-            repeat(2) {
+            repeat(3) {
                 for (variable in listOf(baseline, proposal)) {
                     hints.beginNode(0, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
@@ -260,8 +303,8 @@ class LpHintsTest {
             assertEquals(if (apply) proposal else baseline, selected)
             val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
             assertEquals(1, events.count { it == event })
-            assertEquals(4, events.count { it == "UP" })
-            assertEquals(4, events.count { it == "DOWN" })
+            assertEquals(6, events.count { it == "UP" })
+            assertEquals(6, events.count { it == "DOWN" })
             costs.add(work - before)
         }
         assertEquals(costs.first(), costs.last())
@@ -278,7 +321,7 @@ class LpHintsTest {
         val proposal = VarRef.IntVar(1)
         val events = ArrayList<String>()
         val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
-        repeat(2) {
+        repeat(3) {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
@@ -313,7 +356,7 @@ class LpHintsTest {
         val events = ArrayList<String>()
         val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
         val proposal = VarRef.IntVar(1)
-        repeat(2) {
+        repeat(3) {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
@@ -351,7 +394,7 @@ class LpHintsTest {
             var work = 0L
             val hints = LpHints(1, 0, directionalGains = true, charge = { work += it })
             val variable = VarRef.IntVar(0)
-            for ((phase, directions) in listOf(prefix, listOf(false, false, true, true)).withIndex()) {
+            for ((phase, directions) in listOf(prefix, listOf(false, false, false, true, true, true)).withIndex()) {
                 for (up in directions) {
                     hints.beginNode(0, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
@@ -374,7 +417,7 @@ class LpHintsTest {
                     assertEquals(before, work)
                 } else {
                     assertEquals(sqrt(3.0), score, 1e-9)
-                    assertEquals(before + 1L, work)
+                    assertEquals(before + 5L, work)
                 }
             }
         }
@@ -565,7 +608,7 @@ class LpHintsTest {
                 booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
             val observations = ArrayList<String>()
             val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
-            repeat(2) {
+            repeat(3) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
                 hints.recordObjective(relaxation, 10.0)
@@ -622,7 +665,7 @@ class LpHintsTest {
                 booleanArrayOf(false), constant, intArrayOf(0), IntArray(0))
             val hints = LpHints(1, 0, directionalGains = true)
             val variable = VarRef.IntVar(0)
-            repeat(2) {
+            repeat(3) {
                 hints.beginNode(0, Double.POSITIVE_INFINITY)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)

@@ -30,9 +30,8 @@ class LpHintsCollectionTest {
             val variable = VarRef.IntVar(0)
             val down = SearchDecision.IntAtMost(0, 2)
             val up = SearchDecision.IntAtLeast(0, 3)
-            for ((decision, point, objective) in listOf(
-                Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0), Triple(down, 2.0, 11.0),
-            )) {
+            val visits = listOf(Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0), Triple(down, 2.0, 11.0))
+            for ((decision, point, objective) in visits) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
@@ -59,10 +58,14 @@ class LpHintsCollectionTest {
             assertEquals(1, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
             assertEquals(2, events.count { it == "UP" })
             assertEquals(2, events.count { it == "DOWN" })
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            assertTrue(hints.directionalScore(variable).isNaN())
             costs.add(work)
         }
         assertTrue(costs.first() > 0L)
-        assertEquals(costs.first(), costs.last())
+        for (pair in costs.chunked(2)) assertEquals(pair.first(), pair.last())
     }
 
     @Test
