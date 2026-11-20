@@ -377,6 +377,7 @@ with each other before fallback, so objective units are not mixed with reduced c
 Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
+A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.

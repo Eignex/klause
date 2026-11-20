@@ -19,7 +19,7 @@ internal class LpDirectionalHistory(
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
-        val stable: Boolean get() = count >= RELIABILITY && minOf(latest, previous) >= maxOf(latest, previous) * 0.5
+        val stable: Boolean get() = count >= RELIABILITY && maxOf(latest, previous) <= minOf(latest, previous) * 2.0
     }
 
     private class Gains(val down: Direction = Direction(), val up: Direction = Direction())

@@ -63,6 +63,35 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
+    fun `directional stability respects factor two agreement at floating extremes`() {
+        for ((observations, available) in listOf(
+            (0.0 to 0.0) to true,
+            (0.0 to Double.MIN_VALUE) to false,
+            (Double.MIN_VALUE to Double.MIN_VALUE) to true,
+            (3.0 * Double.MIN_VALUE to 7.0 * Double.MIN_VALUE) to false,
+            (1.0e308 to 1.2e308) to true,
+        )) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.25)
+            for (gain in listOf(observations.first, observations.second)) {
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.record(1.0)
+                history.commit(SearchDecision.Bool(0), 1)
+                history.beginNode(1)
+                history.record(gain)
+            }
+            history.beginNode(0)
+            history.record(0.0)
+
+            assertEquals(available, history.preferGainDirection(variable, 0.25) != null, "gains=$observations")
+        }
+    }
+
+    @Test
     fun `parent bookkeeping pays allocation without repeatedly charging unused capacity`() {
         var work = 0L
         val history = LpDirectionalHistory({}, charge = { work += it })
