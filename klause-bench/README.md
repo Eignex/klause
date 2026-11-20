@@ -89,6 +89,11 @@ grant and at most four snapshots. A retained rejected ray does not stop capture 
 another ray passes the complete kernel check. `missingBoundSideObserved` records the
 rejection history; `stoppedOnUnresolvedMissingSide` identifies an unresolved matching
 rejection that stopped the producer. Snapshot and source-journal limits remain separate.
+This mode accepts `capture-authority=nominal|accepted` and
+`capture-cut-policy=ordinary|selected`, defaulting to nominal authority and ordinary cuts.
+Accepted authority requires the production source-mapping compatibility check; unavailable
+authority declines instead of substituting nominal rows. Selected cuts enable point
+selection and source aggregation within the same containing allowance.
 `capture-mode=joint-ordinary handoff=true` observes the actual finite portfolio's
 ordinary pre-incumbent companion with complete proof-worker coverage and progress
 logging disabled. It records bounded exact proposals, selected refutation roots,
