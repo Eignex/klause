@@ -13,7 +13,6 @@ import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.util.numbers.BigFraction

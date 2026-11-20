@@ -505,9 +505,12 @@ and work allowances. The [portfolio](15-portfolio-scheduling.md#roles-and-the-mi
 decides when the aggressive LP emphasis is seated.
 
 Immutable column bindings retain their exact source expressions. CP bound refreshes
-reuse a binding's expression only for a matching unit integer source without an
-offset; absent or incompatible mappings construct the source expression directly.
-Each refresh captures its own active bound facts.
+capture integer endpoints and Boolean pins in private primitive arrays, including
+variables absent from LP columns. Exact endpoint values materialize for requested
+premise checks. LP bounds and auxiliary exclusions remain active facts; fixed-value
+checks combine their directions with the captured CP endpoints. Row-parent and
+premise derivations preserve the capture. A CP refresh replaces it, and an LP-only
+bound refresh clears it.
 
 Cut family identity follows portable proofs and retained rows without contributing
 to proof authority or deduplication. Observations separate construction, mapping

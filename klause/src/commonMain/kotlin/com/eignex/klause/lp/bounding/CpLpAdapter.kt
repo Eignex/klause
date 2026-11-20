@@ -18,7 +18,6 @@ import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
 import com.eignex.klause.lp.relaxation.columnBounds
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.LpPhaseStats
@@ -314,7 +313,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (result !is LpBoundBatchResult.Applied) return null
         val state = requireNotNull(core.state)
         val proof = state.ownerWorkingModel() ?: return null
-        val sources = base.sourceMap?.withCpBounds(proof, session, base.intColOf)
+        val sources = base.sourceMap?.withCpBounds(proof, session)
         val rebound = base.withModel(proof, sources)
         currentModel = proof
         persistentState = true
@@ -327,7 +326,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         selected: List<Cut>? = null,
     ): LpRelaxation? {
         if (currentModel !== base.model || native !== session) return null
-        val map = base.sourceMap?.withCpBounds(base.model, session, base.intColOf) ?: return null
+        val map = base.sourceMap?.withCpBounds(base.model, session) ?: return null
         return applyCuts(base, map, selected, session, engine.params.cancellation)
     }
 
@@ -387,7 +386,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val state = requireNotNull(core.state)
         val model = requireNotNull(state.ownerWorkingModel())
         val rebound = source?.relaxation(state, SessionDomains(session)) ?: base.withModel(model, remap = remap)
-        val map = rebound.sourceMap?.withCpBounds(model, session, rebound.intColOf)
+        val map = rebound.sourceMap?.withCpBounds(model, session)
             ?.withParentRows(cuts.parentRows(state))
         if (map != null) engine.cutPool.remap(map)
         return rebound.withModel(model, map)

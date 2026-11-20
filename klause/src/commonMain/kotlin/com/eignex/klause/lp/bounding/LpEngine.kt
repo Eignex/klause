@@ -71,7 +71,6 @@ import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.observeConsumption
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
@@ -907,7 +906,7 @@ internal class LpEngine(
     }
 
     fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray, relaxation: LpRelaxation, session: PropagationSession) {
-        val sources = relaxation.sourceMap?.withCpBounds(relaxation.model, session, relaxation.intColOf)
+        val sources = relaxation.sourceMap?.withCpBounds(relaxation.model, session)
         val active = relaxation.withModel(relaxation.model, sources)
         sources?.let(cutPool::remap)
         var added = 0

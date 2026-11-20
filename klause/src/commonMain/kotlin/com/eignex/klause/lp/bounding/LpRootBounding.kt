@@ -22,7 +22,6 @@ import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.util.ExecutionControl
@@ -423,7 +422,7 @@ internal fun LpEngine.harvestRootCuts(
             var resultObserved = false
             var round = 0
             while (round++ < CUT_POOL_ROUNDS && !cancellation.pollStop()) {
-                relaxation.sourceMap?.withCpBounds(relaxation.model, session, relaxation.intColOf)?.let(pool::remap)
+                relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(pool::remap)
                 pool.observe(result.primal)
                 resultObserved = true
                 val ctx = CutContext(problem, relaxation, result.primal, session)

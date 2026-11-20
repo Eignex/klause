@@ -61,17 +61,31 @@ internal class LpAuxiliarySources {
     }
 }
 
-internal class CutSourceMap(
+internal class CutSourceMap private constructor(
     val model: Any,
     val epoch: Long,
     columns: List<CutColumnSource?>,
-    globalPremises: Set<CutPremise> = emptySet(),
-    activePremises: Set<CutPremise> = emptySet(),
-    fixed: Map<CutSource, BigFraction> = emptyMap(),
-    assumptions: Set<String> = emptySet(),
-    parentRows: Map<Int, CutProvenance> = emptyMap(),
-    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
+    globalPremises: Set<CutPremise>,
+    activePremises: Set<CutPremise>,
+    fixed: Map<CutSource, BigFraction>,
+    assumptions: Set<String>,
+    parentRows: Map<Int, CutProvenance>,
+    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition>,
+    private val cpBounds: CpCutBounds?,
 ) {
+    constructor(
+        model: Any,
+        epoch: Long,
+        columns: List<CutColumnSource?>,
+        globalPremises: Set<CutPremise> = emptySet(),
+        activePremises: Set<CutPremise> = emptySet(),
+        fixed: Map<CutSource, BigFraction> = emptyMap(),
+        assumptions: Set<String> = emptySet(),
+        parentRows: Map<Int, CutProvenance> = emptyMap(),
+        auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
+    ) : this(model, epoch, columns, globalPremises, activePremises, fixed, assumptions,
+        parentRows, auxiliaryDefinitions, null)
+
     private val columnSnapshot = columns.toList()
     private val globalSnapshot = globalPremises.toSet()
     private val activeSnapshot = activePremises.toSet()
@@ -114,7 +128,17 @@ internal class CutSourceMap(
                         (source.kind == CutSourceKind.INTEGER || source.kind == CutSourceKind.BOOLEAN)
                 }
             )
-    fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || implied(premise, activeSnapshot)
+    fun isActive(premise: CutPremise): Boolean = isGlobal(premise) || impliedActive(premise)
+
+    private fun impliedActive(premise: CutPremise): Boolean {
+        if (premise in activeSnapshot) return true
+        if (premise is CutPremise.Fixed) {
+            val expression = CutExpression(mapOf(premise.source to BigFraction.ONE))
+            return impliedActive(CutPremise.Bound(expression, false, premise.value)) &&
+                impliedActive(CutPremise.Bound(expression, true, premise.value))
+        }
+        return cpBounds?.implies(premise) == true || implied(premise, activeSnapshot)
+    }
 
     fun presenceGuard(premise: CutPremise.Bound): CutPremise.Excluded? {
         val term = premise.expression.terms.entries.singleOrNull() ?: return null
@@ -163,49 +187,34 @@ internal class CutSourceMap(
 
     fun withParentRows(parents: Map<Int, CutProvenance>): CutSourceMap = CutSourceMap(
         model, epoch, columnSnapshot, globalSnapshot, activeSnapshot, fixedSnapshot, assumptionSnapshot,
-        parents, auxiliarySnapshot,
+        parents, auxiliarySnapshot, cpBounds,
     )
 
     fun withActivePremises(premises: Set<CutPremise>): CutSourceMap = CutSourceMap(
         model, epoch, columnSnapshot, globalSnapshot, activeSnapshot + premises, fixedSnapshot, assumptionSnapshot,
-        parentSnapshot, auxiliarySnapshot,
+        parentSnapshot, auxiliarySnapshot, cpBounds,
     )
-}
 
-internal fun CutSourceMap.withCpBounds(
-    model: LpModel,
-    session: com.eignex.klause.propagation.PropagationSession,
-    intColumns: IntArray? = null,
-): CutSourceMap {
-    val facts = HashSet<CutPremise>()
-    for (variable in 0 until session.problem.numBoolVars) {
-        val value = session.boolValue(variable) ?: continue
-        facts.add(CutPremise.Literal((variable shl 1) or if (value) 0 else 1))
-    }
-    for (variable in 0 until session.problem.numIntVars) {
-        val domain = session.intDomain(variable)
-        val index = if (intColumns != null && variable < intColumns.size) intColumns[variable] else -1
-        val column = column(index)
-        val expression = if (column != null && column.source.kind == CutSourceKind.INTEGER &&
-            column.source.id == variable && column.scale == BigFraction.ONE && column.offset.isZero
-        ) {
-            column.expression()
-        } else CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
-        facts.add(CutPremise.Bound(expression, false, BigFraction.ofLong(domain.min)))
-        facts.add(CutPremise.Bound(expression, true, BigFraction.ofLong(domain.max)))
-    }
-    for (definition in auxiliaryDefinitions.values) {
-        for (index in definition.required.indices step 2) {
-            val variable = definition.required[index].toInt()
-            val value = definition.required[index + 1]
-            if (!session.intDomain(variable).contains(value)) {
-                facts.add(
-                    CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
-                )
+    fun withCpBounds(
+        bounds: LpModel,
+        session: com.eignex.klause.propagation.PropagationSession,
+    ): CutSourceMap {
+        val facts = columnBounds(bounds, columnSnapshot)
+        val cp = CpCutBounds.capture(session)
+        for (definition in auxiliarySnapshot.values) {
+            for (index in definition.required.indices step 2) {
+                val variable = definition.required[index].toInt()
+                val value = definition.required[index + 1]
+                if (!session.intDomain(variable).contains(value)) {
+                    facts.add(
+                        CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
+                    )
+                }
             }
         }
+        return CutSourceMap(model, epoch + 1, columnSnapshot, globalSnapshot, facts, fixedSnapshot,
+            assumptionSnapshot, parentSnapshot, auxiliarySnapshot, cp)
     }
-    return withBounds(model, facts)
 }
 
 internal fun cpCutSources(
@@ -313,13 +322,13 @@ internal fun cpCutSources(
     return CutSourceMap(problem, 0, columns, globals, active, parentRows = parents, auxiliaryDefinitions = auxiliary)
 }
 
-private fun columnBounds(model: LpModel, columns: List<CutColumnSource?>): Set<CutPremise> =
+private fun columnBounds(model: LpModel, columns: List<CutColumnSource?>): MutableSet<CutPremise> =
     columnBounds(columns) { column -> model.exactBounds(column) to model.exactShift(column) }
 
 private fun columnBounds(
     columns: List<CutColumnSource?>,
     bound: (Int) -> Pair<ExactLpBounds, BigFraction>,
-): Set<CutPremise> {
+): MutableSet<CutPremise> {
     val active = HashSet<CutPremise>()
     for ((index, column) in columns.withIndex()) {
         if (column == null) continue
