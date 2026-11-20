@@ -378,9 +378,19 @@ internal class LpHints(
         val values = checkNotNull(passiveValues)
         collection.clear()
         values.clear()
-        val valueReady = cutoff.isFinite() && history.hasValueHistory && history.hasPruningHistory
+        val diagnosticReady = cutoff.isFinite() && history.hasValueHistory
+        val valueReady = diagnosticReady && history.hasPruningHistory
+        if (cutoff.isFinite()) {
+            charge(1L)
+            observe(when {
+                !passivePointCurrent() -> "PASSIVE_VALUE_DIAGNOSTIC_POINT_UNAVAILABLE"
+                !history.hasValueHistory -> "PASSIVE_VALUE_DIAGNOSTIC_NUMERIC_UNAVAILABLE"
+                !history.hasPruningHistory -> "PASSIVE_VALUE_DIAGNOSTIC_CONSENSUS_UNAVAILABLE"
+                else -> "PASSIVE_VALUE_DIAGNOSTIC_READY"
+            })
+        }
         val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
-        if (!history.hasObservations || (!valueReady && !collectReady) ||
+        if (!history.hasObservations || (!valueReady && !collectReady && !diagnosticReady) ||
             cancelled() || !passivePointCurrent()
         ) return alternatives
         val point = passivePoint
@@ -391,6 +401,12 @@ internal class LpHints(
                 stamp == solveStamp && passivePointCurrent()
         }
         if (!current()) return alternatives
+        if (diagnosticReady && !valueReady) {
+            charge(1L)
+            observe("PASSIVE_VALUE_DIAGNOSTIC_ONLY")
+            history.preferPruningDirection(variable, value(variable))
+            if (!current()) return alternatives
+        }
         if (valueReady) {
             val advised = values.select(variable, value(variable), alternatives, history, stamp, fresh = current)
             if (values.hasNomination) return advised

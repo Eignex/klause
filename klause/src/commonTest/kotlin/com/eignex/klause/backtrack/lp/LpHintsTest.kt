@@ -364,7 +364,10 @@ class LpHintsTest {
             hints.commit(selected.first(), 1)
 
             assertEquals(listOf(down, up), selected)
-            assertTrue(events.none { it.startsWith("PASSIVE_VALUE_") })
+            assertTrue("PASSIVE_VALUE_DIAGNOSTIC_ONLY" in events)
+            assertFalse("PASSIVE_VALUE_CHECK" in events)
+            assertFalse("PASSIVE_VALUE_COMPARED" in events)
+            assertFalse("PASSIVE_VALUE_COMMIT_CHECK" in events)
             assertFalse("PASSIVE_COLLECTION_COMMIT_CHANGED" in events)
             costs.add(work - before)
         }

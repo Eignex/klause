@@ -275,15 +275,48 @@ internal class LpDirectionalHistory(
     }
 
     fun preferPruningDirection(variable: VarRef, value: Double): Boolean? {
-        val history = reliable(variable, value) ?: return null
-        if (history.down.gain <= 0.0 && history.up.gain <= 0.0) return null
+        val history = reliable(variable, value, explain = true) ?: return null
+        if (history.down.gain <= 0.0 && history.up.gain <= 0.0) {
+            diagnose("PASSIVE_VALUE_DECLINE_ZERO_GAINS")
+            return null
+        }
         val version = generation
         charge(8L)
         if (version != generation) return null
-        val down = outcomeEstimate(history.down.outcome)
-        val up = outcomeEstimate(history.up.outcome)
-        if (!down.isFinite() || !up.isFinite() || down == up) return null
+        val downOutcome = history.down.outcome
+        val upOutcome = history.up.outcome
+        if (downOutcome.count < RELIABILITY || upOutcome.count < RELIABILITY) {
+            diagnose("PASSIVE_VALUE_DECLINE_OUTCOME_SAMPLES")
+            return null
+        }
+        if (stamp - downOutcome.previousStamp > maxAge || stamp - upOutcome.previousStamp > maxAge) {
+            diagnose("PASSIVE_VALUE_DECLINE_OUTCOME_AGE")
+            return null
+        }
+        if (downOutcome.latest != downOutcome.previous || upOutcome.latest != upOutcome.previous) {
+            diagnose("PASSIVE_VALUE_DECLINE_OUTCOME_MIXED")
+            charge(6L)
+            if (version != generation) return null
+            val downCount = (if (downOutcome.latest) 1 else 0) + (if (downOutcome.previous) 1 else 0)
+            val upCount = (if (upOutcome.latest) 1 else 0) + (if (upOutcome.previous) 1 else 0)
+            diagnose(if (downCount == upCount) "PASSIVE_VALUE_MIXED_RATE_EQUAL"
+            else "PASSIVE_VALUE_MIXED_RATE_DIRECTIONAL")
+            return null
+        }
+        val down = outcomeEstimate(downOutcome)
+        val up = outcomeEstimate(upOutcome)
+        if (down == up) {
+            diagnose(if (down == 0.0) "PASSIVE_VALUE_DECLINE_BOTH_OPEN" else "PASSIVE_VALUE_DECLINE_BOTH_PRUNED")
+            return null
+        }
+        diagnose("PASSIVE_VALUE_ELIGIBLE")
+        if (version != generation) return null
         return up > down
+    }
+
+    private fun diagnose(reason: String) {
+        charge(1L)
+        observe(reason)
     }
 
     fun prunedDirections(variable: VarRef, value: Double): Double {
@@ -329,14 +362,30 @@ internal class LpDirectionalHistory(
         return if (preferHighGain) up > down else up < down
     }
 
-    private fun reliable(variable: VarRef, value: Double): Gains? {
-        if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
-        val history = gains[variable] ?: return null
+    private fun reliable(variable: VarRef, value: Double, explain: Boolean = false): Gains? {
+        if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) {
+            if (explain) diagnose("PASSIVE_VALUE_DECLINE_POINT")
+            return null
+        }
+        val history = gains[variable] ?: run {
+            if (explain) diagnose("PASSIVE_VALUE_DECLINE_NUMERIC_MISSING")
+            return null
+        }
         expire(history.down)
         expire(history.up)
-        if (!history.down.stable || !history.up.stable) return null
+        if (history.down.count < RELIABILITY || history.up.count < RELIABILITY) {
+            if (explain) diagnose("PASSIVE_VALUE_DECLINE_NUMERIC_SAMPLES")
+            return null
+        }
+        if (!history.down.stable || !history.up.stable) {
+            if (explain) diagnose("PASSIVE_VALUE_DECLINE_NUMERIC_UNSTABLE")
+            return null
+        }
         val fraction = value - floor(value)
-        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) {
+            if (explain) diagnose("PASSIVE_VALUE_DECLINE_INTEGRAL")
+            return null
+        }
         return history
     }
 

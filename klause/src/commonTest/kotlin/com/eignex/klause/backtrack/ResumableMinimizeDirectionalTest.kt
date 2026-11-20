@@ -75,6 +75,7 @@ class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
                 assertEquals(0L, observations["PASSIVE_VARIABLE_SCORE"] ?: 0L, diagnostic)
                 assertEquals(0L, observations["PASSIVE_VARIABLE_COMMIT_CHANGED"] ?: 0L, diagnostic)
                 assertEquals(0L, observations["CONSUMED"] ?: 0L, diagnostic)
+                assertEquals(0L, observations["PASSIVE_VALUE_COMMIT_CHANGED"] ?: 0L, diagnostic)
             }
         }
     }

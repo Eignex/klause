@@ -11,6 +11,31 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `mixed outcome diagnostics cannot supply child advice`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) { sample ->
+            for (up in listOf(false, true)) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(12.0)
+                history.finishNode(!up && sample == 0)
+            }
+        }
+
+        val preferred = history.preferPruningDirection(variable, 0.5)
+
+        assertNull(preferred)
+        assertEquals(1, events.count { it == "PASSIVE_VALUE_DECLINE_OUTCOME_MIXED" })
+        assertEquals(1, events.count { it == "PASSIVE_VALUE_MIXED_RATE_DIRECTIONAL" })
+        assertFalse("PASSIVE_VALUE_ELIGIBLE" in events)
+    }
+
+    @Test
     fun `child order needs opposite known completed outcomes`() {
         for (pruned in listOf("up", "down", "both", "neither", "missing")) {
             val history = LpDirectionalHistory({})
