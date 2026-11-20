@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
@@ -8,6 +9,33 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class JointRepairLpCaptureTest {
+    companion object {
+        private lateinit var solveContext: Any
+
+        @BeforeAll
+        @JvmStatic
+        fun initializeContext() {
+            solveContext = Class.forName("com.eignex.klause.lp.engine.LpSolveContext").getConstructor().newInstance()
+            NumericalResidualProfile.call(solveContext, "getNumericalDeductions")
+        }
+    }
+
+    @Suppress("SpreadOperator")
+    @Test
+    fun `observing queries should retain the original numerical deduction policy`() {
+        val defaults = solveContext
+        val copy = defaults.javaClass.methods.single { it.name == "copy" }
+        val arguments = Array(copy.parameterCount) { index ->
+            NumericalResidualProfile.call(defaults, "component${index + 1}")
+        }
+        arguments[7] = true
+        val original = copy.invoke(defaults, *arguments)
+
+        val observing = JointRepairLpCapture.observingContext(original) { }
+
+        assertEquals(true, NumericalResidualProfile.call(observing, "getNumericalDeductions"))
+    }
+
     @Test
     fun `ray encoding should preserve exact finite bits and signed zero`() {
         val ray = doubleArrayOf(0.0, -0.0, 1.5, Double.MIN_VALUE, Double.MAX_VALUE)
