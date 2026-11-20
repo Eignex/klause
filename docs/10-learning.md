@@ -412,7 +412,9 @@ never live branch bounds.
 Endpoint discovery uses a heap ordered by historical deduction position, with
 coordinate order breaking ties. Unsupported projection kinds are excluded before
 marker reconstruction; eligible endpoints share one lazily allocated array of packed
-trail and coordinate priorities. An analysis caches validated source identities and
+trail and coordinate priorities. Eager reasons supply their priority from the bound
+journal; source expansion and marker reconstruction wait until an endpoint is selected.
+An analysis caches validated source identities and
 normalized inequality sides; every consultation still checks historical guard truth,
 raw requested bounds and membership. Incompatible guards decline before historical
 bound reconstruction. Discovery, arithmetic, candidate ordering and duplicate scans
