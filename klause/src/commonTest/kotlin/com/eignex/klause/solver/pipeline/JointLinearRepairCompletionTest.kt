@@ -19,6 +19,7 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -72,7 +73,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `a retained advisory query should complete a fractional target within its current offer`() {
+    fun `an infeasible advisory neighborhood should withhold a source conclusion`() {
         val integers = 7
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(LongArray(integers), LongArray(integers) { 1 }, null, null),
@@ -93,9 +94,41 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
 
                 val stages = repair.stats.smt.completeSearchStages.orEmpty()
                 assertEquals(1L, stages["jointRepairProximityCompleted"])
-                assertTrue((stages["jointRepairPrimalFractional"] ?: 0L) > 0L)
-                assertTrue((stages["jointRepairGrantedQueryResumeRequests"] ?: 0L) > 0L)
                 assertFalse(search.minimizeResult(TerminationReason.BudgetExhausted) is MinimizeResult.WithSample)
+            }
+        }
+    }
+
+    @Test
+    fun `a refuted advisory neighborhood should advance the same center to another root`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 1, 0), longArrayOf(1, 1, 1), null, null),
+            factors = arrayOf(ExactLinear.of(intArrayOf(Term.ofIntVar(2), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 2),
+            realCoefficients = doubleArrayOf(1.0))
+        val original = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val pin = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val source = original.atScope(original.scope.copy(condition = original.scope.condition.copy(
+            lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))))
+        var queries = 0
+
+        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 3),
+            external = { Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(1e-8)) },
+            incumbentProximity = true, incumbentCompletionCheck = { point, _, _ ->
+                point.ints.contentEquals(longArrayOf(1, 1, 0)) && point.exactReals == listOf(BigFraction.ONE)
+            }, onComparison = { if (it.phase == "query") queries++ }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val result = assertIs<MinimizeResult.WithSample>(
+                    search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ONE, objective.evaluateExact(result.sample))
+                assertEquals(3, queries)
+                assertTrue(repair.isProximityDiscovery(result.sample))
             }
         }
     }

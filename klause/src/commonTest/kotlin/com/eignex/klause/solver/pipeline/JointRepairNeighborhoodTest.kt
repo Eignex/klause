@@ -21,6 +21,29 @@ import kotlin.test.assertTrue
 
 class JointRepairNeighborhoodTest {
     @Test
+    fun `advisory neighborhoods should pin other integers and leave continuous recourse free`() {
+        val integers = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(SourceScope(SourceRevision("advisory-connected", "exact")),
+            integers.toSet() + real, mapOf("edge" to SourcePremise(SourceInequality(
+                mapOf(integers[1] to BigFraction.ONE, real to BigFraction.ONE,
+                    integers[2] to BigFraction.ONE), BigFraction.ONE))))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 1, ExecutionControl.Never,
+            sourceIntegers = intArrayOf(1, 2)))
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+
+        val condition = assertNotNull(repair.advisoryNeighborhood(
+            listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO), 0, BigFraction.ONE,
+            SourceLpBudget(funding = funding), ExecutionControl.Never))
+
+        assertEquals(mapOf(0 to BigFraction.ONE), condition.lower)
+        assertEquals(condition.lower, condition.upper)
+        assertTrue(condition.bools.isEmpty())
+        assertTrue(funding.spent > 0)
+        assertTrue(funding.allocated > 0)
+    }
+
+    @Test
     fun `binary neighborhoods should allow coordinated changes to agreeing integers`() {
         val columns = (0 until 40).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("binary-support", "exact")),

@@ -512,12 +512,17 @@ The numerical owner alternates private consultations with its retained ordinary
 frontier inside the same turn offers, using at most half the remaining offered time
 and work for each private consultation. The private search visits the center's side
 of each integer split first and retains sibling alternatives; ordinary traversal
-retains bound order. Joint repair starts the same private query without first
-reconstructing the advisory point. Ordinary fallback neighborhoods retain their
-own checked centers and cutoffs.
+retains bound order. Joint repair uses its connected-variable selector to free at
+most two binary coordinates per advisory neighborhood and pins the other integers
+to the center. Continuous coordinates stay free. These pins intersect the private
+change-radius row. A pass visits each eligible root within the existing allowances;
+its identity includes the binary coordinates and aspiration, so a new sample wrapper
+does not restart it. A completed restricted neighborhood advances only that pass,
+and supplies no source refutation. Ordinary fallback neighborhoods retain their own
+checked centers and cutoffs.
 
-Both searches share one LP operation/work/allocation ledger and containing
-decision/check allowances. A retained joint private query uses remaining instructions
+Each owner charges ordinary and private work to one LP operation/work/allocation
+ledger and containing decision/check allowances. A retained joint private query uses remaining instructions
 in its current offer before yielding. Private query progress supplies no root-fixing or
 learned-clause reward. A generated witness passes complete receiving-source checks
 and exact original-source feasibility and objective checks before it can improve

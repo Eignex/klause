@@ -75,6 +75,7 @@ internal class JointLinearRepair(
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
     private class CheckedProposal(val condition: ExactNeighborhoodCondition, val sample: Sample)
+    private class AdvisoryPass(val value: BigFraction, val coordinates: List<BigFraction>, var next: Int = 0)
 
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout.withAccounting(params.cancellation) or params.cancellation
@@ -110,6 +111,8 @@ internal class JointLinearRepair(
     private var advisorySeen: Sample? = null
     private var advisoryCenter: IncumbentProximity.AdvisoryCenter? = null
     private var proximityAdvisory: IncumbentProximity.AdvisoryCenter? = null
+    private var advisoryPass: AdvisoryPass? = null
+    private var queryAdvisoryPass: AdvisoryPass? = null
     private var proximityCompletedCutoff: BigFraction? = null
     private var proximityDeclined = false
     private var queryProximity = false
@@ -263,6 +266,32 @@ internal class JointLinearRepair(
         return CheckedCenter(sample, value)
     }
 
+    private fun advisoryPass(center: IncumbentProximity.AdvisoryCenter): AdvisoryPass? {
+        val work = 16L * (model.numIntVars + 1L)
+        if (stop() || funding.availableWork <= work) return null
+        budget.observe(preparation = work)
+        val previous = advisoryPass
+        if (previous != null && previous.value == center.value &&
+            previous.coordinates.indices.all {
+                previous.coordinates[it] == BigFraction.of(center.sample.exactIntValue(it), BIG_ONE)
+            }) return previous
+        val bytes = 256L + 128L * model.numIntVars
+        if (funding.remainingAllocation <= bytes) return null
+        funding.charge(0L, bytes)
+        return AdvisoryPass(center.value,
+            List(model.numIntVars) { BigFraction.of(center.sample.exactIntValue(it), BIG_ONE) })
+            .takeUnless { stop() || funding.exhausted }?.also { advisoryPass = it }
+    }
+
+    private fun finishProximity(cutoff: BigFraction?, finishCenter: Boolean = false) {
+        val pass = queryAdvisoryPass
+        if (pass == null) proximityCompletedCutoff = cutoff
+        else {
+            pass.next = if (finishCenter) requireNotNull(selection).advisoryRoots else pass.next + 1
+            observe("jointRepairAdvisoryNeighborhoodCompletions")
+        }
+    }
+
     private fun refreshedCenter(center: CheckedCenter): CheckedCenter {
         val cutoff = center.value ?: return center
         if (completion == null || stop()) return center
@@ -407,12 +436,16 @@ internal class JointLinearRepair(
                     minOf(width, checkedTrialWidth + 1) else width
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
                 val privateLimit = advisory?.value ?: limit
+                val pass = advisory?.let(::advisoryPass)
                 val proximity = if (incumbentProximity && !proximityDeclined && !adaptive &&
                     ((pooled != null && completion != null) || advisory != null) &&
                     !bootstrap && privateLimit != null &&
-                    privateLimit != proximityCompletedCutoff && model.numBoolVars == 0 &&
+                    (if (advisory != null) pass != null && pass.next < requireNotNull(selection).advisoryRoots
+                    else privateLimit != proximityCompletedCutoff) && model.numBoolVars == 0 &&
                     IncumbentProximity.accepts(model.intBounds, model.numIntVars))
-                    ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), privateLimit) else null
+                    if (pass != null) requireNotNull(selection).advisoryNeighborhood(
+                        pass.coordinates, pass.next, privateLimit, budget, stop)
+                    else ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), privateLimit) else null
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
                 val binary = if (proximity == null && !adaptive && pooled != null && completion != null && !bootstrap)
                     requireNotNull(selection).binaryNeighborhood(hint, from, model.intBounds,
@@ -647,7 +680,7 @@ internal class JointLinearRepair(
         if (queryProximity && pending == condition &&
             (advisoryExternalCenter(queryProximityCutoff) != null ||
                 checkedExternalCenter(queryProximityCutoff) != null)) {
-            proximityCompletedCutoff = queryProximityCutoff
+            finishProximity(queryProximityCutoff, finishCenter = true)
             retire()
             observe("jointRepairProximitySuperseded")
             return JointRepairAttempt(ExactNeighborhoodResult.Undecided)
@@ -693,6 +726,7 @@ internal class JointLinearRepair(
                     stop or cancellation)?.also {
                     queryProximity = true
                     queryProximityCutoff = privateCutoff
+                    queryAdvisoryPass = advisoryPass.takeIf { proximityAdvisory != null }
                     observe("jointRepairProximityCenters")
                 } ?: run {
                     proximityDeclined = true
@@ -783,8 +817,8 @@ internal class JointLinearRepair(
                     bound = bound)
             }
             val accepted = checked == SourceEvidenceCheck.Checked && originalChecked
-            if (privateProximity) proximityCompletedCutoff = if (accepted)
-                requireNotNull(objective).evaluateExact(sample) else queryProximityCutoff
+            if (privateProximity) finishProximity(if (accepted)
+                requireNotNull(objective).evaluateExact(sample) else queryProximityCutoff, finishCenter = accepted)
             if (accepted) {
                 compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(sample))
             }
@@ -827,7 +861,7 @@ internal class JointLinearRepair(
                 bound = bound)
         }
         if (privateProximity) {
-            proximityCompletedCutoff = queryProximityCutoff
+            finishProximity(queryProximityCutoff)
             observe("jointRepairProximityCompleted")
             retire()
             return JointRepairAttempt(ExactNeighborhoodResult.Undecided, result.reason)
@@ -1014,6 +1048,7 @@ internal class JointLinearRepair(
         querySawExternal = false
         queryProximity = false
         queryProximityCutoff = null
+        queryAdvisoryPass = null
         retainedProposal = null
         publishedQueryIncumbent = null
         active?.close()
@@ -1044,6 +1079,7 @@ internal class JointLinearRepair(
         proximityAdvisory = null
         advisoryCenter = null
         advisorySeen = null
+        advisoryPass = null
         proximityDiscovery = null
         bootstrapHint = null
         guidedProposal = null

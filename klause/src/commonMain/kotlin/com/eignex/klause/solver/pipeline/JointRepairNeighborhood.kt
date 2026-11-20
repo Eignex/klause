@@ -52,6 +52,26 @@ internal class JointRepairNeighborhood private constructor(
     fun eligibleInteger(id: Int): Boolean =
         id in 0 until integers && eligible?.get(id) != false
 
+    val advisoryRoots: Int get() = seeds.size
+
+    fun advisoryNeighborhood(centers: List<BigFraction>, root: Int, cutoff: BigFraction,
+        budget: SourceLpBudget, token: ExecutionControl): ExactNeighborhoodCondition? {
+        val funding = budget.funding ?: return null
+        val work = 16L * (integers + 1L)
+        val bytes = 256L + 128L * integers
+        if (root !in seeds.indices || centers.size != integers || token() ||
+            funding.availableWork <= work + MAX_SELECTION_VISITS || funding.remainingAllocation <= bytes) return null
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        val before = visitedEntries
+        val freed = connected(listOf(seeds[root]), minOf(2, seeds.size))
+        budget.observe(preparation = visitedEntries - before)
+        selectedIntegers += freed.size
+        val pins = (0 until integers).filter { it !in freed }.associateWith { centers[it] }
+        return ExactNeighborhoodCondition(emptyMap(), pins, pins, cutoff)
+            .takeUnless { token() || funding.exhausted }
+    }
+
     fun clearRefutation() {
         refutedPins.clear()
         refutationBools = null
