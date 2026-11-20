@@ -61,16 +61,26 @@ internal class LpAuxiliarySources {
     }
 }
 
+private class CutSourceDefinition(
+    columns: List<CutColumnSource?>,
+    globalPremises: Set<CutPremise>,
+    fixed: Map<CutSource, BigFraction>,
+    assumptions: Set<String>,
+    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition>,
+) {
+    val columns = columns.toList()
+    val globals = globalPremises.toSet()
+    val fixed = fixed.toMap()
+    val assumptions = assumptions.toSet()
+    val auxiliaryDefinitions = auxiliaryDefinitions.toMap()
+}
+
 internal class CutSourceMap private constructor(
     val model: Any,
     val epoch: Long,
-    columns: List<CutColumnSource?>,
-    globalPremises: Set<CutPremise>,
-    activePremises: Set<CutPremise>,
-    fixed: Map<CutSource, BigFraction>,
-    assumptions: Set<String>,
-    parentRows: Map<Int, CutProvenance>,
-    auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition>,
+    private val sourceDefinition: CutSourceDefinition,
+    private val activeSnapshot: Set<CutPremise>,
+    private val parentSnapshot: Map<Int, CutProvenance>,
     private val cpBounds: CpCutBounds?,
 ) {
     constructor(
@@ -83,44 +93,37 @@ internal class CutSourceMap private constructor(
         assumptions: Set<String> = emptySet(),
         parentRows: Map<Int, CutProvenance> = emptyMap(),
         auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> = emptyMap(),
-    ) : this(model, epoch, columns, globalPremises, activePremises, fixed, assumptions,
-        parentRows, auxiliaryDefinitions, null)
+    ) : this(model, epoch, CutSourceDefinition(columns, globalPremises, fixed, assumptions, auxiliaryDefinitions),
+        activePremises.toSet(), parentRows.toMap(), null)
 
-    private val columnSnapshot = columns.toList()
-    private val globalSnapshot = globalPremises.toSet()
-    private val activeSnapshot = activePremises.toSet()
-    private val fixedSnapshot = fixed.toMap()
-    private val assumptionSnapshot = assumptions.toSet()
-    private val parentSnapshot = parentRows.toMap()
-    private val auxiliarySnapshot = auxiliaryDefinitions.toMap()
     private val auxiliaryByDefinition: Map<CutAuxiliaryDefinition, CutSource?> by lazy(
         LazyThreadSafetyMode.PUBLICATION,
     ) {
         val unique = HashMap<CutAuxiliaryDefinition, CutSource?>()
-        for ((source, definition) in auxiliarySnapshot) {
+        for ((source, definition) in sourceDefinition.auxiliaryDefinitions) {
             if (source.kind != CutSourceKind.AUXILIARY) continue
             unique[definition] = if (definition in unique) null else source
         }
         unique
     }
-    val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> get() = auxiliarySnapshot.toMap()
-    val columns: List<CutColumnSource?> get() = columnSnapshot.toList()
-    val columnCount: Int get() = columnSnapshot.size
-    val fixed: Map<CutSource, BigFraction> get() = fixedSnapshot.toMap()
-    val assumptions: Set<String> get() = assumptionSnapshot.toSet()
-    fun column(index: Int): CutColumnSource? = columnSnapshot.getOrNull(index)
-    fun columnForInt(variable: Int): CutColumnSource? = columnSnapshot.firstOrNull {
+    val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition>
+        get() = sourceDefinition.auxiliaryDefinitions.toMap()
+    val columns: List<CutColumnSource?> get() = sourceDefinition.columns.toList()
+    val columnCount: Int get() = sourceDefinition.columns.size
+    val fixed: Map<CutSource, BigFraction> get() = sourceDefinition.fixed.toMap()
+    val assumptions: Set<String> get() = sourceDefinition.assumptions.toSet()
+    fun column(index: Int): CutColumnSource? = sourceDefinition.columns.getOrNull(index)
+    fun columnForInt(variable: Int): CutColumnSource? = sourceDefinition.columns.firstOrNull {
         it?.source == CutSource(CutSourceKind.INTEGER, variable)
     }
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
     fun parentFamilies(): Map<Int, CutFamily> = parentSnapshot.mapValues { it.value.family }
-    fun auxiliarySource(source: CutSource, definition: CutAuxiliaryDefinition): CutSource? =
-        if (source.kind != CutSourceKind.AUXILIARY) null else if (auxiliarySnapshot[source] == definition) {
-            source
-        } else {
-            auxiliaryByDefinition[definition]
-        }
-    fun isGlobal(premise: CutPremise): Boolean = implied(premise, globalSnapshot) ||
+    fun auxiliarySource(source: CutSource, definition: CutAuxiliaryDefinition): CutSource? = when {
+        source.kind != CutSourceKind.AUXILIARY -> null
+        sourceDefinition.auxiliaryDefinitions[source] == definition -> source
+        else -> auxiliaryByDefinition[definition]
+    }
+    fun isGlobal(premise: CutPremise): Boolean = implied(premise, sourceDefinition.globals) ||
         (
             premise is CutPremise.Integral && premise.expression.constant.den == BIG_ONE &&
                 premise.expression.terms.all { (source, coefficient) ->
@@ -147,7 +150,7 @@ internal class CutSourceMap private constructor(
         ) {
             return null
         }
-        val definition = auxiliarySnapshot[term.key] ?: return null
+        val definition = sourceDefinition.auxiliaryDefinitions[term.key] ?: return null
         for (index in definition.required.indices step 2) {
             val absent = CutPremise.Excluded(
                 CutSource(CutSourceKind.INTEGER, definition.required[index].toInt()),
@@ -176,32 +179,27 @@ internal class CutSourceMap private constructor(
     fun withBounds(bounds: LpModel, active: Set<CutPremise> = emptySet()): CutSourceMap = CutSourceMap(
         model,
         epoch + 1,
-        columnSnapshot,
-        globalSnapshot,
-        columnBounds(bounds, columnSnapshot) + active,
-        fixedSnapshot,
-        assumptionSnapshot,
+        sourceDefinition,
+        columnBounds(bounds, sourceDefinition.columns) + active,
         parentSnapshot,
-        auxiliarySnapshot,
+        null,
     )
 
     fun withParentRows(parents: Map<Int, CutProvenance>): CutSourceMap = CutSourceMap(
-        model, epoch, columnSnapshot, globalSnapshot, activeSnapshot, fixedSnapshot, assumptionSnapshot,
-        parents, auxiliarySnapshot, cpBounds,
+        model, epoch, sourceDefinition, activeSnapshot, parents.toMap(), cpBounds,
     )
 
     fun withActivePremises(premises: Set<CutPremise>): CutSourceMap = CutSourceMap(
-        model, epoch, columnSnapshot, globalSnapshot, activeSnapshot + premises, fixedSnapshot, assumptionSnapshot,
-        parentSnapshot, auxiliarySnapshot, cpBounds,
+        model, epoch, sourceDefinition, activeSnapshot + premises, parentSnapshot, cpBounds,
     )
 
     fun withCpBounds(
         bounds: LpModel,
         session: com.eignex.klause.propagation.PropagationSession,
     ): CutSourceMap {
-        val facts = columnBounds(bounds, columnSnapshot)
+        val facts = columnBounds(bounds, sourceDefinition.columns)
         val cp = CpCutBounds.capture(session)
-        for (definition in auxiliarySnapshot.values) {
+        for (definition in sourceDefinition.auxiliaryDefinitions.values) {
             for (index in definition.required.indices step 2) {
                 val variable = definition.required[index].toInt()
                 val value = definition.required[index + 1]
@@ -212,8 +210,7 @@ internal class CutSourceMap private constructor(
                 }
             }
         }
-        return CutSourceMap(model, epoch + 1, columnSnapshot, globalSnapshot, facts, fixedSnapshot,
-            assumptionSnapshot, parentSnapshot, auxiliarySnapshot, cp)
+        return CutSourceMap(model, epoch + 1, sourceDefinition, facts, parentSnapshot, cp)
     }
 }
 

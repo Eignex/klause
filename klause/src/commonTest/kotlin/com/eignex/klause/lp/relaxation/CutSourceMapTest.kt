@@ -2,8 +2,10 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpBuilder
@@ -17,6 +19,115 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CutSourceMapTest {
+    @Test
+    fun `source snapshots resist mutation through producers and derived readers`() {
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val y = CutSource(CutSourceKind.INTEGER, 1)
+        val first = CutSource(CutSourceKind.AUXILIARY, 0)
+        val second = CutSource(CutSourceKind.AUXILIARY, 1)
+        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
+        val otherDefinition = CutAuxiliaryDefinition(listOf(2L), emptyList(), 1L, true)
+        val columns = mutableListOf(CutColumnSource(x), CutColumnSource(y))
+        val globals = mutableSetOf<CutPremise>(CutPremise.Literal(0), CutPremise.Literal(2))
+        val active = mutableSetOf<CutPremise>(CutPremise.Literal(4), CutPremise.Literal(6))
+        val fixed = mutableMapOf(x to BigFraction.ONE, y to BigFraction.ZERO)
+        val assumptions = mutableSetOf("first", "second")
+        val parent = CutProvenance(Any(), 0L, emptyList())
+        val parents = mutableMapOf(0 to parent, 1 to parent)
+        val auxiliary = mutableMapOf(first to definition, second to otherDefinition)
+        val root = CutSourceMap(Any(), 0L, columns, globals, active, fixed, assumptions, parents, auxiliary)
+        val maps = listOf(root, root.withParentRows(parents), root.withActivePremises(emptySet()))
+        columns.clear()
+        globals.clear()
+        active.clear()
+        fixed.clear()
+        assumptions.clear()
+        parents.clear()
+        auxiliary.clear()
+        for (map in maps) {
+            runCatching { (map.columns as? MutableList)?.clear() }
+            runCatching { (map.fixed as? MutableMap)?.clear() }
+            runCatching { (map.assumptions as? MutableSet)?.clear() }
+            runCatching { (map.auxiliaryDefinitions as? MutableMap)?.clear() }
+        }
+
+        for (map in maps) {
+            assertEquals(listOf(CutColumnSource(x), CutColumnSource(y)), map.columns)
+            assertTrue(map.isGlobal(CutPremise.Literal(0)))
+            assertTrue(map.isGlobal(CutPremise.Literal(2)))
+            assertTrue(map.isActive(CutPremise.Literal(4)))
+            assertTrue(map.isActive(CutPremise.Literal(6)))
+            assertFalse(map.isGlobal(CutPremise.Literal(4)))
+            assertEquals(mapOf(x to BigFraction.ONE, y to BigFraction.ZERO), map.fixed)
+            assertEquals(setOf("first", "second"), map.assumptions)
+            assertEquals(parent, map.parent(0))
+            assertEquals(parent, map.parent(1))
+            assertEquals(mapOf(first to definition, second to otherDefinition), map.auxiliaryDefinitions)
+        }
+    }
+
+    @Test
+    fun `parent row replacement captures caller rows without changing preceding views`() {
+        val old = CutProvenance(Any(), 0L, emptyList())
+        val replacement = CutProvenance(Any(), 1L, emptyList())
+        val root = CutSourceMap(Any(), 0L, emptyList(), parentRows = mapOf(0 to old, 1 to old))
+        val parents = mutableMapOf(1 to replacement, 2 to replacement)
+
+        val derived = root.withParentRows(parents)
+        parents.clear()
+
+        assertEquals(old, root.parent(0))
+        assertEquals(old, root.parent(1))
+        assertEquals(null, root.parent(2))
+        assertEquals(null, derived.parent(0))
+        assertEquals(replacement, derived.parent(1))
+        assertEquals(replacement, derived.parent(2))
+    }
+
+    @Test
+    fun `premise derivations capture caller facts without retroactive activation`() {
+        for (lpRefresh in listOf(false, true)) {
+            val original = CutPremise.Literal(0)
+            val added = CutPremise.Literal(2)
+            val later = CutPremise.Literal(4)
+            val root = CutSourceMap(Any(), 0L, emptyList(), activePremises = setOf(original))
+            val facts = mutableSetOf<CutPremise>(added)
+            val model = LpBuilder().build(Sense.MINIMIZE)
+
+            val derived = if (lpRefresh) root.withBounds(model, facts) else root.withActivePremises(facts)
+            facts.clear()
+            facts.add(later)
+
+            assertTrue(root.isActive(original))
+            assertFalse(root.isActive(added))
+            assertTrue(derived.isActive(added))
+            assertEquals(!lpRefresh, derived.isActive(original))
+            assertFalse(derived.isActive(later))
+        }
+    }
+
+    @Test
+    fun `derived auxiliary lookups preserve unique and ambiguous definitions`() {
+        for (ambiguous in listOf(false, true)) {
+            val first = CutSource(CutSourceKind.AUXILIARY, 0)
+            val second = CutSource(CutSourceKind.AUXILIARY, 1)
+            val unknown = CutSource(CutSourceKind.AUXILIARY, 2)
+            val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
+            val definitions = if (ambiguous) mapOf(first to definition, second to definition)
+                else mapOf(first to definition)
+            val root = CutSourceMap(Any(), 0L, emptyList(), auxiliaryDefinitions = definitions)
+            val expected = if (ambiguous) null else first
+            assertEquals(expected, root.auxiliarySource(unknown, definition))
+
+            val maps = listOf(root.withParentRows(emptyMap()), root.withActivePremises(emptySet()))
+
+            for (map in maps) {
+                assertEquals(first, map.auxiliarySource(first, definition))
+                assertEquals(expected, map.auxiliarySource(unknown, definition))
+            }
+        }
+    }
+
     @Test
     fun `copied column bindings should evaluate their own source geometry`() {
         val x = CutSource(CutSourceKind.INTEGER, 0)
@@ -176,14 +287,18 @@ class CutSourceMapTest {
 
     @Test
     fun `source derivations preserve captured cp bounds`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(3, 10)), emptyArray())
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val session = PropagationSession(problem)
+        session.pinIntAtLeast(0, 3L)
         val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE))
         val lower = CutPremise.Bound(expression, false, BigFraction.ofLong(3L))
         val root = CutSourceMap(problem, 0L, emptyList())
-            .withCpBounds(LpBuilder().build(Sense.MINIMIZE), PropagationSession(problem))
+            .withCpBounds(LpBuilder().build(Sense.MINIMIZE), session)
+        val derived = listOf(root.withParentRows(emptyMap()), root.withActivePremises(emptySet()))
+        session.popLast()
 
-        for (derived in listOf(root.withParentRows(emptyMap()), root.withActivePremises(emptySet()))) {
-            assertTrue(derived.isActive(lower))
+        for (map in derived) {
+            assertTrue(map.isActive(lower))
         }
     }
 

@@ -14,12 +14,15 @@ class CutColumnLayoutTest {
     fun `bindings should belong to the exact map that was checked`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val first = CutSourceMap(Any(), 0, listOf(CutColumnSource(source)))
-        val next = CutSourceMap(first.model, 1, first.columns)
+        val variants = listOf(CutSourceMap(first.model, first.epoch, first.columns),
+            first.withParentRows(emptyMap()), first.withActivePremises(emptySet()))
         val bound = assertNotNull(CutColumnLayout.capture(first, 64L, ExecutionControl.Never) {})
         val layout = assertNotNull(bound.layoutFor(first))
 
-        assertNull(bound.layoutFor(next))
-        assertNotNull(assertNotNull(layout.bind(next, ExecutionControl.Never) {}).layoutFor(next))
+        for (next in variants) {
+            assertNull(bound.layoutFor(next))
+            assertNotNull(assertNotNull(layout.bind(next, ExecutionControl.Never) {}).layoutFor(next))
+        }
     }
 
     @Test

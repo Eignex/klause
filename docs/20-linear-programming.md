@@ -515,6 +515,8 @@ the original row count, and root and node separation keep their round, depth, po
 and work allowances. The [portfolio](15-portfolio-scheduling.md#roles-and-the-mixed-roster)
 decides when the aggressive LP emphasis is seated.
 
+Source maps capture caller collections; derivatives share unchanged private definitions,
+capture changed facts and parent rows, and expose independent collection copies.
 Immutable column bindings retain their exact source expressions. CP bound refreshes
 capture integer endpoints and Boolean pins in private primitive arrays, including
 variables absent from LP columns. Exact endpoint values materialize for requested
