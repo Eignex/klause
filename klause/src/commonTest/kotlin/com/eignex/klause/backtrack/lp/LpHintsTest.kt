@@ -217,15 +217,20 @@ class LpHintsTest {
 
     @Test
     fun `reliable passive history reaches matching applied and withheld commitments`() {
-        val builder = LpBuilder()
-        repeat(2) { builder.addVar(0, 10, cost = 1L) }
-        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
-            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
         val baseline = VarRef.IntVar(0)
         val proposal = VarRef.IntVar(1)
         val costs = ArrayList<Long>()
-        for ((apply, zeroReference) in listOf(false to true, true to true, false to false, true to false)) {
+        for ((apply, zeroReference, referencePoint) in listOf(
+            Triple(false, true, 2.25), Triple(true, true, 2.25),
+            Triple(false, false, 2.25), Triple(true, false, 2.25),
+            Triple(false, true, 2.5), Triple(true, true, 2.5),
+            Triple(false, false, 2.5), Triple(true, false, 2.5),
+        )) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 10, cost = 1L) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
             var work = 0L
             var nodeWork = 0L
             val events = ArrayList<String>()
@@ -234,7 +239,7 @@ class LpHintsTest {
             repeat(2) {
                 for (variable in listOf(baseline, proposal)) {
                     hints.beginNode(0, 100.0)
-                    hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+                    hints.record(relaxation, doubleArrayOf(referencePoint, 3.25), DoubleArray(0))
                     hints.recordObjective(relaxation, 10.0)
                     hints.branch(variable)
                     val split = if (variable == baseline) 2L else 3L
@@ -243,7 +248,7 @@ class LpHintsTest {
                         else SearchDecision.IntAtMost(variable.varId, split), 1)
                         nodeWork += if (variable == baseline) 100L else 10L
                         hints.beginNode(1, 100.0)
-                        val child = doubleArrayOf(2.25, 3.25)
+                        val child = doubleArrayOf(referencePoint, 3.25)
                         child[variable.varId] = if (up) split + 1.0 else split.toDouble()
                         hints.record(relaxation, child, DoubleArray(0))
                         val objective = when {
@@ -256,7 +261,7 @@ class LpHintsTest {
                 }
             }
             hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+            hints.record(relaxation, doubleArrayOf(referencePoint, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
             assertEquals(0.05, hints.directionalScore(proposal), 1e-9)
@@ -265,11 +270,13 @@ class LpHintsTest {
 
             val selected = assertNotNull(hints.selectVariable(proposal, baseline))
             hints.branch(selected)
-            hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, if (selected == proposal) 3L else 2L), 1)
 
-            assertEquals(if (apply) proposal else baseline, selected)
+            val tied = referencePoint == 2.25
+            assertEquals(if (apply && tied) proposal else baseline, selected)
             val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
+            assertEquals(if (tied) 1 else 0, events.count { it == event })
+            assertEquals(if (tied) 0 else 1, events.count { it == "PASSIVE_VARIABLE_PRIORITY_DECLINED" })
             assertEquals(4, events.count { it == "UP" })
             assertEquals(4, events.count { it == "DOWN" })
             costs.add(work - before)

@@ -372,8 +372,9 @@ The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
 in each direction permit the minimum predicted child gain per measured LP work;
 a zero gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
+scoring and the configured selector keep their precedence. Directional efficiencies
+break exact ties in the highest ordinary LP score. A stronger ordinary score keeps
+its priority; objective-per-work estimates are not mixed with reduced costs.
 Each committed child snapshots the owning LP engine's cumulative work after charged
 commitment bookkeeping. Its fresh matching optimum records the positive meter difference
 before charging the final meter read. The estimate divides the minimum predicted child

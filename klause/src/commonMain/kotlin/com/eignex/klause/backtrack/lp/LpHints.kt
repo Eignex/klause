@@ -222,11 +222,22 @@ internal class LpHints(
             fresh = current,
             reliable = {
                 charge(2L)
-                val gain = history.efficiencyScore(proposal, proposed.point)
-                val baselineGain = if (proposal == baseline) gain else history.efficiencyEstimate(baseline, reference.point)
-                if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
-                history.hasEfficientHistory && gain.isFinite() && baselineGain.isFinite() &&
-                    (proposal == baseline || gain > baselineGain)
+                val samePriority = if (proposal == baseline) true else {
+                    charge(8L)
+                    val priority = branchScore(proposal)
+                    val referencePriority = branchScore(baseline)
+                    priority.isFinite() && referencePriority.isFinite() && priority == referencePriority
+                }
+                if (!samePriority) {
+                    observe("PASSIVE_VARIABLE_PRIORITY_DECLINED")
+                    false
+                } else {
+                    val gain = history.efficiencyScore(proposal, proposed.point)
+                    val baselineGain = if (proposal == baseline) gain else history.efficiencyEstimate(baseline, reference.point)
+                    if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
+                    history.hasEfficientHistory && gain.isFinite() && baselineGain.isFinite() &&
+                        (proposal == baseline || gain > baselineGain)
+                }
             })
         if (choice.nominatedVariable != null && !current()) {
             choice.clear()
