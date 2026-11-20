@@ -78,6 +78,9 @@ Only fully committed source comparisons receive assertion markers; a declined
 batch publishes neither its staged witnesses nor its markers. Root batches commit
 direct source-column bounds before the next comparison, so its normalization can
 substitute earlier root fixings; affine-column bounds can share a root batch.
+Each search-node snapshot retains the prefix of source branches fully asserted in
+its matching LP scope. Later checks retry only the unfinished suffix; interrupted
+assertions cannot advance the prefix, and retraction restores it with the node.
 
 #### A check
 

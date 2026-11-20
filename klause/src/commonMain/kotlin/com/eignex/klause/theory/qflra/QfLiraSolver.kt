@@ -1321,6 +1321,9 @@ class ExactLiraSearchComponent private constructor(
                     if (!system.assertAtom(atom, SearchAtomPremise.Asserted(decision))) {
                         return ComponentResult.Indeterminate
                     }
+                    if (node.assertedSourceBranchCount == node.sourceBranches.lastIndex) {
+                        node = node.copy(assertedSourceBranchCount = node.sourceBranches.size)
+                    }
                 }
             }
 
@@ -1395,9 +1398,11 @@ class ExactLiraSearchComponent private constructor(
         )
             return false
         if (lp.state?.conflict != null) return true
-        for (atom in node.sourceBranches) {
+        for (index in node.assertedSourceBranchCount until node.sourceBranches.size) {
+            val atom = node.sourceBranches[index]
             val premise = SearchAtomPremise.Asserted(branchNames[atom] ?: return false)
             if (!system.assertAtom(atom, premise)) return false
+            node = node.copy(assertedSourceBranchCount = index + 1)
         }
         when (assertPublishedBounds(context)) {
             is LpBoundBatchResult.Declined -> return false
