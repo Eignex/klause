@@ -376,8 +376,12 @@ Both directions need two independently aged finite normalized gains within a
 factor of two, each paired with a known completed LP-assisted pruning outcome.
 The two outcomes in each direction must agree. A repeated zero gain is stable
 only when both numeric observations are zero. The child that repeatedly pruned
-is visited first when the other direction repeatedly returned without pruning.
-Equal, missing, unstable or expired evidence retains ordinary order. Historical
+is visited first when the other direction repeatedly returned without pruning,
+and the conservative gain prediction reaches the current positive finite cutoff
+gap in that direction alone. The cutoff excludes the scoped objective constant
+before comparison. Predictions compare normalized gains against the gap
+divided by branch distance, preserving subnormal distances. Equal, missing,
+unstable, expired or non-reaching evidence retains ordinary order. Historical
 outcomes provide no current pruning authority or exclusion of either child.
 
 Pruning outcomes are retained only under a finite incumbent cutoff. Numeric gain

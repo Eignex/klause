@@ -243,12 +243,21 @@ internal class LpDirectionalHistory(
     fun pruningScore(variable: VarRef, value: Double): Double = pruningEstimate(variable, value)
         .takeIf { it > 0.0 } ?: Double.NaN
 
-    fun preferPruningDirection(variable: VarRef, value: Double): Boolean? {
+    fun preferPruningDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {
         val history = reliable(variable, value) ?: return null
         charge(3L)
         val down = history.down.pruning ?: return null
         val up = history.up.pruning ?: return null
-        return (up > down).takeIf { up != down }
+        if (up == down) return null
+        charge(6L)
+        val gap = cutoff - objective
+        if (!gap.isFinite() || gap <= 0.0) return null
+        val fraction = value - floor(value)
+        val downReaches = history.down.gain >= gap / fraction
+        val upReaches = history.up.gain >= gap / (1.0 - fraction)
+        val preferredReaches = if (up > down) upReaches && !downReaches else downReaches && !upReaches
+        observe(if (preferredReaches) "PRUNING_FORECAST_SUPPORTED" else "PRUNING_FORECAST_DECLINED")
+        return (up > down).takeIf { preferredReaches }
     }
 
     fun pruningEstimate(variable: VarRef, value: Double): Double {

@@ -25,6 +25,7 @@ internal class LpPassiveValueChoice(
         point: Double,
         alternatives: List<SearchDecision>,
         history: LpDirectionalHistory,
+        cutoff: Double,
         stamp: Int,
         fresh: () -> Boolean,
     ): List<SearchDecision> {
@@ -33,7 +34,7 @@ internal class LpPassiveValueChoice(
         charge(20L)
         observe("PASSIVE_VALUE_CHECK")
         if (!fresh()) return alternatives.also { observe("PASSIVE_VALUE_STALE") }
-        val preferUp = history.preferPruningDirection(variable, point)
+        val preferUp = history.preferPruningDirection(variable, point, cutoff)
             ?: return alternatives.also { observe("PASSIVE_VALUE_NO_PROPOSAL") }
         val down: SearchDecision
         val up: SearchDecision

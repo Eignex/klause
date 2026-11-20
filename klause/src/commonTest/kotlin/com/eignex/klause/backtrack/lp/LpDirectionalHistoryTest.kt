@@ -11,6 +11,56 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `pruning preference needs one supported prediction reaching the current cutoff`() {
+        for (cutoff in listOf(10.0, 11.0, 12.0, 14.0, Double.POSITIVE_INFINITY, Double.NaN)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 13.0 else 11.0)
+                    history.finishNode(up)
+                }
+            }
+            history.beginNode(0)
+            history.record(10.0)
+
+            val preferred = history.preferPruningDirection(variable, 0.5, cutoff)
+
+            assertEquals(if (cutoff == 12.0) true else null, preferred)
+        }
+    }
+
+    @Test
+    fun `pruning predictions preserve subnormal cutoff distances`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(if (up) Double.MIN_VALUE else 0.0)
+                history.finishNode(up)
+            }
+        }
+        history.beginNode(0)
+        history.record(0.0)
+
+        val reaching = history.preferPruningDirection(variable, 0.5, Double.MIN_VALUE)
+        val short = history.preferPruningDirection(variable, 0.5, Double.MIN_VALUE * 2.0)
+
+        assertEquals(true, reaching)
+        assertNull(short)
+    }
+
+    @Test
     fun `skipped outcomes cannot become completed pruning evidence`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)
@@ -50,7 +100,10 @@ class LpDirectionalHistoryTest {
                 }
             }
 
-            val selected = history.preferPruningDirection(variable, 0.5)
+            history.beginNode(0)
+            history.record(10.0)
+
+            val selected = history.preferPruningDirection(variable, 0.5, 12.0)
 
             assertEquals(preferred, selected)
         }

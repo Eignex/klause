@@ -27,6 +27,8 @@ class LpPassiveValueChoiceTest {
                     history.finishNode(isUp == preferUp)
                 }
             }
+            history.beginNode(0)
+            history.record(10.0)
             val ordinary = if (preferUp) listOf(down, up) else listOf(up, down)
             val costs = ArrayList<Long>()
             for (apply in listOf(false, true)) {
@@ -34,7 +36,7 @@ class LpPassiveValueChoiceTest {
                 var work = 0L
                 val choice = LpPassiveValueChoice(apply, events::add, { work += it })
 
-                val selected = choice.select(variable, point, ordinary, history, 7) { true }
+                val selected = choice.select(variable, point, ordinary, history, 12.0, 7) { true }
                 choice.commit(selected.first(), 7) { true }
                 choice.commit(selected.first(), 7) { true }
 
@@ -59,19 +61,21 @@ class LpPassiveValueChoiceTest {
             history.record(10.0)
             history.branch(variable, 2.25)
             repeat(if (condition == "missing") 0 else 2) {
-                for ((decision, objective) in listOf(down to 13.0, up to 11.0)) {
+                for ((decision, objective) in listOf(down to 10.0, up to 11.0)) {
                     history.commit(decision, 1)
                     history.beginNode(1)
                     history.record(objective)
                     history.finishNode(decision == up)
                 }
             }
+            history.beginNode(0)
+            history.record(10.0)
             if (condition == "aged") repeat(5) { history.beginNode(0) }
             var fresh = condition != "selection"
             val events = ArrayList<String>()
             val choice = LpPassiveValueChoice(true, events::add, { if (condition == "charge") fresh = false })
             val alternatives = listOf(down, up)
-            val selected = choice.select(variable, 2.25, alternatives, history, 7) { fresh }
+            val selected = choice.select(variable, 2.25, alternatives, history, 10.5, 7) { fresh }
             if (condition == "commit") fresh = false
             if (condition == "clear") choice.clear()
 

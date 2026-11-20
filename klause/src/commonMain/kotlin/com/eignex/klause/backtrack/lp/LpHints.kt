@@ -283,7 +283,9 @@ internal class LpHints(
                 stamp == solveStamp && passivePointCurrent()
         }
         if (valueReady) {
-            val advised = values.select(variable, value(variable), alternatives, history, stamp, fresh = current)
+            charge(1L)
+            val advised = values.select(variable, value(variable), alternatives, history,
+                cutoff - scopeConstant.toDouble(), stamp, fresh = current)
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
