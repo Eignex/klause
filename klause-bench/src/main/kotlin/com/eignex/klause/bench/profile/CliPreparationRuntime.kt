@@ -1,7 +1,6 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.SolveEvidence
-import com.eignex.klause.bench.metric.sha256
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -22,8 +21,11 @@ internal object CliPreparationRuntime {
 
     fun classpath(cli: File, bench: File): List<File> {
         val cliJars = requireNotNull(cli.listFiles()).filter { it.extension == "jar" }.sortedBy { it.name }
+        require(cliJars.count { it.name.startsWith("annotations-") } == 1)
+        // The helper uses the CLI annotation runtime; compiler dependencies belong to the bench parent.
         val benchJars = requireNotNull(bench.listFiles()).filter {
-            it.extension == "jar" && !it.name.startsWith("kotlin-compiler-embeddable-")
+            it.extension == "jar" && !it.name.startsWith("kotlin-compiler-embeddable-") &&
+                !it.name.startsWith("annotations-")
         }.sortedBy { it.name }
         require(cliJars.isNotEmpty() && benchJars.isNotEmpty())
         val cliByName = cliJars.associateBy { it.name }
@@ -37,14 +39,17 @@ internal object CliPreparationRuntime {
     }
 
     internal fun requireSharedClasses(jars: List<File>) {
-        val classes = mutableMapOf<String, String>()
+        val classes = mutableMapOf<String, File>()
         for (file in jars) {
             JarFile(file).use { jar ->
                 for (entry in jar.entries()) {
                     if (!entry.name.endsWith(".class") || entry.name.endsWith("module-info.class")) continue
-                    val hash = jar.getInputStream(entry).use { sha256(it.readBytes()) }
-                    val previous = classes.putIfAbsent(entry.name, hash)
-                    require(previous == null || previous == hash) { "shared class differs: ${entry.name}" }
+                    val previous = classes.putIfAbsent(entry.name, file) ?: continue
+                    JarFile(previous).use { original ->
+                        val expected = original.getInputStream(original.getJarEntry(entry.name)).use { it.readBytes() }
+                        val actual = jar.getInputStream(entry).use { it.readBytes() }
+                        require(expected.contentEquals(actual)) { "shared class differs: ${entry.name}" }
+                    }
                 }
             }
         }

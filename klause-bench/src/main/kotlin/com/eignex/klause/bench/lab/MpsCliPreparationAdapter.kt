@@ -26,7 +26,7 @@ fun main(args: Array<String>) {
 }
 
 internal object MpsCliPreparationSuite : BenchSuite {
-    private val resources = BenchResources(1, 4096, 180)
+    private val resources = BenchResources(1, 4096, 180, setOf("platform:linux", "arch:x86_64"))
     private val defaults = mapOf("heap-mib" to "2560", "gc" to "default", "debug" to "true",
         "measurement" to "none", "compile-timeout-sec" to "60")
     private val supplied = setOf("plain-sha256", "timeout-ms", "seed")
