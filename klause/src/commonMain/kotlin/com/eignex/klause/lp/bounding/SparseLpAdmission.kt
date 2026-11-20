@@ -69,10 +69,10 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         return decline("Shape")
     }
     if (cancellation()) return decline("Cancelled")
-    val optimisticProbeWork = sparseProbeWork(rows, columns, 0L, 0L)
-    if (automatic && optimisticProbeWork > queryWorkAllowance) {
+    val optimisticPassWork = sparsePassWork(rows, columns, 0L, 0L)
+    if (automatic && optimisticPassWork > queryWorkAllowance) {
         return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
-            "SourceEstimatedProbeWork" to optimisticProbeWork, "QueryWorkAllowance" to queryWorkAllowance))
+            "SourceEstimatedPassWork" to optimisticPassWork, "QueryWorkAllowance" to queryWorkAllowance))
     }
     if (32L * (columns + rows) > preparationAllowance) return decline("PreparationWork")
     for ((index, factor) in problem.factors.withIndex()) {
@@ -98,11 +98,11 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     val reservation = sparseLpStorage(rows, columns, entries)
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
     val assemblyCost = 32L * (entries + rows + columns)
-    val sourceProbeWork = sparseProbeWork(rows, columns, entries, sourceFillRisk)
-    if (automatic && assemblyCost + sourceProbeWork > queryWorkAllowance) {
+    val sourcePassWork = sparsePassWork(rows, columns, entries, sourceFillRisk)
+    if (automatic && assemblyCost + sourcePassWork > queryWorkAllowance) {
         return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
-            "SourceEstimatedProbeWork" to sourceProbeWork,
-            "SourceEstimatedProbeTotalWork" to assemblyCost + sourceProbeWork,
+            "SourceEstimatedPassWork" to sourcePassWork,
+            "SourceEstimatedPassTotalWork" to assemblyCost + sourcePassWork,
             "QueryWorkAllowance" to queryWorkAllowance))
     }
     assemblyWork = assemblyCost
@@ -133,7 +133,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
 }
 
 // Reserve capped factor storage, CSC, exact authority, temporary maps, transforms and scratch.
-// Component counts inform diagnosis; this owner remains monolithic.
+// Disconnected blocks share this owner's global workspace and storage caps.
 private fun sparseLpStorage(rows: Long, columns: Long, entries: Long): Long =
     minOf(rows * rows * 3L, SPARSE_LP_MAX_FACTOR_ENTRIES) * 256L +
         entries * 512L + (rows + columns) * 4096L + SPARSE_LP_CHECKING_ALLOCATION
@@ -142,11 +142,9 @@ private fun sparseLpStorage(rows: Long, columns: Long, entries: Long): Long =
 private fun sparseQueryWork(rows: Long, columns: Long, entries: Long, fillRisk: Long): Long =
     rows * rows * rows + (entries + rows + columns) * minOf(rows, columns) + fillRisk
 
-// Predict an exploratory query with two capped attempts and sparse passes over the retained basis rows.
-// Recovery and subsequent pivots can exceed this forecast; cooperative funding remains separate.
-private fun sparseProbeWork(rows: Long, columns: Long, entries: Long, fillRisk: Long): Long =
-    2L * minOf(rows * rows * rows, SPARSE_LP_MAX_FACTOR_WORK) +
-        (entries + rows + columns) * rows + fillRisk
+// Global scans and basis-vector passes span all rows even when factor arithmetic stays within blocks.
+private fun sparsePassWork(rows: Long, columns: Long, entries: Long, fillRisk: Long): Long =
+    (entries + rows + columns) * rows + fillRisk
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun estimateSparseLpAdmission(
@@ -220,16 +218,23 @@ internal fun estimateSparseLpAdmission(
     var components = 0L
     var largestRows = 0L
     var largestColumns = 0L
+    var componentRowCubes = 0L
     for (id in parent.indices) {
         if (componentRows[id] + componentColumns[id] == 0) continue
         components++
         largestRows = maxOf(largestRows, componentRows[id].toLong())
         largestColumns = maxOf(largestColumns, componentColumns[id].toLong())
+        val rows = componentRows[id].toLong()
+        componentRowCubes += rows * rows * rows
     }
     val fillRisk = rowDegree.sumOf { it.toLong() * maxOf(0, it - 1) }
     val storage = sparseLpStorage(model.m.toLong(), model.n.toLong(), entries)
     val queryWork = sparseQueryWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
-    val probeWork = sparseProbeWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
+    // Sparse updates cannot connect these emitted blocks; ordering and recovery still use one owner.
+    // Two predicted attempts do not bound repair or subsequent pivots under cooperative funding.
+    val factorAttemptWork = minOf(componentRowCubes + model.m.toLong() * model.m, SPARSE_LP_MAX_FACTOR_WORK)
+    val probeWork = 2L * factorAttemptWork +
+        sparsePassWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
     val decline = when {
         scalarBits > 128 -> "ScalarWidth"
         storage > SPARSE_LP_MAX_ALLOCATION -> "Storage"
@@ -250,6 +255,7 @@ internal fun estimateSparseLpAdmission(
         put("RowIntersectionRisk", fillRisk)
         if (automatic) put("FillRiskLimit", MAX_AUTOMATIC_FILL_RISK)
         put("EstimatedMonolithicQueryWork", queryWork)
+        put("EstimatedFactorAttemptWork", factorAttemptWork)
         put("EstimatedProbeWork", probeWork)
         put("EstimatedProbeTotalWork", preparationWork + probeWork)
         put("QueryWorkAllowance", queryWorkAllowance)

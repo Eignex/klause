@@ -44,6 +44,7 @@ import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -58,14 +59,14 @@ class SparseLpAdmissionTest {
             List(64) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.GE, 1) },
             settings = ProblemSettings(lpMaxTableauCells = 1L)).bake()
         val sink = SolveStatsSink("short-solve")
-        val token = ExecutionControl.until(clock.markNow() + 10.milliseconds)
+        val token = ExecutionControl.until(clock.markNow() + 1.milliseconds)
 
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(64) { 1L }),
             LpParams(lpConfig = LpConfig.AUTO, cancellation = token), sink).use { engine ->
             assertFalse(engine.sparseTrialActive)
             assertEquals(1L, sink.lp.sparseTrial["DeclineQueryWork"])
             assertEquals(0L, sink.lp.sparseTrial["PreparationWork"])
-            assertEquals(50_000L, sink.lp.sparseTrial["QueryWorkAllowance"])
+            assertEquals(5_000L, sink.lp.sparseTrial["QueryWorkAllowance"])
         }
     }
 
@@ -127,7 +128,7 @@ class SparseLpAdmissionTest {
         var admission: SparseLpAdmission? = null
 
         sequence<Unit> {
-            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 1_000_000L)
+            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 100_000L)
         }.forEach { }
 
         assertEquals(1L, admission?.metrics?.get("DeclineQueryWork"))
@@ -158,14 +159,14 @@ class SparseLpAdmissionTest {
         var admission: SparseLpAdmission? = null
 
         sequence<Unit> {
-            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 17_100_000L)
+            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 1_100_000L)
         }.forEach { }
 
         val result = requireNotNull(admission)
         assertEquals(1L, result.metrics["DeclineQueryWork"])
         assertEquals(600L, result.work)
-        assertTrue(requireNotNull(result.metrics["SourceEstimatedProbeWork"]) < 17_100_000L)
-        assertTrue(requireNotNull(result.metrics["SourceEstimatedProbeTotalWork"]) > 17_100_000L)
+        assertTrue(requireNotNull(result.metrics["SourceEstimatedPassWork"]) < 1_100_000L)
+        assertTrue(requireNotNull(result.metrics["SourceEstimatedPassTotalWork"]) > 1_100_000L)
         assertNull(result.sourceLayout)
     }
 
@@ -206,9 +207,50 @@ class SparseLpAdmissionTest {
             }
 
             assertEquals(1L, result.metrics["DeclineQueryWork"])
-            assertEquals(0L, result.work)
+            if (emitted) assertEquals(0L, result.work) else assertTrue(result.work > 600L)
             assertNull(result.sourceLayout)
         }
+    }
+
+    @Test
+    fun `automatic emitted admission distinguishes connectivity at equal sparse dimensions`() {
+        for (connected in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                repeat(300) { addVar(0L, 1L) }
+                repeat(300) { row ->
+                    val first = if (connected) row else row / 2 * 2
+                    val second = if (connected) (row + 1) % 300 else first + 1
+                    addRow(intArrayOf(first, second), longArrayOf(1L, 1L), Relation.GE, 1L)
+                }
+            }.build(Sense.MINIMIZE)
+
+            val result = estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = 1_000_000L)
+
+            assertEquals(!connected, result.admitted)
+            assertEquals(600L, result.metrics["Nonzeros"])
+            assertEquals(600L, result.metrics["RowIntersectionRisk"])
+            assertEquals(if (connected) 1L else 150L, result.metrics["Components"])
+        }
+    }
+
+    @Test
+    fun `automatic source preflight leaves factor prediction to the emitted graph`() {
+        val problem = Problem(0, 300, Array(300) { IntDomain(0, 1) },
+            List(300) { row ->
+                val first = row / 2 * 2
+                Linear(intArrayOf(1, 1), intArrayOf(first, first + 1), LinearOp.GE, 1)
+            })
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 1_000_000L)
+        }.forEach { }
+
+        val result = requireNotNull(admission)
+        assertTrue(result.admitted)
+        assertEquals(150L, result.metrics["Components"])
+        assertTrue(result.work > 300L)
+        assertNotNull(result.sourceLayout)
     }
 
     @Test

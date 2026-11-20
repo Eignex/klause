@@ -358,13 +358,17 @@ scalar width and row-intersection fill risk on the same source-root boxes as the
 retained layout. Custom emitters decline because they reserve no source size. The
 automatic policy declines row-intersection risk above eight million pairs before
 source assembly and checks the emitted risk again afterward. A first-probe forecast
-combines two factor attempts, each predicted by the smaller of the row-count cube
-and the factor-work limit, with sparse work per retained basis row and fill risk.
-The retained basis has one dimension per emitted row, including slack columns. It compares
-that forecast and source assembly against the cumulative root grant, with an early
-shape-only check before scanning source rows. This predicts an affordable exploration;
+combines two factor attempts with global sparse passes and fill risk. Each attempt
+uses the sum of the emitted connected blocks' row-count cubes plus a global
+row-count square, capped by the factor-work limit. Sparse factor updates stay within
+those blocks; ordering, workspace and recovery retain one numerical owner. Global
+passes use one basis dimension per emitted row, including slack columns. Source
+preflight compares assembly and global passes against the cumulative root grant,
+with an early shape-only check before scanning source rows. Connectivity is known
+only after bounded assembly; the emitted forecast includes factor attempts and
+retains completed preparation cost on refusal. This predicts an affordable exploration;
 recovery and subsequent pivots can exceed it, and completion is not promised. The
-uncapped monolithic forecast remains diagnostic; connected blocks do not imply
+uncapped monolithic forecast remains diagnostic; disconnected blocks do not imply
 separate numerical owners. Automatic
 admission also caps its grant by the remaining containing deadline's LP work share,
 when that allowance is enabled. Admission fixes the grant once; later slices do not
