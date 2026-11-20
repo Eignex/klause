@@ -627,9 +627,10 @@ internal class LinearAuthority(
                     }
                 }
             }, maximumCandidates = limit,
-                limits = limits.copy(work = minOf(if (seeded) 65_536L else limits.work,
-                    limits.work - generatedWork), allocation = minOf(if (seeded) 1_048_576L else limits.allocation,
-                    limits.allocation - generatedAllocation)), point = if (seeded) point else null)
+                limits = limits.copy(rows = if (seeded) 16 else limits.rows,
+                    work = minOf(if (seeded) 65_536L else limits.work,
+                        limits.work - generatedWork), allocation = minOf(if (seeded) 1_048_576L else limits.allocation,
+                        limits.allocation - generatedAllocation)), point = if (seeded) point else null)
         }
         val generated = if (generateAggregates) {
             val seeded = if (point == null) emptyList() else generate(minOf(8, 64 - additionalCuts.size), true)

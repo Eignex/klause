@@ -23,6 +23,53 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateContinuationTest {
     @Test
+    fun `integer projection should cancel a coupled flow within its configured row limit`() {
+        for (count in listOf(4, 8)) {
+            val scale = BigFraction.ofLong(if (count == 4) 1L else 1_000_000_000_000L)
+            val integers = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+            val flows = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+            val premises = linkedMapOf<String, SourcePremise>()
+            for (id in integers.indices) {
+                val rowScale = scale * BigFraction.ofLong(id + 1L)
+                premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to rowScale,
+                    integers[id] to rowScale * BigFraction.ofLong(-2)), BigFraction.ZERO))
+            }
+            premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { scale.negated() },
+                scale * BigFraction.ofLong(1L - 2L * count)))
+            val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+            val point = integers.associateWith { 1.0 - 0.5 / count } + flows.associateWith { 2.0 - 1.0 / count }
+            for (rows in listOf(count, count + 1)) {
+                val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+                    maximumCandidates = 1,
+                    limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = rows), point = point)
+
+                if (rows == count) assertTrue(cuts.isEmpty()) else {
+                    val cut = cuts.single()
+                    assertEquals(SourceInequality(integers.associateWith { BigFraction.MINUS_ONE },
+                        BigFraction.ofLong(-count.toLong())), cut.inequality)
+                    assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                        SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `interrupting integer projection should withhold its unfinished source combination`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
+            observe = { name, _ -> if (name == "AggregateIntegerProjectionAttempts") stopped = true },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16),
+            point = mapOf(x to 0.75, y to 0.75, real to 1.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
     fun `point separation should cancel a third source row within its configured row limit`() {
         val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(

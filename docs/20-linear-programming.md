@@ -584,9 +584,14 @@ opposite-sign continuous incidence path through at most four original rows.
 Point selection generates up to eight point-seeded proposals, then fills the remaining
 pool from unseeded source pairs. Seeded proposals precede unseeded proposals; these
 aggregate proposals precede directed rounding proposals within the 64-addition cap.
+Point-seeded discovery reserves at most a quarter of its remaining allowance, capped
+at 16,384 work and 256 KiB, for integer-only projections through at most sixteen
+original rows. Fractional integer coordinates order up to eight starting rows, and
+at most two separating projections survive. Exact positive coefficient ratios cancel
+continuous coordinates without repeatedly scaling the existing combination.
 The ordinary prefix is separate. Both generators share a 500,000-work, 8 MiB family
 allowance; seeded discovery uses at most 65,536 work and 1 MiB of it.
-each derivation remains bounded by 65,536 work and 1 MiB within that allowance.
+Each derivation remains bounded by 65,536 work and 1 MiB within that allowance.
 Pure-integer points also try half rounding, two-row combinations and half scaling
 whose odd coefficients cite established endpoint premises. An established
 invocation bound can stand in for a missing stated endpoint only as a typed
