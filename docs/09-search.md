@@ -414,12 +414,12 @@ Value nominations and matching committed changes have separate counters from
 variable advice and missing-direction collection. Withheld advice retains ordinary
 value order while paying the same comparison work.
 
-With a finite incumbent cutoff, the same opt-in path can visit an under-observed
-child first to collect missing passive information. It uses a recent positive
+The same opt-in path can visit an under-observed child first to collect missing
+passive information, including before an incumbent exists. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
-around its fresh fractional LP point. Each direction needs an in-age observation
-before collection can complete a nearly reliable pair, and the more observed side
-must have a stable positive estimate. A scope-wide availability
+around its fresh fractional LP point. The more observed side must have a stable
+positive estimate from two in-age observations; the opposite direction may have no
+sample. A scope-wide availability
 stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and

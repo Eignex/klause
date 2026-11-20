@@ -102,11 +102,13 @@ internal class LpDirectionalHistory(
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
         observed = true
-        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
+        if (history.down.count != history.up.count) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
             if (majority.stable && majority.gain > 0.0) {
-                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
+                charge(1L)
+                val minorityStamp = if (minority.count > 0) minority.stamp else majority.previousStamp
+                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minorityStamp))
             }
         }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
@@ -233,7 +235,6 @@ internal class LpDirectionalHistory(
         expire(history.up)
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
-        if (history.down.count == 0 || history.up.count == 0) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up

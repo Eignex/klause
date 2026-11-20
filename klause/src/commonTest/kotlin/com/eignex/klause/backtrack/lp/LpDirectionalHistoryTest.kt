@@ -207,8 +207,8 @@ class LpDirectionalHistoryTest {
                 history.record(11.0)
             }
 
-            assertFalse(history.hasCollectionHistory)
-            assertNull(history.preferUnderObservedDirection(variable, 2.25))
+            assertTrue(history.hasCollectionHistory)
+            assertEquals(!firstUp, history.preferUnderObservedDirection(variable, 2.25))
             history.commit(if (firstUp) SearchDecision.IntAtMost(0, 2) else SearchDecision.IntAtLeast(0, 3), 1)
             history.beginNode(1)
             history.record(11.0)

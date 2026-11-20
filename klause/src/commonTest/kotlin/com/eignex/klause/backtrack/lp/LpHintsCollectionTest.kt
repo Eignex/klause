@@ -15,6 +15,61 @@ import kotlin.test.assertTrue
 
 class LpHintsCollectionTest {
     @Test
+    fun `collection completes a missing direction before an incumbent exists in both advice modes`() {
+        val costs = ArrayList<Long>()
+        for (apply in listOf(false, true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+            val events = ArrayList<String>()
+            var work = 0L
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, charge = { work += it })
+            val variable = VarRef.IntVar(0)
+            val down = SearchDecision.IntAtMost(0, 2)
+            val up = SearchDecision.IntAtLeast(0, 3)
+            repeat(2) {
+                hints.beginNode(0, Double.POSITIVE_INFINITY)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                hints.commit(down, 1)
+                hints.beginNode(1, Double.POSITIVE_INFINITY)
+                hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+                hints.recordObjective(relaxation, 11.0)
+            }
+
+            repeat(2) {
+                hints.beginNode(0, Double.POSITIVE_INFINITY)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.finishNode(trail.state)
+                hints.branch(variable)
+                val selected = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
+                assertEquals(listOf(up, down), selected)
+                hints.commit(selected.first(), 1)
+                hints.beginNode(1, Double.POSITIVE_INFINITY)
+                hints.record(relaxation, doubleArrayOf(3.0), DoubleArray(0))
+                hints.recordObjective(relaxation, 13.0)
+            }
+            hints.beginNode(0, Double.POSITIVE_INFINITY)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+
+            assertTrue(hints.directionalScore(variable).isFinite())
+            assertEquals(2, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
+            assertEquals(2, events.count { it == "DOWN" })
+            assertEquals(2, events.count { it == "UP" })
+            assertTrue("PASSIVE_VARIABLE_COMMITTED" !in events)
+            costs.add(work)
+        }
+        assertTrue(costs.first() > 0L)
+        assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
     fun `advice withholding preserves collection and its completed child observation`() {
         val costs = ArrayList<Long>()
         for (apply in listOf(false, true)) {
@@ -67,7 +122,7 @@ class LpHintsCollectionTest {
 
     @Test
     fun `unavailable collection preserves ordinary alternatives`() {
-        for (condition in listOf("disabled", "unbounded", "missing", "reset", "cancelled")) {
+        for (condition in listOf("disabled", "invalid-cutoff", "negative-infinity", "missing", "reset", "cancelled")) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1L)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -77,7 +132,11 @@ class LpHintsCollectionTest {
             val hints = LpHints(1, 0, directionalGains = condition != "disabled", observe = events::add)
             val variable = VarRef.IntVar(0)
             val alternatives = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
-            val bound = if (condition == "unbounded") Double.POSITIVE_INFINITY else 100.0
+            val bound = when (condition) {
+                "invalid-cutoff" -> Double.NaN
+                "negative-infinity" -> Double.NEGATIVE_INFINITY
+                else -> 100.0
+            }
             for ((decision, point, objective) in listOf(
                 Triple(alternatives.first(), 2.0, 11.0), Triple(alternatives.last(), 3.0, 13.0),
                 Triple(alternatives.first(), 2.0, 11.0),
