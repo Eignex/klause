@@ -1022,7 +1022,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     }
     projection?.reserve(1L, 64L, matrix = true)
     val groups = LpComponentGroups(blockCols, blockRows, blocks).coarsen(
-        model, rowIndex, accept?.minimumOwnerCells ?: 0L, cancellation, projection,
+        model, rowIndex, accept?.ownerMergeWork ?: 0L, cancellation, projection,
     ) ?: return null
     if (accept != null) {
         projection?.reserve(groups.columns.size.toLong() + 1L, 64L, matrix = false)
@@ -1090,7 +1090,7 @@ internal fun interface LpComponentAdmission {
     fun declinedEdit(reason: LpComponentEditDecline) {}
     val basisEntryLimit: Long get() = Long.MAX_VALUE
     val basisWorkLimit: Long get() = Long.MAX_VALUE
-    val minimumOwnerCells: Long get() = 0L
+    val ownerMergeWork: Long get() = 0L
 }
 
 private fun LpModel.componentRestrictions(

@@ -42,7 +42,7 @@ class MpsLpAdmissionTest {
         assertEquals(21L, assertNotNull(report["componentDenseProxy"]).jsonPrimitive.long)
         assertEquals(13L, assertNotNull(report["naturalComponentDenseProxy"]).jsonPrimitive.long)
         assertEquals(1L, assertNotNull(report["numericalOwners"]).jsonPrimitive.long)
-        assertEquals(4096L, assertNotNull(report["minimumOwnerCells"]).jsonPrimitive.long)
+        assertEquals(64L, assertNotNull(report["ownerMergeWork"]).jsonPrimitive.long)
     }
 
     @Test

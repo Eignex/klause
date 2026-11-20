@@ -3,13 +3,14 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.lp.engine.LpComponentAdmission
 import com.eignex.klause.lp.engine.LpComponentEditDecline
 import com.eignex.klause.lp.engine.LpComponentShape
+import com.eignex.klause.lp.engine.simplexWorkspaceWork
 
 private const val MIN_COMPONENT_CELLS = 4096L
 private const val MAX_COMPONENT_BYTES = 16L * 1024 * 1024
 private const val MAX_COMPONENTS = 1024
 private const val MAX_COMPONENT_PREPARATION_WORK = 16_000_000L
 
-internal fun componentReuseOwnerCells(): Long = MIN_COMPONENT_CELLS
+internal fun componentReuseMergeWork(): Long = simplexWorkspaceWork(0, 0)
 
 internal fun componentReuseFundingAvailable(
     allowance: Long?,
@@ -31,7 +32,7 @@ internal val LpEngine.numericalComponentAdmission: LpComponentAdmission
     get() = object : LpComponentAdmission {
         override val basisEntryLimit = 131_072L
         override val basisWorkLimit = 8_000_000L
-        override val minimumOwnerCells = componentReuseOwnerCells()
+        override val ownerMergeWork = componentReuseMergeWork()
 
         override fun inspect(columns: Int, rows: Int, entries: Int): Boolean {
             val outcome = componentReuseInspection(columns, rows, entries) ?: return true

@@ -937,7 +937,7 @@ internal class LpScopedSolver(
                     ::ComponentLpSolver,
                     accept = componentAdmission?.let { admission ->
                         object : LpComponentAdmission {
-                            override val minimumOwnerCells: Long get() = admission.minimumOwnerCells
+                            override val ownerMergeWork: Long get() = admission.ownerMergeWork
 
                             override fun inspect(columns: Int, rows: Int, entries: Int): Boolean =
                                 admission.inspect(columns, rows, entries).also {

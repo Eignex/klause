@@ -293,13 +293,13 @@ internal object MpsLpAdmission {
 
     private fun numericalOwnerShape(model: Any, stop: ExecutionControl): JsonObject {
         val policy = Class.forName("com.eignex.klause.lp.bounding.LpComponentReuseKt")
-        val minimumCells = policy.getMethod("componentReuseOwnerCells").invoke(null) as Long
+        val mergeWork = policy.getMethod("componentReuseMergeWork").invoke(null) as Long
         val admissionType = Class.forName("com.eignex.klause.lp.engine.LpComponentAdmission")
         var observed: Any? = null
         val admission = Proxy.newProxyInstance(admissionType.classLoader, arrayOf(admissionType)) { _, method, args ->
             when (method.name) {
                 "inspect" -> true
-                "getMinimumOwnerCells" -> minimumCells
+                "getOwnerMergeWork" -> mergeWork
                 "accepts" -> {
                     observed = requireNotNull(args)[0]
                     false
@@ -317,7 +317,7 @@ internal object MpsLpAdmission {
         factory.invoke(null, model, stop, null, engine, component, admission)
         check(!stop())
         return buildJsonObject {
-            put("minimumOwnerCells", minimumCells)
+            put("ownerMergeWork", mergeWork)
             put("numericalOwners", observed?.let { get(it, "Blocks") as Int } ?: 0)
             put("componentDenseProxy", observed?.let { get(it, "ComponentCells") as Long } ?: 0L)
             put("modeledComponentBytes", observed?.let { get(it, "ModeledBytes") as Long } ?: 0L)

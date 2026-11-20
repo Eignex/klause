@@ -27,7 +27,7 @@ class LpScopedSolverTest {
         }
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val admission = object : LpComponentAdmission {
-            override val minimumOwnerCells = 32L
+            override val ownerMergeWork = 13L
             override fun accepts(shape: LpComponentShape): Boolean = true
         }
         LpScopedSolver(state, componentSplit = true, componentAdmission = admission).use { owner ->
@@ -51,7 +51,7 @@ class LpScopedSolverTest {
         }
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val admission = object : LpComponentAdmission {
-            override val minimumOwnerCells = 32L
+            override val ownerMergeWork = 13L
             override fun accepts(shape: LpComponentShape): Boolean = true
         }
         LpScopedSolver(state, componentSplit = true, componentAdmission = admission).use { owner ->
@@ -77,7 +77,7 @@ class LpScopedSolverTest {
         builder.addRow(intArrayOf(), longArrayOf(), Relation.GE, 0L)
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val admission = object : LpComponentAdmission {
-            override val minimumOwnerCells = 32L
+            override val ownerMergeWork = 19L
             override fun accepts(shape: LpComponentShape): Boolean = true
         }
 

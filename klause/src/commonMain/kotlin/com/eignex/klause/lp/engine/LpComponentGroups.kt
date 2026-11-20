@@ -11,13 +11,13 @@ internal class LpComponentGroups(
     fun coarsen(
         model: LpModel,
         rowIndex: LpRowIndex,
-        minimumCells: Long,
+        mergeWork: Long,
         token: ExecutionControl,
         projection: LpProjectionMeter?,
     ): LpComponentGroups? {
-        require(minimumCells >= 0L)
-        if (minimumCells == 0L || blocks < 2) return this
-        projection?.reserve(8L * blocks + 1L, 4L * blocks, matrix = true)
+        require(mergeWork >= 0L)
+        if (mergeWork == 0L || blocks < 2) return this
+        projection?.reserve(12L * blocks + 1L, 4L * blocks, matrix = true)
         val groupOf = IntArray(blocks)
         var groups = 0
         var pending = -1
@@ -27,11 +27,13 @@ internal class LpComponentGroups(
             if (token()) return null
             val rowCount = rows[block].size.toLong()
             val columnCount = columns[block].size.toLong()
-            if (rowCount * (columnCount + rowCount + 1L) >= minimumCells) {
+            if (3L * rowCount + columnCount >= mergeWork) {
                 groupOf[block] = groups++
                 continue
             }
-            if (pending < 0) {
+            val extraCells = pendingRows * columnCount + rowCount * pendingColumns +
+                2L * pendingRows * rowCount
+            if (pending < 0 || extraCells >= mergeWork) {
                 pending = groups++
                 pendingRows = 0L
                 pendingColumns = 0L
@@ -39,7 +41,6 @@ internal class LpComponentGroups(
             groupOf[block] = pending
             pendingRows += rowCount
             pendingColumns += columnCount
-            if (pendingRows * (pendingColumns + pendingRows + 1L) >= minimumCells) pending = -1
         }
         if (groups == blocks) return this
         val children = groups + if (columns.size > blocks) 1 else 0

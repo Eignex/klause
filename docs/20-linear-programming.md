@@ -453,10 +453,11 @@ decline component retention. Without a supplied LP horizon or a deadline, retent
 can use its bounded atomic grant. The funding decision is fixed for that worker;
 a decline keeps its ordinary preparation and query policies.
 Funded workers reject small or oversized owners before
-partition allocation and group small independent blocks using the same small-model
-tableau floor for each numerical owner. Large blocks stay separate and at most one
-small remainder remains; logical-only rows keep their own child. Grouping preserves
-the LP model and leaves guidance and rounding partitions separate. Admission uses the grouped partition's size,
+partition allocation. Small independent blocks merge only when their extra tableau-cell
+proxy is less than the fixed workspace work saved by removing one owner. A block whose
+smallest possible merge cannot save that work stays separate; logical-only rows keep
+their own child. Grouping preserves the LP model and leaves guidance and rounding
+partitions separate. Admission uses the grouped partition's size,
 tableau-size reduction and modeled child-model storage. A finite shared basis-entry
 limit is divided among the admitted children. Construction and declined inspection
 spend the containing LP grant separately from each adaptive numerical query. Owner
