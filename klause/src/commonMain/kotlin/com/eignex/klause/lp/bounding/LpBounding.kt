@@ -348,7 +348,9 @@ private fun LpEngine.solveSelectedCuts(
         observeCutFill(it.luMaxFill, tightened.model.m)
         return LpCutOutcome.Solved(tightened, it, previous.completed && it.optimal)
     }
-    if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous.unfinished()
+    if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) {
+        return previous.unfinished()
+    }
     val floatRay = attempt.first.infeasibleRay ?: return previous.unfinished()
     val ray = infeasibilityRay(tightened.model, floatRay, sink) ?: return previous.unfinished()
     recordPruneBound(Double.POSITIVE_INFINITY)

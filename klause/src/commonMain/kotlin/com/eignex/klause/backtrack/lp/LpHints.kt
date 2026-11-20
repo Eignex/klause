@@ -283,7 +283,9 @@ internal class LpHints(
         val state = passiveState
         val stamp = solveStamp
         val pointValue = value(variable)
-        val preference = if (valueReady) history.preferDirection(variable, pointValue, cutoff - scopeConstant.toDouble()) else null
+        val preference = if (valueReady) {
+            history.preferDirection(variable, pointValue, cutoff - scopeConstant.toDouble())
+        } else null
         if (cancelled() || passivePoint !== point || passiveState !== state ||
             stamp != solveStamp || !passivePointCurrent()
         ) return alternatives

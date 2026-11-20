@@ -266,7 +266,7 @@ class LpDirectionalHistoryTest {
             }
 
             history.infeasible()
-        history.finishNode(true)
+            history.finishNode(true)
 
             assertFalse("OUTCOME_PRUNED" in events)
         }
@@ -291,7 +291,7 @@ class LpDirectionalHistoryTest {
         recording = true
 
         history.infeasible()
-                history.finishNode(true)
+        history.finishNode(true)
 
         assertEquals(0, history.retainedEntries)
         assertFalse("OUTCOME_PRUNED" in events)

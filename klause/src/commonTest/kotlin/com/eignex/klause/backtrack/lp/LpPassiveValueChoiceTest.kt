@@ -57,7 +57,8 @@ class LpPassiveValueChoiceTest {
                 var work = 0L
                 val choice = LpPassiveValueChoice(apply, events::add, { work += it })
 
-                val selected = choice.select(variable, point, ordinary, history.preferDirection(variable, point, 10.25), 7) { true }
+                val preference = history.preferDirection(variable, point, 10.25)
+                val selected = choice.select(variable, point, ordinary, preference, 7) { true }
                 choice.commit(selected.first(), 7) { true }
                 choice.commit(selected.first(), 7) { true }
 
@@ -95,7 +96,8 @@ class LpPassiveValueChoiceTest {
             val events = ArrayList<String>()
             val choice = LpPassiveValueChoice(true, events::add, { if (condition == "charge") fresh = false })
             val alternatives = listOf(down, up)
-            val selected = choice.select(variable, 2.25, alternatives, history.preferDirection(variable, 2.25, 10.25), 7) { fresh }
+            val preference = history.preferDirection(variable, 2.25, 10.25)
+            val selected = choice.select(variable, 2.25, alternatives, preference, 7) { fresh }
             if (condition == "commit") fresh = false
             if (condition == "clear") choice.clear()
 
