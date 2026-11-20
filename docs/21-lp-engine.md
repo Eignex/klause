@@ -218,6 +218,10 @@ conflict pruning. Heuristic LP seeding consumes floating coordinates directly an
 requests no certificate.
 Exact point reconstruction checks every bound, skips zero objective products, and
 reuses converted coordinates where the source origin is zero.
+Reconstruction shares a complete immutable coefficient capture across models with
+the same owned matrix. Each invocation repeats input, scalar, work and allocation
+admission; bounds, premises, right-hand sides and objective values are read from
+the current model. A changed matrix has a separate capture.
 
 ### Safe objective bounds
 
