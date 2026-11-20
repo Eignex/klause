@@ -11,15 +11,39 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
-    fun `reset during a charged preference lookup discards the result`() {
-        var reading = false
-        lateinit var history: LpDirectionalHistory
-        history = LpDirectionalHistory({}, charge = {
-            if (reading) {
-                reading = false
-                history.clear()
+    fun `child order seeks open outcomes until a predicted gain reaches the cutoff`() {
+        for (prunedUp in listOf(false, true)) {
+            for (mixed in listOf(false, true)) {
+                var work = 0L
+                val history = LpDirectionalHistory({}, charge = { work += it })
+                val variable = VarRef.Bool(0)
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 0.5)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (up) 13.0 else 11.0)
+                        history.finishNode(up == prunedUp && (!mixed || sample == 0))
+                    }
+                }
+                history.record(10.0)
+                for (cutoff in listOf(11.0, 12.0, 13.0, 14.0)) {
+                    val before = work
+
+                    val preference = history.preferDirection(variable, 0.5, cutoff)
+
+                    assertEquals(if (cutoff <= 13.0) prunedUp else !prunedUp, preference)
+                    assertEquals(32L, work - before)
+                }
             }
-        })
+        }
+    }
+
+    @Test
+    fun `unknown or nonpositive remaining gaps cannot authorize child advice`() {
+        val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)
         history.beginNode(0)
         history.record(10.0)
@@ -28,17 +52,71 @@ class LpDirectionalHistoryTest {
             for (up in listOf(false, true)) {
                 history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
                 history.beginNode(1)
-                history.record(12.0)
+                history.record(if (up) 13.0 else 11.0)
                 history.finishNode(up)
             }
         }
-        reading = true
+        history.record(10.0)
 
-        assertNull(history.preferPruningDirection(variable, 0.5))
+        for (cutoff in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 10.0, 9.0)) {
+            assertNull(history.preferDirection(variable, 0.5, cutoff))
+        }
     }
 
     @Test
-    fun `child order follows prune rates from two known outcomes`() {
+    fun `a positive unrepresentable child prediction cannot supply zero cutoff reach`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(if (up) 1.0 else Double.MIN_VALUE)
+                history.finishNode(up)
+            }
+        }
+        history.record(0.0)
+
+        assertNull(history.preferDirection(variable, 0.125, 1.0))
+        assertEquals(true, history.preferDirection(variable, 0.5, 1.0))
+    }
+
+    @Test
+    fun `reset during a charged preference lookup discards the result`() {
+        for (resetAt in 1..3) {
+            var reading = false
+            var reads = 0
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({}, charge = {
+                if (reading && ++reads == resetAt) {
+                    reading = false
+                    history.clear()
+                }
+            })
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(12.0)
+                    history.finishNode(up)
+                }
+            }
+            history.record(10.0)
+            reading = true
+
+            assertNull(history.preferDirection(variable, 0.5, 10.25))
+        }
+    }
+
+    @Test
+    fun `child order follows prune rates when a predicted gain reaches the cutoff`() {
         for (pruned in listOf("up", "down", "both", "neither", "missing", "one", "mixedUp", "mixedDown",
             "mixedEqual", "fullDownMixedUp", "aged")) {
             val history = LpDirectionalHistory({}, maxAge = 6L)
@@ -74,7 +152,8 @@ class LpDirectionalHistoryTest {
                 }
             }
 
-            val preferred = history.preferPruningDirection(variable, 0.5)
+            history.record(10.0)
+            val preferred = history.preferDirection(variable, 0.5, 10.25)
 
             assertEquals(when (pruned) {
                 "up", "mixedUp" -> true
@@ -100,7 +179,7 @@ class LpDirectionalHistoryTest {
             }
         }
 
-        assertNull(history.preferPruningDirection(variable, 0.5))
+        assertNull(history.preferDirection(variable, 0.5, 10.25))
     }
 
     @Test
@@ -145,12 +224,13 @@ class LpDirectionalHistoryTest {
                 history.commit(SearchDecision.Bool(1), 1)
                 history.beginNode(1)
                 history.infeasible()
-            history.finishNode(true)
+                history.finishNode(true)
                 if (observation == 0) {
+                    history.record(10.0)
                     assertTrue(history.hasPruningHistory)
                     assertTrue(history.prunedDirections(variable, 0.5).isNaN())
-                    if (samples == 2) assertEquals(false, history.preferPruningDirection(variable, 0.5))
-                    else assertNull(history.preferPruningDirection(variable, 0.5))
+                    if (samples == 2) assertEquals(false, history.preferDirection(variable, 0.5, 10.25))
+                    else assertNull(history.preferDirection(variable, 0.5, 10.25))
                 }
                 history.finishNode()
             }

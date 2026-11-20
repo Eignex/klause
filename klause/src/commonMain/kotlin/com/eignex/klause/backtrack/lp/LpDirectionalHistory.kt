@@ -236,7 +236,7 @@ internal class LpDirectionalHistory(
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
     }
 
-    fun preferPruningDirection(variable: VarRef, value: Double): Boolean? {
+    fun preferDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {
         val version = generation
         charge(8L)
         if (version != generation) return null
@@ -247,7 +247,18 @@ internal class LpDirectionalHistory(
         val down = outcomeRate(history.down.outcome)
         val up = outcomeRate(history.up.outcome)
         if (!down.isFinite() || !up.isFinite() || down == up) return null
-        return up > down
+        charge(16L)
+        if (version != generation) return null
+        val gap = cutoff - objective
+        if (!gap.isFinite() || gap <= 0.0) return null
+        val fraction = value - floor(value)
+        val downGain = history.down.gain * fraction
+        val upGain = history.up.gain * (1.0 - fraction)
+        if (!downGain.isFinite() || !upGain.isFinite() ||
+            (downGain == 0.0 && history.down.gain > 0.0) ||
+            (upGain == 0.0 && history.up.gain > 0.0)
+        ) return null
+        return if (maxOf(downGain, upGain) >= gap) up > down else up < down
     }
 
     fun prunedDirections(variable: VarRef, value: Double): Double {

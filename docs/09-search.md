@@ -388,9 +388,14 @@ state, and checks cancellation after charging its work and before storing data.
 Numeric samples and completed outcomes age independently, without renewal on restart.
 
 Both directions must have two known recent outcomes. Their observed prune fractions
-are zero, one half or one; zero requires two observed open outcomes. The consumer
-visits the child with the greater observed fraction first. Equal or unknown rates
-keep ordinary order. Numerical gain reliability is checked independently, including
+are zero, one half or one; zero requires two observed open outcomes. Equal or
+unknown rates keep ordinary order. The current remaining incumbent gap determines
+the search intent: if either stable gain, scaled by its current fractional branch
+movement, reaches that gap, the child with the greater prune fraction goes first.
+Otherwise the child with the smaller prune fraction goes first. Nonfinite or
+nonpositive gaps and positive predictions that cannot be represented as positive
+floating values keep ordinary order. Predictions supply only this ordering, never
+a bound or pruning authority. Numerical gain reliability is checked independently, including
 two stable finite gains in each direction and a positive gain in at least one.
 These historical outcomes supply no bound or pruning authority at another node.
 Coarse recent positive-gain and positive-prune-rate stamps skip lookups until such
