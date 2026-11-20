@@ -412,7 +412,9 @@ never live branch bounds.
 Endpoint discovery uses a heap ordered by historical deduction position, with
 coordinate order breaking ties. Unsupported projection kinds are excluded before
 marker reconstruction; eligible endpoints share one lazily allocated array of packed
-trail and coordinate priorities. An analysis caches validated source identities and
+trail and coordinate priorities. Eager reasons supply their priority from the bound
+journal; source expansion and marker reconstruction wait until an endpoint is selected.
+An analysis caches validated source identities and
 normalized inequality sides; every consultation still checks historical guard truth,
 raw requested bounds and membership. Incompatible guards decline before historical
 bound reconstruction. Discovery, arithmetic, candidate ordering and duplicate scans
@@ -454,7 +456,9 @@ a non-root integer decision cannot supply a shared premise and mapped admission
 must decline. Every native conflict cascade repeats the mapped-target assertion
 and complete premise checks before admitting a typed result; an unavailable
 mapping keeps its clausal fallback, including cascades reached through an LP
-consequence. Within one fixpoint publication, complete conjunctions of active
+consequence. Mapped-row admission validates named, active premises through the same
+bounded traversal as clause construction without materializing a discarded clause.
+Within one fixpoint publication, complete conjunctions of active
 named assertions can share bounded proof subgraphs, and conjunctions retain every
 child; an unavailable, unnameable or inactive leaf withholds reuse, and the memo
 ends with the publication callback. Fixpoint facts already implied by shared

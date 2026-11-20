@@ -56,6 +56,31 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `nested source predicate retraction should preserve a strict ancestor`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0))
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val first = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ONE, strict = true))
+            val second = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ofLong(2L)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(first.positive)))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(second.negative)))
+
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(second.positive)))
+
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val witness = assertNotNull(session.model().valueOf(component.assignmentKey))
+            assertTrue(witness.reals.single() < BigFraction.ONE)
+            session.popTo(1)
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(second.negative)))
+        }
+    }
+
+    @Test
     fun `rows sharing coefficients should keep distinct strict implications after bound strengthening`() {
         val source = Problem(5, 0, emptyArray(), arrayOf(
             ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),

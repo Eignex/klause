@@ -32,7 +32,6 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal object JointRepairLpCapture {
     private const val PIPELINE = "com.eignex.klause.solver.pipeline."
-    private const val ENGINE = "com.eignex.klause.lp.engine."
 
     fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
@@ -66,18 +65,18 @@ internal object JointRepairLpCapture {
         val captureContext = companion.javaClass.declaredMethods.single { it.name == "captureContext" }
             .apply { isAccessible = true }
         val context = requireNotNull(captureContext.invoke(companion, model, objective, stop))
-        val original = requireNotNull(field(invocation, "linearSource"))
+        val original = requireNotNull(call(invocation, "getLinearSource"))
         val checker = Class.forName(PIPELINE + "FiniteIncumbentCompletionKt").methods.single {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
-        }.invoke(null, original, field(preparation, "sourceMapping"))
+        }.invoke(null, original, call(preparation, "getSourceMapping"))
         val active = stop or ExecutionControl.after(4_000.milliseconds)
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
             sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
             sourceIncumbentCompletion = true)
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
-        val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 16 }
+        val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
             .newInstance(model, context, objective, params, policy, true, { null }, active, null,
-                null, null, true, null, checker, null, null)
+                null, null, true, null, checker, null, null, null)
         val window = ConditionWindow(limit)
         val authority = requireNotNull(field(owner, "authority"))
         val budget = requireNotNull(field(owner, "budget"))
@@ -116,11 +115,7 @@ internal object JointRepairLpCapture {
                 observerNs += System.nanoTime() - started
             }
         }
-        val contextType = Class.forName(ENGINE + "LpSolveContext")
-        val observing = contextType.constructors.single { it.parameterCount == 7 }.newInstance(
-            call(defaults, "getEngineFactory"), call(defaults, "getCertificationPolicy"),
-            call(defaults, "getOnRefinementBasisVerification"), call(defaults, "getSparsePointRecovery"),
-            call(defaults, "getStartArbitraryPrecision"), call(defaults, "getPreserveOverflowCheckpoint"), observe)
+        val observing = observingContext(defaults, observe)
         budget.javaClass.getDeclaredField("solveContext").apply { isAccessible = true }.set(budget, { observing })
         val snapshots = NumericalSelectionSnapshot(stop)
         val journal = snapshots.journal()
@@ -293,6 +288,16 @@ internal object JointRepairLpCapture {
         val model = requireNotNull(call(state, "getModel"))
         put("rows", call(model, "getM") as Int)
         put("columns", call(model, "getN") as Int)
+    }
+
+    @Suppress("SpreadOperator") // Java reflection requires varargs at the copy boundary.
+    internal fun observingContext(context: Any, observe: (Any) -> Unit): Any {
+        val copy = context.javaClass.methods.single { it.name == "copy" }
+        val observerComponent = 7
+        val arguments = Array(copy.parameterCount) { index ->
+            if (index + 1 == observerComponent) observe else call(context, "component${index + 1}")
+        }
+        return requireNotNull(copy.invoke(context, *arguments))
     }
 
     private fun field(owner: Any, name: String): Any? =

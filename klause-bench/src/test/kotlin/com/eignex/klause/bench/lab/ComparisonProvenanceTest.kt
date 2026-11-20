@@ -11,6 +11,54 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 class ComparisonProvenanceTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["", "\""])
+    fun `managed recording destinations do not change runtime identity`(quote: String) {
+        val arguments = "\"-Xmx2560m\"\n" +
+            "$quote-XX:StartFlightRecording=filename=/local/cases/1/out/report/cli.jfr," +
+            "settings=profile,dumponexit=true$quote"
+        val before = BuildProvenance(
+            emptyMap(), emptyMap(), mapOf("lab.cli.args" to arguments), "Linux", "amd64",
+        )
+        val after = before.copy(runtimeOptions = mapOf("lab.cli.args" to arguments.replace("cases/1", "cases/2")))
+
+        assertEquals(ComparisonProvenance.runtimeFingerprint(before), ComparisonProvenance.runtimeFingerprint(after))
+        assertEquals(arguments, before.runtimeOptions["lab.cli.args"])
+        assertNotEquals(before.fingerprint, after.fingerprint)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["-Dproperty=", "\"-Dproperty=", "prefix"])
+    fun `recording flag text embedded in another argument retains runtime identity`(prefix: String) {
+        val arguments = "$prefix-XX:StartFlightRecording=filename=/local/cases/1/out/report/cli.jfr,settings=profile"
+        val before = BuildProvenance(
+            emptyMap(), emptyMap(), mapOf("lab.cli.args" to arguments), "Linux", "amd64",
+        )
+        val after = before.copy(runtimeOptions = mapOf("lab.cli.args" to arguments.replace("cases/1", "cases/2")))
+
+        assertNotEquals(ComparisonProvenance.runtimeFingerprint(before), ComparisonProvenance.runtimeFingerprint(after))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["settings=default", "-Xmx1280m", "stackdepth=64", "custom.jfr", "unknown=true"])
+    fun `runtime identity retains recording settings and other JVM arguments`(change: String) {
+        val arguments = "-Xmx2560m\n-XX:FlightRecorderOptions=stackdepth=128\n" +
+            "-XX:StartFlightRecording=filename=/local/cases/1/out/report/cli.jfr,settings=profile,dumponexit=true"
+        val before = BuildProvenance(
+            emptyMap(), emptyMap(), mapOf("lab.cli.args" to arguments), "Linux", "amd64",
+        )
+        val changed = when (change) {
+            "settings=default" -> arguments.replace("settings=profile", change)
+            "-Xmx1280m" -> arguments.replace("-Xmx2560m", change)
+            "stackdepth=64" -> arguments.replace("stackdepth=128", change)
+            "custom.jfr" -> arguments.replace("cli.jfr", change)
+            else -> "$arguments\n$change"
+        }
+        val after = before.copy(runtimeOptions = mapOf("lab.cli.args" to changed))
+
+        assertNotEquals(ComparisonProvenance.runtimeFingerprint(before), ComparisonProvenance.runtimeFingerprint(after))
+    }
+
     @Test
     fun `cached harness classes retain exact identities and recheck changed files`() {
         val root = Files.createTempDirectory("cached-comparison-")

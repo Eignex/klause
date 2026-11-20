@@ -285,7 +285,11 @@ internal class ReconstructionAuthority(val model: LpModel, val meter: Reconstruc
         bounds = List(size) { j ->
             model.exactBounds(j).also { b ->
                 if (j < n && (b.lower == null || b.upper == null)) openStructuralBounds = true
-                for (side in listOfNotNull(b.lower, b.upper)) {
+                b.lower?.let { side ->
+                    meter.fraction(side.number.value)
+                    chargePremises(side.premises)
+                }
+                b.upper?.let { side ->
                     meter.fraction(side.number.value)
                     chargePremises(side.premises)
                 }

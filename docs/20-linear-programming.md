@@ -652,6 +652,12 @@ certificate allowances, and retained MIP callers fund consultations through
 `SourceLpFunding`, where caller cancellation closes the owner and exhaustion is an
 incomplete result.
 
+Source primal statistics report each returned guidance consultation's native phase,
+floating termination, native and projected point availability and pause status.
+Repeated consultations of a retained result count separately. These observations
+do not count distinct queries, witnesses or certificates; a completed consultation
+can have no primal point. An unavailable termination is not an infeasibility verdict.
+
 Identity row layouts are the default. An explicit unconditional-equality policy
 (equality packing) combines adjacent closed, exactly opposing inequalities into one
 row with a fixed logical column; a cut mask that suspends rows through packing needs

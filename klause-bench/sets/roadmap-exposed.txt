@@ -108,6 +108,8 @@ miplib2017/neos-3426132-dieze
 miplib2017/neos-555001
 miplib2017/rococoC10-001000
 miplib2017/shiftreg2-7
+miplib2017/amaze22012-06-28i
+miplib2017/n6-3
 
 # #3843 ordinary-arithmetic combinatorial PB development groups; related encodings share exposure.
 pb-comp/normalized-PB24/DEC-LIN/nordstrom/CombinatorialBenchmarksPBsolvers/subsetcard/random4reg_opb_shuffle/normalized-subsetcard-eq-random4reg-35.shuf-1
