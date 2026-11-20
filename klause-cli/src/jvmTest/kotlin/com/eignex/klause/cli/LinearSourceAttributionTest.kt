@@ -73,10 +73,12 @@ class LinearSourceAttributionTest(
                 return accepted
             }
 
-            override fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long) {
+            override fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long,
+                privateIncumbentReuse: Boolean) {
                 assertTrue(arm.isNotBlank())
                 assertTrue(elapsedMs >= 0L)
                 assertEquals(points.last(), objective)
+                assertEquals(false, privateIncumbentReuse)
                 attributed += objective
             }
 

@@ -111,6 +111,7 @@ internal class FiniteExecutionRequest(
     val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
     /** Source optimality gap over [objective]; see [BacktrackParams.optimalityGap]. */
     val optimalityGap: OptimalityGap? = null,
+    val companionIncumbentReuse: Boolean = false,
 )
 
 /** Streaming hooks owned by a rendering frontend. */
@@ -131,6 +132,7 @@ internal class FiniteImprovement(
     val elapsedMs: Long,
     /** Engine-normalized objective value at [sample]. */
     val objective: Double,
+    val privateIncumbentReuse: Boolean = false,
 )
 
 /** Terminal outcome of a finite execution. */
@@ -663,6 +665,7 @@ private fun executePortfolio(
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
         numericalCompanions = request.numericalCompanionParams,
+        companionIncumbentReuse = request.companionIncumbentReuse,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(
@@ -822,5 +825,6 @@ private fun backtrackDryRun(
 
 private fun AttributedImprovement.toFiniteImprovement(): FiniteImprovement {
     val improvement = result as MinimizeResult.WithSample
-    return FiniteImprovement(improvement.sample, workerLabel, elapsed.inWholeMilliseconds, improvement.objective)
+    return FiniteImprovement(improvement.sample, workerLabel, elapsed.inWholeMilliseconds, improvement.objective,
+        improvement.stats.smt.completeSearchStages?.get("incumbentReusePrivateCandidate") == 1L)
 }

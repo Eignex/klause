@@ -495,6 +495,42 @@ completion.
 
 ### Incumbent completion and repair
 
+Admitted nominal MPS binary companions with ordinary admission and fixed repair can
+use a finite-accepted point lacking exact real coordinates as an advisory private
+search center under the declared default numerical policy. Explicit
+`source-incumbent-completion=false` withholds this consumer default. Other source
+interpretations and repair/admission controls retain explicit selection. Automatic
+reuse keeps ordinary finite cutoff windows and scheduling; only the explicit
+completion option selects its cutoff accounting and first-proposal trial.
+
+The advisory point supplies binary coordinates for a bounded change neighborhood
+and a floating objective evaluated as a rational aspiration. It supplies no feasible
+incumbent, parent cutoff or bound. A private query retains the original objective,
+all receiving conditions and source rows, adds the aspiration target and change
+radius, and leaves continuous coordinates free. Its first query is an LP relaxation.
+The numerical owner alternates private consultations with its retained ordinary
+frontier inside the same turn offers, using at most half the remaining offered time
+and work for each private consultation. The private search visits the center's side
+of each integer split first and retains sibling alternatives; ordinary traversal
+retains bound order. Joint repair starts the same private query without first
+reconstructing the advisory point. Ordinary fallback neighborhoods retain their
+own checked centers and cutoffs.
+
+Both searches share one LP operation/work/allocation ledger and containing
+decision/check allowances. Private query progress supplies no root-fixing or
+learned-clause reward. A generated witness passes complete receiving-source checks
+and exact original-source feasibility and objective checks before it can improve
+the source incumbent. Private bounds and proofs never enter parent coverage.
+A private query retires after a checked improvement or a completed target; the
+numerical frontier also retires a target made obsolete by an ordinary improvement.
+Unchanged advisory points do not restart completed targets. Explicit completion can
+start private queries from imported checked improvements. All containing allowances
+stay cumulative.
+Accepted improvement attribution retains whether its candidate came from the
+private query, including candidates whose source publication was deferred.
+Objective-coordinate conversion retains the producer's candidate statistics while
+replacing its objective and proof authority.
+
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
 approximate real coordinates guiding rational reconstruction without authority. A
@@ -553,6 +589,25 @@ fixing or coverage. Other integer models can pin the
 eligible integers agreeing with the paid point, releasing every disagreement.
 Continuous columns remain free. Missing guidance, cancellation and unavailable
 funding retain the connected two-integer start.
+Fixed binary companion repair instead searches near a checked center under the
+original pins. Its private objective retains the original cost and continuous
+residuals remain free. A Hamming row bounds changed binary
+coordinates to ten percent of the integer columns rounded up, clamped between four
+and thirty-two changes and limited by the integer count. A separate original-cost
+row requests improvement by the largest of the declared positive objective allowance,
+one percent of the current variable objective magnitude, and one thousandth of the
+smallest nonzero objective coefficient.
+Source constants and maximization direction stay in that row. Preparation and
+native progress spend the existing query grants. Only a freshly source- and
+original-checked strict improvement can leave this search; its private objective bounds,
+refutations and optima supply no parent objective or coverage evidence. A failed
+target ends undecided and is not retried at the same cutoff; unavailable preparation
+falls back to ordinary neighborhoods.
+After a checked private improvement, joint repair leaves the improved cutoff to
+ordinary neighborhoods until a better shared center arrives.
+A newer checked shared incumbent replaces the target before its query opens, or
+retires an already pending private query. Its replacement keeps the same containing
+allowance and original receiving conditions.
 The all-pinned rounded-root bootstrap serves a center without that handoff.
 Before a checked center exists, root repair can keep the ordinary
 pre-selection relaxation point for advisory centering and neighborhood order,

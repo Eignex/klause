@@ -12921,8 +12921,10 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveCallbacks {
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveImprovement {
 	public fun <init> (Lcom/eignex/klause/solver/Sample;Ljava/lang/String;JD)V
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Ljava/lang/String;JDZ)V
 	public final fun getElapsedMs ()J
 	public final fun getObjective ()D
+	public final fun getPrivateIncumbentReuse ()Z
 	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
 	public final fun getWorkerLabel ()Ljava/lang/String;
 }
