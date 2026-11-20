@@ -53,8 +53,10 @@ internal class IntegerConflictRow private constructor(
     fun withOwnedCoefficients(coefficients: Array<BigInt>, bound: BigInt,
         budget: ArithmeticLearningBudget?): IntegerConflictRow {
         require(coefficients.size == variables.size)
+        // Storage reuse must not expand the source-sized normalization grant.
+        budget?.spend(work = variables.size.toLong())
         val divisor = coefficientDivisor(coefficients, coefficients.size, budget)
-        budget?.spend(work = variables.size.toLong(), bytes = 64)
+        budget?.spend(work = variables.size.toLong(), bytes = maxOf(64L, variables.size.toLong() * 16))
         for (index in coefficients.indices) {
             require(coefficients[index] != BIG_ZERO)
             budget?.scalar(coefficients[index], divisor)

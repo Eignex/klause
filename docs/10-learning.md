@@ -431,7 +431,8 @@ every coefficient and needs no rounding retains its normalized row without rebui
 term storage.
 Coefficient reductions transfer their fresh coefficient array into the result and
 share the source row's immutable coordinate array. Source normalization still
-captures borrowed arrays before retaining them.
+captures borrowed arrays before retaining them. Both paths fund a conservative
+source-sized normalization allowance; storage reuse does not enlarge the derivation grant.
 
 Each combination must remain conflicting. A retained row must propagate against the
 session's historical domains at its first-UIP clause's native backjump and at the
