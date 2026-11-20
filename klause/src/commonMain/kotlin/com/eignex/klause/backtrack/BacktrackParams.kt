@@ -490,6 +490,8 @@ data class BacktrackParams(
     val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
     /** Apply reliable directional branching advice; false retains its observations, collection and comparison work. */
     val lpDirectionalAdvice: Boolean = true,
+    /** Admit derived integer rows; disabling keeps derivation and integer decision naming enabled. */
+    val integerRowAdmission: Boolean = true,
 ) : SolverParams {
     init {
         require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)
