@@ -25,6 +25,52 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `infeasible outcomes with missing or changed scope discard retained history`() {
+        for (change in listOf("missing", "mapping", "constant", "cutoff")) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val model = assertNotNull(trail.state.ownerWorkingModel())
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
+                0L, intArrayOf(0), IntArray(0))
+            val variable = VarRef.IntVar(0)
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = events::add)
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.branch(variable)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3L) else SearchDecision.IntAtMost(0, 2L), 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, 12.0)
+                }
+            }
+            hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
+            hints.beginNode(1, if (change == "cutoff") 99.0 else 100.0)
+            val changed = when (change) {
+                "missing" -> null
+                "mapping" -> LpRelaxation(model, intArrayOf(1), booleanArrayOf(false),
+                    0L, intArrayOf(0), IntArray(0))
+                "constant" -> LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
+                    1L, intArrayOf(0), IntArray(0))
+                else -> relaxation
+            }
+
+            hints.recordInfeasible(changed)
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+
+            assertTrue(hints.directionalScore(variable).isNaN())
+            assertEquals(1, events.count { it == "RESET" })
+            assertFalse("OUTCOME_INFEASIBLE" in events)
+        }
+    }
+
+    @Test
     fun `restart advice requires a fresh optimum with matching retained scope`() {
         for (change in listOf("none", "cutoff", "rows")) {
             val builder = LpBuilder()
@@ -247,7 +293,23 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            assertFalse(hints.hasDirectionalCandidates)
+            assertEquals(baseline, hints.pickVariable(baseline, 1e-9, { true }, { false }))
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(proposal)
+                hints.commit(SearchDecision.IntAtMost(1, 3L), 1)
+                hints.beginNode(1, 100.0)
+                hints.recordInfeasible(relaxation)
+                hints.finishNode(trail.state)
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
+            assertTrue(hints.hasDirectionalCandidates)
             assertEquals(sqrt(3.0), hints.directionalScore(proposal), 1e-9)
             val before = work
 
@@ -334,6 +396,19 @@ class LpHintsTest {
                         DoubleArray(0))
                     hints.recordObjective(relaxation, if (variable == baseline) 10.0 else 12.0)
                 }
+            }
+            if (variable != baseline) repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                hints.commit(when (variable) {
+                    is VarRef.Bool -> SearchDecision.Bool(variable.varId * 2 + 1)
+                    is VarRef.IntVar -> SearchDecision.IntAtMost(variable.varId, 0L)
+                }, 1)
+                hints.beginNode(1, 100.0)
+                hints.recordInfeasible(relaxation)
+                hints.finishNode(trail.state)
             }
         }
         hints.beginNode(0, 100.0)

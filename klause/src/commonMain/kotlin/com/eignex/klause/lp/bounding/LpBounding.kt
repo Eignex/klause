@@ -302,7 +302,7 @@ private fun LpEngine.foldSelectedCuts(
 
 private sealed interface LpCutOutcome {
     class Solved(val relaxation: LpRelaxation, val result: FloatLpResult) : LpCutOutcome
-    class Pruned(val explanation: IntArray?) : LpCutOutcome
+    class Pruned(val explanation: IntArray?, val relaxation: LpRelaxation) : LpCutOutcome
 }
 
 private fun LpEngine.solveSelectedCuts(
@@ -342,7 +342,7 @@ private fun LpEngine.solveSelectedCuts(
     sink.lp.observeInfeasiblePrune()
     observeCutRayUse(tightened, ray)
     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
-    return LpCutOutcome.Pruned(if (learn) learnedClause(tightened, ray, session, sink) else null)
+    return LpCutOutcome.Pruned(if (learn) learnedClause(tightened, ray, session, sink) else null, tightened)
 }
 
 private fun LpHintSink.recordPoint(relaxation: LpRelaxation, result: FloatLpResult) {
@@ -430,7 +430,7 @@ internal fun LpEngine.sparseSafePrune(
                     recordPruneBound(Double.POSITIVE_INFINITY)
                     sink.lp.observeInfeasiblePrune()
                     LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
-                    hints?.recordInfeasible()
+                    hints?.recordInfeasible(filter.relaxation)
                     val clause = if (learn) {
                         learnedClause(filter.relaxation, ray, session, sink)
                     } else {
@@ -501,7 +501,7 @@ internal fun LpEngine.sparseSafePrune(
             recordPruneBound(Double.POSITIVE_INFINITY)
             sink.lp.observeInfeasiblePrune()
             LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
-            hints?.recordInfeasible()
+            hints?.recordInfeasible(relaxation)
             // With learning, the Farkas ray becomes a bound-atom nogood for a 1UIP backjump;
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
             val clause = if (learn) learnedClause(relaxation, ray, session, sink) else null
@@ -537,7 +537,7 @@ internal fun LpEngine.sparseSafePrune(
         if (cancellation.pollStop()) return LpNodeOutcome(false, null)
         return when (outcome) {
             is LpCutOutcome.Pruned -> {
-                hints?.recordInfeasible()
+                hints?.recordInfeasible(outcome.relaxation)
                 LpNodeOutcome(true, null, outcome.explanation)
             }
             is LpCutOutcome.Solved -> {
@@ -553,7 +553,7 @@ internal fun LpEngine.sparseSafePrune(
     // tightened immutable relaxation.
     val cutOutcome = foldSelectedCuts(session, relaxation, result, cancellation, sink, learn)
     if (cutOutcome is LpCutOutcome.Pruned) {
-        hints?.recordInfeasible()
+        hints?.recordInfeasible(cutOutcome.relaxation)
         return LpNodeOutcome(true, null, cutOutcome.explanation)
     }
     val cutSolved = cutOutcome as LpCutOutcome.Solved
@@ -596,7 +596,7 @@ internal fun LpEngine.sparseSafePrune(
             val outcome = solveSelectedCuts(session, previous, selectedCuts, cancellation, sink, learn)
             when (outcome) {
                 is LpCutOutcome.Pruned -> {
-                    hints?.recordInfeasible()
+                    hints?.recordInfeasible(outcome.relaxation)
                     return LpNodeOutcome(true, null, outcome.explanation)
                 }
                 is LpCutOutcome.Solved -> {

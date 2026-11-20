@@ -375,8 +375,8 @@ remains available before admission. Leaving a finite cutoff clears the retained 
 Two recent samples
 in each direction permit the geometric mean of the predicted child gains; a zero
 gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
+scoring and the configured selector keep their precedence. Geometric scores supply
+numeric eligibility separately from reduced costs.
 Geometric scoring scales square roots before multiplication and charges the additional work.
 An underflowed positive score supplies no measured-zero reference.
 Each direction uses the lower of its latest two in-age normalized gains, so one
@@ -384,8 +384,20 @@ large observation cannot raise its estimate alone. The two gains must agree with
 a factor of two; disagreement withholds advice until passive observations stabilize.
 A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
-Replacing the ordinary LP variable requires reliable history for that reference
-as well, including measured zero gains, and a strictly greater predicted gain.
+Variable advice retains a separate two-observation LP termination history for each
+side of the committed split. An optimal solve with a usable gain records an open
+outcome; a verified LP
+infeasibility records an infeasible outcome without supplying a numerical gain.
+Missing or interrupted solves supply neither outcome. Each outcome ages separately.
+Both directions must have two agreeing recent outcomes, in addition to the two
+stable finite gains in each direction. A proposal with positive gains in both
+directions can replace the ordinary variable only when it has more repeatedly
+infeasible directions. The ordinary reference must meet the same numeric and outcome
+requirements; two observed open outcomes in each direction supply its measured zero.
+No outcome is a pruning authority at another node. A coarse recent stamp skips
+production candidate selection until one direction has two verified infeasible
+outcomes. Its variables still need their own complete numeric and outcome records;
+this prerequisite supplies no score and resets with the history.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that

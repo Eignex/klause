@@ -11,6 +11,95 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `infeasible outcomes retain numeric gains without manufacturing a sample`() {
+        for (samples in listOf(1, 2)) {
+            val events = ArrayList<String>()
+            val history = LpDirectionalHistory(events::add)
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(samples) {
+                for (literal in listOf(0, 1)) {
+                    history.commit(SearchDecision.Bool(literal), 1)
+                    history.beginNode(1)
+                    history.record(12.0)
+                }
+            }
+            repeat(2) { observation ->
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.infeasible(verified = true)
+                if (observation == 0) {
+                    assertFalse(history.hasInfeasibleHistory)
+                    assertTrue(history.infeasibleDirections(variable, 0.5).isNaN())
+                }
+                history.finishNode()
+            }
+
+            assertTrue(history.hasInfeasibleHistory)
+            if (samples == 2) {
+                assertEquals(2.0, history.score(variable, 0.5), 1e-9)
+                assertEquals(1.0, history.infeasibleDirections(variable, 0.5))
+            } else {
+                assertTrue(history.score(variable, 0.5).isNaN())
+                assertTrue(history.infeasibleDirections(variable, 0.5).isNaN())
+            }
+            assertEquals(samples, events.count { it == "DOWN" })
+            assertEquals(samples, events.count { it == "UP" })
+            assertEquals(2, events.count { it == "OUTCOME_INFEASIBLE" })
+        }
+    }
+
+    @Test
+    fun `unverified and abandoned children cannot supply infeasible outcomes`() {
+        for (action in listOf("unverified", "finish", "restart", "depth")) {
+            val events = ArrayList<String>()
+            val history = LpDirectionalHistory(events::add)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            history.commit(SearchDecision.Bool(1), 1)
+            history.beginNode(1)
+            when (action) {
+                "unverified" -> history.infeasible()
+                "finish" -> history.finishNode()
+                "restart" -> history.restart()
+                "depth" -> history.beginNode(2)
+            }
+
+            history.infeasible(verified = true)
+
+            assertFalse("OUTCOME_INFEASIBLE" in events)
+        }
+    }
+
+    @Test
+    fun `reset while outcome bookkeeping is charged discards the observation`() {
+        var recording = false
+        val events = ArrayList<String>()
+        lateinit var history: LpDirectionalHistory
+        history = LpDirectionalHistory(events::add, charge = {
+            if (recording) {
+                recording = false
+                history.clear()
+            }
+        })
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        history.commit(SearchDecision.Bool(1), 1)
+        history.beginNode(1)
+        recording = true
+
+        history.infeasible(verified = true)
+
+        assertEquals(0, history.retainedEntries)
+        assertFalse("OUTCOME_INFEASIBLE" in events)
+    }
+
+
+    @Test
     fun `restart retains samples but discards ancestor and pending child attribution`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add)

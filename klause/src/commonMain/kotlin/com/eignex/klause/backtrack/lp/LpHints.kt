@@ -127,9 +127,22 @@ internal class LpHints(
         return true
     }
 
-    override fun recordInfeasible() {
+    override fun recordInfeasible(relaxation: LpRelaxation?) {
         clearPassivePoint()
-        history.infeasible()
+        if (!collect || !cutoff.isFinite() || scopeModel == null) return
+        val state = relaxation?.model?.exactState
+        val model = scopeModel
+        val rows = scopeRows
+        val bound = cutoff
+        charge(5L)
+        val difference = if (state == null) "INCOMPATIBLE_MISSING_SCOPE" else scopeDifference(relaxation, state)
+        if (difference != null) {
+            reportScopeDifference(difference)
+            resetHistory()
+            return
+        }
+        if (scopeModel !== model || scopeRows !== rows || cutoff != bound) return
+        history.infeasible(verified = true)
     }
 
     fun finishNode(state: LpExactState? = null) {
@@ -184,7 +197,7 @@ internal class LpHints(
     private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
         history.hasReliableHistory && passivePointCurrent()
 
-    val hasDirectionalCandidates: Boolean get() = hasDirectionalScore()
+    val hasDirectionalCandidates: Boolean get() = hasDirectionalScore() && history.hasInfeasibleHistory
 
     private fun readyDirectionalScore(variable: VarRef): Double {
         charge(1L)
@@ -225,7 +238,7 @@ internal class LpHints(
                 stamp == solveStamp && passivePointCurrent()
         }
         charge(1L)
-        val reference = history.estimate(baseline, value(baseline))
+        val reference = history.infeasibleDirections(baseline, value(baseline))
         if (!current()) return baseline.also { selected(null) }
         if (!reference.isFinite()) {
             observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
@@ -235,7 +248,8 @@ internal class LpHints(
         var bestScore = minimumScore
         history.forEachCandidate(current) { variable ->
             if (available(variable)) {
-                val score = readyDirectionalScore(variable)
+                val score = if (readyDirectionalScore(variable).isFinite())
+                    history.infeasibleDirections(variable, value(variable)) else Double.NaN
                 val previous = proposal
                 val precedes = previous != null && if ((variable is VarRef.Bool) == (previous is VarRef.Bool))
                     variable.varId < previous.varId else variable is VarRef.Bool
@@ -272,10 +286,12 @@ internal class LpHints(
             fresh = current,
             reliable = {
                 charge(2L)
-                val gain = history.score(proposal, proposed.point)
-                val baselineGain = if (proposal == baseline) gain else history.estimate(baseline, reference.point)
+                val numeric = history.score(proposal, proposed.point)
+                val gain = history.infeasibleDirections(proposal, proposed.point)
+                val baselineGain = if (proposal == baseline) gain
+                else history.infeasibleDirections(baseline, reference.point)
                 if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
-                history.hasReliableHistory && gain.isFinite() && baselineGain.isFinite() &&
+                history.hasReliableHistory && numeric.isFinite() && gain.isFinite() && baselineGain.isFinite() &&
                     (proposal == baseline || gain > baselineGain)
             })
         if (choice.nominatedVariable != null && !current()) {

@@ -11,7 +11,16 @@ internal class LpDirectionalHistory(
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
 ) {
+    private class Outcome {
+        var count = 0
+        var latest = false
+        var previous = false
+        var stamp = 0L
+        var previousStamp = 0L
+    }
+
     private class Direction {
+        val outcome = Outcome()
         var count = 0
         var latest = 0.0
         var previous = 0.0
@@ -37,12 +46,14 @@ internal class LpDirectionalHistory(
     private var parentCount = 0
     private var parentLimit = 0
     private var pending: Pending? = null
+    private var pendingOutcome: Pending? = null
     private var stamp = 0L
     private var depth = 0
     private var objective = Double.NaN
     private var reliableStamp = -1L
     private var valueStamp = -1L
     private var collectionStamp = -1L
+    private var infeasibleStamp = -1L
     private var observed = false
 
     fun beginNode(level: Int) {
@@ -50,6 +61,7 @@ internal class LpDirectionalHistory(
         depth = level
         objective = Double.NaN
         if (pending?.depth != level) pending = null
+        if (pendingOutcome?.depth != level) pendingOutcome = null
     }
 
     val retainedEntries: Int get() = gains.size + parentCount
@@ -60,12 +72,15 @@ internal class LpDirectionalHistory(
 
     val hasCollectionHistory: Boolean get() = collectionStamp >= 0L && stamp - collectionStamp <= maxAge
 
+    val hasInfeasibleHistory: Boolean get() = infeasibleStamp >= 0L && stamp - infeasibleStamp <= maxAge
+
     val hasObservations: Boolean get() = observed
 
     fun restart() {
         charge(3L)
         trimParents(0)
         pending = null
+        pendingOutcome = null
         objective = Double.NaN
         observe("RESTART")
         if (gains.isNotEmpty()) {
@@ -83,10 +98,12 @@ internal class LpDirectionalHistory(
         gains.clear()
         trimParents(0)
         pending = null
+        pendingOutcome = null
         objective = Double.NaN
         reliableStamp = -1L
         valueStamp = -1L
         collectionStamp = -1L
+        infeasibleStamp = -1L
         observed = false
         if (report) observe("RESET")
     }
@@ -98,9 +115,13 @@ internal class LpDirectionalHistory(
         val gain = value - child.parent.objective
         val normalized = gain / child.distance
         if (!gain.isFinite() || gain < 0.0 || !normalized.isFinite()) {
+            pendingOutcome = null
             observe("UNUSABLE")
             return
         }
+        val version = generation
+        recordOutcome(false)
+        if (version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
         expire(history.up)
@@ -197,6 +218,7 @@ internal class LpDirectionalHistory(
         charge(8L)
         trimParents(level)
         pending = null
+        pendingOutcome = null
         val parent = parents?.getOrNull(level - 1) ?: return
         val floor = floor(parent.value)
         val up = when (decision) {
@@ -219,17 +241,59 @@ internal class LpDirectionalHistory(
         val distance = if (up) floor + 1.0 - parent.value else parent.value - floor
         if (distance <= DISTANCE_TOL || distance >= 1.0 - DISTANCE_TOL) return
         pending = Pending(parent, up, distance, level)
+        pendingOutcome = pending
     }
 
-    fun infeasible() {
+    fun infeasible(verified: Boolean = false) {
+        if (verified) recordOutcome(true) else pendingOutcome = null
         if (pending != null) observe("INFEASIBLE")
         pending = null
     }
 
     fun finishNode() {
+        pendingOutcome = null
         if (pending != null) observe("MISSING")
         pending = null
     }
+
+    private fun recordOutcome(infeasible: Boolean) {
+        val child = pendingOutcome ?: return
+        pendingOutcome = null
+        val version = generation
+        charge(8L)
+        if (version != generation) return
+        val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
+        val outcome = (if (child.up) history.up else history.down).outcome
+        if (outcome.count > 0 && stamp - outcome.stamp > maxAge) outcome.count = 0
+        else if (outcome.count >= RELIABILITY && stamp - outcome.previousStamp > maxAge) outcome.count = 1
+        outcome.previous = outcome.latest
+        outcome.previousStamp = outcome.stamp
+        outcome.latest = infeasible
+        outcome.stamp = stamp
+        outcome.count = minOf(RELIABILITY, outcome.count + 1)
+        if (infeasible && outcome.count >= RELIABILITY && outcome.previous) {
+            charge(1L)
+            if (version != generation) return
+            infeasibleStamp = maxOf(infeasibleStamp, outcome.previousStamp)
+            observe("OUTCOME_INFEASIBLE_READY")
+        }
+        observe(if (infeasible) "OUTCOME_INFEASIBLE" else "OUTCOME_OPTIMAL")
+    }
+
+    fun infeasibleDirections(variable: VarRef, value: Double): Double {
+        val history = reliable(variable, value) ?: return Double.NaN
+        val version = generation
+        charge(8L)
+        if (version != generation) return Double.NaN
+        val down = outcomeEstimate(history.down.outcome)
+        val up = outcomeEstimate(history.up.outcome)
+        return down + up
+    }
+
+    private fun outcomeEstimate(outcome: Outcome): Double =
+        if (outcome.count < RELIABILITY || stamp - outcome.previousStamp > maxAge ||
+            outcome.latest != outcome.previous
+        ) Double.NaN else if (outcome.latest) 1.0 else 0.0
 
     fun score(variable: VarRef, value: Double): Double = estimate(variable, value)
         .takeIf { it > 0.0 } ?: Double.NaN

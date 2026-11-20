@@ -356,6 +356,7 @@ class LpBoundingTest : RuntimeInitializedTest() {
         var points = 0
         var objectives = 0
         var infeasible = 0
+        var infeasibleScope: LpRelaxation? = null
         val hints = object : LpHintSink {
             override fun clear() = Unit
 
@@ -367,8 +368,9 @@ class LpBoundingTest : RuntimeInitializedTest() {
                 objectives++
             }
 
-            override fun recordInfeasible() {
+            override fun recordInfeasible(relaxation: LpRelaxation?) {
                 infeasible++
+                infeasibleScope = relaxation
             }
         }
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
@@ -382,6 +384,7 @@ class LpBoundingTest : RuntimeInitializedTest() {
 
             assertTrue(outcome.prune)
             assertEquals(1, infeasible)
+            assertNotNull(assertNotNull(infeasibleScope).model.exactState)
             assertEquals(0, points)
             assertEquals(0, objectives)
         }

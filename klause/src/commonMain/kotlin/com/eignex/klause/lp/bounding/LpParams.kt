@@ -43,7 +43,7 @@ internal interface LpHintSink {
     /** Advisory floating optimum in minimized working units; supplies no certified bound. */
     fun recordObjective(relaxation: LpRelaxation, objective: Double) {}
 
-    fun recordInfeasible() {}
+    fun recordInfeasible(relaxation: LpRelaxation? = null) {}
 
     /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)

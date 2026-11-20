@@ -324,7 +324,9 @@ One integer or disjunction leaf cannot refute its sibling branches.
 The bounding callback passes the final node relaxation's primal and dual point to
 finite search hints after cut re-solves. Only an optimal result supplies an
 objective sample; an unfinished cut solve keeps the preceding point, and cancellation
-withholds publication. [Finite guidance](09-search.md#finite-lp-directional-guidance)
+withholds publication. Verified infeasibility callbacks carry the relaxation whose
+ray was checked, including cut re-solves, so finite history can validate its source
+scope without inventing an optimum. [Finite guidance](09-search.md#finite-lp-directional-guidance)
 owns selection and history lifetime.
 
 An exact state appending one bound copies only the changed side; tightening can
