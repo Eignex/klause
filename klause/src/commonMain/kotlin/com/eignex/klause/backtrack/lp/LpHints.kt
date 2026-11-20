@@ -34,7 +34,7 @@ internal class LpHints(
     private val history = LpDirectionalHistory(observe, charge = charge)
     private val passiveChoice = if (collect) LpPassiveVariableChoice(false, observe, charge) else null
     private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
-    private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
+    private val passiveCollection = if (collect) LpPassiveCollection(observe, charge, requirePruning = true) else null
     private var passivePoint: LpRelaxation? = null
     private var passiveState: LpExactState? = null
     private var freshRecord = false
@@ -283,7 +283,7 @@ internal class LpHints(
         values.clear()
         collection.clear()
         val valueReady = cutoff.isFinite() && history.hasPruningHistory
-        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
+        val collectReady = cutoff.isFinite() && collection.available && history.hasPruningCollectionHistory
         if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
         ) return alternatives

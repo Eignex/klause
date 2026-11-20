@@ -51,7 +51,7 @@ class LpHintsTest {
             hints.recordOutcome(true)
             hints.finishNode(trail.state)
 
-            assertEquals(if (bound.isFinite()) 9L else 0L, work - sampled)
+            assertEquals(if (bound.isFinite()) 11L else 0L, work - sampled)
             assertEquals(if (bound.isFinite()) 1 else 0, events.count { it == "PRUNING_SAMPLE_PRUNED" })
             assertEquals(if (bound.isFinite()) 1 else 0, events.count { it == "DOWN" })
         }

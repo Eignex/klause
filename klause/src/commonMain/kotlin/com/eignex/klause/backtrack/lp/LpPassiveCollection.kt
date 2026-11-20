@@ -9,6 +9,7 @@ internal class LpPassiveCollection(
     private val charge: (Long) -> Unit,
     maxChecks: Int = 128,
     maxSelections: Int = 32,
+    private val requirePruning: Boolean = false,
 ) {
     private var remainingChecks = maxChecks
     private var remainingSelections = maxSelections
@@ -42,7 +43,7 @@ internal class LpPassiveCollection(
         charge(16L)
         observe("PASSIVE_COLLECTION_CHECK")
         if (!fresh()) return alternatives.also { observe("PASSIVE_COLLECTION_STALE") }
-        val preferUp = history.preferUnderObservedDirection(variable, point)
+        val preferUp = history.preferUnderObservedDirection(variable, point, requirePruning)
             ?: return alternatives.also { observe("PASSIVE_COLLECTION_NO_PROPOSAL") }
         val down: SearchDecision
         val up: SearchDecision

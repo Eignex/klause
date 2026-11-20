@@ -11,6 +11,52 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `pruning collection requires two known pruning outcomes on the sampled side`() {
+        for (outcome in listOf<Boolean?>(true, false, null)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.record(12.0)
+                history.finishNode(outcome)
+            }
+
+            val preferred = history.preferUnderObservedDirection(variable, 0.5, requirePruning = true)
+
+            assertEquals(if (outcome == true) true else null, preferred)
+            assertEquals(outcome == true, history.hasPruningCollectionHistory)
+            assertFalse(history.hasReliableHistory)
+        }
+    }
+
+    @Test
+    fun `pruning collection evidence expires and clears with its numeric support`() {
+        for (invalidated in listOf("age", "clear")) {
+            val history = LpDirectionalHistory({}, maxAge = 4L)
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.record(12.0)
+                history.finishNode(true)
+            }
+            if (invalidated == "clear") history.clear() else repeat(5) { history.beginNode(0) }
+
+            val preferred = history.preferUnderObservedDirection(variable, 0.5, requirePruning = true)
+
+            assertNull(preferred)
+            assertFalse(history.hasPruningCollectionHistory)
+        }
+    }
+
+    @Test
     fun `skipped outcomes cannot become completed pruning evidence`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)

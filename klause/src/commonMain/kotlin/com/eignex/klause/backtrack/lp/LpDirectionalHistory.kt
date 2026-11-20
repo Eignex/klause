@@ -45,6 +45,7 @@ internal class LpDirectionalHistory(
     private var pruningStamp = -1L
     private var valueStamp = -1L
     private var collectionStamp = -1L
+    private var pruningCollectionStamp = -1L
     private var observed = false
 
     fun beginNode(level: Int) {
@@ -64,6 +65,8 @@ internal class LpDirectionalHistory(
     val hasValueHistory: Boolean get() = valueStamp >= 0L && stamp - valueStamp <= maxAge
 
     val hasCollectionHistory: Boolean get() = collectionStamp >= 0L && stamp - collectionStamp <= maxAge
+
+    val hasPruningCollectionHistory: Boolean get() = pruningCollectionStamp >= 0L && stamp - pruningCollectionStamp <= maxAge
 
     val hasObservations: Boolean get() = observed
 
@@ -93,6 +96,7 @@ internal class LpDirectionalHistory(
         pruningStamp = -1L
         valueStamp = -1L
         collectionStamp = -1L
+        pruningCollectionStamp = -1L
         observed = false
         if (report) observe("RESET")
     }
@@ -229,6 +233,15 @@ internal class LpDirectionalHistory(
             false -> "PRUNING_SAMPLE_OPEN"
             null -> "PRUNING_SAMPLE_UNKNOWN"
         })
+        if (history.down.count != history.up.count) {
+            val majority = if (history.down.count > history.up.count) history.down else history.up
+            val minority = if (majority === history.down) history.up else history.down
+            charge(2L)
+            if (majority.stable && majority.gain > 0.0 && majority.pruning == 1) {
+                val minorityStamp = if (minority.count > 0) minority.stamp else majority.previousStamp
+                pruningCollectionStamp = maxOf(pruningCollectionStamp, minOf(majority.previousStamp, minorityStamp))
+            }
+        }
         val down = history.down.pruning
         val up = history.up.pruning
         if (history.down.stable && history.up.stable && down != null && up != null) {
@@ -298,7 +311,7 @@ internal class LpDirectionalHistory(
         return history
     }
 
-    fun preferUnderObservedDirection(variable: VarRef, value: Double): Boolean? {
+    fun preferUnderObservedDirection(variable: VarRef, value: Double, requirePruning: Boolean = false): Boolean? {
         if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
         val history = gains[variable] ?: return null
         expire(history.down)
@@ -308,7 +321,7 @@ internal class LpDirectionalHistory(
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
-        if (!sampledDirection.stable) return null
+        if (!sampledDirection.stable || (requirePruning && sampledDirection.pruning != 1)) return null
         if (sampledDirection.gain <= 0.0) {
             observe("PASSIVE_COLLECTION_ZERO_GAIN")
             return null
