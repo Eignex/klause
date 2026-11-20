@@ -44,6 +44,7 @@ internal class PreparedSourceRow(
 internal data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),
     val sourceBranches: List<SourceBoundAtom> = emptyList(),
+    val assertedSourceBranchCount: Int = 0,
     val retainedReduction: ExactLiraReduction.Bounded? = null,
     val reducedBranches: List<IntegerBranch> = emptyList(),
     val rowAssertions: Map<RowAddress, RegisteredTheoryDecision> = emptyMap(),
