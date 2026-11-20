@@ -510,6 +510,7 @@ Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI rec
 and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
 Recordings capture up to 128 stack frames. Clock-conversion summaries retain up to
 32 frames per sampled caller chain and mark capture truncation.
+Class-loading events retain triggering callers for cold class-footprint diagnosis.
 Summary generation runs in the bench process after CLI exit, outside the subprocess
 `elapsedMs` and GNU time metrics and inside the containing case and job allowances.
 These instrumented captures support attribution; use separate uninstrumented controls
