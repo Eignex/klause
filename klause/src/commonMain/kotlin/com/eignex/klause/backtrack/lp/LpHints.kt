@@ -32,8 +32,8 @@ internal class LpHints(
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
-    private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
-    private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
+    private var passiveValues: LpPassiveValueChoice? = null
+    private var passiveCollection: LpPassiveCollection? = null
     private var passivePoint: LpRelaxation? = null
     private var passiveState: LpExactState? = null
     private var freshRecord = false
@@ -53,15 +53,24 @@ internal class LpHints(
 
     fun beginNode(depth: Int, bound: Double) {
         nodeStamp++
+        val version = nodeStamp
         pruningOutcome = null
         pruningScope = null
         clearPassivePoint()
         if (scopeModel != null) charge(1L)
+        if (version != nodeStamp) return
         cutoff = bound
         freshRecord = false
         objectiveRecorded = false
-        if (collect && bound.isFinite()) history.beginNode(depth)
-        else if (scopeModel != null) resetHistory()
+        if (collect && bound.isFinite()) {
+            if (passiveValues == null) {
+                charge(16L)
+                if (version != nodeStamp) return
+                passiveValues = LpPassiveValueChoice(applyAdvice, observe, charge)
+                passiveCollection = LpPassiveCollection(observe, charge)
+            }
+            history.beginNode(depth)
+        } else if (scopeModel != null) resetHistory()
     }
 
     override fun recordObjective(relaxation: LpRelaxation, objective: Double) {

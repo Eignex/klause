@@ -15,6 +15,51 @@ import kotlin.test.assertTrue
 
 class LpHintsCollectionTest {
     @Test
+    fun `finite readmission cannot renew exhausted collection limits`() {
+        for (apply in listOf(false, true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply, observe = events::add)
+            val variable = VarRef.IntVar(0)
+            val down = SearchDecision.IntAtMost(0, 2)
+            val up = SearchDecision.IntAtLeast(0, 3)
+            for (readmission in listOf(false, true)) {
+                repeat(2) {
+                    hints.beginNode(0, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                    hints.recordObjective(relaxation, 10.0)
+                    hints.branch(variable)
+                    hints.commit(down, 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, 11.0)
+                    hints.finishNode(trail.state)
+                }
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                if (!readmission) repeat(32) {
+                    val ordered = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
+                    assertEquals(listOf(up, down), ordered)
+                    hints.commit(ordered.first(), 1)
+                }
+
+                val ordered = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
+                hints.commit(ordered.first(), 1)
+
+                assertEquals(listOf(down, up), ordered)
+                assertEquals(32, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
+                hints.beginNode(0, Double.POSITIVE_INFINITY)
+            }
+        }
+    }
+
+    @Test
     fun `nonfinite cutoffs retain ordinary LP guidance without training history`() {
         for (bound in listOf(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NaN)) {
             val builder = LpBuilder()

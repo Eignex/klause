@@ -371,7 +371,9 @@ subtraction, preserving small gains when the constant exceeds floating precision
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with resolved LP bounding and branching enabled. History
 and passive point retention start at a finite incumbent cutoff; ordinary LP guidance
-remains available before admission. Leaving a finite cutoff clears the retained history.
+remains available before admission. Child-choice and collection owners initialize
+once at the first finite cutoff. Leaving a finite cutoff clears retained history
+without renewing those owners or their invocation-wide collection limits.
 The ordinary reduced-cost/fractionality score and configured selector choose the
 variable. Directional history retains no variable-candidate index or variable
 nomination. Historical observations order only the selected variable's adjacent children. Each direction
