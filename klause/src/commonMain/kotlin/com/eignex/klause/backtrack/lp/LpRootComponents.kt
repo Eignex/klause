@@ -63,6 +63,11 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
     if (!order.offered) {
         order.offered = true
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "COMPONENT_PICK_OFFERED", 0L)
+        if (automaticSparseTrial && !targets.auxiliary && targets.knownColumns == null &&
+            targets.intColumns.getOrNull(variable)?.let { targets.coordinates.getOrNull(it)?.isFinite() } == true
+        ) {
+            sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "SOURCE_ROOT_COMPONENT_PICK_OFFERED", 0L)
+        }
     }
     return VarRef.IntVar(variable)
 }

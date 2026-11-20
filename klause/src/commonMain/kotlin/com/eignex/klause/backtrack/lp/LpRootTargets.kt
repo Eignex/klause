@@ -70,6 +70,11 @@ private fun LpEngine.observeRootValuePreference(
     if (!saved && targets != null && !targets.valueOrderOffered) {
         targets.valueOrderOffered = true
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "VALUE_ORDER_OFFERED", 0L)
+        if (automaticSparseTrial && targets === rootPrimalTargets && !targets.auxiliary &&
+            targets.knownColumns == null
+        ) {
+            sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "SOURCE_ROOT_VALUE_ORDER_OFFERED", 0L)
+        }
         if (targets.auxiliary) {
             sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "AUXILIARY_ROOT_VALUE_ORDER_OFFERED", 0L)
         }

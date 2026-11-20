@@ -1463,8 +1463,15 @@ internal class ResumableMinimize(
             }
         }
         val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
-        val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
+        var pointHandedOff = false
+        val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial,
+            handoffRootPoint = {
+                pointHandedOff = lpEngine.automaticSparseTrial && !lpEngine.params.lpPlan.componentOwnership &&
+                    handoffRootTargets(rootToken)
+                pointHandedOff
+            }, accept = ::accept)
         lpEngine.continuedRootLowerBound?.let(::publishRootLpBound)
+        if (pointHandedOff) return installed
         if (handoffSparseRootBound(afterQuery = true)) return installed
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null

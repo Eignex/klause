@@ -460,6 +460,125 @@ class ResumableMinimizeGuidanceTest {
     }
 
     @Test
+    fun `completed automatic root points reach search before private pinning`() {
+        for (mode in listOf("automatic", "explicit", "zero-decisions", "no-branching")) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+                settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            var queries = 0
+            var firstCompletionQuery: Int? = null
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                    return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                        private var pausedWork = 0L
+                        override val currentWork: Long get() = pausedWork + delegate.lastMetrics.workOps
+                        override val lastMetrics: LpSolveMetrics get() =
+                            delegate.lastMetrics.copy(workOps = currentWork)
+                        override fun openSolve(
+                            allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                        ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                            queries++
+                            repeat(2) {
+                                pausedWork += 5_000L * LP_WORK_PER_NODE
+                                pauseAt(pausedWork)
+                            }
+                            delegate.resolveBounds(allowance).also {
+                                if (it?.optimal == true && firstCompletionQuery == null) firstCompletionQuery = queries
+                            }
+                        }
+                    }
+                }
+            }
+            val params = BacktrackParams(maxDecisions = if (mode == "zero-decisions") 0L else 16L,
+                variableSelector = InputOrder, valueSelector = IndomainMax,
+                lpConfig = if (mode == "explicit") LpConfig.parse("default,+sparse-trial") else LpConfig.AUTO,
+                lpPlan = LpPlan(rootCutHarvest = false, branching = mode != "no-branching"))
+            val offered = ArrayList<Sample>()
+            val stopAtWitness = ExecutionControl { offered.isNotEmpty() }
+            BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+                repeat(6) {
+                    search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+                }
+
+                assertEquals(listOf(1L, 0L), offered.single().ints.toList(), mode)
+                val handoff = search.stats.lp.phases["PRIMAL_ROUNDING_ROOT"]?.outcomes?.get("SEARCH_HANDOFF")
+                assertEquals(if (mode == "automatic") 1L else null, handoff, mode)
+                assertEquals(1, firstCompletionQuery, mode)
+                if (mode == "automatic") {
+                    assertNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
+                    assertEquals(1L, search.stats.lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
+                        ?.outcomes?.get("VALUE_ORDER_OFFERED"))
+                    assertEquals(1L, search.stats.lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
+                        ?.outcomes?.get("SOURCE_ROOT_VALUE_ORDER_OFFERED"))
+                } else assertNotNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"], mode)
+            }
+        }
+    }
+
+    @Test
+    fun `completed automatic root points preserve a prepared private component trial`() {
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(3, 4), LinearOp.GE, 1),
+        ), settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2))
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    private var pausedWork = 0L
+                    override val currentWork: Long get() = pausedWork + delegate.lastMetrics.workOps
+                    override val lastMetrics: LpSolveMetrics get() = delegate.lastMetrics.copy(workOps = currentWork)
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        queries++
+                        repeat(2) {
+                            pausedWork += 5_000L * LP_WORK_PER_NODE
+                            pauseAt(pausedWork)
+                        }
+                        delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+        val params = BacktrackParams(maxDecisions = 16L, variableSelector = InputOrder,
+            valueSelector = IndomainMax, lpConfig = LpConfig.AUTO,
+            lpPlan = LpPlan(rootCutHarvest = false, boundMaxDepth = -1))
+        val offered = ArrayList<Sample>()
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            repeat(6) {
+                search.runSlice(ExecutionControl { offered.isNotEmpty() }, Long.MAX_VALUE, 5_000L) {
+                    offered += it.sample
+                }
+            }
+
+            val sample = offered.single()
+            assertTrue(sample.ints.all { it in 0L..1L } &&
+                listOf(0 to 1, 1 to 2, 0 to 2, 3 to 4).all { (left, right) ->
+                    sample.ints[left] + sample.ints[right] >= 1L
+                })
+            assertEquals(1, queries)
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_COMPONENT_ROUNDING_ROOT"]
+                ?.outcomes?.get("HANDOFF_TRIAL_PREPARED"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_CP_GUIDANCE_ROOT"]?.outcomes?.get("REUSED"))
+        }
+    }
+
+    @Test
     fun `paused root queries finish before the worker starts discrete traversal`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),

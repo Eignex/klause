@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
@@ -15,6 +17,7 @@ import com.eignex.klause.lp.engine.LpProjectionMeter
 import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
@@ -29,6 +32,50 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpRootComponentsTest {
+    @Test
+    fun `source point consumers exclude auxiliary masked and unavailable coordinates`() {
+        for (mode in listOf("finite", "auxiliary", "masked", "unmapped", "nonfinite", "saved")) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            ), settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+            val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
+            val sink = SolveStatsSink("source-point-consumers")
+            LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO), sink,
+                nodeWorkAllowance = { 1_000_000L }).use { engine ->
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+                assertTrue(engine.automaticSparseTrial)
+                val source = assertNotNull(engine.rootRoundingWarmStart).relaxation
+                val relaxation = if (mode == "unmapped") LpRelaxation(source.model, source.colVarId,
+                    source.colIsBool, source.objectiveConstant, IntArray(4) { -1 }, source.boolColOf) else source
+                val coordinates = DoubleArray(relaxation.model.n) { if (mode == "nonfinite") Double.NaN else 0.1 }
+                engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+                    primal = coordinates, knownColumns = if (mode == "masked") BooleanArray(coordinates.size) { true }
+                    else null, sourceProblem = problem, auxiliaryPoint = mode == "auxiliary")
+                assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
+                val session = PropagationSession(problem)
+
+                assertNotNull(engine.pickRootComponent(session, ExecutionControl.Never))
+                if (mode == "saved") {
+                    session.pinInt(0, 1)
+                    session.pinInt(2, 1)
+                    engine.pickRootComponent(session, ExecutionControl.Never)
+                }
+                val values = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(1L, 0L)).toList()
+
+                val phases = sink.snapshot().lp.phases
+                assertEquals(1L, phases["PRIMAL_COMPONENT_ORDER_ROOT"]?.outcomes?.get("COMPONENT_PICK_OFFERED"), mode)
+                assertEquals(if (mode == "finite" || mode == "saved") 1L else null,
+                    phases["PRIMAL_COMPONENT_ORDER_ROOT"]?.outcomes?.get("SOURCE_ROOT_COMPONENT_PICK_OFFERED"), mode)
+                assertEquals(if (mode == "finite") 1L else null,
+                    phases["PRIMAL_VALUE_GUIDANCE_ROOT"]?.outcomes?.get("SOURCE_ROOT_VALUE_ORDER_OFFERED"), mode)
+                assertEquals(if (mode in listOf("unmapped", "nonfinite", "saved")) listOf(1L, 0L) else listOf(0L, 1L),
+                    values, mode)
+            }
+        }
+    }
+
     @Test
     fun `completed component values survive a restart without another numerical query`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(

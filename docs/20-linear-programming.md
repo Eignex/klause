@@ -411,8 +411,12 @@ handoff. This scheduling hint supplies no point or certificate and spends the ex
 caller slices and cumulative root grant. Replacing the root owner or warm start clears it.
 The handoff retires the unfinished cursor and skips further root consultations for
 that search binding; the accepted global bound remains available.
-Completed-point rounding, component-owned plans and workers without a decision
-allowance keep their existing root consultation paths.
+When an automatic query completes a full source-root point during a consultation,
+the same sliced finite worker can transfer it through the ordinary target handoff
+before starting private pinning. Target retention and the component-trial hook retain
+their storage, work and cancellation checks; refusal continues private rounding.
+Auxiliary or masked points, resumed pinning, explicit trials, component-owned plans
+and workers without a decision allowance keep their existing consultation paths.
 
 Sparse-trial preparation is capped at eight million modeled work units; root LP
 funding cooperatively limits reported `LpWork` to 150 million units or the containing

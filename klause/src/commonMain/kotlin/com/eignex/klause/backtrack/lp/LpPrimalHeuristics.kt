@@ -42,6 +42,7 @@ internal fun LpEngine.lpRoundingProbe(
     objective: LinearObjective,
     cancellation: ExecutionControl,
     initial: Sample? = null,
+    handoffRootPoint: () -> Boolean = { false },
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
     requireOpen()
@@ -63,8 +64,8 @@ internal fun LpEngine.lpRoundingProbe(
         retainRootPartialPrimalGuidance(pending.relaxation, cancellation)
     }
     val retained = rootRoundingWarmStart
-    val resumed = retained?.pinning
-    val session = resumed ?: PropagationSession(problem, cancellation)
+    var resumed = retained?.pinning
+    var session = resumed ?: PropagationSession(problem, cancellation)
     var previousWork = if (resumed == null) 0L else session.work
     var keepPinning = resumed != null
     try {
@@ -118,6 +119,30 @@ internal fun LpEngine.lpRoundingProbe(
         val guidance = rootRoundingWarmStart?.takeIf {
             problem.numRealVars == 0 && it.objective === objective &&
                 it.relaxation === relaxation && it.primal === primal
+        }
+        if (retained?.primal == null && resumed == null && guidance != null &&
+            guidance.knownColumns == null && !guidance.auxiliaryPoint &&
+            guidance.sourceProblem === problem && ownsRootPrimalModel(relaxation.model) &&
+            !cancellation()
+        ) {
+            if (handoffRootPoint()) {
+                outcome = "SEARCH_HANDOFF"
+                return null
+            }
+            val prepared = guidance.pinning?.takeIf { rootRoundingWarmStart === guidance }
+            if (prepared != null && prepared !== session) {
+                val unused = session
+                val unusedPreviousWork = previousWork
+                session = prepared
+                previousWork = prepared.work
+                resumed = prepared
+                keepPinning = true
+                try {
+                    unused.releaseRetainedState()
+                } finally {
+                    primalPropagationWork += unused.work - unusedPreviousWork
+                }
+            }
         }
         guidance?.pinning = session
         if (resumed != null) {
