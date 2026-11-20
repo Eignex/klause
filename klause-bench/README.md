@@ -103,6 +103,12 @@ records the bounded joint journal under ordinary source defaults, including auto
 incumbent reuse where the source admits it. This observer does not select explicit
 completion or change admission, scheduling, companion limits or cutoff accounting.
 Observation costs remain in the containing execution and the existing producer grant.
+The joint journal records actual private integer pass centers, root and phase before
+ordinary fallback, including bounded support and the edge at a structural decline.
+Prepared row ordinals follow non-singleton source-premise rows; columns put integers
+before reals. Real-center values are approximate guidance with an explicit completeness
+flag, so they do not establish a witness or exact mixed-row slack. Selection metadata
+shares the existing journal entry, byte, record and source-funding caps.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs

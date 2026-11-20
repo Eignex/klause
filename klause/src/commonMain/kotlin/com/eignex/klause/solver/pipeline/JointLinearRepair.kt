@@ -75,7 +75,8 @@ internal class JointLinearRepair(
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
     private class CheckedProposal(val condition: ExactNeighborhoodCondition, val sample: Sample)
-    private class ProximityPass(val value: BigFraction, val coordinates: List<BigFraction>, var next: Int = 0) {
+    private class ProximityPass(val value: BigFraction, val coordinates: List<BigFraction>, val observationId: Long,
+        var next: Int = 0) {
         var pair: ExactNeighborhoodCondition? = null
     }
 
@@ -94,6 +95,7 @@ internal class JointLinearRepair(
     private var proposalHasCheckedCenter = false
     private val observation = onObservation?.let { JointRepairObservationCapture(budget, stop, it) }
     private var proposalSequence = 0L
+    private var observedPasses = 0L
     private var observationQuery = 0L
     private var observedOperator = 0
     private var observedSchedulingRound = 0L
@@ -291,7 +293,8 @@ internal class JointLinearRepair(
         if (funding.remainingAllocation <= bytes) return null
         funding.charge(0L, bytes)
         return ProximityPass(value,
-            List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) })
+            List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) },
+            if (observation == null) 0L else ++observedPasses)
             .takeUnless { stop() || funding.exhausted }?.also { centerPass = it }
     }
 
@@ -468,6 +471,7 @@ internal class JointLinearRepair(
                 if (advisory != null && !proximityTurn) observe("jointRepairAdvisoryOrdinaryTurns")
                 val beforeSelection = requireNotNull(selection).visitedEntries
                 var supportClosed = false
+                var observedSelection: JointRepairObservedSelection? = null
                 val proximity = if (incumbentProximity && !proximityDeclined && !adaptive &&
                     (!rotating || proximityTurn || (advisory == null && !proximityStarted)) &&
                     ((pooled != null && completion != null) || pass != null) &&
@@ -475,27 +479,36 @@ internal class JointLinearRepair(
                     (if (rotating) pass != null && pass.next < requireNotNull(selection).advisoryRoots
                     else privateLimit != proximityCompletedCutoff) && model.numBoolVars == 0 &&
                     IncumbentProximity.accepts(model.intBounds, model.numIntVars))
-                    if (pass != null) when (val selected = requireNotNull(selection).advisoryNeighborhood(
-                        pass.coordinates, pass.next, privateLimit, budget, stop, expand = pass.pair != null)) {
-                        is JointRepairNeighborhood.AdvisorySelection.Ready -> {
-                            val pair = pass.pair
-                            if (pair != null && selected.condition.lower.keys.containsAll(pair.lower.keys)) {
+                    if (pass != null) {
+                        val selector = requireNotNull(selection)
+                        val selected = selector.advisoryNeighborhood(pass.coordinates, pass.next, privateLimit,
+                            budget, stop, expand = pass.pair != null)
+                        observedSelection = observation?.advisorySelection(pass.observationId, pass.next,
+                            selector.advisoryRoot(pass.next), pass.pair != null, pass.coordinates,
+                            advisory?.sample ?: privateChecked, model.numRealVars, privateLimit, source.scope.revision,
+                            selected, selector.visitedEntries - beforeSelection,
+                            if (advisory != null) "advisory-source" else "checked-private")
+                        when (selected) {
+                            is JointRepairNeighborhood.AdvisorySelection.Ready -> {
+                                val pair = pass.pair
+                                if (pair != null && selected.condition.lower.keys.containsAll(pair.lower.keys)) {
+                                    pass.next++
+                                    pass.pair = null
+                                    observe("jointRepairProximityRepeatedSupportSkipped")
+                                    null
+                                } else {
+                                    supportClosed = selected.closed
+                                    selected.condition
+                                }
+                            }
+                            is JointRepairNeighborhood.AdvisorySelection.Declined -> {
                                 pass.next++
                                 pass.pair = null
-                                observe("jointRepairProximityRepeatedSupportSkipped")
+                                observe("jointRepairProximityNeighborhood${selected.limit}Declines")
                                 null
-                            } else {
-                                supportClosed = selected.closed
-                                selected.condition
                             }
+                            JointRepairNeighborhood.AdvisorySelection.Unavailable -> null
                         }
-                        is JointRepairNeighborhood.AdvisorySelection.Declined -> {
-                            pass.next++
-                            pass.pair = null
-                            observe("jointRepairProximityNeighborhood${selected.limit}Declines")
-                            null
-                        }
-                        JointRepairNeighborhood.AdvisorySelection.Unavailable -> null
                     } else ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), privateLimit) else null
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
                 val binary = if (proximity == null && !adaptive && pooled != null && completion != null && !bootstrap)
@@ -535,11 +548,15 @@ internal class JointLinearRepair(
                             observationQuery = 0L
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
                                 proposalRound, count, size, when {
+                                    proximity != null && pass != null ->
+                                        if (advisory != null) "advisory-source" else "checked-private"
                                     bootstrap -> "rounded-paid-root"
                                     pooled == null -> "stored"
                                     else -> "checked-pooled"
                                 },
-                                from, model.numIntVars, sourceIntegers, observedRoots, condition)
+                                if (proximity != null && pass != null) pass.coordinates else from,
+                                model.numIntVars, sourceIntegers, observedRoots, condition, reals = model.numRealVars,
+                                selection = observedSelection.takeIf { proximity != null })
                         }
                         guidedProposal = condition.takeIf { guided }
                         if (checkedStart) {

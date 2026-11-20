@@ -81,8 +81,8 @@ class JointRepairNeighborhoodTest {
 
             if (count == 32) assertTrue(assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(selected)
                 .condition.lower.isEmpty())
-            else assertEquals(JointRepairNeighborhood.AdvisorySelection.Declined(
-                JointRepairNeighborhood.AdvisorySelection.Limit.Width), selected)
+            else assertEquals(JointRepairNeighborhood.AdvisorySelection.Limit.Width,
+                assertIs<JointRepairNeighborhood.AdvisorySelection.Declined>(selected).limit)
         }
     }
 
@@ -100,8 +100,8 @@ class JointRepairNeighborhoodTest {
         val selected = repair.advisoryNeighborhood(List(2) { BigFraction.ZERO }, 0, BigFraction.ONE,
             SourceLpBudget(funding = funding), ExecutionControl.Never, expand = true)
 
-        assertEquals(JointRepairNeighborhood.AdvisorySelection.Declined(
-            JointRepairNeighborhood.AdvisorySelection.Limit.Visits), selected)
+        assertEquals(JointRepairNeighborhood.AdvisorySelection.Limit.Visits,
+            assertIs<JointRepairNeighborhood.AdvisorySelection.Declined>(selected).limit)
         val fallback = repair.proposeWithinSelectionBudget(List(2) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
             BigFraction.ONE, repair.visitedEntries)
         assertEquals(mapOf(1 to BigFraction.ZERO), fallback.lower)

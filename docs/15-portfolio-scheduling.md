@@ -691,6 +691,15 @@ existing LP funding, reporting time stays inside the worker's active lifetime, a
 disabled reporting does no extra scoring. Companion statistics separate active-time
 retirement, checked completions, publication checks and the actual width of opened
 queries; these counts grant no publication or proof authority.
+An opt-in proposal journal distinguishes ordinary, checked private and advisory
+centers. Private selection records bind an integer pass, aspiration, root coordinate
+and pair or expansion phase before ordinary fallback. Structural declines retain
+bounded partial support, the prepared row and boundary coordinate, and charged visits.
+Integer coordinates come from that pass; available finite real coordinates are
+approximate guidance with an explicit completeness flag. Prepared row ordinals refer
+to non-singleton source-premise rows, and columns place integers before reals. All
+metadata spends the existing observation, source-work and allocation limits; it has
+no witness or proof authority.
 
 ## Statistics
 

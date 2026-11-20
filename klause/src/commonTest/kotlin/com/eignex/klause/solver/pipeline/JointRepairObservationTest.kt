@@ -2,8 +2,10 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -45,6 +47,51 @@ class JointRepairObservationTest {
         assertEquals(1L, record.proposalRound)
         assertTrue(funding.spent > 0)
         assertTrue(funding.allocated > 0)
+    }
+
+    @Test
+    fun `declined selection capture should preserve its own center and boundary edge`() {
+        val funding = SourceLpFunding(1_000_000, 1_000_000)
+        val records = mutableListOf<JointRepairObservation>()
+        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding), ExecutionControl.Never,
+            records::add)
+        val centers = mutableListOf(BigFraction.ONE, BigFraction.ZERO)
+        val freed = linkedSetOf(0)
+        val result = JointRepairNeighborhood.AdvisorySelection.Declined(
+            JointRepairNeighborhood.AdvisorySelection.Limit.Width, 4, 0, 1, freed)
+        val sample = Sample(booleanArrayOf(), longArrayOf(1, 0), doubleArrayOf(0.25))
+
+        val metadata = capture.advisorySelection(9, 3, 0, true, centers, sample, 1, BigFraction.ONE,
+            SourceRevision("captured-source", "native"), result, 7, "advisory-source")
+        centers[0] = BigFraction.ZERO
+        freed.clear()
+
+        val record = records.single()
+        assertEquals(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ZERO), record.centers)
+        assertEquals(listOf(0), record.freed)
+        assertEquals(mapOf(0 to 0.25), record.realCenters)
+        assertEquals(true, record.realCentersComplete)
+        assertEquals("width-declined", record.disposition)
+        assertEquals(JointRepairObservedSelection(9, 3, 0, true, 7, null, 4, 0, 1,
+            "captured-source", "native"), metadata)
+        assertEquals(metadata, record.selection)
+        assertTrue(funding.spent > 0)
+        assertTrue(funding.allocated > 0)
+    }
+
+    @Test
+    fun `nonfinite real guidance should make a captured center incomplete`() {
+        val records = mutableListOf<JointRepairObservation>()
+        val capture = JointRepairObservationCapture(
+            SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)), ExecutionControl.Never, records::add)
+        val sample = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(Double.NaN))
+
+        capture.advisorySelection(1, 0, 0, false, listOf(BigFraction.ZERO), sample, 1, BigFraction.ONE,
+            SourceRevision("captured-source", "native"), JointRepairNeighborhood.AdvisorySelection.Unavailable,
+            0, "advisory-source")
+
+        assertEquals(emptyMap(), records.single().realCenters)
+        assertEquals(false, records.single().realCentersComplete)
     }
 
     @Test

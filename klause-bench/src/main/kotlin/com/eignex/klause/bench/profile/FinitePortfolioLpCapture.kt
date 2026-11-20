@@ -392,10 +392,10 @@ internal object FinitePortfolioLpCapture {
             put("sourceSha256", sourceHash)
             for (name in listOf("Proposal", "Query", "Phase", "Disposition", "Operator", "SchedulingRound",
                 "ProposalRound", "RequestedCount", "EffectiveCount", "CenterKind", "Cutoff",
-                "IntegerCount", "RealCount", "BooleanCount")) {
+                "IntegerCount", "RealCount", "BooleanCount", "RealCentersComplete")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, call(observation, "get$name")?.toString())
             }
-            for (name in listOf("Centers", "Bools", "Lower", "Upper")) {
+            for (name in listOf("Centers", "Bools", "Lower", "Upper", "RealCenters")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, buildJsonObject {
                     (get(observation, name) as Map<*, *>).forEach { (key, value) ->
                         put(key.toString(), value.toString())
@@ -405,6 +405,17 @@ internal object FinitePortfolioLpCapture {
             for (name in listOf("Freed", "RefutationRoots")) {
                 put(name.replaceFirstChar { it.lowercaseChar() },
                     JsonArray((get(observation, name) as List<*>).map { JsonPrimitive(it as Int) }))
+            }
+            put("realCentersAuthority", "approximate-guidance")
+            call(observation, "getSelection")?.let { selection ->
+                put("selection", buildJsonObject {
+                    for (name in listOf("Pass", "RootIndex", "RootCoordinate", "Expanded", "Visits", "Closed",
+                        "Row", "Column", "Peer", "SourceRevision", "SourceSemantics")) {
+                        put(name.replaceFirstChar { it.lowercaseChar() }, call(selection, "get$name")?.toString())
+                    }
+                    put("rowOrder", "prepared non-singleton source-premise rows")
+                    put("columnOrder", "integers followed by continuous coordinates")
+                })
             }
             put("support", JsonArray((get(observation, "Support") as List<*>).map { bound ->
                 val value = requireNotNull(bound)

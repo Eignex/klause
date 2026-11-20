@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
@@ -12,6 +14,20 @@ internal data class JointRepairObservedBound(
     val coordinate: SourceCoordinate,
     val upper: Boolean,
     val value: BigFraction?,
+)
+
+internal data class JointRepairObservedSelection(
+    val pass: Long,
+    val rootIndex: Int,
+    val rootCoordinate: Int,
+    val expanded: Boolean,
+    val visits: Long,
+    val closed: Boolean?,
+    val row: Int?,
+    val column: Int?,
+    val peer: Int?,
+    val sourceRevision: String,
+    val sourceSemantics: String,
 )
 
 internal data class JointRepairObservation(
@@ -36,6 +52,9 @@ internal data class JointRepairObservation(
     val integerCount: Int? = null,
     val realCount: Int? = null,
     val booleanCount: Int? = null,
+    val selection: JointRepairObservedSelection? = null,
+    val realCenters: Map<Int, Double> = emptyMap(),
+    val realCentersComplete: Boolean? = null,
 )
 
 internal class JointRepairObservationCapture(
@@ -93,26 +112,27 @@ internal class JointRepairObservationCapture(
         return pay(1L + bits, 64L + bits)
     }
 
-    private fun capture(build: () -> JointRepairObservation?) {
+    private fun capture(build: () -> JointRepairObservation?): JointRepairObservation? {
         if (decline != null) {
             dropped++
-            return
+            return null
         }
         val mark = TimeSource.Monotonic.markNow()
         try {
             if (records >= MAX_RECORDS) decline = "Records"
-            if (decline != null || !pay(1L, 256L)) {
+            if (decline != null || !pay(1L, 512L)) {
                 dropped++
-                return
+                return null
             }
             val observation = build()
             if (observation == null || stop()) {
                 if (decline == null) decline = "Cancelled"
                 dropped++
-                return
+                return null
             }
             records++
             report(observation)
+            return observation
         } finally {
             nanos += mark.elapsedNow().inWholeNanoseconds
         }
@@ -129,7 +149,8 @@ internal class JointRepairObservationCapture(
 
     fun proposal(sequence: Long, operator: Int, schedulingRound: Long, proposalRound: Long,
         requested: Int, effective: Int, kind: String, centers: List<BigFraction>, integers: Int,
-        eligible: IntArray?, roots: List<Int>, condition: ExactNeighborhoodCondition) = capture {
+        eligible: IntArray?, roots: List<Int>, condition: ExactNeighborhoodCondition,
+        reals: Int = centers.size - integers, selection: JointRepairObservedSelection? = null) = capture {
         val copied = linkedMapOf<Int, BigFraction>()
         val freed = mutableListOf<Int>()
         for (id in eligible?.asIterable() ?: (0 until integers)) {
@@ -152,9 +173,57 @@ internal class JointRepairObservationCapture(
         if (!scalar(condition.cutoff)) return@capture null
         JointRepairObservation(sequence, 0L, "proposal", "constructed", operator, schedulingRound,
             proposalRound, requested, effective, kind, copied, bools, lower, upper, freed, refutationRoots,
-            cutoff = condition.cutoff, integerCount = integers, realCount = centers.size - integers,
-            booleanCount = condition.bools.size)
+            cutoff = condition.cutoff, integerCount = integers, realCount = reals,
+            booleanCount = condition.bools.size, selection = selection)
     }
+
+    fun advisorySelection(pass: Long, root: Int, coordinate: Int, expanded: Boolean,
+        centers: List<BigFraction>, sample: Sample?, reals: Int, cutoff: BigFraction, revision: SourceRevision,
+        result: JointRepairNeighborhood.AdvisorySelection, visits: Long, kind: String): JointRepairObservedSelection? =
+        capture {
+            val text = revision.identity.length.toLong() + revision.semantics.length
+            if (!pay(1L + text, 2L * text) || !scalar(cutoff)) return@capture null
+            val copied = linkedMapOf<Int, BigFraction>()
+            for (id in centers.indices) {
+                if (!entry() || !scalar(centers[id])) return@capture null
+                copied[id] = centers[id]
+            }
+            val freed = mutableListOf<Int>()
+            val ready = result as? JointRepairNeighborhood.AdvisorySelection.Ready
+            val declined = result as? JointRepairNeighborhood.AdvisorySelection.Declined
+            if (declined == null && !pay(1L + centers.size, 0L)) return@capture null
+            for (id in declined?.freed ?: centers.indices) {
+                if (declined != null ||
+                    (ready != null && id !in ready.condition.lower && id !in ready.condition.upper)) {
+                    if (!entry()) return@capture null
+                    freed += id
+                }
+            }
+            val approximate = linkedMapOf<Int, Double>()
+            var complete = reals == 0
+            if (sample != null && sample.numRealVars == reals) {
+                complete = true
+                for (id in 0 until reals) {
+                    if (!entry() || !pay(1L, 64L)) return@capture null
+                    val value = sample.approximateRealValue(id)
+                    if (value.isFinite()) approximate[id] = value else complete = false
+                }
+            }
+            val metadata = JointRepairObservedSelection(pass, root, coordinate, expanded, visits,
+                ready?.closed, declined?.row, declined?.column, declined?.peer,
+                revision.identity, revision.semantics)
+            val disposition = when (result) {
+                is JointRepairNeighborhood.AdvisorySelection.Ready -> "ready"
+                is JointRepairNeighborhood.AdvisorySelection.Declined -> when (result.limit) {
+                    JointRepairNeighborhood.AdvisorySelection.Limit.Width -> "width-declined"
+                    JointRepairNeighborhood.AdvisorySelection.Limit.Visits -> "visits-declined"
+                }
+                JointRepairNeighborhood.AdvisorySelection.Unavailable -> "unavailable"
+            }
+            JointRepairObservation(0L, 0L, "selection", disposition, centerKind = kind, centers = copied,
+                freed = freed, cutoff = cutoff, integerCount = centers.size, realCount = reals,
+                booleanCount = 0, selection = metadata, realCenters = approximate, realCentersComplete = complete)
+        }?.selection
 
     fun feedback(proposal: Long, query: Long, disposition: String,
         assumptions: Set<SourceDerivation.Assumption>?, condition: ExactNeighborhoodCondition,

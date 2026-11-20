@@ -23,7 +23,8 @@ internal class JointRepairNeighborhood private constructor(
 ) : ExactNeighborhoodProposal {
     sealed interface AdvisorySelection {
         data class Ready(val condition: ExactNeighborhoodCondition, val closed: Boolean) : AdvisorySelection
-        data class Declined(val limit: Limit) : AdvisorySelection
+        data class Declined(val limit: Limit, val row: Int? = null, val column: Int? = null,
+            val peer: Int? = null, val freed: Set<Int> = emptySet()) : AdvisorySelection
         data object Unavailable : AdvisorySelection
         enum class Limit { Width, Visits }
     }
@@ -63,6 +64,8 @@ internal class JointRepairNeighborhood private constructor(
 
     val advisoryRoots: Int get() = seeds.size
 
+    fun advisoryRoot(root: Int): Int = seeds[root]
+
     fun advisoryNeighborhood(centers: List<BigFraction>, root: Int, cutoff: BigFraction,
         budget: SourceLpBudget, token: ExecutionControl, expand: Boolean = false): AdvisorySelection {
         val funding = budget.funding ?: return AdvisorySelection.Unavailable
@@ -88,9 +91,10 @@ internal class JointRepairNeighborhood private constructor(
         val queue = IntArrayDeque().also { it.addLast(seeds[root]) }
         val seenRows = BooleanArray(rows.size)
         var visits = 0
-        fun visit(): AdvisorySelection? = when {
+        fun visit(row: Int, column: Int, peer: Int? = null): AdvisorySelection? = when {
             token() -> AdvisorySelection.Unavailable
-            visits == MAX_SELECTION_VISITS -> AdvisorySelection.Declined(AdvisorySelection.Limit.Visits)
+            visits == MAX_SELECTION_VISITS -> AdvisorySelection.Declined(
+                AdvisorySelection.Limit.Visits, row, column, peer, freed)
             else -> {
                 visits++
                 null
@@ -100,14 +104,14 @@ internal class JointRepairNeighborhood private constructor(
             while (queue.isNotEmpty()) {
                 val column = queue.removeFirst()
                 for (row in occurrences[column]) {
-                    visit()?.let { return it }
+                    visit(row, column)?.let { return it }
                     if (seenRows[row]) continue
                     seenRows[row] = true
                     for (peer in rows[row]) {
-                        visit()?.let { return it }
+                        visit(row, column, peer)?.let { return it }
                         if (!eligibleInteger(peer) || peer in freed) continue
                         if (freed.size == MAX_FREE_INTEGERS)
-                            return AdvisorySelection.Declined(AdvisorySelection.Limit.Width)
+                            return AdvisorySelection.Declined(AdvisorySelection.Limit.Width, row, column, peer, freed)
                         freed += peer
                         queue.addLast(peer)
                     }
