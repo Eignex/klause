@@ -265,7 +265,7 @@ internal class LinearAuthorityInvocation(
                         importedIncumbents++
                         importedIncumbent = incumbent
                         onIncumbentImport?.invoke()
-                        if (incumbentProximity && completion != null) prepareProximity()
+                        if (incumbentProximity) prepareProximity()
                     }
                 }
             }
@@ -336,9 +336,12 @@ internal class LinearAuthorityInvocation(
     }
 
     private fun prepareProximity(advisory: Sample? = null, aspiration: BigFraction? = null) {
-        val sample = advisory ?: completion?.complete(context, incumbent ?: return, stop) ?: return
-        proximity?.close()
+        val previous = proximity
         proximity = null
+        proximityTurn = false
+        previous?.close()
+        if (previous != null) observeProximity("SupersededTargets")
+        val sample = advisory ?: proximityChecking?.complete(context, incumbent ?: return, stop) ?: return
         val exact = aspiration ?: value ?: return
         val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
         val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop) ?: return

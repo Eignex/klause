@@ -503,6 +503,10 @@ interpretations and repair/admission controls retain explicit selection. Automat
 reuse keeps ordinary finite cutoff windows and scheduling; only the explicit
 completion option selects its cutoff accounting and first-proposal trial.
 
+Shared points with exact real coordinates pass private completion and original-source
+checks before centering a query. A replacement retires the prior target even when
+checking withholds the new center.
+
 The advisory point supplies binary coordinates for a bounded change neighborhood
 and a floating objective evaluated as a rational aspiration. It supplies no feasible
 incumbent, parent cutoff or bound. A private query retains the original objective,

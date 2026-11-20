@@ -50,7 +50,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     )
 
     @Test
-    fun `an ordinary improvement should retire an active advisory query`() {
+    fun `ordinary and imported improvements should retire an active advisory query`() {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val rows = columns.flatMapIndexed { index, column ->
             listOf(
@@ -68,17 +68,32 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             (columns + real).associateWith { BigFraction.ONE })
         val seed = Sample(booleanArrayOf(), longArrayOf(0, 0, 0), doubleArrayOf(1.99))
 
-        LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), external = { seed },
-            boundOrdered = true, incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true })
-            .use { invocation ->
-                repeat(128) {
-                    if (!invocation.isDone) invocation.runSlice(ExecutionControl.Never, 1_000, 1) { _, _ -> }
-                }
+        for (imported in listOf(false, true)) {
+            var offered = seed
+            LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), external = { offered },
+                boundOrdered = true, incumbentProximity = true,
+                incumbentCompletionCheck = { _, value, _ -> !imported || value != BigFraction.ofLong(2) })
+                .use { invocation ->
+                    invocation.runSlice(ExecutionControl.Never, 1_000, 1) { _, _ -> }
+                    val consultations = invocation.stats.smt.completeSearchStages
+                        ?.get("numericalProximityConsultations")
+                    if (imported) offered = Sample(booleanArrayOf(), longArrayOf(1, 1, 0), doubleArrayOf(0.0),
+                        exactReals = listOf(BigFraction.ZERO))
 
-                assertEquals(BigFraction.ofLong(2), invocation.snapshot(TerminationReason.BudgetExhausted).value)
-                assertEquals(1L,
-                    invocation.stats.smt.completeSearchStages?.get("numericalProximityOrdinaryRetirements"))
-            }
+                    repeat(128) {
+                        if (!invocation.isDone) invocation.runSlice(ExecutionControl.Never, 1_000, 1) { _, _ -> }
+                    }
+
+                    assertEquals(BigFraction.ofLong(2), invocation.snapshot(TerminationReason.BudgetExhausted).value)
+                    if (imported) {
+                        assertEquals(consultations,
+                            invocation.stats.smt.completeSearchStages?.get("numericalProximityConsultations"))
+                        assertEquals(1L,
+                            invocation.stats.smt.completeSearchStages?.get("numericalProximitySupersededTargets"))
+                    } else assertEquals(1L,
+                        invocation.stats.smt.completeSearchStages?.get("numericalProximityOrdinaryRetirements"))
+                }
+        }
     }
 
     @Test
@@ -130,7 +145,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `private traversal should improve the checked center within two checks and one decision`() {
+    fun `default and explicit private traversal should improve checked centers within their allowance`() {
         val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val rows = columns.flatMapIndexed { index, column ->
             listOf(
@@ -138,17 +153,25 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
                     mapOf(column to BigFraction.MINUS_ONE), BigFraction.ZERO)),
                 "upper$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.ONE), BigFraction.ONE)),
             )
-        }.toMap()
-        val source = SourceProofContext(scope, columns.toSet(), rows,
-            columns.associateWith { BigFraction.MINUS_ONE })
-        val seed = Sample(booleanArrayOf(), longArrayOf(0, 0, 0, 0))
+        }.toMap() + mapOf(
+            "real-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO)),
+        )
+        val source = SourceProofContext(scope, columns.toSet() + real, rows,
+            columns.associateWith { BigFraction.MINUS_ONE } + (real to BigFraction.ONE))
+        val seed = Sample(booleanArrayOf(), longArrayOf(0, 0, 0, 0), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
 
-        val result = LinearAuthorityInvocation(source,
-            TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxLeaves = 2, maxDecisions = 1),
-            external = { seed }, boundOrdered = true, incumbentCompletionCheck = { _, _, _ -> true },
-            incumbentProximity = true).use { it.run { _, _ -> } }
+        for (completion in listOf(false, true)) {
+            val result = LinearAuthorityInvocation(source,
+                TheoryParams(sourceIncumbentCompletion = completion, sourceCuts = false, maxLeaves = 2,
+                    maxDecisions = 1), external = { seed }, boundOrdered = true,
+                incumbentCompletionCheck = { _, _, _ -> true }, incumbentProximity = true)
+                .use { it.run { _, _ -> } }
 
-        assertEquals(BigFraction.ofLong(-4), result.value)
+            assertEquals(BigFraction.ofLong(-4), result.value)
+            assertEquals(1L, result.stats.smt.completeSearchStages?.get("numericalProximityImprovements"))
+        }
     }
 
     @Test
