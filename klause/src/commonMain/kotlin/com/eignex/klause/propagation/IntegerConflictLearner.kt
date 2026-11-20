@@ -158,6 +158,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
 
     private fun endpointTrail(variable: Int, lower: Boolean, factorId: Int): Int? {
         val recorded = if (lower) state.intMinAntecedents[variable] else state.intMaxAntecedents[variable]
+        if (recorded == null) return null
         if (isLazyReason(recorded)) {
             if (recorded.size != LAZY_PAYLOAD + 6 || recorded[1] != factorId) {
                 state.arithmeticLearningTrace?.record("integer.endpoint-decline.marker-shape")
@@ -165,7 +166,6 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             return recorded[2]
         }
-        if (recorded == null) return null
         val key = variable to lower
         if (eagerMarkers.containsKey(key)) return eagerMarkers[key]?.get(2)
         return eagerEndpointTrail(variable, lower)
