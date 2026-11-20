@@ -213,7 +213,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable passive history reaches matching applied and withheld commitments`() {
+    fun `variable advice stays withheld while child advice can be applied`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -255,11 +255,11 @@ class LpHintsTest {
 
             val selected = assertNotNull(hints.selectVariable(proposal, baseline))
             hints.branch(selected)
-            hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, 2L), 1)
 
-            assertEquals(if (apply) proposal else baseline, selected)
-            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
+            assertEquals(baseline, selected)
+            assertEquals(1, events.count { it == "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED" })
+            assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events)
             assertEquals(4, events.count { it == "UP" })
             assertEquals(4, events.count { it == "DOWN" })
             costs.add(work - before)

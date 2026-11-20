@@ -381,8 +381,10 @@ large observation cannot raise its estimate alone. The two gains must agree with
 a factor of two; disagreement withholds advice until passive observations stabilize.
 A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
-Replacing the ordinary LP variable requires reliable history for that reference
+Variable comparisons require reliable history for the ordinary reference
 as well, including measured zero gains, and a strictly greater predicted gain.
+The variable consumer withholds its proposals and retains the ordinary variable;
+reliable child ordering can still apply to that variable's adjacent alternatives.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that
@@ -429,7 +431,8 @@ separate counters from reliable variable advice. Withholding reliable advice kee
 this collection policy and its costs enabled. `lp-directional-advice=false` keeps
 the ordinary variable and value choices while retaining enabled directional observation,
 nomination and comparison work; the corresponding backtrack setting is
-`BacktrackParams.lpDirectionalAdvice`.
+`BacktrackParams.lpDirectionalAdvice`. Variable comparison and commitment observations
+retain their withheld role in either mode.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
