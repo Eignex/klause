@@ -107,6 +107,9 @@ class LinearAuthorityTest {
             var result = authority.advance(source, ExecutionControl.Never)
             assertTrue(result.paused)
             assertEquals(null, result.evidence)
+            assertEquals(1L, result.primalStages["PrimalGuidancePaused"])
+            assertEquals(1L, result.primalStages["PrimalGuidanceNativePointUnavailable"])
+            assertEquals(1L, result.primalStages["PrimalGuidancePointUnavailable"])
             repeat(64) {
                 if (result.paused) result = authority.advance(source, ExecutionControl.Never)
             }
@@ -116,6 +119,10 @@ class LinearAuthorityTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
             assertTrue(result.relaxedPoint.isEmpty())
+            assertEquals(1L, result.primalStages["PrimalGuidanceNotPaused"])
+            assertEquals(1L, result.primalStages["PrimalGuidanceNativePointUnavailable"])
+            assertEquals(1L, result.primalStages["PrimalGuidancePointUnavailable"])
+            assertEquals(1L, result.primalStages["PrimalGuidanceTerminationINFEASIBLE_CANDIDATE"])
             val certificateWork = budget.measuredConflictCertificationWork
             val floatWork = budget.measuredFloatWork
             assertTrue(certificateWork > 0L)
@@ -338,6 +345,10 @@ class LinearAuthorityTest {
             val result = authority.advance(source, ExecutionControl.Never)
 
             val terminal = assertNotNull(result.evidence)
+            assertEquals(1L, result.primalStages["PrimalGuidanceNativePointPresent"])
+            assertEquals(1L, result.primalStages["PrimalGuidancePointPresent"])
+            assertEquals(1L, result.primalStages["PrimalGuidanceNotPaused"])
+            assertEquals(1L, result.primalStages["PrimalGuidanceTerminationOPTIMAL_CANDIDATE"])
             assertEquals(SourceValue.Rational(BigFraction.ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))

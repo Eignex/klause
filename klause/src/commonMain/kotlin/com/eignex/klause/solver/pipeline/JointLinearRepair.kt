@@ -322,7 +322,9 @@ internal class JointLinearRepair(
                 "numericalRetainedNodes" -> "jointRepairPeakRetainedNodes"
                 "numericalPendingLeaves" -> "jointRepairUnresolvedLeaves"
                 "numericalFrontierPending" -> "jointRepairFrontierUnresolved"
-                else -> if (key.startsWith("numericalExternal"))
+                else -> if (queryProximity && key.startsWith("numericalPrimalGuidance"))
+                    "jointRepairProximity" + key.removePrefix("numerical")
+                else if (key.startsWith("numericalExternal"))
                     "jointRepairQueryExternal" + key.removePrefix("numericalExternal")
                 else "jointRepair" + key.removePrefix("numerical")
             }
