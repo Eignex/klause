@@ -486,6 +486,10 @@ withhold a global bound. Output labels it a native nominal-source claim: toleran
 coverage is separate, and publication confers no independent validation or terminal
 status. Reading the retained bound requests no LP work.
 
+Objective-coordinate conversion retains the producer's candidate statistics while
+replacing its objective and proof authority, including candidates published from
+ordinary, instruction and scheduled slices.
+
 Private companion admission of pooled incumbents counts missing exact coordinates,
 rejected or unavailable native source checks and non-improving points. An incumbent
 accepted by finite tolerance policy can lack the exact source authority a private
