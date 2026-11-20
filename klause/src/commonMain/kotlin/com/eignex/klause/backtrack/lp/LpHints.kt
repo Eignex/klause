@@ -176,8 +176,19 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains || !objectiveRecorded || !history.hasReliableHistory) return Double.NaN
-        if (!passivePointCurrent()) return Double.NaN
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(variable)
+    }
+
+    fun directionalScore(varId: Int, isBool: Boolean): Double {
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(if (isBool) VarRef.Bool(varId) else VarRef.IntVar(varId))
+    }
+
+    private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
+        history.hasReliableHistory && passivePointCurrent()
+
+    private fun readyDirectionalScore(variable: VarRef): Double {
         charge(1L)
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)
@@ -386,13 +397,10 @@ internal class LpHints(
      * A variable the LP already pins to an integer scores `0` (no branching needed); one with no LP
      * value scores `NaN` (the selector falls back). Higher = branch here first.
      */
-    fun branchScore(varRef: VarRef): Double {
+    fun branchScore(varRef: VarRef): Double = branchScore(varRef.varId, varRef is VarRef.Bool)
+
+    fun branchScore(id: Int, isBool: Boolean): Double {
         if (!recorded) return Double.NaN
-        val isBool = varRef is VarRef.Bool
-        val id = when (varRef) {
-            is VarRef.IntVar -> varRef.varId
-            is VarRef.Bool -> varRef.varId
-        }
         val vals = if (isBool) boolVal else intVal
         if (id < 0 || id >= vals.size) return Double.NaN
         if ((if (isBool) boolStamp else intStamp)[id] != solveStamp) return Double.NaN

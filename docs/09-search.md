@@ -400,6 +400,8 @@ an unconsumed nomination. Variable commitment rechecks cancellation and current
 LP state after charging its work and before attributing advice, using the existing LP allowance.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
+The bounded selector reads reduced-cost scores by primitive variable ID and kind.
+Directional references are constructed only after history passes its eligibility checks.
 
 The same recent directional estimates can order the selected variable's two
 existing adjacent alternatives. It visits the lower predicted gain first to seek
