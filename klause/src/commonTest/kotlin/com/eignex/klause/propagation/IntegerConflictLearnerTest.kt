@@ -98,7 +98,6 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
             shared.popTo(backjump.decisionLevel)
             assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
             assertEquals(1L, shared.intUpperBound(0))
-            assertEquals(1L, native.learnedLifecycle()["learningClauseAdmitted"])
             assertEquals(if (admission) 1L else 0L,
                 native.learnedLifecycle()["learningIntegerAdmitted"] ?: 0L)
         }

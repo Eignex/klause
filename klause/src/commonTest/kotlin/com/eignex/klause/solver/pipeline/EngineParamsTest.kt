@@ -24,10 +24,10 @@ class EngineParamsTest {
         for (admission in listOf(false, true)) {
             val base = com.eignex.klause.backtrack.BacktrackParams(
                 integerRowLearning = true, integerRowAdmission = !admission)
-            val settings = EngineParams(listOf("integer-row-admission=$admission"))
+            val settings = listOf("integer-row-admission=$admission")
 
-            val workers = listOf(applyFixedBacktrackParams(base, settings, allowSelectors = true),
-                applyBacktrackParams(base, settings))
+            val workers = listOf(applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true),
+                applyBacktrackParams(base, EngineParams(settings)))
 
             for (worker in workers) {
                 assertEquals(admission, worker.integerRowAdmission)
