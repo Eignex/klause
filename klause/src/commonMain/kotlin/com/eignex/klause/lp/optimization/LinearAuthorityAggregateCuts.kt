@@ -468,6 +468,7 @@ internal object LinearAuthorityAggregateCuts {
     ) {
         private class Continuation(val row: ProbeRow, val residual: BigFraction, val pivot: BigFraction)
         private class ProjectionSeed(val row: ProbeRow, val coordinate: SourceCoordinate, val fraction: Double)
+        private val slacks = HashMap<Int, Double>()
         val capture = AggregateCapture()
         var attempted = false
             private set
@@ -566,16 +567,29 @@ internal object LinearAuthorityAggregateCuts {
         }
 
         private fun continuationScore(row: ProbeRow, pivot: BigFraction): Double? {
-            meter.reserve(4L, 128L)
+            meter.reserve(4L)
             val divisor = abs(meter.number(pivot).toDouble())
             if (!divisor.isFinite() || divisor == 0.0) return null
-            var slack = meter.number(row.term.inequality.rhs).toDouble()
-            for ((id, value) in row.coefficients) {
-                meter.reserve(4L)
-                val coordinate = point[id]?.takeIf { it.isFinite() } ?: return null
-                val coefficient = meter.number(value).toDouble()
-                if (!coefficient.isFinite()) return null
-                slack -= coefficient * coordinate
+            var slack = slacks[row.term.owner]
+            if (slack == null) {
+                meter.reserve(1L, 128L)
+                var projected = meter.number(row.term.inequality.rhs).toDouble()
+                for ((id, value) in row.coefficients) {
+                    meter.reserve(4L)
+                    val coordinate = point[id]?.takeIf(Double::isFinite)
+                    if (coordinate == null) {
+                        projected = Double.NaN
+                        break
+                    }
+                    val coefficient = meter.number(value).toDouble()
+                    if (!coefficient.isFinite()) {
+                        projected = Double.NaN
+                        break
+                    }
+                    projected -= coefficient * coordinate
+                }
+                slacks[row.term.owner] = projected
+                slack = projected
             }
             meter.reserve(4L)
             val score = slack / divisor
@@ -585,8 +599,13 @@ internal object LinearAuthorityAggregateCuts {
         fun integerProjections(rows: List<ProbeRow>, candidates: MutableList<LinearAuthorityCut>, maximum: Int) {
             val cap = minOf(maximum, candidates.size + 2)
             if (candidates.size >= cap) return
-            meter.reserve(rows.size.toLong(), 128L + rows.size * 48L)
+            meter.reserve(1L, 256L)
             val seeds = ArrayList<ProjectionSeed>()
+            fun order(left: ProjectionSeed, right: ProjectionSeed): Int {
+                meter.reserve(1L)
+                val order = right.fraction.compareTo(left.fraction)
+                return if (order == 0) left.row.term.owner.compareTo(right.row.term.owner) else order
+            }
             for (row in rows) {
                 meter.reserve(1L)
                 if (!row.hasInteger || row.coefficients.size <= 1) continue
@@ -603,21 +622,30 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
                 if (coordinate != null) {
+                    var duplicate = -1
+                    for (index in seeds.indices) {
+                        meter.reserve(1L)
+                        if (seeds[index].coordinate == coordinate) duplicate = index
+                    }
+                    if (duplicate >= 0 && seeds[duplicate].row.term.owner <= row.term.owner) continue
+                    if (duplicate >= 0) seeds.removeAt(duplicate)
+                    if (seeds.size == 8) {
+                        meter.reserve(1L)
+                        val last = seeds.last()
+                        if (fraction < last.fraction ||
+                            (fraction == last.fraction && row.term.owner >= last.row.term.owner)) continue
+                        seeds.removeAt(seeds.lastIndex)
+                    }
                     meter.reserve(1L, 64L)
-                    seeds += ProjectionSeed(row, coordinate, fraction)
+                    val retained = ProjectionSeed(row, coordinate, fraction)
+                    var insertion = 0
+                    while (insertion < seeds.size && order(seeds[insertion], retained) <= 0) insertion++
+                    seeds.add(insertion, retained)
                 }
             }
-            seeds.sortWith { left, right ->
-                meter.reserve(1L)
-                val order = right.fraction.compareTo(left.fraction)
-                if (order == 0) left.row.term.owner.compareTo(right.row.term.owner) else order
-            }
-            meter.reserve(1L, 128L)
-            val visited = HashSet<SourceCoordinate>()
             for (seed in seeds) {
                 meter.reserve(1L, 64L)
-                if (candidates.size >= cap || visited.size >= 8) return
-                if (!visited.add(seed.coordinate)) continue
+                if (candidates.size >= cap) return
                 val row = seed.row
                 var selected: Continuation? = null
                 var best = Double.POSITIVE_INFINITY
