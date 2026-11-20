@@ -116,11 +116,7 @@ internal object JointRepairLpCapture {
                 observerNs += System.nanoTime() - started
             }
         }
-        val contextType = Class.forName(ENGINE + "LpSolveContext")
-        val observing = contextType.constructors.single { it.parameterCount == 7 }.newInstance(
-            call(defaults, "getEngineFactory"), call(defaults, "getCertificationPolicy"),
-            call(defaults, "getOnRefinementBasisVerification"), call(defaults, "getSparsePointRecovery"),
-            call(defaults, "getStartArbitraryPrecision"), call(defaults, "getPreserveOverflowCheckpoint"), observe)
+        val observing = observingContext(defaults, observe)
         budget.javaClass.getDeclaredField("solveContext").apply { isAccessible = true }.set(budget, { observing })
         val snapshots = NumericalSelectionSnapshot(stop)
         val journal = snapshots.journal()
@@ -293,6 +289,16 @@ internal object JointRepairLpCapture {
         val model = requireNotNull(call(state, "getModel"))
         put("rows", call(model, "getM") as Int)
         put("columns", call(model, "getN") as Int)
+    }
+
+    @Suppress("SpreadOperator") // Java reflection requires varargs at the copy boundary.
+    internal fun observingContext(context: Any, observe: (Any) -> Unit): Any {
+        val copy = context.javaClass.methods.single { it.name == "copy" }
+        val observerComponent = 7
+        val arguments = Array(copy.parameterCount) { index ->
+            if (index + 1 == observerComponent) observe else call(context, "component${index + 1}")
+        }
+        return requireNotNull(copy.invoke(context, *arguments))
     }
 
     private fun field(owner: Any, name: String): Any? =
