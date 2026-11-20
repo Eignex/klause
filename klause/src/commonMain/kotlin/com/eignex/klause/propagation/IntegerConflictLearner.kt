@@ -114,21 +114,15 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             val lower = row.coefficients[index] > BIG_ZERO
             val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
             if (!state.hasIntegerArithmeticSource(factorId)) continue
-            val marker = endpointMarker(row, index)
-            state.arithmeticLearningTrace?.marker(variable, lower, marker)
-            marker ?: continue
-            if (marker.size != LAZY_PAYLOAD + 6 || marker[1] != factorId) {
-                state.arithmeticLearningTrace?.record("integer.endpoint-decline.marker-shape")
-                continue
-            }
-            val key = variable to if (lower) marker[2] else marker[2].inv()
+            val trail = endpointTrail(variable, lower, factorId) ?: continue
+            val key = variable to if (lower) trail else trail.inv()
             if (key in used) continue
             val priorities = candidates ?: run {
                 budget.spend(bytes = row.variables.size.toLong() * Long.SIZE_BYTES)
                 LongArray(row.variables.size).also { candidates = it }
             }
             // Signed high words order trails; complemented low words prefer the earlier coordinate on ties.
-            priorities[count++] = (marker[2].toLong() shl Int.SIZE_BITS) or (index.toLong().inv() and 0xFFFF_FFFFL)
+            priorities[count++] = (trail.toLong() shl Int.SIZE_BITS) or (index.toLong().inv() and 0xFFFF_FFFFL)
         }
         val priorities = candidates ?: return null
         fun later(left: Long, right: Long): Boolean {
@@ -151,17 +145,33 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         for (root in count / 2 - 1 downTo 0) sift(root, count)
         var remaining = count
         while (remaining > 0) {
-            val index = priorities[0].toInt().inv()
+            val priority = priorities[0]
+            val index = priority.toInt().inv()
             remaining--
             priorities[0] = priorities[remaining]
             sift(0, remaining)
             budget.spend()
-            qualifiedReason(row, index)?.let { return it }
+            qualifiedReason(row, index, (priority shr Int.SIZE_BITS).toInt())?.let { return it }
         }
         return null
     }
 
-    private fun endpointMarker(row: IntegerConflictRow, index: Int): IntArray? {
+    private fun endpointTrail(variable: Int, lower: Boolean, factorId: Int): Int? {
+        val recorded = if (lower) state.intMinAntecedents[variable] else state.intMaxAntecedents[variable]
+        if (isLazyReason(recorded)) {
+            if (recorded.size != LAZY_PAYLOAD + 6 || recorded[1] != factorId) {
+                state.arithmeticLearningTrace?.record("integer.endpoint-decline.marker-shape")
+                return null
+            }
+            return recorded[2]
+        }
+        if (recorded == null) return null
+        val key = variable to lower
+        if (eagerMarkers.containsKey(key)) return eagerMarkers[key]?.get(2)
+        return eagerEndpointTrail(variable, lower)
+    }
+
+    private fun endpointMarker(row: IntegerConflictRow, index: Int, trail: Int): IntArray? {
         val variable = row.variables[index]
         val lower = row.coefficients[index] > BIG_ZERO
         val recorded = if (lower) state.intMinAntecedents[variable] else state.intMaxAntecedents[variable]
@@ -170,14 +180,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val key = variable to lower
         if (eagerMarkers.containsKey(key)) return eagerMarkers[key]
         budget.spend(bytes = 96)
-        val marker = eagerEndpoint(variable, lower)
+        val marker = eagerEndpoint(variable, lower, trail)
         eagerMarkers[key] = marker
         return marker
     }
 
-    private fun eagerEndpoint(variable: Int, lower: Boolean): IntArray? {
-        val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
-        if (factorId < 0) return null
+    private fun eagerEndpointTrail(variable: Int, lower: Boolean): Int? {
         val moves = state.boundMoves[variable] ?: return null
         val previous =
             (if (lower) state.boundMovePriorMin[variable] else state.boundMovePriorMax[variable]) ?: return null
@@ -190,7 +198,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if (if (lower) previous[mid] < live else previous[mid] > live) lo = mid + 1 else hi = mid
         }
         if (lo == 0) return null
-        val trail = moves[lo - 1]
+        return moves[lo - 1]
+    }
+
+    private fun eagerEndpoint(variable: Int, lower: Boolean, trail: Int): IntArray? {
+        val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+        if (factorId < 0) return null
         val source = sourceFactor(factorId, trail, forBoundReason = true) ?: return null
         budget.spend(source.variables.size.toLong())
         val position = source.variables.indexOf(variable)
@@ -203,10 +216,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         }
     }
 
-    private fun qualifiedReason(row: IntegerConflictRow, index: Int): BoundEvent? {
+    private fun qualifiedReason(row: IntegerConflictRow, index: Int, trail: Int): BoundEvent? {
         val variable = row.variables[index]
         val lower = row.coefficients[index] > BIG_ZERO
-        val marker = checkNotNull(endpointMarker(row, index))
+        val marker = endpointMarker(row, index, trail) ?: return null
+        state.arithmeticLearningTrace?.marker(variable, lower, marker)
         val factorId = marker[1]
         val key = variable to if (lower) marker[2] else marker[2].inv()
         val source = sourceFactor(factorId, marker[2], forBoundReason = true)
