@@ -440,6 +440,10 @@ column identities, producer presence and auxiliary catalog generation guard reus
 Append and compaction release the entry; row refreshes can reuse it while capturing
 fresh active bounds and exclusions. Key checks and binding traversals remain charged,
 and metadata construction is charged on misses.
+LP bound facts can pass between source and cut bindings only under the same immutable
+exact-state identity. This shares owned facts and an opaque token, retaining no state
+or matrix through the token. Each binding replaces CP snapshots and exclusions;
+a different exact state reconstructs and charges the LP facts.
 
 The default `lp-component-reuse` setting requires its bounded owner setup to fit
 within a quarter of the worker's LP work horizon. A remaining node quota supplies

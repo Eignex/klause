@@ -187,7 +187,7 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `cached source binding should charge its bound refresh`() {
+    fun `cached source binding should charge checks without rebuilding unchanged LP facts`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
         ))
@@ -204,7 +204,7 @@ class LpRetainedSourcesTest {
             sources.relaxation(owner.state, domains) { charged = it }
 
             assertTrue(assertNotNull(charged).structural > 0L)
-            assertTrue(assertNotNull(charged).exact > 0L)
+            assertEquals(0L, assertNotNull(charged).exact)
         }
     }
 

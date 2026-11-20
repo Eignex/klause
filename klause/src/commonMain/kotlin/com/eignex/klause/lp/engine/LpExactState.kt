@@ -105,6 +105,7 @@ internal class LpExactState internal constructor(
 
     // Tokens identify adjacent scalar revisions without retaining a predecessor's state or cached vectors.
     private val scalarIdentity = Any()
+    internal val boundSnapshotIdentity: Any get() = scalarIdentity
     private var scalarPredecessor: Any? = null
     private val boundPredecessor: Any?
     private val changedBounds: Set<Int>

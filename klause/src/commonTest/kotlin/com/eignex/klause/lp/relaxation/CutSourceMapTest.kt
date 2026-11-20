@@ -8,8 +8,13 @@ import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
@@ -23,6 +28,64 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CutSourceMapTest {
+    @Test
+    fun `CP refresh should retain LP bound facts only for the same exact state`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList())
+        val session = PropagationSession(problem)
+        val state = LpExactState(assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+            .build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.ownerWorkingModel())
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(source to BigFraction.ONE))
+        val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source))).withBounds(model)
+        for (derived in listOf(root, root.withParentRows(emptyMap()), root.withActivePremises(emptySet()))) {
+            var charged: CutSourceWork? = null
+
+            val refreshed = derived.withCpBounds(model, session) { charged = it }
+
+            assertTrue(refreshed.isActive(CutPremise.Bound(expression, true, BigFraction.ofLong(10L))))
+            assertEquals(0L, assertNotNull(charged).exact)
+            assertTrue(assertNotNull(charged).structural > 0L)
+        }
+    }
+
+    @Test
+    fun `a different exact state should replace LP bounds through rollback`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList())
+        val session = PropagationSession(problem)
+        val state = LpExactState(assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+            .build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.ownerWorkingModel())
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(source to BigFraction.ONE))
+        val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source))).withBounds(model)
+        val trail = LpBoundTrail(state)
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(5L)), 0L))
+        var childWork: CutSourceWork? = null
+        val child = root.withCpBounds(assertNotNull(trail.state.ownerWorkingModel()), session) { childWork = it }
+        var restoredWork: CutSourceWork? = null
+
+        val restored = child.withCpBounds(model, session) { restoredWork = it }
+
+        val premise = CutPremise.Bound(expression, true, BigFraction.ofLong(5L))
+        assertTrue(child.isActive(premise))
+        assertFalse(restored.isActive(premise))
+        assertTrue(assertNotNull(childWork).exact > 0L)
+        assertTrue(assertNotNull(restoredWork).exact > 0L)
+    }
+
+    @Test
+    fun `a model without exact authority should rebuild LP bound facts`() {
+        val source = CutSource(CutSourceKind.INTEGER, 0)
+        val model = LpBuilder().apply { addVar(0L, 10L) }.build(Sense.MINIMIZE)
+        val root = CutSourceMap(Any(), 0L, listOf(CutColumnSource(source))).withBounds(model)
+        var charged: CutSourceWork? = null
+
+        root.withBounds(model, onWork = { charged = it })
+
+        assertTrue(assertNotNull(charged).exact > 0L)
+    }
+
     @Test
     fun `failed source capture should retain its failure and reported work`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyList())
@@ -66,7 +129,9 @@ class CutSourceMapTest {
         val session = PropagationSession(problem)
         val source = CutSource(CutSourceKind.BOOLEAN, 0)
         val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)))
-        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val state = LpExactState(assertNotNull(LpBuilder().apply { addVar(0L, 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.ownerWorkingModel())
         session.pinBool(0, true)
         val child = root.withCpBounds(model, session)
         session.popLast()
@@ -86,7 +151,9 @@ class CutSourceMapTest {
             val definition = CutAuxiliaryDefinition(listOf(0L), listOf(0L, 1L), 1L, true)
             val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)),
                 auxiliaryDefinitions = mapOf(source to definition))
-            val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+            val state = LpExactState(assertNotNull(LpBuilder().apply { addVar(0L, 1L) }
+                .build(Sense.MINIMIZE).authoritativeModel()))
+            val model = assertNotNull(state.ownerWorkingModel())
             session.pinInt(0, 0L)
             val child = if (cpCapture) root.withCpBounds(model, session)
             else root.withDomainBounds(model, SessionDomains(session))

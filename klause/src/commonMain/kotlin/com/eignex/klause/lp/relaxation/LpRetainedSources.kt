@@ -626,7 +626,8 @@ internal class LpRetainedSources(
             ?: cpCutSourceLayout(problem, vars, bools, reals, signs, presence, auxiliarySources, work::add).also {
                 sourceLayout = SourceLayout(columns, presence, auxiliarySources.generation, it)
             }
-        val sourceMap = layout.bindCpLayout(domains, emptyMap(), work::add) { column ->
+        val sourceMap = layout.bindCpLayout(domains, emptyMap(), work::add,
+            boundIdentity = state.boundSnapshotIdentity) { column ->
             model.exactBounds(column) to model.exactShift(column)
         }
         LpRelaxation(
