@@ -24,7 +24,8 @@ internal data class CutColumnSource(
     init {
         require(!scale.isZero)
     }
-    fun expression(): CutExpression = CutExpression(mapOf(source to scale), offset)
+    private val sourceExpression = CutExpression(mapOf(source to scale), offset)
+    fun expression(): CutExpression = sourceExpression
 }
 
 internal class LpAuxiliarySources {
@@ -174,6 +175,7 @@ internal class CutSourceMap(
 internal fun CutSourceMap.withCpBounds(
     model: LpModel,
     session: com.eignex.klause.propagation.PropagationSession,
+    intColumns: IntArray? = null,
 ): CutSourceMap {
     val facts = HashSet<CutPremise>()
     for (variable in 0 until session.problem.numBoolVars) {
@@ -182,7 +184,13 @@ internal fun CutSourceMap.withCpBounds(
     }
     for (variable in 0 until session.problem.numIntVars) {
         val domain = session.intDomain(variable)
-        val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
+        val index = if (intColumns != null && variable < intColumns.size) intColumns[variable] else -1
+        val column = column(index)
+        val expression = if (column != null && column.source.kind == CutSourceKind.INTEGER &&
+            column.source.id == variable && column.scale == BigFraction.ONE && column.offset.isZero
+        ) {
+            column.expression()
+        } else CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
         facts.add(CutPremise.Bound(expression, false, BigFraction.ofLong(domain.min)))
         facts.add(CutPremise.Bound(expression, true, BigFraction.ofLong(domain.max)))
     }

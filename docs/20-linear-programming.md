@@ -504,6 +504,11 @@ the original row count, and root and node separation keep their round, depth, po
 and work allowances. The [portfolio](15-portfolio-scheduling.md#roles-and-the-mixed-roster)
 decides when the aggressive LP emphasis is seated.
 
+Immutable column bindings retain their exact source expressions. CP bound refreshes
+reuse a binding's expression only for a matching unit integer source without an
+offset; absent or incompatible mappings construct the source expression directly.
+Each refresh captures its own active bound facts.
+
 Cut family identity follows portable proofs and retained rows without contributing
 to proof authority or deduplication. Observations separate construction, mapping
 refusal, admission, selection, tightness, retirement and retraction; a tight or

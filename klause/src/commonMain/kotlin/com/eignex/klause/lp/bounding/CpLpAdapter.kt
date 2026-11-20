@@ -314,7 +314,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (result !is LpBoundBatchResult.Applied) return null
         val state = requireNotNull(core.state)
         val proof = state.ownerWorkingModel() ?: return null
-        val sources = base.sourceMap?.withCpBounds(proof, session)
+        val sources = base.sourceMap?.withCpBounds(proof, session, base.intColOf)
         val rebound = base.withModel(proof, sources)
         currentModel = proof
         persistentState = true
@@ -327,7 +327,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         selected: List<Cut>? = null,
     ): LpRelaxation? {
         if (currentModel !== base.model || native !== session) return null
-        val map = base.sourceMap?.withCpBounds(base.model, session) ?: return null
+        val map = base.sourceMap?.withCpBounds(base.model, session, base.intColOf) ?: return null
         return applyCuts(base, map, selected, session, engine.params.cancellation)
     }
 
@@ -387,7 +387,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val state = requireNotNull(core.state)
         val model = requireNotNull(state.ownerWorkingModel())
         val rebound = source?.relaxation(state, SessionDomains(session)) ?: base.withModel(model, remap = remap)
-        val map = rebound.sourceMap?.withCpBounds(model, session)?.withParentRows(cuts.parentRows(state))
+        val map = rebound.sourceMap?.withCpBounds(model, session, rebound.intColOf)?.withParentRows(cuts.parentRows(state))
         if (map != null) engine.cutPool.remap(map)
         return rebound.withModel(model, map)
     }

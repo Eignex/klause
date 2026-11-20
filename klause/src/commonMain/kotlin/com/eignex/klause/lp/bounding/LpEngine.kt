@@ -907,7 +907,7 @@ internal class LpEngine(
     }
 
     fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray, relaxation: LpRelaxation, session: PropagationSession) {
-        val sources = relaxation.sourceMap?.withCpBounds(relaxation.model, session)
+        val sources = relaxation.sourceMap?.withCpBounds(relaxation.model, session, relaxation.intColOf)
         val active = relaxation.withModel(relaxation.model, sources)
         sources?.let(cutPool::remap)
         var added = 0
