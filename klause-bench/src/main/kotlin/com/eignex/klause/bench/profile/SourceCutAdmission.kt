@@ -65,11 +65,13 @@ internal object SourceCutAdmission {
             put("accepted", shape(acceptedView, checkNotNull(acceptedModel)))
             put("nonBinaryCanonicalIntegers", nonBinary)
             put("nonBinaryCanonicalSample", buildJsonArray {
-                nonBinarySample.forEach { id -> add(buildJsonObject {
-                    put("id", id)
-                    put("lower", if (model.intBounds.hasLower(id)) model.intBounds.lower(id) else null)
-                    put("upper", if (model.intBounds.hasUpper(id)) model.intBounds.upper(id) else null)
-                }) }
+                nonBinarySample.forEach { id ->
+                    add(buildJsonObject {
+                        put("id", id)
+                        put("lower", if (model.intBounds.hasLower(id)) model.intBounds.lower(id) else null)
+                        put("upper", if (model.intBounds.hasUpper(id)) model.intBounds.upper(id) else null)
+                    })
+                }
             })
             put("sameColumns", (get(nominalView, "Columns") as IntArray)
                 .contentEquals(get(acceptedView, "Columns") as IntArray))

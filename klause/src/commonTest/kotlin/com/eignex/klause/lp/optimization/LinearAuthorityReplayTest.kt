@@ -253,8 +253,9 @@ class LinearAuthorityReplayTest : RuntimeInitializedTest() {
         val guarded = SourceProofContext(source.scope.copy(condition = SourceCondition(
             bools = mapOf(0 to false), upper = mapOf(x to BigFraction.ZERO))),
             source.coordinates + SourceCoordinate(SourceCoordinate.Kind.Boolean, 0),
-            source.premises.mapValues { (id, premise) -> SourcePremise(premise.inequality,
-                if (id == "x-plus") mapOf(0 to true) else emptyMap()) }, source.objective)
+            source.premises.mapValues { (id, premise) ->
+                SourcePremise(premise.inequality, if (id == "x-plus") mapOf(0 to true) else emptyMap())
+            }, source.objective)
         val budget = SourceLpBudget()
 
         val result = LinearAuthority(budget, retainLp = true).use {
