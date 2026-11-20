@@ -59,7 +59,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
 
         JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 3), external = { seed },
             incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true },
-            onComparison = { if (it.phase == "query") cutoffs += it.cutoff }).use { repair ->
+            onComparison = { if (it.phase == "query") cutoffs += it.cutoff?.toString() }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
                 repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }

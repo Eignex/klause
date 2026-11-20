@@ -287,10 +287,10 @@ internal class LinearAuthorityInvocation(
             }
             val revision = incumbentRevision
             val event = frontier?.next() ?: checkNotNull(run).next()
-            if (incumbentProximity && completion != null && importedIncumbents > 0 &&
-                incumbentRevision != revision) {
+            if (proximity != null && incumbentRevision != revision) {
                 proximity?.close()
                 proximity = null
+                observeProximity("OrdinaryRetirements")
             }
             proximityTurn = proximity != null
             if (boundOrdered) component.updateGlobalBound()

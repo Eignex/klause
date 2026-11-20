@@ -50,6 +50,37 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     )
 
     @Test
+    fun `an ordinary improvement should retire an active advisory query`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = columns.flatMapIndexed { index, column ->
+            listOf(
+                "lower$index" to SourcePremise(SourceInequality(
+                    mapOf(column to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.ONE), BigFraction.ONE)),
+                "cover$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.MINUS_ONE,
+                    columns[(index + 1) % columns.size] to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            )
+        }.toMap() + mapOf(
+            "real-lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real-upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO)),
+        )
+        val source = SourceProofContext(scope, columns.toSet() + real, rows,
+            (columns + real).associateWith { BigFraction.ONE })
+        val seed = Sample(booleanArrayOf(), longArrayOf(0, 0, 0), doubleArrayOf(1.99))
+
+        LinearAuthorityInvocation(source, TheoryParams(sourceCuts = false), external = { seed },
+            boundOrdered = true, incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true })
+            .use { invocation ->
+                repeat(128) {
+                    if (!invocation.isDone) invocation.runSlice(ExecutionControl.Never, 1_000, 1) { _, _ -> }
+                }
+
+                assertEquals(BigFraction.ofLong(2), invocation.snapshot(TerminationReason.BudgetExhausted).value)
+                assertEquals(1L, invocation.stats.smt.completeSearchStages?.get("numericalProximityOrdinaryRetirements"))
+            }
+    }
+
+    @Test
     fun `an infeasible advisory aspiration should preserve original optimum authority`() {
         val source = SourceProofContext(scope, setOf(integer, real), mapOf(
             "int-lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
