@@ -1053,14 +1053,19 @@ class PropagationSession private constructor(
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
-        if (state.integerRowAdmission) {
+        val fallback = learned.fallbackClause
+        val rowLevels = learned.decisionLevels.size - if (learned.decisionLevels.firstOrNull() == 0) 1 else 0
+        val clauseLevels = fallback.decisionLevels.size - if (fallback.decisionLevels.firstOrNull() == 0) 1 else 0
+        if (state.integerRowAdmission && rowLevels <= clauseLevels) {
             val result = addLearnedIntegerRow(learned.row, learned.lbd)
             if (result is PropagationResult.Unsat || fixpointCancelled) return result
-        } else {
+        } else if (!state.integerRowAdmission) {
             state.integerRowAdmissionsDeclined++
             state.arithmeticLearningTrace?.record("integer.decline.admission-disabled")
+        } else {
+            state.integerRowExtraLevelsDeclined++
+            state.arithmeticLearningTrace?.record("integer.decline.extra-decision-levels")
         }
-        val fallback = learned.fallbackClause
         return registerAndPropagate(base = publicationBase) {
             state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
         }
@@ -1474,6 +1479,7 @@ class PropagationSession private constructor(
             "learningIntegerSessions" to 1L,
             "learningIntegerDerived" to it.integerRowsDerived,
             "learningIntegerAdmissionDeclined" to it.integerRowAdmissionsDeclined,
+            "learningIntegerExtraLevelsDeclined" to it.integerRowExtraLevelsDeclined,
         ) else counts
     } ?: retiredLifecycle
 

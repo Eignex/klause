@@ -369,6 +369,7 @@ class PropagationState private constructor(
     internal var integerRowAdmission = true
     internal var integerRowsDerived = 0L
     internal var integerRowAdmissionsDeclined = 0L
+    internal var integerRowExtraLevelsDeclined = 0L
     internal var arithmeticLearningLimits = ArithmeticLearningLimits()
     internal var factorAttribution: FactorAttribution? = null
     internal var historicalTableReasons = false
