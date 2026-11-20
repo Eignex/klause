@@ -11,6 +11,145 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `gap comparisons retain the factor two boundary for subnormal contexts`() {
+        val history = LpDirectionalHistory({}, requireComparableGap = true)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0, cutoff = Double.MIN_VALUE)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(1.0, cutoff = Double.MIN_VALUE)
+            }
+        }
+        for ((current, available) in listOf(2.0 to true, 3.0 to false)) {
+            history.beginNode(0)
+            history.record(0.0, cutoff = current * Double.MIN_VALUE)
+
+            val estimate = history.estimate(variable, 0.5)
+
+            if (available) assertEquals(1.0, estimate, 1e-9) else assertTrue(estimate.isNaN())
+        }
+    }
+
+    @Test
+    fun `all four parent gaps must be comparable to the current gap`() {
+        for (different in -1 until 4) {
+            val history = LpDirectionalHistory({}, requireComparableGap = true)
+            val variable = VarRef.Bool(0)
+            for ((index, up) in listOf(false, true, false, true).withIndex()) {
+                val parent = if (index == different) 99.0 else 90.0
+                history.beginNode(0)
+                history.record(parent, cutoff = 100.0)
+                history.branch(variable, 0.5)
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(parent + 2.0, cutoff = 100.0)
+            }
+            history.beginNode(0)
+            history.record(90.0, cutoff = 100.0)
+
+            val score = history.score(variable, 0.5)
+
+            if (different < 0) assertEquals(2.0, score, 1e-9) else assertTrue(score.isNaN())
+        }
+    }
+
+    @Test
+    fun `unknown parent context cannot become a measured zero reference`() {
+        for (cutoff in listOf(100.0, Double.NaN, Double.POSITIVE_INFINITY, 90.0, 89.0)) {
+            val history = LpDirectionalHistory({}, requireComparableGap = true)
+            val variable = VarRef.Bool(0)
+            for ((index, up) in listOf(false, true, false, true).withIndex()) {
+                history.beginNode(0)
+                history.record(90.0, cutoff = if (index == 0) cutoff else 100.0)
+                history.branch(variable, 0.5)
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(90.0, cutoff = 100.0)
+            }
+            history.beginNode(0)
+            history.record(90.0, cutoff = 100.0)
+
+            val estimate = history.estimate(variable, 0.5)
+
+            if (cutoff == 100.0) assertEquals(0.0, estimate) else assertTrue(estimate.isNaN())
+        }
+    }
+
+    @Test
+    fun `an unavailable current gap withholds reliable observations`() {
+        for (cutoff in listOf(Double.NaN, Double.POSITIVE_INFINITY, 90.0, 89.0)) {
+            val history = LpDirectionalHistory({}, requireComparableGap = true)
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(90.0, cutoff = 100.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (literal in listOf(0, 1)) {
+                    history.commit(SearchDecision.Bool(literal), 1)
+                    history.beginNode(1)
+                    history.record(92.0, cutoff = 100.0)
+                }
+            }
+            history.beginNode(0)
+            history.record(90.0, cutoff = cutoff)
+
+            assertTrue(history.hasReliableHistory)
+            assertTrue(history.score(variable, 0.5).isNaN())
+        }
+    }
+
+    @Test
+    fun `collection needs two comparable majority parent gaps`() {
+        for (gaps in listOf(10.0 to 10.0, 1.0 to 10.0, 10.0 to 1.0, Double.NaN to 10.0)) {
+            val history = LpDirectionalHistory({}, requireComparableGap = true)
+            val variable = VarRef.Bool(0)
+            for (gap in listOf(gaps.first, gaps.second)) {
+                val parent = if (gap.isNaN()) 90.0 else 100.0 - gap
+                history.beginNode(0)
+                history.record(parent, cutoff = if (gap.isNaN()) Double.NaN else 100.0)
+                history.branch(variable, 0.5)
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.record(parent + 1.0, cutoff = 100.0)
+            }
+            history.beginNode(0)
+            history.record(90.0, cutoff = 100.0)
+
+            val preferred = history.preferUnderObservedDirection(variable, 0.5)
+
+            if (gaps.first == 10.0 && gaps.second == 10.0) assertEquals(true, preferred)
+            else assertNull(preferred)
+        }
+    }
+
+    @Test
+    fun `restart requires a fresh comparable gap without discarding samples`() {
+        val history = LpDirectionalHistory({}, requireComparableGap = true)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(90.0, cutoff = 100.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(92.0, cutoff = 100.0)
+            }
+        }
+
+        history.restart()
+
+        assertTrue(history.score(variable, 0.5).isNaN())
+        history.beginNode(0)
+        history.record(90.0, cutoff = 100.0)
+        assertEquals(2.0, history.score(variable, 0.5), 1e-9)
+    }
+
+    @Test
     fun `restart retains samples but discards ancestor and pending child attribution`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add)

@@ -384,6 +384,11 @@ large observation cannot raise its estimate alone. The two gains must agree with
 a factor of two; disagreement withholds advice until passive observations stabilize.
 A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
+Each observation also retains its parent's remaining objective gap under the shared
+cutoff, after excluding the objective constant. All four parent gaps must be positive,
+finite and within a factor of two of the current gap. Unknown or incomparable gaps
+withhold the estimate, including a zero-gain reference. Recording and comparing the
+gap metadata charge the existing LP allowance; it supplies no pruning authority.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
@@ -416,7 +421,9 @@ child first to collect missing passive information. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
 around its fresh fractional LP point. The more observed side needs two in-age,
 stable positive gains; the missing side may have no observation. A scope-wide availability
-stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions
+stamp skips collection lookups until such observations exist. Both majority-side
+parent gaps must also match the current gap under the same factor-of-two rule.
+Equal sample counts or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
 history resets do not renew those limits. It creates no LP query and charges the

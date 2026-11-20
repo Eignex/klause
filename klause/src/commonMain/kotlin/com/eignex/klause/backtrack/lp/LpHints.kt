@@ -31,7 +31,7 @@ internal class LpHints(
     private val applyAdvice: Boolean = true,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe, charge = charge)
+    private val history = LpDirectionalHistory(observe, charge = charge, requireComparableGap = true)
     private val passiveChoice = if (collect) LpPassiveVariableChoice(applyAdvice, observe, charge) else null
     private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
     private var passivePoint: LpRelaxation? = null
@@ -86,7 +86,7 @@ internal class LpHints(
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         objectiveRecorded = objective.isFinite()
         if (passiveChoice != null && passivePoint === relaxation) passiveState = state
-        history.record(objective)
+        history.record(objective, cutoff = cutoff - scopeConstant.toDouble())
     }
 
     private fun scopeDifference(relaxation: LpRelaxation, state: LpExactState): String? = when {
@@ -182,7 +182,7 @@ internal class LpHints(
     }
 
     private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
-        history.hasReliableHistory && passivePointCurrent()
+        history.hasReliableHistory && history.canCompareGap && passivePointCurrent()
 
     val hasDirectionalCandidates: Boolean get() = hasDirectionalScore()
 
@@ -306,7 +306,7 @@ internal class LpHints(
     ): List<SearchDecision> {
         val collection = passiveCollection ?: return alternatives
         collection.clear()
-        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
+        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory && history.canCompareGap
         if (!history.hasObservations || !collectReady ||
             cancelled() || !passivePointCurrent()
         ) return alternatives

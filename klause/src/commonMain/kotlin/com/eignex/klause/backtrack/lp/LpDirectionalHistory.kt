@@ -10,6 +10,7 @@ internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
+    private val requireComparableGap: Boolean = false,
 ) {
     private class Direction {
         var count = 0
@@ -17,6 +18,8 @@ internal class LpDirectionalHistory(
         var previous = 0.0
         var stamp = 0L
         var previousStamp = 0L
+        var latestGap = Double.NaN
+        var previousGap = Double.NaN
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -26,7 +29,7 @@ internal class LpDirectionalHistory(
     private class Gains(val variable: VarRef, val down: Direction = Direction(), val up: Direction = Direction()) {
         var indexed = false
     }
-    private class Parent(val objective: Double, val variable: VarRef, val value: Double)
+    private class Parent(val objective: Double, val variable: VarRef, val value: Double, val gap: Double)
     private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
     private val gains = HashMap<VarRef, Gains>()
@@ -40,6 +43,7 @@ internal class LpDirectionalHistory(
     private var stamp = 0L
     private var depth = 0
     private var objective = Double.NaN
+    private var gap = Double.NaN
     private var reliableStamp = -1L
     private var valueStamp = -1L
     private var collectionStamp = -1L
@@ -49,6 +53,7 @@ internal class LpDirectionalHistory(
         stamp++
         depth = level
         objective = Double.NaN
+        clearGap()
         if (pending?.depth != level) pending = null
     }
 
@@ -62,11 +67,14 @@ internal class LpDirectionalHistory(
 
     val hasObservations: Boolean get() = observed
 
+    val canCompareGap: Boolean get() = !requireComparableGap || !gap.isNaN()
+
     fun restart() {
         charge(3L)
         trimParents(0)
         pending = null
         objective = Double.NaN
+        clearGap()
         observe("RESTART")
         if (gains.isNotEmpty()) {
             charge(1L)
@@ -84,6 +92,7 @@ internal class LpDirectionalHistory(
         trimParents(0)
         pending = null
         objective = Double.NaN
+        clearGap()
         reliableStamp = -1L
         valueStamp = -1L
         collectionStamp = -1L
@@ -91,7 +100,19 @@ internal class LpDirectionalHistory(
         if (report) observe("RESET")
     }
 
-    fun record(value: Double) {
+    private fun clearGap() {
+        if (gap.isNaN()) return
+        gap = Double.NaN
+        charge(1L)
+    }
+
+    fun record(value: Double, cutoff: Double = Double.NaN) {
+        val version = generation
+        if (requireComparableGap) {
+            charge(3L)
+            if (version != generation) return
+            gap = (cutoff - value).takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
+        }
         objective = value
         val child = pending ?: return
         pending = null
@@ -105,6 +126,12 @@ internal class LpDirectionalHistory(
         expire(history.down)
         expire(history.up)
         val direction = if (child.up) history.up else history.down
+        if (requireComparableGap) {
+            charge(2L)
+            if (version != generation) return
+            direction.previousGap = direction.latestGap
+            direction.latestGap = child.parent.gap
+        }
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
         direction.latest = normalized
@@ -164,7 +191,7 @@ internal class LpDirectionalHistory(
     }
 
     fun branch(variable: VarRef, value: Double) {
-        charge(8L)
+        charge(if (requireComparableGap) 9L else 8L)
         trimParents(depth)
         if (depth !in 0 until MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
         val fraction = value - floor(value)
@@ -173,7 +200,7 @@ internal class LpDirectionalHistory(
             charge(MAX_DEPTH.toLong())
             arrayOfNulls<Parent>(MAX_DEPTH).also { parents = it }
         }
-        records[depth] = Parent(objective, variable, value)
+        records[depth] = Parent(objective, variable, value, gap)
         parentCount++
         parentLimit = depth + 1
     }
@@ -267,8 +294,20 @@ internal class LpDirectionalHistory(
         if (!history.down.stable || !history.up.stable) return null
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        if (requireComparableGap) {
+            charge(4L)
+            if (!matchingGap(history.down.latestGap) || !matchingGap(history.down.previousGap) ||
+                !matchingGap(history.up.latestGap) || !matchingGap(history.up.previousGap)
+            ) {
+                observe("GAP_UNAVAILABLE")
+                return null
+            }
+        }
         return history
     }
+
+    private fun matchingGap(other: Double): Boolean = gap.isFinite() && gap > 0.0 &&
+        other.isFinite() && other > 0.0 && maxOf(gap, other) <= minOf(gap, other) * 2.0
 
     fun preferUnderObservedDirection(variable: VarRef, value: Double): Boolean? {
         if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
@@ -284,6 +323,13 @@ internal class LpDirectionalHistory(
         if (sampledDirection.gain <= 0.0) {
             observe("PASSIVE_COLLECTION_ZERO_GAIN")
             return null
+        }
+        if (requireComparableGap) {
+            charge(2L)
+            if (!matchingGap(sampledDirection.latestGap) || !matchingGap(sampledDirection.previousGap)) {
+                observe("GAP_UNAVAILABLE")
+                return null
+            }
         }
         return history.up.count < history.down.count
     }
