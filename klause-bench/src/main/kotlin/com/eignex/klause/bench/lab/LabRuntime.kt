@@ -41,8 +41,7 @@ internal object LabRuntime {
             if (recordsJfr) {
                 add("-XX:FlightRecorderOptions=stackdepth=128")
                 val compilation = if (measurement == "jfr") "" else ",jdk.Compilation#threshold=0ms"
-                add("-XX:StartFlightRecording=filename=$report/cli.jfr,settings=profile$compilation," +
-                    "jdk.ClassLoad#enabled=true,jdk.ClassLoad#threshold=0ms,dumponexit=true")
+                add("-XX:StartFlightRecording=filename=$report/cli.jfr,settings=profile$compilation,dumponexit=true")
             }
             if (measurement == "compilation+log") {
                 add("-XX:+UnlockDiagnosticVMOptions")
