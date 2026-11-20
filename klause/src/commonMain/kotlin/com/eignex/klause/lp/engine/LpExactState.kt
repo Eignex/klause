@@ -333,13 +333,13 @@ internal class LpExactState internal constructor(
 
     private fun boundsProject(j: Int): Boolean {
         val bounds = model.column(j).bounds
-        return (bounds.lower == null || bounds.lower.number.project() != null) &&
-            (bounds.upper == null || bounds.upper.number.project() != null)
+        return (bounds.lower == null || !bounds.lower.number.project().isNaN()) &&
+            (bounds.upper == null || !bounds.upper.number.project().isNaN())
     }
 
-    private fun objectiveProjects(): Boolean = model.objective.constant.project() != null &&
-        model.objective.scale.project(nonzeroRequired = true) != null &&
-        model.objective.externalConstant.project() != null
+    private fun objectiveProjects(): Boolean = !model.objective.constant.project().isNaN() &&
+        !model.objective.scale.project(nonzeroRequired = true).isNaN() &&
+        !model.objective.externalConstant.project().isNaN()
 
     fun activeSide(column: Int, upper: Boolean): LpBoundAssertion? = if (upper) this.upper[column] else lower[column]
 
@@ -398,7 +398,7 @@ internal class LpExactState internal constructor(
         }
         if (previous.scalarsProjectable == true) {
             scalarsProjectable = columns.all { boundsProject(it) } &&
-                projectionCosts.all { model.objective.cost(it).project(nonzeroRequired = true) != null } &&
+                projectionCosts.all { !model.objective.cost(it).project(nonzeroRequired = true).isNaN() } &&
                 (!projectionObjective || objectiveProjects())
         }
     }
@@ -535,27 +535,31 @@ internal class LpExactState internal constructor(
     ): Double? {
         for (i in 0 until model.m) {
             meter.poll()
-            val value = model.rhs(i).project() ?: return null
+            val value = model.rhs(i).project()
+            if (value.isNaN()) return null
             if (rhs != null) rhs[i] = value
         }
         for (j in 0 until model.numVars) {
             meter.poll()
-            val cost = model.objective.cost(j).project(nonzeroRequired = true) ?: return null
+            val cost = model.objective.cost(j).project(nonzeroRequired = true)
+            if (cost.isNaN()) return null
             if (costs != null) costs[j] = cost
-            model.column(j).bounds.lower?.let { if (it.number.project() == null) return null }
+            model.column(j).bounds.lower?.let { if (it.number.project().isNaN()) return null }
             model.column(j).bounds.upper?.let {
-                val upper = it.number.project() ?: return null
+                val upper = it.number.project()
+                if (upper.isNaN()) return null
                 if (uppers != null) uppers[j] = upper
                 if (hasUpper != null) hasUpper[j] = true
             }
             if (j < model.n) {
-                val origin = model.column(j).origin.project() ?: return null
+                val origin = model.column(j).origin.project()
+                if (origin.isNaN()) return null
                 if (origins != null) origins[j] = origin
             }
         }
-        val constant = model.objective.constant.project() ?: return null
-        if (model.objective.scale.project(nonzeroRequired = true) == null ||
-            model.objective.externalConstant.project() == null
+        val constant = model.objective.constant.project()
+        if (constant.isNaN() || model.objective.scale.project(nonzeroRequired = true).isNaN() ||
+            model.objective.externalConstant.project().isNaN()
         ) {
             return null
         }
@@ -572,9 +576,10 @@ internal fun ExactLpSide.strongerThan(other: ExactLpSide, upper: Boolean): Boole
         (comparison == 0 && strict && !other.strict)
 }
 
-private fun ExactLpNumber.project(nonzeroRequired: Boolean = false): Double? {
+// Successful scalar projections are finite; NaN keeps failure out of the boxed numeric path.
+private fun ExactLpNumber.project(nonzeroRequired: Boolean = false): Double {
     val result = approximation
-    return result.takeIf { it.isFinite() && (!nonzeroRequired || it != 0.0 || value.isZero) }
+    return if (result.isFinite() && (!nonzeroRequired || result != 0.0 || value.isZero)) result else Double.NaN
 }
 
 private class LpProjectionLayout(model: ExactLpModel) {
@@ -701,8 +706,10 @@ private class LpVectorProjection(
         for (column in columns) {
             meter.poll()
             val bounds = model.column(column).bounds
-            bounds.lower?.let { if (it.number.project() == null) return null }
-            val value = bounds.upper?.number?.project() ?: if (bounds.upper == null) 0.0 else return null
+            bounds.lower?.let { if (it.number.project().isNaN()) return null }
+            val bound = bounds.upper
+            val value = if (bound == null) 0.0 else bound.number.project()
+            if (value.isNaN()) return null
             if (upper[column].toRawBits() != value.toRawBits()) {
                 if (nextUpper === upper) {
                     meter.reserve(upper.size.toLong(), upper.size * 8L, matrix = false)
@@ -736,7 +743,8 @@ private class LpVectorProjection(
         var nextCost = cost
         for (column in columns) {
             meter.poll()
-            val value = model.objective.cost(column).project(nonzeroRequired = true) ?: return null
+            val value = model.objective.cost(column).project(nonzeroRequired = true)
+            if (value.isNaN()) return null
             if (cost[column].toRawBits() != value.toRawBits()) {
                 if (nextCost === cost) {
                     meter.reserve(cost.size.toLong(), cost.size * 8L, matrix = false)
@@ -745,9 +753,9 @@ private class LpVectorProjection(
                 nextCost[column] = value
             }
         }
-        val nextConstant = model.objective.constant.project() ?: return null
-        if (model.objective.scale.project(nonzeroRequired = true) == null ||
-            model.objective.externalConstant.project() == null
+        val nextConstant = model.objective.constant.project()
+        if (nextConstant.isNaN() || model.objective.scale.project(nonzeroRequired = true).isNaN() ||
+            model.objective.externalConstant.project().isNaN()
         ) {
             return null
         }
