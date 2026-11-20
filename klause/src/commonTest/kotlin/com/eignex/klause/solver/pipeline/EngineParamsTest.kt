@@ -20,6 +20,23 @@ import kotlin.test.assertTrue
 
 class EngineParamsTest {
     @Test
+    fun `row admission should reach workers independently of integer learning`() {
+        for (admission in listOf(false, true)) {
+            val base = com.eignex.klause.backtrack.BacktrackParams(
+                integerRowLearning = true, integerRowAdmission = !admission)
+            val settings = listOf("integer-row-admission=$admission")
+
+            val workers = listOf(applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true),
+                applyBacktrackParams(base, EngineParams(settings)))
+
+            for (worker in workers) {
+                assertEquals(admission, worker.integerRowAdmission)
+                assertTrue(worker.integerRowLearning)
+            }
+        }
+    }
+
+    @Test
     fun `integer learning allowances should reach fixed and portfolio workers`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         val settings = listOf("arithmetic-learning-work=0", "arithmetic-learning-allocation-bytes=4096")
