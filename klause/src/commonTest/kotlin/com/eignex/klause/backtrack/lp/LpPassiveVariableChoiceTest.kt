@@ -10,6 +10,32 @@ import kotlin.test.assertTrue
 
 class LpPassiveVariableChoiceTest {
     @Test
+    fun `commitment invalidated while bookkeeping is charged supplies no attribution`() {
+        for (apply in listOf(false, true)) {
+            var fresh = true
+            var committing = false
+            var work = 0L
+            val events = ArrayList<String>()
+            val choice = LpPassiveVariableChoice(apply, events::add, {
+                work += it
+                if (committing) fresh = false
+            })
+            val selected = choice.select(LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75),
+                LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25), 1, { fresh }, { true })
+            choice.branch(selected, 1)
+            val before = work
+            committing = true
+
+            choice.commit(SearchDecision.IntAtMost(selected.varId, 0L)) { fresh }
+
+            assertEquals(before + 4L, work)
+            assertNull(choice.nominatedVariable)
+            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMIT_WITHHELD" in events)
+        }
+    }
+
+    @Test
     fun `advice withholding preserves passive comparison cost`() {
         val baseline = LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25)
         val proposal = LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75)
@@ -40,8 +66,8 @@ class LpPassiveVariableChoiceTest {
             choice.select(proposal, baseline, 1, { true }, { true })
             choice.branch(proposal.variable, 1)
 
-            choice.commit(decision)
-            choice.commit(decision)
+            choice.commit(decision) { true }
+            choice.commit(decision) { true }
 
             assertEquals(1, events.count { it == "PASSIVE_VARIABLE_COMMIT_CHANGED" })
             assertNull(choice.nominatedVariable)
@@ -57,7 +83,7 @@ class LpPassiveVariableChoiceTest {
         choice.select(proposal, baseline, 1, { true }, { true })
         choice.branch(baseline.variable, 1)
 
-        choice.commit(SearchDecision.IntAtMost(0, 0L))
+        choice.commit(SearchDecision.IntAtMost(0, 0L)) { true }
 
         assertEquals(1, events.count { it == "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED" })
         assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
@@ -98,7 +124,7 @@ class LpPassiveVariableChoiceTest {
 
             val selected = choice.select(proposal, baseline, 1, { true }, { reliable })
             choice.branch(baseline.variable, 1)
-            choice.commit(SearchDecision.IntAtMost(0, 0L))
+            choice.commit(SearchDecision.IntAtMost(0, 0L)) { true }
 
             assertEquals(baseline.variable, selected)
             assertNull(choice.nominatedVariable)
@@ -119,7 +145,7 @@ class LpPassiveVariableChoiceTest {
                 LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25), 1, { true }, { true })
             choice.branch(variable, stamp)
 
-            choice.commit(decision)
+            choice.commit(decision) { true }
 
             assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
             assertNull(choice.nominatedVariable)
@@ -135,7 +161,7 @@ class LpPassiveVariableChoiceTest {
         choice.branch(VarRef.IntVar(1), 1)
 
         choice.clear()
-        choice.commit(SearchDecision.IntAtMost(1, 0L))
+        choice.commit(SearchDecision.IntAtMost(1, 0L)) { true }
 
         assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
         assertNull(choice.nominatedVariable)

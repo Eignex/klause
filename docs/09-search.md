@@ -394,7 +394,7 @@ flags still clear. Comparison and changed-proposal observations remain separate 
 the actual variable and matching
 adjacent split committed by search; replacement, retraction and retirement discard
 an unconsumed nomination. Variable commitment rechecks cancellation and current
-LP state before attributing advice, charging the existing LP allowance.
+LP state after charging its work and before attributing advice, using the existing LP allowance.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
