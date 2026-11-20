@@ -396,7 +396,10 @@ the search intent: if either stable gain, scaled by its current fractional branc
 movement, reaches that gap, the child with the greater prune fraction goes first.
 Otherwise the child with the smaller prune fraction goes first. Nonfinite or
 nonpositive gaps and positive predictions that cannot be represented as positive
-floating values keep ordinary order. Predictions supply only this ordering, never
+floating values keep ordinary order. Prune-first advice requires its preferred
+prediction to reach the gap; open-first advice requires its prediction to be no
+greater than the other child's. Disagreement keeps ordinary order.
+Predictions supply only this ordering, never
 a bound or pruning authority. Numerical gain reliability is checked independently, including
 two stable finite gains in each direction and a positive gain in at least one.
 These historical outcomes supply no bound or pruning authority at another node.
@@ -427,9 +430,9 @@ keep ordinary order. Pooled point replay keeps precedence. Collection checks at 
 history resets do not renew those limits. It creates no LP query and charges the
 existing LP allowance. Collection comparisons and changed committed splits have
 separate counters from reliable child advice. Withholding reliable advice keeps
-this collection policy and its costs enabled. `lp-directional-advice=false` keeps
-the ordinary variable and value choices while retaining enabled directional observation,
-nomination and comparison work; the corresponding backtrack setting is
+this collection policy and its costs enabled. `lp-directional-advice=false` withholds
+reliable child-order proposals while retaining directional observation, collection,
+nomination, comparison and commitment work; the corresponding backtrack setting is
 `BacktrackParams.lpDirectionalAdvice`.
 
 Samples share one retained exact base model, active-row identity, objective mapping

@@ -14,29 +14,57 @@ class LpDirectionalHistoryTest {
     fun `child order seeks open outcomes until a predicted gain reaches the cutoff`() {
         for (prunedUp in listOf(false, true)) {
             for (mixed in listOf(false, true)) {
-                var work = 0L
-                val history = LpDirectionalHistory({}, charge = { work += it })
-                val variable = VarRef.Bool(0)
-                history.beginNode(0)
-                history.record(10.0)
-                history.branch(variable, 0.5)
-                repeat(2) { sample ->
-                    for (up in listOf(false, true)) {
-                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
-                        history.beginNode(1)
-                        history.record(if (up) 13.0 else 11.0)
-                        history.finishNode(up == prunedUp && (!mixed || sample == 0))
+                for (sameGain in listOf(false, true)) {
+                    var work = 0L
+                    val history = LpDirectionalHistory({}, charge = { work += it })
+                    val variable = VarRef.Bool(0)
+                    history.beginNode(0)
+                    history.record(10.0)
+                    history.branch(variable, 0.5)
+                    repeat(2) { sample ->
+                        for (up in listOf(false, true)) {
+                            history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                            history.beginNode(1)
+                            history.record(if (up == prunedUp || sameGain) 13.0 else 11.0)
+                            history.finishNode(up == prunedUp && (!mixed || sample == 0))
+                        }
+                    }
+                    history.record(10.0)
+                    for (cutoff in listOf(11.0, 12.0, 13.0, 14.0)) {
+                        val before = work
+
+                        val preference = history.preferDirection(variable, 0.5, cutoff)
+
+                        assertEquals(if (cutoff <= 13.0) prunedUp else !prunedUp, preference)
+                        assertEquals(40L, work - before)
                     }
                 }
-                history.record(10.0)
-                for (cutoff in listOf(11.0, 12.0, 13.0, 14.0)) {
-                    val before = work
+            }
+        }
+    }
 
-                    val preference = history.preferDirection(variable, 0.5, cutoff)
-
-                    assertEquals(if (cutoff <= 13.0) prunedUp else !prunedUp, preference)
-                    assertEquals(32L, work - before)
+    @Test
+    fun `child rate advice requires predictions consistent with its search intent`() {
+        for (higherUp in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up == higherUp) 13.0 else 11.0)
+                    history.finishNode(up != higherUp)
                 }
+            }
+            history.record(10.0)
+
+            for (cutoff in listOf(11.0, 12.0, 14.0)) {
+                val preference = history.preferDirection(variable, 0.5, cutoff)
+
+                assertEquals(if (cutoff == 11.0) !higherUp else null, preference)
             }
         }
     }
@@ -86,7 +114,7 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `reset during a charged preference lookup discards the result`() {
-        for (resetAt in 1..3) {
+        for (resetAt in 1..4) {
             var reading = false
             var reads = 0
             lateinit var history: LpDirectionalHistory

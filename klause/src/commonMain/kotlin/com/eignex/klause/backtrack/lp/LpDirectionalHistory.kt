@@ -258,7 +258,14 @@ internal class LpDirectionalHistory(
             (downGain == 0.0 && history.down.gain > 0.0) ||
             (upGain == 0.0 && history.up.gain > 0.0)
         ) return null
-        return if (maxOf(downGain, upGain) >= gap) up > down else up < down
+        charge(8L)
+        if (version != generation) return null
+        val prune = maxOf(downGain, upGain) >= gap
+        val preferUp = if (prune) up > down else up < down
+        val preferredGain = if (preferUp) upGain else downGain
+        val otherGain = if (preferUp) downGain else upGain
+        if ((prune && preferredGain < gap) || (!prune && preferredGain > otherGain)) return null
+        return preferUp
     }
 
     fun prunedDirections(variable: VarRef, value: Double): Double {
