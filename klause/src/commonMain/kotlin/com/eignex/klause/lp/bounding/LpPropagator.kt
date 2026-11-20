@@ -94,7 +94,7 @@ internal class LpPropagator(
     // Each bound edit costs the scoped solver a pass over the model's columns; the engine charges it as LP work.
     private val onEdit: (Long) -> Unit = {},
     private val queryWorkAllowance: () -> Long? = { null },
-    private val onPreparation: ((LpSolveMetrics) -> Unit)? = null,
+    private var onPreparation: ((LpSolveMetrics) -> Unit)? = null,
     private val continuationAllowance: () -> Long? = { null },
 ) : SearchComponent,
     SearchBrancher,
@@ -103,6 +103,11 @@ internal class LpPropagator(
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
     private var owner: LpScopedSolver? = null
+    internal fun accountPreparation(observer: (LpSolveMetrics) -> Unit) {
+        check(owner == null)
+        onPreparation = observer
+    }
+
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
 

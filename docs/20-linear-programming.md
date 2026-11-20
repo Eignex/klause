@@ -344,11 +344,36 @@ integer box sum when it fits, falling back to rational accumulation on overflow.
 Objective changes retract dependent bounds, cuts and clauses, or restore an
 objective-independent region.
 
-The explicit `+sparse-trial` LP option selects a bounded root trial for compact
-closed unconditional linear sources; emphasis levels leave it disabled. Admission
+Portfolio capability checks use an applicable ordinary numerical plan directly;
+sparse admission prepares a source for that check only when ordinary work supplies no capability.
+Detailed plans and worker engines retain their full admission path.
+
+Numerical emphasis permits automatic sparse root admission beyond the small-relaxation
+budget for compact finite optimizing linear sources. Component ownership, tree
+search, objective cones and forced cut families keep their requested plans.
+`-sparse-trial` disables admission; `+sparse-trial` requests the bounded root trial
+without the automatic fill-risk gate. Admission
 bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
 retained layout. Custom emitters decline because they reserve no source size. The
+automatic policy declines row-intersection risk above eight million pairs before
+source assembly and checks the emitted risk again afterward. A first-probe forecast
+combines two factor attempts with global sparse passes and fill risk. Each attempt
+uses the sum of the emitted connected blocks' row-count cubes plus a global
+row-count square, capped by the factor-work limit. Sparse factor updates stay within
+those blocks; ordering, workspace and recovery retain one numerical owner. Global
+passes use one basis dimension per emitted row, including slack columns. Source
+preflight compares assembly and global passes against the cumulative root grant,
+with an early shape-only check before scanning source rows. Connectivity is known
+only after bounded assembly; the emitted forecast includes factor attempts and
+retains completed preparation cost on refusal. This predicts an affordable exploration;
+recovery and subsequent pivots can exceed it, and completion is not promised. The
+uncapped monolithic forecast remains diagnostic; disconnected blocks do not imply
+separate numerical owners. Automatic
+admission also caps its grant by the remaining containing deadline's LP work share,
+when that allowance is enabled. Admission fixes the grant once; later slices do not
+resize it against the approaching deadline.
+The
 trial uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
 cuts and expanded hulls stay outside its allowance, and admitted roots enable the
 ordinary root primal consumers. The initial root bound and later root propagation
@@ -369,17 +394,26 @@ qualify; later CP assertions supply no global bound. Search publishes accepted
 bounds to its objective floor and retains them in its terminal bound.
 With a checked bound and a positive decision allowance, a sliced monolithic finite
 worker can enter discrete search before its root numerical query completes.
+Automatic handoff requires its checked integer objective floor to improve the
+domain and shared floors captured before its first root LP query, together with
+its first checked root floor. The first checked floor fixes that scheduling baseline,
+including when the initial query supplies no bound and a continuation supplies it.
+A proposal matching that baseline leaves the cursor available for further funded slices.
 The handoff retires the unfinished cursor and skips further root consultations for
 that search binding; the accepted global bound remains available.
 Completed-point rounding, component-owned plans and workers without a decision
 allowance keep their existing root consultation paths.
 
-Sparse-trial preparation is capped at eight million modeled work units; root and
-node LP work stop at 150 million units or the containing invocation's smaller
-allowance, and tighter caller deadlines and work shares remain in force. Bounded
-atomic numerical operations can finish past a work boundary; the ledger keeps their
-actual cost. An exhausted root grant cannot restart an unchanged root query through
-the node consumer.
+Sparse-trial preparation is capped at eight million modeled work units; root LP
+funding cooperatively limits reported `LpWork` to 150 million units or the containing
+invocation's smaller allowance, with tighter caller deadlines and work shares.
+Atomic numerical operations can finish past a work boundary. Reported basis work
+stays separate from `LpWork`: repair can overlap both counters, while scoped initial
+factor construction and exact-rank recovery costs are unmeasured. Neither the grant
+nor the admission forecast bounds total physical cost. An exhausted root grant cannot restart an unchanged root query through
+the node consumer. Automatic admission preserves an existing ordinary node plan
+and its funding below the root; a model beyond the ordinary ceiling
+receives only the bounded root trial. Explicit trials keep root-only funding.
 The two-GiB modeled storage envelope covers source authority, sparse owners,
 scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;
