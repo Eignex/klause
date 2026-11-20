@@ -24,6 +24,40 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `pruning outcome bookkeeping requires a finite cutoff and matching sample`() {
+        for (bound in listOf(Double.POSITIVE_INFINITY, 100.0)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+            var work = 0L
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = events::add, charge = { work += it })
+            hints.beginNode(0, bound)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            val unpaired = work
+            hints.recordOutcome(true)
+            hints.finishNode(trail.state)
+            assertEquals(unpaired, work)
+            hints.branch(VarRef.IntVar(0))
+            hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+            hints.beginNode(1, bound)
+            hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+            hints.recordObjective(relaxation, 11.0)
+            val sampled = work
+
+            hints.recordOutcome(true)
+            hints.finishNode(trail.state)
+
+            assertEquals(if (bound.isFinite()) 9L else 0L, work - sampled)
+            assertEquals(if (bound.isFinite()) 1 else 0, events.count { it == "PRUNING_SAMPLE_PRUNED" })
+            assertEquals(1, events.count { it == "DOWN" })
+        }
+    }
+
+    @Test
     fun `restart advice requires a fresh optimum with matching retained scope`() {
         for (change in listOf("none", "cutoff", "rows")) {
             val builder = LpBuilder()
@@ -458,6 +492,21 @@ class LpHintsTest {
     }
 
     @Test
+    fun `primitive branch scores keep boolean and integer coordinates distinct`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 1, cost = 1L)
+        builder.addVar(0, 10, cost = 4L)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 0),
+            booleanArrayOf(true, false), 0L, intArrayOf(1), intArrayOf(0))
+        val hints = LpHints(numIntVars = 1, numBoolVars = 1)
+
+        hints.record(relaxation, doubleArrayOf(0.25, 3.5), DoubleArray(0))
+
+        assertEquals(0.25, hints.branchScore(0, isBool = true), 1e-6)
+        assertEquals(2.0, hints.branchScore(0, isBool = false), 1e-6)
+    }
+
+    @Test
     fun `disabled directional gains skip history bookkeeping`() {
         val b = LpBuilder()
         b.addVar(0, 10, cost = 1)
@@ -643,20 +692,20 @@ class LpHintsTest {
             val hints = LpHints(1, 0, directionalGains = true)
             val variable = VarRef.IntVar(0)
             repeat(2) {
-                hints.beginNode(0, Double.POSITIVE_INFINITY)
+                hints.beginNode(0, constant.toDouble() + 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
                 hints.branch(variable)
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
-                    hints.beginNode(1, Double.POSITIVE_INFINITY)
+                    hints.beginNode(1, constant.toDouble() + 100.0)
                     hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
                     hints.recordOutcome(true)
                     hints.finishNode(trail.state)
                 }
             }
-            hints.beginNode(0, Double.POSITIVE_INFINITY)
+            hints.beginNode(0, constant.toDouble() + 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 

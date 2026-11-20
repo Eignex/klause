@@ -62,7 +62,7 @@ class LpHintsCollectionTest {
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 
-            assertTrue(hints.directionalScore(variable).isFinite())
+            assertTrue(hints.directionalScore(variable).isNaN())
             assertEquals(2, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
             assertEquals(2, events.count { it == "DOWN" })
             assertEquals(2, events.count { it == "UP" })

@@ -380,6 +380,11 @@ is visited first when the other direction repeatedly returned without pruning.
 Equal, missing, unstable or expired evidence retains ordinary order. Historical
 outcomes provide no current pruning authority or exclusion of either child.
 
+Pruning outcomes are retained only under a finite incumbent cutoff. Numeric gain
+collection can run before that cutoff exists; the first finite cutoff replaces
+that scope. Skipped outcomes remain unknown, and only a retained numeric sample
+can accept its completed outcome. This avoids paying classification and observation
+work for labels that cannot inform finite-cutoff advice.
 Final node-scope validation precedes outcome attribution. Missing state,
 interrupted or failed cut re-solves, cancellation after a published optimum and
 unfinished attribution across node transitions or restart leave unknown outcomes.
@@ -394,7 +399,8 @@ Selection and commitment recheck cancellation and the current fractional point,
 optimum and exact LP state, including after charged commitment work. Agreed,
 withheld and changed proposals are separate from actual changed child commitments.
 Withholding advice retains ordinary value order while paying the same work.
-Variable-history ranking is absent from the branch-selection scan. Disabled
+Variable-history ranking is absent from the branch-selection scan. Ordinary branch
+scores read primitive variable IDs and kinds before constructing a selected reference. Disabled
 directional gains collect no history or retained model scope and charge no history
 bookkeeping; ordinary LP values and reduced-cost preferences remain available.
 

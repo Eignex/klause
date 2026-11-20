@@ -89,7 +89,7 @@ internal class LpHints(
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         objectiveRecorded = objective.isFinite()
         if (passiveChoice != null && passivePoint === relaxation) passiveState = state
-        history.record(objective)
+        history.record(objective, retainOutcome = cutoff.isFinite())
     }
 
     private fun scopeDifference(relaxation: LpRelaxation, state: LpExactState): String? = when {
@@ -136,7 +136,7 @@ internal class LpHints(
     }
 
     override fun recordOutcome(pruned: Boolean?) {
-        if (!collect) return
+        if (!collect || !cutoff.isFinite() || !history.hasPendingOutcome) return
         charge(1L)
         pruningOutcome = pruned
     }
@@ -270,7 +270,7 @@ internal class LpHints(
         val values = checkNotNull(passiveValues)
         values.clear()
         collection.clear()
-        val valueReady = history.hasPruningHistory
+        val valueReady = cutoff.isFinite() && history.hasPruningHistory
         val collectReady = cutoff > Double.NEGATIVE_INFINITY && collection.available && history.hasCollectionHistory
         if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
@@ -408,13 +408,10 @@ internal class LpHints(
      * A variable the LP already pins to an integer scores `0` (no branching needed); one with no LP
      * value scores `NaN` (the selector falls back). Higher = branch here first.
      */
-    fun branchScore(varRef: VarRef): Double {
+    fun branchScore(varRef: VarRef): Double = branchScore(varRef.varId, varRef is VarRef.Bool)
+
+    fun branchScore(id: Int, isBool: Boolean): Double {
         if (!recorded) return Double.NaN
-        val isBool = varRef is VarRef.Bool
-        val id = when (varRef) {
-            is VarRef.IntVar -> varRef.varId
-            is VarRef.Bool -> varRef.varId
-        }
         val vals = if (isBool) boolVal else intVal
         if (id < 0 || id >= vals.size) return Double.NaN
         if ((if (isBool) boolStamp else intStamp)[id] != solveStamp) return Double.NaN

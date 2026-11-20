@@ -11,6 +11,29 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `skipped outcomes cannot become completed pruning evidence`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0, retainOutcome = false)
+                history.finishNode(true)
+            }
+        }
+
+        val estimate = history.pruningEstimate(variable, 0.5)
+
+        assertTrue(estimate.isNaN())
+        assertTrue(history.score(variable, 0.5).isFinite())
+        assertFalse(history.hasPendingOutcome)
+    }
+
+    @Test
     fun `child preference follows agreeing completed pruning outcomes`() {
         for (preferred in listOf<Boolean?>(false, true, null)) {
             val history = LpDirectionalHistory({})

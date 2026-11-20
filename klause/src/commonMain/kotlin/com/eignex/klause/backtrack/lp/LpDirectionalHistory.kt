@@ -67,6 +67,8 @@ internal class LpDirectionalHistory(
 
     val hasObservations: Boolean get() = observed
 
+    val hasPendingOutcome: Boolean get() = sampled != null
+
     fun restart() {
         charge(3L)
         trimParents(0)
@@ -95,7 +97,7 @@ internal class LpDirectionalHistory(
         if (report) observe("RESET")
     }
 
-    fun record(value: Double) {
+    fun record(value: Double, retainOutcome: Boolean = true) {
         sampled = null
         objective = value
         val child = pending ?: return
@@ -115,11 +117,17 @@ internal class LpDirectionalHistory(
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
-        charge(3L)
-        direction.previousPruned = direction.latestPruned
-        direction.latestPruned = -1
-        sampled = history
-        sampledUp = child.up
+        if (retainOutcome) {
+            charge(3L)
+            direction.previousPruned = direction.latestPruned
+            direction.latestPruned = -1
+            sampled = history
+            sampledUp = child.up
+        } else {
+            charge(2L)
+            direction.previousPruned = -1
+            direction.latestPruned = -1
+        }
         observed = true
         if (history.down.count != history.up.count) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
