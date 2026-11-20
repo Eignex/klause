@@ -382,7 +382,8 @@ Equal, missing, unstable or expired evidence retains ordinary order. Historical
 outcomes provide no current pruning authority or exclusion of either child.
 
 Directional history and missing-direction collection begin only under a finite
-incumbent cutoff in a worker with LP bounding and branching enabled. Other
+incumbent cutoff in a worker whose resolved plan enables LP bounding and
+branching. The hint owner binds after automatic LP preparation resolves that plan. Other
 workers retain ordinary LP hint handling without directional bookkeeping.
 Earlier observations belong to a different cutoff scope and
 cannot inform this consumer. Ordinary LP point and reduced-cost guidance remains

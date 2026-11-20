@@ -10,6 +10,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -26,55 +27,58 @@ import kotlin.test.assertTrue
 class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
     @Test
     fun `finite search records completed lp outcomes across cooperative slices`() {
-        val blocks = 4
-        val variables = blocks * 3
-        val factors = ArrayList<Factor>()
-        repeat(blocks) { block ->
-            repeat(3) { edge ->
-                factors.add(Linear(longArrayOf(1L, 1L),
-                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
-            }
-        }
-        val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
-        val params = BacktrackParams(
-            variableSelector = InputOrder,
-            valueSelector = IndomainMin,
-            randomSeed = 3L,
-            maxDecisions = 1000L,
-            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
-                boundMaxOpsPerNode = 0L),
-            lpDirectionalGains = true,
-            objectiveBoundSupplier = { 100.0 },
-            componentFactory = {
-                listOf(object : SearchComponent {
-                    override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
-                })
-            },
-        )
-
-        val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
-        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
-            var slices = 0
-            var firstSliceOpen = Long.MAX_VALUE
-            while (slices < 128 && !search.isDone &&
-                ((search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("UP") ?: 0L) < 2L ||
-                    (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("DOWN") ?: 0L) < 2L ||
-                    (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("PRUNING_SAMPLE_OPEN") ?: 0L) <= firstSliceOpen)
-            ) {
-                slices++
-                search.runSlice(ExecutionControl.Never, 1000L, 64L) {}
-                if (slices == 1) {
-                    firstSliceOpen = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]
-                        ?.outcomes?.get("PRUNING_SAMPLE_OPEN") ?: 0L
+        for (automatic in listOf(false, true)) {
+            val blocks = 4
+            val variables = blocks * 3
+            val factors = ArrayList<Factor>()
+            repeat(blocks) { block ->
+                repeat(3) { edge ->
+                    factors.add(Linear(longArrayOf(1L, 1L),
+                        intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
                 }
             }
+            val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
+            val params = BacktrackParams(
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
+                randomSeed = 3L,
+                maxDecisions = 1000L,
+                lpConfig = if (automatic) LpConfig.parse("bounding") else null,
+                lpPlan = LpPlan(bounding = !automatic, rootBudgetMillis = 0L, rootCutHarvest = false,
+                    boundMaxOpsPerNode = 0L),
+                lpDirectionalGains = true,
+                objectiveBoundSupplier = { 100.0 },
+                componentFactory = {
+                    listOf(object : SearchComponent {
+                        override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
+                    })
+                },
+            )
 
-            val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-            val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
-            assertTrue(slices > 1, diagnostic)
-            assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
-            assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-            assertTrue((observations["PRUNING_SAMPLE_OPEN"] ?: 0L) > firstSliceOpen, diagnostic)
+            val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
+            ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+                var slices = 0
+                var firstSliceOpen = Long.MAX_VALUE
+                while (slices < 128 && !search.isDone &&
+                    ((search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("UP") ?: 0L) < 2L ||
+                        (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("DOWN") ?: 0L) < 2L ||
+                        (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("PRUNING_SAMPLE_OPEN") ?: 0L) <= firstSliceOpen)
+                ) {
+                    slices++
+                    search.runSlice(ExecutionControl.Never, 1000L, 64L) {}
+                    if (slices == 1) {
+                        firstSliceOpen = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]
+                            ?.outcomes?.get("PRUNING_SAMPLE_OPEN") ?: 0L
+                    }
+                }
+
+                val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
+                val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
+                assertTrue(slices > 1, diagnostic)
+                assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
+                assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
+                assertTrue((observations["PRUNING_SAMPLE_OPEN"] ?: 0L) > firstSliceOpen, diagnostic)
+            }
         }
     }
 
