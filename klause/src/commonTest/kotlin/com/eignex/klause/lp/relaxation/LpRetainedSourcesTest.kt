@@ -8,11 +8,19 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.LpAuxiliaryColumn
+import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
+import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutSource
+import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
@@ -26,6 +34,158 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `bound only rollback should retain global source preparation work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        val domains = RootDomains(problem)
+        val sources = LpRetainedSources(problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1))))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            var cold: CutSourceWork? = null
+            sources.relaxation(owner.state, domains) { cold = it }
+            assertTrue(owner.push())
+            assertTrue(owner.pop(0))
+            sources.retract(0)
+            var restored: CutSourceWork? = null
+
+            sources.relaxation(owner.state, domains) { restored = it }
+
+            assertTrue(assertNotNull(restored).exact < assertNotNull(cold).exact)
+            assertTrue(assertNotNull(restored).structural > 0L)
+        }
+    }
+
+    @Test
+    fun `retained source facts should discard a popped bound`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        val root = problem.finiteIntDomain(0)
+        var live = root
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1))))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            val base = sources.relaxation(owner.state, domains)
+            val column = base.intColOf[0]
+            assertTrue(owner.push())
+            live = root.withMinAtLeast(5L)
+            assertTrue(owner.assertBound(column, false, assertNotNull(sources.liveBounds(domains)[column].lower), 0L))
+            val child = assertNotNull(sources.relaxation(owner.state, domains).sourceMap)
+            assertTrue(owner.pop(0))
+            sources.retract(0)
+            live = root
+
+            val restored = assertNotNull(sources.relaxation(owner.state, domains).sourceMap)
+
+            val premise = CutPremise.Bound(
+                CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE)),
+                false, BigFraction.ofLong(5L),
+            )
+            assertTrue(child.isActive(premise))
+            assertFalse(restored.isActive(premise))
+        }
+    }
+
+    @Test
+    fun `source metadata should follow auxiliary producer disappearance and restoration`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(3, 9)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 3),
+        ))
+        val root = problem.finiteIntDomain(0)
+        var live = root
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = if (varId == 0) live else problem.finiteIntDomain(varId)
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val projections = FactorProjectionProviders(
+            relaxation = RelaxationProjectionProvider {
+                RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
+                    val domain = builder.liveDomain(0)
+                    if (domain.min != domain.max) {
+                        val column = builder.auxColumn(0L, 1L,
+                            presence = longArrayOf(0L, 1L),
+                            definition = LpAuxiliaryColumn(listOf(0L), 1L, true))
+                        builder.row(intArrayOf(column), longArrayOf(1L), LinearOp.GE, 0L)
+                    }
+                }
+            },
+        ).prepare(problem)
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
+            LinearObjective(intCoefficients = longArrayOf(0, 1)), projections = projections))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val initial = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(initial.retired, initial.columns, initial.rows, false,
+                objective = initial.objective))
+            initial.commit()
+            val before = assertNotNull(sources.relaxation(owner.state, domains).sourceMap)
+            assertTrue(owner.push())
+            live = IntDomain(0, 0)
+            val edit = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, true, objective = edit.objective))
+            edit.commit()
+            val absent = assertNotNull(sources.relaxation(owner.state, domains).sourceMap)
+            assertTrue(owner.pop(0))
+            sources.retract(0)
+            live = root
+
+            val restored = assertNotNull(sources.relaxation(owner.state, domains).sourceMap)
+
+            assertTrue(before.auxiliaryDefinitions.isNotEmpty())
+            assertTrue(absent.auxiliaryDefinitions.isEmpty())
+            assertEquals(before.auxiliaryDefinitions, restored.auxiliaryDefinitions)
+        }
+    }
+
+    @Test
+    fun `source metadata should replace auxiliary identities after catalog retirement`() {
+        for (failBinding in listOf(false, true)) {
+            val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(3, 9)), arrayOf<Factor>(
+                Element(0, 1, longArrayOf(3, 5, 9), false, 0),
+            ))
+            val catalog = LpAuxiliarySources()
+            var rejectBinding = false
+            val domains = object : RelaxationDomains {
+                override fun intDomain(varId: Int): IntDomain {
+                    check(!rejectBinding)
+                    return problem.finiteIntDomain(varId)
+                }
+                override fun boolValue(varId: Int): Boolean? = null
+            }
+            val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
+                LinearObjective(intCoefficients = longArrayOf(0, 1)), elementHull = true, auxiliarySources = catalog))
+            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+                val edit = assertNotNull(sources.prepare(owner.state, domains))
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+                edit.commit()
+                val before = assertNotNull(sources.relaxation(owner.state, domains).sourceMap).auxiliaryDefinitions
+                catalog.retain(emptySet())
+                if (failBinding) {
+                    rejectBinding = true
+                    assertFailsWith<IllegalStateException> { sources.relaxation(owner.state, domains) }
+                    rejectBinding = false
+                }
+
+                val after = assertNotNull(sources.relaxation(owner.state, domains).sourceMap).auxiliaryDefinitions
+
+                assertTrue(before.isNotEmpty())
+                assertEquals(before.values.toSet(), after.values.toSet())
+                assertTrue(before.keys.none { it in after })
+            }
+        }
+    }
+
     @Test
     fun `cached source binding should charge its bound refresh`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
@@ -328,6 +488,7 @@ class LpRetainedSourcesTest {
             assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
             edit.commit()
             assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            sources.relaxation(owner.state, domains)
             val before = owner.state
             val owners = owner.metrics.createdOwners
             for (id in 0L until 64L) catalog.source(CutAuxiliaryDefinition(listOf(id), emptyList(), 1L, true))
@@ -346,6 +507,8 @@ class LpRetainedSourcesTest {
             assertEquals(0L, catalog.storageUnits)
             assertSame(before, owner.state)
             assertEquals(owners, owner.metrics.createdOwners)
+            assertEquals(CutSource(CutSourceKind.INTEGER, 0),
+                assertNotNull(sources.relaxation(owner.state, domains).sourceMap).column(0)?.source)
             assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
         }
     }

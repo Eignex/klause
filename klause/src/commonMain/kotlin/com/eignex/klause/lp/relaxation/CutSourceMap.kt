@@ -184,6 +184,54 @@ internal class CutSourceMap private constructor(
         withBoundSnapshot(facts.apply { addAll(active) })
     }
 
+    fun withDomainBounds(
+        model: LpModel,
+        domains: RelaxationDomains,
+        onWork: ((CutSourceWork) -> Unit)? = null,
+    ): CutSourceMap = measureCutSourceWork(onWork) { work ->
+        withBoundSnapshot(domainBounds(domains, work) { column ->
+            model.exactBounds(column) to model.exactShift(column)
+        })
+    }
+
+    fun bindCpLayout(
+        domains: RelaxationDomains?,
+        parents: Map<Int, CutProvenance>,
+        onWork: ((CutSourceWork) -> Unit)? = null,
+        bound: (Int) -> Pair<ExactLpBounds, BigFraction>,
+    ): CutSourceMap = measureCutSourceWork(onWork) { work ->
+        val active = domainBounds(domains, work, bound)
+        work.structural(parents.size.toLong() + 1L)
+        CutSourceMap(model, epoch, columnSnapshot, globalSnapshot, active, fixedSnapshot, assumptionSnapshot,
+            parents.toMap(), auxiliarySnapshot, null, true)
+    }
+
+    private fun domainBounds(
+        domains: RelaxationDomains?,
+        work: CutSourceWorkMeter,
+        bound: (Int) -> Pair<ExactLpBounds, BigFraction>,
+    ): Set<CutPremise> {
+        val active = columnBounds(columnSnapshot, work, bound)
+        if (domains != null) {
+            for (definition in auxiliarySnapshot.values) {
+                val required = definition.required
+                work.structural(required.size.toLong() + 1L)
+                for (index in required.indices step 2) {
+                    work.structural()
+                    val variable = required[index].toInt()
+                    val value = required[index + 1]
+                    if (!domains.intDomain(variable).contains(value)) {
+                        work.exact()
+                        active.add(
+                            CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
+                        )
+                    }
+                }
+            }
+        }
+        return active
+    }
+
     private fun withBoundSnapshot(
         active: Set<CutPremise>,
         cp: CpCutBounds? = null,
@@ -239,6 +287,17 @@ internal class CutSourceMap private constructor(
         model, epoch, columnSnapshot, globalSnapshot, activeSnapshot + premises, fixedSnapshot, assumptionSnapshot,
         parentSnapshot, auxiliarySnapshot, cpBounds, true,
     )
+
+    companion object {
+        // The CP layout builder transfers fresh collections; bound publications share their immutable contents.
+        fun ownedCpLayout(
+            model: Any,
+            columns: List<CutColumnSource?>,
+            globals: Set<CutPremise>,
+            auxiliary: Map<CutSource, CutAuxiliaryDefinition>,
+        ): CutSourceMap = CutSourceMap(model, 0L, columns, globals, emptySet(), emptyMap(), emptySet(), emptyMap(),
+            auxiliary, null, true)
+    }
 }
 
 internal fun cpCutSources(
@@ -269,6 +328,20 @@ internal fun cpCutSources(
     domains: RelaxationDomains?,
     onWork: ((CutSourceWork) -> Unit)? = null,
     bound: (Int) -> Pair<ExactLpBounds, BigFraction>,
+): CutSourceMap = measureCutSourceWork(onWork) { work ->
+    cpCutSourceLayout(problem, vars, booleans, realIds, realSigns, presence, auxiliarySources, work::add)
+        .bindCpLayout(domains, parents, work::add, bound)
+}
+
+internal fun cpCutSourceLayout(
+    problem: com.eignex.klause.ir.Problem,
+    vars: IntArray,
+    booleans: BooleanArray,
+    realIds: IntArray,
+    realSigns: IntArray,
+    presence: List<CutAuxiliaryDefinition?>,
+    auxiliarySources: LpAuxiliarySources,
+    onWork: ((CutSourceWork) -> Unit)? = null,
 ): CutSourceMap = measureCutSourceWork(onWork) { work ->
     val globals = HashSet<CutPremise>()
     val auxiliary = HashMap<CutSource, CutAuxiliaryDefinition>()
@@ -353,27 +426,8 @@ internal fun cpCutSources(
             }
         }
     }
-    val active = columnBounds(columns, work, bound)
-    if (domains != null) {
-        for (definition in auxiliary.values) {
-            val required = definition.required
-            work.structural(required.size.toLong() + 1L)
-            for (index in required.indices step 2) {
-                work.structural()
-                val variable = required[index].toInt()
-                val value = required[index + 1]
-                if (!domains.intDomain(variable).contains(value)) {
-                    work.exact()
-                    active.add(
-                        CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, variable), BigFraction.ofLong(value)),
-                    )
-                }
-            }
-        }
-    }
-    work.structural(columns.size.toLong() + parents.size + auxiliary.size)
-    work.structural(globals.size.toLong() + active.size)
-    CutSourceMap(problem, 0, columns, globals, active, parentRows = parents, auxiliaryDefinitions = auxiliary)
+    work.structural()
+    CutSourceMap.ownedCpLayout(problem, columns, globals, auxiliary)
 }
 
 private fun columnBounds(

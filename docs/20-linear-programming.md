@@ -434,6 +434,12 @@ report structural traversal and exact premise work separately, including cached 
 refreshes and failed attempts. The host charges them with the existing construction
 and exact-work weights to the pending node and cumulative allowance. Refreshes
 report on completion; a slice excess remains work debt.
+Each retained source owner keeps at most one immutable CP source layout, containing
+only ordered column expressions, global facts and auxiliary definitions. Ordered
+column identities, producer presence and auxiliary catalog generation guard reuse.
+Append and compaction release the entry; row refreshes can reuse it while capturing
+fresh active bounds and exclusions. Key checks and binding traversals remain charged,
+and metadata construction is charged on misses.
 
 The default `lp-component-reuse` setting requires its bounded owner setup to fit
 within a quarter of the worker's LP work horizon. A remaining node quota supplies

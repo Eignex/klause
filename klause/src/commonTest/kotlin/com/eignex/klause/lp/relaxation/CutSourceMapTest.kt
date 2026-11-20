@@ -78,23 +78,43 @@ class CutSourceMapTest {
     }
 
     @Test
-    fun `cp rebinding should discard a retracted auxiliary exclusion`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
-        val session = PropagationSession(problem)
-        val source = CutSource(CutSourceKind.AUXILIARY, 0)
-        val definition = CutAuxiliaryDefinition(listOf(0L), listOf(0L, 1L), 1L, true)
-        val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)),
-            auxiliaryDefinitions = mapOf(source to definition))
-        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
-        session.pinInt(0, 0L)
-        val child = root.withCpBounds(model, session)
-        session.popLast()
-        val excluded = CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, 0), BigFraction.ONE)
+    fun `domain rebinding should discard a retracted auxiliary exclusion`() {
+        for (cpCapture in listOf(false, true)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
+            val session = PropagationSession(problem)
+            val source = CutSource(CutSourceKind.AUXILIARY, 0)
+            val definition = CutAuxiliaryDefinition(listOf(0L), listOf(0L, 1L), 1L, true)
+            val root = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)),
+                auxiliaryDefinitions = mapOf(source to definition))
+            val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+            session.pinInt(0, 0L)
+            val child = if (cpCapture) root.withCpBounds(model, session)
+            else root.withDomainBounds(model, SessionDomains(session))
+            session.popLast()
+            val excluded = CutPremise.Excluded(CutSource(CutSourceKind.INTEGER, 0), BigFraction.ONE)
 
-        val restored = child.withCpBounds(model, session)
+            val restored = if (cpCapture) child.withCpBounds(model, session)
+            else child.withDomainBounds(model, SessionDomains(session))
 
-        assertTrue(child.isActive(excluded))
-        assertFalse(restored.isActive(excluded))
+            assertTrue(child.isActive(excluded))
+            assertFalse(restored.isActive(excluded))
+        }
+    }
+
+    @Test
+    fun `appended duplicate real coordinates should withhold ambiguous source identities`() {
+        val problem = Problem(0, 0, emptyArray(), emptyList(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val catalog = LpAuxiliarySources()
+        val initial = cpCutSourceLayout(problem, intArrayOf(-1), booleanArrayOf(false),
+            intArrayOf(0), intArrayOf(1), listOf(null), catalog)
+
+        val appended = cpCutSourceLayout(problem, intArrayOf(-1, -1), booleanArrayOf(false, false),
+            intArrayOf(0, 0), intArrayOf(1, -1), listOf(null, null), catalog)
+
+        assertEquals(CutSource(CutSourceKind.REAL, 0), initial.column(0)?.source)
+        assertNull(appended.column(0))
+        assertNull(appended.column(1))
     }
 
     @Test

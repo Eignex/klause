@@ -21,6 +21,8 @@ import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.lp.engine.exactBounds
+import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
@@ -141,6 +143,25 @@ internal class LpRetainedSources(
         }
     }
     private class Change(val depth: Int, val index: Int, val previous: Binding?)
+    private class SourceLayout(
+        val columns: List<Column>,
+        val presence: List<CutAuxiliaryDefinition?>,
+        val catalogGeneration: Long,
+        val map: CutSourceMap,
+    ) {
+        fun matches(columns: List<Column>, presence: List<CutAuxiliaryDefinition?>,
+            catalogGeneration: Long, work: CutSourceWorkMeter): Boolean {
+            work.structural(3L)
+            if (this.catalogGeneration != catalogGeneration || this.columns.size != columns.size ||
+                this.presence.size != presence.size
+            ) return false
+            for (index in columns.indices) {
+                work.structural(2L)
+                if (this.columns[index] !== columns[index] || this.presence[index] !== presence[index]) return false
+            }
+            return true
+        }
+    }
     private class CompactionView(
         val columns: List<Column>,
         val uses: IntArray,
@@ -176,6 +197,7 @@ internal class LpRetainedSources(
     private var generation = 0L
     private var columnEpoch = 0L
     private var cached: LpRelaxation? = null
+    private var sourceLayout: SourceLayout? = null
     val depth: Int get() = emissions.depth
     val emittedRegions: Long get() = emissions.emittedRegions
 
@@ -372,6 +394,7 @@ internal class LpRetainedSources(
         ) {
             check(generation == expectedGeneration) { "stale source edit" }
             update.commit()
+            if (added.isNotEmpty()) sourceLayout = null
             columns = staged.toList()
             handles = keys.toMap()
             columnUses = uses
@@ -439,6 +462,7 @@ internal class LpRetainedSources(
             check(generation == expectedGeneration) { "stale source compaction" }
             check(auxiliarySources.generation == catalogGeneration) { "stale auxiliary compaction" }
             auxiliarySources.retain(view.definitions)
+            sourceLayout = null
             columns = descriptors
             handles = keys
             columnUses = uses
@@ -522,9 +546,12 @@ internal class LpRetainedSources(
     ): LpRelaxation = measureCutSourceWork(onWork) { work ->
         require(state.model.n == columns.size)
         val model = requireNotNull(state.ownerWorkingModel())
-        cached?.let {
-            return@measureCutSourceWork it.withModel(model, it.sourceMap?.withBounds(model, onWork = work::add))
+        work.structural()
+        cached?.takeIf { sourceLayout?.catalogGeneration == auxiliarySources.generation }?.let {
+            return@measureCutSourceWork it.withModel(model,
+                it.sourceMap?.withDomainBounds(model, domains, onWork = work::add))
         }
+        cached = null
         val vars = IntArray(columns.size) {
             work.structural()
             columns[it].variable
@@ -595,6 +622,13 @@ internal class LpRetainedSources(
             work.structural()
             it != null
         }?.emission?.relaxation?.objectiveConstant ?: 0L
+        val layout = sourceLayout?.takeIf { it.matches(columns, presence, auxiliarySources.generation, work) }?.map
+            ?: cpCutSourceLayout(problem, vars, bools, reals, signs, presence, auxiliarySources, work::add).also {
+                sourceLayout = SourceLayout(columns, presence, auxiliarySources.generation, it)
+            }
+        val sourceMap = layout.bindCpLayout(domains, emptyMap(), work::add) { column ->
+            model.exactBounds(column) to model.exactShift(column)
+        }
         LpRelaxation(
             model, vars, bools, constant,
             integerColumns, booleanColumns, circuits,
@@ -607,9 +641,7 @@ internal class LpRetainedSources(
                 columns[it].presentUpper
             }, hullFactorIds = hulls.toIntArray().also { work.structural(it.size.toLong()) },
             colRealId = reals, colRealSign = signs,
-            sourceMap = cpCutSources(
-                model, problem, vars, bools, reals, signs, emptyMap(), presence, auxiliarySources, domains, work::add,
-            ),
+            sourceMap = sourceMap,
             colPresence = presence, rowFactorIds = factors,
             realUpperRows = realDefinitions.entries.associate {
                 work.structural()
