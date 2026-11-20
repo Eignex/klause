@@ -352,7 +352,12 @@ class LpHintsTest {
 
     @Test
     fun `directional scoring skips lookup work until both directions have enough samples`() {
-        for (prefix in listOf(listOf(false, false), listOf(false, true))) {
+        for ((prefix, primitive) in listOf(
+            listOf(false, false) to false,
+            listOf(false, false) to true,
+            listOf(false, true) to false,
+            listOf(false, true) to true,
+        )) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -378,7 +383,8 @@ class LpHintsTest {
                 hints.recordObjective(relaxation, 10.0)
                 val before = work
 
-                val score = hints.directionalScore(variable)
+                val score = if (primitive) hints.directionalScore(variable.varId, isBool = false)
+                else hints.directionalScore(variable)
 
                 if (phase == 0) {
                     assertTrue(score.isNaN())
@@ -448,6 +454,21 @@ class LpHintsTest {
         hints.record(relaxation, doubleArrayOf(3.5), doubleArrayOf(-4.0))
 
         assertEquals(1.0, hints.branchScore(VarRef.IntVar(0)), 1e-6)
+    }
+
+    @Test
+    fun `primitive branch scores keep boolean and integer coordinates distinct`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 1, cost = 1L)
+        builder.addVar(0, 10, cost = 4L)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 0),
+            booleanArrayOf(true, false), 0L, intArrayOf(1), intArrayOf(0))
+        val hints = LpHints(numIntVars = 1, numBoolVars = 1)
+
+        hints.record(relaxation, doubleArrayOf(0.25, 3.5), DoubleArray(0))
+
+        assertEquals(0.25, hints.branchScore(0, isBool = true), 1e-6)
+        assertEquals(2.0, hints.branchScore(0, isBool = false), 1e-6)
     }
 
     @Test
