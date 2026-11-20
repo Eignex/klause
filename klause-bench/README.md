@@ -654,6 +654,17 @@ Successful `source-identity-v1` receipts contribute verified decoded identities 
 exposure after their path and stored hash match the declared input; incomplete or mismatched
 receipts remain gaps. Hash-only jobs run no solver and establish no applicability or quality.
 
+Roadmap lanes reconcile `sets/roadmap-exposed.txt` and `sets/roadmap-reserved.txt` with an external
+versioned exposure manifest before qualification. A reservation names prospective work and supplies
+no untouched claim. Record verified stored/decoded identities, known related encodings, provenance,
+coverage and gaps; link the manifest and its digest from the owning issue. Unknown history stays unresolved.
+
+Concurrent lanes check current main and open reservation PRs, then merge an issue-identified claim
+covering the source and its known related encodings before execution. Move the source to the exposed
+set before its first solver run or applicability screen, retaining failed, unsuitable and no-witness
+uses in the manifest. Identity-only hashing does not expose a source. Release an unused claim explicitly;
+never return an executed source to the reserve.
+
 `lab/frozen-minizinc-linux.json` also accepts plain `.mzn` models and an optional
 plain `.dzn` data input with role `data` and attribute `sourceDataPlainSha256`.
 Both inputs use declared corpus paths and hashes; planning reads neither source.
