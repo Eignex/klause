@@ -74,8 +74,10 @@ class LinearAuthorityAggregateContinuationTest {
             point = point)
 
         assertTrue(cuts.any { it.conditionalCandidate })
-        val separating = cuts.single { !it.conditionalCandidate && it.inequality == SourceInequality(
-            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)) }
+        val separating = cuts.single {
+            !it.conditionalCandidate && it.inequality == SourceInequality(
+                mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2))
+        }
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
             SourceEvidence(scope, SourceClaim.Consequence(separating.inequality), separating.derivation)))
     }
