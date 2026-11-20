@@ -532,8 +532,10 @@ and supplies no source refutation. Ordinary fallback neighborhoods retain their 
 checked centers and cutoffs.
 
 Each owner charges ordinary and private work to one LP operation/work/allocation
-ledger and containing decision/check allowances. A retained joint private query uses remaining instructions
-in its current offer before yielding. Private query progress supplies no root-fixing or
+ledger and containing decision/check allowances. With incumbent reuse, an active joint
+query whose original condition matches the paused proposal can use remaining instructions
+in its current offer before yielding. Resumption requires charged progress and retains
+all cumulative caps and cancellation checks. Private query progress supplies no root-fixing or
 learned-clause reward. A generated witness passes complete receiving-source checks
 and exact original-source feasibility and objective checks before it can improve
 the source incumbent. Private bounds and proofs never enter parent coverage.

@@ -366,13 +366,14 @@ internal class JointLinearRepair(
             prepareBooleanCenter = { prepare(it, bootstrap = !adaptive) }, rootCoordinateValue = ::center,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
-            continuePausedCompletion = {
+            continuePausedCompletion = { condition ->
                 val proposal = checkedProposal
                 val checked = proposal != null && proposal.condition === queryOriginalCondition &&
                     (queryProximity || query?.hasIncumbent == true)
                 val advisory = queryProximity && proximityAdvisory != null &&
                     proximityProposal === queryOriginalCondition
-                val carries = checked || advisory
+                val retained = incumbentProximity && query != null && queryOriginalCondition === condition
+                val carries = checked || advisory || retained
                 if (carries) observe("jointRepairGrantedQueryResumeRequests")
                 carries
             },

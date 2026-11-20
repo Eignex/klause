@@ -16,14 +16,16 @@ import kotlin.test.assertTrue
 
 class ExactNeighborhoodTest {
     @Test
-    fun `a progressing private pause should retain the remaining instruction grant`() {
+    fun `a progressing retained pause should retain the remaining instruction grant`() {
         var work = 0L
         var checks = 0
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { _, _ ->
             work++
             if (++checks == 1) ExactNeighborhoodResult.Paused else ExactNeighborhoodResult.Refuted
         }, coordinateValues = { emptyList() }, maximumMoves = 1, nativeWork = { work },
-            continuePausedCompletion = { true })
+            proposal = ExactNeighborhoodProposal { _, _, _, _, _, _ -> condition },
+            continuePausedCompletion = { it === condition })
 
         val done = search.advance(ExecutionControl.Never, 4)
 
@@ -34,7 +36,7 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `a private pause without progress should yield the current grant`() {
+    fun `a retained pause without progress should yield the current grant`() {
         var checks = 0
         val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { _, _ ->
             checks++
@@ -49,7 +51,7 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `cancellation should stop private resumption within the same grant`() {
+    fun `cancellation should stop retained resumption within the same grant`() {
         var work = 0L
         var checks = 0
         var cancelled = false
