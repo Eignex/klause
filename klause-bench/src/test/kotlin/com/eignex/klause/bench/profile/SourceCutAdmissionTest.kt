@@ -14,7 +14,7 @@ import kotlin.test.assertNotNull
 class SourceCutAdmissionTest {
     @Test
     fun `diagnosis should distinguish canonical binary rejection from widened coordinates`() {
-        val source = assertNotNull(Mps.parse("""
+        val text = """
             NAME canonical
             ROWS
              N cost
@@ -28,7 +28,8 @@ class SourceCutAdmissionTest {
             BOUNDS
              BV bounds x
             ENDATA
-        """.trimIndent()).toLinearSourceProblem())
+        """.trimIndent()
+        val source = assertNotNull(Mps.parse(text).toLinearSourceProblem())
 
         val report = SourceCutAdmission.inspect(source, ProblemSettings(), ExecutionControl.Never)
 
@@ -40,7 +41,7 @@ class SourceCutAdmissionTest {
 
     @Test
     fun `diagnosis should identify compatible binary and continuous coordinates`() {
-        val source = assertNotNull(Mps.parse("""
+        val text = """
             NAME compatible
             ROWS
              N cost
@@ -53,7 +54,8 @@ class SourceCutAdmissionTest {
             BOUNDS
              BV bounds x
             ENDATA
-        """.trimIndent()).toLinearSourceProblem())
+        """.trimIndent()
+        val source = assertNotNull(Mps.parse(text).toLinearSourceProblem())
 
         val report = SourceCutAdmission.inspect(source, ProblemSettings(), ExecutionControl.Never)
 
@@ -63,7 +65,7 @@ class SourceCutAdmissionTest {
 
     @Test
     fun `a stopped diagnosis should leave setup eligibility unknown`() {
-        val source = assertNotNull(Mps.parse("""
+        val text = """
             NAME stopped
             ROWS
              N cost
@@ -73,7 +75,8 @@ class SourceCutAdmissionTest {
             BOUNDS
              BV bounds x
             ENDATA
-        """.trimIndent()).toLinearSourceProblem())
+        """.trimIndent()
+        val source = assertNotNull(Mps.parse(text).toLinearSourceProblem())
 
         val report = SourceCutAdmission.inspect(source, ProblemSettings(), ExecutionControl { true })
 

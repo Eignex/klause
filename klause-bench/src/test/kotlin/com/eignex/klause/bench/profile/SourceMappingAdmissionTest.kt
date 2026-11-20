@@ -21,8 +21,11 @@ class SourceMappingAdmissionTest {
     @ParameterizedTest
     @ValueSource(strings = ["constant", "integer"])
     fun `diagnosis should name the changed prepared objective`(part: String) {
-        val costs = if (part == "constant") objective.copy(constant = 1L)
-            else objective.copy(intCoefficients = longArrayOf(2))
+        val costs = if (part == "constant") {
+            objective.copy(constant = 1L)
+        } else {
+            objective.copy(intCoefficients = longArrayOf(2))
+        }
 
         val report = SourceMappingAdmission.inspect(authority, null, model, costs, ExecutionControl.Never)
 

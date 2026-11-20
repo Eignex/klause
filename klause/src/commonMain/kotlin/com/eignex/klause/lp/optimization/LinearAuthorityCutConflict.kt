@@ -150,8 +150,12 @@ private class CutConflictSides(
     private fun improves(candidate: CutConflictSide, previous: CutConflictSide?): Boolean {
         if (previous == null) return true
         meter.arithmetic(candidate.value, previous.value)
-        return (if (candidate.coefficient < BigFraction.ZERO) candidate.value > previous.value
-            else candidate.value < previous.value) ||
+        val stronger = if (candidate.coefficient < BigFraction.ZERO) {
+            candidate.value > previous.value
+        } else {
+            candidate.value < previous.value
+        }
+        return stronger ||
             (candidate.value == previous.value && candidate.strict && !previous.strict)
     }
 }
