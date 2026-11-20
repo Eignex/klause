@@ -10,6 +10,7 @@ internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
+    private val readWork: (() -> Long)? = null,
 ) {
     private class Direction {
         var count = 0
@@ -17,15 +18,21 @@ internal class LpDirectionalHistory(
         var previous = 0.0
         var stamp = 0L
         var previousStamp = 0L
+        var latestWork = 0L
+        var previousWork = 0L
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
         val stable: Boolean get() = count >= RELIABILITY && maxOf(latest, previous) <= minOf(latest, previous) * 2.0
+
+        val knownWork: Boolean get() = count >= RELIABILITY && latestWork > 0L && previousWork > 0L
     }
 
-    private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
+    private class Gains(val down: Direction = Direction(), val up: Direction = Direction()) {
+        var workEstimate = Double.NaN
+    }
     private class Parent(val objective: Double, val variable: VarRef, val value: Double)
-    private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
+    private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int, val work: Long?)
 
     private val gains = HashMap<VarRef, Gains>()
     private var parents: Array<Parent?>? = null
@@ -36,6 +43,7 @@ internal class LpDirectionalHistory(
     private var depth = 0
     private var objective = Double.NaN
     private var reliableStamp = -1L
+    private var efficiencyStamp = -1L
     private var valueStamp = -1L
     private var collectionStamp = -1L
     private var observed = false
@@ -51,11 +59,25 @@ internal class LpDirectionalHistory(
 
     val hasReliableHistory: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
+    val hasEfficientHistory: Boolean get() = efficiencyStamp >= 0L && stamp - efficiencyStamp <= maxAge
+
     val hasValueHistory: Boolean get() = valueStamp >= 0L && stamp - valueStamp <= maxAge
 
     val hasCollectionHistory: Boolean get() = collectionStamp >= 0L && stamp - collectionStamp <= maxAge
 
     val hasObservations: Boolean get() = observed
+
+    fun restart() {
+        charge(3L)
+        trimParents(0)
+        pending = null
+        objective = Double.NaN
+        observe("RESTART")
+        if (gains.isNotEmpty()) {
+            charge(1L)
+            observe("RESTART_RETAINED")
+        }
+    }
 
     fun clear(report: Boolean = true) {
         charge(gains.size.toLong())
@@ -64,6 +86,7 @@ internal class LpDirectionalHistory(
         pending = null
         objective = Double.NaN
         reliableStamp = -1L
+        efficiencyStamp = -1L
         valueStamp = -1L
         collectionStamp = -1L
         observed = false
@@ -74,6 +97,11 @@ internal class LpDirectionalHistory(
         objective = value
         val child = pending ?: return
         pending = null
+        val finishedWork = readWork?.let { meter ->
+            val measured = meter()
+            charge(1L)
+            measured
+        }
         val gain = value - child.parent.objective
         val normalized = gain / child.distance
         if (!gain.isFinite() || gain < 0.0 || !normalized.isFinite()) {
@@ -89,19 +117,40 @@ internal class LpDirectionalHistory(
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
+        if (readWork != null) {
+            charge(3L)
+            direction.previousWork = direction.latestWork
+            direction.latestWork = if (child.work != null && child.work >= 0L &&
+                finishedWork != null && finishedWork > child.work
+            ) finishedWork - child.work else 0L
+            history.workEstimate = Double.NaN
+            observe(if (direction.latestWork > 0L) "COST_SAMPLE" else "COST_UNAVAILABLE")
+        }
         observed = true
-        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
+        if (history.down.count != history.up.count) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
             if (majority.stable && majority.gain > 0.0) {
-                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
+                charge(1L)
+                val minorityStamp = if (minority.count > 0) minority.stamp else majority.previousStamp
+                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minorityStamp))
             }
         }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
             if (history.down.stable && history.up.stable) {
                 val pairStamp = minOf(history.down.previousStamp, history.up.previousStamp)
+                if (readWork != null) {
+                    charge(8L)
+                    if (history.down.knownWork && history.up.knownWork) {
+                        history.workEstimate = maxOf(history.down.latestWork, history.down.previousWork).toDouble() +
+                            maxOf(history.up.latestWork, history.up.previousWork).toDouble()
+                    }
+                }
                 if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
-                if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
+                if (history.down.gain > 0.0 && history.up.gain > 0.0) {
+                    reliableStamp = maxOf(reliableStamp, pairStamp)
+                    if (history.workEstimate > 0.0) efficiencyStamp = maxOf(efficiencyStamp, pairStamp)
+                }
             } else observe("UNSTABLE")
         }
         observe(if (child.up) "UP" else "DOWN")
@@ -162,7 +211,11 @@ internal class LpDirectionalHistory(
         }
         val distance = if (up) floor + 1.0 - parent.value else parent.value - floor
         if (distance <= DISTANCE_TOL || distance >= 1.0 - DISTANCE_TOL) return
-        pending = Pending(parent, up, distance, level)
+        val startedWork = readWork?.let { meter ->
+            charge(1L)
+            meter()
+        }
+        pending = Pending(parent, up, distance, level, startedWork)
     }
 
     fun infeasible() {
@@ -188,6 +241,20 @@ internal class LpDirectionalHistory(
         val downRoot = sqrt(downGain) * sqrt(fraction)
         val upRoot = sqrt(upGain) * sqrt(1.0 - fraction)
         val score = downRoot * upRoot
+        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
+    }
+
+    fun efficiencyScore(variable: VarRef, value: Double): Double = efficiencyEstimate(variable, value)
+        .takeIf { it > 0.0 } ?: Double.NaN
+
+    fun efficiencyEstimate(variable: VarRef, value: Double): Double {
+        val history = reliable(variable, value) ?: return Double.NaN
+        charge(5L)
+        if (!(history.workEstimate > 0.0)) return Double.NaN
+        if (history.down.gain == 0.0 || history.up.gain == 0.0) return 0.0
+        val fraction = value - floor(value)
+        val gain = minOf(history.down.gain * fraction, history.up.gain * (1.0 - fraction))
+        val score = gain / history.workEstimate
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
@@ -221,7 +288,6 @@ internal class LpDirectionalHistory(
         expire(history.up)
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
-        if (history.down.count == 0 || history.up.count == 0) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
@@ -238,10 +304,13 @@ internal class LpDirectionalHistory(
             direction.count = 0
             direction.latest = 0.0
             direction.previous = 0.0
+            direction.latestWork = 0L
+            direction.previousWork = 0L
             observe("EXPIRED")
         } else if (direction.count >= RELIABILITY && stamp - direction.previousStamp > maxAge) {
             direction.count = 1
             direction.previous = 0.0
+            direction.previousWork = 0L
             observe("EXPIRED")
         }
     }

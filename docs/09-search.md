@@ -370,20 +370,27 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit the geometric mean of the predicted child gains; a zero
-gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
+in each direction permit the minimum predicted child gain per measured LP work;
+a zero gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
-Geometric scoring scales square roots before multiplication and charges the additional work.
-An underflowed positive score supplies no measured-zero reference.
+Each committed child snapshots the owning LP engine's cumulative work after charged
+commitment bookkeeping. Its fresh matching optimum records the positive meter difference
+before charging the final meter read. The estimate divides the minimum predicted child
+gain by the sum of each direction's larger recent measured cost. Missing, nonpositive
+or reversed measurements supply no cost estimate. The containing LP allowance pays
+for meter reads, retained cost samples and score comparisons. An underflowed positive
+efficiency supplies no measured-zero reference.
+The work denominator is retained with its sample pair; updating either direction
+invalidates it before rebuilding it from known costs.
 Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
 A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
-as well, including measured zero gains, and a strictly greater predicted gain.
-The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
+as well, including measured zero gains and known costs, and a strictly greater predicted efficiency.
+The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains and known costs
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that
 gate. Passing it still requires the variable's own recent samples; it grants no
@@ -401,11 +408,9 @@ LP state after charging its work and before attributing advice, using the existi
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
-The same recent directional estimates can order the selected variable's two
-existing adjacent alternatives. It visits the lower predicted gain first to seek
-an incumbent, unless a predicted child gain reaches the current objective gap;
-then it visits the higher predicted gain first to seek early pruning.
-Predicted gains carry no pruning authority.
+The same recent directional estimates compare the selected variable's two
+existing adjacent alternatives. Their proposals remain withheld; ordinary child
+order is retained in either advice mode. Predicted gains carry no pruning authority.
 Both directions need two in-age observations; equal or unavailable
 estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
 creates no LP query, charges constant comparison and commitment work to the LP
@@ -414,12 +419,12 @@ Value nominations and matching committed changes have separate counters from
 variable advice and missing-direction collection. Withheld advice retains ordinary
 value order while paying the same comparison work.
 
-With a finite incumbent cutoff, the same opt-in path can visit an under-observed
-child first to collect missing passive information. It uses a recent positive
+The same opt-in path can visit an under-observed child first to collect missing
+passive information, including before an incumbent exists. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
-around its fresh fractional LP point. Each direction needs an in-age observation
-before collection can complete a nearly reliable pair, and the more observed side
-must have a stable positive estimate. A scope-wide availability
+around its fresh fractional LP point. The more observed side must have a stable
+positive estimate from two in-age observations; the opposite direction may have no
+sample. A scope-wide availability
 stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
@@ -435,7 +440,11 @@ Samples share one retained exact base model, active-row identity, objective mapp
 and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
 replacement arrays are checked element by element. Scope capture borrows those arrays,
 and comparison work charges the visited elements. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+history and pending comparisons. An internal restart retains in-age observations
+but discards ancestor splits, pending child attribution and nominations. Advice
+requires a fresh optimum with the same complete scope after the restart; changed
+source or cutoff still invalidates history. Restarts do not renew observation age.
+Assumption reseeding and close clear history.
 Invalidations report the first differing scope facet: base model, active rows,
 objective constant, incumbent cutoff, variable mapping or variable kind, in that order.
 Initial scope capture reports no invalidation. The additional reason observation

@@ -11,6 +11,106 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `efficiency prefers reliable progress per measured child work`() {
+        var work = 0L
+        val history = LpDirectionalHistory({}, readWork = { work })
+        val slow = VarRef.Bool(0)
+        val fast = VarRef.Bool(1)
+        for ((variable, gain, cost) in listOf(Triple(slow, 2.0, 100L), Triple(fast, 1.0, 10L))) {
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) { sample ->
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool((variable.varId shl 1) or (if (up) 0 else 1)), 1)
+                    work += if (sample == 0) cost else cost / 2
+                    history.beginNode(1)
+                    history.record(gain)
+                }
+            }
+        }
+
+        assertTrue(history.score(slow, 0.5) > history.score(fast, 0.5))
+        assertEquals(0.01, history.efficiencyScore(slow, 0.5), 1e-9)
+        assertEquals(0.05, history.efficiencyScore(fast, 0.5), 1e-9)
+    }
+
+    @Test
+    fun `a missing child cost invalidates an existing efficiency estimate`() {
+        var work = 0L
+        val history = LpDirectionalHistory({}, readWork = { work })
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                work += 10L
+                history.beginNode(1)
+                history.record(1.0)
+            }
+        }
+        assertTrue(history.efficiencyScore(variable, 0.5).isFinite())
+
+        history.commit(SearchDecision.Bool(1), 1)
+        history.beginNode(1)
+        history.record(1.0)
+
+        assertTrue(history.score(variable, 0.5).isFinite())
+        assertTrue(history.efficiencyEstimate(variable, 0.5).isNaN())
+    }
+
+    @Test
+    fun `unknown nonpositive or reversed work cannot supply an efficiency reference`() {
+        for (cost in listOf<Long?>(null, 0L, -1L)) {
+            var work = 100L
+            val history = LpDirectionalHistory({}, readWork = if (cost == null) null else ({ work }))
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (literal in listOf(0, 1)) {
+                    history.commit(SearchDecision.Bool(literal), 1)
+                    work += cost ?: 0L
+                    history.beginNode(1)
+                    history.record(1.0)
+                }
+            }
+
+            assertTrue(history.score(variable, 0.5).isFinite(), "cost=$cost")
+            assertTrue(history.efficiencyEstimate(variable, 0.5).isNaN(), "cost=$cost")
+            assertFalse(history.hasEfficientHistory, "cost=$cost")
+        }
+    }
+
+    @Test
+    fun `efficiency underflow cannot replace a measured zero reference`() {
+        for (gain in listOf(0.0, 1e-310)) {
+            var work = 0L
+            val history = LpDirectionalHistory({}, readWork = { work })
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (literal in listOf(0, 1)) {
+                    history.commit(SearchDecision.Bool(literal), 1)
+                    work += 1_000_000_000_000_000L
+                    history.beginNode(1)
+                    history.record(gain)
+                }
+            }
+
+            val estimate = history.efficiencyEstimate(variable, 0.5)
+
+            if (gain == 0.0) assertEquals(0.0, estimate)
+            else assertTrue(estimate.isNaN())
+        }
+    }
+
+    @Test
     fun `geometric scores survive an underflowed child product`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)
@@ -77,6 +177,59 @@ class LpDirectionalHistoryTest {
 
             assertEquals(available, history.preferGainDirection(variable, 0.25) != null, "gains=$observations")
         }
+    }
+
+    @Test
+    fun `restart retains samples but discards ancestor and pending child attribution`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        history.commit(SearchDecision.Bool(1), 1)
+
+        history.restart()
+        history.beginNode(1)
+        history.record(1000.0)
+
+        assertEquals(2.0, history.score(variable, 0.5), 1e-9)
+        assertEquals(1, history.retainedEntries)
+        assertEquals(2, events.count { it == "DOWN" })
+        assertEquals(2, events.count { it == "UP" })
+        assertEquals(1, events.count { it == "RESTART_RETAINED" })
+    }
+
+    @Test
+    fun `restarts do not renew the age of retained observations`() {
+        val history = LpDirectionalHistory({}, maxAge = 6L)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        assertTrue(history.score(variable, 0.5).isFinite())
+
+        repeat(7) {
+            history.restart()
+            history.beginNode(0)
+        }
+
+        assertTrue(history.score(variable, 0.5).isNaN())
+        assertFalse(history.hasReliableHistory)
     }
 
     @Test
@@ -154,8 +307,8 @@ class LpDirectionalHistoryTest {
                 history.record(11.0)
             }
 
-            assertFalse(history.hasCollectionHistory)
-            assertNull(history.preferUnderObservedDirection(variable, 2.25))
+            assertTrue(history.hasCollectionHistory)
+            assertEquals(!firstUp, history.preferUnderObservedDirection(variable, 2.25))
             history.commit(if (firstUp) SearchDecision.IntAtMost(0, 2) else SearchDecision.IntAtLeast(0, 3), 1)
             history.beginNode(1)
             history.record(11.0)

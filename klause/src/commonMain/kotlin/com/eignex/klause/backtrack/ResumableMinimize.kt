@@ -581,7 +581,7 @@ internal class ResumableMinimize(
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                applyAdvice = params.lpDirectionalAdvice)
+                applyAdvice = params.lpDirectionalAdvice, readWork = { lpEngine.totalSolveWork() })
         } else
             null
 
@@ -1617,7 +1617,7 @@ internal class ResumableMinimize(
         }
 
         override fun onRestart() {
-            lpHints?.resetHistory()
+            lpHints?.restart()
             restartRootTargetsPending = incumbents.current() == null &&
                 lpEngine.rootPrimalTargets?.components?.offered == true
             lpEngine.restartRootPrimalTargets()
