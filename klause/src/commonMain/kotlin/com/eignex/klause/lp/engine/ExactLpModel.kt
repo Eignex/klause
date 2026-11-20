@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.eignex.klause.lp.engine
 
 import com.eignex.util.numbers.BIG_ONE
@@ -7,6 +9,8 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.toLongExact
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 // The exact model types deliberately do not implement ExactSimplexModel: the Long-valued simplex sees their
 // values only through a checked projection.
@@ -178,6 +182,7 @@ internal class ExactLpModel private constructor(
     private val rows: List<ExactLpRow>,
     val objective: ExactLpObjective,
     validateMatrix: Boolean,
+    private val reconstructionMatrix: AtomicReference<List<List<Pair<Int, BigFraction>>>?> = AtomicReference(null),
 ) {
     constructor(
         matrix: List<List<ExactLpEntry>>,
@@ -215,6 +220,12 @@ internal class ExactLpModel private constructor(
     // Engine kernels read the owned immutable list; caller snapshots go through entries.
     internal fun columnEntries(j: Int): List<ExactLpEntry> = matrix[j]
 
+    internal fun reconstructionColumns(): List<List<Pair<Int, BigFraction>>>? = reconstructionMatrix.load()
+
+    internal fun retainReconstructionColumns(columns: List<List<Pair<Int, BigFraction>>>) {
+        reconstructionMatrix.compareAndSet(null, columns)
+    }
+
     fun copy(
         rhs: List<ExactLpNumber> = this.rightHandSide,
         columns: List<ExactLpColumn> = this.columns,
@@ -232,6 +243,7 @@ internal class ExactLpModel private constructor(
             if (rows === this.rows) this.rows else rows.toList(),
             objective,
             false,
+            reconstructionMatrix,
         ).also { it.storageCache = if (rows === this.rows) layoutStorage else layoutStorage.withRows(rows) }
     }
 
@@ -243,14 +255,14 @@ internal class ExactLpModel private constructor(
      */
     fun withBoundColumns(columns: List<ExactLpColumn>): ExactLpModel {
         require(columns.size == numVars)
-        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false).also {
+        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false, reconstructionMatrix).also {
             it.storageCache = layoutStorage
         }
     }
 
     fun withObjective(objective: ExactLpObjective): ExactLpModel {
         require(objective.size == numVars)
-        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false).also {
+        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false, reconstructionMatrix).also {
             it.storageCache = layoutStorage
         }
     }
@@ -282,7 +294,8 @@ internal class ExactLpModel private constructor(
         } else {
             objective.withConstant(ExactLpNumber.of(constant))
         }
-        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows, nextObjective, false).also {
+        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows, nextObjective, false,
+            reconstructionMatrix).also {
             it.storageCache = layoutStorage
         }
     }

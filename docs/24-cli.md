@@ -132,6 +132,10 @@ allocation) bound each optional cutting-planes analysis inside propagation work 
 cancellation. Both accept nonnegative values. Zero keeps clause fallback; neither
 control enables integer-row or pseudo-Boolean learning. See [learning](10-learning.md).
 
+`--param integer-row-admission=false` keeps enabled integer-row derivation and integer
+decision naming while attaching only each mapped row's first-UIP clause. It defaults
+to `true` and does not enable learning. Mandatory arithmetic remains enforced.
+
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
 (1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch

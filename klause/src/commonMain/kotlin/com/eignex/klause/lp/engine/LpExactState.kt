@@ -214,9 +214,9 @@ internal class LpExactState internal constructor(
             val region = if (touched.isEmpty()) {
                 source.model
             } else {
-                source.model.withBoundColumns(
-                    List(baseModel.numVars) { if (it in touched) column(it) else source.model.column(it) },
-                )
+                val columns = MutableList(baseModel.numVars) { source.model.column(it) }
+                for (j in touched) columns[j] = column(j)
+                source.model.withBoundColumns(columns)
             }
             model = if (region.objective === baseModel.objective) region else region.withObjective(baseModel.objective)
             if (appended != null) {

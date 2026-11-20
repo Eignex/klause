@@ -517,10 +517,15 @@ Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI rec
 and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
 Recordings capture up to 128 stack frames. Clock-conversion summaries retain up to
 32 frames per sampled caller chain and mark capture truncation.
+Class-loading events retain triggering callers for cold class-footprint diagnosis.
 Summary generation runs in the bench process after CLI exit, outside the subprocess
 `elapsedMs` and GNU time metrics and inside the containing case and job allowances.
 These instrumented captures support attribution; use separate uninstrumented controls
 for performance comparisons.
+
+Runtime comparison identity canonicalizes the managed `out/report/cli.jfr` output
+destination in the CLI arguments. Recording settings and other JVM arguments remain
+part of that identity; raw provenance retains the complete destination.
 
 Profile reflection reads the session's nullable retained propagation owner through
 `LivePropagationState`; live-only probes fail explicitly after release. Captures retain bounded diagnostic traces
@@ -656,6 +661,20 @@ decoded bytes and recorded relations. Eligibility requires a verified decoded ha
 complete coverage of every collection those identities touch. `exposures --use USE --label LABEL
 lab-cases.jsonl...` records every retained row as exposure, including failed, unsuitable and no-witness
 outcomes. Rows without hashed inputs are recorded as gaps.
+Successful `source-identity-v1` receipts contribute verified decoded identities instead of
+exposure after their path and stored hash match the declared input; incomplete or mismatched
+receipts remain gaps. Hash-only jobs run no solver and establish no applicability or quality.
+
+Roadmap lanes reconcile `sets/roadmap-exposed.txt` and `sets/roadmap-reserved.txt` with an external
+versioned exposure manifest before qualification. A reservation names prospective work and supplies
+no untouched claim. Record verified stored/decoded identities, known related encodings, provenance,
+coverage and gaps; link the manifest and its digest from the owning issue. Unknown history stays unresolved.
+
+Concurrent lanes check current main and open reservation PRs, then merge an issue-identified claim
+covering the source and its known related encodings before execution. Move the source to the exposed
+set before its first solver run or applicability screen, retaining failed, unsuitable and no-witness
+uses in the manifest. Identity-only hashing does not expose a source. Release an unused claim explicitly;
+never return an executed source to the reserve.
 
 `lab/frozen-minizinc-linux.json` also accepts plain `.mzn` models and an optional
 plain `.dzn` data input with role `data` and attribute `sourceDataPlainSha256`.

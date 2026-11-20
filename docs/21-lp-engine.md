@@ -21,6 +21,7 @@ dense ratio scans gather that same carrier in row order.
 and widening state. `SimplexBasicValues` retains the coupled basic values, model,
 scaling view and nonbasic statuses, invalidating them together. Its restoration
 adjusts changed nonbasic seats through the retained factors.
+Short update vectors use portable Koblas AXPY; larger vectors use the selected backend.
 `SimplexSolveControl` owns allowance checks and work charging; every phase and
 recovery restart shares one cumulative `SolveProgress`. `RevisedSimplex` coordinates
 starts, recovery, cursor lifetime and result publication.
@@ -234,6 +235,10 @@ conflict pruning. Heuristic LP seeding consumes floating coordinates directly an
 requests no certificate.
 Exact point reconstruction checks every bound, skips zero objective products, and
 reuses converted coordinates where the source origin is zero.
+Reconstruction shares a complete immutable coefficient capture across models with
+the same owned matrix. Each invocation repeats input, scalar, work and allocation
+admission; bounds, premises, right-hand sides and objective values are read from
+the current model. A changed matrix has a separate capture.
 
 ### Safe objective bounds
 

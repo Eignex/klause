@@ -10,6 +10,7 @@ import com.eignex.klause.bench.lab.SourceEligibility.Verified
 import com.eignex.klause.bench.source.CommittedCorpusIndexes
 import com.eignex.klause.bench.source.CorpusIndex
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -163,6 +164,74 @@ class SourceEligibilityTest {
             assertEquals(listOf("no-witness", "unsuitable", "failed:FAILED"), manifest.exposures.map { it.outcome })
             assertEquals(hash('2'), manifest.exposures.first().inputs.single().plainSha256)
             assertEquals(listOf("miplib2017", null), manifest.gaps.map { it.collection })
+        } finally {
+            file.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["valid", "path", "stored", "plain", "executed", "failed", "missing-id", "blank-id",
+        "missing-suite", "blank-suite", "missing-problem", "blank-problem", "blank-path", "absolute-path"])
+    fun `identity only receipts should verify matching bytes without exposing a source`(variant: String) {
+        val file = Files.createTempFile("identity-cases-", ".jsonl").toFile()
+        try {
+            val path = when (variant) {
+                "blank-path" -> ""
+                "absolute-path" -> "/miplib2017/a.mps.zst"
+                else -> "miplib2017/a.mps.zst"
+            }
+            val id = if (variant == "missing-id") JsonNull else JsonPrimitive(if (variant == "blank-id") " " else "a")
+            val suite = if (variant == "missing-suite") JsonNull else
+                JsonPrimitive(if (variant == "blank-suite") " " else "miplib2017")
+            val problem = if (variant == "missing-problem") JsonNull else
+                JsonPrimitive(if (variant == "blank-problem") " " else "a")
+            val detailsPath = if (variant == "path") "miplib2017/b.mps.zst" else path
+            val stored = if (variant == "stored") hash('9') else hash('1')
+            val plain = if (variant == "plain") "missing" else hash('2')
+            val executed = variant == "executed"
+            val status = if (variant == "failed") "FAILED" else "DONE"
+            file.writeText("""{"index":0,"status":"$status","problem":{"benchCase":{"id":$id,
+                "inputs":[{"path":"$path","root":"CORPUS","role":"model","sha256":"${hash('1')}"}],
+                "attributes":{"recordSchema":"source-identity-v1","suite":$suite,"problem":$problem}}},
+                "record":{"caseId":$id,"status":"success","details":{"path":"$detailsPath",
+                "packedSha256":"$stored","plainSha256":"$plain","plainBytes":42,
+                "suite":$suite,"problem":$problem,"solverExecuted":$executed}}}""".replace("\n", ""))
+
+            val manifest = SourceEligibility.exposures(listOf(file), "screen", "job 5")
+
+            assertTrue(manifest.exposures.isEmpty())
+            if (variant == "valid") {
+                assertEquals(Identity(path, "model", hash('1'), hash('2')),
+                    manifest.identities.single().inputs.single())
+                assertTrue(manifest.gaps.isEmpty())
+                assertEquals(Status.UNRESOLVED, SourceEligibility.classify("a", manifest.identities.single().inputs,
+                    manifest).status)
+            } else {
+                assertTrue(manifest.identities.isEmpty())
+                assertEquals(if (variant.endsWith("path") && variant != "path") null else "miplib2017",
+                    manifest.gaps.single().collection)
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `rejected identity receipts should preserve every possibly affected collection`(enumerable: Boolean) {
+        val file = Files.createTempFile("invalid-identity-cases-", ".jsonl").toFile()
+        try {
+            val second = if (enumerable) """{"path":"other/b.mps.zst"}""" else "null"
+            file.writeText("""{"status":"DONE","problem":{"benchCase":{"inputs":[
+                {"path":"miplib2017/a.mps.zst"},$second],"attributes":{"recordSchema":"source-identity-v1"}}}}
+                """.replace("\n", ""))
+
+            val manifest = SourceEligibility.exposures(listOf(file), "screen", "job 6")
+
+            assertEquals(if (enumerable) listOf("miplib2017", "other") else listOf(null),
+                manifest.gaps.map { it.collection })
+            assertTrue(manifest.identities.isEmpty())
+            assertTrue(manifest.exposures.isEmpty())
         } finally {
             file.delete()
         }

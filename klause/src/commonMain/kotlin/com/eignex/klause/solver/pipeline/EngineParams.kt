@@ -175,7 +175,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-component-reuse",
     "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
-    "pb-learning", "pb-objective-cutoff", "integer-row-learning",
+    "pb-learning", "pb-objective-cutoff", "integer-row-learning", "integer-row-admission",
     "arithmetic-learning-work", "arithmetic-learning-allocation-bytes",
     "propagation-attribution", "historical-table-reasons",
     "objective-guided-values",
@@ -254,6 +254,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpRootCuts = p[ExecutionOption.lpRootCuts]
     val pbLearning = p[ExecutionOption.pbLearning]
     val integerRowLearning = p[ExecutionOption.integerRowLearning]
+    val integerRowAdmission = p[ExecutionOption.integerRowAdmission]
     val arithmeticLearningWork = p[ExecutionOption.arithmeticLearningWork]?.also {
         if (it < 0) pipelineConfigError("arithmetic learning allowances must be non-negative")
     }
@@ -282,7 +283,8 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpComponentReuse,
         lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
-        pbObjectiveCutoff, integerRowLearning, arithmeticLearningWork, arithmeticLearningAllocationBytes,
+        pbObjectiveCutoff, integerRowLearning, integerRowAdmission,
+        arithmeticLearningWork, arithmeticLearningAllocationBytes,
         propagationAttribution, historicalTableReasons, costAwarePropagation,
         reasonPreflight,
         objectiveGuidedValues, lpDirectionalGains, lpDirectionalAdvice,
@@ -347,6 +349,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpRootCuts?.let { out = out.copy(lpPlan = out.lpPlan.copy(rootCutHarvest = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         integerRowLearning?.let { out = out.copy(integerRowLearning = it) }
+        integerRowAdmission?.let { out = out.copy(integerRowAdmission = it) }
         arithmeticLearningWork?.let { out = out.copy(arithmeticLearningWork = it) }
         arithmeticLearningAllocationBytes?.let { out = out.copy(arithmeticLearningAllocationBytes = it) }
         propagationAttribution?.let { out = out.copy(propagationAttribution = it) }
