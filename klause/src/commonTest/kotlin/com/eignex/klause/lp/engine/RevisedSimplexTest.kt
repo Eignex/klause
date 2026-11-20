@@ -31,7 +31,7 @@ class RevisedSimplexTest {
             RevisedSimplex(assertNotNull(trail.state.ownerWorkingModel()),
                 iterationLimit = allowance.iterations).use { solver ->
                 assertNull(if (reason == LpFloatTermination.PIVOTS) solver.solvePrimal()
-                    else solver.resolveBounds(allowance))
+                else solver.resolveBounds(allowance))
                 assertEquals(reason, solver.lastTermination)
                 assertNull(solver.solvedExactState)
                 assertNull(solver.infeasibleRay)
