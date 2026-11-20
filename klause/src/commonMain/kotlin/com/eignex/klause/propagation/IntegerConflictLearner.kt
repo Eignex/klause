@@ -166,6 +166,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             return recorded[2]
         }
+        budget.spend(bytes = 48)
         val key = variable to lower
         if (eagerMarkers.containsKey(key)) return eagerMarkers[key]?.get(2)
         return eagerEndpointTrail(variable, lower)
