@@ -113,6 +113,11 @@ optimum or failed check cannot prune or prove a result.
 [LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
 owns these checks.
 
+Exact-state rebuilds share unchanged immutable model descriptions and declared-bound
+witnesses. A declared witness matches its column, side and fixed declaration identity;
+an asserted witness cannot become a declaration. Strict logical sides and inactive-row
+metadata are derived into fresh descriptions, and each state keeps its own revision identity.
+
 ### Numerical and exact deductions
 
 `LpSolveContext.numericalDeductions` selects how finite search and presolve consume

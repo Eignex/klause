@@ -177,7 +177,7 @@ internal class LpExactState internal constructor(
             validateAssertions(0)
             lower = arrayOfNulls(baseModel.numVars)
             upper = arrayOfNulls(baseModel.numVars)
-            for (j in 0 until baseModel.numVars) seedDeclared(j)
+            for (j in 0 until baseModel.numVars) seedDeclared(j, previous)
             for (assertion in activeAssertions) tighten(assertion)
             model = fullModel()
             inconsistent = BooleanArray(model.numVars) { !model.column(it).bounds.consistent }
@@ -206,7 +206,7 @@ internal class LpExactState internal constructor(
             } else {
                 lower = if (touched.isEmpty()) source.lower else source.lower.copyOf()
                 upper = if (touched.isEmpty()) source.upper else source.upper.copyOf()
-                for (j in touched) seedDeclared(j)
+                for (j in touched) seedDeclared(j, source)
                 if (touched.isNotEmpty()) {
                     for (assertion in activeAssertions) if (assertion.column in touched) tighten(assertion)
                 }
@@ -279,7 +279,7 @@ internal class LpExactState internal constructor(
         return k
     }
 
-    private fun seedDeclared(j: Int) {
+    private fun seedDeclared(j: Int, previous: LpExactState?) {
         lower[j] = null
         upper[j] = null
         if (j >= baseModel.n && !rows.row(j - baseModel.n).active) return
@@ -291,8 +291,14 @@ internal class LpExactState internal constructor(
         } else {
             declared
         }
-        lower[j] = bounds.lower?.let { LpBoundAssertion(j, false, it, -2L * j - 1L, 0) }
-        upper[j] = bounds.upper?.let { LpBoundAssertion(j, true, it, -2L * j - 2L, 0) }
+        lower[j] = bounds.lower?.let { side ->
+            previous?.lower?.getOrNull(j)?.takeIf { it.witness == -2L * j - 1L && it.side == side }
+                ?: LpBoundAssertion(j, false, side, -2L * j - 1L, 0)
+        }
+        upper[j] = bounds.upper?.let { side ->
+            previous?.upper?.getOrNull(j)?.takeIf { it.witness == -2L * j - 2L && it.side == side }
+                ?: LpBoundAssertion(j, true, side, -2L * j - 2L, 0)
+        }
     }
 
     private fun tighten(assertion: LpBoundAssertion) {
@@ -318,18 +324,23 @@ internal class LpExactState internal constructor(
     }
 
     private fun fullModel(): ExactLpModel {
-        val columns = List(baseModel.numVars) { column(it) }
-        return if (rows.activeCount == rows.size) {
-            baseModel.copy(columns = columns)
-        } else {
-            baseModel.copy(
-                columns = columns,
-                rows = List(baseModel.m) {
-                    val row = baseModel.row(it)
-                    if (rows.row(it).active || !row.strict) row else row.copy(strict = false)
-                },
-            )
+        var columns: MutableList<ExactLpColumn>? = null
+        for (j in 0 until baseModel.numVars) {
+            val next = column(j)
+            if (next === baseModel.column(j)) continue
+            if (columns == null) columns = MutableList(baseModel.numVars) { baseModel.column(it) }
+            columns[j] = next
         }
+        val bounded = columns?.let { baseModel.withBoundColumns(it) } ?: baseModel
+        if (rows.activeCount == rows.size) return bounded
+        var metadata: MutableList<ExactLpRow>? = null
+        for (i in 0 until baseModel.m) {
+            val row = baseModel.row(i)
+            if (rows.row(i).active || !row.strict) continue
+            if (metadata == null) metadata = MutableList(baseModel.m) { baseModel.row(it) }
+            metadata[i] = row.copy(strict = false)
+        }
+        return metadata?.let { bounded.copy(rows = it) } ?: bounded
     }
 
     private fun boundsProject(j: Int): Boolean {

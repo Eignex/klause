@@ -404,6 +404,7 @@ internal fun LpNeighborhood.rebindExact(
         popRevision = state.popRevision,
         rows = identities,
         rowRevision = state.rowRevision,
+        previous = previous,
     )
     if (!previous.sameMatrix(next)) return null
     next.inheritProjection(previous)

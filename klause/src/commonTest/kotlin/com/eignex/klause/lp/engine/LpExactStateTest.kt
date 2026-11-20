@@ -15,6 +15,25 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
+    fun `replaced declared bounds should not inherit an asserted witness`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val side = ExactLpSide(ExactLpNumber.of(4L))
+        val parent = LpExactState(source, listOf(LpBoundAssertion(0, false, side, 7L, 0)))
+        val replacement = source.withBoundColumns(listOf(source.column(0).copy(
+            bounds = ExactLpBounds(side, source.column(0).bounds.upper),
+        )))
+
+        val next = LpExactState(replacement,
+            listOf(LpBoundAssertion(0, true, ExactLpSide(ExactLpNumber.of(3L)), 8L, 0)), previous = parent)
+
+        val conflict = assertNotNull(next.conflict)
+        assertEquals(-1L, conflict.lower.witness)
+        assertEquals(8L, conflict.upper.witness)
+        assertEquals(7L, parent.activeSide(0, false)?.witness)
+    }
+
+    @Test
     fun `assertion captures should remain independent across empty scopes and later edits`() {
         val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
             .build(Sense.MINIMIZE).authoritativeModel())
