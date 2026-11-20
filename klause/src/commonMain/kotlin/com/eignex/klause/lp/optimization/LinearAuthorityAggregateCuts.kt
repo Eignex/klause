@@ -483,17 +483,21 @@ internal object LinearAuthorityAggregateCuts {
         private fun continuation(
             terms: List<LinearAuthorityAggregateTerm>, aggregate: Map<SourceCoordinate, BigFraction>,
             snapshots: List<Map<SourceCoordinate, BigFraction>>,
+            knownSupport: Set<SourceCoordinate>? = null,
         ): Continuation? {
-            meter.reserve(snapshots.size.toLong(), 128L + snapshots.size * 32L)
-            val support = HashSet<SourceCoordinate>()
-            for (row in snapshots) {
-                for (id in row.keys) {
-                    meter.reserve(1L)
-                    if (id in support) continue
-                    if (support.size >= limits.support) stopAggregate("SupportLimit")
-                    meter.reserve(1L, 64L)
-                    support.add(id)
+            val support = knownSupport ?: run {
+                meter.reserve(snapshots.size.toLong(), 128L + snapshots.size * 32L)
+                val collected = HashSet<SourceCoordinate>()
+                for (row in snapshots) {
+                    for (id in row.keys) {
+                        meter.reserve(1L)
+                        if (id in collected) continue
+                        if (collected.size >= limits.support) stopAggregate("SupportLimit")
+                        meter.reserve(1L, 64L)
+                        collected.add(id)
+                    }
                 }
+                collected
             }
             for ((id, value) in aggregate) {
                 meter.reserve(1L)
@@ -939,26 +943,39 @@ internal object LinearAuthorityAggregateCuts {
         private fun extendInteger(
             seed: List<LinearAuthorityAggregateTerm>, seedCoefficients: List<Map<SourceCoordinate, BigFraction>>,
         ): LinearAuthorityCut? {
-            var terms = seed
-            var snapshots = seedCoefficients
-            var aggregate = capture.coefficients ?: return null
+            val initial = capture.coefficients ?: return null
+            meter.reserve(seed.size * 2L + initial.size, 512L + limits.rows * 32L + initial.size * 64L)
+            val terms = ArrayList<LinearAuthorityAggregateTerm>(limits.rows).also { it.addAll(seed) }
+            val snapshots = ArrayList<Map<SourceCoordinate, BigFraction>>(limits.rows).also {
+                it.addAll(seedCoefficients)
+            }
+            val aggregate = LinkedHashMap(initial)
+            val support = HashSet<SourceCoordinate>()
+            fun retainSupport(row: Map<SourceCoordinate, BigFraction>) {
+                for (id in row.keys) {
+                    meter.reserve(1L)
+                    if (id in support) continue
+                    if (support.size >= limits.support) stopAggregate("SupportLimit")
+                    meter.reserve(1L, 64L)
+                    support.add(id)
+                }
+            }
+            for (row in snapshots) retainSupport(row)
             while (true) {
                 halfInteger()?.let { return it }
                 if (terms.size >= limits.rows) return null
-                val next = continuation(terms, aggregate, snapshots) ?: return null
+                val next = continuation(terms, aggregate, snapshots, support) ?: return null
                 meter.arithmetic(next.residual, next.pivot)
                 val weight = meter.number(next.residual.negated() * next.pivot.reciprocal())
-                meter.reserve(terms.size + aggregate.size + 1L,
-                    256L + (terms.size + 1L) * 64L + aggregate.size * 64L)
-                terms = terms + next.row.term.copy(weight = weight)
-                snapshots = snapshots + next.row.coefficients
-                val combined = LinkedHashMap(aggregate)
+                meter.reserve(2L, 64L)
+                terms.add(next.row.term.copy(weight = weight))
+                snapshots.add(next.row.coefficients)
+                retainSupport(next.row.coefficients)
                 for ((id, value) in next.row.coefficients) {
-                    meter.reserve(1L, if (id in combined) 0L else 64L)
-                    val updated = meter.add(combined[id] ?: BigFraction.ZERO, meter.multiply(value, weight))
-                    if (updated.isZero) combined.remove(id) else combined[id] = updated
+                    meter.reserve(1L, if (id in aggregate) 0L else 64L)
+                    val updated = meter.add(aggregate[id] ?: BigFraction.ZERO, meter.multiply(value, weight))
+                    if (updated.isZero) aggregate.remove(id) else aggregate[id] = updated
                 }
-                aggregate = combined
                 capture.coefficients = aggregate
                 capture.integer = null
                 observe("AggregateIntegerProjectionRows", 1L)
