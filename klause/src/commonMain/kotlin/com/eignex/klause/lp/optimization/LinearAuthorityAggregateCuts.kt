@@ -523,7 +523,7 @@ internal object LinearAuthorityAggregateCuts {
                         continue
                     }
                     if (first == null) first = other
-                    val rank = if (integerProjection) projectionRank(other, aggregate) else 0L
+                    val rank = if (integerProjection) projectionRank(other, aggregate, support) else 0L
                     if (rank < bestRank) continue
                     val score = continuationScore(other, pivot)
                     if (score == null) {
@@ -580,19 +580,27 @@ internal object LinearAuthorityAggregateCuts {
             return false
         }
 
-        private fun projectionRank(row: ProbeRow, aggregate: Map<SourceCoordinate, BigFraction>): Long {
+        private fun projectionRank(
+            row: ProbeRow, aggregate: Map<SourceCoordinate, BigFraction>, seen: Set<SourceCoordinate>? = null,
+        ): Long {
             var introduced = 0
             var opposed = 0
+            var revived = false
             for ((id, value) in row.coefficients) {
                 meter.reserve(1L)
                 if (id.kind != SourceCoordinate.Kind.Real) continue
                 val current = aggregate[id]
-                if (current == null) introduced++ else {
+                if (current == null) {
+                    meter.reserve(1L)
+                    introduced++
+                    if (seen != null && id in seen) revived = true
+                } else {
                     meter.reserve(2L)
                     if ((current < BigFraction.ZERO) != (value < BigFraction.ZERO)) opposed++
                 }
             }
-            return opposed.toLong() * (limits.support.toLong() + 1L) - introduced
+            val base = limits.support.toLong() + 1L
+            return opposed * base - introduced - if (revived) base * base else 0L
         }
 
         private fun continuationScore(row: ProbeRow, pivot: BigFraction): Double? {

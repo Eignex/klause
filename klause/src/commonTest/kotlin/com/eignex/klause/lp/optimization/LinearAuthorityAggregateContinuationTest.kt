@@ -23,6 +23,45 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateContinuationTest {
     @Test
+    fun `first integer projection should finish without reviving an eliminated flow coordinate`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val flows = (0 until 3).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val stocks = (3 until 5).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val backlogs = (5 until 7).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val integers = listOf(x, y, z)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["coupled"] = SourcePremise(SourceInequality(mapOf(stocks[1] to BigFraction.MINUS_ONE,
+            backlogs[0] to BigFraction.MINUS_ONE, flows[1] to BigFraction.ONE, y to BigFraction.MINUS_ONE),
+            BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()))
+        val demand = BigFraction.ofLong(-149) * BigFraction.ofLong(100).reciprocal()
+        premises["first"] = SourcePremise(SourceInequality(mapOf(flows[0] to BigFraction.MINUS_ONE,
+            stocks[0] to BigFraction.ONE, backlogs[0] to BigFraction.MINUS_ONE), demand))
+        premises["middle"] = SourcePremise(SourceInequality(mapOf(flows[1] to BigFraction.MINUS_ONE,
+            stocks[0] to BigFraction.MINUS_ONE, stocks[1] to BigFraction.ONE,
+            backlogs[0] to BigFraction.ONE, backlogs[1] to BigFraction.MINUS_ONE), demand))
+        premises["last"] = SourcePremise(SourceInequality(mapOf(flows[2] to BigFraction.MINUS_ONE,
+            stocks[1] to BigFraction.MINUS_ONE, backlogs[1] to BigFraction.ONE), demand))
+        val source = SourceProofContext(scope, (integers + flows + stocks + backlogs).toSet(), premises)
+        val point = integers.associateWith { 0.75 } + flows.associateWith { 1.5 } +
+            (stocks + backlogs).associateWith { 0.0 }
+        var attempts = 0
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { attempts > 1 },
+            observe = { name, _ -> if (name == "AggregateIntegerProjectionAttempts") attempts++ },
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 6),
+            point = point).single()
+
+        assertEquals(SourceInequality(integers.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-3)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `integer projection should finish a widened flow despite expanding and inverse rows`() {
         val flow = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val stock = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
