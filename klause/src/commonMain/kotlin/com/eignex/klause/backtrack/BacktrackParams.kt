@@ -429,8 +429,6 @@ data class BacktrackParams(
     val pbLearning: Boolean? = null,
     /** Learn exact mandatory integer rows from finite conflicts; disabled by default. */
     val integerRowLearning: Boolean = false,
-    /** Admit derived integer rows; disabling keeps derivation and integer decision naming enabled. */
-    val integerRowAdmission: Boolean = true,
     /**
      * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
      * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a
@@ -492,6 +490,8 @@ data class BacktrackParams(
     val arithmeticLearningAllocationBytes: Long = 8L * 1024 * 1024,
     /** Apply reliable directional branching advice; false retains its observations, collection and comparison work. */
     val lpDirectionalAdvice: Boolean = true,
+    /** Admit derived integer rows; disabling keeps derivation and integer decision naming enabled. */
+    val integerRowAdmission: Boolean = true,
 ) : SolverParams {
     init {
         require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)
