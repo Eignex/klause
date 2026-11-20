@@ -119,7 +119,8 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
         JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 6),
             external = { Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(1e-8)) },
             incumbentProximity = true, incumbentCompletionCheck = { point, _, _ ->
-                privateQuery && point.ints.contentEquals(longArrayOf(1, 1, 0)) && point.exactReals == listOf(BigFraction.ONE)
+                privateQuery && point.ints.contentEquals(longArrayOf(1, 1, 0)) &&
+                    point.exactReals == listOf(BigFraction.ONE)
             }, onComparison = {
                 if (it.phase == "query") {
                     queries++
