@@ -107,7 +107,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true,
-        gap: OptimalityGap? = null): List<PortfolioArmFactory> {
+        gap: OptimalityGap? = null, incumbentTrials: Boolean = true): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
         val binding = EngineInvocation(plan, identity, objective)
         fun factory(arm: Int, family: ArmFamily, create: (PortfolioWorkerSlot) -> PortfolioWorker) =
@@ -147,14 +147,17 @@ internal class FiniteNumericalCompanions private constructor(
                 repairGuidance?.let(slot::own)
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
-                val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion } }
+                val worker = context?.let {
+                    repairWorker(slot, firstArm + 1, limits, it, sharePoints, incumbentTrials) { companion }
+                }
                 companion = PortfolioWorker.ofMinimize(FiniteCompanionArms.JOINT_REPAIR, firstArm + 1,
                     countsInstructions = true,
                     resumable = {
                         val search = if (worker != null) requireNotNull(worker.newResumableSearch(incumbents::bound))
                         else DeferredCompanionSearch({ requireNotNull(admission).declineReason }) { global, millis ->
                             requireNotNull(admission).contextForStart(global, millis)?.let {
-                                requireNotNull(repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion }
+                                requireNotNull(repairWorker(slot, firstArm + 1, limits, it, sharePoints,
+                                    incumbentTrials) { companion }
                                     .newResumableSearch(incumbents::bound))
                             }
                         }
@@ -171,7 +174,8 @@ internal class FiniteNumericalCompanions private constructor(
     }
 
     private fun repairWorker(slot: PortfolioWorkerSlot, arm: Int, limits: TheoryParams,
-        context: SourceProofContext, sharePoints: Boolean, companion: () -> PortfolioWorker): PortfolioWorker {
+        context: SourceProofContext, sharePoints: Boolean, incumbentTrials: Boolean,
+        companion: () -> PortfolioWorker): PortfolioWorker {
         var readVersion = 0L
         var importedVersion = 0L
         val repair = slot.own(JointLinearRepair(model, context, objective, limits,
@@ -185,6 +189,7 @@ internal class FiniteNumericalCompanions private constructor(
             }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
             sharedCompletions = completionSharing,
             repairGuidance = repairGuidance,
+            incumbentProximity = !adaptiveRepair,
             incumbentCompletionCheck = incumbentCompletionCheck,
             onObservation = onObservation?.let { report -> { observation -> report(slot.seed, observation) } },
             onComparison = onComparison?.let { report ->
@@ -207,7 +212,8 @@ internal class FiniteNumericalCompanions private constructor(
             }))
         return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
-            pendingIncumbentTrial = { repair.incumbentTrialPending },
+            pendingIncumbentTrial = { incumbentTrials && repair.incumbentTrialPending },
+            privateCandidate = repair::isProximityDiscovery,
             open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
     }
 
@@ -232,7 +238,8 @@ internal class FiniteNumericalCompanions private constructor(
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
                 incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance,
-                gap = gap, useSourceGap = false)
+                gap = gap, useSourceGap = false,
+                incumbentProximity = completionSharing != null && model.binaryIntegers && !adaptiveRepair)
             private var result: MinimizeResult? = null
             private var closed = false
             override val isDone: Boolean get() = result != null
@@ -244,7 +251,8 @@ internal class FiniteNumericalCompanions private constructor(
                 result?.let { return it }
                 val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
                     onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(),
-                        TerminationReason.BudgetExhausted, stats))
+                        TerminationReason.BudgetExhausted,
+                        IncumbentProximity.candidateStats(stats, search.incumbentIsProximity)))
                 }.also { objectiveBound = search.objectiveBound } ?: return null
                 val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
                     finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics,

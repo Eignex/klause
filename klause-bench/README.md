@@ -25,6 +25,8 @@ Execution verifies the planned file and directory identities before each solve.
 
 Solver records retain reported numerical LP authority, objective tolerance and original-unit
 bound/gap metadata. Independent source validation remains separate from those reported claims.
+Accepted incumbent attribution marks candidates produced by private incumbent reuse,
+including candidates whose publication was deferred inside the portfolio.
 `param.source-tolerance-envelope=true` forwards the CLI's opt-in absolute MPS tolerance
 envelope control; its accepted-set bounds retain a separate scope from nominal bounds.
 
