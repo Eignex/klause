@@ -460,8 +460,9 @@ internal object SourceEligibility {
                             }.orEmpty()
                             val affected = if (collections.isEmpty() || null in collections) listOf(null)
                             else collections.distinct()
-                            affected.forEach { collection -> gaps += Gap(collection,
-                                "$where has an incomplete or mismatched identity receipt") }
+                            affected.forEach { collection ->
+                                gaps += Gap(collection, "$where has an incomplete or mismatched identity receipt")
+                            }
                         }
                         return@forEachIndexed
                     }
@@ -494,7 +495,9 @@ internal object SourceEligibility {
             exposures = rows.map { (key, evidence) ->
                 Exposure(key.first, use, key.second, evidence.joinToString("; "))
             },
-            identities = verified.map { (identity, evidence) -> Verified(listOf(identity), evidence.joinToString("; ")) },
+            identities = verified.map { (identity, evidence) ->
+                Verified(listOf(identity), evidence.joinToString("; "))
+            },
             gaps = gaps,
         )
     }
