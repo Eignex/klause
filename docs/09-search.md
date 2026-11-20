@@ -369,37 +369,18 @@ The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit the geometric mean of the predicted child gains; a zero
-gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
-Geometric scoring scales square roots before multiplication and charges the additional work.
-An underflowed positive score supplies no measured-zero reference.
+`lp-directional-gains=true`, with LP bounding and branching enabled.
 Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
 A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
-Variable comparisons require reliable history for the ordinary reference
-as well, including measured zero gains, and a strictly greater predicted gain.
-The variable consumer withholds its proposals and retains the ordinary variable;
-reliable child ordering can still apply to that variable's adjacent alternatives.
-The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
-and skips history lookups until such a variable has been observed, or after all
-such observations have aged out. Samples from different variables cannot open that
-gate. Passing it still requires the variable's own recent samples; it grants no
-score or authority. History reset clears the prerequisite.
-Selection rechecks that the fractional point and optimum belong to the same current
-relaxation and exact state, and declines on cancellation or stale information. A
-nomination retains only its variable, point and solve stamp. Proposal and
-baseline roles share one immutable candidate when they name the same variable.
-Clearing an already-empty nomination leaves its state untouched; transient selection
-flags still clear. Comparison and changed-proposal observations remain separate from
-the actual variable and matching
-adjacent split committed by search; replacement, retraction and retirement discard
-an unconsumed nomination. Variable commitment rechecks cancellation and current
-LP state after charging its work and before attributing advice, using the existing LP allowance.
+The variable selector retains ordinary reduced-cost and configured scoring without
+scanning directional estimates. Reliable child ordering applies only to the selected
+variable's adjacent alternatives.
+The scope retains the most recent oldest-sample stamp of a reliable pair with a
+positive direction. Child lookups decline until such support exists or after it
+ages out. Each lookup still requires that variable's own recent samples.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
@@ -413,7 +394,7 @@ estimates keep ordinary order. Pooled point replay keeps precedence. This consum
 creates no LP query, charges constant comparison and commitment work to the LP
 allowance, and checks the current point, scope, solve stamp and cancellation.
 Value nominations and matching committed changes have separate counters from
-variable advice and missing-direction collection. Withheld advice retains ordinary
+missing-direction collection. Withheld advice retains ordinary
 value order while paying the same comparison work.
 
 The same opt-in path can visit an under-observed child first to collect missing
@@ -427,12 +408,11 @@ keep ordinary order. Pooled point replay keeps precedence. Collection checks at 
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
 history resets do not renew those limits. It creates no LP query and charges the
 existing LP allowance. Collection comparisons and changed committed splits have
-separate counters from reliable variable advice. Withholding reliable advice keeps
+separate counters from reliable child advice. Withholding reliable advice keeps
 this collection policy and its costs enabled. `lp-directional-advice=false` keeps
 the ordinary variable and value choices while retaining enabled directional observation,
 nomination and comparison work; the corresponding backtrack setting is
-`BacktrackParams.lpDirectionalAdvice`. Variable comparison and commitment observations
-retain their withheld role in either mode.
+`BacktrackParams.lpDirectionalAdvice`.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
