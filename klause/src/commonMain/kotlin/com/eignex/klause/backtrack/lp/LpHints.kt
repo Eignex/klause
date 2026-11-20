@@ -214,10 +214,24 @@ internal class LpHints(
         }
     }
 
-    fun branch(variable: VarRef) {
+    fun branch(variable: VarRef, cancelled: ExecutionControl = ExecutionControl.Never) {
         passiveValues?.clear()
         passiveCollection?.clear()
         if (collect && scopeModel != null) {
+            if (history.canInspectClosure && passivePointCurrent()) {
+                val point = passivePoint
+                val state = passiveState
+                val stamp = solveStamp
+                val version = nodeStamp
+                val current = {
+                    !cancelled() && nodeStamp == version && passivePoint === point && passiveState === state &&
+                        solveStamp == stamp && passivePointCurrent()
+                }
+                charge(12L)
+                if (!current()) return
+                history.inspectClosure(variable, ::value, cutoff - scopeConstant.toDouble(), current)
+                if (!current()) return
+            }
             history.branch(variable, value(variable))
         }
     }

@@ -51,6 +51,78 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    private var remainingInspection = 4096
+
+    val canInspectClosure: Boolean get() = hasReliableHistory && remainingInspection > 0
+
+    fun inspectClosure(
+        selected: VarRef,
+        point: (VarRef) -> Double,
+        cutoff: Double,
+        current: () -> Boolean,
+    ) {
+        if (!canInspectClosure) return
+        val gap = cutoff - objective
+        if (!gap.isFinite() || gap <= 0.0) return
+        val version = generation
+        remainingInspection--
+        charge(76L)
+        if (version != generation || !current()) return
+        val selectedEvidence = closureEvidence(selected, point(selected), gap)
+        if (version != generation || !current()) return
+        val counts = IntArray(5)
+        var visited = 0
+        var other = false
+        var limited = false
+        for (variable in gains.keys) {
+            if (visited == 128 || remainingInspection == 0) {
+                limited = true
+                break
+            }
+            remainingInspection--
+            visited++
+            charge(64L)
+            if (version != generation || !current()) return
+            val evidence = closureEvidence(variable, point(variable), gap)
+            if (version != generation || !current()) return
+            counts[evidence]++
+            if (variable != selected && evidence >= 2) other = true
+        }
+        if (version != generation || !current()) return
+        observe("DIAGNOSTIC_CLOSURE_SCAN")
+        for (evidence in counts.indices) repeat(counts[evidence]) {
+            if (version != generation || !current()) return
+            observe(when (evidence) {
+                0 -> "DIAGNOSTIC_CLOSURE_UNKNOWN"
+                1 -> "DIAGNOSTIC_CLOSURE_NUMERIC_ONLY"
+                2 -> "DIAGNOSTIC_CLOSURE_REACH_UNKNOWN_OUTCOMES"
+                3 -> "DIAGNOSTIC_CLOSURE_REACH_OPEN_SIDE"
+                else -> "DIAGNOSTIC_CLOSURE_REACH_PRUNE_BOTH"
+            })
+        }
+        if (version != generation || !current()) return
+        if (limited) observe("DIAGNOSTIC_CLOSURE_LIMIT")
+        if (version != generation || !current()) return
+        when {
+            other && selectedEvidence < 2 -> observe("DIAGNOSTIC_CLOSURE_CHANGED_PROPOSAL")
+            selectedEvidence >= 2 -> observe("DIAGNOSTIC_CLOSURE_SELECTED_REACH")
+            !limited -> observe("DIAGNOSTIC_CLOSURE_NO_PROPOSAL")
+        }
+    }
+
+    private fun closureEvidence(variable: VarRef, value: Double, gap: Double): Int {
+        val history = reliable(variable, value) ?: return 0
+        if (history.down.gain <= 0.0 || history.up.gain <= 0.0) return 0
+        val fraction = value - floor(value)
+        val downGain = history.down.gain * fraction
+        val upGain = history.up.gain * (1.0 - fraction)
+        if (!downGain.isFinite() || !upGain.isFinite() || downGain <= 0.0 || upGain <= 0.0) return 0
+        if (downGain < gap || upGain < gap) return 1
+        val down = outcomeRate(history.down.outcome)
+        val up = outcomeRate(history.up.outcome)
+        if (!down.isFinite() || !up.isFinite()) return 2
+        return if (down > 0.0 && up > 0.0) 4 else 3
+    }
 
     fun beginNode(level: Int) {
         stamp++

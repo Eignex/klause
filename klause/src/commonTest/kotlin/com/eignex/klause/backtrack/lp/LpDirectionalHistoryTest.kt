@@ -11,6 +11,119 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `variable inspection compares predicted cutoff reach and completed outcomes`() {
+        for (pruned in listOf(null, false, true)) {
+            for (selected in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+                val events = ArrayList<String>()
+                var work = 0L
+                val history = LpDirectionalHistory(events::add, charge = { work += it })
+                for (variable in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    repeat(2) {
+                        for (up in listOf(false, true)) {
+                            history.commit(SearchDecision.Bool((variable.varId shl 1) or if (up) 0 else 1), 1)
+                            history.beginNode(1)
+                            history.record(if (variable.varId == 1) 5.0 else 1.0)
+                            history.finishNode(pruned)
+                        }
+                    }
+                }
+                history.record(0.0)
+                events.clear()
+                val before = work
+
+                history.inspectClosure(selected, { 0.5 }, 3.0) { true }
+
+                assertEquals(204L, work - before)
+                assertEquals(1, events.count { it == "DIAGNOSTIC_CLOSURE_NUMERIC_ONLY" })
+                val category = when (pruned) {
+                    null -> "DIAGNOSTIC_CLOSURE_REACH_UNKNOWN_OUTCOMES"
+                    false -> "DIAGNOSTIC_CLOSURE_REACH_OPEN_SIDE"
+                    true -> "DIAGNOSTIC_CLOSURE_REACH_PRUNE_BOTH"
+                }
+                assertEquals(1, events.count { it == category })
+                assertEquals(selected.varId == 0, "DIAGNOSTIC_CLOSURE_CHANGED_PROPOSAL" in events)
+                assertEquals(selected.varId == 1, "DIAGNOSTIC_CLOSURE_SELECTED_REACH" in events)
+            }
+        }
+    }
+
+    @Test
+    fun `reset or cancellation during variable inspection cannot publish a proposal`() {
+        for (reset in listOf(false, true)) {
+            for (stopAt in 1..3) {
+                val events = ArrayList<String>()
+                var reading = false
+                var reads = 0
+                var fresh = true
+                lateinit var history: LpDirectionalHistory
+                history = LpDirectionalHistory(events::add, charge = {
+                    if (reading && ++reads == stopAt) {
+                        reading = false
+                        if (reset) history.clear() else fresh = false
+                    }
+                })
+                for (variable in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    repeat(2) {
+                        for (up in listOf(false, true)) {
+                            history.commit(SearchDecision.Bool((variable.varId shl 1) or if (up) 0 else 1), 1)
+                            history.beginNode(1)
+                            history.record(if (variable.varId == 1) 5.0 else 1.0)
+                            history.finishNode(true)
+                        }
+                    }
+                }
+                history.record(0.0)
+                events.clear()
+                reading = true
+
+                history.inspectClosure(VarRef.Bool(0), { 0.5 }, 3.0) { fresh }
+
+                assertFalse(events.any { it.startsWith("DIAGNOSTIC_CLOSURE_") })
+            }
+        }
+    }
+
+    @Test
+    fun `history reset cannot renew exhausted variable inspection visits`() {
+        var scans = 0
+        var work = 0L
+        val history = LpDirectionalHistory({ if (it == "DIAGNOSTIC_CLOSURE_SCAN") scans++ }, charge = { work += it })
+        var exhaustedScans = 0
+        for (readmission in listOf(false, true)) {
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(5.0)
+                    history.finishNode(true)
+                }
+            }
+            history.record(0.0)
+            if (!readmission) {
+                repeat(4097) { history.inspectClosure(VarRef.Bool(0), { 0.5 }, 3.0) { true } }
+                exhaustedScans = scans
+            }
+            val before = work
+
+            history.inspectClosure(VarRef.Bool(0), { 0.5 }, 3.0) { true }
+
+            assertEquals(before, work)
+            assertEquals(exhaustedScans, scans)
+            history.clear()
+        }
+        assertTrue(exhaustedScans > 0)
+    }
+
+    @Test
     fun `child order seeks open outcomes until a predicted gain reaches the cutoff`() {
         for (prunedUp in listOf(false, true)) {
             for (mixed in listOf(false, true)) {

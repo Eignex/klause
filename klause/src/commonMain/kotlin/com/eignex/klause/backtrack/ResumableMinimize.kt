@@ -1610,7 +1610,7 @@ internal class ResumableMinimize(
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
         override fun onBranch(variable: VarRef) {
-            lpHints?.branch(variable)
+            lpHints?.branch(variable, params.cancellation)
         }
 
         override fun onCommit(decision: SearchDecision, depth: Int) {

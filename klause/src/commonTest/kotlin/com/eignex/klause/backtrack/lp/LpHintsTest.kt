@@ -419,6 +419,7 @@ class LpHintsTest {
         assertTrue(hints.directionalScore(proposal).isNaN())
         assertFalse("PASSIVE_VALUE_COMPARED" in events)
         assertFalse("PASSIVE_VALUE_COMMITTED" in events)
+        assertFalse("DIAGNOSTIC_CLOSURE_SCAN" in events)
     }
 
     @Test
