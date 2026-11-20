@@ -24,11 +24,13 @@ internal class JointRepairNeighborhood private constructor(
     private val objectiveDefinition: ObjectiveDefinition?,
 ) : ExactNeighborhoodProposal {
     sealed interface AdvisorySelection {
-        data class Ready(val condition: ExactNeighborhoodCondition, val closed: Boolean) : AdvisorySelection
+        data class Ready(val condition: ExactNeighborhoodCondition, val closed: Boolean,
+            val kind: Kind = Kind.Pair) : AdvisorySelection
         data class Declined(val limit: Limit, val row: Int? = null, val column: Int? = null,
             val peer: Int? = null, val freed: Set<Int> = emptySet()) : AdvisorySelection
         data object Unavailable : AdvisorySelection
         enum class Limit { Width, Visits }
+        enum class Kind { Pair, IntegerSupport, ContinuousSupport }
     }
 
     private class ObjectiveDefinition(val firstRow: Int, val first: SourcePremise,
@@ -106,7 +108,8 @@ internal class JointRepairNeighborhood private constructor(
     fun advisoryRoot(root: Int): Int = seeds[root]
 
     fun advisoryNeighborhood(centers: List<BigFraction>, root: Int, cutoff: BigFraction,
-        budget: SourceLpBudget, token: ExecutionControl, expand: Boolean = false): AdvisorySelection {
+        budget: SourceLpBudget, token: ExecutionControl, expand: Boolean = false,
+        previous: ExactNeighborhoodCondition? = null): AdvisorySelection {
         val funding = budget.funding ?: return AdvisorySelection.Unavailable
         val work = 16L * (integers + 1L)
         val bytes = 256L + 128L * integers +
@@ -166,6 +169,44 @@ internal class JointRepairNeighborhood private constructor(
                     }
                 }
             }
+            var kind = AdvisorySelection.Kind.IntegerSupport
+            var closed = true
+            if (previous != null && freed.size <= 2 && previous.lower.keys.none { it in freed }) {
+                val remaining = MAX_SELECTION_VISITS - visits
+                val columns = minOf(occurrences.size, remaining)
+                val adjacentRows = minOf(rows.size, remaining)
+                val target = minOf(seeds.size, IncumbentProximity.radius(integers))
+                val setupWork = 16L + columns + adjacentRows + target
+                val setupBytes = 256L + 128L * columns + 64L * adjacentRows + 256L * target
+                if (token() || funding.availableWork <= setupWork + MAX_SELECTION_VISITS ||
+                    funding.remainingAllocation <= setupBytes) return AdvisorySelection.Unavailable
+                budget.observe(preparation = setupWork)
+                funding.charge(0L, setupBytes)
+                if (token() || funding.availableWork <= MAX_SELECTION_VISITS)
+                    return AdvisorySelection.Unavailable
+                kind = AdvisorySelection.Kind.ContinuousSupport
+                freed.clear()
+                freed += seeds[root]
+                queue.addLast(seeds[root])
+                val seenColumns = IntHashSet().also { it.add(seeds[root]) }
+                val physicalRows = IntHashSet()
+                while (queue.isNotEmpty() && freed.size < target) {
+                    val column = queue.removeFirst()
+                    for (row in occurrences[column]) {
+                        visit(row, column)?.let { return it }
+                        if (ignoredPrivateRow(row) || !physicalRows.add(row)) continue
+                        for (peer in rows[row]) {
+                            visit(row, column, peer)?.let { return it }
+                            if (!seenColumns.add(peer)) continue
+                            queue.addLast(peer)
+                            if (eligibleInteger(peer)) freed += peer
+                            if (freed.size == target) break
+                        }
+                        if (freed.size == target) break
+                    }
+                }
+                closed = queue.isEmpty() || freed.size == seeds.size
+            }
             val pins = linkedMapOf<Int, BigFraction>()
             for (id in 0 until integers) {
                 if (token()) return AdvisorySelection.Unavailable
@@ -173,7 +214,7 @@ internal class JointRepairNeighborhood private constructor(
             }
             if (token() || funding.exhausted) return AdvisorySelection.Unavailable
             selectedIntegers += freed.size
-            return AdvisorySelection.Ready(ExactNeighborhoodCondition(emptyMap(), pins, pins, cutoff), true)
+            return AdvisorySelection.Ready(ExactNeighborhoodCondition(emptyMap(), pins, pins, cutoff), closed, kind)
         } finally {
             visitedEntries += visits
             budget.observe(preparation = visits.toLong())

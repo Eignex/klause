@@ -132,6 +132,65 @@ class JointRepairNeighborhoodTest {
     }
 
     @Test
+    fun `continuous support should stay bounded without claiming graph closure`() {
+        val integers = List(6) { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(SourceScope(SourceRevision("continuous-support", "exact")),
+            integers.toSet() + real, integers.mapIndexed { id, coordinate ->
+                id.toString() to SourcePremise(SourceInequality(mapOf(coordinate to BigFraction.ONE,
+                    real to BigFraction.ONE), BigFraction.ONE))
+            }.toMap())
+        val selector = assertNotNull(JointRepairNeighborhood.prepare(source, 6, 1, ExecutionControl.Never))
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+        val budget = SourceLpBudget(funding = funding)
+        val centers = List(6) { BigFraction.ZERO }
+        val pair = assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(selector.advisoryNeighborhood(
+            centers, 0, BigFraction.ONE, budget, ExecutionControl.Never))
+
+        val expanded = assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(selector.advisoryNeighborhood(
+            centers, 0, BigFraction.ONE, budget, ExecutionControl.Never, expand = true, previous = pair.condition))
+
+        assertEquals(mapOf(4 to BigFraction.ZERO, 5 to BigFraction.ZERO), expanded.condition.lower)
+        assertEquals(expanded.condition.lower, expanded.condition.upper)
+        assertFalse(expanded.closed)
+        assertEquals(JointRepairNeighborhood.AdvisorySelection.Kind.ContinuousSupport, expanded.kind)
+    }
+
+    @Test
+    fun `continuous support and ordinary fallback should share the remaining graph visits`() {
+        val integers = List(6) { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val reals = List(2) { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf("root" to SourcePremise(SourceInequality(
+            mapOf(integers[0] to BigFraction.ONE, reals[0] to BigFraction.ONE), BigFraction.ONE)))
+        repeat(4096) { id ->
+            premises["bridge-" + id] = SourcePremise(SourceInequality(
+                reals.associateWith { BigFraction.ONE }, BigFraction.ONE))
+        }
+        for (id in 1..5) {
+            premises["leaf-" + id] = SourcePremise(SourceInequality(
+                mapOf(reals[1] to BigFraction.ONE, integers[id] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(SourceScope(SourceRevision("continuous-visits", "exact")),
+            (integers + reals).toSet(), premises)
+        val selector = assertNotNull(JointRepairNeighborhood.prepare(source, 6, 2, ExecutionControl.Never))
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+        val budget = SourceLpBudget(funding = funding)
+        val centers = List(6) { BigFraction.ZERO }
+        val pair = assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(selector.advisoryNeighborhood(
+            centers, 0, BigFraction.ONE, budget, ExecutionControl.Never))
+        val before = selector.visitedEntries
+
+        val expanded = selector.advisoryNeighborhood(centers, 0, BigFraction.ONE, budget,
+            ExecutionControl.Never, expand = true, previous = pair.condition)
+        selector.proposeWithinSelectionBudget(centers, booleanArrayOf(), 2, 1, BigFraction.ONE,
+            selector.visitedEntries - before)
+
+        assertEquals(JointRepairNeighborhood.AdvisorySelection.Limit.Visits,
+            assertIs<JointRepairNeighborhood.AdvisorySelection.Declined>(expanded).limit)
+        assertEquals(8192L, selector.visitedEntries - before)
+    }
+
+    @Test
     fun `binary neighborhoods should allow coordinated changes to agreeing integers`() {
         val columns = (0 until 40).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("binary-support", "exact")),

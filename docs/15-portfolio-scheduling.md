@@ -537,7 +537,13 @@ recourse and source rows remain in the query. The selection is heuristic and pro
 no independence. Width or visit-limit decline advances that root; resource or
 cancellation unavailability retains its phase. Each proposal shares one 8,192-visit
 ceiling between private selection and ordinary fallback, and declined work stays
-charged. Repeated or narrower expansions are skipped. Other integers stay pinned
+charged. A completed integer component of at most two coordinates that repeats or
+narrows its pair can use one bounded breadth-first selection through continuous
+recourse. Its width is the existing proximity radius, at most 32 coordinates; a
+selection stopped at that width is not graph closure. Traversal storage and setup
+spend the same source funding, and transient unavailability retains the phase.
+Each root gets at most one expanded query, including an unclosed continuous-support
+selection. Repeated or narrower selections are skipped. Other integers stay pinned
 to the center, intersecting the private change-radius row. A pass visits each
 eligible root within the existing allowances; its identity includes the binary
 coordinates and aspiration, so a new sample wrapper does not restart it. Completion

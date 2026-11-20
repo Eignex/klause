@@ -18,6 +18,8 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal object IncumbentProximity {
+    fun radius(integers: Int): Int = minOf(integers, ((integers + 9) / 10).coerceIn(4, 32))
+
     class AdvisoryCenter(val sample: Sample, val value: BigFraction)
 
     fun advisoryCenter(source: SourceProofContext, sample: Sample, budget: SourceLpBudget,
@@ -145,7 +147,7 @@ internal object IncumbentProximity {
         val radiusKey = "incumbent-proximity-radius"
         if (key in premises || radiusKey in premises) return null
         premises[key] = SourcePremise(SourceInequality(original, target))
-        val radius = minOf(center.numIntVars, ((center.numIntVars + 9) / 10).coerceIn(4, 32))
+        val radius = radius(center.numIntVars)
         premises[radiusKey] =
             SourcePremise(SourceInequality(costs, BigFraction.ofLong(radius.toLong()) - constant))
         val scope = source.scope.copy(

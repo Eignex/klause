@@ -128,6 +128,8 @@ internal class JointLinearRepair(
     private var proximityCompletedCutoff: BigFraction? = null
     private var proximityDeclined = false
     private var proximityProposalClosed = false
+    private var proximityProposalKind = JointRepairNeighborhood.AdvisorySelection.Kind.Pair
+    private var queryProximityKind = JointRepairNeighborhood.AdvisorySelection.Kind.Pair
     private var queryProximityClosed = false
     private var queryProximity = false
     private var queryProximityCutoff: BigFraction? = null
@@ -302,7 +304,8 @@ internal class JointLinearRepair(
         val pass = queryProximityPass
         if (pass == null) proximityCompletedCutoff = cutoff
         else {
-            if (finishCenter || queryProximityClosed) {
+            if (finishCenter || queryProximityClosed ||
+                queryProximityKind != JointRepairNeighborhood.AdvisorySelection.Kind.Pair) {
                 pass.next = if (finishCenter) requireNotNull(selection).advisoryRoots else pass.next + 1
                 pass.pair = null
             } else {
@@ -471,6 +474,7 @@ internal class JointLinearRepair(
                 if (advisory != null && !proximityTurn) observe("jointRepairAdvisoryOrdinaryTurns")
                 val beforeSelection = requireNotNull(selection).visitedEntries
                 var supportClosed = false
+                var supportKind = JointRepairNeighborhood.AdvisorySelection.Kind.Pair
                 var observedSelection: JointRepairObservedSelection? = null
                 val proximity = if (incumbentProximity && !proximityDeclined && !adaptive &&
                     (!rotating || proximityTurn || (advisory == null && !proximityStarted)) &&
@@ -482,7 +486,7 @@ internal class JointLinearRepair(
                     if (pass != null) {
                         val selector = requireNotNull(selection)
                         val selected = selector.advisoryNeighborhood(pass.coordinates, pass.next, privateLimit,
-                            budget, stop, expand = pass.pair != null)
+                            budget, stop, expand = pass.pair != null, previous = pass.pair)
                         observedSelection = observation?.advisorySelection(pass.observationId, pass.next,
                             selector.advisoryRoot(pass.next), pass.pair != null, pass.coordinates,
                             advisory?.sample ?: privateChecked, model.numRealVars, privateLimit, source.scope.revision,
@@ -498,6 +502,10 @@ internal class JointLinearRepair(
                                     null
                                 } else {
                                     supportClosed = selected.closed
+                                    supportKind = selected.kind
+                                    if (selected.kind ==
+                                        JointRepairNeighborhood.AdvisorySelection.Kind.ContinuousSupport)
+                                        observe("jointRepairProximityContinuousSupportSelections")
                                     selected.condition
                                 }
                             }
@@ -533,6 +541,7 @@ internal class JointLinearRepair(
                         relaxationProposal = condition.takeIf { relaxation != null || binary != null }
                         proximityProposal = condition.takeIf { proximity != null }
                         proximityProposalClosed = proximity != null && supportClosed
+                        proximityProposalKind = supportKind
                         proximityAdvisory = advisory.takeIf { proximity != null }
                         proximityProposalPass = pass.takeIf { proximity != null }
                         if (proximity != null && rotating) proximityStarted = true
@@ -798,6 +807,7 @@ internal class JointLinearRepair(
                     queryProximityCutoff = privateCutoff
                     queryProximityPass = proximityProposalPass
                     queryProximityClosed = proximityProposalClosed
+                    queryProximityKind = proximityProposalKind
                     if (queryProximityPass?.pair != null) observe("jointRepairProximityExpansionQueries")
                     observe("jointRepairProximityCenters")
                 } ?: run {
@@ -1120,6 +1130,7 @@ internal class JointLinearRepair(
         querySawExternal = false
         queryProximity = false
         queryProximityClosed = false
+        queryProximityKind = JointRepairNeighborhood.AdvisorySelection.Kind.Pair
         queryProximityCutoff = null
         queryProximityPass = null
         retainedProposal = null
