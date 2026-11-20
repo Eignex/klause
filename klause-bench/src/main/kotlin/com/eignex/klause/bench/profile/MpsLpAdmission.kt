@@ -136,6 +136,7 @@ internal object MpsLpAdmission {
             if (engine == FiniteEngine.MIXED) {
                 put("sourceCompanionAdmission", companionAdmission(invocation, preparation, stop,
                     preparationComplete = budget.remaining() > 0L))
+                put("sourceCutSetupGuards", SourceCutAdmission.inspect(original, ProblemSettings(), stop))
             } else {
                 put("full", shape(problem, objective, false, stop))
                 put("objectiveCone", shape(problem, objective, true, stop))
