@@ -32,7 +32,8 @@ internal class LpHints(
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
-    private val passiveChoice = if (collect) LpPassiveVariableChoice(applyAdvice, observe, charge) else null
+    private val passiveChoice = if (collect) LpPassiveVariableChoice(false, observe, charge) else null
+    private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
     private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
     private var passivePoint: LpRelaxation? = null
     private var passiveState: LpExactState? = null
@@ -71,6 +72,7 @@ internal class LpHints(
             charge(2L)
             observe("PASSIVE_VARIABLE_OPTIMUM_CHECK")
             passiveChoice.clear()
+            passiveValues?.clear()
             passiveCollection?.clear()
             passiveState = null
         }
@@ -162,6 +164,7 @@ internal class LpHints(
 
     fun finishNode(state: LpExactState? = null, cancelled: ExecutionControl = ExecutionControl.Never) {
         passiveChoice?.clear()
+        passiveValues?.clear()
         passiveCollection?.clear()
         val outcome = pruningOutcome
         val relaxation = pruningScope
@@ -208,6 +211,7 @@ internal class LpHints(
     }
 
     fun branch(variable: VarRef) {
+        passiveValues?.clear()
         passiveCollection?.clear()
         passiveChoice?.branch(variable, if (passivePointCurrent()) solveStamp else -1)
         if (directionalGains && scopeModel != null) {
@@ -224,6 +228,7 @@ internal class LpHints(
             charge(2L)
             passiveChoice.commit(decision) { !cancelled() && passivePointCurrent() }
         }
+        passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         if (collect && scopeModel != null) {
             history.commit(decision, depth)
@@ -257,11 +262,13 @@ internal class LpHints(
 
     fun selected(variable: VarRef?) {
         passiveChoice?.clear()
+        passiveValues?.clear()
         directionalChoice = variable
     }
 
     fun beginPassiveSelection() {
         passiveChoice?.clear()
+        passiveValues?.clear()
         if (!collect || !history.hasReliableHistory) return
         charge(4L)
         observe("PASSIVE_VARIABLE_CHECK")
@@ -346,7 +353,7 @@ internal class LpHints(
             observe("PASSIVE_VARIABLE_STALE")
             return baseline
         }
-        directionalChoice = choice.nominatedVariable.takeIf { applyAdvice }
+        directionalChoice = null
         return selected
     }
 
@@ -356,6 +363,7 @@ internal class LpHints(
     private fun clearPassivePoint() {
         val choice = passiveChoice ?: return
         choice.clear()
+        passiveValues?.clear()
         passiveCollection?.clear()
         passivePoint = null
         passiveState = null
@@ -367,9 +375,12 @@ internal class LpHints(
         cancelled: ExecutionControl,
     ): List<SearchDecision> {
         val collection = passiveCollection ?: return alternatives
+        val values = checkNotNull(passiveValues)
         collection.clear()
+        values.clear()
+        val valueReady = cutoff.isFinite() && history.hasValueHistory && history.hasPruningHistory
         val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
-        if (!history.hasObservations || !collectReady ||
+        if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
         ) return alternatives
         val point = passivePoint
@@ -380,6 +391,11 @@ internal class LpHints(
                 stamp == solveStamp && passivePointCurrent()
         }
         if (!current()) return alternatives
+        if (valueReady) {
+            val advised = values.select(variable, value(variable), alternatives, history, stamp, fresh = current)
+            if (values.hasNomination) return advised
+        }
+        if (!collectReady || !current()) return alternatives
         return collection.select(variable, value(variable), alternatives, history, stamp, current)
     }
 

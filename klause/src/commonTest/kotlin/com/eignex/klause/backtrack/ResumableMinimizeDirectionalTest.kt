@@ -72,6 +72,9 @@ class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
                 assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
                 assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
                 assertTrue((observations["OUTCOME_OPEN"] ?: 0L) >= 4L, diagnostic)
+                assertEquals(0L, observations["PASSIVE_VARIABLE_SCORE"] ?: 0L, diagnostic)
+                assertEquals(0L, observations["PASSIVE_VARIABLE_COMMIT_CHANGED"] ?: 0L, diagnostic)
+                assertEquals(0L, observations["CONSUMED"] ?: 0L, diagnostic)
             }
         }
     }

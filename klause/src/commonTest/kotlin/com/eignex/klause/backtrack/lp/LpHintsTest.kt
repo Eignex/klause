@@ -25,6 +25,60 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `reliable completed outcomes reach applied and withheld child commitments`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2L)
+        val up = SearchDecision.IntAtLeast(0, 3L)
+        val costs = ArrayList<Long>()
+        for (apply in listOf(false, true)) {
+            var work = 0L
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, charge = { work += it })
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(trail.state)
+                hints.branch(variable)
+                for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 11.0))) {
+                    hints.commit(decision, 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                    hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(decision == down, relaxation)
+                    hints.finishNode(trail.state)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(trail.state)
+            hints.branch(variable)
+            val before = work
+
+            val ordered = hints.orderAlternatives(variable, listOf(up, down), ExecutionControl.Never)
+            hints.commit(ordered.first(), 1)
+
+            assertEquals(if (apply) listOf(down, up) else listOf(up, down), ordered)
+            val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
+            assertEquals(1, events.count { it == event })
+            assertFalse("PASSIVE_VARIABLE_SCORE" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events)
+            costs.add(work - before)
+        }
+        assertTrue(costs.first() > 0L)
+        assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
     fun `cancelled final publication discards a completed outcome`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
@@ -318,7 +372,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable passive history reaches matching applied and withheld commitments`() {
+    fun `manual variable advice remains withheld`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -387,10 +441,10 @@ class LpHintsTest {
 
             val selected = assertNotNull(hints.pickVariable(baseline, 1e-9, { true }, { false }))
             hints.branch(selected)
-            hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, 2L), 1)
 
-            assertEquals(if (apply) proposal else baseline, selected)
-            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+            assertEquals(baseline, selected)
+            val event = "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
             assertEquals(1, events.count { it == event })
             assertEquals(4, events.count { it == "UP" })
             assertEquals(4, events.count { it == "DOWN" })
@@ -447,7 +501,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `sparse candidate ties retain kind and variable order among available variables`() {
+    fun `manual sparse candidates keep the ordinary variable`() {
         val builder = LpBuilder()
         repeat(4) { builder.addVar(0, 1, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -502,14 +556,14 @@ class LpHintsTest {
         hints.recordObjective(relaxation, 10.0)
         hints.recordOutcome(false, relaxation)
         hints.finishNode(relaxation.model.exactState)
-        for ((unavailable, expected) in listOf(
-            emptySet<VarRef>() to VarRef.Bool(0),
-            setOf<VarRef>(VarRef.Bool(0)) to VarRef.Bool(1),
-            setOf<VarRef>(VarRef.Bool(0), VarRef.Bool(1)) to VarRef.IntVar(0),
+        for (unavailable in listOf(
+            emptySet<VarRef>(),
+            setOf<VarRef>(VarRef.Bool(0)),
+            setOf<VarRef>(VarRef.Bool(0), VarRef.Bool(1)),
         )) {
             val selected = hints.pickVariable(baseline, 1e-9, { it !in unavailable }, { false })
 
-            assertEquals(expected, selected)
+            assertEquals(baseline, selected)
         }
     }
 

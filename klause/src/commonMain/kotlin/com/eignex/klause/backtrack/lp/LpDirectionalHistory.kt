@@ -274,6 +274,18 @@ internal class LpDirectionalHistory(
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
     }
 
+    fun preferPruningDirection(variable: VarRef, value: Double): Boolean? {
+        val history = reliable(variable, value) ?: return null
+        if (history.down.gain <= 0.0 && history.up.gain <= 0.0) return null
+        val version = generation
+        charge(8L)
+        if (version != generation) return null
+        val down = outcomeEstimate(history.down.outcome)
+        val up = outcomeEstimate(history.up.outcome)
+        if (!down.isFinite() || !up.isFinite() || down == up) return null
+        return up > down
+    }
+
     fun prunedDirections(variable: VarRef, value: Double): Double {
         val history = reliable(variable, value) ?: return Double.NaN
         val version = generation

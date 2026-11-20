@@ -372,57 +372,37 @@ The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with resolved LP bounding and branching enabled. History
 and passive point retention start at a finite incumbent cutoff; ordinary LP guidance
 remains available before admission. Leaving a finite cutoff clears the retained history.
-Two recent samples
-in each direction permit the geometric mean of the predicted child gains; a zero
-gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Geometric scores supply
-numeric eligibility separately from reduced costs.
-Geometric scoring scales square roots before multiplication and charges the additional work.
-An underflowed positive score supplies no measured-zero reference.
-Each direction uses the lower of its latest two in-age normalized gains, so one
-large observation cannot raise its estimate alone. The two gains must agree within
-a factor of two; disagreement withholds advice until passive observations stabilize.
-A zero estimate is stable only when both recent observations are zero.
-Each observation ages separately.
-Variable advice retains a separate two-observation completed LP-node outcome for
-each side of the committed split. A completed optimal pass that keeps the node
-records an open outcome. Accepted LP bounds, fixings, mixed deductions and
-infeasibility can record a prune without supplying a numerical gain. A missing,
-interrupted or incomplete cut solve supplies neither outcome. Outcomes validate
-the returned source scope and final owner state, and each outcome ages separately.
-Both directions must have two agreeing recent outcomes, in addition to the two
-stable finite gains in each direction. A proposal with positive gains in both
-directions can replace the ordinary variable only when it has more repeatedly
-pruned directions. The ordinary reference must meet the same numeric and outcome
-requirements; two observed open outcomes in each direction supply its measured zero.
-No outcome is a pruning authority at another node. A coarse recent stamp skips
-production candidate selection until one direction has two completed prune
-outcomes. Its variables still need their own complete numeric and outcome records;
-this prerequisite supplies no score and resets with the history.
-The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
-and skips history lookups until such a variable has been observed, or after all
-such observations have aged out. Samples from different variables cannot open that
-gate. Passing it still requires the variable's own recent samples; it grants no
-score or authority. History reset clears the prerequisite.
-Selection rechecks that the fractional point and optimum belong to the same current
-relaxation and exact state, and declines on cancellation or stale information. A
-nomination retains only its variable, point and solve stamp. Proposal and
-baseline roles share one immutable candidate when they name the same variable.
-Clearing an already-empty nomination leaves its state untouched; transient selection
-flags still clear. Comparison and changed-proposal observations remain separate from
-the actual variable and matching
-adjacent split committed by search; replacement, retraction and retirement discard
-an unconsumed nomination. Variable commitment rechecks cancellation and current
-LP state after charging its work and before attributing advice, using the existing LP allowance.
-Disabled directional gains collect no history or retained model scope and charge no
-history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
-The bounded selector reads reduced-cost scores by primitive variable ID and kind.
-The ordinary variable is selected before directional candidates are visited. Missing
-reliable reference measurements skip that visit. A bounded source-scoped index reuses
-references for variables that have held reliable positive gains in both directions;
-each visit still checks the variable's own current observations and fractional point.
-Index growth, visits and reclamation charge the LP allowance. Reset invalidates an
-active visit, and equal scores retain Boolean-before-integer, ascending-ID precedence.
+The ordinary reduced-cost/fractionality score and configured selector choose the
+variable. Historical observations order only its adjacent children. Each direction
+needs two recent finite normalized gains agreeing within a factor of two, and at
+least one direction must have a positive lower-of-two gain. Two measured zero
+directions keep ordinary order; unknown gains cannot supply measured zero.
+
+Each side also retains its own latest two known completed LP-node outcomes. A
+completed optimal pass that keeps the node records an open outcome. Accepted LP
+bounds, fixings, mixed deductions and infeasibility can record a prune without
+supplying a numerical gain. Missing, interrupted or incomplete cut work supplies
+neither outcome. Final publication validates the returned source scope and owner
+state, and checks cancellation after charging its work and before storing data.
+Numeric samples and completed outcomes age independently, without renewal on restart.
+
+Both directions must have two agreeing recent outcomes. When one direction was
+repeatedly pruned and the other repeatedly open, the consumer visits the pruned
+child first. Equal or unknown outcomes keep ordinary order. These historical
+outcomes supply no bound or pruning authority at another node. Coarse recent
+positive-gain and repeated-prune stamps skip lookups until such observations exist;
+the current variable still needs its own complete numeric and outcome records.
+Reset clears those prerequisites.
+
+Selection requires the fractional point and optimum from the same current
+relaxation and exact state. It recognizes only the two adjacent partitions of that
+point and retains both alternatives. A nomination carries the proposed decision
+and solve stamp. Only the matching committed child, with current scope and point
+after its bookkeeping charge, counts as applied advice. Replacement, retraction,
+cancellation and retirement discard an unconsumed nomination. Withholding advice
+keeps the same producer, comparison and commitment costs while retaining ordinary
+order. Disabled directional gains retain no history or model scope and charge no
+history bookkeeping; ordinary LP guidance remains available.
 
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
 child first to collect missing passive information. It uses a recent positive
