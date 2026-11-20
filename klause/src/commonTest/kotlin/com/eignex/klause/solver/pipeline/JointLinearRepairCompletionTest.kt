@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.RuntimeInitializedTest
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -15,6 +16,7 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.withLinearAuthority
@@ -43,6 +45,126 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
+    @Test
+    fun `a newer checked point should replace a private target before opening its query`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        var offered = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { offered }, incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true },
+            onComparison = { event ->
+                if (event.phase == "query") offered = offered.copy(ints = longArrayOf(0, 0, 1))
+            }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val result = assertIs<MinimizeResult.WithSample>(
+                    search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityRecentered"))
+                assertTrue(repair.isProximityDiscovery(result.sample))
+            }
+        }
+    }
+
+    @Test
+    fun `an original rejected private target should not restart at the same cutoff`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3), external = { center },
+            incumbentProximity = true,
+            incumbentCompletionCheck = { sample, _, _ -> sample.intValue(0) == 1L }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityCenters"))
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
+    fun `proximity repair should coordinate binary changes with a free continuous residual`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1),
+            realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { center },
+            incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                val result =
+                    assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ONE, objective.evaluateExact(result.sample))
+                assertContentEquals(longArrayOf(0, 0), result.sample.ints)
+                assertEquals(listOf(BigFraction.ONE), result.sample.exactReals)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityImprovements"))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityCenters"))
+                assertTrue(done)
+            }
+        }
+    }
+
+    @Test
+    fun `an infeasible proximity target should not close original objective coverage`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(1), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { center },
+            incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+
+                assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(1L, stages["jointRepairProximityCompleted"])
+                assertEquals(0L, stages["jointRepairCutoffClosures"] ?: 0L)
+                assertEquals(1.0, search.stats.ls.completionsUndecided.sum)
+                assertTrue(done)
+            }
+        }
+    }
+
     @Test
     fun `a newer incompatible point should not displace the checked proposal seed`() {
         val model = Problem(0,

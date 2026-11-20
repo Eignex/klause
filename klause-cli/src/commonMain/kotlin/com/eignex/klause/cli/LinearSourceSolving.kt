@@ -53,7 +53,8 @@ internal fun solveLinearSource(
                 // Source publication precedes this callback within the serialized incumbent install.
                 val value = lastPoint?.objective
                 if (common.statistics && lastAccepted && value != null) {
-                    output.onImprovement(improvement.workerLabel, value, improvement.elapsedMs)
+                    output.onImprovement(improvement.workerLabel, value, improvement.elapsedMs,
+                        improvement.privateIncumbentReuse)
                 }
             }),
         ),

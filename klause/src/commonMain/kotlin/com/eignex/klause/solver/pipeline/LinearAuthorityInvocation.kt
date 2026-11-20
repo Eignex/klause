@@ -25,7 +25,10 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchExecutionAccounting
+import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchFrontierRun
+import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
@@ -68,16 +71,21 @@ internal class LinearAuthorityInvocation(
     private val observeExternalIncumbents: Boolean = false,
     sharedCompletions: LinearIncumbentSharing? = null,
     incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
-    repairGuidance: LinearRepairGuidance? = null,
+    private val repairGuidance: LinearRepairGuidance? = null,
     gap: OptimalityGap? = null,
     useSourceGap: Boolean = true,
     gapTolerance: OptimalityTolerance? = context.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = params.sourceIncumbentCompletion,
+    private val incumbentProximity: Boolean = false,
+    borrowedBudget: SourceLpBudget? = null,
+    private val recordProgress: Boolean = true,
+    private val proximityCenter: Sample? = null,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
             "borrowed linear authority has another work allowance"
         }
+        require(borrowedBudget == null || borrowedBudget.funding === funding)
     }
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
@@ -100,8 +108,14 @@ internal class LinearAuthorityInvocation(
     private val externalOffers = mutableMapOf<String, Long>()
     private var importedIncumbent: Sample? = null
     private var consumedIncumbent: Sample? = null
+    private var proximityIncumbent: Sample? = null
     private var result: LinearInvocationResult? = null
-    private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
+    private var proximity: LinearAuthorityInvocation? = null
+    private var proximityTurn = false
+    private var proximityLatest: Map<String, Long> = emptyMap()
+    private var exchangePrepared = false
+    private var exchange: LinearIncumbentExchange? = null
+    private val budget = borrowedBudget ?: SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val completion = if (params.sourceIncumbentCompletion)
         LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
@@ -111,6 +125,7 @@ internal class LinearAuthorityInvocation(
     val isDone: Boolean get() = result != null
     val hasIncumbent: Boolean get() = incumbent != null
     val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent
+    val incumbentIsProximity: Boolean get() = incumbent != null && incumbent === proximityIncumbent
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
     val stats: SolveStats get() = SolveStats(
@@ -119,7 +134,7 @@ internal class LinearAuthorityInvocation(
         smt = state.smt.snapshot().let { snapshot ->
             snapshot.copy(
                 completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
-                    externalOffers +
+                    externalOffers + proximityLatest +
                     mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
                         "numericalImportedIncumbents" to importedIncumbents,
                         "numericalIncumbentFrontierRanks" to guidedFrontierRanks) +
@@ -152,13 +167,21 @@ internal class LinearAuthorityInvocation(
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
         gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
-        guideIncumbent = guideIncumbent)
+        guideIncumbent = guideIncumbent && !incumbentProximity, proximityCenter = proximityCenter)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {
                 it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
             }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {
-        it.bindOpenTheoryWork(state.work)
+        val accounting = OpenTheoryExecutionAccounting(state.work)
+        it.attachExecutionControls(
+            SearchExecutionControlAdapter(stop, object : SearchExecutionAccounting by accounting {
+                override fun canCommitDecision(): Boolean =
+                    state.remainingDecisions() > 0 && accounting.canCommitDecision()
+                override fun consumeCheck(): Boolean = state.work.acceptedChecks < params.maxLeaves &&
+                    accounting.consumeCheck()
+            }),
+        )
     }
     private var initialized = false
     private val branching = if (params.openBranching != OpenBranching.Activity)
@@ -186,7 +209,8 @@ internal class LinearAuthorityInvocation(
     )
 
     private fun frontierRank(): Pair<Int, BigFraction?> {
-        val depth = if (guideIncumbent && incumbent != null) session.decisionLevel else 0
+        val depth = if ((guideIncumbent && !incumbentProximity && incumbent != null) || proximityCenter != null)
+            session.decisionLevel else 0
         if (depth > 0) guidedFrontierRanks++
         return -depth to component.frontierRank()
     }
@@ -226,18 +250,55 @@ internal class LinearAuthorityInvocation(
                     importedIncumbents++
                     importedIncumbent = incumbent
                     onIncumbentImport?.invoke()
+                    if (incumbentProximity && completion != null) prepareProximity()
                 }
             }
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
             else TerminationReason.Cancelled)
             if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
+            if (!exchangePrepared && proximityCenter != null) {
+                exchangePrepared = true
+                exchange = LinearIncumbentExchange.prepare(context, proximityCenter, budget, stop,
+                    claim = {
+                        state.remainingDecisions() > 0 && state.work.acceptedChecks < params.maxLeaves &&
+                            state.work.hasAllowance() && state.decisionBudget.consume() &&
+                            state.work.theoryDecision() && state.work.theoryCheck()
+                    }, observe = { stage, count ->
+                        val key = "numericalExchange$stage"
+                        externalOffers[key] = (externalOffers[key] ?: 0L) + count
+                    })
+            }
+            exchange?.takeUnless { it.finished }?.advance(stop or ExecutionControl { paused() })?.let(::offer)
+            if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
+            else TerminationReason.Cancelled)
+            if (paused()) return null
+            if (proximityCenter != null && proximityCenter.numRealVars != 0) {
+                return if (exchange?.finished != false) finish(null, TerminationReason.Unsupported) else null
+            }
             if (!initialized) {
                 initialized = true
                 if (session.initialize() !is ComponentResult.Consistent) {
                     return finish(null, TerminationReason.Unsupported)
                 }
             }
+            if (proximityTurn && proximity != null) {
+                proximityTurn = false
+                advanceProximity()
+                if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
+                else TerminationReason.Cancelled)
+                if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
+                if (paused()) return null
+            }
+            val revision = incumbentRevision
             val event = frontier?.next() ?: checkNotNull(run).next()
+            if (incumbentProximity && completion != null && importedIncumbents > 0 &&
+                incumbentRevision != revision) {
+                if (incumbent?.numRealVars == 0) prepareProximity() else {
+                    proximity?.close()
+                    proximity = null
+                }
+            }
+            proximityTurn = proximity != null
             if (boundOrdered) component.updateGlobalBound()
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
             if (component.gapBound() != null) return finish(null, TerminationReason.SearchExhausted, gapClosed = true)
@@ -274,6 +335,73 @@ internal class LinearAuthorityInvocation(
 
     private fun paused(): Boolean = work > startWork && (work >= endWork || sliceEnd?.hasPassedNow() == true)
 
+    private fun observeProximity(stage: String, count: Long = 1L) {
+        val key = "numericalProximity$stage"
+        externalOffers[key] = (externalOffers[key] ?: 0L) + count
+    }
+
+    private fun prepareProximity() {
+        val sample = completion?.complete(context, incumbent ?: return, stop) ?: return
+        proximity?.close()
+        proximity = null
+        val exact = value ?: return
+        val cutoff = if (context.scope.objective?.sense == ObjectiveSense.MAXIMIZE) exact.negated() else exact
+        val source = IncumbentProximity.prepare(context, sample, cutoff, budget, stop,
+            repairGuidance?.find(context)) ?: return
+        if (sample === importedIncumbent && sample !== consumedIncumbent) {
+            consumedIncumbent = sample
+            onIncumbentUse?.invoke()
+        }
+        proximity = LinearAuthorityInvocation(source, params.copy(sourceIncumbentCompletion = false), state = state,
+            boundOrdered = true, funding = funding, useSourceGap = false, guideIncumbent = false,
+            borrowedBudget = budget, recordProgress = false, proximityCenter = sample)
+        proximityTurn = true
+        observeProximity("Centers")
+    }
+
+    private fun advanceProximity() {
+        val active = proximity ?: return
+        val remaining = sliceEnd?.let { (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
+            ?.coerceAtLeast(0L) ?: Long.MAX_VALUE
+        if (remaining == 0L || work >= endWork) return
+        val before = work
+        val preparation = budget.measuredPreparationWork
+        val floating = budget.measuredFloatWork
+        val certification = budget.measuredBoundCertificationWork
+        val revision = incumbentRevision
+        val delivered = ExecutionControl { incumbentRevision != revision }
+        val millis = if (remaining == Long.MAX_VALUE) 1_000L else maxOf(1L, remaining / 2L)
+        val instructions = minOf(5_000L, maxOf(1L, (endWork - work) / 2L))
+        val completed = active.runSlice(stop or delivered, millis, instructions) { sample, _ ->
+            val checked = completion?.complete(context, sample, stop)
+            if (checked != null) offer(checked, external = false, privatePoint = true) else observeProximity("Rejected")
+        }
+        observeProximity("Consultations")
+        observeProximity("Work", (work - before).coerceAtLeast(0L))
+        observeProximity("PreparationWork", budget.measuredPreparationWork - preparation)
+        observeProximity("FloatWork", budget.measuredFloatWork - floating)
+        observeProximity("CertificationWork", budget.measuredBoundCertificationWork - certification)
+        proximityLatest = (active.component.observations() + active.externalOffers).mapKeys { (key, _) ->
+            "numericalProximityLatest" + key.removePrefix("numerical")
+        }
+        if (completed != null) {
+            observeProximity("Finished${completed.reason.name}")
+            observeProximity(when (completed.terminal?.claim) {
+                SourceClaim.Refutation -> "RefutedTargets"
+                is SourceClaim.Optimal -> "OptimalTargets"
+                null -> "UnresolvedTargets"
+                else -> "OtherTargets"
+            })
+        }
+        if (incumbentRevision != revision) observeProximity("Improvements")
+        if (completed != null || incumbentRevision != revision) {
+            proximity = null
+            active.close()
+            if (incumbentRevision != revision && incumbent?.numRealVars == 0) prepareProximity()
+            proximityTurn = false
+        }
+    }
+
     private fun offer(sample: Sample) = offer(sample, external = false)
 
     private fun observeExternalOffer(external: Boolean, stage: String) {
@@ -283,7 +411,7 @@ internal class LinearAuthorityInvocation(
         }
     }
 
-    private fun offer(sample: Sample, external: Boolean) {
+    private fun offer(sample: Sample, external: Boolean, privatePoint: Boolean = false) {
         val checking = if (external) completion?.checking(stop) ?: stop else stop
         if (checking()) {
             observeExternalOffer(external, "Stopped")
@@ -316,6 +444,7 @@ internal class LinearAuthorityInvocation(
         }
         incumbent = sample
         importedIncumbent = null
+        proximityIncumbent = sample.takeIf { privatePoint }
         value = exact
         incumbentRevision++
         observeExternalOffer(external, "Accepted")
@@ -342,16 +471,18 @@ internal class LinearAuthorityInvocation(
     override fun close() {
         if (closed) return
         closed = true
-        state.capture(session)
-        try {
+        val active = proximity
+        proximity = null
+        callback = { _, _ -> }
+        val resources = SearchInvocationResources()
+        exchange?.let(resources::own)
+        completion?.let(resources::own)
+        resources.own(component)
+        resources.own(AutoCloseable {
+            if (recordProgress) state.capture(session)
             session.popTo(0)
-        } finally {
-            try {
-                component.close()
-            } finally {
-                completion?.close()
-                callback = { _, _ -> }
-            }
-        }
+        })
+        active?.let(resources::own)
+        resources.close()
     }
 }
