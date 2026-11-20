@@ -112,6 +112,7 @@ internal class JointLinearRepair(
     private var advisoryCenter: IncumbentProximity.AdvisoryCenter? = null
     private var proximityAdvisory: IncumbentProximity.AdvisoryCenter? = null
     private var advisoryPass: AdvisoryPass? = null
+    private var advisoryTurn = false
     private var queryAdvisoryPass: AdvisoryPass? = null
     private var proximityCompletedCutoff: BigFraction? = null
     private var proximityDeclined = false
@@ -439,7 +440,9 @@ internal class JointLinearRepair(
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
                 val privateLimit = advisory?.value ?: limit
                 val pass = advisory?.let(::advisoryPass)
+                if (advisory != null && !advisoryTurn) observe("jointRepairAdvisoryOrdinaryTurns")
                 val proximity = if (incumbentProximity && !proximityDeclined && !adaptive &&
+                    (advisory == null || advisoryTurn) &&
                     ((pooled != null && completion != null) || advisory != null) &&
                     !bootstrap && privateLimit != null &&
                     (if (advisory != null) pass != null && pass.next < requireNotNull(selection).advisoryRoots
@@ -625,8 +628,10 @@ internal class JointLinearRepair(
 
     fun attempt(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): JointRepairAttempt {
         readyCenterStep = null
+        val advisory = condition === proximityProposal && proximityAdvisory != null
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
+            if (incumbentProximity) advisoryTurn = !advisory
             observation?.event(proposalSequence, observationQuery, "result", when (result.result) {
                 is ExactNeighborhoodResult.Witness -> "checked-source-witness"
                 ExactNeighborhoodResult.Refuted -> "regional-refutation"

@@ -513,8 +513,10 @@ frontier inside the same turn offers, using at most half the remaining offered t
 and work for each private consultation. The private search visits the center's side
 of each integer split first and retains sibling alternatives; ordinary traversal
 retains bound order. Advisory joint repair retains ordinary root guidance for
-fallback before preparing private neighborhoods. It uses its connected-variable
-selector to free at most two binary coordinates per advisory neighborhood and pins the other integers
+fallback before preparing private neighborhoods. Its first query uses the ordinary
+rounded root; completed advisory queries alternate with ordinary repair queries.
+Paused queries retain their turn. It uses its connected-variable selector to free at
+most two binary coordinates per advisory neighborhood and pins the other integers
 to the center. Continuous coordinates stay free. These pins intersect the private
 change-radius row. A pass visits each eligible root within the existing allowances;
 its identity includes the binary coordinates and aspiration, so a new sample wrapper

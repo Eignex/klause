@@ -86,7 +86,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
             ExecutionControl.Never))
         val seed = Sample(booleanArrayOf(), LongArray(integers) { if (it % 2 == 0) 1 else 0 }, doubleArrayOf(1e-8))
 
-        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1, sourceCuts = false),
+        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2, sourceCuts = false),
             external = { seed }, incumbentProximity = true,
             incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
             repair.search(adaptive = false).use { search ->
@@ -100,7 +100,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `a refuted advisory neighborhood should advance the same center to another root`() {
+    fun `refuted advisory neighborhoods should retain their pass across ordinary repair`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 1, 0), longArrayOf(1, 1, 1), null, null),
             factors = arrayOf(ExactLinear.of(intArrayOf(Term.ofIntVar(2), Term.ofRealVar(0)),
@@ -114,12 +114,18 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
         val source = original.atScope(original.scope.copy(condition = original.scope.condition.copy(
             lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))))
         var queries = 0
+        var privateQuery = false
 
-        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 3),
+        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 6),
             external = { Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(1e-8)) },
             incumbentProximity = true, incumbentCompletionCheck = { point, _, _ ->
-                point.ints.contentEquals(longArrayOf(1, 1, 0)) && point.exactReals == listOf(BigFraction.ONE)
-            }, onComparison = { if (it.phase == "query") queries++ }).use { repair ->
+                privateQuery && point.ints.contentEquals(longArrayOf(1, 1, 0)) && point.exactReals == listOf(BigFraction.ONE)
+            }, onComparison = {
+                if (it.phase == "query") {
+                    queries++
+                    privateQuery = it.cutoff != null
+                }
+            }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
                 repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
@@ -127,7 +133,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                 val result = assertIs<MinimizeResult.WithSample>(
                     search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ONE, objective.evaluateExact(result.sample))
-                assertEquals(3, queries)
+                assertEquals(6, queries)
                 assertTrue(repair.isProximityDiscovery(result.sample))
             }
         }
@@ -155,34 +161,36 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                 val result = assertIs<MinimizeResult.WithSample>(
                     search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ZERO, objective.evaluateExact(result.sample))
-                assertEquals(listOf("-99", null), cutoffs.take(2))
+                assertEquals(listOf(null, "-99", "0"), cutoffs.take(3))
             }
         }
     }
 
     @Test
-    fun `advisory repair should retain root guidance before private publication`() {
+    fun `advisory repair should improve after the ordinary root query`() {
         val model = Problem(0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
-            factors = arrayOf(ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val objective = LinearObjective(intCoefficients = longArrayOf(2), realCoefficients = doubleArrayOf(1.0))
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = Array(3) { id ->
+                Linear(intArrayOf(1, 1), intArrayOf(id, (id + 1) % 3), LinearOp.LE, 1)
+            }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(-1, -1, -1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             ExecutionControl.Never))
-        val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(1e-8))
+        val seed = Sample(booleanArrayOf(), longArrayOf(0, 0, 0), doubleArrayOf(1e-8))
+        val values = mutableListOf<BigFraction?>()
 
-        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1), external = { seed },
-            incumbentProximity = true, incumbentCompletionCheck = { point, _, _ ->
-                point.intValue(0) == 0L && point.exactReals == listOf(BigFraction.ONE)
-            }).use { repair ->
+        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2), external = { seed },
+            incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+                repeat(128) {
+                    if (!done) done = search.advance(ExecutionControl.Never, 5_000) { _, value -> values += value }
+                }
 
                 val result = assertIs<MinimizeResult.WithSample>(
                     search.minimizeResult(TerminationReason.BudgetExhausted))
-                assertEquals(BigFraction.ONE, objective.evaluateExact(result.sample))
+                assertEquals(listOf<BigFraction?>(BigFraction.ZERO, BigFraction.ONE.negated()), values)
+                assertEquals(BigFraction.ONE.negated(), objective.evaluateExact(result.sample))
                 assertTrue(repair.isProximityDiscovery(result.sample))
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairRootQueries"))
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityAdvisoryConsumed"))
