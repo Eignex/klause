@@ -579,7 +579,7 @@ internal class ResumableMinimize(
     // The engine records each node's LP solution into it; the descent reads it for variable/value order.
     private val lpHints: LpHints? =
         if (params.lpPlan.branching) {
-            LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
+            LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains && params.lpPlan.bounding,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
                 applyAdvice = params.lpDirectionalAdvice)
         } else
