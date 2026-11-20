@@ -56,7 +56,8 @@ class RevisedSimplexRepairTest {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L, cost = 1L)
         builder.addRow(intArrayOf(x), longArrayOf(1000L), Relation.GE, 3000L)
-        val model = builder.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
         for (primal in listOf(false, true)) {
             for (reason in listOf("cancel", "work", "unknown", "throw")) {
                 var repairCalls = 0
@@ -98,6 +99,9 @@ class RevisedSimplexRepairTest {
                     val result = if (primal) solver.solvePrimal() else solver.solve()
 
                     assertNull(result)
+                    assertNull(solver.retainedBasis())
+                    assertNull(solver.solvedExactState)
+                    assertNull(solver.infeasibleRay)
                     assertEquals(1, repairCalls)
                     assertEquals(1, owners)
                 }

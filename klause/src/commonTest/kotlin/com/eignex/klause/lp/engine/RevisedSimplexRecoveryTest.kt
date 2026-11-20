@@ -120,7 +120,8 @@ class RevisedSimplexRecoveryTest {
         val column = builder.addVar(0L, 2L, cost = 1L)
         builder.addRow(mapOf(column to 1024L), Relation.GE, 1024L)
         RevisedSimplex(
-            builder.build(Sense.MINIMIZE),
+            assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+                .ownerWorkingModel()),
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
@@ -132,6 +133,8 @@ class RevisedSimplexRecoveryTest {
             assertNull(solver.solve())
 
             assertEquals(LpFloatTermination.NUMERICAL, solver.lastTermination)
+            assertNull(solver.retainedBasis())
+            assertNull(solver.solvedExactState)
             assertNull(solver.infeasibleRay)
         }
     }

@@ -1,5 +1,9 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.BasisSolver
+import com.eignex.klause.simplex.basis.BasisUpdate
+import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
@@ -11,6 +15,81 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RevisedSimplexTest {
+
+    @Test
+    fun `resource stops retain a basis without publishing a result`() {
+        for ((allowance, reason) in listOf(
+            LpFloatAllowance(1L, 0) to LpFloatTermination.WORK,
+            LpFloatAllowance(0L, 1) to LpFloatTermination.PIVOTS,
+        )) {
+            val builder = LpBuilder()
+            val x = builder.addVar(0L, 5L, cost = 1L)
+            val y = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+            builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 1L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            RevisedSimplex(assertNotNull(trail.state.ownerWorkingModel()),
+                iterationLimit = allowance.iterations).use { solver ->
+                assertNull(if (reason == LpFloatTermination.PIVOTS) solver.solvePrimal()
+                    else solver.resolveBounds(allowance))
+                assertEquals(reason, solver.lastTermination)
+                assertNull(solver.solvedExactState)
+                assertNull(solver.infeasibleRay)
+                assertNotNull(solver.retainedBasis())
+                assertTrue(trail.assertBound(x, false, ExactLpSide(ExactLpNumber.of(2L)), 0L))
+                assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
+
+                val result = assertNotNull(solver.resolveBounds(LpFloatAllowance(0L, 100)))
+
+                assertTrue(result.optimal)
+                assertEquals(0, solver.lastMetrics.initialRefactorizations)
+                val model = assertNotNull(trail.state.ownerWorkingModel())
+                RevisedSimplex(model).use { fresh ->
+                    val expected = assertNotNull(fresh.solve())
+                    assertEquals(expected.objective, result.objective)
+                    assertEquals(LpVerdict.ATTAINED_OPTIMUM, certifyLpResult(model, fresh, expected).verdict)
+                    assertEquals(certifyLpResult(model, fresh, expected).verdict,
+                        certifyLpResult(model, solver, result).verdict)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted factor updates cannot retain a basis`() {
+        for (updated in listOf(false, true)) {
+            val model = assertNotNull(LpExactState(assertNotNull(coverModel().authoritativeModel()))
+                .ownerWorkingModel())
+            var updates = 0
+            var closes = 0
+            RevisedSimplex(model, basisSolverFactory = { matrix ->
+                val delegate = KotlinBasisSolver(matrix)
+                object : BasisSolver by delegate {
+                    override fun update(pivotRow: Int, entering: Int, spike: IndexedVector,
+                        pivotEta: IndexedVector?): BasisUpdate {
+                        updates++
+                        if (updated) delegate.update(pivotRow, entering, spike, pivotEta)
+                        throw LpWorkExhausted()
+                    }
+
+                    override fun close() {
+                        closes++
+                        delegate.close()
+                    }
+                }
+            }).use { solver ->
+                val result = solver.solve()
+
+                assertNull(result)
+                assertEquals(1, updates)
+                assertEquals(1, closes)
+                assertEquals(LpFloatTermination.WORK, solver.lastTermination)
+                assertNull(solver.retainedBasis())
+                assertNull(solver.solvedExactState)
+                assertNull(solver.infeasibleRay)
+            }
+        }
+    }
 
     @Test
     fun `basis directional costs preserve source units and seated directions`() {

@@ -29,6 +29,10 @@ A retained numerical owner can expose a private solve cursor that suspends betwe
 iterations, keeping phase, factors, artificial seats, pricing state and cumulative
 limits. A pause returns no result or certificate; the owner rejects another solve or
 authority adoption while the cursor is live, and closing it unwinds the operation.
+A completed work or pivot stop that returns no result can retain healthy factors
+after a charged heading check. It clears point, ray, solved-state and basic-value evidence; another solve
+recomputes values and feasibility against current bounds. Interrupted factor updates,
+repair failures, numerical failures and cancellation retire that reuse.
 An opt-in bounded progress trace samples scaled objective and bound infeasibility
 per phase. A retained optimal basis can also report advisory objective costs per unit
 of at most two basic structural columns, funded before allocation; the read leaves

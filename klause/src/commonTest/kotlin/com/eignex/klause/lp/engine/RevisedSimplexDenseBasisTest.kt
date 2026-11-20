@@ -58,7 +58,8 @@ class RevisedSimplexDenseBasisTest {
         repeat(2) { builder.addVar(0L, 2L, cost = 1L) }
         builder.addRow(intArrayOf(0, 1), longArrayOf(2, 1), Relation.EQ, 3L)
         builder.addRow(intArrayOf(0, 1), longArrayOf(1, 2), Relation.EQ, 3L)
-        val model = builder.build(Sense.MINIMIZE)
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
         var cancelled = false
         var denseAttempts = 0L
         val token = ExecutionControl { cancelled }
@@ -82,6 +83,7 @@ class RevisedSimplexDenseBasisTest {
 
             assertEquals(1L, denseAttempts)
             assertNull(result)
+            assertNull(solver.retainedBasis())
             assertEquals(LpVerdict.INDETERMINATE, certified.verdict)
             assertNull(certified.witness)
             assertNull(certified.lowerBound)

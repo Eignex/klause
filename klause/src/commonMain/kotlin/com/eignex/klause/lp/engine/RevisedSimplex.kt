@@ -1560,11 +1560,19 @@ internal class RevisedSimplex(
         }
         result.also {
             if (model.exactState != null && it == null && solvedExactState == null) {
-                basicValueCache.invalidate()
-                basisLifecycle.kept = false
-                infeasibleBasis = null
-                infeasibleRow = -1
-                infeasibleRay = null
+                clearNumericalPublication()
+                basisLifecycle.kept = when (observations.termination) {
+                    LpFloatTermination.WORK, LpFloatTermination.PIVOTS -> {
+                        if (!basisLifecycle.factorized || numericalFailure || repairStop != null ||
+                            factorCopyFailed || artificialBounds.active || cancellation()
+                        ) false else {
+                            // A clean resource stop preserves only the numerical recipe; validation remains query debt.
+                            work.add(8L * m + 4L * numVars + 64L)
+                            trackedHeadingsConsistent() && !cancellation()
+                        }
+                    }
+                    else -> false
+                }
             }
         }
     } catch (_: LpWorkExhausted) {
