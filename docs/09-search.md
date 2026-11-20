@@ -386,6 +386,9 @@ stamps bounds a positive validation's lifetime; a rejection ages from the reject
 Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
+The proposal's lower geometric estimate must exceed the reference's upper estimate
+formed from the larger retained gain in each direction. Overlapping support keeps
+ordinary selection. These support ranges describe observations, not confidence intervals.
 The scope retains the most recent oldest validation-support stamp of any variable with reliable positive gains
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that
@@ -410,7 +413,9 @@ then it visits the higher predicted gain first to seek early pruning.
 Predicted gains carry no pruning authority.
 Both directions need stable recent pairs without an in-age rejected forecast; equal or unavailable
 estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
-creates no LP query, charges constant comparison and commitment work to the LP
+requires disjoint child-gain support ranges and agreement across those ranges on
+whether a child reaches the current objective gap. Uncertain order or gap crossing
+keeps ordinary order. This consumer creates no LP query, charges constant comparison and commitment work to the LP
 allowance, and checks the current point, scope, solve stamp and cancellation.
 Value nominations and matching committed changes have separate counters from
 variable advice and missing-direction collection. Withheld advice retains ordinary

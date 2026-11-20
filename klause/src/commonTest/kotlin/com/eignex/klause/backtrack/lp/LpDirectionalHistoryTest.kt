@@ -11,6 +11,67 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `overlapping child gain support keeps ordinary order`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        for (downGain in listOf(1.0, 2.0)) {
+            for ((literal, gain) in listOf(1 to downGain, 0 to 1.5)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(10.0 + gain)
+            }
+        }
+        history.beginNode(0)
+        history.record(10.0)
+
+        assertNull(history.preferGainDirection(variable, 0.5))
+    }
+
+    @Test
+    fun `child support must agree on reaching the objective gap`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        for ((downGain, upGain) in listOf(1.0 to 3.0, 2.0 to 4.0)) {
+            for ((literal, gain) in listOf(1 to downGain, 0 to upGain)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(10.0 + gain)
+            }
+        }
+        history.beginNode(0)
+        history.record(10.0)
+
+        for ((cutoff, preferred) in listOf(13.0 to true, 13.5 to null, 14.1 to false)) {
+            assertEquals(preferred, history.preferGainDirection(variable, 0.5, cutoff))
+        }
+    }
+
+    @Test
+    fun `upper estimate covers the larger retained gain in each direction`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        for ((downGain, upGain) in listOf(1.0 to 3.0, 2.0 to 4.0, 1.5 to 3.5)) {
+            for ((literal, gain) in listOf(1 to downGain, 0 to upGain)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(10.0 + gain)
+            }
+        }
+
+        assertEquals(sqrt(5.25), history.estimate(variable, 0.5), 1e-9)
+        assertEquals(sqrt(8.0), history.upperEstimate(variable, 0.5), 1e-9)
+    }
+
+    @Test
     fun `rejection ages independently of the stabilized numeric pair`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add, maxAge = 8L)

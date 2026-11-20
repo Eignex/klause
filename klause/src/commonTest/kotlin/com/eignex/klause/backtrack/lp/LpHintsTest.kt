@@ -25,6 +25,49 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `only separated variable gain support replaces the ordinary reference`() {
+        for (proposalGain in listOf(1.75, 2.25)) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 10, cost = 1L) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
+            val baseline = VarRef.IntVar(0)
+            val proposal = VarRef.IntVar(1)
+            for (referenceGain in listOf(1.0, 2.0, 1.5)) {
+                for (variable in listOf(baseline, proposal)) {
+                    hints.beginNode(0, 100.0)
+                    hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, 10.0)
+                    hints.branch(variable)
+                    val split = if (variable == baseline) 2L else 3L
+                    for (up in listOf(false, true)) {
+                        hints.commit(if (up) SearchDecision.IntAtLeast(variable.varId, split + 1L)
+                        else SearchDecision.IntAtMost(variable.varId, split), 1)
+                        hints.beginNode(1, 100.0)
+                        val point = doubleArrayOf(2.5, 3.5)
+                        point[variable.varId] = if (up) split + 1.0 else split.toDouble()
+                        hints.record(relaxation, point, DoubleArray(0))
+                        hints.recordObjective(relaxation, 10.0 + if (variable == baseline) referenceGain else proposalGain)
+                    }
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+
+            val selected = assertNotNull(hints.selectVariable(proposal, baseline))
+            hints.branch(selected)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, if (selected == baseline) 2L else 3L), 1)
+
+            assertEquals(if (proposalGain > 2.0) proposal else baseline, selected)
+            assertEquals(if (proposalGain > 2.0) 1 else 0, events.count { it == "PASSIVE_VARIABLE_COMMIT_CHANGED" })
+        }
+    }
+
+    @Test
     fun `cancellation discards a reliable variable commitment`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)

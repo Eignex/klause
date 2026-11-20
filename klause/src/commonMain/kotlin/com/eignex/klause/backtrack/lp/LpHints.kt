@@ -223,8 +223,12 @@ internal class LpHints(
             reliable = {
                 charge(2L)
                 val gain = history.score(proposal, proposed.point)
-                val baselineGain = if (proposal == baseline) gain else history.estimate(baseline, reference.point)
+                val baselineGain = if (proposal == baseline) gain else history.upperEstimate(baseline, reference.point)
                 if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
+                charge(1L)
+                if (gain.isFinite() && baselineGain.isFinite() && proposal != baseline && gain <= baselineGain) {
+                    observe("PASSIVE_VARIABLE_SUPPORT_NOT_SEPARATED")
+                }
                 history.hasReliableHistory && gain.isFinite() && baselineGain.isFinite() &&
                     (proposal == baseline || gain > baselineGain)
             })

@@ -2,7 +2,6 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
-import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.sqrt
 
@@ -238,16 +237,41 @@ internal class LpDirectionalHistory(
         return score.takeIf { it.isFinite() } ?: Double.NaN
     }
 
+    fun upperEstimate(variable: VarRef, value: Double): Double {
+        val history = reliable(variable, value) ?: return Double.NaN
+        charge(6L)
+        val fraction = value - floor(value)
+        val down = maxOf(history.down.latest, history.down.previous) * fraction
+        val up = maxOf(history.up.latest, history.up.previous) * (1.0 - fraction)
+        val score = sqrt(down) * sqrt(up)
+        return score.takeIf { it.isFinite() } ?: Double.NaN
+    }
+
     fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? {
         val history = reliable(variable, value, requireValidation = false) ?: return null
+        charge(12L)
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
-        if (!down.isFinite() || !up.isFinite() || abs(down - up) <= 1e-9 * maxOf(1.0, down, up)) return null
+        val downHigh = maxOf(history.down.latest, history.down.previous) * fraction
+        val upHigh = maxOf(history.up.latest, history.up.previous) * (1.0 - fraction)
+        if (!downHigh.isFinite() || !upHigh.isFinite()) return null
+        val tolerance = 1e-9 * maxOf(1.0, downHigh, upHigh)
+        val downFirst = downHigh < up - tolerance
+        val upFirst = upHigh < down - tolerance
+        if (!downFirst && !upFirst) {
+            observe("PASSIVE_VALUE_SUPPORT_OVERLAP")
+            return null
+        }
         val gap = cutoff - objective
         if (gap.isNaN() || gap <= 0.0) return null
         val preferHighGain = maxOf(down, up) >= gap
-        return if (preferHighGain) up > down else up < down
+        if (!preferHighGain && maxOf(downHigh, upHigh) >= gap) {
+            observe("PASSIVE_VALUE_GAP_UNCERTAIN")
+            return null
+        }
+        observe("PASSIVE_VALUE_SUPPORT_SEPARATED")
+        return if (preferHighGain) downFirst else upFirst
     }
 
     private fun reliable(variable: VarRef, value: Double, requireValidation: Boolean = true): Gains? {
