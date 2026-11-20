@@ -188,8 +188,19 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains || !objectiveRecorded || !history.hasPruningHistory) return Double.NaN
-        if (!passivePointCurrent()) return Double.NaN
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(variable)
+    }
+
+    fun directionalScore(varId: Int, isBool: Boolean): Double {
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(if (isBool) VarRef.Bool(varId) else VarRef.IntVar(varId))
+    }
+
+    private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
+        history.hasPruningHistory && passivePointCurrent()
+
+    private fun readyDirectionalScore(variable: VarRef): Double {
         charge(1L)
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)

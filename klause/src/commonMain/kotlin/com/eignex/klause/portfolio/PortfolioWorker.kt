@@ -254,7 +254,7 @@ class PortfolioWorker private constructor(
                             sliceNodes: Long,
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
                         ): MinimizeResult? = child.runSlice(global, sliceMillis, sliceNodes) { point ->
-                            proposal(point.sample)?.let(onIncumbent)
+                            proposal(point.sample)?.copy(stats = point.stats)?.let(onIncumbent)
                         }?.let(::checked)
 
                         override fun runInstructionSlice(
@@ -264,7 +264,7 @@ class PortfolioWorker private constructor(
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
                         ): MinimizeResult? {
                             val accept: (MinimizeResult.WithSample) -> Unit = { point ->
-                                proposal(point.sample)?.let(onIncumbent)
+                                proposal(point.sample)?.copy(stats = point.stats)?.let(onIncumbent)
                             }
                             val terminal = if (child is InstructionSlicedSearch) {
                                 child.runInstructionSlice(global, sliceMillis, sliceInstructions, accept)
@@ -281,7 +281,7 @@ class PortfolioWorker private constructor(
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
                         ): MinimizeResult? {
                             val accept: (MinimizeResult.WithSample) -> Unit = { point ->
-                                proposal(point.sample)?.let(onIncumbent)
+                                proposal(point.sample)?.copy(stats = point.stats)?.let(onIncumbent)
                             }
                             val terminal = if (child is InstructionSlicedSearch) {
                                 child.runScheduledSlice(
