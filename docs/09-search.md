@@ -432,7 +432,11 @@ Samples share one retained exact base model, active-row identity, objective mapp
 and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
 replacement arrays are checked element by element. Scope capture borrows those arrays,
 and comparison work charges the visited elements. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+history and pending comparisons. An internal restart retains in-age observations
+but discards ancestor splits, pending child attribution and nominations. Advice
+requires a fresh optimum with the same complete scope after the restart; changed
+source or cutoff still invalidates history. Restarts do not renew observation age.
+Assumption reseeding and close clear history.
 Invalidations report the first differing scope facet: base model, active rows,
 objective constant, incumbent cutoff, variable mapping or variable kind, in that order.
 Initial scope capture reports no invalidation. The additional reason observation
