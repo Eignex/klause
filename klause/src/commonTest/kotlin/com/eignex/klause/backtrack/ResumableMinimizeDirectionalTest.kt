@@ -84,6 +84,7 @@ class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
             Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), min = 1, max = 2),
         )).bake()
         val params = BacktrackParams(randomSeed = 3L, lpDirectionalGains = true,
+            objectiveBoundSupplier = { 100.0 },
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L))
         ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
