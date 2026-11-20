@@ -17,10 +17,13 @@ internal class LpDirectionalHistory(
         var previous = 0.0
         var stamp = 0L
         var previousStamp = 0L
+        var validationStamp = 0L
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
         val stable: Boolean get() = count >= RELIABILITY && minOf(latest, previous) >= maxOf(latest, previous) * 0.5
+
+        val readiness: Int get() = count + if (stable && validationStamp > 0L) 1 else 0
     }
 
     private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
@@ -77,34 +80,75 @@ internal class LpDirectionalHistory(
         val gain = value - child.parent.objective
         val normalized = gain / child.distance
         if (!gain.isFinite() || gain < 0.0 || !normalized.isFinite()) {
+            charge(1L)
+            gains[child.parent.variable]?.let { history ->
+                val direction = if (child.up) history.up else history.down
+                if (direction.validationStamp > 0L) {
+                    charge(2L)
+                    direction.validationStamp = 0L
+                    observe("FORECAST_UNAVAILABLE")
+                }
+            }
             observe("UNUSABLE")
             return
         }
-        val history = gains.getOrPut(child.parent.variable, ::Gains)
+        val history = gains.getOrPut(child.parent.variable) {
+            charge(2L)
+            Gains()
+        }
         expire(history.down)
         expire(history.up)
         val direction = if (child.up) history.up else history.down
+        validateForecast(direction, normalized)
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
         observed = true
-        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
-            val majority = if (history.down.count > history.up.count) history.down else history.up
+        recordCollectionAvailability(history)
+        recordAdviceAvailability(history)
+        observe(if (child.up) "UP" else "DOWN")
+    }
+
+    private fun validateForecast(direction: Direction, normalized: Double) {
+        charge(2L)
+        val prior = direction.gain
+        val predictable = direction.stable
+        val validated = predictable && when {
+            normalized < prior -> normalized / prior >= 0.5
+            normalized > prior -> prior / normalized >= 0.5
+            else -> true
+        }
+        // A validated prediction still depends on both of its earlier input observations.
+        direction.validationStamp = if (validated) direction.previousStamp else 0L
+        if (predictable) {
+            charge(4L)
+            observe(if (validated) "FORECAST_VALIDATED" else "FORECAST_REJECTED")
+        }
+    }
+
+    private fun recordCollectionAvailability(history: Gains) {
+        if (history.down.count > 0 && history.up.count > 0 && history.down.readiness != history.up.readiness) {
+            val majority = if (history.down.readiness > history.up.readiness) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
-            if (majority.stable && majority.gain > 0.0) {
-                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
+            if (majority.stable && (history.down.latest > 0.0 || history.up.latest > 0.0)) {
+                val witness = if (majority.validationStamp > 0L) majority.validationStamp else majority.previousStamp
+                collectionStamp = maxOf(collectionStamp, minOf(witness, minority.stamp))
             }
         }
+    }
+
+    private fun recordAdviceAvailability(history: Gains) {
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
-            if (history.down.stable && history.up.stable) {
-                val pairStamp = minOf(history.down.previousStamp, history.up.previousStamp)
+            if (history.down.stable && history.up.stable &&
+                history.down.validationStamp > 0L && history.up.validationStamp > 0L
+            ) {
+                val pairStamp = minOf(history.down.validationStamp, history.up.validationStamp)
                 if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
                 if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
-            } else observe("UNSTABLE")
+            } else observe(if (history.down.stable && history.up.stable) "UNCALIBRATED" else "UNSTABLE")
         }
-        observe(if (child.up) "UP" else "DOWN")
     }
 
     fun branch(variable: VarRef, value: Double) {
@@ -204,7 +248,9 @@ internal class LpDirectionalHistory(
         val history = gains[variable] ?: return null
         expire(history.down)
         expire(history.up)
-        if (!history.down.stable || !history.up.stable) return null
+        if (!history.down.stable || !history.up.stable ||
+            history.down.validationStamp == 0L || history.up.validationStamp == 0L
+        ) return null
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         return history
@@ -218,27 +264,32 @@ internal class LpDirectionalHistory(
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         if (history.down.count == 0 || history.up.count == 0) return null
-        if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
-        if (history.down.count == history.up.count) return null
-        val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
+        if (history.down.readiness == history.up.readiness) return null
+        val sampledDirection = if (history.up.readiness < history.down.readiness) history.down else history.up
         if (!sampledDirection.stable) return null
-        if (sampledDirection.gain <= 0.0) {
+        if (history.down.latest <= 0.0 && history.up.latest <= 0.0) {
             observe("PASSIVE_COLLECTION_ZERO_GAIN")
             return null
         }
-        return history.up.count < history.down.count
+        return history.up.readiness < history.down.readiness
     }
 
     private fun expire(direction: Direction) {
+        if (direction.validationStamp > 0L) charge(1L)
         if (direction.count > 0 && stamp - direction.stamp > maxAge) {
             direction.count = 0
             direction.latest = 0.0
             direction.previous = 0.0
+            direction.validationStamp = 0L
             observe("EXPIRED")
         } else if (direction.count >= RELIABILITY && stamp - direction.previousStamp > maxAge) {
             direction.count = 1
             direction.previous = 0.0
+            direction.validationStamp = 0L
             observe("EXPIRED")
+        } else if (direction.validationStamp > 0L && stamp - direction.validationStamp > maxAge) {
+            direction.validationStamp = 0L
+            observe("CALIBRATION_EXPIRED")
         }
     }
 

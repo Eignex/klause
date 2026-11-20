@@ -369,7 +369,7 @@ The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
+`lp-directional-gains=true`, with LP bounding and branching enabled. Validated recent samples
 in each direction permit the geometric mean of the predicted child gains; a zero
 gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
@@ -377,10 +377,14 @@ with each other before fallback, so objective units are not mixed with reduced c
 Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
-Each observation ages separately.
+The latest observation must also agree within a factor of two with the estimate
+formed before it arrived. A rejected or unavailable forecast withholds advice until
+a subsequent stable prediction validates. An unusable child gain revokes its
+direction's validation without adding a numeric sample. The oldest of the three supporting sample
+stamps bounds that validation's lifetime. Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
-The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
+The scope retains the most recent oldest validation-support stamp of any variable with reliable positive gains
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that
 gate. Passing it still requires the variable's own recent samples; it grants no
@@ -402,7 +406,7 @@ existing adjacent alternatives. It visits the lower predicted gain first to seek
 an incumbent, unless a predicted child gain reaches the current objective gap;
 then it visits the higher predicted gain first to seek early pruning.
 Predicted gains carry no pruning authority.
-Both directions need two in-age observations; equal or unavailable
+Both directions need a current validated forecast; equal or unavailable
 estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
 creates no LP query, charges constant comparison and commitment work to the LP
 allowance, and checks the current point, scope, solve stamp and cancellation.
@@ -411,12 +415,13 @@ variable advice and missing-direction collection. Withheld advice retains ordina
 value order while paying the same comparison work.
 
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
-child first to collect missing passive information. It uses a recent positive
-directional estimate for the selected variable and only reorders the two adjacent alternatives
+child first to complete passive sample or forecast readiness. It needs a recent positive
+observation for the selected variable and only reorders the two adjacent alternatives
 around its fresh fractional LP point. Each direction needs an in-age observation
-before collection can complete a nearly reliable pair, and the more observed side
-must have a stable positive estimate. A scope-wide availability
-stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions
+before collection can complete a nearly reliable pair. Readiness counts the two retained
+observations and a current validated forecast; the more ready side must have a stable estimate.
+A scope-wide availability stamp skips collection lookups until such observations exist.
+Equal readiness or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
 history resets do not renew those limits. It creates no LP query and charges the
