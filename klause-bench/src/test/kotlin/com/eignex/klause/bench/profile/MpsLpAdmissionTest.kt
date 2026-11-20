@@ -45,7 +45,8 @@ class MpsLpAdmissionTest {
     fun `a resource declined plan cannot report complete preparation from a baked model`() {
         val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 2)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1))).bake()
-        val plan = problem.prepareExecutionPlan(preferFinite = true, cancellation = ExecutionControl(Cancellation { true }))
+        val cancelled = ExecutionControl(Cancellation { true })
+        val plan = problem.prepareExecutionPlan(preferFinite = true, cancellation = cancelled)
         val preparation = FinitePipelinePreparation(problem, null, { it }, null)
         preparation.javaClass.methods.single { it.name.startsWith("setExecutionPlan") }
             .invoke(preparation, plan)
