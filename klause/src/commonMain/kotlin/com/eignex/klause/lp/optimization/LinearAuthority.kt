@@ -658,6 +658,15 @@ internal class LinearAuthority(
         val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive,
             prepared.unconditionalRows)
             ?: return LinearAuthorityResult(paused = budget.funding?.paused == true) else null
+        guide?.let {
+            observePrimal("PrimalGuidancePhase${it.phase?.name ?: "Unavailable"}")
+            observePrimal("PrimalGuidanceTermination${it.termination?.name ?: "Unavailable"}")
+            it.nativePointPresent?.let { present ->
+                observePrimal(if (present) "PrimalGuidanceNativePointPresent" else "PrimalGuidanceNativePointUnavailable")
+            }
+            observePrimal(if (it.point == null) "PrimalGuidancePointUnavailable" else "PrimalGuidancePointPresent")
+            observePrimal(if (it.paused) "PrimalGuidancePaused" else "PrimalGuidanceNotPaused")
+        }
         if (guide?.paused == true) return LinearAuthorityResult(paused = true)
         guide?.coordinateConflictWeights?.let { weights ->
             val evidence = checked(SourceClaim.Refutation, LinearPinnedRefutation(derivation(weights)))
