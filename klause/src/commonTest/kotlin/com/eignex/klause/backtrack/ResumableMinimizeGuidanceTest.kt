@@ -615,7 +615,7 @@ class ResumableMinimizeGuidanceTest {
                                     else -> count
                                 })
                                 put("NumericalWork", if (observation == "stale-work" && count >= 3L) 0L
-                                    else pausedWork)
+                                else pausedWork)
                                 put("LastViolatedBasics", when {
                                     observation == "invalid-violation" && count >= 3L -> model.m + 1L
                                     observation == "exhausted" -> (model.m + 1L - count).coerceAtLeast(0L)
