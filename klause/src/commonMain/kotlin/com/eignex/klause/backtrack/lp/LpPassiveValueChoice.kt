@@ -33,7 +33,7 @@ internal class LpPassiveValueChoice(
         charge(20L)
         observe("PASSIVE_VALUE_CHECK")
         if (!fresh()) return alternatives.also { observe("PASSIVE_VALUE_STALE") }
-        val preferUp = history.preferPruningDirection(variable, point)
+        val preferUp = history.preferSurvivingDirection(variable, point)
             ?: return alternatives.also { observe("PASSIVE_VALUE_NO_PROPOSAL") }
         val down: SearchDecision
         val up: SearchDecision

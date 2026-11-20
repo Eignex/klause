@@ -243,12 +243,12 @@ internal class LpDirectionalHistory(
     fun pruningScore(variable: VarRef, value: Double): Double = pruningEstimate(variable, value)
         .takeIf { it > 0.0 } ?: Double.NaN
 
-    fun preferPruningDirection(variable: VarRef, value: Double): Boolean? {
+    fun preferSurvivingDirection(variable: VarRef, value: Double): Boolean? {
         val history = reliable(variable, value) ?: return null
         charge(3L)
         val down = history.down.pruning ?: return null
         val up = history.up.pruning ?: return null
-        return (up > down).takeIf { up != down }
+        return (up < down).takeIf { up != down }
     }
 
     fun pruningEstimate(variable: VarRef, value: Double): Double {

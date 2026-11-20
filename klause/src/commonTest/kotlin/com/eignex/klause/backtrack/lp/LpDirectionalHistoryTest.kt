@@ -34,7 +34,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `child preference follows agreeing completed pruning outcomes`() {
+    fun `child preference follows agreeing completed open outcomes`() {
         for (preferred in listOf<Boolean?>(false, true, null)) {
             val history = LpDirectionalHistory({})
             val variable = VarRef.Bool(0)
@@ -46,11 +46,11 @@ class LpDirectionalHistoryTest {
                     history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
                     history.beginNode(1)
                     history.record(if (up == preferred) 13.0 else 11.0)
-                    history.finishNode(preferred == null || up == preferred)
+                    history.finishNode(preferred == null || up != preferred)
                 }
             }
 
-            val selected = history.preferPruningDirection(variable, 0.5)
+            val selected = history.preferSurvivingDirection(variable, 0.5)
 
             assertEquals(preferred, selected)
         }
