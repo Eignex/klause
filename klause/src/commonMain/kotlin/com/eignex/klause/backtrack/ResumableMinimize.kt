@@ -577,13 +577,7 @@ internal class ResumableMinimize(
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
     // The engine records each node's LP solution into it; the descent reads it for variable/value order.
-    private val lpHints: LpHints? =
-        if (params.lpPlan.branching) {
-            LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
-                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                applyAdvice = params.lpDirectionalAdvice)
-        } else
-            null
+    private var lpHints: LpHints? = null
 
     private lateinit var cp: CpSearchComponent
     private val session: PropagationSession get() = cp.session
@@ -708,6 +702,12 @@ internal class ResumableMinimize(
             ),
         )
         lpEngine.preparation().forEach { yield(Unit) }
+        lpHints = if (params.lpPlan.branching) {
+            LpHints(problem.numIntVars, problem.numBoolVars,
+                params.lpDirectionalGains && lpEngine.params.lpPlan.bounding,
+                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
+                applyAdvice = params.lpDirectionalAdvice)
+        } else null
         lpEngine.lpHints = lpHints
         yield(Unit)
         brancher = BacktrackBrancher(
@@ -1618,7 +1618,7 @@ internal class ResumableMinimize(
         }
 
         override fun onRestart() {
-            lpHints?.resetHistory()
+            lpHints?.restart()
             restartRootTargetsPending = incumbents.current() == null &&
                 lpEngine.rootPrimalTargets?.components?.offered == true
             lpEngine.restartRootPrimalTargets()
