@@ -70,6 +70,8 @@ input and records its decoded SHA-256 and byte count without parsing or solving 
 `sha256`. An optional `engine=mixed` reports automatic source selection, prepared authority
 compatibility and numerical companion eligibility without running selection or search.
 Preparation can solve LP bounds; this diagnostic supplies no source verdict or quality evidence.
+The bounded source-setup report separately recomputes canonical binary eligibility and
+the widened model's coordinate compatibility; incomplete inspection leaves its decline unknown.
 
 `FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
 Its lab profile build requires both `:klause-cli:installJvmDist` and `:klause-bench:installDist`
