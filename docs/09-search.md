@@ -407,7 +407,7 @@ directional gains collect no history or retained model scope and charge no histo
 bookkeeping; ordinary LP values and reduced-cost preferences remain available.
 
 The same opt-in path can visit an under-observed child first to collect missing
-passive information, including before an incumbent exists. It uses a recent positive
+passive information under the finite cutoff. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
 around its fresh fractional LP point. The more observed side must have a stable
 positive estimate from two in-age observations; the opposite direction may have no
