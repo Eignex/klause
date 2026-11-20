@@ -384,18 +384,19 @@ large observation cannot raise its estimate alone. The two gains must agree with
 a factor of two; disagreement withholds advice until passive observations stabilize.
 A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
-Variable advice retains a separate two-observation LP termination history for each
-side of the committed split. An optimal solve with a usable gain records an open
-outcome; a verified LP
-infeasibility records an infeasible outcome without supplying a numerical gain.
-Missing or interrupted solves supply neither outcome. Each outcome ages separately.
+Variable advice retains a separate two-observation completed LP-node outcome for
+each side of the committed split. A completed optimal pass that keeps the node
+records an open outcome. Accepted LP bounds, fixings, mixed deductions and
+infeasibility can record a prune without supplying a numerical gain. A missing,
+interrupted or incomplete cut solve supplies neither outcome. Outcomes validate
+the returned source scope and final owner state, and each outcome ages separately.
 Both directions must have two agreeing recent outcomes, in addition to the two
 stable finite gains in each direction. A proposal with positive gains in both
 directions can replace the ordinary variable only when it has more repeatedly
-infeasible directions. The ordinary reference must meet the same numeric and outcome
+pruned directions. The ordinary reference must meet the same numeric and outcome
 requirements; two observed open outcomes in each direction supply its measured zero.
 No outcome is a pruning authority at another node. A coarse recent stamp skips
-production candidate selection until one direction has two verified infeasible
+production candidate selection until one direction has two completed prune
 outcomes. Its variables still need their own complete numeric and outcome records;
 this prerequisite supplies no score and resets with the history.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains

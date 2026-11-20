@@ -11,6 +11,27 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `cancelled completed outcomes cannot extend directional history`() {
+        for (pruned in listOf(false, true)) {
+            var recording = false
+            var current = true
+            val events = ArrayList<String>()
+            val history = LpDirectionalHistory(events::add, charge = { if (recording) current = false })
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            history.commit(SearchDecision.Bool(1), 1)
+            history.beginNode(1)
+            recording = true
+
+            history.finishNode(pruned) { current }
+
+            assertFalse("OUTCOME_PRUNED" in events)
+            assertFalse("OUTCOME_OPEN" in events)
+        }
+    }
+
+    @Test
     fun `infeasible outcomes retain numeric gains without manufacturing a sample`() {
         for (samples in listOf(1, 2)) {
             val events = ArrayList<String>()
@@ -24,36 +45,38 @@ class LpDirectionalHistoryTest {
                     history.commit(SearchDecision.Bool(literal), 1)
                     history.beginNode(1)
                     history.record(12.0)
+                    history.finishNode(false)
                 }
             }
             repeat(2) { observation ->
                 history.commit(SearchDecision.Bool(1), 1)
                 history.beginNode(1)
-                history.infeasible(verified = true)
+                history.infeasible()
+            history.finishNode(true)
                 if (observation == 0) {
-                    assertFalse(history.hasInfeasibleHistory)
-                    assertTrue(history.infeasibleDirections(variable, 0.5).isNaN())
+                    assertFalse(history.hasPruningHistory)
+                    assertTrue(history.prunedDirections(variable, 0.5).isNaN())
                 }
                 history.finishNode()
             }
 
-            assertTrue(history.hasInfeasibleHistory)
+            assertTrue(history.hasPruningHistory)
             if (samples == 2) {
                 assertEquals(2.0, history.score(variable, 0.5), 1e-9)
-                assertEquals(1.0, history.infeasibleDirections(variable, 0.5))
+                assertEquals(1.0, history.prunedDirections(variable, 0.5))
             } else {
                 assertTrue(history.score(variable, 0.5).isNaN())
-                assertTrue(history.infeasibleDirections(variable, 0.5).isNaN())
+                assertTrue(history.prunedDirections(variable, 0.5).isNaN())
             }
             assertEquals(samples, events.count { it == "DOWN" })
             assertEquals(samples, events.count { it == "UP" })
-            assertEquals(2, events.count { it == "OUTCOME_INFEASIBLE" })
+            assertEquals(2, events.count { it == "OUTCOME_PRUNED" })
         }
     }
 
     @Test
-    fun `unverified and abandoned children cannot supply infeasible outcomes`() {
-        for (action in listOf("unverified", "finish", "restart", "depth")) {
+    fun `unknown and abandoned children cannot supply prune outcomes`() {
+        for (action in listOf("unknown", "restart", "depth")) {
             val events = ArrayList<String>()
             val history = LpDirectionalHistory(events::add)
             history.beginNode(0)
@@ -62,15 +85,15 @@ class LpDirectionalHistoryTest {
             history.commit(SearchDecision.Bool(1), 1)
             history.beginNode(1)
             when (action) {
-                "unverified" -> history.infeasible()
-                "finish" -> history.finishNode()
+                "unknown" -> history.finishNode()
                 "restart" -> history.restart()
                 "depth" -> history.beginNode(2)
             }
 
-            history.infeasible(verified = true)
+            history.infeasible()
+        history.finishNode(true)
 
-            assertFalse("OUTCOME_INFEASIBLE" in events)
+            assertFalse("OUTCOME_PRUNED" in events)
         }
     }
 
@@ -92,12 +115,12 @@ class LpDirectionalHistoryTest {
         history.beginNode(1)
         recording = true
 
-        history.infeasible(verified = true)
+        history.infeasible()
+                history.finishNode(true)
 
         assertEquals(0, history.retainedEntries)
-        assertFalse("OUTCOME_INFEASIBLE" in events)
+        assertFalse("OUTCOME_PRUNED" in events)
     }
-
 
     @Test
     fun `restart retains samples but discards ancestor and pending child attribution`() {

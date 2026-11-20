@@ -326,7 +326,11 @@ finite search hints after cut re-solves. Only an optimal result supplies an
 objective sample; an unfinished cut solve keeps the preceding point, and cancellation
 withholds publication. Verified infeasibility callbacks carry the relaxation whose
 ray was checked, including cut re-solves, so finite history can validate its source
-scope without inventing an optimum. [Finite guidance](09-search.md#finite-lp-directional-guidance)
+scope without inventing an optimum. The node pass also reports its final source
+relaxation and whether LP bounding completed. A verified prune needs no optimum;
+an open outcome requires an optimal solve and completed cut work. Finite hints
+validate that scope against the final owner state and withhold outcomes on
+cancellation. Non-LP checks supply no such outcome. [Finite guidance](09-search.md#finite-lp-directional-guidance)
 owns selection and history lifetime.
 
 An exact state appending one bound copies only the changed side; tightening can

@@ -45,6 +45,8 @@ internal interface LpHintSink {
 
     fun recordInfeasible(relaxation: LpRelaxation? = null) {}
 
+    fun recordOutcome(pruned: Boolean?, relaxation: LpRelaxation?) {}
+
     /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)
 }

@@ -48,8 +48,14 @@ internal class LpHints(
     private var scopeConstant = 0L
     private var scopeCutoff = Double.NaN
     private var cutoff = Double.NaN
+    private var nodeStamp = 0L
+    private var pruningOutcome: Boolean? = null
+    private var pruningScope: LpRelaxation? = null
 
     fun beginNode(depth: Int, bound: Double) {
+        nodeStamp++
+        pruningOutcome = null
+        pruningScope = null
         clearPassivePoint()
         if (scopeModel != null) charge(1L)
         cutoff = bound
@@ -142,22 +148,62 @@ internal class LpHints(
             return
         }
         if (scopeModel !== model || scopeRows !== rows || cutoff != bound) return
-        history.infeasible(verified = true)
+        history.infeasible()
     }
 
-    fun finishNode(state: LpExactState? = null) {
+    override fun recordOutcome(pruned: Boolean?, relaxation: LpRelaxation?) {
+        if (!collect || !cutoff.isFinite()) return
+        val version = nodeStamp
+        charge(2L)
+        if (version != nodeStamp) return
+        pruningOutcome = pruned
+        pruningScope = relaxation
+    }
+
+    fun finishNode(state: LpExactState? = null, cancelled: ExecutionControl = ExecutionControl.Never) {
         passiveChoice?.clear()
         passiveCollection?.clear()
-        history.finishNode()
-        if (scopeModel == null || state == null) return
-        val difference = when {
-            scopeModel !== state.baseModel -> "INCOMPATIBLE_MODEL"
-            scopeRows !== state.rows -> "INCOMPATIBLE_ROWS"
+        val outcome = pruningOutcome
+        val relaxation = pruningScope
+        pruningOutcome = null
+        pruningScope = null
+        val model = scopeModel
+        val rows = scopeRows
+        val bound = cutoff
+        val version = nodeStamp
+        if (model == null || state == null) {
+            history.finishNode()
+            return
+        }
+        val ownerDifference = when {
+            model !== state.baseModel -> "INCOMPATIBLE_MODEL"
+            rows !== state.rows -> "INCOMPATIBLE_ROWS"
             else -> null
         }
+        if (ownerDifference != null) {
+            reportScopeDifference(ownerDifference)
+            resetHistory()
+            return
+        }
+        if (outcome != null && relaxation == null) {
+            reportScopeDifference("INCOMPATIBLE_MISSING_SCOPE")
+            resetHistory()
+            return
+        }
+        if (outcome == null || relaxation == null || cancelled()) {
+            history.finishNode()
+            return
+        }
+        charge(5L)
+        val exact = relaxation.model.exactState
+        val difference = if (exact == null) "INCOMPATIBLE_MISSING_SCOPE" else scopeDifference(relaxation, exact)
         if (difference != null) {
             reportScopeDifference(difference)
             resetHistory()
+            return
+        }
+        history.finishNode(outcome) {
+            !cancelled() && nodeStamp == version && scopeModel === model && scopeRows === rows && cutoff == bound
         }
     }
 
@@ -197,7 +243,7 @@ internal class LpHints(
     private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
         history.hasReliableHistory && passivePointCurrent()
 
-    val hasDirectionalCandidates: Boolean get() = hasDirectionalScore() && history.hasInfeasibleHistory
+    val hasDirectionalCandidates: Boolean get() = hasDirectionalScore() && history.hasPruningHistory
 
     private fun readyDirectionalScore(variable: VarRef): Double {
         charge(1L)
@@ -238,7 +284,7 @@ internal class LpHints(
                 stamp == solveStamp && passivePointCurrent()
         }
         charge(1L)
-        val reference = history.infeasibleDirections(baseline, value(baseline))
+        val reference = history.prunedDirections(baseline, value(baseline))
         if (!current()) return baseline.also { selected(null) }
         if (!reference.isFinite()) {
             observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
@@ -249,7 +295,7 @@ internal class LpHints(
         history.forEachCandidate(current) { variable ->
             if (available(variable)) {
                 val score = if (readyDirectionalScore(variable).isFinite())
-                    history.infeasibleDirections(variable, value(variable)) else Double.NaN
+                    history.prunedDirections(variable, value(variable)) else Double.NaN
                 val previous = proposal
                 val precedes = previous != null && if ((variable is VarRef.Bool) == (previous is VarRef.Bool))
                     variable.varId < previous.varId else variable is VarRef.Bool
@@ -287,9 +333,9 @@ internal class LpHints(
             reliable = {
                 charge(2L)
                 val numeric = history.score(proposal, proposed.point)
-                val gain = history.infeasibleDirections(proposal, proposed.point)
+                val gain = history.prunedDirections(proposal, proposed.point)
                 val baselineGain = if (proposal == baseline) gain
-                else history.infeasibleDirections(baseline, reference.point)
+                else history.prunedDirections(baseline, reference.point)
                 if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
                 history.hasReliableHistory && numeric.isFinite() && gain.isFinite() && baselineGain.isFinite() &&
                     (proposal == baseline || gain > baselineGain)
@@ -365,6 +411,9 @@ internal class LpHints(
     private var recorded = false
 
     fun restart() {
+        nodeStamp++
+        pruningOutcome = null
+        pruningScope = null
         clearPassivePoint()
         if (scopeModel != null) {
             charge(2L)
@@ -376,6 +425,9 @@ internal class LpHints(
     }
 
     fun resetHistory() {
+        nodeStamp++
+        pruningOutcome = null
+        pruningScope = null
         clearPassivePoint()
         if (scopeModel != null) {
             charge(2L)

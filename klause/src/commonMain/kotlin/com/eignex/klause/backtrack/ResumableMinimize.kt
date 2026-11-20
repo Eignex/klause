@@ -1689,7 +1689,7 @@ internal class ResumableMinimize(
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
                 singleObj?.ascending ?: true, deferSimplex = deferSimplex)
             lpEngine.fixingCutoff = Double.NaN
-            lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
+            lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState, params.cancellation)
             // Fixings read the incumbent's own cutoff, so only a prune whose bound stays below that cutoff relies on
             // the gap; it and everything learned from it hold only for points below the recorded bound.
             val gap = params.optimalityGap

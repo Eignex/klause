@@ -25,7 +25,32 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
-    fun `infeasible outcomes with missing or changed scope discard retained history`() {
+    fun `cancelled final publication discards a completed outcome`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val events = ArrayList<String>()
+        val hints = LpHints(1, 0, directionalGains = true, observe = events::add)
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+        hints.recordObjective(relaxation, 10.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(trail.state)
+        hints.branch(VarRef.IntVar(0))
+        hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
+        hints.beginNode(1, 100.0)
+        hints.recordOutcome(true, relaxation)
+
+        hints.finishNode(trail.state, ExecutionControl { true })
+        hints.finishNode(trail.state)
+
+        assertFalse("OUTCOME_PRUNED" in events)
+    }
+
+    @Test
+    fun `completed outcomes with missing or changed scope discard retained history`() {
         for (change in listOf("missing", "mapping", "constant", "cutoff")) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1L)
@@ -39,6 +64,8 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.branch(variable)
             repeat(2) {
                 for (up in listOf(false, true)) {
@@ -46,6 +73,8 @@ class LpHintsTest {
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
                     hints.recordObjective(relaxation, 12.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
@@ -59,14 +88,17 @@ class LpHintsTest {
                 else -> relaxation
             }
 
-            hints.recordInfeasible(changed)
+            hints.recordOutcome(true, changed)
+            hints.finishNode(relaxation.model.exactState)
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
 
             assertTrue(hints.directionalScore(variable).isNaN())
             assertEquals(1, events.count { it == "RESET" })
-            assertFalse("OUTCOME_INFEASIBLE" in events)
+            assertFalse("OUTCOME_PRUNED" in events)
         }
     }
 
@@ -88,17 +120,23 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), doubleArrayOf(0.0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 for ((decision, point, objective) in listOf(Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0))) {
                     hints.commit(decision, 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), doubleArrayOf(0.0))
                     hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), doubleArrayOf(0.0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             assertEquals(variable, hints.selectVariable(variable, variable))
             hints.branch(variable)
 
@@ -113,6 +151,8 @@ class LpHintsTest {
             hints.beginNode(0, if (change == "cutoff") 99.0 else 100.0)
             hints.record(current, doubleArrayOf(2.25), DoubleArray(current.model.m))
             hints.recordObjective(current, 10.0)
+            hints.recordOutcome(false, current)
+            hints.finishNode(current.model.exactState)
 
             if (change == "none") assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9)
             else assertTrue(hints.directionalScore(variable).isNaN())
@@ -139,17 +179,23 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 11.0))) {
                     hints.commit(decision, 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                     hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.finishNode(trail.state)
             assertEquals(variable, hints.selectVariable(variable, variable))
             hints.branch(variable)
@@ -175,10 +221,14 @@ class LpHintsTest {
             val hints = LpHints(width, 0, directionalGains = true, charge = { work += it })
             hints.beginNode(0, 100.0)
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             val rebound = relaxation.withModel(assertNotNull(trail.state.ownerWorkingModel()))
             val before = work
 
             hints.recordObjective(rebound, 10.0)
+            hints.recordOutcome(false, rebound)
+            hints.finishNode(rebound.model.exactState)
 
             costs.add(work - before)
         }
@@ -200,11 +250,15 @@ class LpHintsTest {
             val hints = LpHints(width, 0, directionalGains = true, charge = { work += it })
             hints.beginNode(0, 100.0)
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             val replacement = LpRelaxation(model, relaxation.colVarId.copyOf(), relaxation.colIsBool.copyOf(),
                 0L, relaxation.intColOf, relaxation.boolColOf)
             val before = work
 
             hints.recordObjective(replacement, 10.0)
+            hints.recordOutcome(false, replacement)
+            hints.finishNode(replacement.model.exactState)
 
             costs.add(work - before)
         }
@@ -231,17 +285,23 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 10.0))) {
                     hints.commit(decision, 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                     hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.finishNode(trail.state)
             val before = work
             hints.branch(variable)
@@ -277,6 +337,8 @@ class LpHintsTest {
                     hints.beginNode(0, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
                     hints.recordObjective(relaxation, 10.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                     hints.branch(variable)
                     val split = if (variable == baseline) 2L else 3L
                     for (up in listOf(false, true)) {
@@ -287,27 +349,37 @@ class LpHintsTest {
                         child[variable.varId] = if (up) split + 1.0 else split.toDouble()
                         hints.record(relaxation, child, DoubleArray(0))
                         hints.recordObjective(relaxation, if (variable == baseline) 10.0 else if (up) 13.0 else 11.0)
+                        hints.recordOutcome(false, relaxation)
+                        hints.finishNode(relaxation.model.exactState)
                     }
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             assertFalse(hints.hasDirectionalCandidates)
             assertEquals(baseline, hints.pickVariable(baseline, 1e-9, { true }, { false }))
             repeat(2) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(proposal)
                 hints.commit(SearchDecision.IntAtMost(1, 3L), 1)
                 hints.beginNode(1, 100.0)
                 hints.recordInfeasible(relaxation)
+                hints.recordOutcome(true, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.finishNode(trail.state)
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.finishNode(trail.state)
             assertTrue(hints.hasDirectionalCandidates)
             assertEquals(sqrt(3.0), hints.directionalScore(proposal), 1e-9)
@@ -342,17 +414,23 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.branch(proposal)
             for (up in listOf(false, true)) {
                 hints.commit(if (up) SearchDecision.IntAtLeast(1, 4) else SearchDecision.IntAtMost(1, 3), 1)
                 hints.beginNode(1, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
                 hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
             }
         }
         hints.beginNode(0, 100.0)
         hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
         hints.recordObjective(relaxation, 10.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(relaxation.model.exactState)
 
         for (reference in listOf(null, baseline)) {
             val selected = hints.selectVariable(proposal, reference)
@@ -382,6 +460,8 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.branch(variable)
             repeat(2) {
                 for (up in listOf(false, true)) {
@@ -395,12 +475,16 @@ class LpHintsTest {
                     hints.record(relaxation, DoubleArray(4) { if (it == column) if (up) 1.0 else 0.0 else 0.5 },
                         DoubleArray(0))
                     hints.recordObjective(relaxation, if (variable == baseline) 10.0 else 12.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             if (variable != baseline) repeat(2) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 hints.commit(when (variable) {
                     is VarRef.Bool -> SearchDecision.Bool(variable.varId * 2 + 1)
@@ -408,12 +492,16 @@ class LpHintsTest {
                 }, 1)
                 hints.beginNode(1, 100.0)
                 hints.recordInfeasible(relaxation)
+                hints.recordOutcome(true, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.finishNode(trail.state)
             }
         }
         hints.beginNode(0, 100.0)
         hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
         hints.recordObjective(relaxation, 10.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(relaxation.model.exactState)
         for ((unavailable, expected) in listOf(
             emptySet<VarRef>() to VarRef.Bool(0),
             setOf<VarRef>(VarRef.Bool(0)) to VarRef.Bool(1),
@@ -453,6 +541,8 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 repeat(2) {
                     for (up in listOf(false, true)) {
@@ -463,12 +553,16 @@ class LpHintsTest {
                             if (it == variable.varId) if (up) 1.0 else 0.0 else 0.5
                         }, DoubleArray(0))
                         hints.recordObjective(relaxation, if (variable == baseline) 10.0 else 12.0)
+                        hints.recordOutcome(false, relaxation)
+                        hints.finishNode(relaxation.model.exactState)
                     }
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             events.clear()
             selecting = true
 
@@ -498,12 +592,16 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.branch(proposal)
             for (up in listOf(false, true)) {
                 hints.commit(if (up) SearchDecision.IntAtLeast(1, 4L) else SearchDecision.IntAtMost(1, 3L), 1)
                 hints.beginNode(1, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
                 hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
             }
         }
         hints.beginNode(0, 100.0)
@@ -542,15 +640,21 @@ class LpHintsTest {
                     hints.beginNode(0, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                     hints.recordObjective(relaxation, 10.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                     hints.branch(variable)
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 val before = work
 
                 val score = if (primitive) hints.directionalScore(variable.varId, isBool = false)
@@ -655,11 +759,15 @@ class LpHintsTest {
         hints.beginNode(0, 100.0)
         hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
         hints.recordObjective(relaxation, 10.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(relaxation.model.exactState)
         hints.branch(VarRef.IntVar(0))
         hints.commit(SearchDecision.IntAtMost(0, 2), 1)
         hints.beginNode(1, 100.0)
         hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
         hints.recordObjective(relaxation, 11.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(relaxation.model.exactState)
         hints.finishNode()
         hints.resetHistory()
 
@@ -699,6 +807,8 @@ class LpHintsTest {
             val parent = relaxation()
             hints.record(parent, doubleArrayOf(2.25), DoubleArray(parent.model.m))
             hints.recordObjective(parent, 10.0)
+            hints.recordOutcome(false, parent)
+            hints.finishNode(parent.model.exactState)
             hints.branch(VarRef.IntVar(0))
             hints.commit(SearchDecision.IntAtMost(0, 2), 1)
             assertTrue(trail.push())
@@ -723,6 +833,8 @@ class LpHintsTest {
             hints.record(child, doubleArrayOf(2.0), DoubleArray(child.model.m))
 
             hints.recordObjective(child, 11.0)
+            hints.recordOutcome(false, child)
+            hints.finishNode(child.model.exactState)
 
             assertEquals(0, observations.count { it == "DOWN" }, change)
             assertEquals(listOf(reason), observations.filter { it.startsWith("INCOMPATIBLE_") }, change)
@@ -771,12 +883,16 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(VarRef.IntVar(0))
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
@@ -786,6 +902,8 @@ class LpHintsTest {
 
             if (change != "missing") {
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 if (change == "retire") {
                     assertTrue(trail.deactivate(setOf(0L)))
                 } else if (change == "cut") {
@@ -828,17 +946,23 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
 
             assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9, "constant=$constant")
         }

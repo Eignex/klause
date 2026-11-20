@@ -53,7 +53,7 @@ internal class LpDirectionalHistory(
     private var reliableStamp = -1L
     private var valueStamp = -1L
     private var collectionStamp = -1L
-    private var infeasibleStamp = -1L
+    private var prunedStamp = -1L
     private var observed = false
 
     fun beginNode(level: Int) {
@@ -72,7 +72,7 @@ internal class LpDirectionalHistory(
 
     val hasCollectionHistory: Boolean get() = collectionStamp >= 0L && stamp - collectionStamp <= maxAge
 
-    val hasInfeasibleHistory: Boolean get() = infeasibleStamp >= 0L && stamp - infeasibleStamp <= maxAge
+    val hasPruningHistory: Boolean get() = prunedStamp >= 0L && stamp - prunedStamp <= maxAge
 
     val hasObservations: Boolean get() = observed
 
@@ -103,7 +103,7 @@ internal class LpDirectionalHistory(
         reliableStamp = -1L
         valueStamp = -1L
         collectionStamp = -1L
-        infeasibleStamp = -1L
+        prunedStamp = -1L
         observed = false
         if (report) observe("RESET")
     }
@@ -115,13 +115,9 @@ internal class LpDirectionalHistory(
         val gain = value - child.parent.objective
         val normalized = gain / child.distance
         if (!gain.isFinite() || gain < 0.0 || !normalized.isFinite()) {
-            pendingOutcome = null
             observe("UNUSABLE")
             return
         }
-        val version = generation
-        recordOutcome(false)
-        if (version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
         expire(history.up)
@@ -244,43 +240,41 @@ internal class LpDirectionalHistory(
         pendingOutcome = pending
     }
 
-    fun infeasible(verified: Boolean = false) {
-        if (verified) recordOutcome(true) else pendingOutcome = null
+    fun infeasible() {
         if (pending != null) observe("INFEASIBLE")
         pending = null
     }
 
-    fun finishNode() {
+    fun finishNode(pruned: Boolean? = null, current: () -> Boolean = { true }) {
+        if (pruned != null && current()) recordOutcome(pruned, current)
         pendingOutcome = null
         if (pending != null) observe("MISSING")
         pending = null
     }
 
-    private fun recordOutcome(infeasible: Boolean) {
+    private fun recordOutcome(pruned: Boolean, current: () -> Boolean) {
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
-        charge(8L)
-        if (version != generation) return
+        charge(9L)
+        if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         val outcome = (if (child.up) history.up else history.down).outcome
         if (outcome.count > 0 && stamp - outcome.stamp > maxAge) outcome.count = 0
         else if (outcome.count >= RELIABILITY && stamp - outcome.previousStamp > maxAge) outcome.count = 1
         outcome.previous = outcome.latest
         outcome.previousStamp = outcome.stamp
-        outcome.latest = infeasible
+        outcome.latest = pruned
         outcome.stamp = stamp
         outcome.count = minOf(RELIABILITY, outcome.count + 1)
-        if (infeasible && outcome.count >= RELIABILITY && outcome.previous) {
-            charge(1L)
-            if (version != generation) return
-            infeasibleStamp = maxOf(infeasibleStamp, outcome.previousStamp)
-            observe("OUTCOME_INFEASIBLE_READY")
+        if (pruned && outcome.count >= RELIABILITY && outcome.previous) {
+            prunedStamp = maxOf(prunedStamp, outcome.previousStamp)
+            observe("OUTCOME_PRUNED_READY")
         }
-        observe(if (infeasible) "OUTCOME_INFEASIBLE" else "OUTCOME_OPTIMAL")
+        observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
     }
 
-    fun infeasibleDirections(variable: VarRef, value: Double): Double {
+    fun prunedDirections(variable: VarRef, value: Double): Double {
         val history = reliable(variable, value) ?: return Double.NaN
         val version = generation
         charge(8L)

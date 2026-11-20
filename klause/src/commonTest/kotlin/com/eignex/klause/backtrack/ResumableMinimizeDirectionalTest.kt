@@ -71,7 +71,7 @@ class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
                 assertTrue(slices > 1, diagnostic)
                 assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
                 assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-                assertTrue((observations["OUTCOME_OPTIMAL"] ?: 0L) >= 4L, diagnostic)
+                assertTrue((observations["OUTCOME_OPEN"] ?: 0L) >= 4L, diagnostic)
             }
         }
     }
