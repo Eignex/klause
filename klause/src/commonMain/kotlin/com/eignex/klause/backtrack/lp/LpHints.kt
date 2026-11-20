@@ -294,7 +294,8 @@ internal class LpHints(
                 stamp == solveStamp && passivePointCurrent()
         }
         if (preference != null) {
-            val advised = values.select(variable, pointValue, alternatives, preference, stamp, fresh = current)
+            val advised = values.select(variable, pointValue, alternatives, preference, stamp,
+                diagnostic = history.diagnosticIntent, fresh = current)
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives

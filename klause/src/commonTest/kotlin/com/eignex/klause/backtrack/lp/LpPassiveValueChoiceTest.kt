@@ -57,16 +57,19 @@ class LpPassiveValueChoiceTest {
                 var work = 0L
                 val choice = LpPassiveValueChoice(apply, events::add, { work += it })
 
-                val selected = choice.select(variable, point, ordinary, history.preferDirection(variable, point, 10.25), 7) { true }
+                val selected = choice.select(variable, point, ordinary, history.preferDirection(variable, point, 10.25), 7,
+                    diagnostic = history.diagnosticIntent) { true }
                 choice.commit(selected.first(), 7) { true }
                 choice.commit(selected.first(), 7) { true }
 
                 assertEquals(if (apply) ordinary.reversed() else ordinary, selected)
                 val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
                 assertEquals(1, events.count { it == event })
+                assertEquals(1, events.count { it == if (apply) "DIAGNOSTIC_CHANGED_PRUNE_LOWER"
+                    else "DIAGNOSTIC_WITHHELD_PRUNE_LOWER" })
                 costs.add(work)
             }
-            assertEquals(20L, costs.first())
+            assertEquals(36L, costs.first())
             assertEquals(costs.first(), costs.last())
         }
     }
@@ -95,7 +98,8 @@ class LpPassiveValueChoiceTest {
             val events = ArrayList<String>()
             val choice = LpPassiveValueChoice(true, events::add, { if (condition == "charge") fresh = false })
             val alternatives = listOf(down, up)
-            val selected = choice.select(variable, 2.25, alternatives, history.preferDirection(variable, 2.25, 10.25), 7) { fresh }
+            val selected = choice.select(variable, 2.25, alternatives, history.preferDirection(variable, 2.25, 10.25), 7,
+                diagnostic = history.diagnosticIntent) { fresh }
             if (condition == "commit") fresh = false
             if (condition == "clear") choice.clear()
 
@@ -103,6 +107,7 @@ class LpPassiveValueChoiceTest {
                 if (condition == "stamp") 8 else 7) { fresh }
 
             assertFalse("PASSIVE_VALUE_COMMITTED" in events, condition)
+            assertFalse(events.any { it.startsWith("DIAGNOSTIC_CHANGED_") }, condition)
             assertFalse(choice.hasNomination, condition)
         }
     }

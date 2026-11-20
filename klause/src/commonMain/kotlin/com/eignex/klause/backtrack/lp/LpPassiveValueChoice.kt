@@ -12,12 +12,14 @@ internal class LpPassiveValueChoice(
     private var nomination: SearchDecision? = null
     private var nominationStamp = -1
     private var changed = false
+    private var diagnosticIntent = 0
 
     val hasNomination: Boolean get() = nomination != null
 
     fun clear() {
         nomination = null
         changed = false
+        diagnosticIntent = 0
     }
 
     fun select(
@@ -26,10 +28,12 @@ internal class LpPassiveValueChoice(
         alternatives: List<SearchDecision>,
         preferUp: Boolean?,
         stamp: Int,
+        diagnostic: Int = 0,
         fresh: () -> Boolean,
     ): List<SearchDecision> {
         clear()
         if (alternatives.size != 2 || preferUp == null) return alternatives
+        if (diagnostic != 0) charge(8L)
         charge(16L)
         observe("PASSIVE_VALUE_CHECK")
         if (!fresh()) return alternatives.also { observe("PASSIVE_VALUE_STALE") }
@@ -55,6 +59,7 @@ internal class LpPassiveValueChoice(
         changed = proposal != alternatives.first()
         nomination = if (applyAdvice) proposal else alternatives.first()
         nominationStamp = stamp
+        diagnosticIntent = diagnostic
         observe("PASSIVE_VALUE_COMPARED")
         observe(if (changed) "PASSIVE_VALUE_PROPOSAL_CHANGED" else "PASSIVE_VALUE_PROPOSAL_AGREED")
         observe(if (applyAdvice) "PASSIVE_VALUE_CONSUMED" else "PASSIVE_VALUE_WITHHELD")
@@ -68,6 +73,8 @@ internal class LpPassiveValueChoice(
     fun commit(decision: SearchDecision, stamp: Int, fresh: () -> Boolean) {
         val expected = nomination ?: return
         charge(4L)
+        val intent = diagnosticIntent
+        if (intent != 0) charge(8L)
         observe("PASSIVE_VALUE_COMMIT_CHECK")
         val accepted = expected == decision && nominationStamp == stamp && fresh()
         val wasChanged = changed
@@ -76,6 +83,14 @@ internal class LpPassiveValueChoice(
         observe(if (applyAdvice) "PASSIVE_VALUE_COMMITTED" else "PASSIVE_VALUE_COMMIT_WITHHELD")
         if (wasChanged) observe(if (applyAdvice) "PASSIVE_VALUE_COMMIT_CHANGED"
         else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED")
+        if (wasChanged && intent != 0) observe(when (intent) {
+            1 -> if (applyAdvice) "DIAGNOSTIC_CHANGED_OPEN_LOWER" else "DIAGNOSTIC_WITHHELD_OPEN_LOWER"
+            2 -> if (applyAdvice) "DIAGNOSTIC_CHANGED_OPEN_HIGHER" else "DIAGNOSTIC_WITHHELD_OPEN_HIGHER"
+            3 -> if (applyAdvice) "DIAGNOSTIC_CHANGED_OPEN_EQUAL" else "DIAGNOSTIC_WITHHELD_OPEN_EQUAL"
+            4 -> if (applyAdvice) "DIAGNOSTIC_CHANGED_PRUNE_LOWER" else "DIAGNOSTIC_WITHHELD_PRUNE_LOWER"
+            5 -> if (applyAdvice) "DIAGNOSTIC_CHANGED_PRUNE_HIGHER" else "DIAGNOSTIC_WITHHELD_PRUNE_HIGHER"
+            else -> if (applyAdvice) "DIAGNOSTIC_CHANGED_PRUNE_EQUAL" else "DIAGNOSTIC_WITHHELD_PRUNE_EQUAL"
+        })
     }
 
     private companion object {

@@ -35,7 +35,10 @@ class LpDirectionalHistoryTest {
                     val preference = history.preferDirection(variable, 0.5, cutoff)
 
                     assertEquals(if (cutoff <= 13.0) prunedUp else !prunedUp, preference)
-                    assertEquals(32L, work - before)
+                    assertEquals(56L, work - before)
+                    assertEquals(if (cutoff <= 13.0) {
+                        if (prunedUp) 5 else 4
+                    } else if (prunedUp) 1 else 2, history.diagnosticIntent)
                 }
             }
         }
@@ -86,7 +89,7 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `reset during a charged preference lookup discards the result`() {
-        for (resetAt in 1..3) {
+        for (resetAt in 1..4) {
             var reading = false
             var reads = 0
             lateinit var history: LpDirectionalHistory

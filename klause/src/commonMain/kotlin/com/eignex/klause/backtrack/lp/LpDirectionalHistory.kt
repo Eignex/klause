@@ -51,6 +51,8 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    var diagnosticIntent = 0
+        private set
 
     fun beginNode(level: Int) {
         stamp++
@@ -87,6 +89,7 @@ internal class LpDirectionalHistory(
 
     fun clear(report: Boolean = true) {
         generation++
+        diagnosticIntent = 0
         charge(gains.size.toLong())
         gains.clear()
         trimParents(0)
@@ -237,6 +240,7 @@ internal class LpDirectionalHistory(
     }
 
     fun preferDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {
+        diagnosticIntent = 0
         val version = generation
         charge(8L)
         if (version != generation) return null
@@ -258,7 +262,28 @@ internal class LpDirectionalHistory(
             (downGain == 0.0 && history.down.gain > 0.0) ||
             (upGain == 0.0 && history.up.gain > 0.0)
         ) return null
-        return if (maxOf(downGain, upGain) >= gap) up > down else up < down
+        charge(24L)
+        if (version != generation) return null
+        val prune = maxOf(downGain, upGain) >= gap
+        val preferUp = if (prune) up > down else up < down
+        val preferredGain = if (preferUp) upGain else downGain
+        val otherGain = if (preferUp) downGain else upGain
+        val gainOrder = when {
+            preferredGain < otherGain -> 1
+            preferredGain > otherGain -> 2
+            else -> 3
+        }
+        diagnosticIntent = gainOrder + if (prune) 3 else 0
+        observe(when (diagnosticIntent) {
+            1 -> "DIAGNOSTIC_LOOKUP_OPEN_LOWER"
+            2 -> "DIAGNOSTIC_LOOKUP_OPEN_HIGHER"
+            3 -> "DIAGNOSTIC_LOOKUP_OPEN_EQUAL"
+            4 -> "DIAGNOSTIC_LOOKUP_PRUNE_LOWER"
+            5 -> "DIAGNOSTIC_LOOKUP_PRUNE_HIGHER"
+            else -> "DIAGNOSTIC_LOOKUP_PRUNE_EQUAL"
+        })
+        if (version != generation) return null
+        return preferUp
     }
 
     fun prunedDirections(variable: VarRef, value: Double): Double {
