@@ -324,6 +324,41 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `a selected eager endpoint should retain its grant beside an unselected wide source`() {
+        val width = 512
+        val native = PropagationSession(Problem(0, width + 4,
+            Array(width + 4) { index -> IntDomain(0, when (index) {
+                0 -> 6
+                1 -> 12
+                2 -> 24
+                3 -> 36
+                else -> 0
+            }) }, arrayOf(Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0))),
+            pbLearning = false).apply { enableIntegerRowLearning() }
+        val older = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 1) + IntArray(width) { it + 4 },
+            Array(width + 2) { bigIntOf(when (it) {
+                0 -> 2
+                1 -> -1
+                else -> 1
+            }) }, bigIntOf(0), useLo = true))
+        val newest = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 2, 3),
+            arrayOf(bigIntOf(2), bigIntOf(1), bigIntOf(-1)), bigIntOf(0), useLo = true))
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(older, 3))
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(newest, 3))
+        native.explanationState.arithmeticLearningLimits = ArithmeticLearningLimits(work = 512)
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(3, 11))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertContentEquals(intArrayOf(0, 1, 3), learned.row.variables)
+        assertContentEquals(longArrayOf(4, 1, -1), learned.row.coefficients.map { it.toLongExact() }.toLongArray())
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned))
+        assertEquals(1L, native.intDomain(0).max)
+    }
+
+    @Test
     fun `an alternative source should not bypass an unavailable mapped premise`() {
         val native = PropagationSession(Problem(2, 4,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 36)), arrayOf(
