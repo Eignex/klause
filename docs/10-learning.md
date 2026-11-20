@@ -429,6 +429,9 @@ Unsupported seed projection kinds keep their completed clausal analysis without
 constructing integer discovery state. A box reduction whose degree already covers
 every coefficient and needs no rounding retains its normalized row without rebuilding
 term storage.
+Coefficient reductions transfer their fresh coefficient array into the result and
+share the source row's immutable coordinate array. Source normalization still
+captures borrowed arrays before retaining them.
 
 Each combination must remain conflicting. A retained row must propagate against the
 session's historical domains at its first-UIP clause's native backjump and at the

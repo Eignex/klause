@@ -86,5 +86,5 @@ internal fun IntegerConflictRow.reduced(
         nextBound += contribution
         signed
     }
-    return IntegerConflictRow.source(variables, nextCoefficients, nextBound, useLo = true, guard, budget)
+    return withOwnedCoefficients(nextCoefficients, nextBound, budget)
 }

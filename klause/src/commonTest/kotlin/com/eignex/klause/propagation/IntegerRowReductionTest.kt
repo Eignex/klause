@@ -88,6 +88,20 @@ class IntegerRowReductionTest {
     }
 
     @Test
+    fun `saturation should normalize fresh coefficients without changing its source`() {
+        val row = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(-100), bigIntOf(-101)), bigIntOf(-2), useLo = true))
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+
+        val reduced = assertNotNull(row.reduced(state))
+
+        assertEquals(listOf(bigIntOf(-1), bigIntOf(-1)), reduced.coefficients.toList())
+        assertEquals(bigIntOf(-1), reduced.bound)
+        assertEquals(listOf(bigIntOf(-100), bigIntOf(-101)), row.coefficients.toList())
+        assertEquals(bigIntOf(-2), row.bound)
+    }
+
+    @Test
     fun `mixed integer rounding should strengthen a nonnegative cover`() {
         val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
             longArrayOf(-3, -2), intArrayOf(0, 1), LinearOp.LE, -4), useLo = true))

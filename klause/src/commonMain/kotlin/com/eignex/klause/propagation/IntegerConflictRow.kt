@@ -50,6 +50,23 @@ internal class IntegerConflictRow private constructor(
         return if (index < 0) BIG_ZERO else coefficients[index]
     }
 
+    fun withOwnedCoefficients(coefficients: Array<BigInt>, bound: BigInt,
+        budget: ArithmeticLearningBudget?): IntegerConflictRow {
+        require(coefficients.size == variables.size)
+        val divisor = coefficientDivisor(coefficients, coefficients.size, budget)
+        budget?.spend(work = variables.size.toLong(), bytes = 64)
+        for (index in coefficients.indices) {
+            require(coefficients[index] != BIG_ZERO)
+            budget?.scalar(coefficients[index], divisor)
+            if (divisor != BIG_ONE) coefficients[index] /= divisor
+        }
+        val normalizedBound = if (divisor == BIG_ONE) bound else {
+            budget?.scalar(bound, divisor)
+            floorDiv(bound, divisor)
+        }
+        return IntegerConflictRow(variables, coefficients, normalizedBound, guard)
+    }
+
     fun subsumes(other: IntegerConflictRow): Boolean =
         directionHash == other.directionHash &&
             (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&
@@ -295,12 +312,7 @@ internal class IntegerConflictRow private constructor(
         private fun normalizedSorted(variables: IntArray, coefficients: Array<BigInt>, size: Int,
             bound: BigInt, guard: Int, budget: ArithmeticLearningBudget?): IntegerConflictRow? {
             if (size == 0) return null
-            var divisor = BIG_ZERO
-            for (index in 0 until size) {
-                budget?.scalar(divisor, coefficients[index])
-                divisor = divisor.gcd(coefficients[index].abs())
-                if (divisor == BIG_ONE) break
-            }
+            val divisor = coefficientDivisor(coefficients, size, budget)
             budget?.spend(work = size.toLong(), bytes = size.toLong() * 16)
             if (divisor == BIG_ONE) {
                 for (index in 0 until size) budget?.scalar(coefficients[index], BIG_ONE)
@@ -312,6 +324,17 @@ internal class IntegerConflictRow private constructor(
             }
             budget?.scalar(bound, divisor)
             return IntegerConflictRow(variables.copyOf(size), normalized, floorDiv(bound, divisor), guard)
+        }
+
+        private fun coefficientDivisor(coefficients: Array<BigInt>, size: Int,
+            budget: ArithmeticLearningBudget?): BigInt {
+            var divisor = BIG_ZERO
+            for (index in 0 until size) {
+                budget?.scalar(divisor, coefficients[index])
+                divisor = divisor.gcd(coefficients[index].abs())
+                if (divisor == BIG_ONE) break
+            }
+            return divisor
         }
 
         internal fun endpoint(residual: BigInt, coefficient: BigInt): BigInt =
