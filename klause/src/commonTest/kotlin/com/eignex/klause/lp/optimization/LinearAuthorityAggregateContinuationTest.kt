@@ -23,6 +23,36 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateContinuationTest {
     @Test
+    fun `integer projection with integral rhs should retain endpoint half rounding`() {
+        val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val coefficients = listOf(3L, 3L, 2L, 2L).map(BigFraction::ofLong)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to coefficients[id].negated()), BigFraction.ZERO))
+            premises["lower $id"] = SourcePremise(SourceInequality(mapOf(integers[id] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+            premises["upper $id"] = SourcePremise(SourceInequality(mapOf(integers[id] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-4)))
+        val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+        val point = integers.zip(listOf(0.75, 0.0, 0.875, 0.0)).toMap() +
+            flows.zip(listOf(2.25, 0.0, 1.75, 0.0)).toMap()
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 5),
+            point = point).single()
+
+        assertEquals(SourceInequality(integers.zip(listOf(-1L, -2L, -1L, -1L).map(BigFraction::ofLong)).toMap(),
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `first integer projection should finish without reviving an eliminated flow coordinate`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val flows = (0 until 3).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
@@ -104,7 +134,7 @@ class LinearAuthorityAggregateContinuationTest {
 
     @Test
     fun `integer projection should cancel a coupled flow within its configured row limit`() {
-        for (count in listOf(4, 8, 15)) {
+        for ((count, strict) in listOf(4, 8, 15).flatMap { count -> listOf(count to false, count to true) }) {
             val scale = BigFraction.ofLong(if (count == 4) 1L else 1_000_000_000_000L)
             val integers = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
             val flows = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
@@ -115,7 +145,7 @@ class LinearAuthorityAggregateContinuationTest {
                     integers[id] to rowScale * BigFraction.ofLong(-2)), BigFraction.ZERO))
             }
             premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { scale.negated() },
-                scale * BigFraction.ofLong(1L - 2L * count)))
+                scale * BigFraction.ofLong((if (strict) 2L else 1L) - 2L * count), strict))
             val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
             val point = integers.associateWith { 1.0 - 0.5 / count } + flows.associateWith { 2.0 - 1.0 / count }
             for (rows in listOf(count, count + 1)) {
@@ -147,7 +177,8 @@ class LinearAuthorityAggregateContinuationTest {
             BigFraction.ofLong(-7)))
         val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
         val point = integers.associateWith { 0.875 } + flows.associateWith { 1.75 }
-        for (boundary in listOf("AggregateIntegerProjectionAttempts", "AggregateIntegerProjectionRows")) {
+        for (boundary in listOf("AggregateIntegerProjectionAttempts", "AggregateIntegerProjectionRows",
+            "AggregateIntegerProjectionCompleted")) {
             var stopped = false
 
             val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },

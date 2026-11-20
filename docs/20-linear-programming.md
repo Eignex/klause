@@ -589,8 +589,10 @@ at 16,384 work and 256 KiB, for integer-only projections through at most sixteen
 original rows. Fractional integer coordinates order up to eight starting rows, and
 at most two separating projections survive. Exact positive coefficient ratios cancel
 continuous coordinates without repeatedly scaling the existing combination.
-Intermediate coefficients accumulate one source row at a time; a completed integer
-projection is rebuilt from its original premises before rounding and verification.
+Exact coefficients, right-hand side and strictness accumulate one source row at a time.
+A completed integer projection normalizes this owned aggregate and constructs its proof
+from every original weighted premise; source verification reconstructs the combination
+before any certified use.
 Integer projection prioritizes rows that avoid reviving canceled continuous coordinates,
 then those opposing more active coordinates and introducing fewer. It skips an inverse
 source pair whose cancellation only adds a nonnegative constant.

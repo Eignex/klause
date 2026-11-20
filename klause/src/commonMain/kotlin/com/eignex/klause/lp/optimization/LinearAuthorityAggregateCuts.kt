@@ -999,6 +999,9 @@ internal object LinearAuthorityAggregateCuts {
                 it.addAll(seedCoefficients)
             }
             val aggregate = LinkedHashMap(initial)
+            var rhs = BigFraction.ZERO
+            for (term in seed) rhs = meter.add(rhs, meter.multiply(term.weight, meter.number(term.inequality.rhs)))
+            var strict = seed.any { it.inequality.strict }
             val support = HashSet<SourceCoordinate>()
             fun retainSupport(row: Map<SourceCoordinate, BigFraction>) {
                 for (id in row.keys) {
@@ -1022,17 +1025,22 @@ internal object LinearAuthorityAggregateCuts {
                 retainSupport(next.row.coefficients)
                 for ((id, value) in next.row.coefficients) {
                     meter.reserve(1L, if (id in aggregate) 0L else 64L)
-                    val updated = meter.add(aggregate[id] ?: BigFraction.ZERO, meter.multiply(value, weight))
+                    val updated = meter.add(aggregate[id] ?: BigFraction.ZERO,
+                        meter.multiply(meter.number(value), weight))
                     if (updated.isZero) aggregate.remove(id) else aggregate[id] = updated
                 }
+                rhs = meter.add(rhs, meter.multiply(weight, meter.number(next.row.term.inequality.rhs)))
+                strict = strict || next.row.term.inequality.strict
                 capture.coefficients = aggregate
                 capture.integer = null
                 observe("AggregateIntegerProjectionRows", 1L)
                 meter.reserve(aggregate.size.toLong())
                 if (aggregate.keys.any { it.kind == SourceCoordinate.Kind.Real }) continue
                 observe("AggregateIntegerProjectionCompleted", 1L)
-                val cut = deriveWithCoefficients(terms, cancellation, charge, limits, allowMixed = false,
-                    continuousBounds = emptyMap(), coefficientSnapshots = snapshots, capture = capture)
+                if (aggregate.isEmpty()) return null
+                val proofBytes = aggregateProofBytes(terms, meter, limits)
+                val cut = finalizeIntegerAggregate(terms, aggregate, rhs, strict, proofBytes,
+                    meter, limits, observe, capture)
                 if (cut != null && separates(cut, point, meter, observe) == true) return cut
             }
         }
