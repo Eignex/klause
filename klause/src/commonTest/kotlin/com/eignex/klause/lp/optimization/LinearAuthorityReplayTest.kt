@@ -57,6 +57,34 @@ class LinearAuthorityReplayTest {
     )
 
     @Test
+    fun `an exact conflict fallback should preserve a selected recipe when its proof is unavailable`() {
+        val restricted = SourceProofContext(source.scope, source.coordinates, source.premises +
+            ("sum upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                BigFraction.ofLong(3) * half))), source.objective)
+        var proof: SourceDerivation = SourceDerivation.Combination(cuts.map {
+            SourceDerivation.Combination.Term(BigFraction.ONE, it.derivation)
+        })
+        // The cut fits the proof depth limit; its surrounding refutation does not.
+        repeat(123) {
+            proof = SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(BigFraction.ONE, proof)))
+        }
+        val cut = LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+            proof, owners = setOf(0, 1, 2, 3), family = CutFamily.SOURCE_AGGREGATION)
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(listOf(cut))
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        assertEquals(1L, result.primalStages["ConflictExactFallback"])
+        assertNull(result.evidence)
+        assertNull(result.incumbent)
+        assertNull(result.split)
+    }
+
+    @Test
     fun `replay masks should target supplied captured cuts after their owner closes`() {
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {
