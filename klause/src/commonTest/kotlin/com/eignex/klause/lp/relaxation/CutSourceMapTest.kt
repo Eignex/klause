@@ -92,6 +92,7 @@ class CutSourceMapTest {
         assertFalse(source.isActive(strong))
         assertEquals(tight.epoch + 1, loose.epoch)
     }
+
     @Test
     fun `active fixed facts remain available without separate bounds`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)
@@ -233,5 +234,4 @@ class CutSourceMapTest {
             assertFalse(root.isActive(CutPremise.Bound(expression, false, BigFraction.ofLong(3L))))
         }
     }
-
 }
