@@ -70,6 +70,10 @@ internal object LinearAuthorityAggregateCuts {
             }
             val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
             val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>()
+            val integerSingletons = if (point == null) null else {
+                meter.reserve(source.premiseCount.toLong(), 128L + source.premiseCount * 8L)
+                arrayOfNulls<SourceCoordinate>(source.premiseCount)
+            }
             var ordinal = 0
             source.forEachPremise { name, premise ->
                 val owner = ordinal++
@@ -84,6 +88,10 @@ internal object LinearAuthorityAggregateCuts {
                 val coefficients = term.inequality.coefficients
                 if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) return@forEachPremise
                 val row = ProbeRow(term, coefficients)
+                if (integerSingletons != null && coefficients.size == 1) {
+                    meter.reserve(1L)
+                    integerSingletons[owner] = row.firstInteger
+                }
                 if (row.realCount == 0) {
                     if (integerRows != null && row.hasInteger && coefficients.size > 1) {
                         if (integerRows.size < AggregationMirSeparator.MAX_ROWS) {
@@ -114,6 +122,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
             }
+            if (integerSingletons != null) observe("AggregateIntegerBoundSnapshotComplete", 1L)
             if (point != null) orderPointRows(rows, incidence, point, meter, observe, source)
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
@@ -134,7 +143,7 @@ internal object LinearAuthorityAggregateCuts {
             val selectedBounds = if (point == null) bounds else pointBounds(bounds, point, meter, observe)
             val integerBounds = if (point == null) null else {
                 meter.reserve(1L, 64L)
-                IntegerBoundIndex(source)
+                IntegerBoundIndex(source, integerSingletons)
             }
             val extension = if (point == null) null else {
                 meter.reserve(1L, 320L)

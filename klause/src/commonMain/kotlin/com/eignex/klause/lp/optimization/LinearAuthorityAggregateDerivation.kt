@@ -174,13 +174,15 @@ internal class IntegerBound(
     val identityBytes: Long,
 )
 
-internal class IntegerBoundIndex(private val source: SourceProofContext) {
+internal class IntegerBoundIndex(
+    private val source: SourceProofContext, knownSingletons: Array<SourceCoordinate?>? = null,
+) {
     private class CompletedBatch(
         val coordinates: Set<SourceCoordinate>,
         val bounds: Map<Pair<SourceCoordinate, Boolean>, IntegerBound>,
     )
     private var completed: MutableList<CompletedBatch>? = null
-    private var singletonCoordinates: Array<SourceCoordinate?>? = null
+    private var singletonCoordinates: Array<SourceCoordinate?>? = knownSingletons
 
     fun prepare(
         coefficients: Map<SourceCoordinate, BigFraction>, meter: AggregateMeter,

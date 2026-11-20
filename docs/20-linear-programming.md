@@ -592,7 +592,8 @@ continuous coordinates without repeatedly scaling the existing combination.
 Exact coefficients, right-hand side and strictness accumulate one source row at a time.
 A completed integer projection normalizes this owned aggregate and constructs its proof
 from every original weighted premise; source verification reconstructs the combination
-before any certified use.
+before any certified use. Integer endpoint discovery reuses unary-coordinate metadata
+captured by the source-row pass.
 Integer projection prioritizes rows that avoid reviving canceled continuous coordinates,
 then those opposing more active coordinates and introducing fewer. It skips an inverse
 source pair whose cancellation only adds a nonnegative constant.
