@@ -45,7 +45,10 @@ class LinearIncumbentExchangeTest : RuntimeInitializedTest() {
         var claims = 0
         var paused = false
         assertNotNull(LinearIncumbentExchange.prepare(source, center, budget, ExecutionControl.Never,
-            claim = { claims++; true }, observe = { stage, _ -> if (stage == "Attempts") paused = true }))
+            claim = {
+                claims++
+                true
+            }, observe = { stage, _ -> if (stage == "Attempts") paused = true }))
             .use { exchange ->
                 assertNull(exchange.advance(ExecutionControl { paused }))
                 assertEquals(1, claims)
@@ -80,7 +83,10 @@ class LinearIncumbentExchangeTest : RuntimeInitializedTest() {
             var claims = 0
 
             val point = assertNotNull(LinearIncumbentExchange.prepare(query, center, budget,
-                ExecutionControl.Never, claim = { claims++; true }, observe = { _, _ -> }).use { exchange ->
+                ExecutionControl.Never, claim = {
+                    claims++
+                    true
+                }, observe = { _, _ -> }).use { exchange ->
                 assertNotNull(exchange).advance(ExecutionControl.Never)
             })
 
