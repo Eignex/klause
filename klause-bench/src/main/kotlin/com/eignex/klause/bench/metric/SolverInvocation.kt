@@ -659,6 +659,7 @@ internal object SolverInvocation {
             exactObjective = exactObjective.toString(),
             continuousObjective = continuousObjective,
             elapsedMs = kv["time"]?.toLongOrNull() ?: return null,
+            privateIncumbentReuse = kv["privateIncumbentReuse"] == "true",
         )
     }
 
@@ -724,6 +725,7 @@ internal data class Attribution(
     val continuousObjective: Double? = null,
     val elapsedMs: Long,
     val processElapsedMs: Long? = null,
+    val privateIncumbentReuse: Boolean = false,
 )
 
 internal fun solveTimeMs(stats: Map<String, String>): Long? = stats["solveTime"]?.toDoubleOrNull()
