@@ -503,8 +503,33 @@ internal class LiveQfLraSystem(
     }
 
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
-        val expression = sourceTerms(atom) ?: return false
-        return assertTerms(SmtTermKey.of(expression), atom.upper, atom.threshold, atom.strict, premise)
+        val terms = atom.terms
+        val columns = IntArray(terms.size)
+        val coefficients = MutableList(terms.size) { BigFraction.ZERO }
+        // Canonical source terms sort each typed segment; LP columns place real coordinates first.
+        var real = 0
+        var integer = terms.count { it.source is SearchRealValue }
+        for (term in terms) {
+            val index: Int
+            val column = when (val key = term.source) {
+                is SearchIntValue -> {
+                    if (key.variable !in 0 until source.numIntVars) return false
+                    index = integer++
+                    source.numRealVars + key.variable
+                }
+
+                is SearchRealValue -> {
+                    if (key.variable !in 0 until source.numRealVars) return false
+                    index = real++
+                    key.variable
+                }
+
+                else -> return false
+            }
+            columns[index] = column
+            coefficients[index] = term.coefficient
+        }
+        return assertTerms(SmtTermKey(columns, coefficients), atom.upper, atom.threshold, atom.strict, premise)
     }
 
     fun sourceTerms(atom: SourceBoundAtom): Map<Int, BigFraction>? {
