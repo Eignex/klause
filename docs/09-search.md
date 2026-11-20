@@ -374,6 +374,7 @@ ordinary reduced-cost/fractionality variable selection. Reliable directional
 outcomes only order the selected variable's two existing adjacent alternatives.
 Both directions need two independently aged finite normalized gains within a
 factor of two, each paired with a known completed LP-assisted pruning outcome.
+All four samples must come from branches at the current parent decision depth.
 The two outcomes in each direction must agree. A repeated zero gain is stable
 only when both numeric observations are zero. The child that repeatedly pruned
 is visited first when the other direction repeatedly returned without pruning.
@@ -411,7 +412,8 @@ The same opt-in path can visit an under-observed child first to collect missing
 passive information under the finite cutoff. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
 around its fresh fractional LP point. The more observed side must have a stable
-positive estimate from two in-age observations, each paired with a known completed
+positive estimate from two in-age observations at the current parent depth,
+each paired with a known completed
 pruning outcome. Both outcomes must indicate pruning; the opposite direction may
 have no sample. A scope-wide availability
 stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions

@@ -11,6 +11,56 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `pruning advice requires every numeric sample to match the current parent depth`() {
+        for (condition in listOf("same", "other", "mixed")) {
+            val history = LpDirectionalHistory({}, sameParentDepth = true)
+            val variable = VarRef.Bool(0)
+            repeat(2) { repetition ->
+                for (up in listOf(false, true)) {
+                    val parent = if (condition == "other" || (condition == "mixed" && repetition == 1 && up)) 1 else 0
+                    history.beginNode(parent)
+                    history.record(10.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), parent + 1)
+                    history.beginNode(parent + 1)
+                    history.record(12.0)
+                    history.finishNode(up)
+                }
+            }
+            history.beginNode(0)
+            history.record(10.0)
+
+            val estimate = history.pruningEstimate(variable, 0.5)
+
+            if (condition == "same") assertEquals(1.0, estimate) else assertTrue(estimate.isNaN())
+        }
+    }
+
+    @Test
+    fun `collection support at another parent depth cannot grant a missing direction`() {
+        for (parent in listOf(0, 1)) {
+            val history = LpDirectionalHistory({}, sameParentDepth = true)
+            val variable = VarRef.Bool(0)
+            repeat(2) {
+                history.beginNode(parent)
+                history.record(10.0)
+                history.branch(variable, 0.5)
+                history.commit(SearchDecision.Bool(1), parent + 1)
+                history.beginNode(parent + 1)
+                history.record(12.0)
+                history.finishNode(true)
+            }
+            history.beginNode(0)
+            history.record(10.0)
+
+            val preferred = history.preferUnderObservedDirection(variable, 0.5, requirePruning = true)
+
+            assertEquals(if (parent == 0) true else null, preferred)
+            assertTrue(history.hasPruningCollectionHistory)
+        }
+    }
+
+    @Test
     fun `pruning collection requires two known pruning outcomes on the sampled side`() {
         for (outcome in listOf<Boolean?>(true, false, null)) {
             val history = LpDirectionalHistory({})

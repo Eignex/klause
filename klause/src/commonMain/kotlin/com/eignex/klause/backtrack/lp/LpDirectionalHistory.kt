@@ -10,6 +10,7 @@ internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
+    private val sameParentDepth: Boolean = false,
 ) {
     private class Direction {
         var count = 0
@@ -19,6 +20,8 @@ internal class LpDirectionalHistory(
         var previousStamp = 0L
         var latestPruned = -1
         var previousPruned = -1
+        var parentDepth = -1
+        var previousParentDepth = -1
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -121,6 +124,11 @@ internal class LpDirectionalHistory(
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
+        if (sameParentDepth) {
+            charge(2L)
+            direction.previousParentDepth = direction.parentDepth
+            direction.parentDepth = child.depth - 1
+        }
         if (retainOutcome) {
             charge(3L)
             direction.previousPruned = direction.latestPruned
@@ -306,6 +314,10 @@ internal class LpDirectionalHistory(
         expire(history.down)
         expire(history.up)
         if (!history.down.stable || !history.up.stable) return null
+        if (sameParentDepth) {
+            charge(4L)
+            if (!history.down.matchesDepth() || !history.up.matchesDepth()) return null
+        }
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         return history
@@ -322,12 +334,18 @@ internal class LpDirectionalHistory(
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
         if (!sampledDirection.stable || (requirePruning && sampledDirection.pruning != 1)) return null
+        if (sameParentDepth) {
+            charge(2L)
+            if (!sampledDirection.matchesDepth()) return null
+        }
         if (sampledDirection.gain <= 0.0) {
             observe("PASSIVE_COLLECTION_ZERO_GAIN")
             return null
         }
         return history.up.count < history.down.count
     }
+
+    private fun Direction.matchesDepth(): Boolean = parentDepth == depth && previousParentDepth == depth
 
     private fun expire(direction: Direction) {
         if (direction.count > 0 && stamp - direction.stamp > maxAge) {

@@ -31,7 +31,7 @@ internal class LpHints(
     private val applyAdvice: Boolean = true,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe, charge = charge)
+    private val history = LpDirectionalHistory(observe, charge = charge, sameParentDepth = true)
     private val passiveChoice = if (collect) LpPassiveVariableChoice(false, observe, charge) else null
     private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
     private val passiveCollection = if (collect) LpPassiveCollection(observe, charge, requirePruning = true) else null
