@@ -21,6 +21,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
@@ -34,6 +35,35 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioWorkerTest {
+    @Test
+    fun `objective conversion should retain callback candidate statistics across slice entry points`() {
+        val stats = SolveStats.EMPTY.copy(smt = SolveStats.EMPTY.smt.copy(
+            completeSearchStages = mapOf("incumbentReusePrivateCandidate" to 1L)))
+        val point = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(3)), 3.0, stats = stats)
+        for (entry in listOf("slice", "instructions", "scheduled")) {
+            val child = TrackingResumableSearch(point, point)
+            val worker = PortfolioWorker.ofMinimize("private", 0, resumable = { child }) { _, _, _, _ ->
+                sequenceOf(point)
+            }.objectiveCoordinateProposals(ModelIdentity.of(Any())) {
+                MinimizeResult.BestFound(it, 6.0, TerminationReason.SearchExhausted)
+            }
+            val points = mutableListOf<MinimizeResult.WithSample>()
+
+            assertNotNull(worker.newResumableSearch { 0.0 }).use { handle ->
+                when (entry) {
+                    "slice" -> handle.runSlice(ExecutionControl.Never, 1L, 17L, points::add)
+                    "instructions" -> assertIs<InstructionSlicedSearch>(handle).runInstructionSlice(
+                        ExecutionControl.Never, 1L, 17L, points::add)
+                    else -> assertIs<InstructionSlicedSearch>(handle).runScheduledSlice(
+                        ExecutionControl.Never, 1L, 17L, 17L, 1.0, points::add)
+                }
+            }
+
+            assertEquals(stats, points.single().stats, entry)
+            assertEquals(6.0, points.single().objective, entry)
+        }
+    }
+
     @Test
     fun `objective coordinate search should preserve instruction slices and continuation guards`() {
         val point = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(3)), 3.0)

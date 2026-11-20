@@ -53,7 +53,7 @@ class LpHintsTest {
 
             assertEquals(if (bound.isFinite()) 9L else 0L, work - sampled)
             assertEquals(if (bound.isFinite()) 1 else 0, events.count { it == "PRUNING_SAMPLE_PRUNED" })
-            assertEquals(1, events.count { it == "DOWN" })
+            assertEquals(if (bound.isFinite()) 1 else 0, events.count { it == "DOWN" })
         }
     }
 
@@ -392,7 +392,12 @@ class LpHintsTest {
 
     @Test
     fun `directional scoring skips lookup work until both directions have enough samples`() {
-        for (prefix in listOf(listOf(false, false), listOf(false, true))) {
+        for ((prefix, primitive) in listOf(
+            listOf(false, false) to false,
+            listOf(false, false) to true,
+            listOf(false, true) to false,
+            listOf(false, true) to true,
+        )) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -419,7 +424,8 @@ class LpHintsTest {
                 hints.recordObjective(relaxation, 10.0)
                 val before = work
 
-                val score = hints.directionalScore(variable)
+                val score = if (primitive) hints.directionalScore(variable.varId, isBool = false)
+                else hints.directionalScore(variable)
 
                 if (phase == 0) {
                     assertTrue(score.isNaN())

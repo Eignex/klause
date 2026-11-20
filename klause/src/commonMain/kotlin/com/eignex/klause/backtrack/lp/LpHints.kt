@@ -59,11 +59,12 @@ internal class LpHints(
         freshRecord = false
         objectiveRecorded = false
         directionalChoice = null
-        if (collect) history.beginNode(depth)
+        if (collect && bound.isFinite()) history.beginNode(depth)
+        else if (scopeModel != null) resetHistory()
     }
 
     override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
-        if (passiveChoice != null) {
+        if (passiveChoice != null && cutoff.isFinite()) {
             charge(2L)
             observe("PASSIVE_VARIABLE_OPTIMUM_CHECK")
             passiveChoice.clear()
@@ -71,7 +72,7 @@ internal class LpHints(
             passiveCollection?.clear()
             passiveState = null
         }
-        if (!collect || relaxation.colVarId.size > 8192) return
+        if (!collect || !cutoff.isFinite() || relaxation.colVarId.size > 8192) return
         val state = relaxation.model.exactState ?: return
         charge(5L)
         val difference = scopeDifference(relaxation, state)
@@ -188,8 +189,19 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains || !objectiveRecorded || !history.hasPruningHistory) return Double.NaN
-        if (!passivePointCurrent()) return Double.NaN
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(variable)
+    }
+
+    fun directionalScore(varId: Int, isBool: Boolean): Double {
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(if (isBool) VarRef.Bool(varId) else VarRef.IntVar(varId))
+    }
+
+    private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
+        cutoff.isFinite() && history.hasPruningHistory && passivePointCurrent()
+
+    private fun readyDirectionalScore(variable: VarRef): Double {
         charge(1L)
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)
@@ -271,7 +283,7 @@ internal class LpHints(
         values.clear()
         collection.clear()
         val valueReady = cutoff.isFinite() && history.hasPruningHistory
-        val collectReady = cutoff > Double.NEGATIVE_INFINITY && collection.available && history.hasCollectionHistory
+        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
         if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
         ) return alternatives
@@ -364,7 +376,7 @@ internal class LpHints(
      * ([branchScore]) selection, never feasibility or the optimum.
      */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
-        if (passiveChoice != null) {
+        if (passiveChoice != null && cutoff.isFinite()) {
             charge(2L)
             observe("PASSIVE_VARIABLE_POINT")
             passiveChoice.clear()
