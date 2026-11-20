@@ -1,6 +1,8 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.MAX_SCALAR_COLUMN_ENTRIES
 import com.eignex.koblas.DenseVector
+import com.eignex.koblas.KoblasEngine
 import com.eignex.koblas.koblas
 
 internal class SimplexBasicValues {
@@ -98,7 +100,8 @@ internal class SimplexBasicValues {
             val change = workspace.boundChange
             solve(rhs, change)
             work.add(m)
-            koblas.axpy(1.0, DenseVector.wrap(change, size = m), DenseVector.wrap(out, size = m))
+            val engine = if (m <= MAX_SCALAR_COLUMN_ENTRIES) KoblasEngine.scalar else koblas
+            engine.axpy(1.0, DenseVector.wrap(change, size = m), DenseVector.wrap(out, size = m))
         }
         return out.all { it.isFinite() }
     }
