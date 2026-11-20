@@ -552,6 +552,8 @@ Installed selected aggregate cuts also test the node's active unary source sides
 receiving bounds before another numerical query. Up to two checked integer projection
 candidates can be selected for this conditional check while excluded from LP installation;
 their source owners must be active, and candidate retirement disables their checks.
+Conditional candidates do not consume the mixed-row continuation allowance reserved
+for extending the pool after an LP-separating candidate has been retained.
 A conditional-only pool retains the ordinary LP mask and the paid base result for later
 receiving queries. Its family follows the same aging and retirement as other candidates.
 A violated row supplies a nonnegative

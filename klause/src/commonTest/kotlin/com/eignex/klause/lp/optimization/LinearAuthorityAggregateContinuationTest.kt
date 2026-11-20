@@ -48,6 +48,39 @@ class LinearAuthorityAggregateContinuationTest {
     }
 
     @Test
+    fun `conditional projections should leave continuation for a separating source cut`() {
+        val integers = (10 until 14).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (10 until 14).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["loose demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-7) * BigFraction.ofLong(2).reciprocal()))
+        premises["left"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+            x to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        premises["right"] = SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+            y to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        premises["demand"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+            otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)))
+        val source = SourceProofContext(scope, (integers + flows + listOf(x, y, real, otherReal)).toSet(), premises)
+        val point = integers.associateWith { 0.6 } + flows.associateWith { 1.2 } +
+            mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5)
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 8, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16),
+            point = point)
+
+        assertTrue(cuts.any { it.conditionalCandidate })
+        val separating = cuts.single { !it.conditionalCandidate && it.inequality == SourceInequality(
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)) }
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(separating.inequality), separating.derivation)))
+    }
+
+    @Test
     fun `integer projection with integral rhs should retain endpoint half rounding`() {
         val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }

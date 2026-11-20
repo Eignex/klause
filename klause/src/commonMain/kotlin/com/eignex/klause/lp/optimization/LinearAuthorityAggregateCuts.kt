@@ -182,6 +182,8 @@ internal object LinearAuthorityAggregateCuts {
                 }
             }
             val projectedInteger = candidates.size > beforeProjection
+            meter.reserve(candidates.size.toLong())
+            var separationRetained = candidates.any { !it.conditionalCandidate }
             for (row in rows) {
                 meter.reserve(1L)
                 if (!row.hasInteger) continue
@@ -216,7 +218,7 @@ internal object LinearAuthorityAggregateCuts {
                                 continue
                             }
                             if (!separating) {
-                                if (candidates.isNotEmpty()) {
+                                if (separationRetained) {
                                     if (retainedContinuationUsed) continue
                                     retainedContinuationUsed = true
                                     continuedAfterRetention = true
@@ -234,6 +236,7 @@ internal object LinearAuthorityAggregateCuts {
                         }
                         meter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
                         candidates += retained
+                        separationRetained = separationRetained || !retained.conditionalCandidate
                     }
                 }
             }
