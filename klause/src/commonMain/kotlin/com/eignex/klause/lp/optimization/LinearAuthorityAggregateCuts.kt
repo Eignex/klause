@@ -507,7 +507,7 @@ internal object LinearAuthorityAggregateCuts {
                 var first: ProbeRow? = null
                 var selected: ProbeRow? = null
                 var best = Double.POSITIVE_INFINITY
-                var bestGrowth = Int.MAX_VALUE
+                var bestRank = Long.MIN_VALUE
                 for (other in incidence[id to (value < BigFraction.ZERO)].orEmpty()) {
                     meter.reserve(1L + terms.size)
                     if (other.coefficients.size <= 1 || terms.any { it.owner == other.term.owner }) continue
@@ -522,15 +522,15 @@ internal object LinearAuthorityAggregateCuts {
                         continue
                     }
                     if (first == null) first = other
-                    val growth = if (integerProjection) introducedReal(other, aggregate) else 0
+                    val rank = if (integerProjection) projectionRank(other, aggregate) else 0L
                     val score = continuationScore(other, pivot)
                     if (score == null) {
                         observe("AggregateContinuationPointUnavailable", 1L)
                     } else {
                         observe("AggregateContinuationScored", 1L)
-                        if (growth < bestGrowth || (growth == bestGrowth && score < best)) {
+                        if (rank > bestRank || (rank == bestRank && score < best)) {
                             best = score
-                            bestGrowth = growth
+                            bestRank = rank
                             selected = other
                         }
                     }
@@ -578,13 +578,19 @@ internal object LinearAuthorityAggregateCuts {
             return false
         }
 
-        private fun introducedReal(row: ProbeRow, aggregate: Map<SourceCoordinate, BigFraction>): Int {
-            var count = 0
-            for (id in row.coefficients.keys) {
+        private fun projectionRank(row: ProbeRow, aggregate: Map<SourceCoordinate, BigFraction>): Long {
+            var introduced = 0
+            var opposed = 0
+            for ((id, value) in row.coefficients) {
                 meter.reserve(1L)
-                if (id.kind == SourceCoordinate.Kind.Real && id !in aggregate) count++
+                if (id.kind != SourceCoordinate.Kind.Real) continue
+                val current = aggregate[id]
+                if (current == null) introduced++ else {
+                    meter.reserve(2L)
+                    if ((current < BigFraction.ZERO) != (value < BigFraction.ZERO)) opposed++
+                }
             }
-            return count
+            return opposed.toLong() * (limits.support.toLong() + 1L) - introduced
         }
 
         private fun continuationScore(row: ProbeRow, pivot: BigFraction): Double? {
@@ -670,7 +676,7 @@ internal object LinearAuthorityAggregateCuts {
                 val row = seed.row
                 var selected: Continuation? = null
                 var best = Double.POSITIVE_INFINITY
-                var bestGrowth = Int.MAX_VALUE
+                var bestRank = Long.MIN_VALUE
                 for ((id, coefficient) in row.coefficients) {
                     meter.reserve(1L)
                     if (id.kind != SourceCoordinate.Kind.Real) continue
@@ -679,10 +685,10 @@ internal object LinearAuthorityAggregateCuts {
                         if (other.term.owner == row.term.owner || other.coefficients.size <= 1) continue
                         val pivot = other.coefficients.getValue(id)
                         val score = continuationScore(other, pivot) ?: continue
-                        val growth = introducedReal(other, row.coefficients)
-                        if (growth < bestGrowth || (growth == bestGrowth && score < best)) {
+                        val rank = projectionRank(other, row.coefficients)
+                        if (rank > bestRank || (rank == bestRank && score < best)) {
                             best = score
-                            bestGrowth = growth
+                            bestRank = rank
                             meter.reserve(1L, 64L)
                             selected = Continuation(other, coefficient, pivot)
                         }

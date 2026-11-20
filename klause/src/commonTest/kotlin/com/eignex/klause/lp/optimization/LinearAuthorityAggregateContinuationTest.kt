@@ -28,9 +28,10 @@ class LinearAuthorityAggregateContinuationTest {
         val stock = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
         val extra = SourceCoordinate(SourceCoordinate.Kind.Real, 3)
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 4)
+        val backlog = SourceCoordinate(SourceCoordinate.Kind.Real, 5)
         val widened = BigFraction.ofLong(149) * BigFraction.ofLong(100).reciprocal()
         val reverse = BigFraction.ofLong(151) * BigFraction.ofLong(100).reciprocal()
-        val source = SourceProofContext(scope, setOf(x, y, real, flow, stock, extra, other), linkedMapOf(
+        val source = SourceProofContext(scope, setOf(x, y, real, flow, stock, extra, other, backlog), linkedMapOf(
             "resource" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
                 extra to BigFraction.ONE, other to BigFraction.ONE), BigFraction.ofLong(3) *
                 BigFraction.ofLong(2).reciprocal())),
@@ -39,19 +40,22 @@ class LinearAuthorityAggregateContinuationTest {
             "right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
                 y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
             "reverse left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
-                stock to BigFraction.MINUS_ONE), reverse)),
+                stock to BigFraction.MINUS_ONE, backlog to BigFraction.ONE), reverse)),
             "reverse right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
-                stock to BigFraction.ONE), reverse)),
+                stock to BigFraction.ONE, backlog to BigFraction.MINUS_ONE), reverse)),
+            "coupled" to SourcePremise(SourceInequality(mapOf(stock to BigFraction.MINUS_ONE,
+                extra to BigFraction.MINUS_ONE, x to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-3) * BigFraction.ofLong(4).reciprocal())),
             "forward left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
-                stock to BigFraction.ONE), widened.negated())),
+                stock to BigFraction.ONE, backlog to BigFraction.MINUS_ONE), widened.negated())),
             "forward right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.MINUS_ONE,
-                stock to BigFraction.MINUS_ONE), widened.negated())),
+                stock to BigFraction.MINUS_ONE, backlog to BigFraction.ONE), widened.negated())),
         ))
 
         val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
-            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16),
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 5),
             point = mapOf(x to 0.75, y to 0.75, real to 1.5, flow to 1.5,
-                stock to 0.0, extra to 0.0, other to 0.0)).single()
+                stock to 0.0, extra to 0.0, other to 0.0, backlog to 0.0)).single()
 
         assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE),
             BigFraction.ofLong(-2)), cut.inequality)
