@@ -207,7 +207,12 @@ private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (null when learning is off or the prune has no expressible reason). */
-internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
+internal class LpNodeOutcome(
+    val prune: Boolean,
+    val basis: Basis?,
+    val explanation: IntArray? = null,
+    val completed: Boolean = prune,
+)
 
 /*
  * Bound pending LP clause storage and deduplicate across restarts. Entries retain whether the
@@ -301,7 +306,9 @@ private fun LpEngine.foldSelectedCuts(
 }
 
 private sealed interface LpCutOutcome {
-    class Solved(val relaxation: LpRelaxation, val result: FloatLpResult) : LpCutOutcome
+    class Solved(val relaxation: LpRelaxation, val result: FloatLpResult, val completed: Boolean = true) : LpCutOutcome {
+        fun unfinished(): Solved = if (completed) Solved(relaxation, result, false) else this
+    }
     class Pruned(val explanation: IntArray?) : LpCutOutcome
 }
 
@@ -313,14 +320,15 @@ private fun LpEngine.solveSelectedCuts(
     sink: SolveStatsSink,
     learn: Boolean,
 ): LpCutOutcome {
-    if (selected.isEmpty() || cancellation.pollStop()) return previous
+    if (selected.isEmpty()) return previous
+    if (cancellation.pollStop()) return previous.unfinished()
     val base = previous.relaxation
     val families = selected.mapTo(HashSet()) { it.family }
     sink.lp.cutLifecycle.families = sink.lp.cutLifecycle.families + families
     val tightened = sink.lp.observeCutBuild(selected.size) {
         sink.lp.cutLifecycle.measureShared("ASSEMBLY") { cpAdapter.cutRelaxation(base, session, selected) }
     }
-        ?: return previous
+        ?: return previous.unfinished()
     activateCutAttribution(tightened)
     if (tightened.model === base.model) return previous
     val attempt = try {
@@ -330,14 +338,14 @@ private fun LpEngine.solveSelectedCuts(
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
         noteSolveOps(propagator.lastMetrics.workOps)
     }
-    if (attempt == null || cancellation.pollStop()) return previous
+    if (attempt == null || cancellation.pollStop()) return previous.unfinished()
     attempt.second?.let {
         observeCutFill(it.luMaxFill, tightened.model.m)
-        return LpCutOutcome.Solved(tightened, it)
+        return LpCutOutcome.Solved(tightened, it, previous.completed && it.optimal)
     }
-    if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous
-    val floatRay = attempt.first.infeasibleRay ?: return previous
-    val ray = infeasibilityRay(tightened.model, floatRay, sink) ?: return previous
+    if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous.unfinished()
+    val floatRay = attempt.first.infeasibleRay ?: return previous.unfinished()
+    val ray = infeasibilityRay(tightened.model, floatRay, sink) ?: return previous.unfinished()
     recordPruneBound(Double.POSITIVE_INFINITY)
     sink.lp.observeInfeasiblePrune()
     observeCutRayUse(tightened, ray)
@@ -529,7 +537,7 @@ internal fun LpEngine.sparseSafePrune(
         val constant = cutPool.constantContradiction()
         if (constant == null) {
             hints?.recordPoint(relaxation, result)
-            return LpNodeOutcome(false, optimalBasis)
+            return LpNodeOutcome(false, optimalBasis, completed = !cancellation.pollStop())
         }
         val outcome = solveSelectedCuts(
             session, LpCutOutcome.Solved(relaxation, result), listOf(constant), cancellation, sink, learn,
@@ -542,7 +550,7 @@ internal fun LpEngine.sparseSafePrune(
             }
             is LpCutOutcome.Solved -> {
                 hints?.recordPoint(outcome.relaxation, outcome.result)
-                LpNodeOutcome(false, outcome.result.basis)
+                LpNodeOutcome(false, outcome.result.basis, completed = outcome.completed && !cancellation.pollStop())
             }
         }
     }
@@ -560,6 +568,7 @@ internal fun LpEngine.sparseSafePrune(
     if (cancellation.pollStop()) return LpNodeOutcome(false, null)
     var boundRel = cutSolved.relaxation
     var boundRes = cutSolved.result
+    var cutsCompleted = cutSolved.completed
     if (cutsAllowed && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
         lpSeparators.isNotEmpty() && cutSeparationSupported(boundRel, cancellation, root = false)
     ) {
@@ -592,7 +601,7 @@ internal fun LpEngine.sparseSafePrune(
                 objectiveCoefficients(boundRel.model),
                 cutPool.maxCuts,
             ) + localCuts.mapNotNull { source -> boundRel.sourceMap?.let { source.toCut(it).orNull() } }
-            val previous = LpCutOutcome.Solved(boundRel, boundRes)
+            val previous = LpCutOutcome.Solved(boundRel, boundRes, cutsCompleted)
             val outcome = solveSelectedCuts(session, previous, selectedCuts, cancellation, sink, learn)
             when (outcome) {
                 is LpCutOutcome.Pruned -> {
@@ -600,6 +609,7 @@ internal fun LpEngine.sparseSafePrune(
                     return LpNodeOutcome(true, null, outcome.explanation)
                 }
                 is LpCutOutcome.Solved -> {
+                    cutsCompleted = outcome.completed
                     if (outcome.relaxation.model === boundRel.model) break
                     boundRel = outcome.relaxation
                     boundRes = outcome.result
@@ -706,7 +716,8 @@ internal fun LpEngine.sparseSafePrune(
     if (lower == null) {
         val prune = rowMeter != null &&
             applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
-        return LpNodeOutcome(prune, if (prune) null else optimalBasis)
+        return LpNodeOutcome(prune, if (prune) null else optimalBasis,
+            completed = cutsCompleted && !cancellation.pollStop())
     }
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
     val sourceRange = sourceObjectiveRange(boundRel)
@@ -797,7 +808,7 @@ internal fun LpEngine.sparseSafePrune(
     ) {
         return LpNodeOutcome(true, null)
     }
-    return LpNodeOutcome(false, optimalBasis)
+    return LpNodeOutcome(false, optimalBasis, completed = cutsCompleted && !cancellation.pollStop())
 }
 
 private fun LpEngine.pruneWithComponentBound(

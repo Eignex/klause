@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.arithmetic.Linear
@@ -22,9 +23,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class ResumableMinimizeDirectionalTest {
+class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
     @Test
-    fun `finite search consumes both directional gains across cooperative slices`() {
+    fun `finite search records completed lp outcomes across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -53,11 +54,18 @@ class ResumableMinimizeDirectionalTest {
         val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
             var slices = 0
+            var firstSliceOpen = Long.MAX_VALUE
             while (slices < 128 && !search.isDone &&
-                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("CONSUMED") ?: 0L) == 0L
+                ((search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("UP") ?: 0L) < 2L ||
+                    (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("DOWN") ?: 0L) < 2L ||
+                    (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("PRUNING_SAMPLE_OPEN") ?: 0L) <= firstSliceOpen)
             ) {
                 slices++
                 search.runSlice(ExecutionControl.Never, 1000L, 64L) {}
+                if (slices == 1) {
+                    firstSliceOpen = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]
+                        ?.outcomes?.get("PRUNING_SAMPLE_OPEN") ?: 0L
+                }
             }
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
@@ -65,7 +73,7 @@ class ResumableMinimizeDirectionalTest {
             assertTrue(slices > 1, diagnostic)
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-            assertTrue((observations["CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertTrue((observations["PRUNING_SAMPLE_OPEN"] ?: 0L) > firstSliceOpen, diagnostic)
         }
     }
 

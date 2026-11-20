@@ -17,10 +17,14 @@ internal class LpDirectionalHistory(
         var previous = 0.0
         var stamp = 0L
         var previousStamp = 0L
+        var latestPruned = -1
+        var previousPruned = -1
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
         val stable: Boolean get() = count >= RELIABILITY && maxOf(latest, previous) <= minOf(latest, previous) * 2.0
+
+        val pruning: Int? get() = latestPruned.takeIf { it >= 0 && it == previousPruned }
     }
 
     private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
@@ -32,15 +36,19 @@ internal class LpDirectionalHistory(
     private var parentCount = 0
     private var parentLimit = 0
     private var pending: Pending? = null
+    private var sampled: Gains? = null
+    private var sampledUp = false
     private var stamp = 0L
     private var depth = 0
     private var objective = Double.NaN
     private var reliableStamp = -1L
+    private var pruningStamp = -1L
     private var valueStamp = -1L
     private var collectionStamp = -1L
     private var observed = false
 
     fun beginNode(level: Int) {
+        sampled = null
         stamp++
         depth = level
         objective = Double.NaN
@@ -51,19 +59,36 @@ internal class LpDirectionalHistory(
 
     val hasReliableHistory: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
+    val hasPruningHistory: Boolean get() = pruningStamp >= 0L && stamp - pruningStamp <= maxAge
+
     val hasValueHistory: Boolean get() = valueStamp >= 0L && stamp - valueStamp <= maxAge
 
     val hasCollectionHistory: Boolean get() = collectionStamp >= 0L && stamp - collectionStamp <= maxAge
 
     val hasObservations: Boolean get() = observed
 
+    fun restart() {
+        charge(3L)
+        trimParents(0)
+        pending = null
+        sampled = null
+        objective = Double.NaN
+        observe("RESTART")
+        if (gains.isNotEmpty()) {
+            charge(1L)
+            observe("RESTART_RETAINED")
+        }
+    }
+
     fun clear(report: Boolean = true) {
         charge(gains.size.toLong())
         gains.clear()
         trimParents(0)
         pending = null
+        sampled = null
         objective = Double.NaN
         reliableStamp = -1L
+        pruningStamp = -1L
         valueStamp = -1L
         collectionStamp = -1L
         observed = false
@@ -71,6 +96,7 @@ internal class LpDirectionalHistory(
     }
 
     fun record(value: Double) {
+        sampled = null
         objective = value
         val child = pending ?: return
         pending = null
@@ -89,12 +115,19 @@ internal class LpDirectionalHistory(
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
+        charge(3L)
+        direction.previousPruned = direction.latestPruned
+        direction.latestPruned = -1
+        sampled = history
+        sampledUp = child.up
         observed = true
-        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
+        if (history.down.count != history.up.count) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
             if (majority.stable && majority.gain > 0.0) {
-                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
+                charge(1L)
+                val minorityStamp = if (minority.count > 0) minority.stamp else majority.previousStamp
+                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minorityStamp))
             }
         }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
@@ -168,11 +201,46 @@ internal class LpDirectionalHistory(
     fun infeasible() {
         if (pending != null) observe("INFEASIBLE")
         pending = null
+        sampled = null
     }
 
-    fun finishNode() {
+    fun finishNode(pruned: Boolean? = null) {
         if (pending != null) observe("MISSING")
         pending = null
+        val history = sampled ?: return
+        sampled = null
+        charge(8L)
+        val direction = if (sampledUp) history.up else history.down
+        direction.latestPruned = when (pruned) {
+            true -> 1
+            false -> 0
+            null -> -1
+        }
+        observe(when (pruned) {
+            true -> "PRUNING_SAMPLE_PRUNED"
+            false -> "PRUNING_SAMPLE_OPEN"
+            null -> "PRUNING_SAMPLE_UNKNOWN"
+        })
+        val down = history.down.pruning
+        val up = history.up.pruning
+        if (history.down.stable && history.up.stable && down != null && up != null) {
+            charge(1L)
+            observe(if (down + up > 0) "PRUNING_PAIR_POSITIVE" else "PRUNING_PAIR_ZERO")
+            if (down + up > 0) {
+                pruningStamp = maxOf(pruningStamp, minOf(history.down.previousStamp, history.up.previousStamp))
+            }
+        }
+    }
+
+    fun pruningScore(variable: VarRef, value: Double): Double = pruningEstimate(variable, value)
+        .takeIf { it > 0.0 } ?: Double.NaN
+
+    fun pruningEstimate(variable: VarRef, value: Double): Double {
+        val history = reliable(variable, value) ?: return Double.NaN
+        charge(3L)
+        val down = history.down.pruning ?: return Double.NaN
+        val up = history.up.pruning ?: return Double.NaN
+        return (down + up).toDouble()
     }
 
     fun score(variable: VarRef, value: Double): Double = estimate(variable, value)
@@ -221,7 +289,6 @@ internal class LpDirectionalHistory(
         expire(history.up)
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
-        if (history.down.count == 0 || history.up.count == 0) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
@@ -238,10 +305,13 @@ internal class LpDirectionalHistory(
             direction.count = 0
             direction.latest = 0.0
             direction.previous = 0.0
+            direction.latestPruned = -1
+            direction.previousPruned = -1
             observe("EXPIRED")
         } else if (direction.count >= RELIABILITY && stamp - direction.previousStamp > maxAge) {
             direction.count = 1
             direction.previous = 0.0
+            direction.previousPruned = -1
             observe("EXPIRED")
         }
     }

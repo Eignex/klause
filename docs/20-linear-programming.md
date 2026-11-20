@@ -325,7 +325,10 @@ The bounding callback passes the final node relaxation's primal and dual point t
 finite search hints after cut re-solves. Only an optimal result supplies an
 objective sample; an unfinished cut solve keeps the preceding point, and cancellation
 withholds publication. [Finite guidance](09-search.md#finite-lp-directional-guidance)
-owns selection and history lifetime.
+owns selection and history lifetime. The model-facing node outcome separately
+reports completion of the LP pass and whether it pruned. Cancellation after a
+published optimum leaves the pruning outcome unknown. This advisory observation
+changes neither certification nor pruning decisions.
 
 An exact state appending one bound copies only the changed side; tightening can
 introduce a conflict only at that column, so the state combines it with the
