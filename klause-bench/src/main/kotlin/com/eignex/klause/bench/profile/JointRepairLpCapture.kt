@@ -32,7 +32,6 @@ import kotlin.time.Duration.Companion.milliseconds
 
 internal object JointRepairLpCapture {
     private const val PIPELINE = "com.eignex.klause.solver.pipeline."
-    private const val ENGINE = "com.eignex.klause.lp.engine."
 
     fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
