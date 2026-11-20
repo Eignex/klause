@@ -564,8 +564,11 @@ internal object LinearAuthorityAggregateCuts {
                 meter.reserve(1L)
                 if (term.inequality.strict || term.inequality.supportSize != row.coefficients.size) continue
                 val inverse = term.inequality.forEachCoefficient { coordinate, value ->
-                    meter.reserve(1L)
+                    meter.reserve(3L)
                     val other = row.coefficients[coordinate] ?: return@forEachCoefficient false
+                    if (!value.isZero && (value < BigFraction.ZERO) == (other < BigFraction.ZERO)) {
+                        return@forEachCoefficient false
+                    }
                     meter.number(value.negated()) == meter.number(other)
                 }
                 if (!inverse) continue
@@ -1027,6 +1030,7 @@ internal object LinearAuthorityAggregateCuts {
                 observe("AggregateIntegerProjectionRows", 1L)
                 meter.reserve(aggregate.size.toLong())
                 if (aggregate.keys.any { it.kind == SourceCoordinate.Kind.Real }) continue
+                observe("AggregateIntegerProjectionCompleted", 1L)
                 val cut = deriveWithCoefficients(terms, cancellation, charge, limits, allowMixed = false,
                     continuousBounds = emptyMap(), coefficientSnapshots = snapshots, capture = capture)
                 if (cut != null && separates(cut, point, meter, observe) == true) return cut
