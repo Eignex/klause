@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpStatsTest {
@@ -270,6 +271,23 @@ class LpStatsTest {
         val stats = sink.snapshot()
         assertEquals(14.0, stats.cutSelected.sum)
         assertEquals(5.0, stats.cutActive.max)
+    }
+
+    @Test
+    fun `component staging attempts should accumulate across observations`() {
+        val sink = LpStatsSink()
+        val first = LpSolveMetrics(componentScalarStages = 2L, componentRowStages = 3L)
+        val copied = first + LpSolveMetrics(componentScalarCopies = 1L)
+        val total = copied + LpSolveMetrics(componentJoinStages = 1L)
+
+        sink.observeEngineCost(LpRoute.NODE, first, finished = false)
+        sink.observeEngineCost(LpRoute.NODE, copied - first, finished = false)
+        sink.observeEngineCost(LpRoute.NODE, total - copied, finished = false)
+
+        val phase = assertNotNull(sink.snapshot().phases["COMPONENT_STAGING_NODE"])
+        assertEquals(6L, phase.calls)
+        assertEquals(mapOf("SCALAR_ATTEMPT" to 2L, "LOCAL_ROWS_ATTEMPT" to 3L, "JOINED_ATTEMPT" to 1L,
+            "SCALAR_COPY" to 1L), phase.outcomes)
     }
 
     @Test

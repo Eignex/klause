@@ -5,11 +5,34 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpTechnique
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BacktrackParamsTest {
+    @Test
+    fun `LP admission captures the remaining worker node horizon`() {
+        val quota = NodeBudget(12_000L).quotas(3)[1]
+        quota.spend()
+        quota.spend()
+
+        val params = BacktrackParams(nodeBudget = quota).lpParams()
+        quota.spend()
+
+        assertEquals(79_960_000L, params.componentReuseWorkHorizon)
+        assertEquals(params.componentReuseWorkHorizon, params.copy().componentReuseWorkHorizon)
+    }
+
+    @Test
+    fun `LP admission horizon saturates for large node allowances`() {
+        val params = BacktrackParams(nodeBudget = NodeBudget(1_000_000_000_000_000L))
+
+        val horizon = params.lpParams().componentReuseWorkHorizon
+
+        assertEquals(Long.MAX_VALUE, horizon)
+    }
+
     @Test
     fun `private byte grants should be nonnegative`() {
         assertFailsWith<IllegalArgumentException> { BacktrackParams(privateRebuildBytes = -1L) }

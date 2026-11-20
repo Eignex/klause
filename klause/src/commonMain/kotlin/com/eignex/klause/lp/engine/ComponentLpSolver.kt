@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BigFraction
@@ -30,18 +31,19 @@ internal class ComponentLpSolver(
 ) : RetainedComponentLpSolverCapability,
     ResumableLpSolver,
     TableauCutSolver {
-    private val reusable = arrayOfNulls<FloatLpResult>(parts.size)
+    private var reusable = arrayOfNulls<FloatLpResult>(parts.size)
     val rowOnlyRows: Int = parts.sumOf { if (it.cols.isEmpty()) it.rows.size else 0 }
     private class CheckedBound(val policy: LpCertificationPolicy, val bound: CertifiedLpBound)
-    private val checkedBounds = arrayOfNulls<CheckedBound>(parts.size)
-    private val deductions = ComponentLpDeductionCache(parts.size)
+    private var checkedBounds = arrayOfNulls<CheckedBound>(parts.size)
+    private var deductions = ComponentLpDeductionCache(parts.size)
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var activeChild: LpSolver? = null
+    private var activeStaging: LpComponentStaging? = null
     private var solveStarted = false
     var queryAllowance: LpFloatAllowance? = null
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
     private var blockResults: List<FloatLpResult?>? = null
-    private val solveOrder = parts.indices.sortedWith(
+    private var solveOrder = parts.indices.sortedWith(
         compareBy<Int> { parts[it].model.m.toLong() + parts[it].model.n }.thenBy { it },
     )
     private var metrics = LpSolveMetrics()
@@ -50,6 +52,10 @@ internal class ComponentLpSolver(
     override var lastColumns: Int = 0
         private set
     var lastReservedConstructionWork: Long = 0L
+        private set
+    var lastLocalEditDecline: LpComponentEditDecline? = null
+        private set
+    var constructionReportComplete = false
         private set
     private var closed = false
     private var continuationTarget: Basis? = null
@@ -61,7 +67,11 @@ internal class ComponentLpSolver(
     override var lastTermination: LpFloatTermination? = null
         private set
 
-    override val lastMetrics: LpSolveMetrics get() = activeChild?.let { metrics + it.lastMetrics } ?: metrics
+    override val lastMetrics: LpSolveMetrics
+        get() {
+            val staged = activeStaging?.let { metrics + it.metrics } ?: metrics
+            return activeChild?.let { staged + it.lastMetrics } ?: staged
+        }
     override val lastPivots: Int get() = lastMetrics.pivots
     override val lastWorkOps: Long get() = lastMetrics.workOps
     override val lastRefactorizations: Int get() = lastMetrics.let {
@@ -69,11 +79,12 @@ internal class ComponentLpSolver(
             it.updateLimitRefactorizations + it.backendRequestedRefactorizations +
             it.reconcileRecoveryRefactorizations + it.numericalRecoveryRefactorizations + it.primalRefactorizations
     }
-    override val currentWork: Long get() = metrics.workOps + when (val child = activeChild) {
-        is ResumableLpSolver -> child.currentWork
-        null -> 0L
-        else -> child.lastMetrics.workOps
-    }
+    override val currentWork: Long get() = metrics.workOps + (activeStaging?.work ?: 0L) +
+        when (val child = activeChild) {
+            is ResumableLpSolver -> child.currentWork
+            null -> 0L
+            else -> child.lastMetrics.workOps
+        }
 
     override fun deferUnscaledSourceDiagnostics() {
         for (solver in solvers) solver.deferUnscaledSourceDiagnostics()
@@ -180,8 +191,13 @@ internal class ComponentLpSolver(
         val previous = model.exactState ?: return false
         if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
         val nextModel = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
+        val changes = if (state.rows === previous.rows) state.projectedScalarChanges(model, nextModel) else null
         val nextParts = ArrayList<LpNeighborhood>(parts.size)
-        for (part in parts) nextParts += part.rebindExact(state, token) ?: return false
+        for (part in parts) {
+            if (token()) return false
+            val affected = changes == null || part.readsScalarChange(changes, model.n)
+            nextParts += if (affected) part.rebindExact(state, token) ?: return false else part
+        }
         if (token()) return false
         try {
             for (index in solvers.indices) {
@@ -228,19 +244,31 @@ internal class ComponentLpSolver(
         lastTermination = null
     }
 
+    @Suppress("TooGenericExceptionCaught") // Child reporting preserves the preparation failure.
     fun prepareLogicals(token: ExecutionControl, workLimit: Long): Basis? {
         metrics = LpSolveMetrics()
+        constructionReportComplete = false
+        var constructionReports = 0
         lastDegenerateColumns = 0
         lastColumns = 0
         val stop = token or ExecutionControl { workLimit > 0L && currentWork >= workLimit }
         for (solver in solvers) {
             val persistent = solver as? PersistentLpSolver ?: return null
             activeChild = solver
+            var preparationFailure: Throwable? = null
             val basis = try {
                 persistent.prepareLogicals(stop)
+            } catch (primary: Throwable) {
+                preparationFailure = primary
+                throw primary
             } finally {
                 activeChild = null
-                metrics += persistent.lastMetrics
+                reportLpPreparation(preparationFailure) {
+                    val reported = persistent.lastMetrics
+                    metrics += reported
+                    if (reported.preparationOps > 0L) constructionReports++
+                    constructionReportComplete = constructionReports == solvers.size
+                }
             }
             if (basis == null || stop()) return null
         }
@@ -252,65 +280,130 @@ internal class ComponentLpSolver(
         state: LpExactState,
         token: ExecutionControl,
         workLimit: Long,
+        admission: LpComponentAdmission? = null,
+        fork: ((LpSolver, LpModel, LpModel, Basis, ExecutionControl, LpComponentStaging) -> LpScalarFork?)? = null,
         engine: (LpModel, ExecutionControl, Long) -> PersistentLpSolver,
     ): Boolean {
         check(!closed && activeSolve == null)
         metrics = LpSolveMetrics()
         lastReservedConstructionWork = 0L
+        lastLocalEditDecline = LpComponentEditDecline.UNAVAILABLE
         val projection = LpProjectionMeter(
             workLimit = workLimit.takeIf { it > 0L } ?: Long.MAX_VALUE, cancellation = token,
         )
-        val (working, nextParts) = try {
-            localRowPlan(state, token, projection) ?: return false
+        val planner = LpComponentRows(model, parts, state, token, projection)
+        val plan = try {
+            planner.plan(admission) ?: run {
+                lastLocalEditDecline = planner.decline
+                return false
+            }
         } catch (_: LpProjectionStop) {
+            lastLocalEditDecline = if (token() || token.admission?.exhausted == true) {
+                LpComponentEditDecline.STOPPED
+            } else LpComponentEditDecline.PROJECTION_LIMIT
             return false
         } finally {
             metrics += LpSolveMetrics(workOps = projection.work)
         }
-        val changed = BooleanArray(parts.size) { nextParts[it] !== parts[it] }
+        lastLocalEditDecline = LpComponentEditDecline.CONSTRUCTION
+        val origins = IntArray(plan.parts.size) { index ->
+            plan.ancestors[index].singleOrNull()?.takeIf { plan.parts[index] === parts[it] } ?: -1
+        }
         val replacements = ArrayList<LpSolver>()
-        val nextSolvers = solvers.toMutableList()
+        val nextSolvers = ArrayList<LpSolver>(plan.parts.size)
         var published = false
         var failure: Throwable? = null
         try {
             val stop = token or ExecutionControl { workLimit > 0L && currentWork >= workLimit }
-            for (index in parts.indices) {
-                if (!changed[index]) continue
+            for (index in plan.parts.indices) {
                 if (stop()) return false
-                val remaining = if (workLimit > 0L) workLimit - metrics.workOps else 0L
-                val child = engine(nextParts[index].model, token, remaining)
-                replacements += child
-                nextSolvers[index] = child
-                val warm = (solvers[index] as? PersistentLpSolver)?.retainedBasis()?.extended(
-                    checkNotNull(parts[index].model.exactState).model,
-                    checkNotNull(nextParts[index].model.exactState).model,
-                )
-                activeChild = child
-                val basis = try {
-                    if (warm == null) child.prepareLogicals(stop) else child.prepareBasis(warm, stop)
-                } finally {
-                    activeChild = null
-                    metrics += child.lastMetrics
+                if (origins[index] >= 0) {
+                    nextSolvers += solvers[origins[index]]
+                    continue
                 }
-                if (basis == null || !basis.validFor(checkNotNull(nextParts[index].model.exactState).model) ||
-                    stop()
-                ) return false
+                val warmProjection = LpProjectionMeter(
+                    workLimit = if (workLimit > 0L) workLimit - metrics.workOps else Long.MAX_VALUE,
+                    cancellation = token,
+                )
+                val warm = try {
+                    rowEditBasis(plan, index, warmProjection)
+                } catch (_: LpProjectionStop) {
+                    lastLocalEditDecline = if (token() || token.admission?.exhausted == true) {
+                        LpComponentEditDecline.STOPPED
+                    } else LpComponentEditDecline.PROJECTION_LIMIT
+                    return false
+                } finally {
+                    metrics += LpSolveMetrics(workOps = warmProjection.work)
+                }
+                if (stop()) return false
+                val staging = LpComponentStaging(if (workLimit > 0L) workLimit - metrics.workOps else 0L, token)
+                activeStaging = staging
+                try {
+                    val nextModel = plan.parts[index].model
+                    val ancestors = plan.ancestors[index]
+                    val scalar = ancestors.size == 1 &&
+                        plan.parts[index].rows.contentEquals(parts[ancestors.single()].rows) &&
+                        plan.parts[index].cols.contentEquals(parts[ancestors.single()].cols)
+                    val copied = if (scalar && warm != null) {
+                        val ancestor = ancestors.single()
+                        fork?.invoke(solvers[ancestor], parts[ancestor].model, nextModel, warm, token, staging)
+                    } else null
+                    val remaining = if (copied == null) {
+                        staging.reserveConstruction(LpScalingView.constructionWorkBound(nextModel),
+                            simplexWorkspaceWork(nextModel.m, nextModel.numVars))
+                        staging.beginConstruction() ?: return false
+                    } else 0L
+                    metrics += when {
+                        ancestors.size > 1 -> LpSolveMetrics(componentJoinStages = 1L)
+                        scalar -> LpSolveMetrics(componentScalarStages = 1L)
+                        else -> LpSolveMetrics(componentRowStages = 1L)
+                    }
+                    var child: PersistentLpSolver? = null
+                    var preparationFailure: Throwable? = null
+                    val basis = try {
+                        val created = if (copied != null) copied.create() else engine(nextModel, token, remaining)
+                        created.also { candidate ->
+                            child = candidate
+                            replacements += candidate
+                            nextSolvers += candidate
+                            activeChild = candidate
+                        }.let { candidate ->
+                            if (warm == null) candidate.prepareLogicals(stop) else candidate.prepareBasis(warm, stop)
+                        }
+                    } catch (primary: Throwable) {
+                        preparationFailure = primary
+                        throw primary
+                    } finally {
+                        activeChild = null
+                        reportLpPreparation(preparationFailure) {
+                            val reported = child?.lastMetrics?.let {
+                                if (copied != null) it.copy(preparationOps = 0L) else it
+                            }
+                            staging.recordConstruction(reported)
+                        }
+                    }
+                    if (basis == null || !basis.validFor(checkNotNull(plan.parts[index].model.exactState).model) ||
+                        stop()
+                    ) return false
+                    if (copied != null && (child as? RevisedSimplex)?.hasImportedFactors == true) {
+                        metrics += LpSolveMetrics(componentScalarCopies = 1L)
+                    }
+                } catch (_: LpProjectionStop) {
+                    lastLocalEditDecline = if (token() || token.admission?.exhausted == true) {
+                        LpComponentEditDecline.STOPPED
+                    } else LpComponentEditDecline.PROJECTION_LIMIT
+                    return false
+                } finally {
+                    activeStaging = null
+                    metrics += staging.metrics
+                    lastReservedConstructionWork += staging.reservedConstructionWork
+                }
             }
             if (token()) return false
-            val retired = parts.indices.filter { changed[it] }.map { solvers[it] }
-            model = working
-            parts = nextParts
-            solvers = nextSolvers
-            for (index in parts.indices) {
-                if (changed[index]) {
-                    reusable[index] = null
-                    checkedBounds[index] = null
-                    deductions.invalidate(index)
-                }
-            }
-            clearEvidence()
+            val retired = publishRowEdits(plan, nextSolvers, origins)
             published = true
             closeComponentSolvers(retired)
+            lastLocalEditDecline = null
             return true
         } catch (primary: Throwable) {
             failure = primary
@@ -327,64 +420,64 @@ internal class ComponentLpSolver(
         }
     }
 
-    private fun localRowPlan(
-        state: LpExactState,
-        token: ExecutionControl,
-        projection: LpProjectionMeter,
-    ): Pair<LpModel, List<LpNeighborhood>>? {
-        val previous = model.exactState ?: return null
-        val source = state.model
-        if (source.n != model.n || source.m <= model.m || token()) return null
-        var entries = 0L
-        for (column in 0 until model.n) {
-            val values = source.columnEntries(column)
-            entries += values.size
-            projection.reserve(values.size.toLong() + 1L, values.size * 16L, matrix = true)
-            if (values.filter { it.row < model.m } != previous.model.columnEntries(column)) return null
+    private fun publishRowEdits(
+        plan: LpComponentRowPlan,
+        nextSolvers: List<LpSolver>,
+        origins: IntArray,
+    ): List<LpSolver> {
+        val retained = BooleanArray(parts.size)
+        for (origin in origins) if (origin >= 0) retained[origin] = true
+        val retired = solvers.filterIndexed { index, _ -> !retained[index] }
+        val nextReusable = Array(plan.parts.size) { index -> origins[index].takeIf { it >= 0 }?.let { reusable[it] } }
+        val nextChecked = Array(plan.parts.size) { index ->
+            origins[index].takeIf { it >= 0 }?.let { checkedBounds[it] }
         }
-        projection.reserve(source.m.toLong() + source.n, (source.m.toLong() + source.n) * 16L, matrix = true)
-        if ((0 until model.m).any { previous.rows.row(it).id != state.rows.row(it).id }) return null
-        val owner = IntArray(model.n) { -1 }
-        for (index in parts.indices) for (column in parts[index].cols) owner[column] = index
-        val added = Array(parts.size) { IntArrayList() }
-        val working = state.ownerWorkingModel(projection) ?: return null
-        projection.reserve(entries * 2L + source.m, entries * 4L + source.m * 8L, matrix = true)
-        val rows = working.rowIndex()
-        for (row in model.m until source.m) {
+        val nextDeductions = deductions.remapped(origins)
+        val nextOrder = plan.parts.indices.sortedWith(
+            compareBy<Int> { plan.parts[it].model.m.toLong() + plan.parts[it].model.n }.thenBy { it },
+        )
+        model = plan.model
+        parts = plan.parts
+        solvers = nextSolvers
+        reusable = nextReusable
+        checkedBounds = nextChecked
+        deductions = nextDeductions
+        solveOrder = nextOrder
+        clearEvidence()
+        return retired
+    }
+
+    private fun rowEditBasis(plan: LpComponentRowPlan, index: Int, projection: LpProjectionMeter): Basis? {
+        val part = plan.parts[index]
+        val next = checkNotNull(part.model.exactState).model
+        val ancestors = plan.ancestors[index]
+        val dimensions = next.numVars.toLong() + next.m
+        val oldDimensions = ancestors.sumOf { parts[it].model.numVars.toLong() + parts[it].model.m }
+        projection.reserve(4L * (dimensions + oldDimensions), 32L * dimensions + 32L * oldDimensions, matrix = false)
+        if (ancestors.size == 1) {
+            val previous = parts[ancestors[0]]
+            return (solvers[ancestors[0]] as? PersistentLpSolver)?.retainedBasis()?.extended(
+                checkNotNull(previous.model.exactState).model, next,
+            )
+        }
+        for (column in part.cols.indices) plan.columnMap[part.cols[column]] = column
+        for (row in part.rows.indices) plan.rowMap[part.rows[row]] = row
+        val headings = IntArray(next.m) { next.n + it }
+        val seats = Array(next.numVars) { VarStatus.BASIC }
+        for (ancestor in ancestors) {
             projection.poll()
-            val from = rows.rowPtr[row]
-            val to = rows.rowPtr[row + 1]
-            if (from == to) return null
-            val block = owner[rows.colIdx[from]]
-            if (block < 0 || (from until to).any { owner[rows.colIdx[it]] != block }) return null
-            added[block].add(row)
-        }
-        val nextParts = ArrayList<LpNeighborhood>(parts.size)
-        val scratch = IntArray(source.m) { -1 }
-        for (index in parts.indices) {
-            val part = parts[index]
-            projection.reserve(part.cols.size.toLong() + part.rows.size, 0L, matrix = false)
-            if (added[index].size == 0) {
-                // Simultaneous edits to other blocks take the ordinary replacement route.
-                if (part.rebindExact(state, token) !== part) return null
-                nextParts += part
-            } else {
-                val columns = IntArrayList().apply { addAll(part.cols) }
-                val selected = IntArrayList().apply {
-                    addAll(part.rows)
-                    added[index].forEach { add(it) }
-                }
-                val nonzeros = part.cols.sumOf { source.columnEntries(it).size.toLong() }
-                projection.reserve(nonzeros * 8L + columns.size + selected.size,
-                    nonzeros * 128L + (columns.size.toLong() + selected.size) * 128L, matrix = true)
-                val next = working.restrictTo(columns, selected, null, copyCosts = true, scratch)
-                val construction = LpScalingView.constructionWorkBound(next.model)
-                projection.reserve(construction, 0L, matrix = true)
-                lastReservedConstructionWork += construction
-                nextParts += next
+            val previous = parts[ancestor]
+            val basis = (solvers[ancestor] as? PersistentLpSolver)?.retainedBasis() ?: return null
+            if (!basis.validFor(checkNotNull(previous.model.exactState).model)) return null
+            fun column(local: Int): Int = if (local < previous.cols.size) {
+                plan.columnMap[previous.cols[local]]
+            } else next.n + plan.rowMap[previous.rows[local - previous.cols.size]]
+            for (local in basis.status.indices) seats[column(local)] = basis.status[local]
+            for (row in basis.basicVars.indices) {
+                headings[plan.rowMap[previous.rows[row]]] = column(basis.basicVars[row])
             }
         }
-        return working to nextParts
+        return Basis(headings, seats, captureEligible = false).takeIf { it.validFor(next) }
     }
 
     @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.
@@ -872,10 +965,13 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     projection: LpProjectionMeter?,
     engine: (LpModel, ExecutionControl, Int) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
+    accept: LpComponentAdmission? = null,
 ): T? {
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null
+    if (accept != null) projection?.reserve(1L, 0L, matrix = false)
+    if (accept?.inspect(n, m, model.doubleView?.rowIdx?.size ?: model.csc.rowIdx.size) == false) return null
     val rowIndex = model.rowIndex(projection)
     projection?.reserve(5L * n + 4L * m + 4L * rowIndex.colIdx.size + 1L,
         16L * n + 12L * m, matrix = true)
@@ -907,7 +1003,12 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         val root = partition.find(j)
         if (blockOf[root] < 0) blockOf[root] = blocks++
     }
-    if (blocks < 2) return null
+    if (blocks < 2) {
+        accept?.accepts(LpComponentShape(blocks, m.toLong() * (n.toLong() + m + 1L),
+            m.toLong() * (n.toLong() + m + 1L),
+            128L * (rowIndex.colIdx.size.toLong() + n + m + blocks) + 4L * m))
+        return null
+    }
 
     val children = blocks + if (rowOnlyRows > 0) 1 else 0
     projection?.reserve(n.toLong() + m, 128L * children + 8L * (n.toLong() + m), matrix = true)
@@ -919,10 +1020,28 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[partition.find(rowIndex.colIdx[from])]
         blockRows[block].add(i)
     }
+    projection?.reserve(1L, 64L, matrix = true)
+    val groups = LpComponentGroups(blockCols, blockRows, blocks).coarsen(
+        model, rowIndex, accept?.ownerMergeWork ?: 0L, cancellation, projection,
+    ) ?: return null
+    if (accept != null) {
+        projection?.reserve(groups.columns.size.toLong() + 1L, 64L, matrix = false)
+        val cells = groups.rows.indices.sumOf { index ->
+            val rows = groups.rows[index].size.toLong()
+            rows * (groups.columns[index].size + rows + 1L)
+        }
+        val shape = LpComponentShape(
+            groups.blocks, m.toLong() * (n.toLong() + m + 1L), cells,
+            128L * (rowIndex.colIdx.size.toLong() + n + m + groups.columns.size) + 4L * m,
+        )
+        if (!accept.accepts(shape) || cancellation()) return null
+    }
+    if (groups.blocks < 2) return null
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
 
-    val parts = model.componentRestrictions(blockCols, blockRows, rowIndex, cancellation, projection) ?: return null
+    val parts = model.componentRestrictions(groups.columns, groups.rows, rowIndex, cancellation, projection)
+        ?: return null
     val solvers = ArrayList<LpSolver>(parts.size)
     try {
         for (part in parts) solvers += engine(part.model, cancellation, rowOnlyRows)
@@ -931,6 +1050,47 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         closeComponentSolvers(solvers, primary)
         throw primary
     }
+}
+
+internal data class LpComponentShape(
+    val blocks: Int,
+    val monolithicCells: Long,
+    val componentCells: Long,
+    val modeledBytes: Long,
+)
+
+private fun LpNeighborhood.readsScalarChange(changes: LpProjectedScalarChanges, columns: Int): Boolean {
+    fun contains(column: Int): Boolean = if (column < columns) {
+        cols.binarySearchInt(column) >= 0
+    } else {
+        rows.binarySearchInt(column - columns) >= 0
+    }
+    return changes.bounds.any(::contains) || changes.costs.any(::contains)
+}
+
+internal enum class LpComponentEditDecline {
+    COLUMNS,
+    ROW_COUNT,
+    MATRIX,
+    ROW_IDENTITY,
+    ROW_ONLY,
+    CROSS_BLOCK,
+    ADMISSION,
+    STOPPED,
+    PROJECTION_LIMIT,
+    REBIND_UNAVAILABLE,
+    CONSTRUCTION,
+    UNAVAILABLE,
+}
+
+// Structural decisions stay fixed for an owner so scalar edits can retain a declined inspection.
+internal fun interface LpComponentAdmission {
+    fun accepts(shape: LpComponentShape): Boolean
+    fun inspect(columns: Int, rows: Int, entries: Int): Boolean = true
+    fun declinedEdit(reason: LpComponentEditDecline) {}
+    val basisEntryLimit: Long get() = Long.MAX_VALUE
+    val basisWorkLimit: Long get() = Long.MAX_VALUE
+    val ownerMergeWork: Long get() = 0L
 }
 
 private fun LpModel.componentRestrictions(

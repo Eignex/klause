@@ -1,5 +1,30 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.util.numbers.saturatedAdd
+
+@Suppress("TooGenericExceptionCaught") // Reporting preserves the preparation's primary failure.
+internal inline fun reportLpPreparation(primary: Throwable?, report: () -> Unit) {
+    try {
+        report()
+    } catch (failure: Throwable) {
+        if (primary == null) throw failure
+        if (failure !== primary) primary.addSuppressed(failure)
+    }
+}
+
+@Suppress("TooGenericExceptionCaught") // Partial preparation still reports work when the child fails.
+internal inline fun <T> withLpPreparationReport(report: () -> Unit, action: () -> T): T {
+    var failure: Throwable? = null
+    try {
+        return action()
+    } catch (primary: Throwable) {
+        failure = primary
+        throw primary
+    } finally {
+        reportLpPreparation(failure, report)
+    }
+}
+
 internal data class LpScopedMetrics(
     val editAttempts: Long,
     val editSuccesses: Long,
@@ -18,10 +43,19 @@ internal data class LpScopedMetrics(
     // the ledger swaps that bound for the work the owners reported building their scaling views.
     val reservedConstructionWork: Long = 0L,
     val constructionWork: Long = 0L,
+    val componentScalarStages: Long = 0L,
+    val componentRowStages: Long = 0L,
+    val componentJoinStages: Long = 0L,
+    val componentScalarCopies: Long = 0L,
 ) {
     val editDeclines: Long get() = editAttempts - editSuccesses
     val preparationDeclines: Long get() = preparationAttempts - preparationSuccesses
     val currentOwners: Long get() = createdOwners - closedOwners
+    val measuredPreparationWork: Long
+        get() = if (preparationWork == Long.MAX_VALUE || reservedConstructionWork == Long.MAX_VALUE ||
+            constructionWork == Long.MAX_VALUE
+        ) Long.MAX_VALUE else saturatedAdd((preparationWork - reservedConstructionWork).coerceAtLeast(0L),
+            constructionWork)
 }
 
 internal fun basisWorkUnits(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =

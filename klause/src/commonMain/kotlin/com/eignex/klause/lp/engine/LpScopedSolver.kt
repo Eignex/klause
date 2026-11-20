@@ -20,6 +20,8 @@ internal class LpScopedSolver(
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
+    private val componentAdmission: LpComponentAdmission? = null,
+    private val monolithicPreparationWork: Long? = null,
 ) : AutoCloseable {
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
@@ -29,6 +31,7 @@ internal class LpScopedSolver(
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
     private var solver: RetainedLpSolver? = null
+    private var declinedComponentMatrix: ExactLpModel? = null
     private class PendingFloat(val cursor: LpSolveCursor<FloatLpResult?>, var allowance: LpFloatAllowance) {
         var reported = LpSolveMetrics()
     }
@@ -67,6 +70,10 @@ internal class LpScopedSolver(
     private var appendUnknownWork = 0L
     private var reservedConstructionWork = 0L
     private var constructionWork = 0L
+    private var componentScalarStages = 0L
+    private var componentScalarCopies = 0L
+    private var componentRowStages = 0L
+    private var componentJoinStages = 0L
     private var pendingAppendSolveWork: Long? = null
     private var pendingAppendSolveWorkComplete = false
     private var pendingAppendSolve = false
@@ -87,6 +94,7 @@ internal class LpScopedSolver(
         preparationWork, preparationRefactorizations, createdOwners, closedOwners, peakOwners,
         state.rows.size, state.rows.activeCount,
         appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork,
+        componentScalarStages, componentRowStages, componentJoinStages, componentScalarCopies,
     )
 
     val primalGuidanceState: String
@@ -108,6 +116,7 @@ internal class LpScopedSolver(
 
     init {
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
+        require(monolithicPreparationWork == null || monolithicPreparationWork >= 0L)
     }
 
     fun prepare(token: ExecutionControl = cancellation): Boolean = prepare(token, null)
@@ -513,7 +522,9 @@ internal class LpScopedSolver(
         val model = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return
         check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
         val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
-            allowance?.work ?: workLimit, null, 0.0, false, null, pricing, componentSplit,
+            allowance?.work ?: workLimit, null, 0.0, false, null,
+            if (current is ComponentLpSolverCapability) componentPricing() else pricing,
+            if (componentAdmission == null) componentSplit else current is ComponentLpSolverCapability,
             route, allowance != null, allowance?.iterations ?: iterationLimit, quantum, retainFundingStop,
             refactorUpdateLimit, trackDegeneracy) { current.continuationBasis(model) }
         try {
@@ -601,7 +612,7 @@ internal class LpScopedSolver(
         val scopeToken = cancellation or token
         val child = LpScopedSolver(
             working.state, scopeToken, context, refactorUpdateLimit, childIterations, childWork,
-            trackDegeneracy, maxRetainedRows, pricing, componentSplit,
+            trackDegeneracy, maxRetainedRows, pricing, componentSplit, componentAdmission, monolithicPreparationWork,
         )
         val scope = LpWorkingScope(working, child, scopeToken)
         workingActive = true
@@ -690,6 +701,7 @@ internal class LpScopedSolver(
             }
             solver = null
             closeOwner(components)
+            components.lastLocalEditDecline?.let { componentAdmission?.declinedEdit(it) }
             if (workLimit > 0L) {
                 if (components.lastMetrics.workOps >= workLimit) return false
                 replacementWorkLimit -= components.lastMetrics.workOps
@@ -714,9 +726,9 @@ internal class LpScopedSolver(
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
-        val initialComponents = componentSplit && solver == null && components == null && compaction == null
+        val prepareComponents = componentSplit && solver == null && compaction == null
         val replacement = prepared(next.state, token, append, warm, replacementWorkLimit,
-            allowComponents = initialComponents) ?: return false
+            allowComponents = prepareComponents) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
@@ -752,7 +764,13 @@ internal class LpScopedSolver(
         components: ComponentLpSolver,
         token: ExecutionControl,
     ): Boolean = try {
-        components.appendLocalRows(next, token, workLimit) { part, childToken, childWork ->
+        val fork = context.engineFactory as? LpScalarForkFactory
+        components.appendLocalRows(next, token, workLimit, componentAdmission, fork = fork?.let { factory ->
+            { source, previous, model, warm, childToken, staging ->
+                factory.newScalarFork(source, previous, model, warm, childToken, staging,
+                    componentPricing(model, next.model.n, components.rowOnlyRows))
+            }
+        }) { part, childToken, childWork ->
             newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
                 childWork, trackDegeneracy, context.engineFactory,
                 componentPricing(part, next.model.n, components.rowOnlyRows))
@@ -766,6 +784,10 @@ internal class LpScopedSolver(
         reservedConstructionWork = saturatedAdd(reservedConstructionWork, components.lastReservedConstructionWork)
         constructionWork = saturatedAdd(constructionWork, components.lastMetrics.preparationOps)
         preparationRefactorizations += components.lastRefactorizations
+        componentScalarStages += components.lastMetrics.componentScalarStages
+        componentScalarCopies += components.lastMetrics.componentScalarCopies
+        componentRowStages += components.lastMetrics.componentRowStages
+        componentJoinStages += components.lastMetrics.componentJoinStages
     }
 
     private fun recordAppendWork(work: Long?, complete: Boolean = work != null) {
@@ -873,8 +895,25 @@ internal class LpScopedSolver(
             cancellation = token,
         )
         var constructionBound = 0L
+        var constructionStarted = false
+        var constructionReported = false
         try {
             if (token() || next.model.m > maxRetainedRows) return null
+            var inspectComponents = allowComponents && warm == null && next.model.n > 0 && next.model.m >= 2 &&
+                declinedComponentMatrix?.sameMatrix(next.model) != true
+            if (inspectComponents && componentAdmission != null) {
+                projection.reserve(next.model.n.toLong() + 1L, 0L, matrix = false)
+                val entries = (0 until next.model.n).sumOf { next.model.columnEntries(it).size.toLong() }
+                if (!componentAdmission.inspect(next.model.n, next.model.m,
+                        entries.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                ) {
+                    declinedComponentMatrix = next.model
+                    inspectComponents = false
+                }
+            }
+            if (!inspectComponents && monolithicPreparationWork != null && monolithicPreparationWork > 0L) {
+                projection.restrictWork(monolithicPreparationWork)
+            }
             val working = next.ownerWorkingModel(projection)?.also {
                 // The numerical owner refreshes its scaled vectors while adopting this state.
                 projection.reserveVectors(next.model)
@@ -884,45 +923,73 @@ internal class LpScopedSolver(
                 constructionBound = bound
             } ?: return null
             if (workBudget > 0L && projection.work >= workBudget) return null
-            candidate = if (allowComponents && warm == null) {
+            candidate = if (inspectComponents) {
                 componentLpSolverOrNull(
                     working, token, projection,
                     { part, childToken, rowOnlyRows ->
                         val remaining = if (workBudget > 0L) workBudget - projection.work else 0L
                         if (workBudget > 0L && remaining <= 0L) throw LpProjectionStop()
+                        constructionStarted = true
                         newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
                             remaining, trackDegeneracy, context.engineFactory,
                             componentPricing(part, working.n, rowOnlyRows))
                     },
                     ::ComponentLpSolver,
+                    accept = componentAdmission?.let { admission ->
+                        object : LpComponentAdmission {
+                            override val ownerMergeWork: Long get() = admission.ownerMergeWork
+
+                            override fun inspect(columns: Int, rows: Int, entries: Int): Boolean =
+                                admission.inspect(columns, rows, entries).also {
+                                    if (!it) declinedComponentMatrix = next.model
+                                }
+
+                            override fun accepts(shape: LpComponentShape): Boolean = admission.accepts(shape).also {
+                                if (!it) declinedComponentMatrix = next.model
+                            }
+                        }
+                    },
                 )
             } else null
-            val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
-            if (workBudget > 0L && remainingWork <= 0L) return null
-            if (candidate == null) candidate = newPersistentLpSolver(
-                working,
-                token,
-                refactorUpdateLimit,
-                iterationLimit,
-                remainingWork,
-                trackDegeneracy,
-                context.engineFactory,
-                pricing,
-            )
+            val selectedBudget = if (candidate == null && monolithicPreparationWork != null &&
+                monolithicPreparationWork > 0L
+            ) {
+                if (workBudget > 0L) minOf(workBudget, monolithicPreparationWork) else monolithicPreparationWork
+            } else workBudget
+            val remainingWork = if (selectedBudget > 0L) selectedBudget - projection.work else 0L
+            if (selectedBudget > 0L && remainingWork <= 0L) return null
+            if (candidate == null) {
+                constructionStarted = true
+                candidate = newPersistentLpSolver(
+                    working,
+                    token,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    remainingWork,
+                    trackDegeneracy,
+                    context.engineFactory,
+                    pricing,
+                )
+            }
             createdOwners++
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
-            val basis = try {
+            val basis = withLpPreparationReport(report = {
+                val reported = candidate.lastMetrics
+                preparationWork = saturatedAdd(preparationWork, reported.workOps)
+                constructionReported = when (val current = candidate) {
+                    is ComponentLpSolver -> current.constructionReportComplete
+                    else -> reported.preparationOps > 0L
+                }
+                if (constructionReported) constructionWork = saturatedAdd(constructionWork, reported.preparationOps)
+                preparationRefactorizations += candidate.lastRefactorizations
+            }) {
                 when (val current = candidate) {
                     is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else
                         current.prepareBasis(warm, token)
                     is ComponentLpSolver -> current.prepareLogicals(token, remainingWork)
                     else -> null
                 }
-            } finally {
-                preparationWork = saturatedAdd(preparationWork, candidate.lastMetrics.workOps)
-                constructionWork = saturatedAdd(constructionWork, candidate.lastMetrics.preparationOps)
-                preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
             if (!basis.validFor(next.model) || (warm == null &&
                     (basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
@@ -943,7 +1010,9 @@ internal class LpScopedSolver(
             throw primary
         } finally {
             preparationWork = saturatedAdd(preparationWork, projection.work)
-            reservedConstructionWork = saturatedAdd(reservedConstructionWork, constructionBound)
+            if (!constructionStarted || constructionReported) {
+                reservedConstructionWork = saturatedAdd(reservedConstructionWork, constructionBound)
+            }
             if (!accepted && candidate != null) {
                 closeRejectedCandidate(candidate, recordRejectedAppendWork, failure)
             }
@@ -976,8 +1045,13 @@ internal class LpScopedSolver(
         }
     }
 
+    private fun componentPricing(): LpPricingOptions = componentAdmission?.let {
+        pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, it.basisEntryLimit),
+            basisWorkLimit = minOf(pricing.basisWorkLimit, it.basisWorkLimit))
+    } ?: pricing
+
     private fun componentPricing(part: LpModel, columns: Int, rowOnlyRows: Int): LpPricingOptions =
-        pricing.componentShare(part.n, columns, rowOnlyRows)
+        componentPricing().componentShare(part.n, columns, rowOnlyRows)
 
     override fun close() {
         requireAvailable()

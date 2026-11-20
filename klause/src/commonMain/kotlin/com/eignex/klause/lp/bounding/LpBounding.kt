@@ -40,6 +40,7 @@ import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.lp.engine.observeLpClaim
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.CutSourceWork
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -345,7 +346,9 @@ private fun LpEngine.solveSelectedCuts(
     return LpCutOutcome.Pruned(if (learn) learnedClause(tightened, ray, session, sink) else null)
 }
 
-private fun LpHintSink.recordPoint(relaxation: LpRelaxation, result: FloatLpResult) {
+private fun LpHintSink.recordPoint(engine: LpEngine, relaxation: LpRelaxation, result: FloatLpResult) {
+    if (result.blocks > 1 && !engine.params.lpPlan.componentOwnership) return
+    engine.noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.GUIDANCE)
     record(relaxation, result.primal, result.duals)
     if (result.optimal) recordObjective(relaxation, result.objective)
 }
@@ -528,7 +531,7 @@ internal fun LpEngine.sparseSafePrune(
         if (cancellation.pollStop()) return LpNodeOutcome(false, optimalBasis)
         val constant = cutPool.constantContradiction()
         if (constant == null) {
-            hints?.recordPoint(relaxation, result)
+            hints?.recordPoint(this, relaxation, result)
             return LpNodeOutcome(false, optimalBasis)
         }
         val outcome = solveSelectedCuts(
@@ -541,7 +544,7 @@ internal fun LpEngine.sparseSafePrune(
                 LpNodeOutcome(true, null, outcome.explanation)
             }
             is LpCutOutcome.Solved -> {
-                hints?.recordPoint(outcome.relaxation, outcome.result)
+                hints?.recordPoint(this, outcome.relaxation, outcome.result)
                 LpNodeOutcome(false, outcome.result.basis)
             }
         }
@@ -611,7 +614,7 @@ internal fun LpEngine.sparseSafePrune(
     // An exact one is computed once when any of them needs it; a singular/unbounded certify yields null and
     // each falls back to its cheap certificate-less path, which is sound. A numerical one is the bound itself.
     if (cancellation.pollStop()) return LpNodeOutcome(false, null)
-    hints?.recordPoint(boundRel, boundRes)
+    hints?.recordPoint(this, boundRel, boundRes)
     if (cancellation.pollStop()) return LpNodeOutcome(false, null)
     activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
@@ -1004,4 +1007,9 @@ private fun learnedClause(
     sink: SolveStatsSink,
 ): IntArray? = LpExplanation.infeasibilityClause(relaxation, ray, session).also {
     sink.observeDeduction(if (it != null) "FARKAS_CITABLE" else "FARKAS_CLAUSELESS")
+}
+
+internal fun LpEngine.noteSourceWork(work: CutSourceWork) {
+    noteNodeOverhead(work.structural * LpNodeOverhead.BUILD)
+    noteNodeOverhead(work.exact * LpNodeOverhead.EXACT)
 }

@@ -12,6 +12,81 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverProgressTest {
     @Test
+    fun `a declined structural preflight preserves the ordinary projection grant`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val admission = object : LpComponentAdmission {
+            override fun inspect(columns: Int, rows: Int, entries: Int): Boolean = false
+            override fun accepts(shape: LpComponentShape): Boolean = error("preflight declined")
+        }
+        LpScopedSolver(LpExactState(source), workLimit = 100_000L, componentSplit = true,
+            componentAdmission = admission, monolithicPreparationWork = 20L).use { owner ->
+
+            assertFalse(owner.prepare())
+
+            assertTrue(owner.metrics.preparationWork <= 20L)
+            assertEquals(0L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `declined components cannot borrow their preparation grant for a monolithic owner`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        var admissions = 0
+        LpScopedSolver(LpExactState(source), workLimit = 100_000L, componentSplit = true,
+            componentAdmission = {
+                admissions++
+                false
+            }, monolithicPreparationWork = 1L).use { owner ->
+
+            repeat(2) { assertFalse(owner.prepare()) }
+
+            assertEquals(1, admissions)
+            assertEquals(0L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `query replay records the admitted numerical owner rather than a declined split request`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        for (admitted in listOf(false, true)) {
+            val observed = ArrayList<Boolean>()
+            val entries = ArrayList<Long>()
+            val context = LpSolveContext(onQuery = {
+                observed += it.componentSplit
+                entries += it.pricing.basisEntryLimit
+            })
+            val admission = object : LpComponentAdmission {
+                override fun accepts(shape: LpComponentShape): Boolean = admitted
+                override val basisEntryLimit = 32L
+            }
+            LpScopedSolver(LpExactState(source), context = context,
+                componentSplit = true, componentAdmission = admission).use { owner ->
+
+                val solved = assertNotNull(owner.solveFloat())
+
+                assertEquals(admitted, solved.first is ComponentLpSolverCapability)
+                assertEquals(listOf(admitted), observed)
+                assertEquals(listOf(if (admitted) 32L else Long.MAX_VALUE), entries)
+            }
+        }
+    }
+
+    @Test
     fun `floating query capture should retain adopted bounds and numerical limits`() {
         var observed: LpQueryObservation? = null
         var bytes: ByteArray? = null

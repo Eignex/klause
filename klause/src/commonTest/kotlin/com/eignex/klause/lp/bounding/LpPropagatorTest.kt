@@ -69,6 +69,32 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
+    fun `preparation should preserve its primary when the host report fails`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        val primary = IllegalArgumentException("construction failed")
+        val report = IllegalStateException("host report failed")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver = throw primary
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory),
+            onPreparation = { throw report }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+
+            val failure = assertFailsWith<IllegalArgumentException> {
+                lp.prepare(ExecutionControl.Never, 100_000L)
+            }
+
+            assertSame(primary, failure)
+            assertTrue(failure.suppressedExceptions.contains(report))
+        }
+    }
+
+    @Test
     fun `installation honors its supplied construction token and preserves the default scope`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
@@ -129,7 +155,7 @@ class LpPropagatorTest {
             val result = lp.solveFloat(queryAllowance = { 0L })
 
             assertNull(result)
-            assertEquals(0L, lp.lastMetrics.workOps - assertNotNull(lp.metrics).preparationWork)
+            assertEquals(0L, lp.lastMetrics.workOps - assertNotNull(lp.metrics).measuredPreparationWork)
         }
     }
 
@@ -276,6 +302,33 @@ class LpPropagatorTest {
             val conflict = assertIs<ComponentResult.Conflict>(lp.propagate(session))
             assertEquals(listOf(1, 3), assertNotNull(conflict.explanation).literals.sorted())
             assertEquals(BigFraction.ZERO, assertNotNull(lp.state?.activeSide(second, false)).side.number.value)
+        }
+    }
+
+    @Test
+    fun `rollback should retain only surviving bound premises`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val root = SearchAtomPremise.All(emptyList())
+        val child = SearchAtomPremise.Asserted(SearchDecision.Bool(0))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val column = base.intColOf[0]
+            assertTrue(lp.assertBound(column, false, ExactLpSide(ExactLpNumber.of(1L)), root))
+            val rootWitness = assertNotNull(lp.state?.activeSide(column, false)).witness
+            lp.retract(0)
+            assertSame(root, lp.boundPremise(rootWitness))
+            assertTrue(lp.atLevel(1))
+            assertTrue(lp.assertBound(column, false, ExactLpSide(ExactLpNumber.of(2L)), child))
+            val childWitness = assertNotNull(lp.state?.activeSide(column, false)).witness
+            assertSame(child, lp.boundPremise(childWitness))
+
+            lp.retract(0)
+
+            assertSame(root, lp.boundPremise(rootWitness))
+            assertSame(SearchAtomPremise.Unavailable, lp.boundPremise(childWitness))
+            assertEquals(rootWitness, assertNotNull(lp.state?.activeSide(column, false)).witness)
         }
     }
 

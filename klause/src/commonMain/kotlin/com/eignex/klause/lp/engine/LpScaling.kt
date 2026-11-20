@@ -136,19 +136,23 @@ internal class LpScalingView private constructor(
         } else {
             if (projectionLostNonzero(next) || !next.objConstantD.isFinite()) return null
             for (i in rhs.indices) {
-                val value = checkedScale(next.rhsD(i), rowExponents[i]) ?: return null
+                val value = checkedScale(next.rhsD(i), rowExponents[i])
+                if (value.isNaN()) return null
                 nextRhs = refreshedValue(rhs, nextRhs, i, value, prefixOnly = true) { copied += it }
             }
             for (j in cost.indices) {
-                val costValue = checkedScale(next.costD(j), columnExponents[j]) ?: return null
+                val costValue = checkedScale(next.costD(j), columnExponents[j])
+                if (costValue.isNaN()) return null
                 nextCost = refreshedValue(cost, nextCost, j, costValue, prefixOnly = true) { copied += it }
-                val lowerValue = checkedScale(next.lowerD(j), -columnExponents[j]) ?: return null
+                val lowerValue = checkedScale(next.lowerD(j), -columnExponents[j])
+                if (lowerValue.isNaN()) return null
                 nextLower = refreshedValue(lower, nextLower, j, lowerValue, prefixOnly = true) { copied += it }
                 val upperValue = if (next.hasFiniteUpper(j)) {
-                    checkedScale(next.upperD(j), -columnExponents[j]) ?: return null
+                    checkedScale(next.upperD(j), -columnExponents[j])
                 } else {
                     0.0
                 }
+                if (upperValue.isNaN()) return null
                 nextUpper = refreshedValue(upper, nextUpper, j, upperValue, prefixOnly = true) { copied += it }
             }
         }
@@ -188,12 +192,14 @@ internal class LpScalingView private constructor(
                 ) {
                     return null
                 }
-                val scaledLower = checkedScale(lowerValue, -columnExponents[column]) ?: return null
+                val scaledLower = checkedScale(lowerValue, -columnExponents[column])
+                if (scaledLower.isNaN()) return null
                 val scaledUpper = if (next.hasFiniteUpper(column)) {
-                    checkedScale(upperValue, -columnExponents[column]) ?: return null
+                    checkedScale(upperValue, -columnExponents[column])
                 } else {
                     0.0
                 }
+                if (scaledUpper.isNaN()) return null
                 nextLower = refreshedValue(lower, nextLower, column, scaledLower)
                 nextUpper = refreshedValue(upper, nextUpper, column, scaledUpper)
             } else {
@@ -203,7 +209,8 @@ internal class LpScalingView private constructor(
         }
         for (column in changes.costs) {
             val value = next.costD(column)
-            val scaled = if (applied) checkedScale(value, columnExponents[column]) ?: return null else value
+            val scaled = if (applied) checkedScale(value, columnExponents[column]) else value
+            if (applied && scaled.isNaN()) return null
             nextCost = refreshedValue(cost, nextCost, column, scaled)
         }
         val work = 2L * changes.bounds.size + changes.costs.size +
@@ -259,13 +266,15 @@ internal class LpScalingView private constructor(
             for (j in 0 until model.n) {
                 for (k in sourceValues.colPtr[j] until sourceValues.colPtr[j + 1]) {
                     val exponent = rowExponents[sourceValues.rowIdx[k]] + columnExponents[j]
-                    scaledValues[k] = checkedScale(sourceValues.values[k], exponent) ?: return identity(
+                    val value = checkedScale(sourceValues.values[k], exponent)
+                    if (value.isNaN()) return identity(
                         model,
                         conditioning,
                         LpScalingDecline.UNSAFE_TRANSFORM,
                         eligible = true,
                         work,
                     )
+                    scaledValues[k] = value
                 }
             }
             work += vectorWork(model)
@@ -457,15 +466,21 @@ private fun scaledVectors(model: LpModel, rowExponents: IntArray, columnExponent
     val cost = DoubleArray(model.numVars)
     val lower = DoubleArray(model.numVars)
     val upper = DoubleArray(model.numVars)
-    for (i in rhs.indices) rhs[i] = checkedScale(model.rhsD(i), rowExponents[i]) ?: return null
+    for (i in rhs.indices) {
+        rhs[i] = checkedScale(model.rhsD(i), rowExponents[i])
+        if (rhs[i].isNaN()) return null
+    }
     for (j in cost.indices) {
-        cost[j] = checkedScale(model.costD(j), columnExponents[j]) ?: return null
-        lower[j] = checkedScale(model.lowerD(j), -columnExponents[j]) ?: return null
+        cost[j] = checkedScale(model.costD(j), columnExponents[j])
+        if (cost[j].isNaN()) return null
+        lower[j] = checkedScale(model.lowerD(j), -columnExponents[j])
+        if (lower[j].isNaN()) return null
         upper[j] = if (model.hasFiniteUpper(j)) {
-            checkedScale(model.upperD(j), -columnExponents[j]) ?: return null
+            checkedScale(model.upperD(j), -columnExponents[j])
         } else {
             0.0
         }
+        if (upper[j].isNaN()) return null
     }
     return NumericalVectors(rhs, cost, lower, upper)
 }
@@ -555,30 +570,34 @@ private fun conditioning(n: Int, m: Int, colPtr: IntArray, rowIdx: IntArray, val
 
 private fun binaryLog(value: Double): Double = ln(value) / LN_TWO
 
-private fun requireMapped(value: Double, exponent: Int): Double =
-    checkedScale(value, exponent) ?: throw LpScalingArithmeticException()
+private fun requireMapped(value: Double, exponent: Int): Double {
+    val mapped = checkedScale(value, exponent)
+    if (mapped.isNaN()) throw LpScalingArithmeticException()
+    return mapped
+}
 
-private fun checkedScale(value: Double, exponent: Int): Double? {
-    if (!value.isFinite()) return null
+// A valid transform is finite; NaN carries a decline without boxing every mapped entry.
+private fun checkedScale(value: Double, exponent: Int): Double {
+    if (!value.isFinite()) return Double.NaN
     if (value == 0.0 || exponent == 0) return value
     var scaled = value
     var remaining = exponent
     while (remaining != 0) {
         val step = remaining.coerceIn(-EXPONENT_STEP, EXPONENT_STEP)
         scaled *= 2.0.pow(step)
-        if (!scaled.isFinite() || scaled == 0.0) return null
+        if (!scaled.isFinite() || scaled == 0.0) return Double.NaN
         remaining -= step
     }
-    if (scaled.isSubnormal()) return null
+    if (scaled.isSubnormal()) return Double.NaN
     var restored = scaled
     remaining = -exponent
     while (remaining != 0) {
         val step = remaining.coerceIn(-EXPONENT_STEP, EXPONENT_STEP)
         restored *= 2.0.pow(step)
-        if (!restored.isFinite() || restored == 0.0) return null
+        if (!restored.isFinite() || restored == 0.0) return Double.NaN
         remaining -= step
     }
-    return scaled.takeIf { restored.toRawBits() == value.toRawBits() }
+    return if (restored.toRawBits() == value.toRawBits()) scaled else Double.NaN
 }
 
 private fun Double.isSubnormal(): Boolean = this != 0.0 && ((toRawBits() ushr 52) and 0x7ffL) == 0L

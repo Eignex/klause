@@ -172,7 +172,8 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "inprocessing-vivify-work", "inprocessing-interval", "inprocessing-growth", "inprocessing-cooldown",
     "inprocessing-warmup-work", "inprocessing-probe-interval",
     "lp-objective-cone", "lp-auto-off-reprobe",
-    "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
+    "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-component-reuse",
+    "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
     "pb-learning", "pb-objective-cutoff", "integer-row-learning",
     "arithmetic-learning-work", "arithmetic-learning-allocation-bytes",
@@ -242,6 +243,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpKnapsack = p[ExecutionOption.lpKnapsackLagrangian]
     val lpComponentSplit = p[ExecutionOption.lpComponentSplit]
     val lpComponentOwnership = p[ExecutionOption.lpComponentOwnership]
+    val lpComponentReuse = p[ExecutionOption.lpComponentReuse]
     val lpBoundMaxPivots = p[ExecutionOption.lpBoundMaxPivots]
     val lpAdaptiveWork = p[ExecutionOption.lpAdaptiveWork]
     val lpBranching = p[ExecutionOption.lpBranching]
@@ -277,7 +279,8 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
         inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
         inprocessingWarmupWork, inprocessingProbeInterval,
-        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
+        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpComponentReuse,
+        lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning, arithmeticLearningWork, arithmeticLearningAllocationBytes,
         propagationAttribution, historicalTableReasons, costAwarePropagation,
@@ -333,6 +336,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
         lpComponentSplit?.let { out = out.copy(lpPlan = out.lpPlan.copy(componentSplit = it)) }
         lpComponentOwnership?.let { out = out.copy(lpPlan = out.lpPlan.copy(componentOwnership = it)) }
+        lpComponentReuse?.let { out = out.copy(lpPlan = out.lpPlan.copy(componentReuse = it)) }
         lpBoundMaxPivots?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundMaxPivots = it)) }
         lpAdaptiveWork?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundAdaptiveWork = it)) }
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }

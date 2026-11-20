@@ -427,6 +427,9 @@ own interruption boundary.
 `solver.resources.NodeAllowance` owns the decision/move ledger, native
 instruction conversion and quota partitioning. `backtrack.NodeBudget` is the
 published facade; each facade forwards to one allowance without copying counters.
+LP component admission can capture the remaining worker quota as an amortization
+horizon. This hint grants no work and never changes the node ledger; see
+[LP ownership](20-linear-programming.md#immutable-component-ownership).
 Shared counters use exact saturating integer cells with the atomic backend used by
 Kumulant's relaxed concurrency mode; single-threaded arithmetic scopes use plain
 variables. Each `WorkCounter` retains its fixed `concurrency` mode and defaults to

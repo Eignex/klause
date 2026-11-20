@@ -1,5 +1,9 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.lp.LpHints
+import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Element
@@ -8,6 +12,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -16,11 +21,13 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
@@ -43,6 +50,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 
 class LpEngineTest {
     @Test
@@ -114,6 +122,240 @@ class LpEngineTest {
             session.popToLevel(0)
 
             assertFalse(engine.linearBoundDominates(session, BigFraction.ZERO))
+        }
+    }
+
+    @Test
+    fun `completed preparation should charge reported construction once to both host ledgers`() {
+        val problem = boundedLpEngineProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val base = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        var containing = 0L
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true)),
+            SolveStatsSink("preparation-construction-charge"), containingWork = { containing += it }).use { engine ->
+            assertTrue(engine.propagator.install(base, assertNotNull(base.model.authoritativeModel())))
+            val before = engine.totalSolveWork()
+            val containingBefore = containing
+
+            assertTrue(engine.propagator.prepare(ExecutionControl.Never, 100_000L))
+
+            val prepared = assertNotNull(engine.propagator.metrics)
+            assertTrue(prepared.reservedConstructionWork > 0L)
+            assertTrue(prepared.constructionWork > 0L)
+            assertEquals(prepared.measuredPreparationWork, engine.totalSolveWork() - before)
+            assertEquals(prepared.measuredPreparationWork, containing - containingBefore)
+            val charged = engine.totalSolveWork()
+            assertTrue(engine.propagator.prepare(ExecutionControl.Never, 100_000L))
+            assertEquals(charged, engine.totalSolveWork())
+            assertEquals(containingBefore + prepared.measuredPreparationWork, containing)
+        }
+    }
+
+    @Test
+    fun `unreported construction failures should retain their charge in both host ledgers`() {
+        val problem = boundedLpEngineProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val base = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        for (throwBeforeCreation in listOf(false, true)) {
+            var containing = 0L
+            var current: LpEngine? = null
+            var reported: LpScopedMetrics? = null
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                    iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    if (throwBeforeCreation) error("construction failed")
+                    val child = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                    return object : PersistentLpSolver by child {
+                        override fun prepareLogicals(token: ExecutionControl): Basis? = error("preparation failed")
+                    }
+                }
+            }
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true)),
+                SolveStatsSink("failed-preparation-charge"), LpSolveContext(factory), containingWork = {
+                    containing += it
+                    reported = current?.propagator?.metrics
+                }).use { engine ->
+                current = engine
+                assertTrue(engine.propagator.install(base, assertNotNull(base.model.authoritativeModel())))
+                val before = engine.totalSolveWork()
+                val containingBefore = containing
+
+                assertFailsWith<IllegalStateException> {
+                    engine.propagator.prepare(ExecutionControl.Never, 100_000L)
+                }
+
+                val failed = assertNotNull(reported)
+                assertEquals(0L, failed.reservedConstructionWork)
+                assertEquals(0L, failed.constructionWork)
+                assertTrue(failed.measuredPreparationWork > 0L)
+                assertEquals(failed.measuredPreparationWork, engine.totalSolveWork() - before)
+                assertEquals(failed.measuredPreparationWork, containing - containingBefore)
+            }
+        }
+    }
+
+    @Test
+    fun `intervening LP overhead should defer an otherwise scheduled node query`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("intervening-query-funding")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundEvery = 2, boundMaxOpsPerNode = 1L)), sink,
+            nodeWorkAllowance = { 1L }).use { engine ->
+            val session = PropagationSession(problem)
+            engine.pruneNode(session, 100.0, -1, true)
+            engine.noteNodeOverhead(128L)
+
+            engine.pruneNode(session, 100.0, -1, true)
+
+            assertEquals(128L, engine.totalSolveWork())
+            assertEquals(0.0, sink.snapshot().lp.nodePasses.sum)
+        }
+    }
+
+    @Test
+    fun `metadata only queries should defer further optional node queries`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("metadata-query-funding")
+        var spent = 0L
+        var cancelAssembly = true
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundMaxOpsPerNode = 1L),
+                cancellation = ExecutionControl { cancelAssembly && spent >= 128L }), sink,
+            containingWork = { spent += it }).use { engine ->
+            val session = PropagationSession(problem)
+            val before = engine.totalSolveWork()
+            engine.pruneNode(session, 100.0, -1, true)
+            val first = sink.snapshot().lp
+            assertTrue(engine.totalSolveWork() - before > 64L)
+            cancelAssembly = false
+
+            engine.pruneNode(session, 100.0, -1, true)
+
+            assertTrue(first.overheadOps.sum > 0.0)
+            assertEquals(0.0, first.workOps.sum)
+            assertEquals(1.0, first.nodePasses.sum)
+            assertEquals(first.nodePasses, sink.snapshot().lp.nodePasses)
+        }
+    }
+
+    @Test
+    fun `required real residual queries should bypass optional query credit`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("residual-query-funding")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, boundMaxOpsPerNode = 1L)),
+            sink).use { engine ->
+            val session = PropagationSession(problem)
+
+            repeat(2) { engine.pruneNode(session, 100.0, -1, true) }
+
+            assertEquals(2.0, sink.snapshot().lp.nodePasses.sum)
+        }
+    }
+
+    @Test
+    fun `unfunded nodes should preserve the configured query cadence`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("query-funding-cadence")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundEvery = 3, boundMaxOpsPerNode = 1L)), sink,
+            nodeWorkAllowance = { 1L }).use { engine ->
+            val session = PropagationSession(problem)
+            val before = engine.totalSolveWork()
+            repeat(3) { engine.pruneNode(session, 100.0, -1, true) }
+            val charged = engine.totalSolveWork() - before
+            assertTrue(charged > 64L)
+            val fundedAfter = charged - 64L + 1L
+            val nextCadence = (fundedAfter + 2L) / 3L * 3L
+
+            repeat((nextCadence - 1L).toInt()) { engine.pruneNode(session, 100.0, -1, true) }
+
+            assertEquals(1.0, sink.snapshot().lp.nodePasses.sum)
+            engine.pruneNode(session, 100.0, -1, true)
+            assertEquals(2.0, sink.snapshot().lp.nodePasses.sum)
+        }
+    }
+
+    @Test
+    fun `failed queries should retain their source assembly debt`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("failed-query-funding")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver = error("query construction")
+        }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundMaxOpsPerNode = 1L)), sink,
+            LpSolveContext(factory)).use { engine ->
+            val session = PropagationSession(problem)
+            assertFailsWith<IllegalStateException> { engine.pruneNode(session, 100.0, -1, true) }
+
+            assertFalse(engine.pruneNode(session, 100.0, -1, true))
+
+            assertEquals(1.0, sink.snapshot().lp.nodePasses.sum)
+            assertTrue(sink.snapshot().lp.overheadOps.sum > 0.0)
+        }
+    }
+
+    @Test
+    fun `branch selection spends the shared LP work allowance`() {
+        val problem = boundedLpEngineProblem()
+        val hints = LpHints(problem.numIntVars, 0)
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(problem.numIntVars) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true), solveBudgetMillis = 1L),
+            SolveStatsSink("branch-guidance-work")).use { engine ->
+            engine.noteNodeOverhead(4_999L)
+            assertFalse(engine.lpWorkAllowanceSpent())
+
+            engine.lpBranchPick(PropagationSession(problem), hints)
+
+            assertTrue(engine.lpWorkAllowanceSpent())
+        }
+    }
+
+    @Test
+    fun `admitted numerical components reuse untouched children to prune without root guidance`() {
+        val problem = Problem(0, 32, Array(32) { IntDomain(0, 5) },
+            (0 until 2).flatMap { block ->
+                (0 until 64).map { row ->
+                    val variable = row % 16
+                    Linear(intArrayOf(1, 1), intArrayOf(16 * block + variable, 16 * block + (variable + 1) % 16),
+                        LinearOp.GE, 1)
+                }
+            })
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("automatic-numerical-reuse")
+        var offeredWork = 1L
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(32) { 1L }),
+            BacktrackParams(lpPlan = LpPlan(bounding = true,
+                probe = false, cuts = false, rootCutHarvest = false), lpConfig = null,
+                nodeBudget = NodeBudget(10_000L), cancellation = ExecutionControl.after(1.hours)).lpParams(),
+            sink, LpSolveContext(factory),
+            nodeWorkAllowance = { offeredWork }).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            assertFalse(engine.pruneNode(cp.session, 1000.0, -1, true))
+            offeredWork = 1_000_000L
+            assertFalse(engine.pruneNode(cp.session, 1000.0, -1, true))
+            val before = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+
+            val pruned = engine.pruneNode(cp.session, 16.0, -1, true)
+
+            assertTrue(pruned)
+            val after = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
+            assertEquals(1L, checkNotNull(after?.get("SOLVED")) - checkNotNull(before?.get("SOLVED")))
+            assertEquals(1L, checkNotNull(after["REUSED"]) - checkNotNull(before["REUSED"]))
+            assertNull(engine.rootRoundingWarmStart)
+            assertNull(engine.rootPrimalTargets)
+            assertEquals(1L, sink.snapshot().lp.phases["COMPONENT_ADMISSION_NODE"]?.outcomes?.get("ADMITTED"))
         }
     }
 

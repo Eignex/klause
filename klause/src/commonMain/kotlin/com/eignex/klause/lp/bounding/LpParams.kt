@@ -12,23 +12,44 @@ import com.eignex.klause.util.ExecutionControl
  * [lpConfig], when set, is a high-level emphasis resolved against the problem's structure into a concrete
  * [lpPlan] by [LpAutoConfig.resolve]; with no emphasis the [lpPlan] is used verbatim.
  */
-class LpParams(
+class LpParams private constructor(
     /** The per-technique relaxation plan, used verbatim unless [lpConfig] resolves a richer one. */
-    val lpPlan: LpPlan = LpPlan(),
+    val lpPlan: LpPlan,
     /** High-level emphasis to resolve into [lpPlan] against the problem structure, or null. */
-    val lpConfig: LpConfig? = null,
+    val lpConfig: LpConfig?,
     /** Deadline token polled by every LP solve / fixpoint. */
-    val cancellation: ExecutionControl = ExecutionControl.Never,
+    val cancellation: ExecutionControl,
     /** The whole-solve wall budget in milliseconds, which sizes the cumulative LP work allowance; null = uncapped. */
-    val solveBudgetMillis: Long? = null,
+    val solveBudgetMillis: Long?,
     /** Seed for the feasibility pump and randomized pricing; null means 0. */
-    val randomSeed: Long? = null,
+    val randomSeed: Long?,
     /** Entering-column policy for exactly zero-objective LP solves. */
-    val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    val zeroObjectivePricing: LpZeroObjectivePricing,
+    internal val componentReuseWorkHorizon: Long?,
 ) {
+    /** Create LP runtime parameters. */
+    constructor(
+        lpPlan: LpPlan = LpPlan(),
+        lpConfig: LpConfig? = null,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+        solveBudgetMillis: Long? = null,
+        randomSeed: Long? = null,
+        zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    ) : this(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing, null)
+
+    /** Create default LP runtime parameters. */
+    constructor() : this(LpPlan(), null, ExecutionControl.Never, null, null,
+        LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null)
+
+    internal fun withComponentReuseWorkHorizon(work: Long?): LpParams {
+        require(work == null || work >= 0L)
+        return LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing, work)
+    }
+
     /** These params with [lpPlan] replaced (the resolved-plan swap [LpEngine] makes after auto-config). */
     fun copy(lpPlan: LpPlan = this.lpPlan): LpParams =
-        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
+        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing,
+            componentReuseWorkHorizon)
 }
 
 /**

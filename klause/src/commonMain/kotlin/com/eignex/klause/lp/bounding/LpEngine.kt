@@ -70,7 +70,6 @@ import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.observeConsumption
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
@@ -297,7 +296,7 @@ internal class LpEngine(
                 params.solveBudgetMillis,
                 params.randomSeed,
                 params.zeroObjectivePricing,
-            ),
+            ).withComponentReuseWorkHorizon(params.componentReuseWorkHorizon),
             sink,
             solveContext,
             projections = projections,
@@ -608,7 +607,7 @@ internal class LpEngine(
         component: ComponentLpSolverCapability?,
         cancellation: ExecutionControl,
     ) {
-        if (component == null) return
+        if (!params.lpPlan.componentOwnership || component == null) return
         retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_RETAINED") {
             component.partialPrimalGuidance(cancellation)
         }
@@ -902,7 +901,7 @@ internal class LpEngine(
     }
 
     fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray, relaxation: LpRelaxation, session: PropagationSession) {
-        val sources = relaxation.sourceMap?.withCpBounds(relaxation.model, session)
+        val sources = relaxation.sourceMap?.withCpBounds(relaxation.model, session, ::noteSourceWork)
         val active = relaxation.withModel(relaxation.model, sources)
         sources?.let(cutPool::remap)
         var added = 0
@@ -976,6 +975,12 @@ internal class LpEngine(
         },
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
+    private val componentReuseFunded = componentReuseFundingAvailable(lpEffortGovernor.remainingWork(),
+        params.componentReuseWorkHorizon, params.cancellation.deadline() != null)
+    private val nodeQueryFunding = LpNodeQueryFunding(params.lpPlan.boundMaxOpsPerNode,
+        LpEffortLadder.DEFAULT_WARMUP)
+    private val automaticComponentReuse: Boolean get() = params.lpPlan.componentReuse && componentReuseFunded
+    private var componentFundingDeclineObserved = false
 
     // Pivot budget for an LP that is not repaying its cost. See [LpPivotBudget].
     private val lpPivotBudget = LpPivotBudget(
@@ -1058,7 +1063,13 @@ internal class LpEngine(
 
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         retainedRootCumulativeWork().coerceAtLeast(1L)
-    } else if (separateNodePreparation) {
+    } else if (automaticComponentReuse && !params.lpPlan.componentOwnership) {
+        componentReusePreparationWork(lpEffortGovernor.remainingWork())
+    } else ordinaryNodePreparationWorkBudget()
+
+    private fun ordinaryNodePreparationWorkBudget(): Long = if (sparseTrialActive) {
+        retainedRootCumulativeWork().coerceAtLeast(1L)
+    } else if (ordinarySeparateNodePreparation) {
         val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
             retainedRootRemainingWork().coerceAtLeast(1L)
         } else nodeWorkBudget()
@@ -1157,8 +1168,11 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
-        rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
+    private val ordinarySeparateNodePreparation: Boolean get() = sparseTrialRequested ||
+        requestedPlan.componentOwnership || rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
+
+    private val separateNodePreparation: Boolean get() =
+        (requestedPlan.componentReuse && componentReuseFunded) || ordinarySeparateNodePreparation
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
         rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK ||
@@ -1240,7 +1254,11 @@ internal class LpEngine(
                 work = nodePreparationWorkBudget(),
                 trackDegeneracy = adaptiveWork,
                 pricing = pricingOptions,
-                componentSplit = params.lpPlan.componentOwnership,
+                componentSplit = params.lpPlan.componentOwnership || automaticComponentReuse,
+                componentAdmission = if (automaticComponentReuse && !params.lpPlan.componentOwnership)
+                    numericalComponentAdmission else null,
+                monolithicPreparationWork = if (automaticComponentReuse && !params.lpPlan.componentOwnership)
+                    ordinaryNodePreparationWorkBudget() else null,
             )
         },
         solveContext = solveContext,
@@ -1737,9 +1755,12 @@ internal class LpEngine(
             if (rootBoundHandedOff && session.decisionLevel == 0) return false
             if (sparseTrialActive && session.decisionLevel == 0 && retainedRootCumulativeWork() <= 0L) return false
             lpEffortGovernor.observeNode()
+            if (!params.lpPlan.realResidual) nodeQueryFunding.observeWork(totalSolveWork())
+            nodeQueryFunding.observeNode()
             if (!params.lpPlan.realResidual && (
                     session.decisionLevel > params.lpPlan.boundMaxDepth ||
                         ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
+                        !nodeQueryFunding.available ||
                         !lpLadder.shouldRun()
                     )
             ) {
@@ -1756,19 +1777,25 @@ internal class LpEngine(
                 null
             }
             nodeWorkStoppedAfterProgress = false
-            val outcome = lpBoundAndFix(
-                lpRelaxerL,
-                session,
-                effectiveBound,
-                sink,
-                objectiveVar = objectiveVar,
-                objectiveAscending = objectiveAscending,
-                cancellation = params.cancellation,
-                hints = lpHints,
-                learn = params.lpPlan.learn,
-                warm = warm,
-                cutsAllowed = cutsAllowed,
-            )
+            val outcome = try {
+                lpBoundAndFix(
+                    lpRelaxerL,
+                    session,
+                    effectiveBound,
+                    sink,
+                    objectiveVar = objectiveVar,
+                    objectiveAscending = objectiveAscending,
+                    cancellation = params.cancellation,
+                    hints = lpHints,
+                    learn = params.lpPlan.learn,
+                    warm = warm,
+                    cutsAllowed = cutsAllowed,
+                )
+            } finally {
+                if (!params.lpPlan.realResidual) {
+                    nodeQueryFunding.observeWork(totalSolveWork())
+                }
+            }
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
             lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
                 nodeWorkStoppedAfterProgress && outcome.basis == null)
@@ -1895,6 +1922,12 @@ internal class LpEngine(
                 }
             }
             params = params.copy(lpPlan = plan)
+        }
+        if (params.lpPlan.bounding && params.lpPlan.componentReuse && !componentReuseFunded &&
+            !params.lpPlan.componentOwnership && !componentFundingDeclineObserved
+        ) {
+            sink.lp.observeComponentAdmission("FUNDING", 0, 0L)
+            componentFundingDeclineObserved = true
         }
         structuralCutSupport = structuralCutSupport || params.lpPlan.circuit
         if (params.lpPlan.cuts && !structuralCutSupport) {
@@ -2032,6 +2065,7 @@ internal object LpNodeOverhead {
     const val EXACT = 32L
     const val FIXING = 2L
     const val EDIT = 1L
+    const val GUIDANCE = 1L
 }
 
 /** Rows, columns and nonzeros: the size every whole-model pass over [this] is linear in. */

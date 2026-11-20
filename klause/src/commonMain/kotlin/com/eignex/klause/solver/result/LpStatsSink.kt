@@ -167,6 +167,15 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
+    fun observeComponentAdmission(outcome: String, blocks: Int, modeledBytes: Long, basisEntries: Long = 0L) {
+        val key = "COMPONENT_ADMISSION_${probeRoute.name}"
+        val delta = LpPhaseStats(calls = 1L, outcomes = mapOf(
+            outcome to 1L, "BLOCKS_SUM" to blocks.toLong(), "MODELED_BYTES_SUM" to modeledBytes,
+            "BASIS_ENTRY_LIMIT_SUM" to basisEntries, "BASIS_RESERVED_BYTES_SUM" to 256L * basisEntries,
+        ))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
     val solves: CountStat = CountStat()
     val pruned: CountStat = CountStat()
     val infeasible: CountStat = CountStat()
@@ -253,6 +262,17 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                 LpPhaseStats(calls = metrics.componentSolves.toLong() + metrics.componentReuses,
                     outcomes = mapOf("SOLVED" to metrics.componentSolves.toLong(),
                         "REUSED" to metrics.componentReuses.toLong())),
+            )
+        }
+        val staged = metrics.componentScalarStages + metrics.componentRowStages + metrics.componentJoinStages
+        if (staged > 0L || metrics.componentScalarCopies > 0L) {
+            val key = "COMPONENT_STAGING_${effectiveRoute.name}"
+            phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(
+                LpPhaseStats(calls = staged,
+                    outcomes = mapOf("SCALAR_ATTEMPT" to metrics.componentScalarStages,
+                        "LOCAL_ROWS_ATTEMPT" to metrics.componentRowStages,
+                        "JOINED_ATTEMPT" to metrics.componentJoinStages,
+                        "SCALAR_COPY" to metrics.componentScalarCopies)),
             )
         }
         if (metrics.sourceResidualCalls > 0L) {

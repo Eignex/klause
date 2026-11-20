@@ -326,6 +326,22 @@ finite search hints after cut re-solves. Only an optimal result supplies an
 objective sample; an unfinished cut solve keeps the preceding point, and cancellation
 withholds publication. [Finite guidance](09-search.md#finite-lp-directional-guidance)
 owns selection and history lifetime.
+Publishing a point charges its model pass, and variable selection charges its bounded
+scan to the same LP effort ledger. These costs join numerical and maintenance work
+in the worker's cumulative allowance and per-node effort observations.
+
+Optional node queries earn work credit at the configured per-node effort cap, with
+initial and stored credit bounded by the existing warmup count. The first optional
+node observation opens a cumulative work checkpoint, excluding earlier setup.
+Every later LP charge, including intervening guidance, restart refresh and leaf
+completion, reduces future optional credit exactly once. Query completion and
+failure settle the checkpoint, and each node settles it before replenishing credit
+or checking depth and cadence. An atomic overshoot becomes debt repaid by later
+observed nodes; pruning and restart cannot erase it. Root and required completion
+paths keep their own budgets and bypass optional credit gating. Unfunded nodes
+advance the ordinary cadence counter while
+the ladder's re-probe clock waits for funded eligibility. A zero per-node cap disables
+credit gating.
 
 An exact state appending one bound copies only the changed side; tightening can
 introduce a conflict only at that column, so the state combines it with the
@@ -404,6 +420,57 @@ and target reset, reseed and engine close release the preferences.
 
 ### Immutable component ownership
 
+Cut-source maps capture incoming collections once. Derived maps share immutable
+column expressions, global premises and source definitions while owning their active
+premises and row-parent mappings. A CP bound refresh captures all integer endpoints
+and Boolean pins in private primitive arrays, including variables absent from LP
+columns. Exact endpoint values materialize only for requested premise checks.
+Column bounds and auxiliary exclusions form a fresh owned premise set; fixed-value
+checks can combine its bound directions with the captured CP endpoints. Row-parent
+and premise derivations preserve the capture. A CP refresh replaces it; an LP-only
+bound refresh clears it. Source
+identities and epochs keep their existing scope. Source-map and retained-layout binding
+report structural traversal and exact premise work separately, including cached bound
+refreshes and failed attempts. The host charges them with the existing construction
+and exact-work weights to the pending node and cumulative allowance. Refreshes
+report on completion; a slice excess remains work debt.
+Each retained source owner keeps at most one immutable CP source layout, containing
+only ordered column expressions, global facts and auxiliary definitions. Ordered
+column identities, producer presence and auxiliary catalog generation guard reuse.
+Append and compaction release the entry; row refreshes can reuse it while capturing
+fresh active bounds and exclusions. Key checks and binding traversals remain charged,
+and metadata construction is charged on misses.
+LP bound facts can pass between source and cut bindings only under the same immutable
+exact-state identity. This shares owned facts and an opaque token, retaining no state
+or matrix through the token. Each binding replaces CP snapshots and exclusions;
+a different exact state reconstructs and charges the LP facts.
+
+The default `lp-component-reuse` setting requires its bounded owner setup to fit
+within a quarter of the worker's LP work horizon. A remaining node quota supplies
+a deterministic horizon through the per-node LP effort policy; this hint grants no
+work. A cumulative LP allowance narrows it. Deadline-bound workers with neither
+decline component retention. Without a supplied LP horizon or a deadline, retention
+can use its bounded atomic grant. The funding decision is fixed for that worker;
+a decline keeps its ordinary preparation and query policies.
+Funded workers reject small or oversized owners before
+partition allocation. Small independent blocks merge only when their extra tableau-cell
+proxy is less than the fixed workspace work saved by removing one owner. A block whose
+smallest possible merge cannot save that work stays separate; logical-only rows keep
+their own child. Grouping preserves the LP model and leaves guidance and rounding
+partitions separate. Admission uses the grouped partition's size,
+tableau-size reduction and modeled child-model storage. A finite shared basis-entry
+limit is divided among the admitted children. Construction and declined inspection
+spend the containing LP grant separately from each adaptive numerical query. Owner
+preparation has a bounded atomic grant; search accounts any slice excess as work debt.
+A declined partition keeps the ordinary monolithic preparation limit, and scalar trail
+edits preserve a structural admission decline. Admitted
+children retain their numerical state through ordinary node edits. Composed component
+points publish node branching hints only under `lp-component-ownership`, which also
+selects root component guidance, ordering and private rounding. Automatic retention
+uses component results for bounds, fixing and separation without replacing branching
+advice. Earlier monolithic advice can survive a withheld point, as it can a skipped
+query; monolithic results keep their ordinary hint publication.
+
 The explicit `lp-component-ownership=true` setting lets finite node bounding retain
 one numerical owner per independent row-coupled block. Each child keeps its basis
 and exact result authority; empty structural rows form one logical-only child that
@@ -437,9 +504,44 @@ aggregate. Returned child coordinates can feed a masked rounding guide.
 The same setting dispatches root tableau separation to the owning block. Lifted cuts
 keep every row multiplier, bound substitution, integrality premise and source
 address for the ordinary source mapper and cut pool. Rows confined to existing
-blocks replace only those children; cross-block rows, new columns and other
-structural edits retire the collection for the ordinary owner. Callers that need one
-retained basis keep the monolithic constructor.
+blocks replace those children and any others whose scalar authority changes.
+Replacements validate their own bases using private retained bases as warm hints;
+unchanged children keep their checked evidence. Rows joining existing blocks form a
+fresh child for each union after admission checks the complete resulting shape.
+Their private basis headings supply a block-triangular warm hint; appended-row
+logicals complete it, and the fresh child validates and refactors it. Other children
+retain their owners and evidence. New columns and unsupported structural edits
+retire every child. The replacement may form a fresh collection
+under the same admission policy and remaining work grant; a declined collection
+uses the ordinary owner. Callers that need one retained basis keep the monolithic
+constructor.
+
+A scalar replacement with the same exact matrix, coordinates and ordered basis can
+fork the current factors through an explicit factory capability. Its matrix views
+remain immutable, while factors, statuses and scratch belong to the new owner.
+Scalar refresh, compatibility checks and factor-copy work spend the same staging
+allowance before any fresh-construction fallback. Unsafe refreshes use that fallback;
+a stopped copied-basis preparation aborts the unpublished edit. The source stays
+live until the complete replacement publishes, and no result evidence crosses the fork.
+
+Component staging observations count construction attempts separately for unchanged
+ordered row/column selections with scalar authority changes, added local rows and
+joined blocks. Failed and cancelled attempts remain counted; these observations
+establish neither committed owners nor consumed numerical reuse.
+The scalar-copy count records installed copied factors after a valid prepared basis;
+it supplies no claim that the whole edit published or a later query consumed it.
+Each staged child reserves construction from its own remaining allowance before
+creating an owner. Its active reservations and numerical work narrow live child
+grants. A complete scalar-refresh report or positive engine preparation report
+replaces the construction reservation once;
+an absent or default report retains its reservation as a conservative charge.
+Private workspace initialization uses the same structural work estimate as a
+directional probe. An unstarted attempt releases that reservation; once construction
+starts, initialization stays charged separately from reported scaling work.
+Node and measured-work ledgers use the same completed preparation total: raw work
+minus refundable construction reservations plus reported construction work.
+Initial collections replace their reservation only after every constructed child
+reports preparation; incomplete reports keep the full reservation conservatively.
 
 ### Cuts
 
@@ -678,6 +780,8 @@ sides, and pop restores bounds and deactivates scoped rows.
 Trail edits borrow owned immutable assertion lists for reading. An empty scope
 push shares its predecessor's captured list; changed assertions receive a fresh
 capture, and caller snapshots remain independent copies.
+Witness cleanup reads that capture with primitive IDs after a pop; a rollback
+that leaves the LP scope unchanged keeps its witness map directly.
 Adjacent states with the same base region and active rows expose their changed
 bound columns through an identity token. This token retains no predecessor state;
 unrelated states require a full check instead of borrowing the delta.

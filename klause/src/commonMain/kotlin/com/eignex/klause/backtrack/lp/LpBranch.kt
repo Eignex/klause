@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 
@@ -17,6 +18,7 @@ import com.eignex.klause.solver.search.VarRef
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
+    noteNodeOverhead((problem.numBoolVars.toLong() + problem.numIntVars) * LpNodeOverhead.GUIDANCE)
     hints.beginPassiveSelection()
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
@@ -24,12 +26,12 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     var gainScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
-        val gain = hints.directionalScore(VarRef.Bool(b))
+        val gain = hints.directionalScore(b, isBool = true)
         if (gain > gainScore) {
             gainScore = gain
             directional = VarRef.Bool(b)
         }
-        val s = hints.branchScore(VarRef.Bool(b))
+        val s = hints.branchScore(b, isBool = true)
         if (!s.isNaN() && s > bestScore) {
             bestScore = s
             best = VarRef.Bool(b)
@@ -37,12 +39,12 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     }
     for (i in 0 until problem.numIntVars) {
         if (session.intDomain(i).isFixed) continue
-        val gain = hints.directionalScore(VarRef.IntVar(i))
+        val gain = hints.directionalScore(i, isBool = false)
         if (gain > gainScore) {
             gainScore = gain
             directional = VarRef.IntVar(i)
         }
-        val s = hints.branchScore(VarRef.IntVar(i))
+        val s = hints.branchScore(i, isBool = false)
         if (!s.isNaN() && s > bestScore) {
             bestScore = s
             best = VarRef.IntVar(i)

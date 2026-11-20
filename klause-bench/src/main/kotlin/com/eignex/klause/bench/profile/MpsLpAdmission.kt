@@ -39,6 +39,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.lang.reflect.Proxy
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 
@@ -73,7 +74,9 @@ internal object MpsLpAdmission {
             SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop,
         ))
-        val plan = requireNotNull(invocation.preparedPlan)
+        val plan = requireNotNull(invocation.preparedPlan) {
+            "finite plan unavailable: route=${invocation.route::class.simpleName}, cancelled=${stop()}"
+        }
         val canonical = requireNotNull(plan.model)
         val sourceObjective = preparedObjective(plan)
         val budget = PresolveBudget(1_650_000_000L)
@@ -85,7 +88,7 @@ internal object MpsLpAdmission {
         check(preparation.presolve?.infeasible != true) { "preparation refuted source" }
         val problem = preparation.problem
         val objective = preparation.objective
-        val report = buildJsonObject {
+        val prepared = buildJsonObject {
             put("revision", Reports.readGitSha())
             put("suite", options.getValue("suite"))
             put("problem", options.getValue("problem"))
@@ -116,8 +119,6 @@ internal object MpsLpAdmission {
             put("aggressiveAdmission", admission(problem, LpConfig.AGGRESSIVE))
             put("mixedRecipes", recipes(problem as BakedProblem, objective, EngineMix.MIXED))
             put("cpRecipes", recipes(problem, objective, EngineMix.BACKTRACK))
-            put("full", shape(problem, objective, false, stop))
-            put("objectiveCone", shape(problem, objective, true, stop))
             put("javaVersion", System.getProperty("java.version"))
             put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
             put("os", System.getProperty("os.name"))
@@ -125,6 +126,12 @@ internal object MpsLpAdmission {
             put("jvmOptions", buildJsonArray {
                 ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
             })
+        }
+        out.resolve("preparation.json").writeText("$prepared\n")
+        val report = buildJsonObject {
+            prepared.forEach { (key, value) -> put(key, value) }
+            put("full", shape(problem, objective, false, stop))
+            put("objectiveCone", shape(problem, objective, true, stop))
         }
         out.resolve("admission.json").writeText("$report\n")
         println(report)
@@ -235,7 +242,7 @@ internal object MpsLpAdmission {
         return build.invoke(relaxer, domains, emptyList<Any>(), stop)
     }
 
-    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean,
+    internal fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean,
         stop: ExecutionControl): JsonObject {
         val relaxation = rootRelaxation(problem, objective, cone, stop)
         val model = get(relaxation, "Model")
@@ -260,11 +267,20 @@ internal object MpsLpAdmission {
         }
         val rowCounts = (0 until rows).groupingBy(::root).eachCount()
         val columnCounts = (0 until columns).groupingBy { root(rows + it) }.eachCount()
+        val coupled = rowCounts.keys.filter { it in columnCounts }
+        val rowOnly = rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count }
+        val childCells = coupled.sumOf { root ->
+            val count = rowCounts.getValue(root).toLong()
+            count * (columnCounts.getValue(root) + count + 1L)
+        } + rowOnly.toLong() * (rowOnly + 1L)
+        val numerical = numericalOwnerShape(model, stop)
         return buildJsonObject {
             put("rows", rows)
             put("columns", columns)
             put("nonzeros", rowIndices.size)
             put("emittedDenseProxy", rows.toLong() * (columns.toLong() + rows + 1))
+            numerical.forEach { (key, value) -> put(key, value) }
+            put("naturalComponentDenseProxy", childCells)
             put("rowComponents", rowCounts.size)
             put("rowCoupledComponents", rowCounts.keys.count { (columnCounts[it] ?: 0) > 0 })
             put("rowOnlyRows", rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count })
@@ -272,6 +288,39 @@ internal object MpsLpAdmission {
             put("largestComponentColumns", rowCounts.keys.maxOfOrNull { columnCounts[it] ?: 0 } ?: 0)
             put("isolatedColumns", (0 until columns).count { pointers[it] == pointers[it + 1] })
             put("persistentEligible", get(relaxation, "PersistentEligible") as Boolean)
+        }
+    }
+
+    private fun numericalOwnerShape(model: Any, stop: ExecutionControl): JsonObject {
+        val policy = Class.forName("com.eignex.klause.lp.bounding.LpComponentReuseKt")
+        val mergeWork = policy.getMethod("componentReuseMergeWork").invoke(null) as Long
+        val admissionType = Class.forName("com.eignex.klause.lp.engine.LpComponentAdmission")
+        var observed: Any? = null
+        val admission = Proxy.newProxyInstance(admissionType.classLoader, arrayOf(admissionType)) { _, method, args ->
+            when (method.name) {
+                "inspect" -> true
+                "getOwnerMergeWork" -> mergeWork
+                "accepts" -> {
+                    observed = requireNotNull(args)[0]
+                    false
+                }
+                else -> error("Unexpected diagnostic admission call: ${method.name}")
+            }
+        }
+        val factory = Class.forName("com.eignex.klause.lp.engine.ComponentLpSolverKt").methods.single {
+            it.name == "componentLpSolverOrNull" && it.parameterCount == 6
+        }
+        val engine: (Any, ExecutionControl, Int) -> Nothing = { _, _, _ -> error("Diagnostic constructed an engine") }
+        val component: (Any, List<Any>, List<Any>, IntArray) -> Nothing = { _, _, _, _ ->
+            error("Diagnostic constructed a component owner")
+        }
+        factory.invoke(null, model, stop, null, engine, component, admission)
+        check(!stop())
+        return buildJsonObject {
+            put("ownerMergeWork", mergeWork)
+            put("numericalOwners", observed?.let { get(it, "Blocks") as Int } ?: 0)
+            put("componentDenseProxy", observed?.let { get(it, "ComponentCells") as Long } ?: 0L)
+            put("modeledComponentBytes", observed?.let { get(it, "ModeledBytes") as Long } ?: 0L)
         }
     }
 

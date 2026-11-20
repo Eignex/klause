@@ -36,3 +36,5 @@ internal class SimplexWorkspace(m: Int, numVars: Int) {
         columnEpochs.fill(0)
     }
 }
+
+internal fun simplexWorkspaceWork(rows: Int, variables: Int): Long = 16L * variables + 40L * rows + 64L

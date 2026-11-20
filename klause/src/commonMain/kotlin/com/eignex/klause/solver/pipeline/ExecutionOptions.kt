@@ -395,6 +395,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val lpComponentOwnership: ExecutionOption<Boolean> =
             ExecutionOption("lp-component-ownership", ValueKind.BOOLEAN)
 
+        /** The `lp-component-reuse` execution setting. */
+        val lpComponentReuse: ExecutionOption<Boolean> = ExecutionOption("lp-component-reuse", ValueKind.BOOLEAN)
+
         /** The `lp-bound-max-pivots` execution setting. */
         val lpBoundMaxPivots: ExecutionOption<Int> = ExecutionOption("lp-bound-max-pivots", ValueKind.INT)
 
@@ -648,7 +651,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingProbeInterval,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
-                lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
+                lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpComponentReuse,
+                lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains, lpDirectionalAdvice,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
                 arithmeticLearningWork, arithmeticLearningAllocationBytes,

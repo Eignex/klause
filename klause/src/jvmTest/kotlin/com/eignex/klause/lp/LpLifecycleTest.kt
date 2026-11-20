@@ -282,7 +282,7 @@ class LpLifecycleTest {
             params().copy(lpConfig = null),
         )
 
-        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
+        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 8L) {})
         val beforeResume = factory.persistent.single()
         assertFalse(beforeResume.closed)
         val operations = beforeResume.operations

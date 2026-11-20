@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpComponentAdmission
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
@@ -25,6 +26,7 @@ import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.reportLpPreparation
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.relaxation.LpCutEdit
 import com.eignex.klause.lp.relaxation.LpSourceCompaction
@@ -43,6 +45,7 @@ import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.pollStop
+import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -57,6 +60,8 @@ internal data class LpEffortProfile(
     val continuation: ExactContinuationLimits = ExactContinuationLimits(),
     val fullContinuation: Boolean = true,
     val componentSplit: Boolean = false,
+    val componentAdmission: LpComponentAdmission? = null,
+    val monolithicPreparationWork: Long? = null,
 )
 
 internal interface LpSearchPolicy {
@@ -111,6 +116,10 @@ internal class LpPropagator(
     private var nextWitness = 0L
     private var preparedWork = 0L
     private var preparedRefactors = 0L
+    private var preparedScalarStages = 0L
+    private var preparedScalarCopies = 0L
+    private var preparedRowStages = 0L
+    private var preparedJoinStages = 0L
     private var solved = false
     private val witnesses = HashMap<Long, SearchAtomPremise>()
     var sourcePremises: LpSourcePremises? = null
@@ -215,6 +224,8 @@ internal class LpPropagator(
             maxRetainedRows = profile.maxRows,
             pricing = profile.pricing,
             componentSplit = profile.componentSplit,
+            componentAdmission = profile.componentAdmission,
+            monolithicPreparationWork = profile.monolithicPreparationWork,
         )
     }
 
@@ -375,7 +386,7 @@ internal class LpPropagator(
         edit: LpSourceEdit,
         premise: (Int, Boolean) -> SearchAtomPremise = { _, _ -> SearchAtomPremise.Unavailable },
     ): Boolean = withOwner { current ->
-        try {
+        withPreparationReport(current) {
             val before = current.state
             if (edit.sourceState !== before || !edit.isCurrent() ||
                 edit.bounds.size != before.model.n + edit.columns.size || cancellation()
@@ -404,17 +415,12 @@ internal class LpPropagator(
             lastMetrics = LpSolveMetrics()
             edit.commit()
             true
-        } finally {
-            onPreparation?.invoke(takePreparationMetrics(current))
         }
     } == true
 
     fun prepare(token: ExecutionControl, workAllowance: Long): Boolean = withOwner { current ->
-        try {
+        withPreparationReport(current, updateLast = true) {
             current.prepare(token, workAllowance)
-        } finally {
-            lastMetrics = takePreparationMetrics(current)
-            onPreparation?.invoke(lastMetrics)
         }
     } == true
 
@@ -476,10 +482,8 @@ internal class LpPropagator(
         var queryStarted = false
         try {
             if (prepareToken != null) {
-                val ready = try {
+                val ready = withPreparationReport(current) {
                     current.prepare(prepareToken)
-                } finally {
-                    onPreparation?.invoke(takePreparationMetrics(current))
                 }
                 if (!ready) return@withOwner null
             }
@@ -521,12 +525,42 @@ internal class LpPropagator(
     private fun takePreparationMetrics(current: LpScopedSolver): LpSolveMetrics {
         val metrics = current.metrics
         val preparation = LpSolveMetrics(
-            workOps = metrics.preparationWork - preparedWork,
+            workOps = metrics.measuredPreparationWork - preparedWork,
             initialRefactorizations = (metrics.preparationRefactorizations - preparedRefactors).toInt(),
+            componentScalarStages = metrics.componentScalarStages - preparedScalarStages,
+            componentScalarCopies = metrics.componentScalarCopies - preparedScalarCopies,
+            componentRowStages = metrics.componentRowStages - preparedRowStages,
+            componentJoinStages = metrics.componentJoinStages - preparedJoinStages,
         )
-        preparedWork = metrics.preparationWork
+        preparedWork = metrics.measuredPreparationWork
         preparedRefactors = metrics.preparationRefactorizations
+        preparedScalarStages = metrics.componentScalarStages
+        preparedScalarCopies = metrics.componentScalarCopies
+        preparedRowStages = metrics.componentRowStages
+        preparedJoinStages = metrics.componentJoinStages
         return preparation
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Reporting preserves an action's primary failure.
+    private inline fun <T> withPreparationReport(
+        current: LpScopedSolver,
+        updateLast: Boolean = false,
+        action: () -> T,
+    ): T {
+        var failure: Throwable? = null
+        try {
+            return action()
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
+        } finally {
+            reportLpPreparation(failure) {
+                if (updateLast) {
+                    lastMetrics = takePreparationMetrics(current)
+                    onPreparation?.invoke(lastMetrics)
+                } else onPreparation?.invoke(takePreparationMetrics(current))
+            }
+        }
     }
 
     override fun initialize(context: SearchContext): ComponentResult {
@@ -589,19 +623,18 @@ internal class LpPropagator(
 
     override fun retract(decisionLevel: Int) {
         val current = owner
-        if (current != null && current.state.depth > decisionLevel &&
-            !current.pop(decisionLevel, ExecutionControl.Never)
-        ) {
-            invalidate()
+        if (current != null && current.state.depth > decisionLevel) {
+            if (current.pop(decisionLevel, ExecutionControl.Never)) retainWitnesses() else invalidate()
         }
         lastMetrics = LpSolveMetrics()
-        retainWitnesses()
         policy.retract(decisionLevel)
     }
 
     private fun retainWitnesses() {
-        val active = state?.assertions?.map { it.witness }?.toSet().orEmpty()
-        witnesses.keys.retainAll(active)
+        if (witnesses.isEmpty()) return
+        val active = LongHashSet()
+        state?.assertionView?.forEach { active.add(it.witness) }
+        witnesses.keys.removeAll { it !in active }
     }
 
     override fun onRestart(context: SearchContext) = policy.restart(context)
@@ -614,6 +647,10 @@ internal class LpPropagator(
         solved = false
         preparedWork = 0L
         preparedRefactors = 0L
+        preparedScalarStages = 0L
+        preparedScalarCopies = 0L
+        preparedRowStages = 0L
+        preparedJoinStages = 0L
         owner = newOwner(retained)
     }
 
@@ -629,6 +666,10 @@ internal class LpPropagator(
         nextWitness = 0L
         preparedWork = 0L
         preparedRefactors = 0L
+        preparedScalarStages = 0L
+        preparedScalarCopies = 0L
+        preparedRowStages = 0L
+        preparedJoinStages = 0L
         lastMetrics = LpSolveMetrics()
         previous?.close()
     }

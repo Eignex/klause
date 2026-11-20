@@ -525,8 +525,17 @@ data class BacktrackParams(
         copy(cancellation = this.cancellation.withLifetime(cancellation))
 
     /** The LP-bounding runtime's slice of these params (see [LpParams]) — what `LpEngine` consumes. */
-    fun lpParams(): LpParams =
-        LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
+    fun lpParams(): LpParams {
+        val remaining = nodeBudget?.decisionsLeft()
+        val perNode = lpPlan.boundMaxOpsPerNode
+        val horizon = when {
+            remaining == null || perNode <= 0L -> null
+            remaining > Long.MAX_VALUE / perNode -> Long.MAX_VALUE
+            else -> remaining * perNode
+        }
+        return LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
+            .withComponentReuseWorkHorizon(horizon)
+    }
 
     private companion object {
         private fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)

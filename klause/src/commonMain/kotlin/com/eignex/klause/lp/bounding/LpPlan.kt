@@ -63,6 +63,8 @@ data class LpPlan(
      * Deterministic ceiling on what the node LP may spend per node the search explores, in [com.eignex.klause.lp.engine.LpWork]
      * operations ([LpEffortGovernor]). Exceeding it, having pruned nothing, demotes the LP to its floor
      * budget; a prune restores it and restarts its evidence window. `0` disables the rule.
+     * Optional query authorization also earns this much credit per observed node, with bounded warmup
+     * credit. Full query cost spends that credit, and a prune cannot forgive the resulting debt.
      *
      * A ratio rather than a wall-clock fraction because it is scale-free and reproducible: it says *the
      * LP is taxing the search* without needing to know how long the run may take or how fast the machine
@@ -410,10 +412,12 @@ data class LpPlan(
     val booleanRlt: Boolean = false,
     /** Harvest globally valid cuts before search. Node separation remains independent. */
     val rootCutHarvest: Boolean = true,
-    /** Retain immutable component owners for node bounds and dispatch tableau cuts within each block. */
+    /** Enable component-composed node hints, retained root guidance and private rounding. */
     val componentOwnership: Boolean = false,
     /** Source-template retention and admission, independent of the enabled numerical techniques. */
     val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+    /** Automatically admit selective numerical child reuse independently of root guidance and rounding. */
+    val componentReuse: Boolean = true,
 ) {
     /**
      * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the
@@ -428,8 +432,11 @@ data class LpPlan(
 }
 
 internal fun LpPlan.hasDefaultNumericalSettings(): Boolean =
-    this == DefaultNumericalPlans.byPreparation[sourcePreparation.ordinal]
+    this == DefaultNumericalPlans.byPreparation[sourcePreparation.ordinal][if (componentReuse) 1 else 0]
 
 private object DefaultNumericalPlans {
-    val byPreparation = LpSourcePreparation.entries.map { LpPlan(sourcePreparation = it) }
+    val byPreparation = LpSourcePreparation.entries.map {
+        arrayOf(LpPlan(sourcePreparation = it, componentReuse = false),
+            LpPlan(sourcePreparation = it, componentReuse = true))
+    }
 }

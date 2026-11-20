@@ -12,13 +12,14 @@ internal data class CutSource(val kind: CutSourceKind, val id: Int) {
 
 internal class CutExpression(terms: Map<CutSource, BigFraction>, val constant: BigFraction = BigFraction.ZERO) {
     private val coefficients = terms.filterValues { !it.isZero }.toMap()
+    private val hash = 31 * coefficients.hashCode() + constant.hashCode()
     val storageUnits: Long get() = coefficients.size.toLong() * 3L + 1L
     val terms: Map<CutSource, BigFraction> get() = coefficients.toMap()
 
     override fun equals(other: Any?): Boolean =
         other is CutExpression && coefficients == other.coefficients && constant == other.constant
 
-    override fun hashCode(): Int = 31 * coefficients.hashCode() + constant.hashCode()
+    override fun hashCode(): Int = hash
 
     fun value(assignment: (CutSource) -> BigFraction): BigFraction =
         coefficients.entries.fold(constant) { value, (source, coefficient) -> value + coefficient * assignment(source) }

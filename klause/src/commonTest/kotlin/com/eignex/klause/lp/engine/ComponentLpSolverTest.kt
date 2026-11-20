@@ -15,6 +15,334 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `appended rows should reject any edit to the existing matrix`() {
+        for (change in 0..2) {
+            val builder = LpBuilder()
+            repeat(3) {
+                val column = builder.addVar(0L, 5L, cost = 1L)
+                builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+            }
+            val base = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+            val state = LpExactState(base)
+            val altered = ExactLpModel(
+                List(base.n) { column ->
+                    if (column != 0) base.columnEntries(column) else when (change) {
+                        0 -> emptyList()
+                        1 -> listOf(ExactLpEntry(0, ExactLpNumber.of(3L)))
+                        else -> base.columnEntries(column) + ExactLpEntry(1, ExactLpNumber.of(1L))
+                    }
+                },
+                List(base.m) { base.rhs(it) }, List(base.numVars) { base.column(it) },
+                List(base.m) { base.row(it) }, base.objective,
+            )
+            val next = LpBoundTrail(altered)
+            assertTrue(next.append(LpScopedRow(3L, listOf(2 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
+            assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+                val before = assertNotNull(owner.solve())
+
+                val accepted = owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
+                    newPersistentLpSolver(model, cancellation = token, workLimit = work)
+                }
+                val after = assertNotNull(owner.solve())
+
+                assertFalse(accepted)
+                assertSame(state, after.exactState)
+                assertEquals(before.objective, after.objective, 1e-8)
+            }
+        }
+    }
+
+    @Test
+    fun `cancelling a scalar fork should preserve the unpublished collection`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        var cancelled = false
+        var closed = 0
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            val original = assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            assertTrue(next.assertBound(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
+
+            val accepted = owner.appendLocalRows(next.state, ExecutionControl { cancelled }, 100_000L,
+                fork = { source, previous, target, warm, token, staging ->
+                    ProductionLpEngineFactory.newScalarFork(source, previous, target, warm, token, staging,
+                        LpPricingOptions())?.let { prepared ->
+                        LpScalarFork {
+                            val child = prepared.create()
+                            cancelled = true
+                            object : PersistentLpSolver by child {
+                                override fun close() {
+                                    closed++
+                                    child.close()
+                                }
+                            }
+                        }
+                    }
+                }) { model, token, work ->
+                newPersistentLpSolver(model, cancellation = token, workLimit = work)
+            }
+            cancelled = false
+            val repeated = assertNotNull(owner.solve())
+
+            assertFalse(accepted)
+            assertEquals(1, closed)
+            assertEquals(original.objective, repeated.objective, 1e-8)
+            assertEquals(3, owner.lastMetrics.componentReuses)
+        }
+    }
+
+    @Test
+    fun `a joining row and a separate bound edit should retain the unaffected child`() {
+        val builder = LpBuilder()
+        repeat(4) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val factory = RecordingLpEngineFactory()
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = factory)).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            assertTrue(next.assertBound(2, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+            assertTrue(next.append(LpScopedRow(4L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+
+            assertTrue(owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
+                newPersistentLpSolver(model, cancellation = token, workLimit = work, factory = factory)
+            })
+            val raw = assertNotNull(owner.solve())
+            val result = certifyLpResult(assertNotNull(next.state.ownerWorkingModel()), owner, raw)
+
+            assertEquals(BigFraction.ofLong(15L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+            assertEquals(3, raw.blocks)
+            assertEquals(1, owner.lastMetrics.componentReuses)
+            assertEquals(2, owner.lastMetrics.componentSolves)
+            assertEquals(6, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        }
+    }
+
+    @Test
+    fun `throwing child construction should retain its staging attempt`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+
+            assertFailsWith<IllegalStateException> {
+                owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { _, _, _ ->
+                    error("construction failed")
+                }
+            }
+
+            assertEquals(1L, owner.lastMetrics.componentJoinStages)
+            assertEquals(0L, owner.lastMetrics.componentScalarStages)
+            assertEquals(0L, owner.lastMetrics.componentRowStages)
+        }
+    }
+
+    @Test
+    fun `throwing preparation without a construction report should retain its reserved charge`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+
+            assertFailsWith<IllegalStateException> {
+                owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
+                    val child = newPersistentLpSolver(model, cancellation = token, workLimit = work)
+                    object : PersistentLpSolver by child {
+                        override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? =
+                            error("preparation failed")
+                    }
+                }
+            }
+
+            assertEquals(0L, owner.lastReservedConstructionWork)
+        }
+    }
+
+    @Test
+    fun `cancelled joining preparation should retain the original collection`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+            var cancelled = false
+            var stagedClosed = false
+
+            val accepted = owner.appendLocalRows(next.state, ExecutionControl { cancelled }, 0L) { model, token, work ->
+                val child = newPersistentLpSolver(model, cancellation = token, workLimit = work)
+                object : PersistentLpSolver by child {
+                    override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? =
+                        child.prepareBasis(basis, token).also { cancelled = true }
+
+                    override fun close() {
+                        stagedClosed = true
+                        child.close()
+                    }
+                }
+            }
+            val stages = owner.lastMetrics.componentJoinStages
+            val raw = assertNotNull(owner.solve())
+            val result = certifyLpResult(assertNotNull(state.ownerWorkingModel()), owner, raw)
+
+            assertFalse(accepted)
+            assertTrue(stagedClosed)
+            assertEquals(1L, stages)
+            assertSame(state, raw.exactState)
+            assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+        }
+    }
+
+    @Test
+    fun `a joining edit exceeding its grant should retain the original collection`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            val minus = ExactLpNumber.of(-1L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+            var constructed = 0
+
+            val accepted = owner.appendLocalRows(next.state, ExecutionControl.Never, 3L) { model, token, work ->
+                constructed++
+                newPersistentLpSolver(model, cancellation = token, workLimit = work)
+            }
+            val charged = owner.lastMetrics.workOps
+            val raw = assertNotNull(owner.solve())
+            val result = certifyLpResult(assertNotNull(state.ownerWorkingModel()), owner, raw)
+
+            assertFalse(accepted)
+            assertEquals(0, constructed)
+            assertTrue(charged in 1L..3L)
+            assertSame(state, raw.exactState)
+            assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+        }
+    }
+
+    @Test
+    fun `later staging exhaustion should close earlier replacements and retain the original collection`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            val zero = ExactLpNumber.of(0L)
+            repeat(2) { column ->
+                assertTrue(next.append(LpScopedRow(3L + column, listOf(column to ExactLpNumber.of(-1L)),
+                    ExactLpNumber.of(-3L), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+            }
+            var constructed = 0
+            var closed = 0
+
+            val accepted = owner.appendLocalRows(next.state, ExecutionControl.Never, 100_000L) { model, token, work ->
+                constructed++
+                val child = newPersistentLpSolver(model, cancellation = token, workLimit = work)
+                var prepared = false
+                object : PersistentLpSolver by child {
+                    override val lastMetrics: LpSolveMetrics
+                        get() = child.lastMetrics.let { if (prepared) it.copy(workOps = work - 1L) else it }
+
+                    override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? =
+                        child.prepareBasis(basis, token).also { prepared = true }
+
+                    override fun close() {
+                        closed++
+                        child.close()
+                    }
+                }
+            }
+            val raw = assertNotNull(owner.solve())
+
+            assertFalse(accepted)
+            assertEquals(1, constructed)
+            assertEquals(1, closed)
+            assertSame(state, raw.exactState)
+        }
+    }
+
+    @Test
+    fun `a local row and a bound in another block should retain the unaffected child`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val factory = RecordingLpEngineFactory()
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = factory)).use { owner ->
+            assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            assertTrue(next.assertBound(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+            val zero = ExactLpNumber.of(0L)
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
+
+            assertTrue(owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
+                newPersistentLpSolver(model, cancellation = token, workLimit = work, factory = factory)
+            })
+            assertEquals(1L, owner.lastMetrics.componentScalarStages)
+            assertEquals(1L, owner.lastMetrics.componentRowStages)
+            assertEquals(0L, owner.lastMetrics.componentJoinStages)
+            val result = assertNotNull(owner.solve())
+            val certified = certifyLpResult(assertNotNull(next.state.ownerWorkingModel()), owner, result)
+
+            assertEquals(BigFraction.ofLong(15L) * BigFraction.ofLong(2L).reciprocal(), certified.lowerBound)
+            assertEquals(1, owner.lastMetrics.componentReuses)
+            assertEquals(5, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        }
+    }
+
+    @Test
     fun `advancing component cursors withhold returned guidance`() {
         val builder = LpBuilder()
         repeat(3) {

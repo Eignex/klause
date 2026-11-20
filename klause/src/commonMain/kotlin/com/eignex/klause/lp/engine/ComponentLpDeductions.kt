@@ -21,6 +21,18 @@ internal class ComponentLpDeductionCache(size: Int) {
     private val entries = arrayOfNulls<Entry>(size)
     private var retainedBytes = 0L
 
+    fun remapped(origins: IntArray): ComponentLpDeductionCache {
+        val next = ComponentLpDeductionCache(origins.size)
+        for (index in origins.indices) {
+            val origin = origins[index]
+            if (origin < 0) continue
+            val entry = entries[origin] ?: continue
+            next.entries[index] = entry
+            next.retainedBytes += entry.bytes
+        }
+        return next
+    }
+
     fun invalidate(index: Int) {
         retainedBytes -= entries[index]?.bytes ?: 0L
         entries[index] = null

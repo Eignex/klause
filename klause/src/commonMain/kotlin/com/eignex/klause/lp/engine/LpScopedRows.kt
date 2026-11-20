@@ -152,7 +152,7 @@ internal fun ExactLpModel.appendScopedRows(
     }
     return ExactLpModel(
         List(newEntries.size) { column ->
-            if (column < n) entries(column) + newEntries[column] else newEntries[column]
+            if (column < n) columnEntries(column) + newEntries[column] else newEntries[column]
         },
         List(m) { rhs(it) } + rows.map { it.rhs },
         List(n) { column(it) } + columns.map { it.column } + List(m) { column(n + it) } + rows.map { it.logical },
@@ -168,7 +168,7 @@ internal fun ExactLpModel.appendScopedRow(row: LpScopedRow): ExactLpModel = appe
 
 internal fun ExactLpModel.compactLayout(remap: LpLayoutRemap): ExactLpModel = ExactLpModel(
     remap.retainedColumns.map { column ->
-        entries(column).mapNotNull { entry ->
+        columnEntries(column).mapNotNull { entry ->
             val next = remap.row(entry.row)
             if (next < 0) null else ExactLpEntry(next, entry.number)
         }

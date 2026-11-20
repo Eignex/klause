@@ -326,11 +326,19 @@ private fun LpExactState.restrictTo(
     val source = model
     val indices = columns.toIntArray() + IntArray(rows.size) { source.n + rows[it] }
     val zero = ExactLpNumber.of(0L)
+    var ordered = true
+    for (index in 1 until rows.size) {
+        if (rows[index - 1] >= rows[index]) {
+            ordered = false
+            break
+        }
+    }
     val restricted = ExactLpModel(
         matrix = List(columns.size) { column ->
-            source.columnEntries(columns[column]).mapNotNull { entry ->
+            val entries = source.columnEntries(columns[column]).mapNotNull { entry ->
                 rowMap[entry.row].takeIf { it >= 0 }?.let { ExactLpEntry(it, entry.number) }
-            }.sortedBy { it.row }
+            }
+            if (ordered) entries else entries.sortedBy { it.row }
         },
         rhs = List(rows.size) { source.rhs(rows[it]) },
         columns = indices.map { source.column(it) },
@@ -348,10 +356,15 @@ private fun LpExactState.restrictTo(
     return LpNeighborhood(working, colMap, rows.toIntArray(), columns.toIntArray())
 }
 
-internal fun LpNeighborhood.rebindExact(state: LpExactState, token: ExecutionControl): LpNeighborhood? {
+internal fun LpNeighborhood.rebindExact(
+    state: LpExactState,
+    token: ExecutionControl,
+    projection: LpProjectionMeter? = null,
+): LpNeighborhood? {
     val previous = model.exactState ?: return null
     val source = state.model
     fun parentColumn(local: Int): Int = if (local < cols.size) cols[local] else source.n + rows[local - cols.size]
+    projection?.reserve(model.numVars.toLong() + rows.size, 0L, matrix = false)
     var changed = false
     for (local in 0 until model.numVars) {
         if (token()) return null
@@ -372,6 +385,8 @@ internal fun LpNeighborhood.rebindExact(state: LpExactState, token: ExecutionCon
         ) changed = true
     }
     if (!changed) return this
+    val dimensions = model.numVars.toLong() + rows.size
+    projection?.reserve(dimensions * 4L + 1L, (dimensions + 1L) * 128L, matrix = false)
     val identities = LpScopedRows(
         List(rows.size) { LpRowIdentity(it.toLong(), null, active = state.rows.row(rows[it]).active) },
         rows.size - 1L,
@@ -389,11 +404,12 @@ internal fun LpNeighborhood.rebindExact(state: LpExactState, token: ExecutionCon
         popRevision = state.popRevision,
         rows = identities,
         rowRevision = state.rowRevision,
+        previous = previous,
     )
     if (!previous.sameMatrix(next)) return null
     next.inheritProjection(previous)
     next.inheritScalars(previous)
-    val working = next.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return null
+    val working = next.ownerWorkingModel(projection ?: LpProjectionMeter(cancellation = token)) ?: return null
     return LpNeighborhood(working, colMap, rows, cols)
 }
 
