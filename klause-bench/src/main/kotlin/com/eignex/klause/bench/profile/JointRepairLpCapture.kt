@@ -66,10 +66,10 @@ internal object JointRepairLpCapture {
         val captureContext = companion.javaClass.declaredMethods.single { it.name == "captureContext" }
             .apply { isAccessible = true }
         val context = requireNotNull(captureContext.invoke(companion, model, objective, stop))
-        val original = requireNotNull(field(invocation, "linearSource"))
+        val original = requireNotNull(call(invocation, "getLinearSource"))
         val checker = Class.forName(PIPELINE + "FiniteIncumbentCompletionKt").methods.single {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
-        }.invoke(null, original, field(preparation, "sourceMapping"))
+        }.invoke(null, original, call(preparation, "getSourceMapping"))
         val active = stop or ExecutionControl.after(4_000.milliseconds)
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
             sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
