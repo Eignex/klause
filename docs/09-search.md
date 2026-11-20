@@ -370,7 +370,8 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit the minimum of the predicted child gains; a zero
+in each direction permit the minimum of the predicted child gains, capped at the
+current node's positive cutoff gap; a zero
 gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
@@ -381,6 +382,9 @@ A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
+Estimates that both reach the gap preserve the ordinary variable. Gap comparison
+and capping charge the containing LP allowance. Positive predictions that underflow
+to zero supply no measured zero reference.
 The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
 and skips history lookups until such a variable has been observed, or after all
 such observations have aged out. Samples from different variables cannot open that

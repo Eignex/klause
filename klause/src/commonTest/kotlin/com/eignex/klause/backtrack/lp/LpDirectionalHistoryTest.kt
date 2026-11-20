@@ -10,6 +10,50 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `positive unrepresentable scores cannot supply a measured zero reference`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, if (up) 0.25 else 0.75)
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(Double.MIN_VALUE)
+            }
+        }
+
+        val score = history.estimate(variable, 0.25)
+
+        assertTrue(score.isNaN())
+    }
+
+    @Test
+    fun `variable estimates require a positive cutoff gap`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        history.beginNode(0)
+        history.record(10.0)
+
+        for (cutoff in listOf(Double.NaN, Double.NEGATIVE_INFINITY, 9.0, 10.0)) {
+            assertTrue(history.estimate(variable, 0.5, cutoff).isNaN(), "cutoff=$cutoff")
+        }
+        assertEquals(0.25, history.score(variable, 0.5, 10.25), 1e-9)
+        assertEquals(2.0, history.score(variable, 0.5), 1e-9)
+    }
+
+    @Test
     fun `restart retains samples but discards ancestor and pending child attribution`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add)

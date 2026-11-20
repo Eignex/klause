@@ -182,7 +182,7 @@ internal class LpHints(
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)
         if (variable is VarRef.Bool && point !in 0.0..1.0) return Double.NaN
-        return history.score(variable, point).also {
+        return history.score(variable, point, cutoff - scopeConstant.toDouble()).also {
             if (it.isFinite()) observe("PASSIVE_VARIABLE_RELIABLE")
         }
     }
@@ -221,8 +221,9 @@ internal class LpHints(
             fresh = current,
             reliable = {
                 charge(2L)
-                val gain = history.score(proposal, proposed.point)
-                val baselineGain = if (proposal == baseline) gain else history.estimate(baseline, reference.point)
+                val gapCutoff = cutoff - scopeConstant.toDouble()
+                val gain = history.score(proposal, proposed.point, gapCutoff)
+                val baselineGain = if (proposal == baseline) gain else history.estimate(baseline, reference.point, gapCutoff)
                 if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
                 history.hasReliableHistory && gain.isFinite() && baselineGain.isFinite() &&
                     (proposal == baseline || gain > baselineGain)

@@ -221,14 +221,19 @@ class LpHintsTest {
         val baseline = VarRef.IntVar(0)
         val proposal = VarRef.IntVar(1)
         val costs = ArrayList<Long>()
-        for ((apply, asymmetricReference) in listOf(false to false, true to false, false to true, true to true)) {
+        for ((apply, asymmetricReference, gap) in listOf(
+            Triple(false, false, 90.0), Triple(true, false, 90.0),
+            Triple(false, true, 90.0), Triple(true, true, 90.0),
+            Triple(false, true, 0.25), Triple(true, true, 0.25),
+            Triple(false, true, 0.75), Triple(true, true, 0.75),
+        )) {
             var work = 0L
             val events = ArrayList<String>()
             val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
                 observe = events::add, charge = { work += it })
             repeat(2) {
                 for (variable in listOf(baseline, proposal)) {
-                    hints.beginNode(0, 100.0)
+                    hints.beginNode(0, 10.0 + gap)
                     hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
                     hints.recordObjective(relaxation, 10.0)
                     hints.branch(variable)
@@ -236,7 +241,7 @@ class LpHintsTest {
                     for (up in listOf(false, true)) {
                         hints.commit(if (up) SearchDecision.IntAtLeast(variable.varId, split + 1L)
                         else SearchDecision.IntAtMost(variable.varId, split), 1)
-                        hints.beginNode(1, 100.0)
+                        hints.beginNode(1, 10.0 + gap)
                         val child = doubleArrayOf(2.25, 3.25)
                         child[variable.varId] = if (up) split + 1.0 else split.toDouble()
                         hints.record(relaxation, child, DoubleArray(0))
@@ -249,26 +254,27 @@ class LpHintsTest {
                     }
                 }
             }
-            hints.beginNode(0, 100.0)
+            hints.beginNode(0, 10.0 + gap)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
-            assertEquals(1.0, hints.directionalScore(proposal), 1e-9)
+            assertEquals(minOf(1.0, gap), hints.directionalScore(proposal), 1e-9)
             val before = work
             hints.beginPassiveSelection()
 
             val selected = assertNotNull(hints.selectVariable(proposal, baseline))
             hints.branch(selected)
-            hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, if (selected == proposal) 3L else 2L), 1)
 
-            assertEquals(if (apply) proposal else baseline, selected)
+            val improves = !asymmetricReference || gap > 0.5
+            assertEquals(if (apply && improves) proposal else baseline, selected)
             val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
+            assertEquals(if (improves) 1 else 0, events.count { it == event })
             assertEquals(4, events.count { it == "UP" })
             assertEquals(4, events.count { it == "DOWN" })
             costs.add(work - before)
         }
-        assertEquals(costs.first(), costs.last())
+        for ((withheld, applied) in costs.chunked(2)) assertEquals(withheld, applied)
     }
 
     @Test
@@ -378,7 +384,7 @@ class LpHintsTest {
                     assertEquals(before, work)
                 } else {
                     assertEquals(1.0, score, 1e-9)
-                    assertEquals(before + 1L, work)
+                    assertEquals(before + 3L, work)
                 }
             }
         }

@@ -193,16 +193,21 @@ internal class LpDirectionalHistory(
         pending = null
     }
 
-    fun score(variable: VarRef, value: Double): Double = estimate(variable, value)
+    fun score(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Double =
+        estimate(variable, value, cutoff)
         .takeIf { it > 0.0 } ?: Double.NaN
 
-    fun estimate(variable: VarRef, value: Double): Double {
+    fun estimate(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Double {
         val history = reliable(variable, value) ?: return Double.NaN
+        charge(2L)
+        val gap = if (cutoff == Double.POSITIVE_INFINITY) cutoff else cutoff - objective
+        if (gap.isNaN() || gap <= 0.0) return Double.NaN
+        if (history.down.gain == 0.0 || history.up.gain == 0.0) return 0.0
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
-        val score = minOf(down, up)
-        return score.takeIf { it.isFinite() } ?: Double.NaN
+        val score = minOf(down, up, gap)
+        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
     fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? {
