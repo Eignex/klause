@@ -62,6 +62,9 @@ Thresholds and premises belong to each asserted source side.
 Prepared source forms share identical exact coefficient maps and ordered arrays
 within one preparation. Each row retains its own threshold, relation, strictness
 and Boolean terms; a fresh source preparation owns a fresh pool.
+Boolean-independent comparisons are retained by their immutable row form. Prepared
+Boolean dependencies also serve source-row truth reads; assignments and disjunct
+directions are read from the current search node.
 Other terms first seen under a branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
