@@ -15,6 +15,45 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `appended rows should reject any edit to the existing matrix`() {
+        for (change in 0..2) {
+            val builder = LpBuilder()
+            repeat(3) {
+                val column = builder.addVar(0L, 5L, cost = 1L)
+                builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+            }
+            val base = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+            val state = LpExactState(base)
+            val altered = ExactLpModel(
+                List(base.n) { column ->
+                    if (column != 0) base.columnEntries(column) else when (change) {
+                        0 -> emptyList()
+                        1 -> listOf(ExactLpEntry(0, ExactLpNumber.of(3L)))
+                        else -> base.columnEntries(column) + ExactLpEntry(1, ExactLpNumber.of(1L))
+                    }
+                },
+                List(base.m) { base.rhs(it) }, List(base.numVars) { base.column(it) },
+                List(base.m) { base.row(it) }, base.objective,
+            )
+            val next = LpBoundTrail(altered)
+            assertTrue(next.append(LpScopedRow(3L, listOf(2 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
+            assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+                val before = assertNotNull(owner.solve())
+
+                val accepted = owner.appendLocalRows(next.state, ExecutionControl.Never, 0L) { model, token, work ->
+                    newPersistentLpSolver(model, cancellation = token, workLimit = work)
+                }
+                val after = assertNotNull(owner.solve())
+
+                assertFalse(accepted)
+                assertSame(state, after.exactState)
+                assertEquals(before.objective, after.objective, 1e-8)
+            }
+        }
+    }
+
+    @Test
     fun `cancelling a scalar fork should preserve the unpublished collection`() {
         val builder = LpBuilder()
         repeat(3) {
