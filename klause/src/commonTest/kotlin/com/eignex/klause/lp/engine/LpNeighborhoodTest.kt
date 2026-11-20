@@ -6,7 +6,9 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.columnNeighborhood
 import com.eignex.klause.lp.engine.rowIndex
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.withBoundedPolling
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,6 +17,20 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpNeighborhoodTest {
+
+    @Test
+    fun `short rebinds observe cancellation before returning an unchanged state`() {
+        val (base, columns) = chain()
+        val state = LpExactState(assertNotNull(base.authoritativeModel()))
+        val working = assertNotNull(state.ownerWorkingModel())
+        val neighborhood = working.columnNeighborhood(intArrayOf(columns[0]), 16, working.rowIndex())
+        var observations = 0
+        val stop = ExecutionControl(Cancellation { ++observations >= 3 }).withBoundedPolling()
+
+        val rebound = neighborhood.rebindExact(state, stop)
+
+        assertNull(rebound)
+    }
 
     @Test
     fun `bound refreshes preserve suspended rows until their scope is popped`() {

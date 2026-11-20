@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
@@ -361,33 +362,42 @@ internal fun LpNeighborhood.rebindExact(
     token: ExecutionControl,
     projection: LpProjectionMeter? = null,
 ): LpNeighborhood? {
+    if (token()) return null
     val previous = model.exactState ?: return null
     val source = state.model
     fun parentColumn(local: Int): Int = if (local < cols.size) cols[local] else source.n + rows[local - cols.size]
     projection?.reserve(model.numVars.toLong() + rows.size, 0L, matrix = false)
     var changed = false
     var activityChanged = false
+    var boundsOnly = true
     for (local in 0 until model.numVars) {
-        if (token()) return null
+        if (token.pollStop()) return null
         val original = parentColumn(local)
         val column = source.column(original)
-        if (column.origin != previous.model.column(local).origin) return null
-        if (column != previous.model.column(local) ||
-            source.objective.cost(original) != previous.model.objective.cost(local)
-        ) changed = true
+        val old = previous.model.column(local)
+        val declared = previous.baseModel.column(local)
+        val cost = source.objective.cost(original)
+        if (column.origin != old.origin) return null
+        if (column != old || cost != previous.model.objective.cost(local)) changed = true
+        if (column.origin != declared.origin || column.integral != declared.integral || column.tag != declared.tag ||
+            cost != previous.baseModel.objective.cost(local)
+        ) boundsOnly = false
     }
     // Global trail revisions do not invalidate a block whose complete numerical and premise authority is unchanged.
     for (local in rows.indices) {
-        if (token()) return null
+        if (token.pollStop()) return null
         val original = rows[local]
-        if (source.rhs(original) != previous.model.rhs(local) ||
-            source.row(original) != previous.model.row(local)
-        ) changed = true
+        val rhs = source.rhs(original)
+        val metadata = source.row(original)
+        if (rhs != previous.model.rhs(local) || metadata != previous.model.row(local)) changed = true
+        if (rhs != previous.baseModel.rhs(local) || metadata != previous.baseModel.row(local)) boundsOnly = false
         if (state.rows.row(original).active != previous.rows.row(local).active) {
             activityChanged = true
+            boundsOnly = false
             changed = true
         }
     }
+    if (token()) return null
     if (!changed) return this
     val dimensions = model.numVars.toLong() + rows.size
     projection?.reserve(dimensions * 4L + 1L, (dimensions + 1L) * 128L, matrix = false)
@@ -395,13 +405,16 @@ internal fun LpNeighborhood.rebindExact(
         List(rows.size) { LpRowIdentity(it.toLong(), null, active = state.rows.row(rows[it]).active) },
         rows.size - 1L,
     )
+    val columns = List(model.numVars) { source.column(parentColumn(it)) }
+    // Checked origins and unchanged metadata let this owned column list preserve the other immutable witnesses.
+    val rebound = if (boundsOnly) previous.baseModel.withBoundColumns(columns) else previous.baseModel.copy(
+        rhs = rows.map { source.rhs(it) },
+        columns = columns,
+        rows = rows.map { source.row(it) },
+        objective = ExactLpObjective(List(model.numVars) { source.objective.cost(parentColumn(it)) }),
+    )
     val next = LpExactState(
-        previous.baseModel.copy(
-            rhs = rows.map { source.rhs(it) },
-            columns = List(model.numVars) { source.column(parentColumn(it)) },
-            rows = rows.map { source.row(it) },
-            objective = ExactLpObjective(List(model.numVars) { source.objective.cost(parentColumn(it)) }),
-        ),
+        rebound,
         matrixRevision = previous.matrixRevision,
         boundRevision = state.boundRevision,
         objectiveRevision = state.objectiveRevision,
@@ -414,6 +427,7 @@ internal fun LpNeighborhood.rebindExact(
     next.inheritProjection(previous)
     next.inheritScalars(previous)
     val working = next.ownerWorkingModel(projection ?: LpProjectionMeter(cancellation = token)) ?: return null
+    if (token()) return null
     return LpNeighborhood(working, colMap, rows, cols)
 }
 
