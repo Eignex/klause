@@ -96,6 +96,19 @@ import kotlin.time.TimeSource
 
 private const val ROOT_PRIMAL_GUIDANCE_BYTES = 1024L * 1024L
 private const val ROOT_PRIMAL_TARGET_HEADER_BYTES = 64L
+private const val ROOT_PROGRESS_CHECK_WORK = 16L
+private val ROOT_PROGRESS_PHASES = setOf("ProgressPhaseDUAL", "ProgressPhaseBOXED_DUAL",
+    "ProgressPhasePRIMAL_FEASIBILITY", "ProgressPhasePRIMAL_OBJECTIVE")
+
+private class RootProgress(
+    val continuation: Long,
+    val attempt: Long,
+    val work: Long,
+    val samples: Long,
+    val violated: Long,
+    val phase: String,
+    val defer: Boolean,
+)
 
 // Magnitude below which every Long and the cutoff it is compared to are exact doubles.
 private const val EXACT_LONG_DOUBLE = 9_007_199_254_740_992.0
@@ -177,6 +190,7 @@ internal class LpEngine(
     internal var sparseTrialActive = false
         private set
     private var rootBoundHandedOff = false
+    private var rootProgress: RootProgress? = null
     private var automaticOrdinaryNodes = false
     private var sparseRootWork = false
     private var admittedSourceLayout: LpRelaxation? = null
@@ -191,6 +205,7 @@ internal class LpEngine(
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
         set(value) {
             if (field !== value) {
+                rootProgress = null
                 field?.pinning?.releaseRetainedState()
                 if (value != null) {
                     clearRootPrimalTargets(retainComponentValues = true, retainRestartTargets = true)
@@ -207,6 +222,7 @@ internal class LpEngine(
     }
 
     internal fun resetRootBoundSearch() {
+        rootProgress = null
         rootBoundHandedOff = false
         sparseRootWork = sparseTrialActive
     }
@@ -217,6 +233,48 @@ internal class LpEngine(
             return guidance.primal == null && ownsRootPrimalModel(guidance.relaxation.model) &&
                 propagator.floatPaused
         }
+
+    internal fun deferAutomaticRootHandoff(afterQuery: Boolean): Boolean {
+        val guidance = rootRoundingWarmStart
+        if (!automaticSparseTrial || guidance == null || guidance.objective !== objective ||
+            guidance.sourceProblem !== problem || !rootRoundingQueryPaused ||
+            retainedRootCumulativeWork() <= ROOT_PROGRESS_CHECK_WORK ||
+            lpWorkAllowanceSpent(ROOT_PROGRESS_CHECK_WORK)
+        ) {
+            rootProgress = null
+            return false
+        }
+        noteNodeOverhead(ROOT_PROGRESS_CHECK_WORK)
+        val continuation = propagator.pausedTrialContinuation
+        val attempt = propagator.pausedTrialAttempt
+        val progress = propagator.pausedTrialProgress
+        val work = progress["NumericalWork"]
+        val samples = progress["ProgressSamples"]
+        val violated = progress["LastViolatedBasics"]
+        val phase = progress.entries.singleOrNull { it.key.startsWith("ProgressPhase") }
+            ?.takeIf { it.value == 1L && it.key in ROOT_PROGRESS_PHASES }?.key
+        if (continuation == null || attempt == null || work == null || work < 0L ||
+            samples == null || samples !in 1L..255L || violated == null ||
+            violated !in 0L..guidance.relaxation.model.m.toLong() || phase == null
+        ) {
+            rootProgress = null
+            return false
+        }
+        val previous = rootProgress
+        // A permission bridges a pre-query check; another attempt must earn its own fresh sample.
+        val defer = if (previous == null || previous.continuation != continuation || previous.phase != phase) {
+            false
+        } else if (previous.attempt == attempt && previous.work == work &&
+            previous.samples == samples && previous.violated == violated
+        ) {
+            !afterQuery && previous.defer
+        } else {
+            previous.attempt < attempt && work > previous.work && samples > previous.samples &&
+                violated < previous.violated
+        }
+        rootProgress = RootProgress(continuation, attempt, work, samples, violated, phase, defer)
+        return defer && retainedRootCumulativeWork() > 0L
+    }
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
@@ -226,6 +284,7 @@ internal class LpEngine(
     // Retain the model and discrete warm-start caches; only native factor-owning solvers are released.
     @Suppress("TooGenericExceptionCaught") // cleanup must preserve arbitrary failures from owned solvers
     internal fun releasePersistentSolvers() {
+        rootProgress = null
         var failure: Throwable? = null
         val node = nodeSimplex
         nodeSimplex = null

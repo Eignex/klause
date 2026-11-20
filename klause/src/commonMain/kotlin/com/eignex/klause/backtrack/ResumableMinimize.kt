@@ -1465,7 +1465,7 @@ internal class ResumableMinimize(
         val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
         val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
         lpEngine.continuedRootLowerBound?.let(::publishRootLpBound)
-        if (handoffSparseRootBound()) return installed
+        if (handoffSparseRootBound(afterQuery = true)) return installed
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
         lpEngine.rootRoundingWarmStart = null
@@ -1473,17 +1473,22 @@ internal class ResumableMinimize(
         return installed
     }
 
-    private fun handoffSparseRootBound(): Boolean {
+    private fun handoffSparseRootBound(afterQuery: Boolean = false): Boolean {
         val plan = lpEngine.params.lpPlan
         if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 || plan.componentOwnership ||
             plan.lbTreeSearch || !lpEngine.sparseTrialActive || !lpEngine.rootRoundingQueryPaused ||
             lpEngine.measuredRootLowerBound == null
         ) return false
         if (lpEngine.automaticSparseTrial) {
+            val defer = lpEngine.deferAutomaticRootHandoff(afterQuery)
             if (!rootBoundHandoffFloorCaptured) return false
             val baseline = rootBoundHandoffBaseline ?: return false
             val lower = lpEngine.measuredRootLowerBound ?: return false
             if (!baseline.isFinite() || ceil(lower) <= ceil(baseline)) return false
+            if (defer) {
+                sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "PROGRESS_DEFERRED", 0L)
+                return false
+            }
         }
         // A checked global bound survives retirement of its unfinished numerical cursor.
         rootRoundingPending = false

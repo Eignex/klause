@@ -26,11 +26,14 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
+import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.ResumableLpSolver
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
@@ -68,6 +71,62 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `root progress distinguishes resumed attempts from replaced numerical queries`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)))
+            .build(PropagationSession(problem))
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    private var pausedWork = 0L
+                    override val currentWork: Long get() = pausedWork
+                    override val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(workOps = pausedWork)
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        while (true) pauseAt(++pausedWork)
+                        @Suppress("UNREACHABLE_CODE")
+                        null
+                    }
+                }
+            }
+        }
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(work = 100_000L) },
+            solveContext = LpSolveContext(factory), queryWorkAllowance = { 1L },
+            continuationAllowance = { 100_000L }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            lp.solveFloat()
+            val first = assertNotNull(lp.pausedTrialContinuation)
+            val attempt = assertNotNull(lp.pausedTrialAttempt)
+
+            lp.solveFloat()
+
+            assertEquals(first, lp.pausedTrialContinuation)
+            assertTrue(assertNotNull(lp.pausedTrialAttempt) > attempt)
+            lp.solveFloat(continuationWorkAllowance = { null })
+            assertNull(lp.pausedTrialContinuation)
+            lp.solveFloat()
+            val replaced = assertNotNull(lp.pausedTrialContinuation)
+            assertTrue(replaced > first)
+            lp.releaseSolver()
+            assertNull(lp.pausedTrialContinuation)
+            lp.solveFloat()
+            val released = assertNotNull(lp.pausedTrialContinuation)
+            assertTrue(released > replaced)
+            assertTrue(lp.resetRoot())
+            assertNull(lp.pausedTrialContinuation)
+            lp.solveFloat()
+            assertTrue(assertNotNull(lp.pausedTrialContinuation) > released)
+        }
+    }
+
     @Test
     fun `installation honors its supplied construction token and preserves the default scope`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())

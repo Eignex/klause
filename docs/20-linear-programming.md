@@ -402,6 +402,13 @@ domain and shared floors captured before its first root LP query, together with
 its first checked root floor. The first checked floor fixes that scheduling baseline,
 including when the initial query supplies no bound and a continuation supplies it.
 A proposal matching that baseline leaves the cursor available for further funded slices.
+Before retiring a stronger bound, automatic handoff can defer while the same live root
+continuation supplies a fresh progress sample in the same numerical phase with fewer
+violated basics. Each numerical attempt must advance both its work and uncapped sample
+count; a repeated pre-query check only carries the preceding attempt's decision.
+Missing, saturated, stale or non-improving observations return to the checked-bound
+handoff. This scheduling hint supplies no point or certificate and spends the existing
+caller slices and cumulative root grant. Replacing the root owner or warm start clears it.
 The handoff retires the unfinished cursor and skips further root consultations for
 that search binding; the accepted global bound remains available.
 Completed-point rounding, component-owned plans and workers without a decision

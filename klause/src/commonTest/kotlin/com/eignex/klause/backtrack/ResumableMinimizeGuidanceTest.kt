@@ -577,6 +577,117 @@ class ResumableMinimizeGuidanceTest {
     }
 
     @Test
+    fun `automatic sparse handoff defers only for fresh funded root progress`() {
+        for (observation in listOf("fresh", "missing", "capped", "stale-sample", "stale-work",
+            "phase-change", "ambiguous-phase", "invalid-phase", "unknown-phase", "stagnant",
+            "invalid-violation", "no-op", "tall", "exhausted")) {
+            val rows = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 2)) +
+                if (observation == "tall" || observation == "exhausted") List(7) {
+                    Linear(intArrayOf(1, it + 2, it + 3), intArrayOf(0, 1, 2), LinearOp.GE, 2)
+                } else emptyList()
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) },
+                rows,
+                settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
+            var pauses = 0
+            var queries = 0
+            val published = ArrayList<Double>()
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                    if (observation == "tall") assertTrue(model.m > model.n)
+                    return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                        private var pausedWork = 0L
+                        override val currentWork: Long get() = pausedWork
+                        override val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(workOps = pausedWork)
+                        override val trialProgress: Map<String, Long> get() {
+                            val count = if (observation == "no-op" && pauses >= 4) 3L else pauses.toLong()
+                            if (observation == "missing" && count >= 3L) return emptyMap()
+                            return buildMap {
+                                put("ProgressSamples", when {
+                                    count < 3L -> count
+                                    observation == "capped" -> 256L
+                                    observation == "stale-sample" -> 2L
+                                    else -> count
+                                })
+                                put("NumericalWork", if (observation == "stale-work" && count >= 3L) 0L
+                                    else pausedWork)
+                                put("LastViolatedBasics", when {
+                                    observation == "invalid-violation" && count >= 3L -> model.m + 1L
+                                    observation == "exhausted" -> (model.m + 1L - count).coerceAtLeast(0L)
+                                    observation == "stagnant" || count < 3L -> model.m.toLong()
+                                    else -> model.m - 1L
+                                })
+                                val phase = if (observation == "phase-change" && count >= 3L)
+                                    "PRIMAL_FEASIBILITY" else "DUAL"
+                                put("ProgressPhase$phase", 1L)
+                                if (observation == "ambiguous-phase" && count >= 3L)
+                                    put("ProgressPhaseBOXED_DUAL", 1L)
+                                if (observation == "invalid-phase" && count >= 3L)
+                                    put("ProgressPhaseBOXED_DUAL", 2L)
+                                if (observation == "unknown-phase" && count >= 3L)
+                                    put("ProgressPhaseUNKNOWN", 1L)
+                            }
+                        }
+                        override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? =
+                            if (cancellation()) null else DoubleArray(model.m) {
+                                if (it != 0) 0.0 else if (pauses >= 2) -2.0 else -1.0
+                            }
+                        override fun openSolve(
+                            allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                        ): LpSolveCursor<FloatLpResult?> {
+                            queries++
+                            return LpSolveCursor {
+                                while (true) {
+                                    pauses++
+                                    if (observation != "no-op" || pauses < 4)
+                                        pausedWork += 5_000L * LP_WORK_PER_NODE
+                                    pauseAt(pausedWork)
+                                }
+                                @Suppress("UNREACHABLE_CODE")
+                                null
+                            }
+                        }
+                    }
+                }
+            }
+            val params = BacktrackParams(maxDecisions = 16L, variableSelector = InputOrder,
+                valueSelector = IndomainMin, lpConfig = LpConfig.AUTO, objectiveLowerBoundSink = published::add,
+                lpPlan = LpPlan(rootCutHarvest = false,
+                    rootMaxWork = if (observation == "exhausted") 22_500L * LP_WORK_PER_NODE else 200_000_000L))
+            val offered = ArrayList<Sample>()
+            BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+                repeat(8) {
+                    if (pauses < 3) search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) {
+                        offered += it.sample
+                    }
+                }
+                assertTrue(published.any { it == 3.0 }, observation)
+                val progresses = observation in listOf("fresh", "no-op", "tall", "exhausted")
+                val phase = search.stats.lp.phases.getValue("PRIMAL_CONTINUATION_ROOT")
+                assertEquals(!progresses, phase.outcomes.containsKey("BOUND_SEARCH_HANDOFF"), observation)
+                if (progresses) assertTrue(offered.isEmpty(), observation)
+
+                repeat(4) {
+                    search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+                }
+
+                val outcomes = search.stats.lp.phases.getValue("PRIMAL_CONTINUATION_ROOT").outcomes
+                if (observation == "exhausted") {
+                    assertTrue(outcomes.containsKey("PROGRESS_DEFERRED"))
+                    assertEquals(5, pauses)
+                } else assertEquals(1L, outcomes["BOUND_SEARCH_HANDOFF"], observation)
+                assertTrue(offered.isNotEmpty(), observation)
+                assertEquals(1, queries, observation)
+            }
+        }
+    }
+
+    @Test
     fun `checked sparse root bounds allow discrete search before a primal point`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
