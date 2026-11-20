@@ -25,6 +25,46 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `cancellation discards a reliable variable commitment`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2)
+        val up = SearchDecision.IntAtLeast(0, 3)
+        for (apply in listOf(false, true)) {
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply, observe = events::add)
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 11.0))) {
+                    hints.commit(decision, 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                    hints.recordObjective(relaxation, objective)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.finishNode(trail.state)
+            assertEquals(variable, hints.selectVariable(variable, variable))
+            hints.branch(variable)
+
+            hints.commit(down, 1, ExecutionControl { true })
+
+            assertTrue("PASSIVE_VARIABLE_COMPARED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMIT_WITHHELD" in events)
+        }
+    }
+
+    @Test
     fun `shared column layouts keep scope checks independent of width`() {
         val costs = ArrayList<Long>()
         for (width in listOf(1, 256)) {
