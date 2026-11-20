@@ -18,12 +18,13 @@ internal class LpDirectionalHistory(
         var stamp = 0L
         var previousStamp = 0L
         var validationStamp = 0L
+        var rejectionStamp = 0L
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
         val stable: Boolean get() = count >= RELIABILITY && minOf(latest, previous) >= maxOf(latest, previous) * 0.5
 
-        val readiness: Int get() = count + if (stable && validationStamp > 0L) 1 else 0
+        val readiness: Int get() = count + if (stable && rejectionStamp == 0L) 1 else 0
     }
 
     private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
@@ -83,17 +84,16 @@ internal class LpDirectionalHistory(
             charge(1L)
             gains[child.parent.variable]?.let { history ->
                 val direction = if (child.up) history.up else history.down
-                if (direction.validationStamp > 0L) {
-                    charge(2L)
-                    direction.validationStamp = 0L
-                    observe("FORECAST_UNAVAILABLE")
-                }
+                charge(3L)
+                direction.validationStamp = 0L
+                direction.rejectionStamp = stamp
+                observe("FORECAST_UNAVAILABLE")
             }
             observe("UNUSABLE")
             return
         }
         val history = gains.getOrPut(child.parent.variable) {
-            charge(2L)
+            charge(4L)
             Gains()
         }
         expire(history.down)
@@ -123,7 +123,8 @@ internal class LpDirectionalHistory(
         // A validated prediction still depends on both of its earlier input observations.
         direction.validationStamp = if (validated) direction.previousStamp else 0L
         if (predictable) {
-            charge(4L)
+            charge(5L)
+            direction.rejectionStamp = if (validated) 0L else stamp
             observe(if (validated) "FORECAST_VALIDATED" else "FORECAST_REJECTED")
         }
     }
@@ -133,21 +134,27 @@ internal class LpDirectionalHistory(
             val majority = if (history.down.readiness > history.up.readiness) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
             if (majority.stable && (history.down.latest > 0.0 || history.up.latest > 0.0)) {
-                val witness = if (majority.validationStamp > 0L) majority.validationStamp else majority.previousStamp
-                collectionStamp = maxOf(collectionStamp, minOf(witness, minority.stamp))
+                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
             }
         }
     }
 
     private fun recordAdviceAvailability(history: Gains) {
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
+            charge(2L)
+            if (history.down.stable && history.up.stable && (history.down.gain > 0.0 || history.up.gain > 0.0)) {
+                // Rejection may expire while these numeric observations remain fresh.
+                valueStamp = maxOf(valueStamp, minOf(history.down.previousStamp, history.up.previousStamp))
+            }
             if (history.down.stable && history.up.stable &&
-                history.down.validationStamp > 0L && history.up.validationStamp > 0L
+                history.down.rejectionStamp == 0L && history.up.rejectionStamp == 0L
             ) {
-                val pairStamp = minOf(history.down.validationStamp, history.up.validationStamp)
-                if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
-                if (history.down.gain > 0.0 && history.up.gain > 0.0) reliableStamp = maxOf(reliableStamp, pairStamp)
-            } else observe(if (history.down.stable && history.up.stable) "UNCALIBRATED" else "UNSTABLE")
+                if (history.down.validationStamp > 0L && history.up.validationStamp > 0L) {
+                    if (history.down.gain > 0.0 && history.up.gain > 0.0) {
+                        reliableStamp = maxOf(reliableStamp, minOf(history.down.validationStamp, history.up.validationStamp))
+                    }
+                } else observe("VARIABLE_UNCALIBRATED")
+            } else observe(if (history.down.stable && history.up.stable) "FORECAST_SUPPRESSED" else "UNSTABLE")
         }
     }
 
@@ -232,7 +239,7 @@ internal class LpDirectionalHistory(
     }
 
     fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? {
-        val history = reliable(variable, value) ?: return null
+        val history = reliable(variable, value, requireValidation = false) ?: return null
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
@@ -243,13 +250,15 @@ internal class LpDirectionalHistory(
         return if (preferHighGain) up > down else up < down
     }
 
-    private fun reliable(variable: VarRef, value: Double): Gains? {
+    private fun reliable(variable: VarRef, value: Double, requireValidation: Boolean = true): Gains? {
         if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
         val history = gains[variable] ?: return null
         expire(history.down)
         expire(history.up)
+        charge(2L)
         if (!history.down.stable || !history.up.stable ||
-            history.down.validationStamp == 0L || history.up.validationStamp == 0L
+            history.down.rejectionStamp > 0L || history.up.rejectionStamp > 0L ||
+            (requireValidation && (history.down.validationStamp == 0L || history.up.validationStamp == 0L))
         ) return null
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
@@ -276,6 +285,13 @@ internal class LpDirectionalHistory(
 
     private fun expire(direction: Direction) {
         if (direction.validationStamp > 0L) charge(1L)
+        if (direction.rejectionStamp > 0L) {
+            charge(1L)
+            if (stamp - direction.rejectionStamp > maxAge) {
+                direction.rejectionStamp = 0L
+                observe("REJECTION_EXPIRED")
+            }
+        }
         if (direction.count > 0 && stamp - direction.stamp > maxAge) {
             direction.count = 0
             direction.latest = 0.0

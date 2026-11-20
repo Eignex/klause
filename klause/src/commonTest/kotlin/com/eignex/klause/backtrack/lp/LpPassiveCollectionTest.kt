@@ -5,9 +5,50 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPassiveCollectionTest {
+    @Test
+    fun `collection repairs a rejected forecast after numeric observations stabilize`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2)
+        val up = SearchDecision.IntAtLeast(0, 3)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 2.25)
+        repeat(3) {
+            for ((decision, objective) in listOf(down to 11.0, up to 13.0)) {
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.record(objective)
+            }
+        }
+        for (objective in listOf(30.0, 13.0, 13.0)) {
+            history.commit(up, 1)
+            history.beginNode(1)
+            history.record(objective)
+        }
+        history.beginNode(0)
+        history.record(10.0)
+        assertNull(history.preferGainDirection(variable, 2.25))
+        history.branch(variable, 2.25)
+        val exploration = LpPassiveCollection({}, {})
+
+        val selected = exploration.select(variable, 2.25, listOf(down, up), history, 1) { true }
+        exploration.commit(selected.first(), 1) { true }
+        history.commit(selected.first(), 1)
+        history.beginNode(1)
+        history.record(13.0)
+        history.beginNode(0)
+        history.record(10.0)
+
+        assertEquals(listOf(up, down), selected)
+        assertEquals(false, history.preferGainDirection(variable, 2.25))
+        assertTrue(history.score(variable, 2.25).isFinite())
+    }
+
     @Test
     fun `collection visits the less sampled child without changing the exhaustive split`() {
         for (boolean in listOf(false, true)) {

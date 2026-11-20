@@ -17,7 +17,7 @@ class LpHintsCollectionTest {
     @Test
     fun `advice withholding preserves collection and its completed child observation`() {
         val costs = ArrayList<Long>()
-        for ((apply, samples) in listOf(false to 2, true to 2, false to 3, true to 3)) {
+        for (apply in listOf(false, true)) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1L)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -30,8 +30,7 @@ class LpHintsCollectionTest {
             val variable = VarRef.IntVar(0)
             val down = SearchDecision.IntAtMost(0, 2)
             val up = SearchDecision.IntAtLeast(0, 3)
-            val visits = List(samples - 1) { listOf(Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0)) }.flatten() +
-                Triple(down, 2.0, 11.0)
+            val visits = listOf(Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0), Triple(down, 2.0, 11.0))
             for ((decision, point, objective) in visits) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
@@ -57,12 +56,12 @@ class LpHintsCollectionTest {
 
             assertEquals(listOf(up, down), selected)
             assertEquals(1, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
-            assertEquals(samples, events.count { it == "UP" })
-            assertEquals(samples, events.count { it == "DOWN" })
+            assertEquals(2, events.count { it == "UP" })
+            assertEquals(2, events.count { it == "DOWN" })
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
-            assertEquals(samples == 3, hints.directionalScore(variable).isFinite())
+            assertTrue(hints.directionalScore(variable).isNaN())
             costs.add(work)
         }
         assertTrue(costs.first() > 0L)
