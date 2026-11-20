@@ -267,9 +267,9 @@ internal class LpDirectionalHistory(
         outcome.latest = pruned
         outcome.stamp = stamp
         outcome.count = minOf(RELIABILITY, outcome.count + 1)
-        if (pruned && outcome.count >= RELIABILITY && outcome.previous) {
+        if (outcome.count >= RELIABILITY && (pruned || outcome.previous)) {
             prunedStamp = maxOf(prunedStamp, outcome.previousStamp)
-            observe("OUTCOME_PRUNED_READY")
+            observe("OUTCOME_RATE_READY")
         }
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
     }
@@ -278,10 +278,10 @@ internal class LpDirectionalHistory(
         val history = reliable(variable, value) ?: return null
         if (history.down.gain <= 0.0 && history.up.gain <= 0.0) return null
         val version = generation
-        charge(8L)
+        charge(12L)
         if (version != generation) return null
-        val down = outcomeEstimate(history.down.outcome)
-        val up = outcomeEstimate(history.up.outcome)
+        val down = outcomeRate(history.down.outcome)
+        val up = outcomeRate(history.up.outcome)
         if (!down.isFinite() || !up.isFinite() || down == up) return null
         return up > down
     }
@@ -294,6 +294,11 @@ internal class LpDirectionalHistory(
         val down = outcomeEstimate(history.down.outcome)
         val up = outcomeEstimate(history.up.outcome)
         return down + up
+    }
+
+    private fun outcomeRate(outcome: Outcome): Double {
+        if (outcome.count < RELIABILITY || stamp - outcome.previousStamp > maxAge) return Double.NaN
+        return (if (outcome.latest) 0.5 else 0.0) + (if (outcome.previous) 0.5 else 0.0)
     }
 
     private fun outcomeEstimate(outcome: Outcome): Double =

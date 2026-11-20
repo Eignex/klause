@@ -386,13 +386,15 @@ neither outcome. Final publication validates the returned source scope and owner
 state, and checks cancellation after charging its work and before storing data.
 Numeric samples and completed outcomes age independently, without renewal on restart.
 
-Both directions must have two agreeing recent outcomes. When one direction was
-repeatedly pruned and the other repeatedly open, the consumer visits the pruned
-child first. Equal or unknown outcomes keep ordinary order. These historical
-outcomes supply no bound or pruning authority at another node. Coarse recent
-positive-gain and repeated-prune stamps skip lookups until such observations exist;
-the current variable still needs its own complete numeric and outcome records.
-Reset clears those prerequisites.
+Both directions must have two known recent outcomes. Their observed prune fractions
+are zero, one half or one; zero requires two observed open outcomes. The consumer
+visits the child with the greater observed fraction first. Equal or unknown rates
+keep ordinary order. Numerical gain reliability is checked independently, including
+two stable finite gains in each direction and a positive gain in at least one.
+These historical outcomes supply no bound or pruning authority at another node.
+Coarse recent positive-gain and positive-prune-rate stamps skip lookups until such
+observations exist; the current variable still needs its own complete numeric and
+outcome records. Reset clears those prerequisites.
 
 Selection requires the fractional point and optimum from the same current
 relaxation and exact state. It recognizes only the two adjacent partitions of that

@@ -11,33 +11,47 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
-    fun `child order needs opposite known completed outcomes`() {
-        for (pruned in listOf("up", "down", "both", "neither", "missing")) {
-            val history = LpDirectionalHistory({})
+    fun `child order follows prune rates from two known outcomes`() {
+        for (pruned in listOf("up", "down", "both", "neither", "missing", "one", "mixedUp", "mixedDown",
+            "mixedEqual", "fullDownMixedUp", "aged")) {
+            val history = LpDirectionalHistory({}, maxAge = 6L)
             val variable = VarRef.Bool(0)
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, 0.5)
-            repeat(2) {
+            repeat(2) { sample ->
                 for (up in listOf(false, true)) {
                     history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
                     history.beginNode(1)
                     history.record(if (up) 14.0 else 12.0)
                     history.finishNode(when (pruned) {
                         "missing" -> if (up) null else true
+                        "one" -> if (up && sample == 1) null else !up
                         "both" -> true
                         "up" -> up
-                        "down" -> !up
+                        "down", "aged" -> !up
+                        "mixedUp" -> up && sample == 0
+                        "mixedDown" -> !up && sample == 0
+                        "mixedEqual" -> sample == 0
+                        "fullDownMixedUp" -> !up || sample == 0
                         else -> false
                     })
+                }
+            }
+            if (pruned == "aged") repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 14.0 else 12.0)
+                    history.finishNode()
                 }
             }
 
             val preferred = history.preferPruningDirection(variable, 0.5)
 
             assertEquals(when (pruned) {
-                "up" -> true
-                "down" -> false
+                "up", "mixedUp" -> true
+                "down", "mixedDown", "fullDownMixedUp" -> false
                 else -> null
             }, preferred)
         }
@@ -106,8 +120,10 @@ class LpDirectionalHistoryTest {
                 history.infeasible()
             history.finishNode(true)
                 if (observation == 0) {
-                    assertFalse(history.hasPruningHistory)
+                    assertTrue(history.hasPruningHistory)
                     assertTrue(history.prunedDirections(variable, 0.5).isNaN())
+                    if (samples == 2) assertEquals(false, history.preferPruningDirection(variable, 0.5))
+                    else assertNull(history.preferPruningDirection(variable, 0.5))
                 }
                 history.finishNode()
             }

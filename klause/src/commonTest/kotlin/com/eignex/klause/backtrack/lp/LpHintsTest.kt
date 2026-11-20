@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
-    fun `reliable completed outcomes reach applied and withheld child commitments`() {
+    fun `reliable measured prune rates reach applied and withheld child commitments`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -40,7 +40,7 @@ class LpHintsTest {
             val events = ArrayList<String>()
             val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
                 observe = events::add, charge = { work += it })
-            repeat(2) {
+            repeat(2) { sample ->
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
@@ -52,7 +52,7 @@ class LpHintsTest {
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                     hints.recordObjective(relaxation, objective)
-                    hints.recordOutcome(decision == down, relaxation)
+                    hints.recordOutcome(decision == down && sample == 0, relaxation)
                     hints.finishNode(trail.state)
                 }
             }
