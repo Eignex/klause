@@ -59,11 +59,12 @@ internal class LpHints(
         freshRecord = false
         objectiveRecorded = false
         directionalChoice = null
-        if (collect) history.beginNode(depth)
+        if (collect && bound.isFinite()) history.beginNode(depth)
+        else if (scopeModel != null) resetHistory()
     }
 
     override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
-        if (passiveChoice != null) {
+        if (passiveChoice != null && cutoff.isFinite()) {
             charge(2L)
             observe("PASSIVE_VARIABLE_OPTIMUM_CHECK")
             passiveChoice.clear()
@@ -71,7 +72,7 @@ internal class LpHints(
             passiveCollection?.clear()
             passiveState = null
         }
-        if (!collect || relaxation.colVarId.size > 8192) return
+        if (!collect || !cutoff.isFinite() || relaxation.colVarId.size > 8192) return
         val state = relaxation.model.exactState ?: return
         charge(5L)
         val difference = scopeDifference(relaxation, state)
@@ -271,7 +272,7 @@ internal class LpHints(
         values.clear()
         collection.clear()
         val valueReady = cutoff.isFinite() && history.hasPruningHistory
-        val collectReady = cutoff > Double.NEGATIVE_INFINITY && collection.available && history.hasCollectionHistory
+        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
         if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
         ) return alternatives
@@ -364,7 +365,7 @@ internal class LpHints(
      * ([branchScore]) selection, never feasibility or the optimum.
      */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
-        if (passiveChoice != null) {
+        if (passiveChoice != null && cutoff.isFinite()) {
             charge(2L)
             observe("PASSIVE_VARIABLE_POINT")
             passiveChoice.clear()

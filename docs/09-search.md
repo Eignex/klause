@@ -380,11 +380,12 @@ is visited first when the other direction repeatedly returned without pruning.
 Equal, missing, unstable or expired evidence retains ordinary order. Historical
 outcomes provide no current pruning authority or exclusion of either child.
 
-Pruning outcomes are retained only under a finite incumbent cutoff. Numeric gain
-collection can run before that cutoff exists; the first finite cutoff replaces
-that scope. Skipped outcomes remain unknown, and only a retained numeric sample
-can accept its completed outcome. This avoids paying classification and observation
-work for labels that cannot inform finite-cutoff advice.
+Directional history and missing-direction collection begin only under a finite
+incumbent cutoff. Earlier observations belong to a different cutoff scope and
+cannot inform this consumer. Ordinary LP point and reduced-cost guidance remains
+available before admission. Leaving a finite cutoff clears the history and
+unfinished attribution. Only a retained numeric sample can accept a completed
+pruning outcome.
 Final node-scope validation precedes outcome attribution. Missing state,
 interrupted or failed cut re-solves, cancellation after a published optimum and
 unfinished attribution across node transitions or restart leave unknown outcomes.

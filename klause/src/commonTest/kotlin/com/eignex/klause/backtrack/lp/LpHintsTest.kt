@@ -53,7 +53,7 @@ class LpHintsTest {
 
             assertEquals(if (bound.isFinite()) 9L else 0L, work - sampled)
             assertEquals(if (bound.isFinite()) 1 else 0, events.count { it == "PRUNING_SAMPLE_PRUNED" })
-            assertEquals(1, events.count { it == "DOWN" })
+            assertEquals(if (bound.isFinite()) 1 else 0, events.count { it == "DOWN" })
         }
     }
 
