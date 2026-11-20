@@ -45,6 +45,7 @@ import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.pollStop
+import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -622,19 +623,18 @@ internal class LpPropagator(
 
     override fun retract(decisionLevel: Int) {
         val current = owner
-        if (current != null && current.state.depth > decisionLevel &&
-            !current.pop(decisionLevel, ExecutionControl.Never)
-        ) {
-            invalidate()
+        if (current != null && current.state.depth > decisionLevel) {
+            if (current.pop(decisionLevel, ExecutionControl.Never)) retainWitnesses() else invalidate()
         }
         lastMetrics = LpSolveMetrics()
-        retainWitnesses()
         policy.retract(decisionLevel)
     }
 
     private fun retainWitnesses() {
-        val active = state?.assertions?.map { it.witness }?.toSet().orEmpty()
-        witnesses.keys.retainAll(active)
+        if (witnesses.isEmpty()) return
+        val active = LongHashSet()
+        state?.assertionView?.forEach { active.add(it.witness) }
+        witnesses.keys.removeAll { it !in active }
     }
 
     override fun onRestart(context: SearchContext) = policy.restart(context)

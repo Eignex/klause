@@ -306,6 +306,33 @@ class LpPropagatorTest {
     }
 
     @Test
+    fun `rollback should retain only surviving bound premises`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val root = SearchAtomPremise.All(emptyList())
+        val child = SearchAtomPremise.Asserted(SearchDecision.Bool(0))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val column = base.intColOf[0]
+            assertTrue(lp.assertBound(column, false, ExactLpSide(ExactLpNumber.of(1L)), root))
+            val rootWitness = assertNotNull(lp.state?.activeSide(column, false)).witness
+            lp.retract(0)
+            assertSame(root, lp.boundPremise(rootWitness))
+            assertTrue(lp.atLevel(1))
+            assertTrue(lp.assertBound(column, false, ExactLpSide(ExactLpNumber.of(2L)), child))
+            val childWitness = assertNotNull(lp.state?.activeSide(column, false)).witness
+            assertSame(child, lp.boundPremise(childWitness))
+
+            lp.retract(0)
+
+            assertSame(root, lp.boundPremise(rootWitness))
+            assertSame(SearchAtomPremise.Unavailable, lp.boundPremise(childWitness))
+            assertEquals(rootWitness, assertNotNull(lp.state?.activeSide(column, false)).witness)
+        }
+    }
+
+    @Test
     fun `premised bound batches should retract before a sibling explanation`() {
         val problem = Problem(4, 1, arrayOf(IntDomain(0, 10)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
