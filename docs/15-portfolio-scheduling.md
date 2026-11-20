@@ -522,13 +522,21 @@ rounded root; completed advisory queries alternate with ordinary repair queries.
 Paused queries retain their turn. A default checked center passes private completion
 and original-source checks, and its first connected private neighborhood replaces the
 all-pinned cutoff query while retaining ordinary root preparation. Later private
-queries alternate with ordinary repair. Both center kinds use the connected-variable selector to free at
-most two binary coordinates per advisory neighborhood and pins the other integers
-to the center. Continuous coordinates stay free. These pins intersect the private
-change-radius row. A pass visits each eligible root within the existing allowances;
-its identity includes the binary coordinates and aspiration, so a new sample wrapper
-does not restart it. A completed restricted neighborhood advances only that pass,
-and supplies no source refutation. Ordinary fallback neighborhoods retain their own
+queries alternate with ordinary repair. Both center kinds first free at most two
+connected binary coordinates. If that query completes without an accepted witness,
+the same root can expand to its integer row-support component, with at most 32 free
+coordinates, after ordinary fallback. Pairs already known to cover their support
+need no expansion. Support
+selection does not join components through continuous columns; all continuous
+recourse and source rows remain in the query. The selection is heuristic and proves
+no independence. Width or visit-limit decline advances that root; resource or
+cancellation unavailability retains its phase. Each proposal shares one 8,192-visit
+ceiling between private selection and ordinary fallback, and declined work stays
+charged. Repeated or narrower expansions are skipped. Other integers stay pinned
+to the center, intersecting the private change-radius row. A pass visits each
+eligible root within the existing allowances; its identity includes the binary
+coordinates and aspiration, so a new sample wrapper does not restart it. Completion
+updates only that pass and supplies no source refutation. Ordinary fallback neighborhoods retain their own
 checked centers and cutoffs.
 
 Each owner charges ordinary and private work to one LP operation/work/allocation

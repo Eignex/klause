@@ -21,6 +21,15 @@ internal class JointRepairNeighborhood private constructor(
     private val occurrences: Array<IntArray>,
     private val inputs: IntArray?,
 ) : ExactNeighborhoodProposal {
+    sealed interface AdvisorySelection {
+        data class Ready(val condition: ExactNeighborhoodCondition, val closed: Boolean) : AdvisorySelection
+        data class Declined(val limit: Limit) : AdvisorySelection
+        data object Unavailable : AdvisorySelection
+        enum class Limit { Width, Visits }
+    }
+
+    private class ConnectedSelection(val integers: Set<Int>, val complete: Boolean)
+
     private val eligible = inputs?.let { indices ->
         BooleanArray(integers).also { mask -> indices.forEach { mask[it] = true } }
     }
@@ -55,21 +64,64 @@ internal class JointRepairNeighborhood private constructor(
     val advisoryRoots: Int get() = seeds.size
 
     fun advisoryNeighborhood(centers: List<BigFraction>, root: Int, cutoff: BigFraction,
-        budget: SourceLpBudget, token: ExecutionControl): ExactNeighborhoodCondition? {
-        val funding = budget.funding ?: return null
+        budget: SourceLpBudget, token: ExecutionControl, expand: Boolean = false): AdvisorySelection {
+        val funding = budget.funding ?: return AdvisorySelection.Unavailable
         val work = 16L * (integers + 1L)
-        val bytes = 256L + 128L * integers
+        val bytes = 256L + 128L * integers +
+            if (expand) 256L + rows.size + 256L * minOf(integers, MAX_FREE_INTEGERS) else 0L
         if (root !in seeds.indices || centers.size != integers || token() ||
-            funding.availableWork <= work + MAX_SELECTION_VISITS || funding.remainingAllocation <= bytes) return null
+            funding.availableWork <= work + MAX_SELECTION_VISITS || funding.remainingAllocation <= bytes)
+            return AdvisorySelection.Unavailable
         budget.observe(preparation = work)
         funding.charge(0L, bytes)
-        val before = visitedEntries
-        val freed = connected(listOf(seeds[root]), minOf(2, seeds.size))
-        budget.observe(preparation = visitedEntries - before)
-        selectedIntegers += freed.size
-        val pins = (0 until integers).filter { it !in freed }.associateWith { centers[it] }
-        return ExactNeighborhoodCondition(emptyMap(), pins, pins, cutoff)
-            .takeUnless { token() || funding.exhausted }
+        if (!expand) {
+            val before = visitedEntries
+            val selected = connected(listOf(seeds[root]), minOf(2, seeds.size))
+            budget.observe(preparation = visitedEntries - before)
+            val pins = (0 until integers).filter { it !in selected.integers }.associateWith { centers[it] }
+            if (token() || funding.exhausted) return AdvisorySelection.Unavailable
+            selectedIntegers += selected.integers.size
+            return AdvisorySelection.Ready(ExactNeighborhoodCondition(emptyMap(), pins, pins, cutoff),
+                selected.complete || selected.integers.size == seeds.size)
+        }
+        val freed = linkedSetOf(seeds[root])
+        val queue = IntArrayDeque().also { it.addLast(seeds[root]) }
+        val seenRows = BooleanArray(rows.size)
+        var visits = 0
+        fun visit(): AdvisorySelection? = when {
+            token() -> AdvisorySelection.Unavailable
+            visits == MAX_SELECTION_VISITS -> AdvisorySelection.Declined(AdvisorySelection.Limit.Visits)
+            else -> { visits++; null }
+        }
+        try {
+            while (queue.isNotEmpty()) {
+                val column = queue.removeFirst()
+                for (row in occurrences[column]) {
+                    visit()?.let { return it }
+                    if (seenRows[row]) continue
+                    seenRows[row] = true
+                    for (peer in rows[row]) {
+                        visit()?.let { return it }
+                        if (!eligibleInteger(peer) || peer in freed) continue
+                        if (freed.size == MAX_FREE_INTEGERS)
+                            return AdvisorySelection.Declined(AdvisorySelection.Limit.Width)
+                        freed += peer
+                        queue.addLast(peer)
+                    }
+                }
+            }
+            val pins = linkedMapOf<Int, BigFraction>()
+            for (id in 0 until integers) {
+                if (token()) return AdvisorySelection.Unavailable
+                if (id !in freed) pins[id] = centers[id]
+            }
+            if (token() || funding.exhausted) return AdvisorySelection.Unavailable
+            selectedIntegers += freed.size
+            return AdvisorySelection.Ready(ExactNeighborhoodCondition(emptyMap(), pins, pins, cutoff), true)
+        } finally {
+            visitedEntries += visits
+            budget.observe(preparation = visits.toLong())
+        }
     }
 
     fun clearRefutation() {
@@ -189,6 +241,11 @@ internal class JointRepairNeighborhood private constructor(
     override fun propose(
         centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
         radius: BigFraction, cutoff: BigFraction?,
+    ): ExactNeighborhoodCondition = propose(centers, bools, count, round, radius, cutoff, 0L)
+
+    fun propose(
+        centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
+        radius: BigFraction, cutoff: BigFraction?, selectionVisitsSpent: Long,
     ): ExactNeighborhoodCondition {
         val order = rankedSeeds ?: seeds
         onRefutationRoots?.invoke(emptyList())
@@ -201,7 +258,9 @@ internal class JointRepairNeighborhood private constructor(
                 refutationSeeds++
                 additionalRefutationSeeds += preferred.size - 1
             }
-            connected(roots, width)
+            val remaining = MAX_SELECTION_VISITS - selectionVisitsSpent.coerceIn(0L,
+                MAX_SELECTION_VISITS.toLong()).toInt()
+            connected(roots, width, remaining).integers
         }
         selectedIntegers += freed.size
         val pins = (inputs?.asIterable() ?: (0 until integers)).filter { it !in freed }.associateWith { centers[it] }
@@ -253,19 +312,22 @@ internal class JointRepairNeighborhood private constructor(
         return ExactNeighborhoodCondition(bools.indices.associateWith { bools[it] }, pins, pins, cutoff)
     }
 
-    private fun connected(roots: List<Int>, count: Int): Set<Int> {
+    private fun connected(roots: List<Int>, count: Int,
+        maximumVisits: Int = MAX_SELECTION_VISITS): ConnectedSelection {
         val selected = roots.toCollection(linkedSetOf())
         val seenColumns = IntHashSet().also { seen -> roots.forEach { seen.add(it) } }
         val seenRows = IntHashSet()
         val queue = IntArrayDeque().also { queue -> roots.forEach { queue.addLast(it) } }
         var visits = 0
-        while (queue.isNotEmpty() && selected.size < count && visits < MAX_SELECTION_VISITS) {
+        while (queue.isNotEmpty() && selected.size < count && visits < maximumVisits) {
             val column = queue.removeFirst()
             for (row in occurrences[column]) {
-                if (++visits > MAX_SELECTION_VISITS) break
+                if (visits == maximumVisits) break
+                visits++
                 if (!seenRows.add(row)) continue
                 for (peer in rows[row]) {
-                    if (++visits > MAX_SELECTION_VISITS) break
+                    if (visits == maximumVisits) break
+                    visits++
                     if (!seenColumns.add(peer)) continue
                     queue.addLast(peer)
                     if (peer < integers && (eligible == null || eligible[peer])) selected += peer
@@ -275,7 +337,7 @@ internal class JointRepairNeighborhood private constructor(
             }
         }
         visitedEntries += visits
-        return selected
+        return ConnectedSelection(selected, queue.isEmpty() && visits < maximumVisits)
     }
 
     companion object {

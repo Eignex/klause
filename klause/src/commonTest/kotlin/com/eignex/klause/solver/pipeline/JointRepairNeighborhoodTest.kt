@@ -15,6 +15,7 @@ import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -26,21 +27,104 @@ class JointRepairNeighborhoodTest {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val source = SourceProofContext(SourceScope(SourceRevision("advisory-connected", "exact")),
             integers.toSet() + real, mapOf("edge" to SourcePremise(SourceInequality(
-                mapOf(integers[1] to BigFraction.ONE, real to BigFraction.ONE,
+                mapOf(integers[0] to BigFraction.ONE, integers[1] to BigFraction.ONE, real to BigFraction.ONE,
                     integers[2] to BigFraction.ONE), BigFraction.ONE))))
         val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 1, ExecutionControl.Never,
             sourceIntegers = intArrayOf(1, 2)))
         val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
 
-        val condition = assertNotNull(repair.advisoryNeighborhood(
+        val condition = assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(repair.advisoryNeighborhood(
             listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO), 0, BigFraction.ONE,
-            SourceLpBudget(funding = funding), ExecutionControl.Never))
+            SourceLpBudget(funding = funding), ExecutionControl.Never)).condition
 
         assertEquals(mapOf(0 to BigFraction.ONE), condition.lower)
         assertEquals(condition.lower, condition.upper)
         assertTrue(condition.bools.isEmpty())
         assertTrue(funding.spent > 0)
         assertTrue(funding.allocated > 0)
+    }
+
+    @Test
+    fun `advisory neighborhoods should close integer support without joining continuous recourse`() {
+        val integers = (0..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val edges = listOf(integers[0] to integers[1], integers[1] to integers[3],
+            integers[3] to integers[2], integers[2] to integers[0], integers[3] to real, integers[4] to real)
+        val source = SourceProofContext(SourceScope(SourceRevision("advisory-cycle", "exact")),
+            integers.toSet() + real, edges.mapIndexed { id, (a, b) ->
+                id.toString() to SourcePremise(SourceInequality(mapOf(a to BigFraction.ONE,
+                    b to BigFraction.ONE), BigFraction.ONE))
+            }.toMap())
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 5, 1, ExecutionControl.Never))
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+
+        val condition = assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(repair.advisoryNeighborhood(
+            listOf(BigFraction.ONE, BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE),
+            0, BigFraction.ONE, SourceLpBudget(funding = funding), ExecutionControl.Never, expand = true)).condition
+
+        assertEquals(mapOf(4 to BigFraction.ONE), condition.lower)
+        assertEquals(condition.lower, condition.upper)
+    }
+
+    @Test
+    fun `advisory support should respect the existing free integer limit`() {
+        for (count in listOf(32, 33)) {
+            val columns = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+            val source = SourceProofContext(SourceScope(SourceRevision("advisory-width", "exact")),
+                columns.toSet(), mapOf("row" to SourcePremise(SourceInequality(
+                    columns.associateWith { BigFraction.ONE }, BigFraction.ONE))))
+            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, count, 0, ExecutionControl.Never))
+            val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+
+            val selected = repair.advisoryNeighborhood(List(count) { BigFraction.ZERO }, 0, BigFraction.ONE,
+                SourceLpBudget(funding = funding), ExecutionControl.Never, expand = true)
+
+            if (count == 32) assertTrue(assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(selected)
+                .condition.lower.isEmpty())
+            else assertEquals(JointRepairNeighborhood.AdvisorySelection.Declined(
+                JointRepairNeighborhood.AdvisorySelection.Limit.Width), selected)
+        }
+    }
+
+    @Test
+    fun `declined support and ordinary fallback should share a graph visit allowance`() {
+        val columns = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("advisory-visits", "exact")),
+            columns.toSet(), (0 until 4096).associate { id -> id.toString() to SourcePremise(SourceInequality(
+                columns.associateWith { BigFraction.ONE }, BigFraction.ONE)) })
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 0, ExecutionControl.Never))
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+
+        val selected = repair.advisoryNeighborhood(List(2) { BigFraction.ZERO }, 0, BigFraction.ONE,
+            SourceLpBudget(funding = funding), ExecutionControl.Never, expand = true)
+
+        assertEquals(JointRepairNeighborhood.AdvisorySelection.Declined(
+            JointRepairNeighborhood.AdvisorySelection.Limit.Visits), selected)
+        val fallback = repair.propose(List(2) { BigFraction.ZERO }, booleanArrayOf(), 2, 1,
+            BigFraction.ONE, BigFraction.ONE, repair.visitedEntries)
+        assertEquals(mapOf(1 to BigFraction.ZERO), fallback.lower)
+        assertTrue(repair.visitedEntries <= 8192)
+        assertTrue(funding.spent > 0)
+    }
+
+    @Test
+    fun `advisory support should withhold selection when its resources are unavailable`() {
+        val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("advisory-unavailable", "exact")),
+            columns.toSet(), mapOf("row" to SourcePremise(SourceInequality(
+                columns.associateWith { BigFraction.ONE }, BigFraction.ONE))))
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, ExecutionControl.Never))
+        for (variant in listOf("work", "allocation", "cancelled")) {
+            val funding = SourceLpFunding(if (variant == "work") 0 else 1_000_000,
+                if (variant == "allocation") 0 else 1_000_000).also { it.grant(1_000_000) }
+            var polls = 0
+            val token = ExecutionControl { variant == "cancelled" && ++polls >= 6 }
+
+            val selected = repair.advisoryNeighborhood(List(4) { BigFraction.ZERO }, 0, BigFraction.ONE,
+                SourceLpBudget(funding = funding), token, expand = true)
+
+            assertEquals(JointRepairNeighborhood.AdvisorySelection.Unavailable, selected)
+        }
     }
 
     @Test
