@@ -49,7 +49,7 @@ class LpPassiveCollectionTest {
                 "missing" -> emptyList()
                 "one-sided" -> listOf(false, false)
                 "equal" -> listOf(false, true)
-                "reliable" -> listOf(false, true, false, true)
+                "reliable" -> listOf(false, true, false, true, false, true)
                 else -> listOf(false, true, false)
             }
             for (up in directions) {

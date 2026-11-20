@@ -19,7 +19,7 @@ class LpPassiveValueChoiceTest {
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, point)
-            repeat(2) {
+            repeat(3) {
                 for ((decision, isUp) in listOf(down to false, up to true)) {
                     history.commit(decision, 1)
                     history.beginNode(1)
@@ -50,21 +50,21 @@ class LpPassiveValueChoiceTest {
     @Test
     fun `unavailable or invalidated value advice cannot count a commitment`() {
         for (condition in listOf("missing", "aged", "selection", "charge", "stamp", "decision", "commit", "clear")) {
-            val history = LpDirectionalHistory({}, maxAge = 4L)
+            val history = LpDirectionalHistory({}, maxAge = 8L)
             val variable = VarRef.IntVar(0)
             val down = SearchDecision.IntAtMost(0, 2)
             val up = SearchDecision.IntAtLeast(0, 3)
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, 2.25)
-            repeat(if (condition == "missing") 0 else 2) {
+            repeat(if (condition == "missing") 0 else 3) {
                 for ((decision, objective) in listOf(down to 13.0, up to 11.0)) {
                     history.commit(decision, 1)
                     history.beginNode(1)
                     history.record(objective)
                 }
             }
-            if (condition == "aged") repeat(5) { history.beginNode(0) }
+            if (condition == "aged") repeat(9) { history.beginNode(0) }
             var fresh = condition != "selection"
             val events = ArrayList<String>()
             val choice = LpPassiveValueChoice(true, events::add, { if (condition == "charge") fresh = false })

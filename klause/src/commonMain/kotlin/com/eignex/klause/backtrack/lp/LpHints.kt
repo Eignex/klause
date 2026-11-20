@@ -164,6 +164,10 @@ internal class LpHints(
     }
 
     fun commit(decision: SearchDecision, depth: Int, cancelled: ExecutionControl = ExecutionControl.Never) {
+        if (passiveChoice?.nominatedVariable != null) {
+            charge(2L)
+            if (cancelled() || !passivePointCurrent()) passiveChoice.clear()
+        }
         passiveChoice?.commit(decision)
         passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
