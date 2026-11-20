@@ -366,6 +366,7 @@ internal fun LpNeighborhood.rebindExact(
     fun parentColumn(local: Int): Int = if (local < cols.size) cols[local] else source.n + rows[local - cols.size]
     projection?.reserve(model.numVars.toLong() + rows.size, 0L, matrix = false)
     var changed = false
+    var activityChanged = false
     for (local in 0 until model.numVars) {
         if (token()) return null
         val original = parentColumn(local)
@@ -380,14 +381,17 @@ internal fun LpNeighborhood.rebindExact(
         if (token()) return null
         val original = rows[local]
         if (source.rhs(original) != previous.model.rhs(local) ||
-            source.row(original) != previous.model.row(local) ||
-            state.rows.row(original).active != previous.rows.row(local).active
+            source.row(original) != previous.model.row(local)
         ) changed = true
+        if (state.rows.row(original).active != previous.rows.row(local).active) {
+            activityChanged = true
+            changed = true
+        }
     }
     if (!changed) return this
     val dimensions = model.numVars.toLong() + rows.size
     projection?.reserve(dimensions * 4L + 1L, (dimensions + 1L) * 128L, matrix = false)
-    val identities = LpScopedRows(
+    val identities = if (!activityChanged) previous.rows else LpScopedRows(
         List(rows.size) { LpRowIdentity(it.toLong(), null, active = state.rows.row(rows[it]).active) },
         rows.size - 1L,
     )

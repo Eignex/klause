@@ -117,6 +117,7 @@ Exact-state rebuilds share unchanged immutable model descriptions and declared-b
 witnesses. A declared witness matches its column, side and fixed declaration identity;
 an asserted witness cannot become a declaration. Strict logical sides and inactive-row
 metadata are derived into fresh descriptions, and each state keeps its own revision identity.
+Component scalar rebindings share immutable local row tables while row activity matches.
 
 ### Numerical and exact deductions
 
