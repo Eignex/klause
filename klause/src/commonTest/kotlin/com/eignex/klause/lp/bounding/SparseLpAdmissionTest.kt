@@ -121,16 +121,67 @@ class SparseLpAdmissionTest {
     }
 
     @Test
-    fun `automatic admission declines an unaffordable monolithic basis before assembly`() {
+    fun `automatic admission declines an unaffordable first probe before assembly`() {
         val problem = Problem(0, 600, Array(600) { IntDomain(0, 1) },
             List(600) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.GE, 0) })
         var admission: SparseLpAdmission? = null
 
-        sequence<Unit> { admission = prepareSparseLpAdmission(problem, null, automatic = true) }.forEach { }
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 1_000_000L)
+        }.forEach { }
 
         assertEquals(1L, admission?.metrics?.get("DeclineQueryWork"))
         assertNull(admission?.sourceLayout)
         assertEquals(0L, admission?.work)
+    }
+
+    @Test
+    fun `automatic admission can explore without forecasting a complete monolithic query`() {
+        val problem = Problem(0, 300, Array(300) { IntDomain(0, 1) },
+            List(300) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.GE, 0) })
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 20_000_000L)
+        }.forEach { }
+
+        val result = requireNotNull(admission)
+        assertTrue(result.admitted)
+        assertTrue(requireNotNull(result.metrics["EstimatedProbeTotalWork"]) <= 20_000_000L)
+        assertTrue(requireNotNull(result.metrics["EstimatedMonolithicQueryWork"]) > 20_000_000L)
+    }
+
+    @Test
+    fun `automatic source refusal charges inspection without charging unperformed assembly`() {
+        val problem = Problem(0, 600, Array(600) { IntDomain(0, 1) },
+            List(600) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.GE, 0) })
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, null, automatic = true, queryWorkAllowance = 17_100_000L)
+        }.forEach { }
+
+        val result = requireNotNull(admission)
+        assertEquals(1L, result.metrics["DeclineQueryWork"])
+        assertEquals(600L, result.work)
+        assertTrue(requireNotNull(result.metrics["SourceEstimatedProbeWork"]) < 17_100_000L)
+        assertTrue(requireNotNull(result.metrics["SourceEstimatedProbeTotalWork"]) > 17_100_000L)
+        assertNull(result.sourceLayout)
+    }
+
+    @Test
+    fun `automatic emitted refusal retains completed preparation costs`() {
+        val model = LpBuilder().apply {
+            repeat(2) { addVar(0L, 1L) }
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+
+        val result = estimateSparseLpAdmission(model, preparationWork = 100L,
+            automatic = true, queryWorkAllowance = 100L)
+
+        assertEquals(1L, result.metrics["DeclineQueryWork"])
+        assertEquals(100L, result.work)
+        assertNull(result.sourceLayout)
     }
 
     @Test

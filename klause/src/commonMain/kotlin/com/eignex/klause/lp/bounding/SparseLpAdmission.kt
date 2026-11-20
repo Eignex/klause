@@ -69,9 +69,10 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         return decline("Shape")
     }
     if (cancellation()) return decline("Cancelled")
-    if (automatic && rows * rows * rows > queryWorkAllowance) {
+    val optimisticProbeWork = sparseProbeWork(rows, columns, 0L, 0L)
+    if (automatic && optimisticProbeWork > queryWorkAllowance) {
         return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
-            "SourceEstimatedQueryWork" to rows * rows * rows, "QueryWorkAllowance" to queryWorkAllowance))
+            "SourceEstimatedProbeWork" to optimisticProbeWork, "QueryWorkAllowance" to queryWorkAllowance))
     }
     if (32L * (columns + rows) > preparationAllowance) return decline("PreparationWork")
     for ((index, factor) in problem.factors.withIndex()) {
@@ -97,10 +98,12 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     val reservation = sparseLpStorage(rows, columns, entries)
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
     val assemblyCost = 32L * (entries + rows + columns)
-    val sourceQueryWork = sparseQueryWork(rows, columns, entries, sourceFillRisk)
-    if (automatic && assemblyCost + sourceQueryWork > queryWorkAllowance) {
+    val sourceProbeWork = sparseProbeWork(rows, columns, entries, sourceFillRisk)
+    if (automatic && assemblyCost + sourceProbeWork > queryWorkAllowance) {
         return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
-            "SourceEstimatedQueryWork" to sourceQueryWork, "QueryWorkAllowance" to queryWorkAllowance))
+            "SourceEstimatedProbeWork" to sourceProbeWork,
+            "SourceEstimatedProbeTotalWork" to assemblyCost + sourceProbeWork,
+            "QueryWorkAllowance" to queryWorkAllowance))
     }
     assemblyWork = assemblyCost
     val relaxation = try {
@@ -138,6 +141,12 @@ private fun sparseLpStorage(rows: Long, columns: Long, entries: Long): Long =
 // This owner refreshes one monolithic basis even when the source graph has independent blocks.
 private fun sparseQueryWork(rows: Long, columns: Long, entries: Long, fillRisk: Long): Long =
     rows * rows * rows + (entries + rows + columns) * minOf(rows, columns) + fillRisk
+
+// Predict an exploratory query with two capped construction attempts, sparse scans and fill risk.
+// Recovery and subsequent pivots can exceed this forecast; cooperative funding remains separate.
+private fun sparseProbeWork(rows: Long, columns: Long, entries: Long, fillRisk: Long): Long =
+    2L * minOf(rows * rows * rows, SPARSE_LP_MAX_FACTOR_WORK) +
+        (entries + rows + columns) * minOf(rows, columns) + fillRisk
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun estimateSparseLpAdmission(
@@ -220,12 +229,13 @@ internal fun estimateSparseLpAdmission(
     val fillRisk = rowDegree.sumOf { it.toLong() * maxOf(0, it - 1) }
     val storage = sparseLpStorage(model.m.toLong(), model.n.toLong(), entries)
     val queryWork = sparseQueryWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
+    val probeWork = sparseProbeWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
     val decline = when {
         scalarBits > 128 -> "ScalarWidth"
         storage > SPARSE_LP_MAX_ALLOCATION -> "Storage"
         preparationWork > SPARSE_LP_MAX_PREPARATION_WORK -> "PreparationWork"
         automatic && fillRisk > MAX_AUTOMATIC_FILL_RISK -> "FillRisk"
-        automatic && preparationWork + queryWork > queryWorkAllowance -> "QueryWork"
+        automatic && preparationWork + probeWork > queryWorkAllowance -> "QueryWork"
         else -> null
     }
     return SparseLpAdmission(buildMap {
@@ -239,8 +249,9 @@ internal fun estimateSparseLpAdmission(
         put("ScalarBits", scalarBits.toLong())
         put("RowIntersectionRisk", fillRisk)
         if (automatic) put("FillRiskLimit", MAX_AUTOMATIC_FILL_RISK)
-        put("EstimatedQueryWork", queryWork)
-        put("EstimatedTotalWork", preparationWork + queryWork)
+        put("EstimatedMonolithicQueryWork", queryWork)
+        put("EstimatedProbeWork", probeWork)
+        put("EstimatedProbeTotalWork", preparationWork + probeWork)
         put("QueryWorkAllowance", queryWorkAllowance)
         put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
         put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)

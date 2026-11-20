@@ -357,10 +357,14 @@ bounds source assembly, then inspects emitted nonzeros, component dimensions, ex
 scalar width and row-intersection fill risk on the same source-root boxes as the
 retained layout. Custom emitters decline because they reserve no source size. The
 automatic policy declines row-intersection risk above eight million pairs before
-source assembly and checks the emitted risk again afterward. It budgets one
-monolithic basis refresh plus sparse row/column work and fill risk against the
-cumulative root grant; connected blocks do not imply separate numerical owners.
-The row-count cube rejects unaffordable queries before a source scan. Automatic
+source assembly and checks the emitted risk again afterward. A first-probe forecast
+combines two factor attempts, each predicted by the smaller of the row-count cube
+and the factor-work limit, with sparse row/column work and fill risk. It compares
+that forecast and source assembly against the cumulative root grant, with an early
+shape-only check before scanning source rows. This predicts an affordable exploration;
+recovery and subsequent pivots can exceed it, and completion is not promised. The
+uncapped monolithic forecast remains diagnostic; connected blocks do not imply
+separate numerical owners. Automatic
 admission also caps its grant by the remaining containing deadline's LP work share,
 when that allowance is enabled. Admission fixes the grant once; later slices do not
 resize it against the approaching deadline.
@@ -396,10 +400,12 @@ Completed-point rounding, component-owned plans and workers without a decision
 allowance keep their existing root consultation paths.
 
 Sparse-trial preparation is capped at eight million modeled work units; root LP
-work stops at 150 million units or the containing invocation's smaller
-allowance, and tighter caller deadlines and work shares remain in force. Bounded
-atomic numerical operations can finish past a work boundary; the ledger keeps their
-actual cost. An exhausted root grant cannot restart an unchanged root query through
+funding cooperatively limits reported `LpWork` to 150 million units or the containing
+invocation's smaller allowance, with tighter caller deadlines and work shares.
+Atomic numerical operations can finish past a work boundary. Reported basis work
+stays separate from `LpWork`: repair can overlap both counters, while scoped initial
+factor construction and exact-rank recovery costs are unmeasured. Neither the grant
+nor the admission forecast bounds total physical cost. An exhausted root grant cannot restart an unchanged root query through
 the node consumer. Automatic admission preserves an existing ordinary node plan
 and its funding below the root; a model beyond the ordinary ceiling
 receives only the bounded root trial. Explicit trials keep root-only funding.

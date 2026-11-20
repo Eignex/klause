@@ -62,11 +62,26 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `unaffordable automatic sparse work does not supply a relaxation`() {
+    fun `affordable automatic exploration supplies a relaxation beyond the monolithic forecast`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
             List(600) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1) },
             settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
+
+        for ((spec, expected) in listOf("default" to true, "default,+sparse-trial" to true,
+            "default,-sparse-trial" to false)) {
+            val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), LpConfig.parse(spec), objective)
+
+            assertEquals(expected, facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)), spec)
+        }
+    }
+
+    @Test
+    fun `excessive automatic fill risk does not supply a relaxation`() {
+        val problem = Problem(0, 3_000, Array(3_000) { IntDomain(0, 1) },
+            listOf(Linear(IntArray(3_000) { 1 }, IntArray(3_000) { it }, LinearOp.GE, 1)),
+            settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(3_000) { 1L })
 
         for ((spec, expected) in listOf("default" to false, "default,+sparse-trial" to true,
             "default,-sparse-trial" to false)) {
