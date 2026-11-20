@@ -39,6 +39,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
+import java.lang.reflect.Proxy
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 
@@ -272,14 +273,14 @@ internal object MpsLpAdmission {
             val count = rowCounts.getValue(root).toLong()
             count * (columnCounts.getValue(root) + count + 1L)
         } + rowOnly.toLong() * (rowOnly + 1L)
-        val children = coupled.size + if (rowOnly > 0) 1 else 0
+        val numerical = numericalOwnerShape(model, stop)
         return buildJsonObject {
             put("rows", rows)
             put("columns", columns)
             put("nonzeros", rowIndices.size)
             put("emittedDenseProxy", rows.toLong() * (columns.toLong() + rows + 1))
-            put("componentDenseProxy", childCells)
-            put("modeledComponentBytes", 128L * (rowIndices.size.toLong() + columns + rows + children) + 4L * rows)
+            numerical.forEach { (key, value) -> put(key, value) }
+            put("naturalComponentDenseProxy", childCells)
             put("rowComponents", rowCounts.size)
             put("rowCoupledComponents", rowCounts.keys.count { (columnCounts[it] ?: 0) > 0 })
             put("rowOnlyRows", rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count })
@@ -287,6 +288,39 @@ internal object MpsLpAdmission {
             put("largestComponentColumns", rowCounts.keys.maxOfOrNull { columnCounts[it] ?: 0 } ?: 0)
             put("isolatedColumns", (0 until columns).count { pointers[it] == pointers[it + 1] })
             put("persistentEligible", get(relaxation, "PersistentEligible") as Boolean)
+        }
+    }
+
+    private fun numericalOwnerShape(model: Any, stop: ExecutionControl): JsonObject {
+        val policy = Class.forName("com.eignex.klause.lp.bounding.LpComponentReuseKt")
+        val minimumCells = policy.getMethod("componentReuseOwnerCells").invoke(null) as Long
+        val admissionType = Class.forName("com.eignex.klause.lp.engine.LpComponentAdmission")
+        var observed: Any? = null
+        val admission = Proxy.newProxyInstance(admissionType.classLoader, arrayOf(admissionType)) { _, method, args ->
+            when (method.name) {
+                "inspect" -> true
+                "getMinimumOwnerCells" -> minimumCells
+                "accepts" -> {
+                    observed = requireNotNull(args)[0]
+                    false
+                }
+                else -> error("Unexpected diagnostic admission call: ${method.name}")
+            }
+        }
+        val factory = Class.forName("com.eignex.klause.lp.engine.ComponentLpSolverKt").methods.single {
+            it.name == "componentLpSolverOrNull" && it.parameterCount == 6
+        }
+        val engine: (Any, ExecutionControl, Int) -> Nothing = { _, _, _ -> error("Diagnostic constructed an engine") }
+        val component: (Any, List<Any>, List<Any>, IntArray) -> Nothing = { _, _, _, _ ->
+            error("Diagnostic constructed a component owner")
+        }
+        factory.invoke(null, model, stop, null, engine, component, admission)
+        check(!stop())
+        return buildJsonObject {
+            put("minimumOwnerCells", minimumCells)
+            put("numericalOwners", observed?.let { get(it, "Blocks") as Int } ?: 0)
+            put("componentDenseProxy", observed?.let { get(it, "ComponentCells") as Long } ?: 0L)
+            put("modeledComponentBytes", observed?.let { get(it, "ModeledBytes") as Long } ?: 0L)
         }
     }
 

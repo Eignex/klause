@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
 
 class MpsLpAdmissionTest {
     @Test
-    fun `component cost accounts for each row coupled block`() {
+    fun `component cost accounts for grouped numerical owners`() {
         val problem = Problem.of(0, 4, Array(4) { IntDomain(0, 3) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
@@ -39,7 +39,10 @@ class MpsLpAdmissionTest {
         val report = MpsLpAdmission.shape(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
             false, ExecutionControl.Never)
 
-        assertEquals(13L, assertNotNull(report["componentDenseProxy"]).jsonPrimitive.long)
+        assertEquals(21L, assertNotNull(report["componentDenseProxy"]).jsonPrimitive.long)
+        assertEquals(13L, assertNotNull(report["naturalComponentDenseProxy"]).jsonPrimitive.long)
+        assertEquals(1L, assertNotNull(report["numericalOwners"]).jsonPrimitive.long)
+        assertEquals(4096L, assertNotNull(report["minimumOwnerCells"]).jsonPrimitive.long)
     }
 
     @Test

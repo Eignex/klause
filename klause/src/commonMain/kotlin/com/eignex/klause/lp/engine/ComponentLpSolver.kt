@@ -1020,22 +1020,28 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[partition.find(rowIndex.colIdx[from])]
         blockRows[block].add(i)
     }
+    projection?.reserve(1L, 64L, matrix = true)
+    val groups = LpComponentGroups(blockCols, blockRows, blocks).coarsen(
+        model, rowIndex, accept?.minimumOwnerCells ?: 0L, cancellation, projection,
+    ) ?: return null
     if (accept != null) {
-        projection?.reserve(children.toLong() + 1L, 64L, matrix = false)
-        val cells = blockRows.indices.sumOf { index ->
-            val rows = blockRows[index].size.toLong()
-            rows * (blockCols[index].size + rows + 1L)
+        projection?.reserve(groups.columns.size.toLong() + 1L, 64L, matrix = false)
+        val cells = groups.rows.indices.sumOf { index ->
+            val rows = groups.rows[index].size.toLong()
+            rows * (groups.columns[index].size + rows + 1L)
         }
         val shape = LpComponentShape(
-            blocks, m.toLong() * (n.toLong() + m + 1L), cells,
-            128L * (rowIndex.colIdx.size.toLong() + n + m + children) + 4L * m,
+            groups.blocks, m.toLong() * (n.toLong() + m + 1L), cells,
+            128L * (rowIndex.colIdx.size.toLong() + n + m + groups.columns.size) + 4L * m,
         )
         if (!accept.accepts(shape) || cancellation()) return null
     }
+    if (groups.blocks < 2) return null
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
 
-    val parts = model.componentRestrictions(blockCols, blockRows, rowIndex, cancellation, projection) ?: return null
+    val parts = model.componentRestrictions(groups.columns, groups.rows, rowIndex, cancellation, projection)
+        ?: return null
     val solvers = ArrayList<LpSolver>(parts.size)
     try {
         for (part in parts) solvers += engine(part.model, cancellation, rowOnlyRows)
@@ -1084,6 +1090,7 @@ internal fun interface LpComponentAdmission {
     fun declinedEdit(reason: LpComponentEditDecline) {}
     val basisEntryLimit: Long get() = Long.MAX_VALUE
     val basisWorkLimit: Long get() = Long.MAX_VALUE
+    val minimumOwnerCells: Long get() = 0L
 }
 
 private fun LpModel.componentRestrictions(

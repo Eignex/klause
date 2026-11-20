@@ -19,6 +19,77 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `coarsened owners should reuse an unchanged group after a bound edit`() {
+        val builder = LpBuilder()
+        repeat(12) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val admission = object : LpComponentAdmission {
+            override val minimumOwnerCells = 32L
+            override fun accepts(shape: LpComponentShape): Boolean = true
+        }
+        LpScopedSolver(state, componentSplit = true, componentAdmission = admission).use { owner ->
+            assertEquals(3, assertNotNull(assertNotNull(owner.solve()).float).blocks)
+
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), 0L))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(19L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+            assertEquals(2, owner.lastMetrics.componentReuses)
+            assertEquals(1, owner.lastMetrics.componentSolves)
+        }
+    }
+
+    @Test
+    fun `a joining row should preserve a separate coarsened owner`() {
+        val builder = LpBuilder()
+        repeat(12) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val admission = object : LpComponentAdmission {
+            override val minimumOwnerCells = 32L
+            override fun accepts(shape: LpComponentShape): Boolean = true
+        }
+        LpScopedSolver(state, componentSplit = true, componentAdmission = admission).use { owner ->
+            assertEquals(3, assertNotNull(assertNotNull(owner.solve()).float).blocks)
+
+            assertTrue(owner.append(LpScopedRow(12L,
+                listOf(0 to ExactLpNumber.of(-1L), 4 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(8L), result.lowerBound)
+            assertEquals(2, assertNotNull(result.float).blocks)
+            assertEquals(1, owner.lastMetrics.componentReuses)
+        }
+    }
+
+    @Test
+    fun `coarsened owners should preserve exact aggregation with interleaved coordinates`() {
+        val builder = LpBuilder()
+        repeat(16) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addVar(0L, 4L, cost = -3L)
+        repeat(8) { builder.addRow(intArrayOf(it, it + 8), longArrayOf(1L, 1L), Relation.GE, 1L) }
+        builder.addRow(intArrayOf(), longArrayOf(), Relation.GE, 0L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val admission = object : LpComponentAdmission {
+            override val minimumOwnerCells = 32L
+            override fun accepts(shape: LpComponentShape): Boolean = true
+        }
+
+        LpScopedSolver(state, componentSplit = true, componentAdmission = admission).use { owner ->
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(-4L), result.lowerBound)
+            assertEquals(3, assertNotNull(result.float).blocks)
+        }
+    }
+
+    @Test
     fun `mixed scalar and local row replacements should copy the scalar basis once`() {
         val builder = LpBuilder()
         repeat(3) {
