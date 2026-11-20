@@ -105,6 +105,18 @@ class FinitePortfolioLpCaptureTest {
             "portfolio-proof-workers=retained", "portfolio-proof-share=0.5"), parameters)
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `joint observation should preserve ordinary source controls`(capture: Boolean) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary",
+            "portfolio-progress" to "false", "capture-joint" to capture.toString(), "captures" to "0")
+
+        val parameters = FinitePortfolioLpCapture.parameters(options)
+
+        assertEquals(listOf("portfolio-progress=false"), parameters)
+    }
+
     @Test
     fun `ordinary policy should leave algorithm selection at source defaults`() {
         val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",

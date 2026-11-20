@@ -98,6 +98,11 @@ fixed repair, complete proof-worker coverage at share 0.5, and quiet logging.
 `source-refutation-center-step=true|false` is accepted in `joint-ordinary` and `joint-handoff` modes
 and forwards the source option to that producer. Omission leaves its default false.
 The existing observation and companion limits apply.
+`portfolio-policy=ordinary handoff=false portfolio-progress=false capture-joint=true captures=0`
+records the bounded joint journal under ordinary source defaults, including automatic
+incumbent reuse where the source admits it. This observer does not select explicit
+completion or change admission, scheduling, companion limits or cutoff accounting.
+Observation costs remain in the containing execution and the existing producer grant.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs
