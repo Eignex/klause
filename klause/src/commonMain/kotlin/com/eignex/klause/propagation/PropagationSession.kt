@@ -1053,16 +1053,19 @@ class PropagationSession private constructor(
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
-        if (state.integerRowAdmission) {
-            val result = addLearnedIntegerRow(learned.row, learned.lbd)
-            if (result is PropagationResult.Unsat || fixpointCancelled) return result
-        } else {
+        if (!state.integerRowAdmission) {
             state.integerRowAdmissionsDeclined++
             state.arithmeticLearningTrace?.record("integer.decline.admission-disabled")
         }
         val fallback = learned.fallbackClause
-        return registerAndPropagate(base = publicationBase) {
+        val clauseResult = registerAndPropagate(base = publicationBase) {
             state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
+        }
+        if (clauseResult is PropagationResult.Unsat || fixpointCancelled || !state.integerRowAdmission) {
+            return clauseResult
+        }
+        return registerAndPropagate(base = publicationBase) {
+            state.addLearnedIntegerRow(learned.row, learned.lbd)
         }
     }
 

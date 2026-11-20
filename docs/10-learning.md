@@ -462,10 +462,11 @@ child; an unavailable, unnameable or inactive leaf withholds reuse, and the memo
 ends with the publication callback. Fixpoint facts already implied by shared
 integer endpoints keep the shared premise without reconstructing a native proof.
 
-Rows share the learned store and integer bounds propagation. A successful row
-assertion also keeps its first-UIP clause in the native store; the two constraints
-can prune different branches, publish their deductions together from the undo
-position before either assertion, and follow their own retention policies. Retained
+Rows share the learned store and integer bounds propagation. Attachment asserts
+the first-UIP clause before retaining the row, so a deduction shared by both keeps
+its clausal reason. A conflicting or interrupted clause fixpoint withholds row
+attachment. The two constraints can prune different branches, publish their deductions
+together from the undo position before either assertion, and follow their own retention policies. Retained
 row deductions freeze eager historical clause premises, including the signed guard,
 without compactable factor IDs. Arithmetic reuse reconstructs their deduction boundary
 from the bound journal and validates the retained row's raw historical consequence.

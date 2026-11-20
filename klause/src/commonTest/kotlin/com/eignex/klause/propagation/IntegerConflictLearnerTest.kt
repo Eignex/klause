@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
@@ -47,6 +48,26 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest : RuntimeInitializedTest() {
+    @Test
+    fun `a shared row and clause deduction should retain its first UIP clause reason`() {
+        val native = PropagationSession(Problem(0, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        native.popToLevel(learned.backjumpLevel)
+
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned))
+
+        assertEquals(1L, native.intDomain(0).max)
+        val state = native.explanationState
+        assertIs<ClausePropagator>(state.factorAt(state.intMaxReason[0]))
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerAdmitted"])
+    }
+
     @Test
     fun `disabled row admission should keep the completed derivation and clause fallback`() {
         val sessions = listOf(false, true).map { admission ->
