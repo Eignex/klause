@@ -887,6 +887,8 @@ internal class LpScopedSolver(
             cancellation = token,
         )
         var constructionBound = 0L
+        var constructionStarted = false
+        var constructionReported = false
         try {
             if (token() || next.model.m > maxRetainedRows) return null
             var inspectComponents = allowComponents && warm == null && next.model.n > 0 && next.model.m >= 2 &&
@@ -919,6 +921,7 @@ internal class LpScopedSolver(
                     { part, childToken, rowOnlyRows ->
                         val remaining = if (workBudget > 0L) workBudget - projection.work else 0L
                         if (workBudget > 0L && remaining <= 0L) throw LpProjectionStop()
+                        constructionStarted = true
                         newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
                             remaining, trackDegeneracy, context.engineFactory,
                             componentPricing(part, working.n, rowOnlyRows))
@@ -945,19 +948,23 @@ internal class LpScopedSolver(
             } else workBudget
             val remainingWork = if (selectedBudget > 0L) selectedBudget - projection.work else 0L
             if (selectedBudget > 0L && remainingWork <= 0L) return null
-            if (candidate == null) candidate = newPersistentLpSolver(
-                working,
-                token,
-                refactorUpdateLimit,
-                iterationLimit,
-                remainingWork,
-                trackDegeneracy,
-                context.engineFactory,
-                pricing,
-            )
+            if (candidate == null) {
+                constructionStarted = true
+                candidate = newPersistentLpSolver(
+                    working,
+                    token,
+                    refactorUpdateLimit,
+                    iterationLimit,
+                    remainingWork,
+                    trackDegeneracy,
+                    context.engineFactory,
+                    pricing,
+                )
+            }
             createdOwners++
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
+            var preparationFailure: Throwable? = null
             val basis = try {
                 when (val current = candidate) {
                     is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else
@@ -965,10 +972,23 @@ internal class LpScopedSolver(
                     is ComponentLpSolver -> current.prepareLogicals(token, remainingWork)
                     else -> null
                 }
+            } catch (primary: Throwable) {
+                preparationFailure = primary
+                throw primary
             } finally {
-                preparationWork = saturatedAdd(preparationWork, candidate.lastMetrics.workOps)
-                constructionWork = saturatedAdd(constructionWork, candidate.lastMetrics.preparationOps)
-                preparationRefactorizations += candidate.lastRefactorizations
+                try {
+                    val reported = candidate.lastMetrics
+                    preparationWork = saturatedAdd(preparationWork, reported.workOps)
+                    constructionReported = when (val current = candidate) {
+                        is ComponentLpSolver -> current.constructionReportComplete
+                        else -> reported.preparationOps > 0L
+                    }
+                    if (constructionReported) constructionWork = saturatedAdd(constructionWork, reported.preparationOps)
+                    preparationRefactorizations += candidate.lastRefactorizations
+                } catch (report: Throwable) {
+                    if (preparationFailure == null) throw report
+                    if (report !== preparationFailure) preparationFailure.addSuppressed(report)
+                }
             } ?: return null
             if (!basis.validFor(next.model) || (warm == null &&
                     (basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
@@ -989,7 +1009,9 @@ internal class LpScopedSolver(
             throw primary
         } finally {
             preparationWork = saturatedAdd(preparationWork, projection.work)
-            reservedConstructionWork = saturatedAdd(reservedConstructionWork, constructionBound)
+            if (!constructionStarted || constructionReported) {
+                reservedConstructionWork = saturatedAdd(reservedConstructionWork, constructionBound)
+            }
             if (!accepted && candidate != null) {
                 closeRejectedCandidate(candidate, recordRejectedAppendWork, failure)
             }

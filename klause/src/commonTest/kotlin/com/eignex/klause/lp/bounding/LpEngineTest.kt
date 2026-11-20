@@ -12,6 +12,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -20,11 +21,13 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
@@ -50,6 +53,78 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 
 class LpEngineTest {
+    @Test
+    fun `completed preparation should charge reported construction once to both host ledgers`() {
+        val problem = boundedLpEngineProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val base = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        var containing = 0L
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true)),
+            SolveStatsSink("preparation-construction-charge"), containingWork = { containing += it }).use { engine ->
+            assertTrue(engine.propagator.install(base, assertNotNull(base.model.authoritativeModel())))
+            val before = engine.totalSolveWork()
+            val containingBefore = containing
+
+            assertTrue(engine.propagator.prepare(ExecutionControl.Never, 100_000L))
+
+            val prepared = assertNotNull(engine.propagator.metrics)
+            assertTrue(prepared.reservedConstructionWork > 0L)
+            assertTrue(prepared.constructionWork > 0L)
+            assertEquals(prepared.measuredPreparationWork, engine.totalSolveWork() - before)
+            assertEquals(prepared.measuredPreparationWork, containing - containingBefore)
+            val charged = engine.totalSolveWork()
+            assertTrue(engine.propagator.prepare(ExecutionControl.Never, 100_000L))
+            assertEquals(charged, engine.totalSolveWork())
+            assertEquals(containingBefore + prepared.measuredPreparationWork, containing)
+        }
+    }
+
+    @Test
+    fun `unreported construction failures should retain their charge in both host ledgers`() {
+        val problem = boundedLpEngineProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val base = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        for (throwBeforeCreation in listOf(false, true)) {
+            var containing = 0L
+            var current: LpEngine? = null
+            var reported: LpScopedMetrics? = null
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                    iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    if (throwBeforeCreation) error("construction failed")
+                    val child = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                    return object : PersistentLpSolver by child {
+                        override fun prepareLogicals(token: ExecutionControl): Basis? = error("preparation failed")
+                    }
+                }
+            }
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true)),
+                SolveStatsSink("failed-preparation-charge"), LpSolveContext(factory), containingWork = {
+                    containing += it
+                    reported = current?.propagator?.metrics
+                }).use { engine ->
+                current = engine
+                assertTrue(engine.propagator.install(base, assertNotNull(base.model.authoritativeModel())))
+                val before = engine.totalSolveWork()
+                val containingBefore = containing
+
+                assertFailsWith<IllegalStateException> {
+                    engine.propagator.prepare(ExecutionControl.Never, 100_000L)
+                }
+
+                val failed = assertNotNull(reported)
+                assertEquals(0L, failed.reservedConstructionWork)
+                assertEquals(0L, failed.constructionWork)
+                assertTrue(failed.measuredPreparationWork > 0L)
+                assertEquals(failed.measuredPreparationWork, engine.totalSolveWork() - before)
+                assertEquals(failed.measuredPreparationWork, containing - containingBefore)
+            }
+        }
+    }
+
     @Test
     fun `metadata only queries should defer further optional node queries`() {
         val problem = boundedLpEngineProblem()

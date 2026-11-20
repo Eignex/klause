@@ -69,6 +69,32 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
+    fun `preparation should preserve its primary when the host report fails`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        val primary = IllegalArgumentException("construction failed")
+        val report = IllegalStateException("host report failed")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver = throw primary
+        }
+        LpPropagator(object : LpSearchPolicy {}, solveContext = LpSolveContext(factory),
+            onPreparation = { throw report }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+
+            val failure = assertFailsWith<IllegalArgumentException> {
+                lp.prepare(ExecutionControl.Never, 100_000L)
+            }
+
+            assertSame(primary, failure)
+            assertTrue(failure.suppressedExceptions.contains(report))
+        }
+    }
+
+    @Test
     fun `installation honors its supplied construction token and preserves the default scope`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
@@ -129,7 +155,7 @@ class LpPropagatorTest {
             val result = lp.solveFloat(queryAllowance = { 0L })
 
             assertNull(result)
-            assertEquals(0L, lp.lastMetrics.workOps - assertNotNull(lp.metrics).preparationWork)
+            assertEquals(0L, lp.lastMetrics.workOps - assertNotNull(lp.metrics).measuredPreparationWork)
         }
     }
 

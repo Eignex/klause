@@ -8,6 +8,7 @@ internal class LpComponentStaging(private val workLimit: Long, token: ExecutionC
     )
     private var reported = LpSolveMetrics()
     private var construction = 0L
+    private var workspace = 0L
     private var constructionStarted = false
     private var completedConstruction = 0L
 
@@ -18,17 +19,19 @@ internal class LpComponentStaging(private val workLimit: Long, token: ExecutionC
     val work: Long get() = projection.work + reported.workOps
     val metrics: LpSolveMetrics get() = reported + LpSolveMetrics(workOps = projection.work)
     val reservedConstructionWork: Long
-        get() = completedConstruction + if (constructionStarted) 0L else construction
+        get() = completedConstruction + if (constructionStarted) 0L else construction + workspace
 
     fun reserve(work: Long, bytes: Long = 0L) {
         if (workLimit > 0L) projection.restrictWork((workLimit - reported.workOps).coerceAtLeast(0L))
         projection.reserve(work, bytes, matrix = false)
     }
 
-    fun reserveConstruction(work: Long) {
-        check(construction == 0L)
-        reserve(work)
+    fun reserveConstruction(work: Long, workspaceWork: Long = 0L) {
+        check(construction == 0L && workspace == 0L)
+        if (workspaceWork < 0L || work < 0L || workspaceWork > Long.MAX_VALUE - work) throw LpProjectionStop()
+        reserve(work + workspaceWork)
         construction = work
+        workspace = workspaceWork
         constructionStarted = false
     }
 
@@ -45,6 +48,7 @@ internal class LpComponentStaging(private val workLimit: Long, token: ExecutionC
         }
         // Default metrics do not establish that a throwing constructor or preparation reported its work.
         construction = 0L
+        workspace = 0L
         constructionStarted = false
     }
 }

@@ -215,7 +215,7 @@ internal class LpDirectionalProbes(
         val savedSourceWork = if (sharedBasisSource) sourceCopyWork else 0L
         // Retained private source snapshots eliminate both coefficient copies; scratch stays private and prepaid.
         val workspace = if (existing == null) {
-            16L * child.numVars + 40L * child.m + 64L + orderPreparation + factorPreparation + parentValuePreparation +
+            simplexWorkspaceWork(child.m, child.numVars) + orderPreparation + factorPreparation + parentValuePreparation +
                 sourceCopyWork - savedSourceWork
         } else 0L
         val scaling = when {

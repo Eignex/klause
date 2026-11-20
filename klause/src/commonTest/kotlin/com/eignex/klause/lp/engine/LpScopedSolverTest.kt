@@ -19,6 +19,69 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `a partially reported initial collection should retain its full construction charge`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        var children = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val child = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                if (++children == 1) return child
+                return object : PersistentLpSolver by child {
+                    override fun prepareLogicals(token: ExecutionControl): Basis? = error("preparation failed")
+                }
+            }
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            assertFailsWith<IllegalStateException> { owner.prepare() }
+
+            assertEquals(2, children)
+            assertEquals(0L, owner.metrics.reservedConstructionWork)
+            assertEquals(0L, owner.metrics.constructionWork)
+            assertTrue(owner.metrics.measuredPreparationWork > 0L)
+        }
+    }
+
+    @Test
+    fun `child preparation should preserve its primary when reporting also fails`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val primary = IllegalArgumentException("preparation failed")
+        val report = IllegalStateException("report failed")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val child = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by child {
+                    override fun prepareLogicals(token: ExecutionControl): Basis? = throw primary
+                    override val lastMetrics: LpSolveMetrics get() = throw report
+                }
+            }
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            val failure = assertFailsWith<IllegalArgumentException> { owner.prepare() }
+
+            assertSame(primary, failure)
+            assertTrue(failure.suppressedExceptions.contains(report))
+        }
+    }
+
+    @Test
     fun `cancellation after exact conflict certification should withhold the result`() {
         var cancelled = false
         val observer = object : LpCertificationObserver {

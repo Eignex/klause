@@ -383,7 +383,7 @@ internal class LpPropagator(
         edit: LpSourceEdit,
         premise: (Int, Boolean) -> SearchAtomPremise = { _, _ -> SearchAtomPremise.Unavailable },
     ): Boolean = withOwner { current ->
-        try {
+        withPreparationReport(current) {
             val before = current.state
             if (edit.sourceState !== before || !edit.isCurrent() ||
                 edit.bounds.size != before.model.n + edit.columns.size || cancellation()
@@ -412,17 +412,12 @@ internal class LpPropagator(
             lastMetrics = LpSolveMetrics()
             edit.commit()
             true
-        } finally {
-            onPreparation?.invoke(takePreparationMetrics(current))
         }
     } == true
 
     fun prepare(token: ExecutionControl, workAllowance: Long): Boolean = withOwner { current ->
-        try {
+        withPreparationReport(current, updateLast = true) {
             current.prepare(token, workAllowance)
-        } finally {
-            lastMetrics = takePreparationMetrics(current)
-            onPreparation?.invoke(lastMetrics)
         }
     } == true
 
@@ -484,10 +479,8 @@ internal class LpPropagator(
         var queryStarted = false
         try {
             if (prepareToken != null) {
-                val ready = try {
+                val ready = withPreparationReport(current) {
                     current.prepare(prepareToken)
-                } finally {
-                    onPreparation?.invoke(takePreparationMetrics(current))
                 }
                 if (!ready) return@withOwner null
             }
@@ -529,18 +522,43 @@ internal class LpPropagator(
     private fun takePreparationMetrics(current: LpScopedSolver): LpSolveMetrics {
         val metrics = current.metrics
         val preparation = LpSolveMetrics(
-            workOps = metrics.preparationWork - preparedWork,
+            workOps = metrics.measuredPreparationWork - preparedWork,
             initialRefactorizations = (metrics.preparationRefactorizations - preparedRefactors).toInt(),
             componentScalarStages = metrics.componentScalarStages - preparedScalarStages,
             componentRowStages = metrics.componentRowStages - preparedRowStages,
             componentJoinStages = metrics.componentJoinStages - preparedJoinStages,
         )
-        preparedWork = metrics.preparationWork
+        preparedWork = metrics.measuredPreparationWork
         preparedRefactors = metrics.preparationRefactorizations
         preparedScalarStages = metrics.componentScalarStages
         preparedRowStages = metrics.componentRowStages
         preparedJoinStages = metrics.componentJoinStages
         return preparation
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Reporting preserves an action's primary failure.
+    private inline fun <T> withPreparationReport(
+        current: LpScopedSolver,
+        updateLast: Boolean = false,
+        action: () -> T,
+    ): T {
+        var failure: Throwable? = null
+        try {
+            return action()
+        } catch (primary: Throwable) {
+            failure = primary
+            throw primary
+        } finally {
+            try {
+                if (updateLast) {
+                    lastMetrics = takePreparationMetrics(current)
+                    onPreparation?.invoke(lastMetrics)
+                } else onPreparation?.invoke(takePreparationMetrics(current))
+            } catch (report: Throwable) {
+                if (failure == null) throw report
+                if (report !== failure) failure.addSuppressed(report)
+            }
+        }
     }
 
     override fun initialize(context: SearchContext): ComponentResult {

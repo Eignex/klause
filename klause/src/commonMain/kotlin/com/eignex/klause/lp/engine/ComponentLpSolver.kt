@@ -55,6 +55,8 @@ internal class ComponentLpSolver(
         private set
     var lastLocalEditDecline: LpComponentEditDecline? = null
         private set
+    var constructionReportComplete = false
+        private set
     private var closed = false
     private var continuationTarget: Basis? = null
     override var recessionDirection: DoubleArray? = null
@@ -241,19 +243,34 @@ internal class ComponentLpSolver(
         lastTermination = null
     }
 
+    @Suppress("TooGenericExceptionCaught") // Child reporting preserves the preparation failure.
     fun prepareLogicals(token: ExecutionControl, workLimit: Long): Basis? {
         metrics = LpSolveMetrics()
+        constructionReportComplete = false
+        var constructionReports = 0
         lastDegenerateColumns = 0
         lastColumns = 0
         val stop = token or ExecutionControl { workLimit > 0L && currentWork >= workLimit }
         for (solver in solvers) {
             val persistent = solver as? PersistentLpSolver ?: return null
             activeChild = solver
+            var preparationFailure: Throwable? = null
             val basis = try {
                 persistent.prepareLogicals(stop)
+            } catch (primary: Throwable) {
+                preparationFailure = primary
+                throw primary
             } finally {
                 activeChild = null
-                metrics += persistent.lastMetrics
+                try {
+                    val reported = persistent.lastMetrics
+                    metrics += reported
+                    if (reported.preparationOps > 0L) constructionReports++
+                    constructionReportComplete = constructionReports == solvers.size
+                } catch (report: Throwable) {
+                    if (preparationFailure == null) throw report
+                    if (report !== preparationFailure) preparationFailure.addSuppressed(report)
+                }
             }
             if (basis == null || stop()) return null
         }
@@ -323,7 +340,9 @@ internal class ComponentLpSolver(
                 val staging = LpComponentStaging(if (workLimit > 0L) workLimit - metrics.workOps else 0L, token)
                 activeStaging = staging
                 try {
-                    staging.reserveConstruction(LpScalingView.constructionWorkBound(plan.parts[index].model))
+                    val nextModel = plan.parts[index].model
+                    staging.reserveConstruction(LpScalingView.constructionWorkBound(nextModel),
+                        simplexWorkspaceWork(nextModel.m, nextModel.numVars))
                     val remaining = staging.beginConstruction() ?: return false
                     val ancestors = plan.ancestors[index]
                     metrics += when {
@@ -334,6 +353,7 @@ internal class ComponentLpSolver(
                         else -> LpSolveMetrics(componentRowStages = 1L)
                     }
                     var child: PersistentLpSolver? = null
+                    var preparationFailure: Throwable? = null
                     val basis = try {
                         engine(plan.parts[index].model, token, remaining).also { candidate ->
                             child = candidate
@@ -343,9 +363,17 @@ internal class ComponentLpSolver(
                         }.let { candidate ->
                             if (warm == null) candidate.prepareLogicals(stop) else candidate.prepareBasis(warm, stop)
                         }
+                    } catch (primary: Throwable) {
+                        preparationFailure = primary
+                        throw primary
                     } finally {
                         activeChild = null
-                        staging.recordConstruction(child?.lastMetrics)
+                        try {
+                            staging.recordConstruction(child?.lastMetrics)
+                        } catch (report: Throwable) {
+                            if (preparationFailure == null) throw report
+                            if (report !== preparationFailure) preparationFailure.addSuppressed(report)
+                        }
                     }
                     if (basis == null || !basis.validFor(checkNotNull(plan.parts[index].model.exactState).model) ||
                         stop()

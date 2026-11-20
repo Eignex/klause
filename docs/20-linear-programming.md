@@ -501,6 +501,13 @@ Each staged child reserves construction from its own remaining allowance before
 creating an owner. Its active reservations and numerical work narrow live child
 grants. A positive preparation report replaces the construction reservation once;
 an absent or default report retains its reservation as a conservative charge.
+Private workspace initialization uses the same structural work estimate as a
+directional probe. An unstarted attempt releases that reservation; once construction
+starts, initialization stays charged separately from reported scaling work.
+Node and measured-work ledgers use the same completed preparation total: raw work
+minus refundable construction reservations plus reported construction work.
+Initial collections replace their reservation only after every constructed child
+reports preparation; incomplete reports keep the full reservation conservatively.
 
 ### Cuts
 

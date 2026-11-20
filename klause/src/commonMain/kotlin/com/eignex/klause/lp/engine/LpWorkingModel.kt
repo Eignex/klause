@@ -51,8 +51,7 @@ internal data class LpWorkingMetrics(
     val measuredWork: Long get() = saturatedSum(
         solves.workOps,
         solves.preparationOps,
-        (owners.preparationWork - owners.reservedConstructionWork).coerceAtLeast(0L),
-        owners.constructionWork,
+        owners.measuredPreparationWork,
         basisWork,
         continuationWork,
         certificationWork,

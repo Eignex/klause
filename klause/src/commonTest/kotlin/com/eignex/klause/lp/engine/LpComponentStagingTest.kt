@@ -63,6 +63,28 @@ class LpComponentStagingTest {
     }
 
     @Test
+    fun `unstarted workspace initialization should release its reservation`() {
+        val staging = LpComponentStaging(9L, ExecutionControl.Never)
+        staging.reserveConstruction(6L, workspaceWork = 3L)
+
+        val allowance = staging.beginConstruction()
+
+        assertNull(allowance)
+        assertEquals(0L, staging.metrics.workOps - staging.reservedConstructionWork)
+    }
+
+    @Test
+    fun `started workspace initialization should remain charged after a scaling report`() {
+        val staging = LpComponentStaging(20L, ExecutionControl.Never)
+        staging.reserveConstruction(6L, workspaceWork = 3L)
+        staging.beginConstruction()
+
+        staging.recordConstruction(LpSolveMetrics(workOps = 3L, preparationOps = 2L))
+
+        assertEquals(8L, staging.metrics.workOps - staging.reservedConstructionWork + staging.metrics.preparationOps)
+    }
+
+    @Test
     fun `later reservations should spend previously reported numerical work`() {
         val staging = LpComponentStaging(20L, ExecutionControl.Never)
         staging.reserveConstruction(6L)
