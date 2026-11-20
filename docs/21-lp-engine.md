@@ -117,6 +117,10 @@ Exact-state rebuilds share unchanged immutable model descriptions and declared-b
 witnesses. A declared witness matches its column, side and fixed declaration identity;
 an asserted witness cannot become a declaration. Strict logical sides and inactive-row
 metadata are derived into fresh descriptions, and each state keeps its own revision identity.
+Bound-only rebindings also retain unchanged right-hand sides, row metadata and objective
+descriptions after checking their base authority; their fresh column list remains owned.
+Element scans use the worker's shared bounded polling and observe cancellation immediately
+before returning a rebound or unchanged view.
 
 ### Numerical and exact deductions
 

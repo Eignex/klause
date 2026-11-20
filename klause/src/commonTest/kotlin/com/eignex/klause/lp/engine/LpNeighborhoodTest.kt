@@ -6,12 +6,56 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.columnNeighborhood
 import com.eignex.klause.lp.engine.rowIndex
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.withBoundedPolling
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpNeighborhoodTest {
+
+    @Test
+    fun `short rebinds observe cancellation before returning an unchanged state`() {
+        val (base, columns) = chain()
+        val state = LpExactState(assertNotNull(base.authoritativeModel()))
+        val working = assertNotNull(state.ownerWorkingModel())
+        val neighborhood = working.columnNeighborhood(intArrayOf(columns[0]), 16, working.rowIndex())
+        var observations = 0
+        val stop = ExecutionControl(Cancellation { ++observations >= 3 }).withBoundedPolling()
+
+        val rebound = neighborhood.rebindExact(state, stop)
+
+        assertNull(rebound)
+    }
+
+    @Test
+    fun `bound refreshes preserve suspended rows until their scope is popped`() {
+        val (base, columns) = chain()
+        val trail = LpBoundTrail(assertNotNull(base.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(2L)))
+        val working = assertNotNull(trail.state.ownerWorkingModel())
+        val neighborhood = working.columnNeighborhood(intArrayOf(columns[2]), 16, working.rowIndex())
+        assertTrue(trail.assertBound(columns[0], false, ExactLpSide(ExactLpNumber.of(1L)), 0L))
+
+        val refreshed = assertNotNull(neighborhood.rebindExact(trail.state, ExecutionControl.Never))
+        assertTrue(trail.pop(0))
+        val restored = assertNotNull(refreshed.rebindExact(trail.state, ExecutionControl.Never))
+
+        val row = refreshed.rows.indexOf(2)
+        val state = assertNotNull(refreshed.model.exactState)
+        assertFalse(state.rows.row(row).active)
+        assertNull(state.model.column(state.model.n + row).bounds.lower)
+        assertEquals(ExactLpNumber.of(1L), state.model.column(refreshed.colOf(columns[0])).bounds.lower?.number)
+        val next = assertNotNull(restored.model.exactState)
+        assertTrue(next.rows.row(row).active)
+        assertEquals(ExactLpNumber.of(0L), next.model.column(next.model.n + row).bounds.lower?.number)
+        assertEquals(ExactLpNumber.of(0L), next.model.column(restored.colOf(columns[0])).bounds.lower?.number)
+    }
 
     @Test
     fun `exact neighborhoods should retain full support when traversal reverses row order`() {
