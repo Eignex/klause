@@ -185,6 +185,33 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `automatic probe forecasts retain tall basis dimensions`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            List(600) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0) })
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            repeat(600) { addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 0L) }
+        }.build(Sense.MINIMIZE)
+
+        for (emitted in listOf(false, true)) {
+            val result = if (emitted) {
+                estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = 16_100_000L)
+            } else {
+                var admission: SparseLpAdmission? = null
+                sequence<Unit> {
+                    admission = prepareSparseLpAdmission(problem, null, automatic = true,
+                        queryWorkAllowance = 16_100_000L)
+                }.forEach { }
+                requireNotNull(admission)
+            }
+
+            assertEquals(1L, result.metrics["DeclineQueryWork"])
+            assertEquals(0L, result.work)
+            assertNull(result.sourceLayout)
+        }
+    }
+
+    @Test
     fun `automatic admission preserves ordinary finite node funding`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),

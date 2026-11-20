@@ -142,11 +142,11 @@ private fun sparseLpStorage(rows: Long, columns: Long, entries: Long): Long =
 private fun sparseQueryWork(rows: Long, columns: Long, entries: Long, fillRisk: Long): Long =
     rows * rows * rows + (entries + rows + columns) * minOf(rows, columns) + fillRisk
 
-// Predict an exploratory query with two capped construction attempts, sparse scans and fill risk.
+// Predict an exploratory query with two capped attempts and sparse passes over the retained basis rows.
 // Recovery and subsequent pivots can exceed this forecast; cooperative funding remains separate.
 private fun sparseProbeWork(rows: Long, columns: Long, entries: Long, fillRisk: Long): Long =
     2L * minOf(rows * rows * rows, SPARSE_LP_MAX_FACTOR_WORK) +
-        (entries + rows + columns) * minOf(rows, columns) + fillRisk
+        (entries + rows + columns) * rows + fillRisk
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun estimateSparseLpAdmission(

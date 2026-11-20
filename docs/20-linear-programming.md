@@ -359,7 +359,8 @@ retained layout. Custom emitters decline because they reserve no source size. Th
 automatic policy declines row-intersection risk above eight million pairs before
 source assembly and checks the emitted risk again afterward. A first-probe forecast
 combines two factor attempts, each predicted by the smaller of the row-count cube
-and the factor-work limit, with sparse row/column work and fill risk. It compares
+and the factor-work limit, with sparse work per retained basis row and fill risk.
+The retained basis has one dimension per emitted row, including slack columns. It compares
 that forecast and source assembly against the cumulative root grant, with an early
 shape-only check before scanning source rows. This predicts an affordable exploration;
 recovery and subsequent pivots can exceed it, and completion is not promised. The
