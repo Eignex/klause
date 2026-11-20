@@ -76,6 +76,19 @@ before optional recipe and shape inspection. Containing lab wall and memory limi
 cover the complete diagnostic. Changing preparation limits can change the prepared
 model; a diagnostic shape requires validation through the intended production route.
 
+`lab/mps-cli-preparation.json` observes hash-pinned MPS preparation through the installed
+CLI parser, loader and request builders, with search disabled. Supply `cases` with
+one corpus model, `suite`/`problem` attributes and `plain-sha256`, `seed` and
+`timeout-ms` parameters (at most 120,000 ms). Each case launches a fresh helper JVM
+with the CLI launcher defaults, 2,560 MiB heap and one processor. Source staging
+retains its containing allowance; optional presolve exhaustion is reported separately
+from final model readiness. A separate 20-second shape inspection follows readiness.
+Shared bytecode and reflected signatures must match. These are observed CLI-code-path
+diagnostics: instrumentation and elapsed limits can change the prepared model, so
+they establish neither production applicability nor performance. Successful capture
+can retain a declined, interrupted or failed preparation; inspect the readiness and
+child-exit fields.
+
 `FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
 Its lab profile build requires both `:klause-cli:installJvmDist` and `:klause-bench:installDist`
 because provenance includes the installed CLI distribution.

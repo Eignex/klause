@@ -261,7 +261,7 @@ internal object MpsLpAdmission {
         }
     }
 
-    private fun admission(problem: Problem, config: LpConfig): JsonObject {
+    internal fun admission(problem: Problem, config: LpConfig): JsonObject {
         val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
         val observed = method.invoke(LpAutoConfig, problem, config, LpPlan())
         return buildJsonObject {
