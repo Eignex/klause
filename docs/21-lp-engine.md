@@ -21,6 +21,7 @@ dense ratio scans gather that same carrier in row order.
 and widening state. `SimplexBasicValues` retains the coupled basic values, model,
 scaling view and nonbasic statuses, invalidating them together. Its restoration
 adjusts changed nonbasic seats through the retained factors.
+Short update vectors use portable Koblas AXPY; larger vectors use the selected backend.
 `SimplexSolveControl` owns allowance checks and work charging; every phase and
 recovery restart shares one cumulative `SolveProgress`. `RevisedSimplex` coordinates
 starts, recovery, cursor lifetime and result publication.
