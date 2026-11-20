@@ -1,11 +1,15 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -23,7 +27,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class LinearAuthorityReplayTest {
+class LinearAuthorityReplayTest : RuntimeInitializedTest() {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
     private val r = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -82,6 +86,183 @@ class LinearAuthorityReplayTest {
         assertNull(result.evidence)
         assertNull(result.incumbent)
         assertNull(result.split)
+    }
+
+    @Test
+    fun `an interrupted cut scan should leave the checked query reusable`() {
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never))
+            .withReplayCuts(cuts, ExecutionControl.Never) { _, _ -> }
+        val query = assertNotNull(LinearAuthorityQuery.prepare(restricted, assertNotNull(template),
+            ExecutionControl.Never, cutMask = setOf(0)))
+        for (cancelled in listOf(false, true)) {
+            val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+            var stopped = false
+            val control = ExecutionControl { stopped || funding.paused }
+
+            val interrupted = query.selectedCutConflict(control, onCost = { work, bytes ->
+                funding.charge(work, bytes)
+                if (funding.spent >= 8L) {
+                    if (cancelled) stopped = true else funding.grant(0L)
+                }
+            })
+            assertNull(interrupted)
+            stopped = false
+            funding.grant(1_000_000L)
+            val resumed = assertNotNull(query.selectedCutConflict(control, funding::charge))
+
+            val evidence = SourceEvidence(restricted.scope, SourceClaim.Refutation,
+                LinearPinnedRefutation(resumed.proof))
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(evidence))
+        }
+    }
+
+    @Test
+    fun `an unverified selected cut should not authorize an early conflict`() {
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val budget = SourceLpBudget()
+        val original = cuts.first()
+        val forged = LinearAuthorityCut(original.owner, original.inequality, SourceDerivation.Premise("missing"),
+            owners = original.owners, family = original.family)
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(listOf(forged))
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        assertTrue(result.cutConflictFamilies.isEmpty())
+        assertNull(result.primalStages["SelectedCutBoundConflicts"])
+        assertTrue(budget.operations > 0)
+    }
+
+    @Test
+    fun `a selected cut should retract when a source owner is inactive`() {
+        val guarded = SourceProofContext(source.scope.copy(condition = SourceCondition(
+            bools = mapOf(0 to false), upper = mapOf(x to BigFraction.ZERO))),
+            source.coordinates + SourceCoordinate(SourceCoordinate.Kind.Boolean, 0),
+            source.premises.mapValues { (id, premise) -> SourcePremise(premise.inequality,
+                if (id == "x-plus") mapOf(0 to true) else emptyMap()) }, source.objective)
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(cuts)
+            it.advance(guarded, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        assertTrue(result.cutConflictFamilies.isEmpty())
+        assertNull(result.primalStages["SelectedCutBoundConflicts"])
+        assertTrue(budget.operations > 0)
+    }
+
+    @Test
+    fun `mixed sign selected cuts should use opposite sides and preserve strict conflicts`() {
+        for ((strict, maximum, conflicts) in listOf(
+            Triple(false, BigFraction.ZERO, true),
+            Triple(false, BigFraction.ONE, false),
+            Triple(true, BigFraction.ONE, true),
+        )) {
+            val mixed = SourceProofContext(source.scope, setOf(x, y, r), linkedMapOf(
+                "plus" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                    y to BigFraction.ONE, r to BigFraction.ONE), half.negated())),
+                "minus" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                    y to BigFraction.ONE, r to BigFraction.MINUS_ONE), half.negated())),
+                "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO, strict = strict)),
+            ), mapOf(x to BigFraction.ONE)).atScope(source.scope.copy(condition = SourceCondition(
+                upper = mapOf(x to maximum))))
+            val cut = LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                y to BigFraction.ONE), BigFraction.MINUS_ONE),
+                SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
+                    SourceDerivation.Combination.Term(half, SourceDerivation.Premise("plus")),
+                    SourceDerivation.Combination.Term(half, SourceDerivation.Premise("minus")),
+                ))), owners = setOf(0, 1), family = CutFamily.SOURCE_AGGREGATION)
+            val budget = SourceLpBudget()
+
+            val result = LinearAuthority(budget, retainLp = true).use {
+                it.useReplayCuts(listOf(cut))
+                it.advance(mixed, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+            }
+
+            assertEquals(if (conflicts) 1L else null, result.primalStages["SelectedCutBoundConflicts"])
+            if (conflicts) {
+                assertEquals(0, budget.operations)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(mixed.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+            } else {
+                assertTrue(budget.operations > 0)
+                assertTrue(result.evidence?.claim != SourceClaim.Refutation)
+            }
+        }
+    }
+
+    @Test
+    fun `a selected cut with a missing receiving side should continue through the LP`() {
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(cuts)
+            it.advance(source, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        assertNull(result.primalStages["SelectedCutBoundConflicts"])
+        assertNotNull(result.bound)
+        assertTrue(budget.operations > 0)
+    }
+
+    @Test
+    fun `selected cuts should refute receiving bounds before another LP solve`() {
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(cuts)
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+        assertEquals(setOf(CutFamily.SOURCE_AGGREGATION), result.cutConflictFamilies)
+        assertEquals(1L, result.primalStages["SelectedCutBoundConflicts"])
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
+    fun `unselected cuts should not receive bound conflict attribution`() {
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(cuts)
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = emptySet())
+        }
+
+        assertTrue(result.cutConflictFamilies.isEmpty())
+        assertNull(result.primalStages["SelectedCutBoundConflicts"])
+        assertTrue(budget.operations > 0)
+    }
+
+    @Test
+    fun `a selected cut conflict should retract with its receiving bound`() {
+        val budget = SourceLpBudget()
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val sibling = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ONE))))
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(cuts)
+            assertNotNull(it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0)).evidence)
+            it.advance(sibling, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        assertNull(result.evidence)
+        assertNull(result.primalStages["SelectedCutBoundConflicts"])
+        assertNotNull(result.bound)
     }
 
     @Test

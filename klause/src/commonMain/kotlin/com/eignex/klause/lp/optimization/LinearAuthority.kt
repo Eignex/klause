@@ -719,6 +719,27 @@ internal class LinearAuthority(
                 observeCutConsumption(conflictFamilies, "CHECKED_CONFLICT")
             }
         }
+        if (cutMask != null) {
+            val checking = ExecutionControl { cancellation() || budget.funding?.paused == true }
+            val conflict = prepared.selectedCutConflict(checking, ::cutCost, ::observePrimal)
+            if (conflict != null) {
+                observePrimal("SelectedCutBoundConflictChecks")
+                val evidence = SourceEvidence(source.scope, SourceClaim.Refutation,
+                    LinearPinnedRefutation(conflict.proof))
+                val verification = ExecutionControl {
+                    cutVerificationWork++
+                    cutCost(1L, 0L)
+                    checking()
+                }
+                if (SourceEvidenceVerifier(context).verify(evidence, verification) == SourceEvidenceCheck.Checked) {
+                    val families = setOf(conflict.family)
+                    observeCutConsumption(families, "CHECKED_CONFLICT")
+                    observePrimal("SelectedCutBoundConflicts")
+                    return LinearAuthorityResult(evidence = evidence, cutConflictFamilies = families)
+                }
+            }
+            if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
+        }
         val closureRows = prepared.closureRows
         val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive,
             prepared.unconditionalRows)

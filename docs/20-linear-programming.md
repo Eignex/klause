@@ -548,6 +548,11 @@ data, revision, objective or Boolean conditions require a new checkpoint. Ordina
 points, splits and advisory points retain their existing ownership. Matching,
 retention, solves, certification and owner transitions spend the containing source
 allowance, and checkpoint bookkeeping has its own recipe attribution.
+Installed selected aggregate cuts also test the node's active unary source sides and
+receiving bounds before another numerical query. A violated row supplies a nonnegative
+combination of that checked cut and its cited sides; original-source verification must
+accept the scoped refutation before traversal prunes. Missing sides decline this check.
+The bounded scan, temporary proof and verification spend the containing cut allowance.
 Completed base bounds survive a paused or declined separation round. A stronger checked
 selected bound retains its cut-family attribution even when primal completion is unavailable
 or interrupted; the base point and split remain guidance for an unfinished node. A new template

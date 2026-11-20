@@ -4,11 +4,16 @@ import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.optimization.LinearAuthority
+import com.eignex.klause.lp.optimization.LinearAuthorityCut
+import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -32,6 +37,51 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearAuthorityTraversalTest : RuntimeInitializedTest() {
+    @Test
+    fun `a selected aggregate conflict should close a receiving search leaf without another LP solve`() {
+        val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val r = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val half = BigFraction.ofLong(2).reciprocal()
+        val source = SourceProofContext(SourceScope(SourceRevision("selected-conflict", "exact-affine"),
+            objective = SourceObjective("z", ObjectiveSense.MINIMIZE)), setOf(x, z, r), linkedMapOf(
+            "plus" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                r to BigFraction.ONE), half.negated())),
+            "minus" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                r to BigFraction.MINUS_ONE), half.negated())),
+            "z lower" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(-2)),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(z to BigFraction.ONE))
+        val cut = LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            SourceDerivation.IntegerRounding(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("plus")),
+                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("minus")),
+            ))), owners = setOf(0, 1), family = CutFamily.SOURCE_AGGREGATION)
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            authority.useReplayCuts(listOf(cut))
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionAdoptedInstalled"])
+            val before = budget.operations
+            LinearAuthorityTraversal(restricted, budget, ExecutionControl.Never, { false }, {}, { null },
+                borrowedAuthority = authority, useGuidance = true, pointCuts = true).use { component ->
+                val session = SearchComponentSet(listOf(component)).session()
+                assertEquals(ComponentResult.Consistent, session.initialize())
+
+                val disposition = component.beforeBranch(session)
+
+                assertEquals(SearchNodeDisposition.Prune, disposition)
+                assertEquals(before, budget.operations)
+                assertEquals(1L, component.observations()["numericalSelectedCutBoundConflicts"])
+                assertEquals(1L, component.observations()["numericalCutLifecycleSOURCE_AGGREGATION_CONFLICT_PRUNE"])
+                assertEquals(1L, component.observations()["numericalClosedLeaves"])
+            }
+        }
+    }
+
     @Test
     fun `incumbent guidance should order splits only within available funding`() {
         for ((registered, limited) in listOf(false to false, true to false, false to true, true to true)) {
