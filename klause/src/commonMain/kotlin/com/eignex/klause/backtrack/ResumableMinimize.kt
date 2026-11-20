@@ -1627,7 +1627,6 @@ internal class ResumableMinimize(
         override fun pick(session: PropagationSession): VarRef? {
             if (incumbents.current() == null) {
                 lpEngine.pickRootComponent(session, params.cancellation)?.let {
-                    lpHints?.selected(null)
                     return it
                 }
             }

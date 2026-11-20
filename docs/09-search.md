@@ -373,7 +373,8 @@ The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 and passive point retention start at a finite incumbent cutoff; ordinary LP guidance
 remains available before admission. Leaving a finite cutoff clears the retained history.
 The ordinary reduced-cost/fractionality score and configured selector choose the
-variable. Historical observations order only its adjacent children. Each direction
+variable. Directional history retains no variable-candidate index or variable
+nomination. Historical observations order only the selected variable's adjacent children. Each direction
 needs two recent finite normalized gains agreeing within a factor of two, and at
 least one direction must have a positive lower-of-two gain. Two measured zero
 directions keep ordinary order; unknown gains cannot supply measured zero.
@@ -418,7 +419,7 @@ keep ordinary order. Pooled point replay keeps precedence. Collection checks at 
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
 history resets do not renew those limits. It creates no LP query and charges the
 existing LP allowance. Collection comparisons and changed committed splits have
-separate counters from reliable variable advice. Withholding reliable advice keeps
+separate counters from reliable child advice. Withholding reliable advice keeps
 this collection policy and its costs enabled. `lp-directional-advice=false` keeps
 the ordinary variable and value choices while retaining enabled directional observation,
 nomination and comparison work; the corresponding backtrack setting is
