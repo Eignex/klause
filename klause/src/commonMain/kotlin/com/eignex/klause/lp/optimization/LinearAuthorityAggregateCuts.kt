@@ -484,6 +484,7 @@ internal object LinearAuthorityAggregateCuts {
             terms: List<LinearAuthorityAggregateTerm>, aggregate: Map<SourceCoordinate, BigFraction>,
             snapshots: List<Map<SourceCoordinate, BigFraction>>,
             knownSupport: Set<SourceCoordinate>? = null,
+            integerProjection: Boolean = false,
         ): Continuation? {
             val support = knownSupport ?: run {
                 meter.reserve(snapshots.size.toLong(), 128L + snapshots.size * 32L)
@@ -506,6 +507,7 @@ internal object LinearAuthorityAggregateCuts {
                 var first: ProbeRow? = null
                 var selected: ProbeRow? = null
                 var best = Double.POSITIVE_INFINITY
+                var bestGrowth = Int.MAX_VALUE
                 for (other in incidence[id to (value < BigFraction.ZERO)].orEmpty()) {
                     meter.reserve(1L + terms.size)
                     if (other.coefficients.size <= 1 || terms.any { it.owner == other.term.owner }) continue
@@ -515,18 +517,20 @@ internal object LinearAuthorityAggregateCuts {
                         continue
                     }
                     val pivot = other.coefficients.getValue(id)
-                    if (cancelsTerm(other, terms, value, pivot)) {
+                    if (cancelsTerm(other, terms, value, pivot, integerProjection)) {
                         observe("AggregateContinuationInverseSkipped", 1L)
                         continue
                     }
                     if (first == null) first = other
+                    val growth = if (integerProjection) introducedReal(other, aggregate) else 0
                     val score = continuationScore(other, pivot)
                     if (score == null) {
                         observe("AggregateContinuationPointUnavailable", 1L)
                     } else {
                         observe("AggregateContinuationScored", 1L)
-                        if (score < best) {
+                        if (growth < bestGrowth || (growth == bestGrowth && score < best)) {
                             best = score
+                            bestGrowth = growth
                             selected = other
                         }
                     }
@@ -551,6 +555,7 @@ internal object LinearAuthorityAggregateCuts {
 
         private fun cancelsTerm(
             row: ProbeRow, terms: List<LinearAuthorityAggregateTerm>, residual: BigFraction, pivot: BigFraction,
+            allowWeaker: Boolean = false,
         ): Boolean {
             if (row.term.inequality.strict) return false
             for (term in terms) {
@@ -562,12 +567,24 @@ internal object LinearAuthorityAggregateCuts {
                     meter.number(value.negated()) == meter.number(other)
                 }
                 if (!inverse) continue
-                if (meter.number(term.inequality.rhs.negated()) != meter.number(row.term.inequality.rhs)) continue
+                val inverseRhs = meter.number(term.inequality.rhs.negated())
+                val rowRhs = meter.number(row.term.inequality.rhs)
+                if (allowWeaker) meter.arithmetic(rowRhs, inverseRhs)
+                if (if (allowWeaker) rowRhs < inverseRhs else rowRhs != inverseRhs) continue
                 val appended = meter.number(if (residual > BigFraction.ZERO) residual else residual.negated())
                 val scale = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
                 if (meter.multiply(term.weight, scale) == appended) return true
             }
             return false
+        }
+
+        private fun introducedReal(row: ProbeRow, aggregate: Map<SourceCoordinate, BigFraction>): Int {
+            var count = 0
+            for (id in row.coefficients.keys) {
+                meter.reserve(1L)
+                if (id.kind == SourceCoordinate.Kind.Real && id !in aggregate) count++
+            }
+            return count
         }
 
         private fun continuationScore(row: ProbeRow, pivot: BigFraction): Double? {
@@ -653,6 +670,7 @@ internal object LinearAuthorityAggregateCuts {
                 val row = seed.row
                 var selected: Continuation? = null
                 var best = Double.POSITIVE_INFINITY
+                var bestGrowth = Int.MAX_VALUE
                 for ((id, coefficient) in row.coefficients) {
                     meter.reserve(1L)
                     if (id.kind != SourceCoordinate.Kind.Real) continue
@@ -661,8 +679,10 @@ internal object LinearAuthorityAggregateCuts {
                         if (other.term.owner == row.term.owner || other.coefficients.size <= 1) continue
                         val pivot = other.coefficients.getValue(id)
                         val score = continuationScore(other, pivot) ?: continue
-                        if (score < best) {
+                        val growth = introducedReal(other, row.coefficients)
+                        if (growth < bestGrowth || (growth == bestGrowth && score < best)) {
                             best = score
+                            bestGrowth = growth
                             meter.reserve(1L, 64L)
                             selected = Continuation(other, coefficient, pivot)
                         }
@@ -964,7 +984,7 @@ internal object LinearAuthorityAggregateCuts {
             while (true) {
                 halfInteger()?.let { return it }
                 if (terms.size >= limits.rows) return null
-                val next = continuation(terms, aggregate, snapshots, support) ?: return null
+                val next = continuation(terms, aggregate, snapshots, support, integerProjection = true) ?: return null
                 meter.arithmetic(next.residual, next.pivot)
                 val weight = meter.number(next.residual.negated() * next.pivot.reciprocal())
                 meter.reserve(2L, 64L)

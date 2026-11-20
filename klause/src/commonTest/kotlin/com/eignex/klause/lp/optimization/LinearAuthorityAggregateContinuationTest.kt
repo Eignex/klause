@@ -23,6 +23,43 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateContinuationTest {
     @Test
+    fun `integer projection should finish a widened flow despite expanding and inverse rows`() {
+        val flow = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val stock = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val extra = SourceCoordinate(SourceCoordinate.Kind.Real, 3)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 4)
+        val widened = BigFraction.ofLong(149) * BigFraction.ofLong(100).reciprocal()
+        val reverse = BigFraction.ofLong(151) * BigFraction.ofLong(100).reciprocal()
+        val source = SourceProofContext(scope, setOf(x, y, real, flow, stock, extra, other), linkedMapOf(
+            "resource" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
+                extra to BigFraction.ONE, other to BigFraction.ONE), BigFraction.ofLong(3) *
+                BigFraction.ofLong(2).reciprocal())),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "reverse left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                stock to BigFraction.MINUS_ONE), reverse)),
+            "reverse right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
+                stock to BigFraction.ONE), reverse)),
+            "forward left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                stock to BigFraction.ONE), widened.negated())),
+            "forward right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.MINUS_ONE,
+                stock to BigFraction.MINUS_ONE), widened.negated())),
+        ))
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16),
+            point = mapOf(x to 0.75, y to 0.75, real to 1.5, flow to 1.5,
+                stock to 0.0, extra to 0.0, other to 0.0)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE),
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `integer projection should cancel a coupled flow within its configured row limit`() {
         for (count in listOf(4, 8, 15)) {
             val scale = BigFraction.ofLong(if (count == 4) 1L else 1_000_000_000_000L)
