@@ -36,6 +36,19 @@ Git pack with its original commit identity. Builds and tools use the current rev
 Use `lab/bench-mps-linux.json` for MPS-only selections; it uses the same Linux adapter and runtime without staging
 the MiniZinc compiler. `lab/bench-linux.json` includes that compiler for MiniZinc workloads.
 
+An opt-in frozen harness build uses `./gradlew :klause-bench:installFrozenHarness` and
+`lab/frozen-harness.properties`. The lock pins an ancestor commit, every runtime JAR,
+the complete bench-class fingerprint and the ordered dependency fingerprint. The task
+requires reachable local Git history, builds the ancestor without a Git network fallback,
+and installs the current CLI separately. Standard manifests and `installDist` use the current harness.
+The generated `build/frozen-harness` directory retains the complete distribution, lock,
+ordered classpath, build-input and CLI inventories, and a `complete.sha256` record.
+Consumers verify that record and its inventories against the immutable prepared workspace
+before launch; the CLI inventory refers to `klause-cli/build/install/klause-cli-jvm`.
+Use explicit classpath entries in lock order when composing a lab recipe; wildcard expansion
+does not preserve the required dependency identity. Such recipes require full source history
+and must retain the stage and current CLI through their declared workspace inputs.
+
 `ObjectiveSymmetryCapture` accepts exact `suite/problem` selections in a lab profile
 and records original-source identity, bounded default/protected preparation, and
 generators that move objective columns. It does not solve or establish performance.

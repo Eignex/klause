@@ -1,3 +1,4 @@
+import com.eignex.gradle.FrozenHarnessLock
 import com.eignex.gradle.LabSdkRepository
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -181,5 +182,90 @@ val prepareLabRuntime = tasks.register("prepareLabRuntime") {
         val root = destination.get().asFile
         check(root.resolve("bin/minizinc").setExecutable(true))
         root.resolve("sha256").writeText("$checksum\n")
+    }
+}
+
+val frozenHarnessLock = layout.projectDirectory.file("lab/frozen-harness.properties")
+val frozenHarnessRevision = providers.gradleProperty("frozenHarnessRevision").orElse(providers.provider {
+    FrozenHarnessLock.read(frozenHarnessLock.asFile).revision
+})
+val frozenHarnessSource = frozenHarnessRevision.map { layout.buildDirectory.dir("frozen-harness-source/$it").get() }
+val frozenHarnessDistribution = layout.buildDirectory.dir("frozen-harness/distribution")
+val frozenHarnessValidation = layout.buildDirectory.dir("frozen-harness-validation")
+val frozenHarnessStageScript = layout.projectDirectory.file("scripts/stage-frozen-harness.sh")
+val beginFrozenHarness = tasks.register<Exec>("beginFrozenHarness") {
+    group = "bench"
+    description = "Invalidate the completion record before preparing a frozen harness."
+    commandLine("bash", frozenHarnessStageScript.asFile, "invalidate")
+}
+rootProject.allprojects {
+    tasks.configureEach {
+        if (path != ":klause-bench:beginFrozenHarness") mustRunAfter(beginFrozenHarness)
+    }
+}
+val prepareFrozenHarness = tasks.register<Exec>("prepareFrozenHarness") {
+    group = "bench"
+    description = "Prepare an ancestor checkout for a frozen benchmark harness."
+    notCompatibleWithConfigurationCache("Prepares a local Git checkout for a nested build")
+    dependsOn(beginFrozenHarness)
+    val script = layout.projectDirectory.file("scripts/prepare-frozen-harness.sh")
+    inputs.file(script)
+    inputs.file(frozenHarnessLock)
+    inputs.property("revision", frozenHarnessRevision)
+    doFirst {
+        check(frozenHarnessRevision.get() == FrozenHarnessLock.read(frozenHarnessLock.asFile).revision) {
+            "The frozen revision must match the explicit harness lock"
+        }
+        commandLine("bash", script.asFile, frozenHarnessRevision.get(), frozenHarnessSource.get().asFile)
+    }
+}
+
+val compileFrozenHarness = tasks.register<GradleBuild>("compileFrozenHarness") {
+    group = "bench"
+    description = "Build the installed benchmark harness at an explicit ancestor revision."
+    notCompatibleWithConfigurationCache("Runs an isolated ancestor build")
+    dependsOn(prepareFrozenHarness)
+    buildName = "frozen-harness"
+    startParameter = gradle.startParameter.newBuild().apply {
+        setGradleUserHomeDir(gradle.gradleUserHomeDir)
+        initScripts = gradle.startParameter.initScripts.toList()
+        maxWorkerCount = gradle.startParameter.maxWorkerCount
+        projectProperties = mapOf("kotlin.compiler.execution.strategy" to "in-process")
+    }
+    setTasks(listOf(":klause-bench:installDist"))
+    doFirst { dir = frozenHarnessSource.get().asFile }
+}
+
+val verifyFrozenHarness = tasks.register("verifyFrozenHarness") {
+    group = "bench"
+    description = "Verify the frozen harness against its source and ordered runtime lock."
+    notCompatibleWithConfigurationCache("Verifies the separately built ancestor distribution")
+    dependsOn(compileFrozenHarness)
+    inputs.file(frozenHarnessLock)
+    outputs.dir(frozenHarnessValidation)
+    outputs.upToDateWhen { false }
+    doLast {
+        FrozenHarnessLock.read(frozenHarnessLock.asFile).verify(
+            frozenHarnessSource.get().dir("klause-bench/build/install/klause-bench").asFile,
+            frozenHarnessValidation.get().asFile,
+        )
+    }
+}
+
+tasks.register<Exec>("installFrozenHarness") {
+    group = "bench"
+    description = "Stage a frozen benchmark harness independently of the current CLI."
+    notCompatibleWithConfigurationCache("Stages an independently built ancestor distribution")
+    dependsOn(verifyFrozenHarness, ":klause-cli:installJvmDist")
+    inputs.property("revision", frozenHarnessRevision)
+    inputs.file(frozenHarnessStageScript)
+    outputs.dir(frozenHarnessDistribution.map { it.asFile.parentFile })
+    outputs.upToDateWhen { false }
+    val initScripts = gradle.startParameter.initScripts.toList()
+    doFirst {
+        commandLine(
+            listOf("bash", frozenHarnessStageScript.asFile, "publish", frozenHarnessRevision.get(),
+                frozenHarnessSource.get().asFile, frozenHarnessValidation.get().asFile) + initScripts,
+        )
     }
 }
