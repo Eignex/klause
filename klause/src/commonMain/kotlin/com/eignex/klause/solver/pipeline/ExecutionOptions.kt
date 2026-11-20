@@ -425,6 +425,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `integer-row-learning` execution setting. */
         val integerRowLearning: ExecutionOption<Boolean> = ExecutionOption("integer-row-learning", ValueKind.BOOLEAN)
 
+        /** Admit optional derived integer rows independently of integer decision naming and derivation. */
+        val integerRowAdmission: ExecutionOption<Boolean> = ExecutionOption("integer-row-admission", ValueKind.BOOLEAN)
+
         /** Per-conflict work allowance for integer row learning. */
         val arithmeticLearningWork: ExecutionOption<Long> = ExecutionOption("arithmetic-learning-work", ValueKind.LONG)
 
@@ -650,7 +653,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains, lpDirectionalAdvice,
-                lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
+                lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, integerRowAdmission,
                 arithmeticLearningWork, arithmeticLearningAllocationBytes,
                 propagationAttribution, historicalTableReasons, costAwarePropagation,
                 reasonPreflight, pbObjectiveCutoff,

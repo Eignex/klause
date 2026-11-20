@@ -63,8 +63,14 @@ internal data class SearchNode(
     fun withDirection(factor: RowAddress, direction: LinearOp): SearchNode =
         copy(disequalityDirections = disequalityDirections + (factor to direction))
 
-    fun rowTruth(address: RowAddress, row: LinearRow, bools: IntArray): Boolean? {
-        val truth = row.truthUnder(bools) ?: return null
+    fun rowTruth(address: RowAddress, row: LinearRow, bools: IntArray): Boolean? =
+        rowTruth(address, row.truthUnder(bools))
+
+    fun rowTruth(prepared: PreparedSourceRow, bools: IntArray): Boolean? =
+        rowTruth(prepared.address, prepared.truthUnder(bools))
+
+    private fun rowTruth(address: RowAddress, truth: Boolean?): Boolean? {
+        if (truth == null) return null
         val asserted = rowAssertions[address]?.payload as? NamedDisjunctDecision
         return if (asserted?.holds == false) !truth else truth
     }

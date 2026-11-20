@@ -365,6 +365,15 @@ false-literal and historical guard truth. Compact lazy markers retain their dedu
 boundary; eager arithmetic endpoints reconstruct that boundary from the bound journal.
 Original and retained arithmetic rows can supply both conflict seeds and endpoint reasons.
 
+`integerRowAdmission=false` keeps the enabled learner's integer decision naming,
+funded row derivations, mapped-target checks and native conflict selection. Attachment
+stores its completed first-UIP clause without attaching the derived row. It does not
+disable mandatory arithmetic or previously retained rows. `learningIntegerDerived`
+counts completed native derivations and
+`learningIntegerAdmissionDeclined` counts this admission control's declines; neither
+counter establishes retained admission or consumption. Admission defaults to enabled
+and does not itself enable integer learning.
+
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
 fallback. Interior holes in the remaining terms stay in the actual domains and do

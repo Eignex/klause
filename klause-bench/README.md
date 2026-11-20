@@ -510,6 +510,7 @@ Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI rec
 and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
 Recordings capture up to 128 stack frames. Clock-conversion summaries retain up to
 32 frames per sampled caller chain and mark capture truncation.
+Class-loading events retain triggering callers for cold class-footprint diagnosis.
 Summary generation runs in the bench process after CLI exit, outside the subprocess
 `elapsedMs` and GNU time metrics and inside the containing case and job allowances.
 These instrumented captures support attribution; use separate uninstrumented controls
@@ -649,6 +650,9 @@ decoded bytes and recorded relations. Eligibility requires a verified decoded ha
 complete coverage of every collection those identities touch. `exposures --use USE --label LABEL
 lab-cases.jsonl...` records every retained row as exposure, including failed, unsuitable and no-witness
 outcomes. Rows without hashed inputs are recorded as gaps.
+Successful `source-identity-v1` receipts contribute verified decoded identities instead of
+exposure after their path and stored hash match the declared input; incomplete or mismatched
+receipts remain gaps. Hash-only jobs run no solver and establish no applicability or quality.
 
 `lab/frozen-minizinc-linux.json` also accepts plain `.mzn` models and an optional
 plain `.dzn` data input with role `data` and attribute `sourceDataPlainSha256`.
