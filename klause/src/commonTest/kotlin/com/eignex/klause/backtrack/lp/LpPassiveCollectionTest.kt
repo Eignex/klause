@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 class LpPassiveCollectionTest {
     @Test
     fun `collection visits the less sampled child without changing the exhaustive split`() {
-        for (boolean in listOf(false, true)) {
+        for ((boolean, missing) in listOf(false to false, true to false, false to true, true to true)) {
             val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
             val point = if (boolean) 0.5 else 2.25
             val down = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2)
@@ -19,7 +19,7 @@ class LpPassiveCollectionTest {
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, point)
-            for (decision in listOf(down, up, down)) {
+            for (decision in if (missing) listOf(down, down) else listOf(down, up, down)) {
                 history.commit(decision, 1)
                 history.beginNode(1)
                 history.record(11.0)
@@ -42,12 +42,12 @@ class LpPassiveCollectionTest {
 
     @Test
     fun `unavailable history points and splits retain ordinary order`() {
-        for (condition in listOf("missing", "one-sided", "equal", "reliable", "integral", "foreign", "cancelled")) {
+        for (condition in listOf("missing", "single", "equal", "reliable", "integral", "foreign", "cancelled")) {
             val history = LpDirectionalHistory({})
             val variable = VarRef.IntVar(0)
             val directions = when (condition) {
                 "missing" -> emptyList()
-                "one-sided" -> listOf(false, false)
+                "single" -> listOf(false)
                 "equal" -> listOf(false, true)
                 "reliable" -> listOf(false, true, false, true)
                 else -> listOf(false, true, false)
