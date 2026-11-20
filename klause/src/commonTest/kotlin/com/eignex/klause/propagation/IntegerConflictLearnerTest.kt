@@ -494,8 +494,9 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
         val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 2),
             longArrayOf(4, -1), intArrayOf(0, 2), LinearOp.LE, 0), useLo = true))
-        val fallback = ConflictAnalyzer.AnalysisResult.Learned(intArrayOf(Lit.make(0, true)),
-            backjumpLevel = 0, lbd = 1, decisionLevels = intArrayOf(0))
+        val condition = Lit.make(native.explanationState.atomVarGe(2, 8), true)
+        val fallback = ConflictAnalyzer.AnalysisResult.Learned(intArrayOf(Lit.make(0, true), condition),
+            backjumpLevel = 1, lbd = 2, decisionLevels = intArrayOf(0, 1))
         val learned = ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row,
             backjumpLevel = 1, lbd = 2, decisionLevels = intArrayOf(0, 1), fallbackClause = fallback)
 
@@ -503,6 +504,30 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
 
         assertEquals(1L, result.intMaxOrNullCompat(0))
         assertEquals(true, result.boolValueOrNull(0))
+    }
+
+    @Test
+    fun `relative level admission should exempt root facts and retain clause fallback`() {
+        for (levels in listOf(intArrayOf(1), intArrayOf(0, 1), intArrayOf(0, 1, 2))) {
+            val native = PropagationSession(Problem(1, 2,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 7)),
+                arrayOf(Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 7))),
+                pbLearning = false).apply { enableIntegerRowLearning() }
+            val row = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+                arrayOf(bigIntOf(4), bigIntOf(-1)), bigIntOf(0), useLo = true))
+            val fallback = ConflictAnalyzer.AnalysisResult.Learned(intArrayOf(Lit.make(0, true)),
+                backjumpLevel = 0, lbd = 1, decisionLevels = intArrayOf(1))
+            val learned = ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row,
+                backjumpLevel = 0, lbd = levels.size, decisionLevels = levels, fallbackClause = fallback)
+
+            val result = assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned))
+
+            val declined = 2 in levels
+            assertEquals(if (declined) 6L else 1L, native.intDomain(0).max)
+            assertEquals(true, result.boolValueOrNull(0))
+            assertEquals(if (declined) 1L else 0L,
+                native.learnedLifecycle()["learningIntegerExtraLevelsDeclined"])
+        }
     }
 
     @Test
