@@ -135,6 +135,7 @@ internal class LinearAuthority(
         var refinementFinished = false
     }
     private var primalAttempt: PrimalAttempt? = null
+    private var cutConflictQuery: LinearAuthorityQuery? = null
 
     fun invalidateGuidance() {
         pointRound = null
@@ -158,6 +159,7 @@ internal class LinearAuthority(
         pointMask = null
         deferAggregatePreparation = false
         primalAttempt = null
+        cutConflictQuery = null
         cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
 
@@ -719,7 +721,8 @@ internal class LinearAuthority(
                 observeCutConsumption(conflictFamilies, "CHECKED_CONFLICT")
             }
         }
-        if (cutMask != null) {
+        if (cutMask != null && cutConflictQuery !== prepared) {
+            cutConflictQuery = prepared
             val checking = ExecutionControl { cancellation() || budget.funding?.paused == true }
             val conflict = prepared.selectedCutConflict(checking, ::cutCost, ::observePrimal)
             if (conflict != null) {

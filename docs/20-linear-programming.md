@@ -551,8 +551,12 @@ allowance, and checkpoint bookkeeping has its own recipe attribution.
 Installed selected aggregate cuts also test the node's active unary source sides and
 receiving bounds before another numerical query. A violated row supplies a nonnegative
 combination of that checked cut and its cited sides; original-source verification must
-accept the scoped refutation before traversal prunes. Missing sides decline this check.
-The bounded scan, temporary proof and verification spend the containing cut allowance.
+accept the scoped refutation before traversal prunes. A missing side can be projected
+from one active source row by combining its other coordinates with original unary
+sides. Projected sides cannot feed another projection. Missing sides decline this
+check. The bounded scan, temporary proof and verification spend the containing cut
+allowance. Each immutable scoped query attempts this optional scan once, leaving
+later grants available for the ordinary LP after a pause or decline.
 Completed base bounds survive a paused or declined separation round. A stronger checked
 selected bound retains its cut-family attribution even when primal completion is unavailable
 or interrupted; the base point and split remain guidance for an unfinished node. A new template

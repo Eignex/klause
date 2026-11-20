@@ -89,6 +89,116 @@ class LinearAuthorityReplayTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `only active source rows should supply missing sides for a selected cut conflict`() {
+        for (active in listOf(false, true)) {
+            val restricted = SourceProofContext(source.scope.copy(condition = SourceCondition(
+                bools = mapOf(0 to active), lower = mapOf(y to BigFraction.ONE))),
+                source.coordinates + SourceCoordinate(SourceCoordinate.Kind.Boolean, 0),
+                source.premises + ("sum upper" to SourcePremise(SourceInequality(
+                    mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ofLong(3) * half),
+                    guards = mapOf(0 to true))), source.objective)
+            val budget = SourceLpBudget()
+
+            val result = LinearAuthority(budget, retainLp = true).use {
+                it.useReplayCuts(cuts)
+                it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+            }
+
+            assertEquals(if (active) 1L else null, result.primalStages["SelectedCutBoundConflicts"])
+            if (active) {
+                assertEquals(0, budget.operations)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+            } else assertTrue(budget.operations > 0)
+        }
+    }
+
+    @Test
+    fun `a projected side should preserve strictness at zero residual`() {
+        for (strict in listOf(false, true)) {
+            val restricted = SourceProofContext(source.scope.copy(condition = SourceCondition(
+                lower = mapOf(y to BigFraction.ONE))), source.coordinates,
+                source.premises + ("sum upper" to SourcePremise(SourceInequality(
+                    mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ofLong(2), strict))),
+                source.objective)
+            val budget = SourceLpBudget()
+
+            val result = LinearAuthority(budget, retainLp = true).use {
+                it.useReplayCuts(cuts)
+                it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+            }
+
+            assertEquals(if (strict) 1L else null, result.primalStages["SelectedCutBoundConflicts"])
+            if (strict) {
+                assertEquals(0, budget.operations)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+            } else assertTrue(result.evidence?.claim != SourceClaim.Refutation)
+        }
+    }
+
+    @Test
+    fun `an interrupted optional scan should leave the next grant for the ordinary LP`() {
+        val restricted = SourceProofContext(source.scope.copy(condition = SourceCondition(
+            lower = mapOf(y to BigFraction.ONE))), source.coordinates,
+            source.premises + ("sum upper" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ofLong(3) * half))),
+            source.objective)
+        val funding = SourceLpFunding(10_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        var interrupted = false
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl {
+            if (!interrupted) {
+                interrupted = true
+                funding.grant(0L)
+            }
+            false
+        })
+        val budget = SourceLpBudget(funding = funding)
+        LinearAuthority(budget, retainLp = true).use { owner ->
+            owner.capture = capture
+            owner.useReplayCuts(cuts)
+            val partial = owner.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+            assertTrue(interrupted && partial.paused)
+            assertEquals(0, budget.operations)
+            funding.grant(1_000_000L)
+
+            val resumed = owner.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+
+            assertTrue(budget.operations > 0)
+            assertNull(resumed.primalStages["SelectedCutBoundConflicts"])
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(assertNotNull(resumed.evidence)))
+        }
+    }
+
+    @Test
+    fun `a projected side should not supply another projection`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val restricted = SourceProofContext(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(z to BigFraction.ZERO))), source.coordinates + z,
+            source.premises + mapOf(
+                "x upper" to SourcePremise(SourceInequality(
+                    mapOf(x to BigFraction.ONE, z to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "y upper" to SourcePremise(SourceInequality(
+                    mapOf(y to BigFraction.ONE, x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), source.objective)
+        val combined = LinearAuthorityCut(0, SourceInequality(
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+            SourceDerivation.Combination(cuts.map {
+                SourceDerivation.Combination.Term(BigFraction.ONE, it.derivation)
+            }), owners = setOf(0, 1, 2, 3), family = CutFamily.SOURCE_AGGREGATION)
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(listOf(combined))
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+        }
+
+        assertNull(result.primalStages["SelectedCutBoundConflicts"])
+        assertTrue(budget.operations > 0)
+    }
+
+    @Test
     fun `an interrupted cut scan should leave the checked query reusable`() {
         val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
             upper = mapOf(x to BigFraction.ZERO))))
