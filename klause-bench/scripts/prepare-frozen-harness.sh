@@ -22,6 +22,8 @@ done
 "${git[@]}" -C "$workspace" merge-base --is-ancestor "$revision" HEAD
 if [[ -e $destination ]]; then
     [[ -d $destination/.git && ! -L $destination/.git ]]
+    [[ $("${git[@]}" -C "$destination" config --local --get core.symlinks) == false ]]
+    [[ -z $(find "$destination" -type l -print -quit) ]]
     [[ ! -e $destination/.git/objects/info/alternates ]]
     [[ -z $(find "$destination/.git" -type l -print -quit) ]]
     [[ -z $(find "$destination/.git/objects" -type f -links +1 -print -quit) ]]
@@ -36,6 +38,7 @@ mkdir -p "$(dirname "$destination")"
 temporary=$(mktemp -d "$(dirname "$destination")/.prepare-XXXXXXXX")
 trap 'rm -rf -- "$temporary"' EXIT
 "${git[@]}" init --quiet --template= "$temporary/source"
+"${git[@]}" -C "$temporary/source" config --local core.symlinks false
 "${git[@]}" -C "$temporary/source" fetch --quiet --depth=1 --no-tags -- "$workspace" "$revision"
 "${git[@]}" -C "$temporary/source" checkout --quiet --detach "$revision"
 cmp "$workspace/gradle/wrapper/gradle-wrapper.properties" \
