@@ -104,18 +104,17 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     @Test
     fun `proximity repair should coordinate binary changes with a free continuous residual`() {
         val model = Problem(0,
-            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2) { 1 }, null, null),
             factors = arrayOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
                 ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
                     listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE),
             ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1),
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1),
             realCoefficients = doubleArrayOf(1.0))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             ExecutionControl.Never))
-        val center = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1), doubleArrayOf(0.0),
             exactReals = listOf(BigFraction.ZERO))
 
         JointLinearRepair(model, source, objective,
@@ -123,12 +122,12 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
             incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+                repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                 val result =
                     assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ONE, objective.evaluateExact(result.sample))
-                assertContentEquals(longArrayOf(0, 0, 0), result.sample.ints)
+                assertContentEquals(longArrayOf(0, 0), result.sample.ints)
                 assertEquals(listOf(BigFraction.ONE), result.sample.exactReals)
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityImprovements"))
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityCenters"))

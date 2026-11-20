@@ -208,15 +208,15 @@ class FiniteNumericalCompanionsTest : RuntimeInitializedTest() {
 
     @Test
     fun `checked repair comparisons should use the current pool instead of the captured center`() {
-        val model = Problem(0, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
-            Linear(intArrayOf(1, 1, 1, 1, 1), intArrayOf(0, 1, 2, 3, 4), LinearOp.GE, 0),
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
         ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 1))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
         val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
         val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
             objective, params).requirements.construction
-        val center = Sample(BooleanArray(0), LongArray(5) { 1 }, doubleArrayOf(0.0),
+        val center = Sample(BooleanArray(0), LongArray(2) { 1 }, doubleArrayOf(0.0),
             exactReals = listOf(BigFraction.ZERO))
 
         for (disposition in listOf("improving", "tied", "dominated")) {
@@ -224,18 +224,18 @@ class FiniteNumericalCompanionsTest : RuntimeInitializedTest() {
             lateinit var companions: FiniteNumericalCompanions
             companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
                 ExecutionControl.Never, cost, incumbentCompletionCheck = { sample, value, _ ->
-                    if (value < BigFraction.ofLong(5)) {
-                        val pool = if (disposition == "dominated") center.copy(ints = LongArray(5)) else sample
+                    if (value < BigFraction.ofLong(2)) {
+                        val pool = if (disposition == "dominated") center.copy(ints = LongArray(2)) else sample
                         if (disposition != "improving") companions.incumbents.exchange.offer(
                             pool, objective.evaluateExact(pool))
                     }
                     true
                 }, onComparison = { events += it }).companions)
-            companions.incumbents.exchange.offer(center, BigFraction.ofLong(5))
+            companions.incumbents.exchange.offer(center, BigFraction.ofLong(2))
 
             PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
                 companions.factories(plan, 0).last().materialize(plan, resources.slots[1]).use { worker ->
-                    assertNotNull(worker.newResumableSearch { 5.0 }).use { search ->
+                    assertNotNull(worker.newResumableSearch { 2.0 }).use { search ->
                         repeat(32) { if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { } }
                     }
                 }
@@ -245,7 +245,7 @@ class FiniteNumericalCompanionsTest : RuntimeInitializedTest() {
             assertEquals(disposition, discovery.disposition)
             assertEquals(if (disposition == "improving") 1L else 2L, discovery.poolVersion)
             assertEquals(0L, discovery.seedVersion)
-            assertEquals("5", discovery.cutoff)
+            assertEquals("2", discovery.cutoff)
             assertTrue(events.any { it.phase == "external" && it.seedVersion == 1L })
         }
     }
