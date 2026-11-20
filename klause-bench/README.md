@@ -66,6 +66,13 @@ cap SMT suites at eight cases each, giving SMT and CSP/COP comparable aggregate 
 single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.
 
+`MpsLpAdmission` inspects hash-pinned sources without search. Its optional
+`input-mib=1..64` sets the decoded input cap (default 16 MiB). The 20-second deadline
+starts after decoding and MPS parsing; the 1.65-billion work allowance covers finite
+pipeline preparation. Retained preparation metadata identifies incomplete models
+before optional recipe and shape inspection. Containing lab wall and memory limits
+cover the complete diagnostic.
+
 `FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
 Its lab profile build requires both `:klause-cli:installJvmDist` and `:klause-bench:installDist`
 because provenance includes the installed CLI distribution.
