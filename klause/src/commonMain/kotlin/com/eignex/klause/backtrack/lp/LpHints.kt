@@ -214,10 +214,15 @@ internal class LpHints(
         }
     }
 
-    fun branch(variable: VarRef, cancelled: ExecutionControl = ExecutionControl.Never) {
+    fun branch(
+        variable: VarRef,
+        cancelled: ExecutionControl = ExecutionControl.Never,
+        eligible: (VarRef) -> Boolean = { true },
+    ) {
         passiveValues?.clear()
         passiveCollection?.clear()
         if (collect && scopeModel != null) {
+            history.branch(variable, value(variable))
             if (history.canInspectClosure && passivePointCurrent()) {
                 val point = passivePoint
                 val state = passiveState
@@ -228,11 +233,10 @@ internal class LpHints(
                         solveStamp == stamp && passivePointCurrent()
                 }
                 charge(12L)
-                if (!current()) return
-                history.inspectClosure(variable, ::value, cutoff - scopeConstant.toDouble(), current)
-                if (!current()) return
+                if (current()) {
+                    history.inspectClosure(variable, ::value, cutoff - scopeConstant.toDouble(), eligible, current)
+                }
             }
-            history.branch(variable, value(variable))
         }
     }
 

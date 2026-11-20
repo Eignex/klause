@@ -45,8 +45,70 @@ class LpDirectionalHistoryTest {
                 }
                 assertEquals(1, events.count { it == category })
                 assertEquals(selected.varId == 0, "DIAGNOSTIC_CLOSURE_CHANGED_PROPOSAL" in events)
+                assertEquals(selected.varId == 0, "DIAGNOSTIC_CLOSURE_KNOWN_BASELINE" in events)
+                assertFalse("DIAGNOSTIC_CLOSURE_UNKNOWN_BASELINE" in events)
                 assertEquals(selected.varId == 1, "DIAGNOSTIC_CLOSURE_SELECTED_REACH" in events)
             }
+        }
+    }
+
+    @Test
+    fun `variable inspection excludes fixed alternatives and fixed selected variables`() {
+        for (fixed in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+            val events = ArrayList<String>()
+            val history = LpDirectionalHistory(events::add)
+            for (variable in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool((variable.varId shl 1) or if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (variable.varId == 1) 5.0 else 1.0)
+                        history.finishNode(true)
+                    }
+                }
+            }
+            history.record(0.0)
+            events.clear()
+
+            history.inspectClosure(VarRef.Bool(0), { 0.5 }, 3.0, { it != fixed }) { true }
+
+            assertFalse("DIAGNOSTIC_CLOSURE_CHANGED_PROPOSAL" in events)
+            assertEquals(fixed.varId == 0, "DIAGNOSTIC_CLOSURE_SELECTED_INELIGIBLE" in events)
+            assertEquals(fixed.varId == 1, "DIAGNOSTIC_CLOSURE_INELIGIBLE" in events)
+            assertEquals(fixed.varId == 1, "DIAGNOSTIC_CLOSURE_NO_PROPOSAL" in events)
+        }
+    }
+
+    @Test
+    fun `variable inspection distinguishes measured zero baselines from missing samples`() {
+        for (samples in 0..2) {
+            val events = ArrayList<String>()
+            val history = LpDirectionalHistory(events::add)
+            for (variable in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                repeat(if (variable.varId == 0) samples else 2) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool((variable.varId shl 1) or if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (variable.varId == 1) 5.0 else 0.0)
+                        history.finishNode(true)
+                    }
+                }
+            }
+            history.record(0.0)
+            events.clear()
+
+            history.inspectClosure(VarRef.Bool(0), { 0.5 }, 3.0) { true }
+
+            assertTrue("DIAGNOSTIC_CLOSURE_CHANGED_PROPOSAL" in events)
+            assertEquals(samples == 2, "DIAGNOSTIC_CLOSURE_KNOWN_BASELINE" in events)
+            assertEquals(samples < 2, "DIAGNOSTIC_CLOSURE_UNKNOWN_BASELINE" in events)
+            assertEquals(samples == 2, "DIAGNOSTIC_CLOSURE_NUMERIC_ONLY" in events)
         }
     }
 
@@ -92,8 +154,12 @@ class LpDirectionalHistoryTest {
     @Test
     fun `history reset cannot renew exhausted variable inspection visits`() {
         var scans = 0
+        var exhaustion = 0
         var work = 0L
-        val history = LpDirectionalHistory({ if (it == "DIAGNOSTIC_CLOSURE_SCAN") scans++ }, charge = { work += it })
+        val history = LpDirectionalHistory({
+            if (it == "DIAGNOSTIC_CLOSURE_SCAN") scans++
+            if (it == "DIAGNOSTIC_CLOSURE_EXHAUSTED") exhaustion++
+        }, charge = { work += it })
         var exhaustedScans = 0
         for (readmission in listOf(false, true)) {
             history.beginNode(0)
@@ -118,6 +184,7 @@ class LpDirectionalHistoryTest {
 
             assertEquals(before, work)
             assertEquals(exhaustedScans, scans)
+            assertEquals(1, exhaustion)
             history.clear()
         }
         assertTrue(exhaustedScans > 0)

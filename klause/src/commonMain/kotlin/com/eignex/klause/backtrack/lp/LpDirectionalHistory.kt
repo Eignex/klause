@@ -59,6 +59,7 @@ internal class LpDirectionalHistory(
         selected: VarRef,
         point: (VarRef) -> Double,
         cutoff: Double,
+        eligible: (VarRef) -> Boolean = { true },
         current: () -> Boolean,
     ) {
         if (!canInspectClosure) return
@@ -68,9 +69,16 @@ internal class LpDirectionalHistory(
         remainingInspection--
         charge(76L)
         if (version != generation || !current()) return
+        if (!eligible(selected)) {
+            if (version != generation || !current()) return
+            if (remainingInspection == 0) observe("DIAGNOSTIC_CLOSURE_EXHAUSTED")
+            if (version != generation || !current()) return
+            observe("DIAGNOSTIC_CLOSURE_SELECTED_INELIGIBLE")
+            return
+        }
         val selectedEvidence = closureEvidence(selected, point(selected), gap)
         if (version != generation || !current()) return
-        val counts = IntArray(5)
+        val counts = IntArray(6)
         var visited = 0
         var other = false
         var limited = false
@@ -83,10 +91,10 @@ internal class LpDirectionalHistory(
             visited++
             charge(64L)
             if (version != generation || !current()) return
-            val evidence = closureEvidence(variable, point(variable), gap)
+            val evidence = if (eligible(variable)) closureEvidence(variable, point(variable), gap) else 5
             if (version != generation || !current()) return
             counts[evidence]++
-            if (variable != selected && evidence >= 2) other = true
+            if (variable != selected && evidence in 2..4) other = true
         }
         if (version != generation || !current()) return
         observe("DIAGNOSTIC_CLOSURE_SCAN")
@@ -97,14 +105,23 @@ internal class LpDirectionalHistory(
                 1 -> "DIAGNOSTIC_CLOSURE_NUMERIC_ONLY"
                 2 -> "DIAGNOSTIC_CLOSURE_REACH_UNKNOWN_OUTCOMES"
                 3 -> "DIAGNOSTIC_CLOSURE_REACH_OPEN_SIDE"
-                else -> "DIAGNOSTIC_CLOSURE_REACH_PRUNE_BOTH"
+                4 -> "DIAGNOSTIC_CLOSURE_REACH_PRUNE_BOTH"
+                else -> "DIAGNOSTIC_CLOSURE_INELIGIBLE"
             })
         }
+        if (version != generation || !current()) return
+        if (remainingInspection == 0) observe("DIAGNOSTIC_CLOSURE_EXHAUSTED")
         if (version != generation || !current()) return
         if (limited) observe("DIAGNOSTIC_CLOSURE_LIMIT")
         if (version != generation || !current()) return
         when {
-            other && selectedEvidence < 2 -> observe("DIAGNOSTIC_CLOSURE_CHANGED_PROPOSAL")
+            other && selectedEvidence < 2 -> {
+                val category = if (selectedEvidence == 1) "DIAGNOSTIC_CLOSURE_KNOWN_BASELINE"
+                else "DIAGNOSTIC_CLOSURE_UNKNOWN_BASELINE"
+                observe("DIAGNOSTIC_CLOSURE_CHANGED_PROPOSAL")
+                if (version != generation || !current()) return
+                observe(category)
+            }
             selectedEvidence >= 2 -> observe("DIAGNOSTIC_CLOSURE_SELECTED_REACH")
             !limited -> observe("DIAGNOSTIC_CLOSURE_NO_PROPOSAL")
         }
@@ -112,11 +129,12 @@ internal class LpDirectionalHistory(
 
     private fun closureEvidence(variable: VarRef, value: Double, gap: Double): Int {
         val history = reliable(variable, value) ?: return 0
-        if (history.down.gain <= 0.0 || history.up.gain <= 0.0) return 0
         val fraction = value - floor(value)
         val downGain = history.down.gain * fraction
         val upGain = history.up.gain * (1.0 - fraction)
-        if (!downGain.isFinite() || !upGain.isFinite() || downGain <= 0.0 || upGain <= 0.0) return 0
+        if (!downGain.isFinite() || !upGain.isFinite() ||
+            (downGain == 0.0 && history.down.gain > 0.0) || (upGain == 0.0 && history.up.gain > 0.0)
+        ) return 0
         if (downGain < gap || upGain < gap) return 1
         val down = outcomeRate(history.down.outcome)
         val up = outcomeRate(history.up.outcome)
