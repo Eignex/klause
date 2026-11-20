@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.lab.configureLabPaths
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -48,6 +49,7 @@ import kotlin.time.Duration.Companion.seconds
 internal object MpsLpAdmission {
     @JvmStatic
     fun main(args: Array<String>) {
+        configureLabPaths()
         require(args.size in 1..2 && args[0].startsWith("batch64="))
         require(args.size == 1 || args[1] in setOf("queries=true", "queries=checkpoint"))
         val requests = Json.decodeFromString<List<List<String>>>(

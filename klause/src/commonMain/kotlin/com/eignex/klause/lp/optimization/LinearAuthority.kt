@@ -969,8 +969,8 @@ internal fun LinearAuthorityResult.retainingBound(
     previous: SourceEvidence?, families: Set<CutFamily>,
 ): LinearAuthorityResult {
     val strongest = strongerLinearBound(previous, bound)
-    return copy(bound = strongest, cutBoundFamilies = if (strongest != null && strongest === previous) families
-        else cutBoundFamilies)
+    val strongestFamilies = if (strongest != null && strongest === previous) families else cutBoundFamilies
+    return copy(bound = strongest, cutBoundFamilies = strongestFamilies)
 }
 
 internal fun strongerLinearBound(left: SourceEvidence?, right: SourceEvidence?): SourceEvidence? {
