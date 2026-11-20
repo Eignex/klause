@@ -387,7 +387,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val state = requireNotNull(core.state)
         val model = requireNotNull(state.ownerWorkingModel())
         val rebound = source?.relaxation(state, SessionDomains(session)) ?: base.withModel(model, remap = remap)
-        val map = rebound.sourceMap?.withCpBounds(model, session, rebound.intColOf)?.withParentRows(cuts.parentRows(state))
+        val map = rebound.sourceMap?.withCpBounds(model, session, rebound.intColOf)
+            ?.withParentRows(cuts.parentRows(state))
         if (map != null) engine.cutPool.remap(map)
         return rebound.withModel(model, map)
     }
