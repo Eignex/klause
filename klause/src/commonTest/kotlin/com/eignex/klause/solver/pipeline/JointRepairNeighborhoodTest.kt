@@ -11,7 +11,9 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -514,5 +516,73 @@ class JointRepairNeighborhoodTest {
             mapOf("empty" to SourcePremise(SourceInequality(emptyMap(), BigFraction.ZERO))))
 
         assertNull(JointRepairNeighborhood.prepare(source, 0, 0, ExecutionControl { true }))
+    }
+
+    @Test
+    fun `ordinary support should retain objective definition adjacency`() {
+        val integers = List(3) { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val coefficients = integers.associateWith { BigFraction.ONE } + (real to BigFraction.MINUS_ONE)
+        val source = SourceProofContext(SourceScope(SourceRevision("ordinary-objective", "exact")),
+            integers.toSet() + real, mapOf(
+                "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ZERO)),
+                "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                    BigFraction.ZERO))), objective = mapOf(real to BigFraction.ONE))
+        val selector = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 1, ExecutionControl.Never,
+            privateObjective = true))
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+        selector.advisoryNeighborhood(List(3) { BigFraction.ZERO }, 0, BigFraction.ONE,
+            SourceLpBudget(funding = funding), ExecutionControl.Never, expand = true)
+
+        val result = selector.propose(List(4) { BigFraction.ZERO }, booleanArrayOf(), 3, 1,
+            BigFraction.ONE, BigFraction.ONE)
+
+        assertEquals(emptyMap(), result.lower)
+    }
+
+    @Test
+    fun `objective recognition should retain the traversal work reserve`() {
+        val integers = List(3) { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val coefficients = integers.associateWith { BigFraction.ONE } + (real to BigFraction.MINUS_ONE)
+        val rhs = BigFraction.of(parseBigInt("1" + "0".repeat(600)), BIG_ONE)
+        val source = SourceProofContext(SourceScope(SourceRevision("objective-reserve", "exact")),
+            integers.toSet() + real, mapOf(
+                "upper" to SourcePremise(SourceInequality(coefficients, rhs)),
+                "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                    rhs.negated()))), objective = mapOf(real to BigFraction.ONE))
+        val selector = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 1, ExecutionControl.Never,
+            privateObjective = true))
+        val funding = SourceLpFunding(10_000, 1_000_000).also { it.grant(10_000) }
+
+        val result = selector.advisoryNeighborhood(List(3) { BigFraction.ZERO }, 0, BigFraction.ONE,
+            SourceLpBudget(funding = funding), ExecutionControl.Never, expand = true)
+
+        assertEquals(JointRepairNeighborhood.AdvisorySelection.Unavailable, result)
+        assertTrue(funding.spent <= 10_000)
+    }
+
+    @Test
+    fun `interrupted objective recognition should retain original private adjacency`() {
+        val integers = List(3) { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val coefficients = integers.associateWith { BigFraction.ONE } + (real to BigFraction.MINUS_ONE)
+        val source = SourceProofContext(SourceScope(SourceRevision("objective-cancelled", "exact")),
+            integers.toSet() + real, mapOf(
+                "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ZERO)),
+                "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                    BigFraction.ZERO))), objective = mapOf(real to BigFraction.ONE))
+        val selector = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 1, ExecutionControl.Never,
+            privateObjective = true))
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+        val budget = SourceLpBudget(funding = funding)
+
+        val cancelled = selector.advisoryNeighborhood(List(3) { BigFraction.ZERO }, 0, BigFraction.ONE,
+            budget, ExecutionControl { funding.spent > 100L }, expand = true)
+        val result = assertIs<JointRepairNeighborhood.AdvisorySelection.Ready>(selector.advisoryNeighborhood(
+            List(3) { BigFraction.ZERO }, 0, BigFraction.ONE, budget, ExecutionControl.Never, expand = true))
+
+        assertEquals(JointRepairNeighborhood.AdvisorySelection.Unavailable, cancelled)
+        assertEquals(emptyMap(), result.condition.lower)
     }
 }

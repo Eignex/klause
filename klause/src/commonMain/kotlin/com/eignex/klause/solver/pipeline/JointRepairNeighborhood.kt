@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
@@ -20,6 +21,7 @@ internal class JointRepairNeighborhood private constructor(
     private val rows: List<IntArray>,
     private val occurrences: Array<IntArray>,
     private val inputs: IntArray?,
+    private val objectiveDefinition: ObjectiveDefinition?,
 ) : ExactNeighborhoodProposal {
     sealed interface AdvisorySelection {
         data class Ready(val condition: ExactNeighborhoodCondition, val closed: Boolean) : AdvisorySelection
@@ -28,6 +30,43 @@ internal class JointRepairNeighborhood private constructor(
         data object Unavailable : AdvisorySelection
         enum class Limit { Width, Visits }
     }
+
+    private class ObjectiveDefinition(val firstRow: Int, val first: SourcePremise,
+        val secondRow: Int, val second: SourcePremise) {
+        fun matches(budget: SourceLpBudget, token: ExecutionControl): Boolean {
+            val a = first.inequality
+            val b = second.inequality
+            if (first.guardCount != 0 || second.guardCount != 0 || first.integerPinCount != 0 ||
+                second.integerPinCount != 0 || a.strict || b.strict || a.supportSize != b.supportSize ||
+                a.supportSize > MAX_SELECTION_VISITS / 2) return false
+            val funding = budget.funding ?: return false
+            val work = 16L + a.supportSize
+            if (token() || funding.availableWork <= work || funding.remainingAllocation <= 128L) return false
+            budget.observe(preparation = work)
+            funding.charge(0L, 128L)
+            fun opposite(left: BigFraction, right: BigFraction): Boolean {
+                val leftBits = left.num.magnitudeBitLength().toLong() + left.den.magnitudeBitLength()
+                val rightBits = right.num.magnitudeBitLength().toLong() + right.den.magnitudeBitLength()
+                if (leftBits > MAX_GUIDANCE_SCALAR_BITS || rightBits > MAX_GUIDANCE_SCALAR_BITS) return false
+                val scalarWork = 16L + leftBits + rightBits
+                val bytes = 128L + 8L * (leftBits + rightBits)
+                if (token() || funding.availableWork <= scalarWork || funding.remainingAllocation <= bytes)
+                    return false
+                budget.observe(preparation = scalarWork)
+                funding.charge(0L, bytes)
+                return left == right.negated() && !token() && !funding.exhausted
+            }
+            return opposite(a.rhs, b.rhs) && a.forEachCoefficient { coordinate, value ->
+                b.coefficient(coordinate)?.let { opposite(value, it) } == true
+            }
+        }
+    }
+
+    private var definitionChecked = objectiveDefinition == null
+    private var ignoredFirstRow = -1
+    private var ignoredSecondRow = -1
+
+    private fun ignoredPrivateRow(row: Int): Boolean = row == ignoredFirstRow || row == ignoredSecondRow
 
     private class ConnectedSelection(val integers: Set<Int>, val complete: Boolean)
 
@@ -77,9 +116,19 @@ internal class JointRepairNeighborhood private constructor(
             return AdvisorySelection.Unavailable
         budget.observe(preparation = work)
         funding.charge(0L, bytes)
+        if (!definitionChecked) {
+            definitionChecked = true
+            val definition = requireNotNull(objectiveDefinition)
+            if (definition.matches(budget, token)) {
+                ignoredFirstRow = definition.firstRow
+                ignoredSecondRow = definition.secondRow
+            }
+        }
+        if (token() || funding.exhausted || funding.availableWork <= MAX_SELECTION_VISITS)
+            return AdvisorySelection.Unavailable
         if (!expand) {
             val before = visitedEntries
-            val selected = connected(listOf(seeds[root]), minOf(2, seeds.size))
+            val selected = connected(listOf(seeds[root]), minOf(2, seeds.size), advisory = true)
             budget.observe(preparation = visitedEntries - before)
             val pins = (0 until integers).filter { it !in selected.integers }.associateWith { centers[it] }
             if (token() || funding.exhausted) return AdvisorySelection.Unavailable
@@ -105,7 +154,7 @@ internal class JointRepairNeighborhood private constructor(
                 val column = queue.removeFirst()
                 for (row in occurrences[column]) {
                     visit(row, column)?.let { return it }
-                    if (seenRows[row]) continue
+                    if (ignoredPrivateRow(row) || seenRows[row]) continue
                     seenRows[row] = true
                     for (peer in rows[row]) {
                         visit(row, column, peer)?.let { return it }
@@ -320,7 +369,7 @@ internal class JointRepairNeighborhood private constructor(
     }
 
     private fun connected(roots: List<Int>, count: Int,
-        maximumVisits: Int = MAX_SELECTION_VISITS): ConnectedSelection {
+        maximumVisits: Int = MAX_SELECTION_VISITS, advisory: Boolean = false): ConnectedSelection {
         val selected = roots.toCollection(linkedSetOf())
         val seenColumns = IntHashSet().also { seen -> roots.forEach { seen.add(it) } }
         val seenRows = IntHashSet()
@@ -331,7 +380,7 @@ internal class JointRepairNeighborhood private constructor(
             for (row in occurrences[column]) {
                 if (visits == maximumVisits) break
                 visits++
-                if (!seenRows.add(row)) continue
+                if ((advisory && ignoredPrivateRow(row)) || !seenRows.add(row)) continue
                 for (peer in rows[row]) {
                     if (visits == maximumVisits) break
                     visits++
@@ -350,7 +399,7 @@ internal class JointRepairNeighborhood private constructor(
     companion object {
         fun prepare(
             source: SourceProofContext, integers: Int, reals: Int, cancellation: ExecutionControl,
-            sourceIntegers: IntArray? = null,
+            sourceIntegers: IntArray? = null, privateObjective: Boolean = false,
         ): JointRepairNeighborhood? {
             if (cancellation() || integers.toLong() + reals > MAX_INDEX_ENTRIES) return null
             cancellation.charge(integers.toLong() + reals)
@@ -365,10 +414,16 @@ internal class JointRepairNeighborhood private constructor(
             val rows = ArrayList<IntArray>()
             val occurrences = arrayOfNulls<IntArrayList>(integers + reals)
             var entries = integers + reals
+            val objective = if (privateObjective) source.singleObjectiveCoordinate()
+                ?.takeIf { it.kind == SourceCoordinate.Kind.Real } else null
+            var objectiveRows = 0
+            var firstObjective: Pair<Int, SourcePremise>? = null
+            var secondObjective: Pair<Int, SourcePremise>? = null
             for (premise in source.premises.values) {
                 cancellation.charge(1)
                 if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
                 val columns = IntArrayList()
+                var hasObjective = false
                 for ((coordinate, coefficient) in premise.inequality.coefficients) {
                     cancellation.charge(1)
                     if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
@@ -376,6 +431,7 @@ internal class JointRepairNeighborhood private constructor(
                     val column = if (coordinate.kind == SourceCoordinate.Kind.Integer) coordinate.id
                     else integers + coordinate.id
                     columns.add(column)
+                    if (coordinate == objective) hasObjective = true
                 }
                 for (coordinate in premise.integerPins.keys) {
                     cancellation.charge(1)
@@ -383,15 +439,31 @@ internal class JointRepairNeighborhood private constructor(
                     if (coordinate.id !in columns) columns.add(coordinate.id)
                 }
                 if (columns.size < 2) continue
+                if (hasObjective) {
+                    objectiveRows++
+                    when (objectiveRows) {
+                        1 -> firstObjective = rows.size to premise
+                        2 -> secondObjective = rows.size to premise
+                        else -> {
+                            firstObjective = null
+                            secondObjective = null
+                        }
+                    }
+                }
                 columns.forEach { column ->
                     val adjacent = occurrences[column] ?: IntArrayList(1).also { occurrences[column] = it }
                     adjacent.add(rows.size)
                 }
                 rows += columns.toIntArray()
             }
+            val definition = if (objectiveRows == 2) {
+                val first = requireNotNull(firstObjective)
+                val second = requireNotNull(secondObjective)
+                ObjectiveDefinition(first.first, first.second, second.first, second.second)
+            } else null
             return if (cancellation()) null else
                 JointRepairNeighborhood(integers, rows,
-                    Array(occurrences.size) { occurrences[it]?.toIntArray() ?: emptyIntArray() }, inputs)
+                    Array(occurrences.size) { occurrences[it]?.toIntArray() ?: emptyIntArray() }, inputs, definition)
         }
     }
 }

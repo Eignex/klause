@@ -526,7 +526,12 @@ queries alternate with ordinary repair. Both center kinds first free at most two
 connected binary coordinates. If that query completes without an accepted witness,
 the same root can expand to its integer row-support component, with at most 32 free
 coordinates, after ordinary fallback. Pairs already known to cover their support
-need no expansion. Support
+need no expansion. Private adjacency omits an isolated real objective definition
+when its only two non-singleton occurrences are unguarded, unpinned, nonstrict
+inequalities with exactly opposite coefficients and right-hand sides. Bounded
+recognition spends the same source funding; unavailable or ambiguous definitions
+retain the original graph. The prepared row index and ordinary traversal stay
+unchanged. Closure describes reachability in this selection graph only. Support
 selection does not join components through continuous columns; all continuous
 recourse and source rows remain in the query. The selection is heuristic and proves
 no independence. Width or visit-limit decline advances that root; resource or

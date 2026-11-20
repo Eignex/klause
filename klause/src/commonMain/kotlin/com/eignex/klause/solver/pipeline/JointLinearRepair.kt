@@ -597,7 +597,7 @@ internal class JointLinearRepair(
                 }
             }
             selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction,
-                sourceIntegers)
+                sourceIntegers, privateObjective = incumbentProximity)
             selection?.onRefutationRoots = observation?.let { { roots -> observedRoots = roots } }
             if (selection == null) {
                 declined = !stop() && !cancellation()
