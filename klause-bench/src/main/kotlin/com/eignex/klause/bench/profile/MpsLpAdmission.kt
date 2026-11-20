@@ -177,6 +177,8 @@ internal object MpsLpAdmission {
         val admitted = get(eligibility, "Admitted") as Boolean
         val cancelled = stop()
         val complete = preparationComplete && !cancelled
+        val mappingGuards = SourceMappingAdmission.inspect(authority, mapping, preparation.problem,
+            preparation.objective, ExecutionControl { !complete || stop() })
         return buildJsonObject {
             put("scope", "source-setup-and-finite-preparation")
             put("complete", complete)
@@ -185,6 +187,7 @@ internal object MpsLpAdmission {
             put("initialAutomaticSelection", automatic)
             put("acceptedAuthorityPrepared", authority != null)
             put("preparedMappingCompatible", if (complete) JsonPrimitive(compatible) else JsonNull)
+            put("mappingGuards", mappingGuards)
             put("workerStructurallyAdmitted", if (complete) JsonPrimitive(admitted) else JsonNull)
             put("declines", if (!complete) JsonNull else buildJsonArray {
                 (get(eligibility, "Declines") as List<*>).forEach { add(JsonPrimitive(it.toString())) }
