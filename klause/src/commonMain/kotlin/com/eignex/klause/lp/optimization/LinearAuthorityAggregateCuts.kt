@@ -639,6 +639,7 @@ internal object LinearAuthorityAggregateCuts {
         fun integerProjections(rows: List<ProbeRow>, candidates: MutableList<LinearAuthorityCut>, maximum: Int) {
             val cap = minOf(maximum, candidates.size + 2)
             if (candidates.size >= cap) return
+            observe("AggregateIntegerProjectionAllocationGrant", meter.remainingAllocation)
             meter.reserve(1L, 256L)
             val seeds = ArrayList<ProjectionSeed>()
             fun order(left: ProjectionSeed, right: ProjectionSeed): Int {
@@ -999,8 +1000,13 @@ internal object LinearAuthorityAggregateCuts {
                 it.addAll(seedCoefficients)
             }
             val aggregate = LinkedHashMap(initial)
+            fun scaled(value: BigFraction, weight: BigFraction): BigFraction {
+                meter.reserve(1L)
+                val checked = meter.number(value)
+                return if (weight == BigFraction.ONE) checked else meter.multiply(checked, weight)
+            }
             var rhs = BigFraction.ZERO
-            for (term in seed) rhs = meter.add(rhs, meter.multiply(term.weight, meter.number(term.inequality.rhs)))
+            for (term in seed) rhs = meter.add(rhs, scaled(term.inequality.rhs, term.weight))
             var strict = seed.any { it.inequality.strict }
             val support = HashSet<SourceCoordinate>()
             fun retainSupport(row: Map<SourceCoordinate, BigFraction>) {
@@ -1024,12 +1030,13 @@ internal object LinearAuthorityAggregateCuts {
                 snapshots.add(next.row.coefficients)
                 retainSupport(next.row.coefficients)
                 for ((id, value) in next.row.coefficients) {
-                    meter.reserve(1L, if (id in aggregate) 0L else 64L)
-                    val updated = meter.add(aggregate[id] ?: BigFraction.ZERO,
-                        meter.multiply(meter.number(value), weight))
+                    val current = aggregate[id]
+                    meter.reserve(1L, if (current == null) 64L else 0L)
+                    val product = scaled(value, weight)
+                    val updated = if (current == null) product else meter.add(current, product)
                     if (updated.isZero) aggregate.remove(id) else aggregate[id] = updated
                 }
-                rhs = meter.add(rhs, meter.multiply(weight, meter.number(next.row.term.inequality.rhs)))
+                rhs = meter.add(rhs, scaled(next.row.term.inequality.rhs, weight))
                 strict = strict || next.row.term.inequality.strict
                 capture.coefficients = aggregate
                 capture.integer = null
@@ -1037,10 +1044,12 @@ internal object LinearAuthorityAggregateCuts {
                 meter.reserve(aggregate.size.toLong())
                 if (aggregate.keys.any { it.kind == SourceCoordinate.Kind.Real }) continue
                 observe("AggregateIntegerProjectionCompleted", 1L)
+                observe("AggregateIntegerProjectionFinalizationAllocationAvailable", meter.remainingAllocation)
                 if (aggregate.isEmpty()) return null
                 val proofBytes = aggregateProofBytes(terms, meter, limits)
                 val cut = finalizeIntegerAggregate(terms, aggregate, rhs, strict, proofBytes,
                     meter, limits, observe, capture)
+                observe("AggregateIntegerProjectionFinalized", 1L)
                 if (cut != null && separates(cut, point, meter, observe) == true) return cut
             }
         }
