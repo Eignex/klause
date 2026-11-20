@@ -11,10 +11,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 class ComparisonProvenanceTest {
-    @Test
-    fun `managed recording destinations do not change runtime identity`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["", "\""])
+    fun `managed recording destinations do not change runtime identity`(quote: String) {
         val arguments = "\"-Xmx2560m\"\n" +
-            "\"-XX:StartFlightRecording=filename=/local/cases/1/out/report/cli.jfr,settings=profile,dumponexit=true\""
+            "$quote-XX:StartFlightRecording=filename=/local/cases/1/out/report/cli.jfr," +
+            "settings=profile,dumponexit=true$quote"
         val before = BuildProvenance(
             emptyMap(), emptyMap(), mapOf("lab.cli.args" to arguments), "Linux", "amd64",
         )
@@ -23,6 +25,18 @@ class ComparisonProvenanceTest {
         assertEquals(ComparisonProvenance.runtimeFingerprint(before), ComparisonProvenance.runtimeFingerprint(after))
         assertEquals(arguments, before.runtimeOptions["lab.cli.args"])
         assertNotEquals(before.fingerprint, after.fingerprint)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["-Dproperty=", "\"-Dproperty=", "prefix"])
+    fun `recording flag text embedded in another argument retains runtime identity`(prefix: String) {
+        val arguments = "$prefix-XX:StartFlightRecording=filename=/local/cases/1/out/report/cli.jfr,settings=profile"
+        val before = BuildProvenance(
+            emptyMap(), emptyMap(), mapOf("lab.cli.args" to arguments), "Linux", "amd64",
+        )
+        val after = before.copy(runtimeOptions = mapOf("lab.cli.args" to arguments.replace("cases/1", "cases/2")))
+
+        assertNotEquals(ComparisonProvenance.runtimeFingerprint(before), ComparisonProvenance.runtimeFingerprint(after))
     }
 
     @ParameterizedTest

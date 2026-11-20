@@ -70,6 +70,6 @@ internal object ComparisonProvenance {
     private const val PREFIX = "com/eignex/klause/bench/"
 
     private val CLI_RECORDING_PATH = Regex(
-        """(-XX:StartFlightRecording=filename=)[^,"\r\n]*/out/report/cli\.jfr(?=[,"\r\n]|$)""",
+        """(?m)^("?-XX:StartFlightRecording=filename=)[^,"\r\n]*/out/report/cli\.jfr(?=[,"\r\n]|$)""",
     )
 }
