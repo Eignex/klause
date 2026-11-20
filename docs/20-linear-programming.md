@@ -589,6 +589,8 @@ at 16,384 work and 256 KiB, for integer-only projections through at most sixteen
 original rows. Fractional integer coordinates order up to eight starting rows, and
 at most two separating projections survive. Exact positive coefficient ratios cancel
 continuous coordinates without repeatedly scaling the existing combination.
+Intermediate coefficients accumulate one source row at a time; a completed integer
+projection is rebuilt from its original premises before rounding and verification.
 The ordinary prefix is separate. Both generators share a 500,000-work, 8 MiB family
 allowance; seeded discovery uses at most 65,536 work and 1 MiB of it.
 Each derivation remains bounded by 65,536 work and 1 MiB within that allowance.

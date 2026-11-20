@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 class LinearAuthorityAggregateContinuationTest {
     @Test
     fun `integer projection should cancel a coupled flow within its configured row limit`() {
-        for (count in listOf(4, 8)) {
+        for (count in listOf(4, 8, 15)) {
             val scale = BigFraction.ofLong(if (count == 4) 1L else 1_000_000_000_000L)
             val integers = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
             val flows = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
@@ -56,17 +56,27 @@ class LinearAuthorityAggregateContinuationTest {
 
     @Test
     fun `interrupting integer projection should withhold its unfinished source combination`() {
-        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
-            "left" to SourcePremise(left), "right" to SourcePremise(right)))
-        var stopped = false
+        val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-7)))
+        val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+        val point = integers.associateWith { 0.875 } + flows.associateWith { 1.75 }
+        for (boundary in listOf("AggregateIntegerProjectionAttempts", "AggregateIntegerProjectionRows")) {
+            var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
-            observe = { name, _ -> if (name == "AggregateIntegerProjectionAttempts") stopped = true },
-            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16),
-            point = mapOf(x to 0.75, y to 0.75, real to 1.5))
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
+                observe = { name, _ -> if (name == boundary) stopped = true },
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16), point = point)
 
-        assertTrue(stopped)
-        assertTrue(cuts.isEmpty())
+            assertTrue(stopped)
+            assertTrue(cuts.isEmpty())
+        }
     }
 
     @Test
