@@ -1472,7 +1472,10 @@ internal class ResumableMinimize(
                 pointHandedOff
             }, accept = ::accept)
         lpEngine.continuedRootLowerBound?.let(::publishRootLpBound)
-        if (pointHandedOff) return installed
+        if (pointHandedOff) {
+            lpEngine.observeRootHandoffDiagnostic("SEARCH", "POINT_HANDOFF")
+            return installed
+        }
         if (handoffSparseRootBound(afterQuery = true)) return installed
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
@@ -1483,25 +1486,44 @@ internal class ResumableMinimize(
 
     private fun handoffSparseRootBound(afterQuery: Boolean = false): Boolean {
         val plan = lpEngine.params.lpPlan
-        if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 || plan.componentOwnership ||
-            plan.lbTreeSearch || !lpEngine.sparseTrialActive || !lpEngine.rootRoundingQueryPaused ||
-            lpEngine.measuredRootLowerBound == null
-        ) return false
+        val facts = linkedMapOf<String, String?>("afterQuery" to afterQuery.toString())
+        fun decline(reason: String): Boolean {
+            lpEngine.observeRootHandoffDiagnostic("SEARCH", reason, facts)
+            return false
+        }
+        val excluded = when {
+            !pausable -> "NOT_PAUSABLE"
+            decisionLimit <= 0L -> "NO_DECISIONS"
+            problem.numRealVars != 0 -> "REAL_VARIABLES"
+            plan.componentOwnership -> "COMPONENT_OWNED"
+            plan.lbTreeSearch -> "TREE_SEARCH"
+            !lpEngine.sparseTrialActive -> "NOT_SPARSE"
+            !lpEngine.rootRoundingQueryPaused -> "NOT_PAUSED"
+            lpEngine.measuredRootLowerBound == null -> "NO_CHECKED_BOUND"
+            else -> null
+        }
+        if (excluded != null) return decline(excluded)
         if (lpEngine.automaticSparseTrial) {
             val defer = lpEngine.deferAutomaticRootHandoff(afterQuery)
-            if (!rootBoundHandoffFloorCaptured) return false
-            val baseline = rootBoundHandoffBaseline ?: return false
-            val lower = lpEngine.measuredRootLowerBound ?: return false
-            if (!baseline.isFinite() || ceil(lower) <= ceil(baseline)) return false
+            facts["defer"] = defer.toString()
+            if (!rootBoundHandoffFloorCaptured) return decline("FLOOR_NOT_CAPTURED")
+            val baseline = rootBoundHandoffBaseline ?: return decline("NO_BASELINE")
+            facts["baselineBits"] = baseline.toRawBits().toString()
+            val lower = lpEngine.measuredRootLowerBound ?: return decline("NO_LOWER_BOUND")
+            facts["lowerBits"] = lower.toRawBits().toString()
+            if (!baseline.isFinite()) return decline("NONFINITE_BASELINE")
+            if (ceil(lower) <= ceil(baseline)) return decline("NONIMPROVING_BOUND")
             if (defer) {
                 sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "PROGRESS_DEFERRED", 0L)
-                return false
+                return decline("PROGRESS_DEFERRED")
             }
         }
         // A checked global bound survives retirement of its unfinished numerical cursor.
+        lpEngine.observeRootHandoffDiagnostic("SEARCH", "BOUND_HANDOFF_BEGIN", facts)
         rootRoundingPending = false
         lpEngine.handoffRootBoundSearch()
         sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "BOUND_SEARCH_HANDOFF", 0L)
+        lpEngine.observeRootHandoffDiagnostic("SEARCH", "BOUND_HANDOFF_END", facts)
         return true
     }
 
@@ -1541,6 +1563,7 @@ internal class ResumableMinimize(
             else -> "PENDING"
         }
         sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", outcome, 0L)
+        lpEngine.observeRootHandoffDiagnostic("RESUME", outcome)
         return outcome == "PENDING"
     }
 

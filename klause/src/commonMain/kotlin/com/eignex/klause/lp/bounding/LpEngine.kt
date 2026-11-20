@@ -191,6 +191,7 @@ internal class LpEngine(
         private set
     private var rootBoundHandedOff = false
     private var rootProgress: RootProgress? = null
+    private var rootHandoffDiagnostic: RootHandoffDiagnostic? = null
     private var automaticOrdinaryNodes = false
     private var sparseRootWork = false
     private var admittedSourceLayout: LpRelaxation? = null
@@ -204,7 +205,9 @@ internal class LpEngine(
         private set
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
         set(value) {
-            if (field !== value) {
+            val changed = field !== value
+            if (changed) {
+                resetRootHandoffDiagnostic(if (value == null) "WARM_START_CLEAR_BEGIN" else "WARM_START_REPLACE_BEGIN")
                 rootProgress = null
                 field?.pinning?.releaseRetainedState()
                 if (value != null) {
@@ -212,19 +215,25 @@ internal class LpEngine(
                 }
             }
             field = value
+            if (changed) observeRootHandoffDiagnostic("LIFECYCLE",
+                if (value == null) "WARM_START_CLEAR_END" else "WARM_START_REPLACE_END")
         }
     internal var rootRoundingInterrupted: Boolean = false
     internal fun handoffRootBoundSearch() {
+        observeRootHandoffDiagnostic("RETIRE", "CHECKED_BOUND_BEGIN")
         rootBoundHandedOff = true
         rootRoundingInterrupted = false
         rootRoundingWarmStart = null
         propagator.releaseSolver()
+        observeRootHandoffDiagnostic("RETIRE", "CHECKED_BOUND_END")
     }
 
     internal fun resetRootBoundSearch() {
+        resetRootHandoffDiagnostic("ROOT_SEARCH_RESET_BEGIN")
         rootProgress = null
         rootBoundHandedOff = false
         sparseRootWork = sparseTrialActive
+        observeRootHandoffDiagnostic("LIFECYCLE", "ROOT_SEARCH_RESET_END")
     }
 
     internal val rootRoundingQueryPaused: Boolean
@@ -236,14 +245,23 @@ internal class LpEngine(
 
     internal fun deferAutomaticRootHandoff(afterQuery: Boolean): Boolean {
         val guidance = rootRoundingWarmStart
-        if (!automaticSparseTrial || guidance == null || guidance.objective !== objective ||
-            guidance.sourceProblem !== problem || !rootRoundingQueryPaused ||
-            retainedRootCumulativeWork() <= ROOT_PROGRESS_CHECK_WORK ||
-            lpWorkAllowanceSpent(ROOT_PROGRESS_CHECK_WORK)
-        ) {
+        val facts = linkedMapOf<String, String?>("afterQuery" to afterQuery.toString())
+        fun decline(reason: String): Boolean {
             rootProgress = null
+            observeRootHandoffDiagnostic("PROGRESS", reason, facts)
             return false
         }
+        if (!automaticSparseTrial) return decline("NOT_AUTOMATIC")
+        if (guidance == null) return decline("NO_GUIDANCE")
+        if (guidance.objective !== objective) return decline("OBJECTIVE")
+        if (guidance.sourceProblem !== problem) return decline("SOURCE")
+        if (!rootRoundingQueryPaused) return decline("NOT_PAUSED")
+        val rootWork = retainedRootCumulativeWork()
+        facts["rootWork"] = rootWork.toString()
+        if (rootWork <= ROOT_PROGRESS_CHECK_WORK) return decline("ROOT_WORK")
+        val lpSpent = lpWorkAllowanceSpent(ROOT_PROGRESS_CHECK_WORK)
+        facts["lpSpent"] = lpSpent.toString()
+        if (lpSpent) return decline("LP_WORK")
         noteNodeOverhead(ROOT_PROGRESS_CHECK_WORK)
         val continuation = propagator.pausedTrialContinuation
         val attempt = propagator.pausedTrialAttempt
@@ -253,14 +271,21 @@ internal class LpEngine(
         val violated = progress["LastViolatedBasics"]
         val phase = progress.entries.singleOrNull { it.key.startsWith("ProgressPhase") }
             ?.takeIf { it.value == 1L && it.key in ROOT_PROGRESS_PHASES }?.key
+        facts.putAll(mapOf("continuation" to continuation?.toString(), "attempt" to attempt?.toString(),
+            "work" to work?.toString(), "samples" to samples?.toString(), "violated" to violated?.toString(),
+            "phase" to phase, "phaseEntries" to progress.entries.filter { it.key.startsWith("ProgressPhase") }
+                .joinToString(",") { "${it.key}~${it.value}" }))
         if (continuation == null || attempt == null || work == null || work < 0L ||
             samples == null || samples !in 1L..255L || violated == null ||
-            violated !in 0L..guidance.relaxation.model.m.toLong() || phase == null
+            violated !in 0L..guidance.relaxation.model.m.toLong().also { facts["rows"] = it.toString() } || phase == null
         ) {
-            rootProgress = null
-            return false
+            return decline("INVALID_PROGRESS")
         }
         val previous = rootProgress
+        facts.putAll(mapOf("previousContinuation" to previous?.continuation?.toString(),
+            "previousAttempt" to previous?.attempt?.toString(), "previousWork" to previous?.work?.toString(),
+            "previousSamples" to previous?.samples?.toString(), "previousViolated" to previous?.violated?.toString(),
+            "previousPhase" to previous?.phase, "previousDefer" to previous?.defer?.toString()))
         // A permission bridges a pre-query check; another attempt must earn its own fresh sample.
         val defer = if (previous == null || previous.continuation != continuation || previous.phase != phase) {
             false
@@ -273,8 +298,41 @@ internal class LpEngine(
                 violated < previous.violated
         }
         rootProgress = RootProgress(continuation, attempt, work, samples, violated, phase, defer)
-        return defer && retainedRootCumulativeWork() > 0L
+        val reason = when {
+            previous == null -> "FIRST_PROGRESS"
+            previous.continuation != continuation -> "CONTINUATION_CHANGED"
+            previous.phase != phase -> "PHASE_CHANGED"
+            previous.attempt == attempt && previous.work == work && previous.samples == samples &&
+                previous.violated == violated -> if (afterQuery) "REPEATED_POST_QUERY" else "REPEATED_PRE_QUERY"
+            previous.attempt >= attempt -> "STALE_ATTEMPT"
+            work <= previous.work -> "STALE_WORK"
+            samples <= previous.samples -> "STALE_SAMPLES"
+            violated >= previous.violated -> "NONDECREASING_VIOLATIONS"
+            else -> "FRESH_PROGRESS"
+        }
+        var postChargeRootWork: Long? = null
+        val result = defer && retainedRootCumulativeWork().also { postChargeRootWork = it } > 0L
+        facts.putAll(mapOf("defer" to defer.toString(), "result" to result.toString(),
+            "postChargeRootWork" to postChargeRootWork?.toString(), "comparison" to reason))
+        observeRootHandoffDiagnostic("PROGRESS", if (defer && !result) "POST_CHARGE_ROOT_WORK" else reason, facts)
+        return result
     }
+
+    internal fun observeRootHandoffDiagnostic(site: String, reason: String, fields: Map<String, String?> = emptyMap()) {
+        if (!sparseTrialActive) return
+        val diagnostic = rootHandoffDiagnostic ?: RootHandoffDiagnostic(sink.lp, params.randomSeed,
+            params.lpConfig?.emphasis?.name, automaticSparseTrial,
+            (if (params.lpPlan.componentOwnership) 1 else 0) + (if (params.lpPlan.lbTreeSearch) 2 else 0) +
+                (if (sparseTrialRequested) 4 else 0)).also { rootHandoffDiagnostic = it }
+        diagnostic.record(site, reason, fields)
+    }
+
+    private fun resetRootHandoffDiagnostic(reason: String) {
+        if (!sparseTrialActive) return
+        observeRootHandoffDiagnostic("LIFECYCLE", reason)
+        rootHandoffDiagnostic?.reset(reason)
+    }
+
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
@@ -284,6 +342,7 @@ internal class LpEngine(
     // Retain the model and discrete warm-start caches; only native factor-owning solvers are released.
     @Suppress("TooGenericExceptionCaught") // cleanup must preserve arbitrary failures from owned solvers
     internal fun releasePersistentSolvers() {
+        resetRootHandoffDiagnostic("SOLVERS_RELEASE_BEGIN")
         rootProgress = null
         var failure: Throwable? = null
         val node = nodeSimplex
@@ -309,10 +368,12 @@ internal class LpEngine(
             failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
         }
         failure?.let { throw it }
+        observeRootHandoffDiagnostic("LIFECYCLE", "SOLVERS_RELEASE_END")
     }
 
     override fun close() {
         if (closed) return
+        observeRootHandoffDiagnostic("LIFECYCLE", "CLOSE_BEGIN")
         closed = true
         discardRootLayoutPreparation()
         preparedRootRelaxation = null
@@ -341,6 +402,7 @@ internal class LpEngine(
             observed.recipe = previousRecipe
             observed.kind = previousKind
         }
+        observeRootHandoffDiagnostic("LIFECYCLE", "CLOSE_END")
     }
 
     internal fun forObjective(
