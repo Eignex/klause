@@ -385,9 +385,8 @@ Disabled directional gains collect no history or retained model scope and charge
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 
 The same recent directional estimates can order the selected variable's two
-existing adjacent alternatives. It visits the lower predicted gain first to seek
-an incumbent, unless a predicted child gain reaches the current objective gap;
-then it visits the higher predicted gain first to seek early pruning.
+existing adjacent alternatives. It visits the higher predicted gain first to seek
+early pruning and objective-bound progress.
 Predicted gains carry no pruning authority.
 Both directions need two in-age observations; equal or unavailable
 estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
@@ -396,6 +395,9 @@ allowance, and checks the current point, scope, solve stamp and cancellation.
 Value nominations and matching committed changes have separate counters from
 missing-direction collection. Withheld advice retains ordinary
 value order while paying the same comparison work.
+Changed commitments retain whether the predicted gain reaches the current cutoff
+gap. These observations follow the charged commitment and freshness check; proposals,
+agreed choices and invalidated nominations supply no changed-commitment observation.
 
 The same opt-in path can visit an under-observed child first to collect missing
 passive information, including before an incumbent exists. It uses a recent positive

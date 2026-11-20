@@ -12,12 +12,14 @@ internal class LpPassiveValueChoice(
     private var nomination: SearchDecision? = null
     private var nominationStamp = -1
     private var changed = false
+    private var preference: LpDirectionalHistory.ChildPreference? = null
 
     val hasNomination: Boolean get() = nomination != null
 
     fun clear() {
         nomination = null
         changed = false
+        preference = null
     }
 
     fun select(
@@ -31,10 +33,10 @@ internal class LpPassiveValueChoice(
     ): List<SearchDecision> {
         clear()
         if (alternatives.size != 2) return alternatives
-        charge(20L)
+        charge(21L)
         observe("PASSIVE_VALUE_CHECK")
         if (!fresh()) return alternatives.also { observe("PASSIVE_VALUE_STALE") }
-        val preferUp = history.preferGainDirection(variable, point, cutoff)
+        val direction = history.childPreference(variable, point, cutoff)
             ?: return alternatives.also { observe("PASSIVE_VALUE_NO_PROPOSAL") }
         val down: SearchDecision
         val up: SearchDecision
@@ -50,10 +52,11 @@ internal class LpPassiveValueChoice(
         }
         if (alternatives != listOf(down, up) && alternatives != listOf(up, down)) return alternatives
         if (!fresh()) return alternatives.also { observe("PASSIVE_VALUE_STALE") }
-        val proposal = if (preferUp) up else down
+        val proposal = if (direction.up) up else down
         changed = proposal != alternatives.first()
         nomination = if (applyAdvice) proposal else alternatives.first()
         nominationStamp = stamp
+        preference = direction
         observe("PASSIVE_VALUE_COMPARED")
         observe(if (changed) "PASSIVE_VALUE_PROPOSAL_CHANGED" else "PASSIVE_VALUE_PROPOSAL_AGREED")
         observe(if (applyAdvice) "PASSIVE_VALUE_CONSUMED" else "PASSIVE_VALUE_WITHHELD")
@@ -66,14 +69,19 @@ internal class LpPassiveValueChoice(
 
     fun commit(decision: SearchDecision, stamp: Int, fresh: () -> Boolean) {
         val expected = nomination ?: return
-        charge(4L)
+        val reachesCutoff = checkNotNull(preference).reachesCutoff
+        charge(5L)
         observe("PASSIVE_VALUE_COMMIT_CHECK")
         val accepted = expected == decision && nominationStamp == stamp && fresh()
         val wasChanged = changed
         clear()
         if (!accepted) return
         observe(if (applyAdvice) "PASSIVE_VALUE_COMMITTED" else "PASSIVE_VALUE_COMMIT_WITHHELD")
-        if (wasChanged) observe(if (applyAdvice) "PASSIVE_VALUE_COMMIT_CHANGED"
-        else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED")
+        if (wasChanged) {
+            observe(if (applyAdvice) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED")
+            val role = if (applyAdvice) "COMMIT" else "COMMIT_WITHHELD"
+            val mode = if (reachesCutoff) "REACHABLE" else "OPEN"
+            observe("PASSIVE_VALUE_${role}_${mode}_CHANGED")
+        }
     }
 }

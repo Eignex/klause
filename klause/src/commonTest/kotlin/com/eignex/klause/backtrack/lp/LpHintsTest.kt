@@ -200,10 +200,10 @@ class LpHintsTest {
             val before = work
             hints.branch(variable)
 
-            val selected = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
+            val selected = hints.orderAlternatives(variable, listOf(up, down), ExecutionControl.Never)
             hints.commit(selected.first(), 1)
 
-            assertEquals(if (apply) listOf(up, down) else listOf(down, up), selected)
+            assertEquals(if (apply) listOf(down, up) else listOf(up, down), selected)
             val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
             assertEquals(1, events.count { it == event })
             assertFalse("PASSIVE_COLLECTION_COMMIT_CHANGED" in events)

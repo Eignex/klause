@@ -11,6 +11,13 @@ internal class LpDirectionalHistory(
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
 ) {
+    enum class ChildPreference(val up: Boolean, val reachesCutoff: Boolean) {
+        DOWN_OPEN(false, false),
+        UP_OPEN(true, false),
+        DOWN_REACHABLE(false, true),
+        UP_REACHABLE(true, true),
+    }
+
     private class Direction {
         var count = 0
         var latest = 0.0
@@ -205,7 +212,10 @@ internal class LpDirectionalHistory(
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
-    fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? {
+    fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? =
+        childPreference(variable, value, cutoff)?.up
+
+    fun childPreference(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): ChildPreference? {
         val history = reliable(variable, value) ?: return null
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
@@ -213,8 +223,12 @@ internal class LpDirectionalHistory(
         if (!down.isFinite() || !up.isFinite() || abs(down - up) <= 1e-9 * maxOf(1.0, down, up)) return null
         val gap = cutoff - objective
         if (gap.isNaN() || gap <= 0.0) return null
-        val preferHighGain = maxOf(down, up) >= gap
-        return if (preferHighGain) up > down else up < down
+        val reachesCutoff = maxOf(down, up) >= gap
+        return if (up > down) {
+            if (reachesCutoff) ChildPreference.UP_REACHABLE else ChildPreference.UP_OPEN
+        } else {
+            if (reachesCutoff) ChildPreference.DOWN_REACHABLE else ChildPreference.DOWN_OPEN
+        }
     }
 
     private fun reliable(variable: VarRef, value: Double): Gains? {
