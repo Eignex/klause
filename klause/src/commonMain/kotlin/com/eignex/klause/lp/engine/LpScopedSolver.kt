@@ -71,6 +71,7 @@ internal class LpScopedSolver(
     private var reservedConstructionWork = 0L
     private var constructionWork = 0L
     private var componentScalarStages = 0L
+    private var componentScalarCopies = 0L
     private var componentRowStages = 0L
     private var componentJoinStages = 0L
     private var pendingAppendSolveWork: Long? = null
@@ -93,7 +94,7 @@ internal class LpScopedSolver(
         preparationWork, preparationRefactorizations, createdOwners, closedOwners, peakOwners,
         state.rows.size, state.rows.activeCount,
         appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork,
-        componentScalarStages, componentRowStages, componentJoinStages,
+        componentScalarStages, componentRowStages, componentJoinStages, componentScalarCopies,
     )
 
     val primalGuidanceState: String
@@ -763,7 +764,13 @@ internal class LpScopedSolver(
         components: ComponentLpSolver,
         token: ExecutionControl,
     ): Boolean = try {
-        components.appendLocalRows(next, token, workLimit, componentAdmission) { part, childToken, childWork ->
+        val fork = context.engineFactory as? LpScalarForkFactory
+        components.appendLocalRows(next, token, workLimit, componentAdmission, fork = fork?.let { factory ->
+            { source, previous, model, warm, childToken, staging ->
+                factory.newScalarFork(source, previous, model, warm, childToken, staging,
+                    componentPricing(model, next.model.n, components.rowOnlyRows))
+            }
+        }) { part, childToken, childWork ->
             newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
                 childWork, trackDegeneracy, context.engineFactory,
                 componentPricing(part, next.model.n, components.rowOnlyRows))
@@ -778,6 +785,7 @@ internal class LpScopedSolver(
         constructionWork = saturatedAdd(constructionWork, components.lastMetrics.preparationOps)
         preparationRefactorizations += components.lastRefactorizations
         componentScalarStages += components.lastMetrics.componentScalarStages
+        componentScalarCopies += components.lastMetrics.componentScalarCopies
         componentRowStages += components.lastMetrics.componentRowStages
         componentJoinStages += components.lastMetrics.componentJoinStages
     }
@@ -964,27 +972,21 @@ internal class LpScopedSolver(
             createdOwners++
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
-            var preparationFailure: Throwable? = null
-            val basis = try {
+            val basis = withLpPreparationReport(report = {
+                val reported = candidate.lastMetrics
+                preparationWork = saturatedAdd(preparationWork, reported.workOps)
+                constructionReported = when (val current = candidate) {
+                    is ComponentLpSolver -> current.constructionReportComplete
+                    else -> reported.preparationOps > 0L
+                }
+                if (constructionReported) constructionWork = saturatedAdd(constructionWork, reported.preparationOps)
+                preparationRefactorizations += candidate.lastRefactorizations
+            }) {
                 when (val current = candidate) {
                     is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else
                         current.prepareBasis(warm, token)
                     is ComponentLpSolver -> current.prepareLogicals(token, remainingWork)
                     else -> null
-                }
-            } catch (primary: Throwable) {
-                preparationFailure = primary
-                throw primary
-            } finally {
-                reportLpPreparation(preparationFailure) {
-                    val reported = candidate.lastMetrics
-                    preparationWork = saturatedAdd(preparationWork, reported.workOps)
-                    constructionReported = when (val current = candidate) {
-                        is ComponentLpSolver -> current.constructionReportComplete
-                        else -> reported.preparationOps > 0L
-                    }
-                    if (constructionReported) constructionWork = saturatedAdd(constructionWork, reported.preparationOps)
-                    preparationRefactorizations += candidate.lastRefactorizations
                 }
             } ?: return null
             if (!basis.validFor(next.model) || (warm == null &&

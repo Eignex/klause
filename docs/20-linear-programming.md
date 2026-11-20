@@ -495,13 +495,24 @@ under the same admission policy and remaining work grant; a declined collection
 uses the ordinary owner. Callers that need one retained basis keep the monolithic
 constructor.
 
+A scalar replacement with the same exact matrix, coordinates and ordered basis can
+fork the current factors through an explicit factory capability. Its matrix views
+remain immutable, while factors, statuses and scratch belong to the new owner.
+Scalar refresh, compatibility checks and factor-copy work spend the same staging
+allowance before any fresh-construction fallback. Unsafe refreshes use that fallback;
+a stopped copied-basis preparation aborts the unpublished edit. The source stays
+live until the complete replacement publishes, and no result evidence crosses the fork.
+
 Component staging observations count construction attempts separately for unchanged
 ordered row/column selections with scalar authority changes, added local rows and
 joined blocks. Failed and cancelled attempts remain counted; these observations
 establish neither committed owners nor consumed numerical reuse.
+The scalar-copy count records installed copied factors after a valid prepared basis;
+it supplies no claim that the whole edit published or a later query consumed it.
 Each staged child reserves construction from its own remaining allowance before
 creating an owner. Its active reservations and numerical work narrow live child
-grants. A positive preparation report replaces the construction reservation once;
+grants. A complete scalar-refresh report or positive engine preparation report
+replaces the construction reservation once;
 an absent or default report retains its reservation as a conservative charge.
 Private workspace initialization uses the same structural work estimate as a
 directional probe. An unstarted attempt releases that reservation; once construction

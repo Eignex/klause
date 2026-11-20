@@ -97,6 +97,14 @@ or retiring one owner preserves its siblings. Generation checks reject stale,
 singular, repairing, closed or cancelled producers. Neither offer carries exact-order
 or certificate authority.
 
+Scalar component replacements can use those factors with the same immutable
+numerical matrix and a refreshed scaling view. Current exact-state identity,
+coordinate origins and ordered headings bind the fork to its source. Compatibility,
+scaling, private workspace and factor-copy work are funded before their phase starts.
+The child imports its basis once and owns its factor lifecycle; it carries no
+source result, certificate, continuation or cached basic values. A separate factory
+capability leaves custom constructor seams in control of their replacements.
+
 ## LP certification
 
 Certification checks numerical proposals against the exact active model. Different

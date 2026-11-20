@@ -41,10 +41,15 @@ internal class LpComponentStaging(private val workLimit: Long, token: ExecutionC
         return remaining
     }
 
-    fun recordConstruction(metrics: LpSolveMetrics?) {
+    fun startConstruction(): Long = beginConstruction() ?: throw LpProjectionStop()
+
+    fun recordConstruction(
+        metrics: LpSolveMetrics?,
+        complete: Boolean = metrics != null && metrics.preparationOps > 0L,
+    ) {
         if (metrics != null) {
             reported += metrics
-            if (metrics.preparationOps > 0L) completedConstruction += construction
+            if (complete) completedConstruction += construction
         }
         // Default metrics do not establish that a throwing constructor or preparation reported its work.
         construction = 0L

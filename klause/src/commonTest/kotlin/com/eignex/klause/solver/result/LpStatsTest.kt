@@ -277,15 +277,17 @@ class LpStatsTest {
     fun `component staging attempts should accumulate across observations`() {
         val sink = LpStatsSink()
         val first = LpSolveMetrics(componentScalarStages = 2L, componentRowStages = 3L)
-        val total = first + LpSolveMetrics(componentJoinStages = 1L)
+        val copied = first + LpSolveMetrics(componentScalarCopies = 1L)
+        val total = copied + LpSolveMetrics(componentJoinStages = 1L)
 
         sink.observeEngineCost(LpRoute.NODE, first, finished = false)
-        sink.observeEngineCost(LpRoute.NODE, total - first, finished = false)
+        sink.observeEngineCost(LpRoute.NODE, copied - first, finished = false)
+        sink.observeEngineCost(LpRoute.NODE, total - copied, finished = false)
 
         val phase = assertNotNull(sink.snapshot().phases["COMPONENT_STAGING_NODE"])
         assertEquals(6L, phase.calls)
-        assertEquals(mapOf("SCALAR_ATTEMPT" to 2L, "LOCAL_ROWS_ATTEMPT" to 3L, "JOINED_ATTEMPT" to 1L),
-            phase.outcomes)
+        assertEquals(mapOf("SCALAR_ATTEMPT" to 2L, "LOCAL_ROWS_ATTEMPT" to 3L, "JOINED_ATTEMPT" to 1L,
+            "SCALAR_COPY" to 1L), phase.outcomes)
     }
 
     @Test

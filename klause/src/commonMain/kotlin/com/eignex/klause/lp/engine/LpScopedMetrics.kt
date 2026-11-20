@@ -12,6 +12,19 @@ internal inline fun reportLpPreparation(primary: Throwable?, report: () -> Unit)
     }
 }
 
+@Suppress("TooGenericExceptionCaught") // Partial preparation still reports work when the child fails.
+internal inline fun <T> withLpPreparationReport(report: () -> Unit, action: () -> T): T {
+    var failure: Throwable? = null
+    try {
+        return action()
+    } catch (primary: Throwable) {
+        failure = primary
+        throw primary
+    } finally {
+        reportLpPreparation(failure, report)
+    }
+}
+
 internal data class LpScopedMetrics(
     val editAttempts: Long,
     val editSuccesses: Long,
@@ -33,6 +46,7 @@ internal data class LpScopedMetrics(
     val componentScalarStages: Long = 0L,
     val componentRowStages: Long = 0L,
     val componentJoinStages: Long = 0L,
+    val componentScalarCopies: Long = 0L,
 ) {
     val editDeclines: Long get() = editAttempts - editSuccesses
     val preparationDeclines: Long get() = preparationAttempts - preparationSuccesses

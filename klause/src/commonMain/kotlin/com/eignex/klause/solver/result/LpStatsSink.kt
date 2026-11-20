@@ -265,13 +265,14 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             )
         }
         val staged = metrics.componentScalarStages + metrics.componentRowStages + metrics.componentJoinStages
-        if (staged > 0L) {
+        if (staged > 0L || metrics.componentScalarCopies > 0L) {
             val key = "COMPONENT_STAGING_${effectiveRoute.name}"
             phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(
                 LpPhaseStats(calls = staged,
                     outcomes = mapOf("SCALAR_ATTEMPT" to metrics.componentScalarStages,
                         "LOCAL_ROWS_ATTEMPT" to metrics.componentRowStages,
-                        "JOINED_ATTEMPT" to metrics.componentJoinStages)),
+                        "JOINED_ATTEMPT" to metrics.componentJoinStages,
+                        "SCALAR_COPY" to metrics.componentScalarCopies)),
             )
         }
         if (metrics.sourceResidualCalls > 0L) {

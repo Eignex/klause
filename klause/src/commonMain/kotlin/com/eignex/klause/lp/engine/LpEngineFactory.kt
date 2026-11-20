@@ -82,10 +82,12 @@ internal interface LpEngineFactory {
     ): PersistentLpSolver
 }
 
-internal object ProductionLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions())
+internal object ProductionLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions()),
+    LpScalarForkFactory
 
 /** Explicit rollback factory for callers comparing or recovering with the unscaled float view. */
-internal object UnscaledLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions(enabled = false))
+internal object UnscaledLpEngineFactory : LpEngineFactory by ScalingLpEngineFactory(LpScalingOptions(enabled = false)),
+    LpScalarForkFactory
 
 private class ScalingLpEngineFactory(private val scalingOptions: LpScalingOptions) : LpEngineFactory {
     override fun newGeneralSolver(

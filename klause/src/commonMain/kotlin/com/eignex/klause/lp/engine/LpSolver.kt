@@ -121,6 +121,7 @@ internal data class LpSolveMetrics(
     val componentScalarStages: Long = 0L,
     val componentRowStages: Long = 0L,
     val componentJoinStages: Long = 0L,
+    val componentScalarCopies: Long = 0L,
 ) {
     operator fun minus(previous: LpSolveMetrics) = LpSolveMetrics(
         pivots = pivots - previous.pivots,
@@ -155,6 +156,7 @@ internal data class LpSolveMetrics(
         componentScalarStages = componentScalarStages - previous.componentScalarStages,
         componentRowStages = componentRowStages - previous.componentRowStages,
         componentJoinStages = componentJoinStages - previous.componentJoinStages,
+        componentScalarCopies = componentScalarCopies - previous.componentScalarCopies,
     )
 
     operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
@@ -184,6 +186,7 @@ internal data class LpSolveMetrics(
         componentScalarStages + other.componentScalarStages,
         componentRowStages + other.componentRowStages,
         componentJoinStages + other.componentJoinStages,
+        componentScalarCopies + other.componentScalarCopies,
     )
 }
 

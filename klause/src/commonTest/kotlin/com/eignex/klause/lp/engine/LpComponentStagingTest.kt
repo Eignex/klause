@@ -4,9 +4,22 @@ import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class LpComponentStagingTest {
+    @Test
+    fun `a complete zero preparation report should release its bound`() {
+        val staging = LpComponentStaging(100L, ExecutionControl.Never)
+        staging.reserveConstruction(10L)
+        assertNotNull(staging.beginConstruction())
+
+        staging.recordConstruction(LpSolveMetrics(), complete = true)
+
+        assertEquals(10L, staging.reservedConstructionWork)
+        assertEquals(0L, staging.work - staging.reservedConstructionWork)
+    }
+
     @Test
     fun `construction reservations should narrow the live child grant`() {
         val staging = LpComponentStaging(20L, ExecutionControl.Never)

@@ -19,6 +19,70 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `mixed scalar and local row replacements should copy the scalar basis once`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        LpScopedSolver(state, componentSplit = true).use { owner ->
+            assertNotNull(owner.solve())
+            val before = owner.metrics.preparationRefactorizations
+            val zero = ExactLpNumber.of(0L)
+
+            assertTrue(owner.replaceRows(emptySet(), emptyList(), listOf(
+                LpScopedRow(3L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            ), false, assertions = listOf(
+                LpBoundAssertion(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L, 0),
+            )))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(15L) * BigFraction.ofLong(2L).reciprocal(), result.lowerBound)
+            assertEquals(1L, owner.metrics.preparationRefactorizations - before)
+            assertEquals(1L, owner.metrics.componentScalarCopies)
+            assertEquals(1, owner.lastMetrics.componentReuses)
+        }
+    }
+
+    @Test
+    fun `mixed edits should preserve delegated factory constructors`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        var constructions = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                constructions++
+                return ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
+                    iterationLimit, workLimit, trackDegeneracy, pricing)
+            }
+        }
+        LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            assertNotNull(owner.solve())
+            val zero = ExactLpNumber.of(0L)
+
+            assertTrue(owner.replaceRows(emptySet(), emptyList(), listOf(
+                LpScopedRow(3L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
+            ), false, assertions = listOf(
+                LpBoundAssertion(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L, 0),
+            )))
+
+            assertEquals(5, constructions)
+            assertEquals(BigFraction.ofLong(15L) * BigFraction.ofLong(2L).reciprocal(),
+                assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
     fun `a partially reported initial collection should retain its full construction charge`() {
         val builder = LpBuilder()
         repeat(2) {

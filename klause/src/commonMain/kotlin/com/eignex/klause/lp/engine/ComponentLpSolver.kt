@@ -281,6 +281,7 @@ internal class ComponentLpSolver(
         token: ExecutionControl,
         workLimit: Long,
         admission: LpComponentAdmission? = null,
+        fork: ((LpSolver, LpModel, LpModel, Basis, ExecutionControl, LpComponentStaging) -> LpScalarFork?)? = null,
         engine: (LpModel, ExecutionControl, Long) -> PersistentLpSolver,
     ): Boolean {
         check(!closed && activeSolve == null)
@@ -339,21 +340,29 @@ internal class ComponentLpSolver(
                 activeStaging = staging
                 try {
                     val nextModel = plan.parts[index].model
-                    staging.reserveConstruction(LpScalingView.constructionWorkBound(nextModel),
-                        simplexWorkspaceWork(nextModel.m, nextModel.numVars))
-                    val remaining = staging.beginConstruction() ?: return false
                     val ancestors = plan.ancestors[index]
+                    val scalar = ancestors.size == 1 &&
+                        plan.parts[index].rows.contentEquals(parts[ancestors.single()].rows) &&
+                        plan.parts[index].cols.contentEquals(parts[ancestors.single()].cols)
+                    val copied = if (scalar && warm != null) {
+                        val ancestor = ancestors.single()
+                        fork?.invoke(solvers[ancestor], parts[ancestor].model, nextModel, warm, token, staging)
+                    } else null
+                    val remaining = if (copied == null) {
+                        staging.reserveConstruction(LpScalingView.constructionWorkBound(nextModel),
+                            simplexWorkspaceWork(nextModel.m, nextModel.numVars))
+                        staging.beginConstruction() ?: return false
+                    } else 0L
                     metrics += when {
                         ancestors.size > 1 -> LpSolveMetrics(componentJoinStages = 1L)
-                        plan.parts[index].rows.contentEquals(parts[ancestors.single()].rows) &&
-                            plan.parts[index].cols.contentEquals(parts[ancestors.single()].cols) ->
-                            LpSolveMetrics(componentScalarStages = 1L)
+                        scalar -> LpSolveMetrics(componentScalarStages = 1L)
                         else -> LpSolveMetrics(componentRowStages = 1L)
                     }
                     var child: PersistentLpSolver? = null
                     var preparationFailure: Throwable? = null
                     val basis = try {
-                        engine(plan.parts[index].model, token, remaining).also { candidate ->
+                        val created = if (copied != null) copied.create() else engine(nextModel, token, remaining)
+                        created.also { candidate ->
                             child = candidate
                             replacements += candidate
                             nextSolvers += candidate
@@ -367,12 +376,18 @@ internal class ComponentLpSolver(
                     } finally {
                         activeChild = null
                         reportLpPreparation(preparationFailure) {
-                            staging.recordConstruction(child?.lastMetrics)
+                            val reported = child?.lastMetrics?.let {
+                                if (copied != null) it.copy(preparationOps = 0L) else it
+                            }
+                            staging.recordConstruction(reported)
                         }
                     }
                     if (basis == null || !basis.validFor(checkNotNull(plan.parts[index].model.exactState).model) ||
                         stop()
                     ) return false
+                    if (copied != null && (child as? RevisedSimplex)?.hasImportedFactors == true) {
+                        metrics += LpSolveMetrics(componentScalarCopies = 1L)
+                    }
                 } catch (_: LpProjectionStop) {
                     lastLocalEditDecline = if (token() || token.admission?.exhausted == true) {
                         LpComponentEditDecline.STOPPED

@@ -1165,6 +1165,71 @@ internal class RevisedSimplex(
 
     override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? = prepareSourceBasis(basis, token)
 
+    internal fun scalarFork(
+        previous: LpModel,
+        next: LpModel,
+        warm: Basis,
+        token: ExecutionControl,
+        staging: LpComponentStaging,
+        limits: LpPricingOptions,
+    ): LpScalarFork? {
+        val source = model.exactState ?: return null
+        val target = next.exactState ?: return null
+        if (model !== previous || activeSolve != null || !basisLifecycle.kept || !basisLifecycle.factorized ||
+            basisSolverFactory != null || next.n != n || next.m != m || token()
+        ) return null
+        val view = numerical
+        val scan = 4L * (numVars.toLong() + n + m) + colVal.size + 64L
+        staging.reserve(scan)
+        if (!source.sameMatrix(target) || !warm.validFor(target.model) ||
+            !warm.basicVars.contentEquals(basicVar) ||
+            (0 until numVars).any { source.model.column(it).origin != target.model.column(it).origin }
+        ) return null
+        if (token() || model !== previous || model.exactState !== source || numerical !== view ||
+            activeSolve != null || !basisLifecycle.kept || !basisLifecycle.factorized ||
+            !warm.basicVars.contentEquals(basicVar)
+        ) return null
+        val factors = probeFactorCopy() ?: return null
+        val forkPricing = pricing.copy(
+            basisEntryLimit = minOf(pricing.basisEntryLimit, limits.basisEntryLimit),
+            basisWorkLimit = minOf(pricing.basisWorkLimit, limits.basisWorkLimit),
+        )
+        if (factors.entries > forkPricing.basisEntryLimit || factors.additionalWork > forkPricing.basisWorkLimit) {
+            return null
+        }
+        staging.reserveConstruction(view.refreshWorkBound(next))
+        staging.startConstruction()
+        var refreshed: LpScalingView? = null
+        try {
+            refreshed = view.refresh(next)
+        } finally {
+            staging.recordConstruction(refreshed?.let { LpSolveMetrics(preparationOps = it.metrics.work) },
+                complete = refreshed != null)
+        }
+        val nextView = refreshed ?: return null
+        val workspaceWork = simplexWorkspaceWork(m, numVars)
+        val copyHeaders = 6L * m + 64L
+        if (factors.additionalWork > Long.MAX_VALUE - copyHeaders ||
+            factors.additionalWork + copyHeaders > Long.MAX_VALUE - workspaceWork
+        ) throw LpProjectionStop()
+        staging.reserveConstruction(0L, workspaceWork + factors.additionalWork + copyHeaders)
+        if (token() || model !== previous || model.exactState !== source || numerical !== view ||
+            activeSolve != null || !basisLifecycle.kept || !basisLifecycle.factorized ||
+            !warm.basicVars.contentEquals(basicVar)
+        ) throw LpProjectionStop()
+        val remaining = staging.startConstruction()
+        val matrix = matrixView()
+        val copy = SimplexFactorCopy(matrix.columns, factors, warm.basicVars,
+            basisLifecycle.columns, basisLifecycle.unitRows)
+        return LpScalarFork {
+            RevisedSimplex(next, token, refactorUpdateLimit, iterationLimit, remaining,
+                trackDegeneracy, basisSolverFactory, forkPricing, reuseRationalOrder, scalingOptions,
+                primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
+                singletonStart, initialScaling = nextView, initialMatrix = matrix, allowUnscaledFallback = false,
+                initialFactorCopy = copy, reuseProbeValues = reuseProbeValues)
+        }
+    }
+
     override fun retainedBasis(): Basis? {
         if (activeSolve != null) return null
         if (!basisLifecycle.kept || !basisLifecycle.factorized || basicVar.distinct().size != m ||
@@ -1191,7 +1256,8 @@ internal class RevisedSimplex(
             val imported = warm != null && tryWarmStart(warm)
             if (!imported) coldStart()
             var prepared = refactorize(if (imported) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL)
-            if (prepared == SimplexBasisRefactor.FAILED && imported && repairStop == null && !token() &&
+            if (prepared == SimplexBasisRefactor.FAILED && imported && !factorCopyFailed &&
+                repairStop == null && !token() &&
                 (workLimit == 0L || work.ops < workLimit)
             ) {
                 coldStart()

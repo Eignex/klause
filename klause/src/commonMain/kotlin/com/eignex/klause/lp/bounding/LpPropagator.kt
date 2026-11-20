@@ -116,6 +116,7 @@ internal class LpPropagator(
     private var preparedWork = 0L
     private var preparedRefactors = 0L
     private var preparedScalarStages = 0L
+    private var preparedScalarCopies = 0L
     private var preparedRowStages = 0L
     private var preparedJoinStages = 0L
     private var solved = false
@@ -526,12 +527,14 @@ internal class LpPropagator(
             workOps = metrics.measuredPreparationWork - preparedWork,
             initialRefactorizations = (metrics.preparationRefactorizations - preparedRefactors).toInt(),
             componentScalarStages = metrics.componentScalarStages - preparedScalarStages,
+            componentScalarCopies = metrics.componentScalarCopies - preparedScalarCopies,
             componentRowStages = metrics.componentRowStages - preparedRowStages,
             componentJoinStages = metrics.componentJoinStages - preparedJoinStages,
         )
         preparedWork = metrics.measuredPreparationWork
         preparedRefactors = metrics.preparationRefactorizations
         preparedScalarStages = metrics.componentScalarStages
+        preparedScalarCopies = metrics.componentScalarCopies
         preparedRowStages = metrics.componentRowStages
         preparedJoinStages = metrics.componentJoinStages
         return preparation
@@ -645,6 +648,7 @@ internal class LpPropagator(
         preparedWork = 0L
         preparedRefactors = 0L
         preparedScalarStages = 0L
+        preparedScalarCopies = 0L
         preparedRowStages = 0L
         preparedJoinStages = 0L
         owner = newOwner(retained)
@@ -663,6 +667,7 @@ internal class LpPropagator(
         preparedWork = 0L
         preparedRefactors = 0L
         preparedScalarStages = 0L
+        preparedScalarCopies = 0L
         preparedRowStages = 0L
         preparedJoinStages = 0L
         lastMetrics = LpSolveMetrics()

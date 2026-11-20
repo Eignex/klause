@@ -15,6 +15,51 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `cancelling a scalar fork should preserve the unpublished collection`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        var cancelled = false
+        var closed = 0
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            val original = assertNotNull(owner.solve())
+            val next = LpBoundTrail(state)
+            assertTrue(next.assertBound(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+            assertTrue(next.append(LpScopedRow(3L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
+
+            val accepted = owner.appendLocalRows(next.state, ExecutionControl { cancelled }, 100_000L,
+                fork = { source, previous, target, warm, token, staging ->
+                    ProductionLpEngineFactory.newScalarFork(source, previous, target, warm, token, staging,
+                        LpPricingOptions())?.let { prepared ->
+                        LpScalarFork {
+                            val child = prepared.create()
+                            cancelled = true
+                            object : PersistentLpSolver by child {
+                                override fun close() {
+                                    closed++
+                                    child.close()
+                                }
+                            }
+                        }
+                    }
+                }) { model, token, work ->
+                newPersistentLpSolver(model, cancellation = token, workLimit = work)
+            }
+            cancelled = false
+            val repeated = assertNotNull(owner.solve())
+
+            assertFalse(accepted)
+            assertEquals(1, closed)
+            assertEquals(original.objective, repeated.objective, 1e-8)
+            assertEquals(3, owner.lastMetrics.componentReuses)
+        }
+    }
+
+    @Test
     fun `a joining row and a separate bound edit should retain the unaffected child`() {
         val builder = LpBuilder()
         repeat(4) {
