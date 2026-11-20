@@ -453,8 +453,16 @@ internal object SourceEligibility {
                     if (attributes?.get("recordSchema")?.jsonPrimitive?.contentOrNull == "source-identity-v1") {
                         val identity = identityReceipt(case, record, row["status"]?.jsonPrimitive?.contentOrNull)
                         if (identity != null) verified.getOrPut(identity) { mutableListOf() } += where
-                        else gaps += Gap(inputs?.firstOrNull()?.jsonObject?.get("path")?.jsonPrimitive
-                            ?.contentOrNull?.substringBefore('/'), "$where has an incomplete or mismatched identity receipt")
+                        else {
+                            val collections = inputs?.map { input ->
+                                ((input as? JsonObject)?.get("path") as? JsonPrimitive)?.contentOrNull
+                                    ?.takeIf(::identityPath)?.substringBefore('/')
+                            }.orEmpty()
+                            val affected = if (collections.isEmpty() || null in collections) listOf(null)
+                            else collections.distinct()
+                            affected.forEach { collection -> gaps += Gap(collection,
+                                "$where has an incomplete or mismatched identity receipt") }
+                        }
                         return@forEachIndexed
                     }
                     val hashes = record?.get("sourceHashes") as? JsonObject
@@ -496,18 +504,25 @@ internal object SourceEligibility {
         val details = record?.get("details") as? JsonObject ?: return null
         val attributes = case["attributes"] as? JsonObject ?: return null
         fun JsonObject.text(name: String): String? = (get(name) as? JsonPrimitive)?.contentOrNull
-        val path = input.text("path") ?: return null
+        val id = case.text("id")?.takeIf { it.isNotBlank() } ?: return null
+        val suite = attributes.text("suite")?.takeIf { it.isNotBlank() } ?: return null
+        val problem = attributes.text("problem")?.takeIf { it.isNotBlank() } ?: return null
+        val path = input.text("path")?.takeIf(::identityPath) ?: return null
         val packed = input.text("sha256")?.takeIf { it.matches(SHA256) } ?: return null
         val plain = details.text("plainSha256")?.takeIf { it.matches(SHA256) } ?: return null
         if (status != "DONE" || record.text("status") != "success" ||
             input.text("root") != "CORPUS" || input.text("role") != "model" ||
-            record.text("caseId") != case.text("id") || details.text("path") != path ||
-            details.text("packedSha256") != packed || details.text("suite") != attributes.text("suite") ||
-            details.text("problem") != attributes.text("problem") ||
+            record.text("caseId") != id || details.text("path") != path ||
+            details.text("packedSha256") != packed || details.text("suite") != suite ||
+            details.text("problem") != problem ||
             (details["solverExecuted"] as? JsonPrimitive)?.booleanOrNull != false ||
-            ((details["plainBytes"] as? JsonPrimitive)?.longOrNull ?: -1L) < 0L) return null
+            ((details["plainBytes"] as? JsonPrimitive)?.longOrNull ?: -1L) < 0L ||
+            (!CorpusFiles.isCompressed(File(path)) && packed != plain)) return null
         return Identity(path, "model", packed, plain)
     }
+
+    private fun identityPath(path: String): Boolean = path.isNotBlank() && !path.contains('\\') &&
+        path.split('/').let { parts -> parts.size >= 2 && parts.none { it.isBlank() || it == "." || it == ".." } }
 
     private fun outcome(status: String?, record: JsonObject?): String {
         val stats = record?.get("stats") as? JsonObject
