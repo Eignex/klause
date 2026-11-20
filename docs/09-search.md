@@ -400,8 +400,7 @@ history bookkeeping. Ordinary LP value preferences and reduced-cost scores remai
 
 The same recent directional estimates can order the selected variable's two
 existing adjacent alternatives. It visits the lower predicted gain first to seek
-an incumbent, unless a predicted child gain reaches the current objective gap;
-then it visits the higher predicted gain first to seek early pruning.
+an incumbent at every positive objective gap.
 Predicted gains carry no pruning authority.
 Both directions need two in-age observations; equal or unavailable
 estimates keep ordinary order. Pooled point replay keeps precedence. This consumer

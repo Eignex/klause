@@ -207,8 +207,7 @@ internal class LpDirectionalHistory(
         if (!down.isFinite() || !up.isFinite() || abs(down - up) <= 1e-9 * maxOf(1.0, down, up)) return null
         val gap = cutoff - objective
         if (gap.isNaN() || gap <= 0.0) return null
-        val preferHighGain = maxOf(down, up) >= gap
-        return if (preferHighGain) up > down else up < down
+        return up < down
     }
 
     private fun reliable(variable: VarRef, value: Double): Gains? {
