@@ -75,9 +75,9 @@ internal object JointRepairLpCapture {
             sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
             sourceIncumbentCompletion = true)
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
-        val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 16 }
+        val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
             .newInstance(model, context, objective, params, policy, true, { null }, active, null,
-                null, null, true, null, checker, null, null)
+                null, null, true, null, checker, null, null, null)
         val window = ConditionWindow(limit)
         val authority = requireNotNull(field(owner, "authority"))
         val budget = requireNotNull(field(owner, "budget"))
