@@ -275,10 +275,12 @@ internal class LpDirectionalHistory(
     }
 
     fun preferPruningDirection(variable: VarRef, value: Double): Boolean? {
+        val version = generation
+        charge(8L)
+        if (version != generation) return null
         val history = reliable(variable, value) ?: return null
         if (history.down.gain <= 0.0 && history.up.gain <= 0.0) return null
-        val version = generation
-        charge(12L)
+        charge(8L)
         if (version != generation) return null
         val down = outcomeRate(history.down.outcome)
         val up = outcomeRate(history.up.outcome)

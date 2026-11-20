@@ -11,6 +11,33 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `reset during a charged preference lookup discards the result`() {
+        var reading = false
+        lateinit var history: LpDirectionalHistory
+        history = LpDirectionalHistory({}, charge = {
+            if (reading) {
+                reading = false
+                history.clear()
+            }
+        })
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(12.0)
+                history.finishNode(up)
+            }
+        }
+        reading = true
+
+        assertNull(history.preferPruningDirection(variable, 0.5))
+    }
+
+    @Test
     fun `child order follows prune rates from two known outcomes`() {
         for (pruned in listOf("up", "down", "both", "neither", "missing", "one", "mixedUp", "mixedDown",
             "mixedEqual", "fullDownMixedUp", "aged")) {

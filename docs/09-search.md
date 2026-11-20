@@ -396,7 +396,9 @@ Coarse recent positive-gain and positive-prune-rate stamps skip lookups until su
 observations exist; the current variable still needs its own complete numeric and
 outcome records. Reset clears those prerequisites.
 
-Selection requires the fractional point and optimum from the same current
+History eligibility precedes nomination bookkeeping; unavailable preferences use a
+bounded lookup without retaining a freshness closure. Selection requires the
+fractional point and optimum from the same current
 relaxation and exact state. It recognizes only the two adjacent partitions of that
 point and retains both alternatives. A nomination carries the proposed decision
 and solve stamp. Only the matching committed child, with current scope and point

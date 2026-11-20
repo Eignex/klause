@@ -378,7 +378,8 @@ internal class LpHints(
         val values = checkNotNull(passiveValues)
         collection.clear()
         values.clear()
-        val valueReady = cutoff.isFinite() && history.hasValueHistory && history.hasPruningHistory
+        val valueReady = alternatives.size == 2 && cutoff.isFinite() &&
+            history.hasValueHistory && history.hasPruningHistory
         val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
         if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
@@ -386,17 +387,23 @@ internal class LpHints(
         val point = passivePoint
         val state = passiveState
         val stamp = solveStamp
+        val pointValue = value(variable)
+        val preference = if (valueReady) history.preferPruningDirection(variable, pointValue) else null
+        if (cancelled() || passivePoint !== point || passiveState !== state ||
+            stamp != solveStamp || !passivePointCurrent()
+        ) return alternatives
+        if (valueReady && preference == null) observe("PASSIVE_VALUE_NO_PROPOSAL")
+        if (preference == null && !collectReady) return alternatives
         val current = {
             !cancelled() && passivePoint === point && passiveState === state &&
                 stamp == solveStamp && passivePointCurrent()
         }
-        if (!current()) return alternatives
-        if (valueReady) {
-            val advised = values.select(variable, value(variable), alternatives, history, stamp, fresh = current)
+        if (preference != null) {
+            val advised = values.select(variable, pointValue, alternatives, preference, stamp, fresh = current)
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
-        return collection.select(variable, value(variable), alternatives, history, stamp, current)
+        return collection.select(variable, pointValue, alternatives, history, stamp, current)
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {

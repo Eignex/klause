@@ -8,6 +8,28 @@ import kotlin.test.assertFalse
 
 class LpPassiveValueChoiceTest {
     @Test
+    fun `a supplied preference cannot bypass point or partition validation`() {
+        for ((variable, point, alternatives) in listOf(
+            Triple(VarRef.Bool(0), Double.NaN, listOf(SearchDecision.Bool(1), SearchDecision.Bool(0))),
+            Triple(VarRef.Bool(0), 1.25, listOf(SearchDecision.Bool(1), SearchDecision.Bool(0))),
+            Triple(VarRef.IntVar(0), 2.0,
+                listOf(SearchDecision.IntAtMost(0, 2L), SearchDecision.IntAtLeast(0, 3L))),
+            Triple(VarRef.IntVar(0), 2.25,
+                listOf(SearchDecision.IntAtMost(0, 2L), SearchDecision.IntAtLeast(0, 4L))),
+        )) {
+            val events = ArrayList<String>()
+            val choice = LpPassiveValueChoice(true, events::add, {})
+
+            val selected = choice.select(variable, point, alternatives, true, 1) { true }
+            choice.commit(selected.first(), 1) { true }
+
+            assertEquals(alternatives, selected)
+            assertFalse(choice.hasNomination)
+            assertFalse("PASSIVE_VALUE_COMMITTED" in events)
+        }
+    }
+
+    @Test
     fun `withheld value advice preserves comparison and commitment cost`() {
         for ((variable, point, preferUp) in listOf(
             Triple(VarRef.Bool(0), 0.75, false),
@@ -34,7 +56,7 @@ class LpPassiveValueChoiceTest {
                 var work = 0L
                 val choice = LpPassiveValueChoice(apply, events::add, { work += it })
 
-                val selected = choice.select(variable, point, ordinary, history, 7) { true }
+                val selected = choice.select(variable, point, ordinary, history.preferPruningDirection(variable, point), 7) { true }
                 choice.commit(selected.first(), 7) { true }
                 choice.commit(selected.first(), 7) { true }
 
@@ -43,7 +65,7 @@ class LpPassiveValueChoiceTest {
                 assertEquals(1, events.count { it == event })
                 costs.add(work)
             }
-            assertEquals(24L, costs.first())
+            assertEquals(20L, costs.first())
             assertEquals(costs.first(), costs.last())
         }
     }
@@ -71,7 +93,7 @@ class LpPassiveValueChoiceTest {
             val events = ArrayList<String>()
             val choice = LpPassiveValueChoice(true, events::add, { if (condition == "charge") fresh = false })
             val alternatives = listOf(down, up)
-            val selected = choice.select(variable, 2.25, alternatives, history, 7) { fresh }
+            val selected = choice.select(variable, 2.25, alternatives, history.preferPruningDirection(variable, 2.25), 7) { fresh }
             if (condition == "commit") fresh = false
             if (condition == "clear") choice.clear()
 
