@@ -79,11 +79,12 @@ internal class ComponentLpSolver(
             it.updateLimitRefactorizations + it.backendRequestedRefactorizations +
             it.reconcileRecoveryRefactorizations + it.numericalRecoveryRefactorizations + it.primalRefactorizations
     }
-    override val currentWork: Long get() = metrics.workOps + (activeStaging?.work ?: 0L) + when (val child = activeChild) {
-        is ResumableLpSolver -> child.currentWork
-        null -> 0L
-        else -> child.lastMetrics.workOps
-    }
+    override val currentWork: Long get() = metrics.workOps + (activeStaging?.work ?: 0L) +
+        when (val child = activeChild) {
+            is ResumableLpSolver -> child.currentWork
+            null -> 0L
+            else -> child.lastMetrics.workOps
+        }
 
     override fun deferUnscaledSourceDiagnostics() {
         for (solver in solvers) solver.deferUnscaledSourceDiagnostics()
@@ -262,14 +263,11 @@ internal class ComponentLpSolver(
                 throw primary
             } finally {
                 activeChild = null
-                try {
+                reportLpPreparation(preparationFailure) {
                     val reported = persistent.lastMetrics
                     metrics += reported
                     if (reported.preparationOps > 0L) constructionReports++
                     constructionReportComplete = constructionReports == solvers.size
-                } catch (report: Throwable) {
-                    if (preparationFailure == null) throw report
-                    if (report !== preparationFailure) preparationFailure.addSuppressed(report)
                 }
             }
             if (basis == null || stop()) return null
@@ -368,11 +366,8 @@ internal class ComponentLpSolver(
                         throw primary
                     } finally {
                         activeChild = null
-                        try {
+                        reportLpPreparation(preparationFailure) {
                             staging.recordConstruction(child?.lastMetrics)
-                        } catch (report: Throwable) {
-                            if (preparationFailure == null) throw report
-                            if (report !== preparationFailure) preparationFailure.addSuppressed(report)
                         }
                     }
                     if (basis == null || !basis.validFor(checkNotNull(plan.parts[index].model.exactState).model) ||

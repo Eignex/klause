@@ -976,7 +976,7 @@ internal class LpScopedSolver(
                 preparationFailure = primary
                 throw primary
             } finally {
-                try {
+                reportLpPreparation(preparationFailure) {
                     val reported = candidate.lastMetrics
                     preparationWork = saturatedAdd(preparationWork, reported.workOps)
                     constructionReported = when (val current = candidate) {
@@ -985,9 +985,6 @@ internal class LpScopedSolver(
                     }
                     if (constructionReported) constructionWork = saturatedAdd(constructionWork, reported.preparationOps)
                     preparationRefactorizations += candidate.lastRefactorizations
-                } catch (report: Throwable) {
-                    if (preparationFailure == null) throw report
-                    if (report !== preparationFailure) preparationFailure.addSuppressed(report)
                 }
             } ?: return null
             if (!basis.validFor(next.model) || (warm == null &&

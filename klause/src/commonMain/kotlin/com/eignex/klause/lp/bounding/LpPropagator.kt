@@ -26,6 +26,7 @@ import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.reportLpPreparation
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.relaxation.LpCutEdit
 import com.eignex.klause.lp.relaxation.LpSourceCompaction
@@ -549,14 +550,11 @@ internal class LpPropagator(
             failure = primary
             throw primary
         } finally {
-            try {
+            reportLpPreparation(failure) {
                 if (updateLast) {
                     lastMetrics = takePreparationMetrics(current)
                     onPreparation?.invoke(lastMetrics)
                 } else onPreparation?.invoke(takePreparationMetrics(current))
-            } catch (report: Throwable) {
-                if (failure == null) throw report
-                if (report !== failure) failure.addSuppressed(report)
             }
         }
     }

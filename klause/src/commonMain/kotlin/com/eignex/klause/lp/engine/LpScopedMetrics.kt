@@ -2,6 +2,16 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.util.numbers.saturatedAdd
 
+@Suppress("TooGenericExceptionCaught") // Reporting preserves the preparation's primary failure.
+internal inline fun reportLpPreparation(primary: Throwable?, report: () -> Unit) {
+    try {
+        report()
+    } catch (failure: Throwable) {
+        if (primary == null) throw failure
+        if (failure !== primary) primary.addSuppressed(failure)
+    }
+}
+
 internal data class LpScopedMetrics(
     val editAttempts: Long,
     val editSuccesses: Long,
