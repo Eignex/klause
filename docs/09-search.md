@@ -374,9 +374,12 @@ in each direction permit the geometric mean of the predicted child gains; a zero
 gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
+Geometric scoring scales square roots before multiplication and charges the additional work.
+An underflowed positive score supplies no measured-zero reference.
 Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
+A zero estimate is stable only when both recent observations are zero.
 Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
@@ -393,9 +396,12 @@ Clearing an already-empty nomination leaves its state untouched; transient selec
 flags still clear. Comparison and changed-proposal observations remain separate from
 the actual variable and matching
 adjacent split committed by search; replacement, retraction and retirement discard
-an unconsumed nomination.
+an unconsumed nomination. Variable commitment rechecks cancellation and current
+LP state after charging its work and before attributing advice, using the existing LP allowance.
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
+The bounded selector reads reduced-cost scores by primitive variable ID and kind.
+Directional references are constructed only after history passes its eligibility checks.
 
 The same recent directional estimates can order the selected variable's two
 existing adjacent alternatives. It visits the lower predicted gain first to seek

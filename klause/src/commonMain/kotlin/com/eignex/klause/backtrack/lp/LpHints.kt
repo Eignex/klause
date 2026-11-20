@@ -164,7 +164,10 @@ internal class LpHints(
     }
 
     fun commit(decision: SearchDecision, depth: Int, cancelled: ExecutionControl = ExecutionControl.Never) {
-        passiveChoice?.commit(decision)
+        if (passiveChoice?.nominatedVariable != null) {
+            charge(2L)
+            passiveChoice.commit(decision) { !cancelled() && passivePointCurrent() }
+        }
         passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         if (collect && scopeModel != null) {
@@ -173,21 +176,19 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!canScoreDirectionally()) return Double.NaN
-        return directionalScoreCurrent(variable)
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(variable)
     }
 
-    fun directionalScore(id: Int, isBool: Boolean): Double {
-        if (!canScoreDirectionally()) return Double.NaN
-        return directionalScoreCurrent(if (isBool) VarRef.Bool(id) else VarRef.IntVar(id))
+    fun directionalScore(varId: Int, isBool: Boolean): Double {
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(if (isBool) VarRef.Bool(varId) else VarRef.IntVar(varId))
     }
 
-    private fun canScoreDirectionally(): Boolean {
-        if (!collect || !directionalGains || !objectiveRecorded || !history.hasReliableHistory) return false
-        return passivePointCurrent()
-    }
+    private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
+        history.hasReliableHistory && passivePointCurrent()
 
-    private fun directionalScoreCurrent(variable: VarRef): Double {
+    private fun readyDirectionalScore(variable: VarRef): Double {
         charge(1L)
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)

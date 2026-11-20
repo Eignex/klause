@@ -25,6 +25,46 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `cancellation discards a reliable variable commitment`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2)
+        val up = SearchDecision.IntAtLeast(0, 3)
+        for (apply in listOf(false, true)) {
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply, observe = events::add)
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 11.0))) {
+                    hints.commit(decision, 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                    hints.recordObjective(relaxation, objective)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.finishNode(trail.state)
+            assertEquals(variable, hints.selectVariable(variable, variable))
+            hints.branch(variable)
+
+            hints.commit(down, 1, ExecutionControl { true })
+
+            assertTrue("PASSIVE_VARIABLE_COMPARED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMIT_WITHHELD" in events)
+        }
+    }
+
+    @Test
     fun `shared column layouts keep scope checks independent of width`() {
         val costs = ArrayList<Long>()
         for (width in listOf(1, 256)) {
@@ -250,7 +290,12 @@ class LpHintsTest {
 
     @Test
     fun `directional scoring skips lookup work until both directions have enough samples`() {
-        for (prefix in listOf(listOf(false, false), listOf(false, true))) {
+        for ((prefix, primitive) in listOf(
+            listOf(false, false) to false,
+            listOf(false, false) to true,
+            listOf(false, true) to false,
+            listOf(false, true) to true,
+        )) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -275,14 +320,15 @@ class LpHintsTest {
                 hints.recordObjective(relaxation, 10.0)
                 val before = work
 
-                val score = hints.directionalScore(variable)
+                val score = if (primitive) hints.directionalScore(variable.varId, isBool = false)
+                else hints.directionalScore(variable)
 
                 if (phase == 0) {
                     assertTrue(score.isNaN())
                     assertEquals(before, work)
                 } else {
                     assertEquals(sqrt(3.0), score, 1e-9)
-                    assertEquals(before + 1L, work)
+                    assertEquals(before + 3L, work)
                 }
             }
         }
@@ -345,6 +391,21 @@ class LpHintsTest {
         hints.record(relaxation, doubleArrayOf(3.5), doubleArrayOf(-4.0))
 
         assertEquals(1.0, hints.branchScore(VarRef.IntVar(0)), 1e-6)
+    }
+
+    @Test
+    fun `primitive branch scores keep boolean and integer coordinates distinct`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 1, cost = 1L)
+        builder.addVar(0, 10, cost = 4L)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 0),
+            booleanArrayOf(true, false), 0L, intArrayOf(1), intArrayOf(0))
+        val hints = LpHints(numIntVars = 1, numBoolVars = 1)
+
+        hints.record(relaxation, doubleArrayOf(0.25, 3.5), DoubleArray(0))
+
+        assertEquals(0.25, hints.branchScore(0, isBool = true), 1e-6)
+        assertEquals(2.0, hints.branchScore(0, isBool = false), 1e-6)
     }
 
     @Test
