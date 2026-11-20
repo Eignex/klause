@@ -662,7 +662,9 @@ internal class LinearAuthority(
             observePrimal("PrimalGuidancePhase${it.phase?.name ?: "Unavailable"}")
             observePrimal("PrimalGuidanceTermination${it.termination?.name ?: "Unavailable"}")
             it.nativePointPresent?.let { present ->
-                observePrimal(if (present) "PrimalGuidanceNativePointPresent" else "PrimalGuidanceNativePointUnavailable")
+                observePrimal(
+                    if (present) "PrimalGuidanceNativePointPresent" else "PrimalGuidanceNativePointUnavailable",
+                )
             }
             observePrimal(if (it.point == null) "PrimalGuidancePointUnavailable" else "PrimalGuidancePointPresent")
             observePrimal(if (it.paused) "PrimalGuidancePaused" else "PrimalGuidanceNotPaused")
