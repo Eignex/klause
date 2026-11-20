@@ -40,6 +40,24 @@ import kotlin.test.assertTrue
 
 class QfLraSystemTest {
     @Test
+    fun `affine input sides should omit bounds on direct source columns`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+            doubleArrayOf(1.0), LinearOp.LE, 1.0)
+        val source = source().withFactors(arrayOf(factor))
+        val form = factor.linearRows.single().exactForm(2)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            val comparison = form.comparison(true) { false }
+            assertTrue(system.assertComparison(comparison, null, premise(0)))
+
+            val sides = system.affineInputSides(comparison, ExecutionControl.Never)
+
+            assertEquals(listOf(null, null), sides)
+        }
+    }
+
+    @Test
     fun `affine input sides should follow strict bounds across sibling scopes`() {
         val factors = Array<Factor>(2) { guard ->
             ReifiedRealLinear(guard, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
