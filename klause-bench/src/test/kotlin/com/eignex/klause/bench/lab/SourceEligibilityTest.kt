@@ -201,7 +201,8 @@ class SourceEligibilityTest {
 
             assertTrue(manifest.exposures.isEmpty())
             if (variant == "valid") {
-                assertEquals(Identity(path, "model", hash('1'), hash('2')), manifest.identities.single().inputs.single())
+                assertEquals(Identity(path, "model", hash('1'), hash('2')),
+                    manifest.identities.single().inputs.single())
                 assertTrue(manifest.gaps.isEmpty())
                 assertEquals(Status.UNRESOLVED, SourceEligibility.classify("a", manifest.identities.single().inputs,
                     manifest).status)
