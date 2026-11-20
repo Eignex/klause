@@ -236,7 +236,7 @@ internal class LpDirectionalHistory(
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
     }
 
-    fun preferPruningDirection(variable: VarRef, value: Double): Boolean? {
+    fun preferPruningDirection(variable: VarRef, value: Double, cutoff: Double = Double.NaN): Boolean? {
         val version = generation
         charge(8L)
         if (version != generation) return null
@@ -247,7 +247,38 @@ internal class LpDirectionalHistory(
         val down = outcomeRate(history.down.outcome)
         val up = outcomeRate(history.up.outcome)
         if (!down.isFinite() || !up.isFinite() || down == up) return null
-        return up > down
+        charge(24L)
+        if (version != generation) return null
+        observeChildIntent(history, value, cutoff, down, up)
+        return (up > down).takeIf { version == generation }
+    }
+
+    private fun observeChildIntent(history: Gains, value: Double, cutoff: Double, down: Double, up: Double) {
+        observe(when (down + up) {
+            0.5 -> "DIAGNOSTIC_CHILD_RATE_HALF_NONE"
+            1.0 -> "DIAGNOSTIC_CHILD_RATE_FULL_NONE"
+            else -> "DIAGNOSTIC_CHILD_RATE_FULL_HALF"
+        })
+        val fraction = value - floor(value)
+        val downGain = history.down.gain * fraction
+        val upGain = history.up.gain * (1.0 - fraction)
+        val favored = if (up > down) upGain else downGain
+        val other = if (up > down) downGain else upGain
+        observe(when {
+            !favored.isFinite() || !other.isFinite() -> "DIAGNOSTIC_CHILD_GAIN_UNKNOWN"
+            favored > other -> "DIAGNOSTIC_CHILD_GAIN_HIGHER"
+            favored < other -> "DIAGNOSTIC_CHILD_GAIN_LOWER"
+            else -> "DIAGNOSTIC_CHILD_GAIN_EQUAL"
+        })
+        val gap = cutoff - objective
+        observe(when {
+            !gap.isFinite() || gap <= 0.0 || !favored.isFinite() || !other.isFinite() ->
+                "DIAGNOSTIC_CHILD_REACH_UNKNOWN"
+            favored >= gap && other >= gap -> "DIAGNOSTIC_CHILD_REACH_BOTH"
+            favored >= gap -> "DIAGNOSTIC_CHILD_REACH_FAVORED"
+            other >= gap -> "DIAGNOSTIC_CHILD_REACH_OTHER"
+            else -> "DIAGNOSTIC_CHILD_REACH_NEITHER"
+        })
     }
 
     fun prunedDirections(variable: VarRef, value: Double): Double {
