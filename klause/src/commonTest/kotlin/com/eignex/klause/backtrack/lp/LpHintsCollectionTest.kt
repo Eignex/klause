@@ -145,7 +145,7 @@ class LpHintsCollectionTest {
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 
-            assertEquals(kotlin.math.sqrt(3.0), hints.directionalScore(variable), 1e-9)
+            assertEquals(1.8133579900357903, hints.directionalScore(variable), 1e-4)
             assertEquals(2, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
             assertEquals(2, events.count { it == "DOWN" })
             assertEquals(2, events.count { it == "UP" })

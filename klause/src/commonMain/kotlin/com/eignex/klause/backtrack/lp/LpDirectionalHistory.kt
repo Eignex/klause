@@ -3,7 +3,10 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.expm1
 import kotlin.math.floor
+import kotlin.math.ln
 import kotlin.math.sqrt
 
 internal class LpDirectionalHistory(
@@ -234,6 +237,40 @@ internal class LpDirectionalHistory(
     fun score(variable: VarRef, value: Double): Double = estimate(variable, value)
         .takeIf { it > 0.0 } ?: Double.NaN
 
+    fun growthScore(variable: VarRef, value: Double): Double = growthEstimate(variable, value)
+        .takeIf { it > 0.0 } ?: Double.NaN
+
+    fun growthEstimate(variable: VarRef, value: Double): Double {
+        val history = reliable(variable, value) ?: return Double.NaN
+        val down = history.down.gain
+        val up = history.up.gain
+        if (down == 0.0 || up == 0.0) return 0.0
+        charge(8L)
+        val fraction = value - floor(value)
+        val downLog = ln(down) + ln(fraction)
+        val upLog = ln(up) + ln(1.0 - fraction)
+        val largestLog = maxOf(downLog, upLog)
+        val logRatio = minOf(downLog, upLog) - largestLog
+        if (logRatio == 0.0) {
+            return (down * fraction).takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
+        }
+        val ratio = exp(logRatio)
+        var lower = LN_TWO
+        var upper = 1.0 - logRatio
+        repeat(GROWTH_ITERATIONS) {
+            charge(8L)
+            val beta = (lower + upper) * 0.5
+            val scaled = beta * ratio
+            // The logarithm retains a positive branch whose ratio underflows in ordinary units.
+            val left = if (scaled == 0.0) ln(beta) + logRatio else ln(-expm1(-scaled))
+            if (left > -beta) upper = beta else lower = beta
+        }
+        charge(2L)
+        val beta = (lower + upper) * 0.5
+        val score = exp(largestLog + ln(LN_TWO / beta))
+        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
+    }
+
     fun estimate(variable: VarRef, value: Double): Double {
         val history = reliable(variable, value) ?: return Double.NaN
         val downGain = history.down.gain
@@ -304,6 +341,8 @@ internal class LpDirectionalHistory(
     private companion object {
         const val MAX_DEPTH = 128
         const val MAX_CANDIDATES = 8192
+        const val GROWTH_ITERATIONS = 16
+        const val LN_TWO = 0.6931471805599453
         const val RELIABILITY = 2
         const val DISTANCE_TOL = 1e-6
     }

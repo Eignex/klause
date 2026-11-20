@@ -373,11 +373,16 @@ The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 and passive point retention start at a finite incumbent cutoff; ordinary LP guidance
 remains available before admission. Leaving a finite cutoff clears the retained history.
 Two recent samples
-in each direction permit the geometric mean of the predicted child gains; a zero
-gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
+in each direction permit a score based on predicted binary-tree growth. For positive
+child gains `d` and `u`, the consumer estimates `r` from
+`exp(-r*d) + exp(-r*u) = 1` and scores the equivalent balanced gain `ln(2)/r`.
+Sixteen bounded root steps operate in logarithmic units, including when the positive
+gain ratio underflows in ordinary units. This advisory tree model supplies no bound
+or pruning authority. A zero gain in either direction keeps the fallback.
+Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
-Geometric scoring scales square roots before multiplication and charges the additional work.
+Score setup, root steps and reconstruction charge the existing LP allowance.
 An underflowed positive score supplies no measured-zero reference.
 Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within

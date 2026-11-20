@@ -11,6 +11,64 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `balanced growth scores retain finite gains at floating extremes`() {
+        for (gain in listOf(Double.MIN_VALUE, 1.0, 1e300)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (literal in listOf(0, 1)) {
+                    history.commit(SearchDecision.Bool(literal), 1)
+                    history.beginNode(1)
+                    history.record(gain)
+                }
+            }
+
+            assertEquals(gain, history.growthScore(variable, 0.5))
+        }
+    }
+
+    @Test
+    fun `growth scores retain positive ratios below the floating range`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.75)
+        repeat(2) {
+            for ((literal, gain) in listOf(1 to Double.MIN_VALUE, 0 to 1e300)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(gain)
+            }
+        }
+
+        val score = history.growthScore(variable, 0.25)
+
+        assertTrue(score.isFinite() && score > 0.0)
+    }
+
+    @Test
+    fun `unrepresentable positive growth cannot become a zero reference`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, if (up) 0.25 else 0.75)
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(Double.MIN_VALUE)
+            }
+        }
+
+        assertTrue(history.growthEstimate(variable, 0.25).isNaN())
+    }
+
+    @Test
     fun `restart retains samples but discards ancestor and pending child attribution`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add)
