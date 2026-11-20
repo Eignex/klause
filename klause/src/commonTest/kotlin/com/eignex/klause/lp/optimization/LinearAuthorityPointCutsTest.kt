@@ -89,6 +89,57 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `conditional checks should survive discovery retirement in the authority`() {
+        val integers = (0 until 7).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 2).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in flows.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-5) * BigFraction.ofLong(2).reciprocal()))
+        premises["sum"] = SourcePremise(SourceInequality(integers.take(2).associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-2)))
+        premises["difference"] = SourcePremise(SourceInequality(mapOf(integers[0] to BigFraction.ONE,
+            integers[1] to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))
+        repeat(5) { id ->
+            premises["cycle $id"] = SourcePremise(SourceInequality(mapOf(integers[id + 2] to BigFraction.MINUS_ONE,
+                integers[(id + 1) % 5 + 2] to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))
+        }
+        for (coordinate in integers + flows) {
+            premises["lower $coordinate"] = SourcePremise(SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+        }
+        for (coordinate in integers.drop(2)) {
+            premises["upper $coordinate"] = SourcePremise(SourceInequality(mapOf(coordinate to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope, (integers + flows).toSet(), premises,
+            integers.drop(1).associateWith { BigFraction.ONE })
+        val restricted = source.atScope(scope.copy(condition = SourceCondition(
+            upper = mapOf(integers[0] to BigFraction.ZERO, integers[1] to BigFraction.ONE))))
+        val budget = SourceLpBudget()
+
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            repeat(35) { authority.advanceWithPointCuts(source, ExecutionControl.Never) }
+            val observations = authority.cutObservations()
+            assertEquals(1L, observations["numericalCutSelectionRetiredFamilies"], observations.toString())
+            assertTrue((observations[
+                "numericalCutLifecycleSOURCE_AGGREGATION_CONDITIONAL_AFTER_DISCOVERY_RETIREMENT"] ?: 0L) > 0L,
+                observations.toString())
+            val operations = budget.operations
+
+            val result = authority.advanceWithPointCuts(restricted, ExecutionControl.Never)
+
+            assertEquals(operations, budget.operations)
+            assertEquals(1L, result.primalStages["SelectedCutBoundRetainedConditionalCheckedConflicts"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(restricted.withLinearAuthority())
+                .verify(assertNotNull(result.evidence)))
+        }
+    }
+
+    @Test
     fun `point policy preparation should include scoring in its containing recipe`() {
         val budget = SourceLpBudget()
         LinearAuthority(budget, retainLp = true).use { authority ->

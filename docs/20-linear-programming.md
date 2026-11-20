@@ -524,12 +524,12 @@ without expanding a point family. This cut-count admission is charged to selecti
 the fallback applies to the matching source family, including integer-bound descendants,
 and avoids repeated generation or scoring. Point-directed families retain
 the ordinary checked recipe as a fixed prefix and add at most 64 distinct candidates.
-Candidate caps and aging apply to additions; ordinary rows remain installed when
+Candidate caps and aging apply to LP additions; ordinary rows remain installed when
 their source premises are active. Duplicate inequalities with different source owners
 retain separate definitions. Only a strictly stronger
 checked bound, a checked incumbent or terminal evidence enables the next scan
 immediately; an unchanged or unavailable bound, an unfinished round or a scan
-without an addition starts a seven-query discovery cooldown. Unselected candidates
+without an addition starts a seven-query discovery cooldown. Unselected LP candidates
 retire after four completed scans without an addition, and installed rows expire
 after four consecutive slack scoring scans; a tight scan resets the count.
 Retirement only weakens the relaxation. A query's cut mask names the cut rows it
@@ -551,11 +551,15 @@ allowance, and checkpoint bookkeeping has its own recipe attribution.
 Installed selected aggregate cuts also test the node's active unary source sides and
 receiving bounds before another numerical query. Up to two checked integer projection
 candidates can be selected for this conditional check while excluded from LP installation;
-their source owners must be active, and candidate retirement disables their checks.
+their source owners must be active and their derivations must pass the current query's checks.
 Conditional candidates do not consume the mixed-row continuation allowance reserved
 for extending the pool after an LP-separating candidate has been retained.
 A conditional-only pool retains the ordinary LP mask and the paid base result for later
-receiving queries. Its family follows the same aging and retirement as other candidates.
+receiving queries. The first two conditional definitions in template order remain
+eligible through the source template's lifetime, independently of LP discovery
+retirement. Every query pays their selection and fresh owner and source-proof checks;
+an inactive or unverified definition is withheld without selecting a later replacement.
+These rows remain excluded from LP installation unless point selection admits them.
 A violated row supplies a nonnegative
 combination of that checked cut and its cited sides; original-source verification must
 accept the scoped refutation before traversal prunes. A missing side can be projected

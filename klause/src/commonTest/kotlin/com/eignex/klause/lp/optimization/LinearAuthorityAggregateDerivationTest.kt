@@ -53,7 +53,7 @@ class LinearAuthorityAggregateDerivationTest {
         val active = listOf(true to true, false to true, true to false, true to true).map { (a, b) ->
             val current = root.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to a, 1 to b))))
             assertNotNull(LinearAuthorityQuery.prepare(current, template, ExecutionControl.Never,
-                cutMask = setOf(0, 1), checkUnselectedCuts = true, retainMaskedCuts = true)).checkedCuts
+                cutMask = setOf(0, 1), checkLpCandidates = true, retainMaskedCuts = true)).checkedCuts
         }
 
         assertEquals(listOf(setOf(0, 1), setOf(0), setOf(0), setOf(0, 1)), active)

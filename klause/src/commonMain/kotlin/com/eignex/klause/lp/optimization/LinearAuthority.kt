@@ -189,7 +189,7 @@ internal class LinearAuthority(
         }
         var pending = pointRound?.takeIf {
             it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
-                checkUnselectedCuts = it.query.checkUnselectedCuts,
+                checkLpCandidates = it.query.checkLpCandidates,
                 retainMaskedCuts = it.query.retainMaskedCuts)
         }
         if (pending == null) {
@@ -218,7 +218,7 @@ internal class LinearAuthority(
             pointFamily = family
             if (family.cuts == null ||
                 !prepared.matches(source, cuts = true, cutMask = baselineMask,
-                    checkUnselectedCuts = checkUnselectedCuts(baselineMask),
+                    checkLpCandidates = checkLpCandidates(baselineMask),
                     retainMaskedCuts = retainMaskedCuts(baselineMask))) {
                 policy.observe("PointUnavailable")
                 return base
@@ -532,7 +532,7 @@ internal class LinearAuthority(
         return recovered
     }
 
-    private fun checkUnselectedCuts(mask: Set<Int>?): Boolean =
+    private fun checkLpCandidates(mask: Set<Int>?): Boolean =
         mask == null || pointPolicy?.candidatesRetired(template?.cuts?.rows) != true
 
     private fun retainMaskedCuts(mask: Set<Int>?): Boolean =
@@ -597,7 +597,7 @@ internal class LinearAuthority(
                     cutLifecycle.observe(family, "ProofVerificationWork", work)
                 }
             }, cutMask = cutMask, onCut = cutLifecycle::observe,
-            checkUnselectedCuts = checkUnselectedCuts(cutMask),
+            checkLpCandidates = checkLpCandidates(cutMask),
             retainMaskedCuts = retainMaskedCuts(cutMask), onCutCost = ::cutCost)?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
@@ -669,7 +669,7 @@ internal class LinearAuthority(
         boundOnly: Boolean = false,
     ): LinearAuthorityResult {
         val cached = if (retainLp || guidance) query?.takeIf {
-            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask))
+            it.matches(source, cuts, cutMask, checkLpCandidates(cutMask), retainMaskedCuts(cutMask))
         } else null
         val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it
@@ -746,6 +746,9 @@ internal class LinearAuthority(
                     val families = setOf(conflict.family)
                     observeCutConsumption(families, "CHECKED_CONFLICT")
                     observePrimal("SelectedCutBoundConflicts")
+                    if (conflict.retainedConditional) {
+                        observePrimal("SelectedCutBoundRetainedConditionalCheckedConflicts")
+                    }
                     return LinearAuthorityResult(evidence = evidence, cutConflictFamilies = families)
                 }
             }

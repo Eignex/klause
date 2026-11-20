@@ -30,7 +30,7 @@ internal class LinearAuthorityQuery private constructor(
     val activeCuts: Int,
     val activeMixedCuts: Int,
     val cutMask: Set<Int>?,
-    val checkUnselectedCuts: Boolean,
+    val checkLpCandidates: Boolean,
     val checkedCuts: Set<Int>,
     val installedCuts: Set<Int>,
     val cutFamilies: Map<Int, CutFamily>,
@@ -44,10 +44,10 @@ internal class LinearAuthorityQuery private constructor(
 
     fun matches(
         other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null,
-        checkUnselectedCuts: Boolean = true,
+        checkLpCandidates: Boolean = true,
         retainMaskedCuts: Boolean = false,
     ): Boolean = this.cuts == cuts && this.cutMask == cutMask &&
-        this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
+        this.checkLpCandidates == checkLpCandidates && this.retainMaskedCuts == retainMaskedCuts &&
         (source === other ||
             (source.scope == other.scope &&
                 source.hasSameLinearData(other) &&
@@ -62,7 +62,7 @@ internal class LinearAuthorityQuery private constructor(
             cutMask: Set<Int>? = null,
             consequences: List<SourceEvidence> = emptyList(),
             onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
-            checkUnselectedCuts: Boolean = true,
+            checkLpCandidates: Boolean = true,
             retainMaskedCuts: Boolean = false,
             onCutCost: (Long, Long) -> Unit = { _, _ -> },
         ): LinearAuthorityQuery? {
@@ -91,8 +91,19 @@ internal class LinearAuthorityQuery private constructor(
             var activeMixedCuts = 0
             var cutVerificationWork = 0L
             val cuts = template?.cuts?.rows.orEmpty()
+            var firstConditional = -1
+            var secondConditional = -1
+            if (cutMask != null) {
+                onCutCost(cuts.size.toLong(), 0L)
+                for (id in cuts.indices) {
+                    if (cancellation()) return null
+                    if (!cuts[id].conditionalCandidate || secondConditional >= 0) continue
+                    if (firstConditional < 0) firstConditional = id else secondConditional = id
+                }
+            }
             val active = cuts.indices.filter { id ->
-                (checkUnselectedCuts || cutMask == null || id in cutMask) &&
+                (cutMask == null || id in cutMask || id == firstConditional || id == secondConditional ||
+                    (checkLpCandidates && !cuts[id].conditionalCandidate)) &&
                     cuts[id].owners.none { it in inactive }
             }
             val checks = if (active.isEmpty()) emptyList() else {
@@ -112,15 +123,20 @@ internal class LinearAuthorityQuery private constructor(
             var conditionalCutFamilies: MutableMap<Int, CutFamily>? = null
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
-                val conditional = id in accepted && cut.conditionalCandidate &&
-                    (conditionalCutFamilies?.size ?: 0) < 2
+                val conditional = id in accepted && (id == firstConditional || id == secondConditional)
                 onCut(cut.family, when {
-                    !checkUnselectedCuts && cutMask != null && id !in cutMask -> "RETIRED_CANDIDATE"
+                    cutMask != null && id !in cutMask && cut.conditionalCandidate &&
+                        id != firstConditional && id != secondConditional -> "CONDITIONAL_LIMIT"
+                    !checkLpCandidates && cutMask != null && id !in cutMask &&
+                        id != firstConditional && id != secondConditional -> "RETIRED_CANDIDATE"
                     id !in active -> "INACTIVE_PREMISE"
                     id !in accepted -> "VERIFICATION_DECLINED"
                     cutMask != null && id !in cutMask -> if (conditional) "CONDITIONAL_CANDIDATE" else "UNSELECTED"
                     else -> "INSTALLED"
                 }, 1L)
+                if (conditional && cutMask != null && id !in cutMask && !checkLpCandidates) {
+                    onCut(cut.family, "CONDITIONAL_AFTER_DISCOVERY_RETIREMENT", 1L)
+                }
                 if (cutMask != null && id !in cutMask && !retainMaskedCuts && !conditional) continue
                 if (id in accepted && (cutMask == null || id in cutMask)) {
                     cutFamilies[cited.size] = cut.family
@@ -169,7 +185,7 @@ internal class LinearAuthorityQuery private constructor(
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
                 unconditional && (inactive.isEmpty() || retainMaskedCuts),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
-                cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
+                cutMask?.toSet(), checkLpCandidates, accepted.toSet(),
                 accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
                 cutFamilies.toMap(), retainMaskedCuts, conditionalCutFamilies?.toMap().orEmpty())
         }

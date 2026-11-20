@@ -6,7 +6,11 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 
-internal class LinearAuthorityCutConflict(val proof: SourceDerivation, val family: CutFamily)
+internal class LinearAuthorityCutConflict(
+    val proof: SourceDerivation,
+    val family: CutFamily,
+    val retainedConditional: Boolean = false,
+)
 
 internal fun LinearAuthorityQuery.selectedCutConflict(
     cancellation: ExecutionControl,
@@ -53,7 +57,8 @@ internal fun LinearAuthorityQuery.selectedCutConflict(
             }
             if (complete) observe("SelectedCutBoundCompleteCandidates", 1L)
             if (complete && (residual < BigFraction.ZERO || (residual.isZero && strict))) {
-                return LinearAuthorityCutConflict(SourceDerivation.Combination(terms), family)
+                return LinearAuthorityCutConflict(SourceDerivation.Combination(terms), family,
+                    retainedConditional = !checkLpCandidates && id in conditionalCutFamilies)
             }
         }
         null
