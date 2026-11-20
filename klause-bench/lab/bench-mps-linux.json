@@ -1,12 +1,34 @@
 {
   "main": "com.eignex.klause.bench.lab.LabAdapterKt",
-  "sourceHistory": "snapshot",
+  "sourceHistory": "full",
   "classpath": [
-    "klause-bench/build/install/klause-bench/lib/*"
+    "klause-bench/build/frozen-harness/distribution/lib/commons-codec-1.19.0.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlinx-coroutines-core-jvm-1.11.0.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kpermute-jvm-1.3.1-20261116.152032-8.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlinx-serialization-core-jvm-1.12.0.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kumulant-jvm-0.3.4-20261116.231003-146.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlin-build-tools-api-2.4.21.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/commons-io-2.20.0.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlin-daemon-embeddable-2.4.21.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/util-jvm-0.0.1-ci.43969094073.1-20261116.222329-1.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/annotations-23.0.0.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlinx-serialization-json-jvm-1.12.0.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/commons-compress-1.28.0.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlin-script-runtime-2.4.21.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlin-compiler-embeddable-2.4.21.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/koblas-jvm-0.1.1-20261116.224320-354.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlin-reflect-1.6.10.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/zstd-jni-1.5.7-24.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/klause-bench-SNAPSHOT.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/lab-bench-0.1.1.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/skema-jvm-0.4.1-20261116.152019-3.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/xz-1.12.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/klause-jvm-SNAPSHOT.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/kotlin-stdlib-2.4.21.jar",
+    "klause-bench/build/frozen-harness/distribution/lib/commons-lang3-3.18.0.jar"
   ],
   "buildTasks": [
-    ":klause-cli:installJvmDist",
-    ":klause-bench:installDist"
+    ":klause-bench:installFrozenHarness"
   ],
   "jvmArgs": [
     "-Xmx512m",
@@ -31,8 +53,8 @@
     "klause-bench/sets",
     "klause-bench/corpus-index",
     "klause-bench/smoke-corpus",
-    "klause-bench/build/install",
-    "klause-cli/build/install",
+    "klause-bench/build/frozen-harness",
+    "klause-cli/build/install/klause-cli-jvm",
     "klause-mzn-lib"
   ]
 }
