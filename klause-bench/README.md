@@ -650,6 +650,9 @@ decoded bytes and recorded relations. Eligibility requires a verified decoded ha
 complete coverage of every collection those identities touch. `exposures --use USE --label LABEL
 lab-cases.jsonl...` records every retained row as exposure, including failed, unsuitable and no-witness
 outcomes. Rows without hashed inputs are recorded as gaps.
+Successful `source-identity-v1` receipts contribute verified decoded identities instead of
+exposure after their path and stored hash match the declared input; incomplete or mismatched
+receipts remain gaps. Hash-only jobs run no solver and establish no applicability or quality.
 
 `lab/frozen-minizinc-linux.json` also accepts plain `.mzn` models and an optional
 plain `.dzn` data input with role `data` and attribute `sourceDataPlainSha256`.
