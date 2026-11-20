@@ -464,8 +464,12 @@ spend the containing LP grant separately from each adaptive numerical query. Own
 preparation has a bounded atomic grant; search accounts any slice excess as work debt.
 A declined partition keeps the ordinary monolithic preparation limit, and scalar trail
 edits preserve a structural admission decline. Admitted
-children retain their numerical state through ordinary node edits; root component
-guidance, ordering and private rounding remain selected by `lp-component-ownership`.
+children retain their numerical state through ordinary node edits. Composed component
+points publish node branching hints only under `lp-component-ownership`, which also
+selects root component guidance, ordering and private rounding. Automatic retention
+uses component results for bounds, fixing and separation without replacing branching
+advice. Earlier monolithic advice can survive a withheld point, as it can a skipped
+query; monolithic results keep their ordinary hint publication.
 
 The explicit `lp-component-ownership=true` setting lets finite node bounding retain
 one numerical owner per independent row-coupled block. Each child keeps its basis

@@ -184,6 +184,40 @@ class LpBoundingTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `component point hints require explicit guidance while monolithic points remain available`() {
+        for ((reuse, ownership, expected) in listOf(Triple(true, false, 0), Triple(true, true, 1),
+            Triple(false, false, 1))) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 5) },
+                List(128) { Linear(intArrayOf(1), intArrayOf(it % 2), LinearOp.GE, 1) })
+            val sink = SolveStatsSink("component-point-hints")
+            var points = 0
+            var objectives = 0
+            val hints = object : LpHintSink {
+                override fun clear() = Unit
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                    points++
+                }
+                override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                    objectives++
+                }
+            }
+            LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+                LpParams(lpPlan = LpPlan(bounding = true, probe = false, rootCutHarvest = false,
+                    componentReuse = reuse, componentOwnership = ownership)), sink).use { engine ->
+                val outcome = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), PropagationSession(problem),
+                    1000.0, sink, ExecutionControl.Never, -1, true, hints = hints)
+
+                assertFalse(outcome.prune)
+                assertNotNull(outcome.basis)
+                assertEquals(expected, points)
+                assertEquals(expected, objectives)
+                if (reuse) assertTrue(checkNotNull(sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"])
+                    .outcomes.getValue("SOLVED") > 0L)
+            }
+        }
+    }
+
+    @Test
     fun `a nonoptimal cut point supplies no optimum sample`() {
         val problem = triangle(3)
         val sink = SolveStatsSink(backend = "nonoptimal-cut-hints")

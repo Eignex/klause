@@ -412,7 +412,7 @@ data class LpPlan(
     val booleanRlt: Boolean = false,
     /** Harvest globally valid cuts before search. Node separation remains independent. */
     val rootCutHarvest: Boolean = true,
-    /** Retain root component guidance and private rounding alongside numerical component owners. */
+    /** Enable component-composed node hints, retained root guidance and private rounding. */
     val componentOwnership: Boolean = false,
     /** Source-template retention and admission, independent of the enabled numerical techniques. */
     val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,

@@ -347,6 +347,7 @@ private fun LpEngine.solveSelectedCuts(
 }
 
 private fun LpHintSink.recordPoint(engine: LpEngine, relaxation: LpRelaxation, result: FloatLpResult) {
+    if (result.blocks > 1 && !engine.params.lpPlan.componentOwnership) return
     engine.noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.GUIDANCE)
     record(relaxation, result.primal, result.duals)
     if (result.optimal) recordObjective(relaxation, result.objective)
