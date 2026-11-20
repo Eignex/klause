@@ -83,7 +83,7 @@ class LinearAuthorityAggregateContinuationTest {
         val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             maximumCandidates = 2, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(
-                rows = 16, work = 14_000L), point = point)
+                rows = 16, work = 14_000L, allocation = 270_000L), point = point)
 
         val expected = (0 until 2).map { group ->
             SourceInequality(integers.subList(group * 8, group * 8 + 8).associateWith { BigFraction.MINUS_ONE },

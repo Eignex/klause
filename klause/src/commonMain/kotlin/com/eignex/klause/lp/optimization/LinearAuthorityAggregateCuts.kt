@@ -171,7 +171,7 @@ internal object LinearAuthorityAggregateCuts {
                 eligibilityKnown = false
                 val projectionLimits = attemptLimits.copy(rows = minOf(16, limits.rows),
                     work = minOf(meter.remainingWork / 3L, 16_384L),
-                    allocation = minOf(meter.remainingAllocation / 4L, 262_144L))
+                    allocation = minOf(meter.remainingAllocation / 3L, 262_144L))
                 val projectionMeter = AggregateMeter(projectionLimits, derivedStop, charge)
                 try {
                     projectionMeter.reserve(1L, 320L)
