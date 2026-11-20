@@ -22,6 +22,30 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
+    fun `focused PB payloads should share the trace word allowance and preserve consumers`() {
+        val state = PropagationState(Problem(76, 0, emptyArray(), emptyArray()), Assumptions.None)
+        for (words in listOf(128, 512)) {
+            val trace = ArithmeticLearningTrace(128, words).apply { captureFirstPb = true }
+            val literals = IntArray(76) { Lit.make(it, true) }
+
+            trace.clause("pb.literals", literals, state)
+            trace.stored(4, "pb")
+            trace.pin(4, 0, 1, "bool", 1)
+
+            if (words == 512) {
+                assertEquals(380, trace.events.single { it.kind == "pb.literals" }.data.size)
+                assertEquals(0, trace.omittedPayloads)
+            } else {
+                assertContentEquals(longArrayOf(76), trace.events.single { it.kind == "pb.literals.omitted" }.data)
+                assertEquals(1, trace.omittedPayloads)
+            }
+            assertTrue(trace.events.any { it.kind == "consumer.bool" })
+            assertFalse(trace.truncated)
+            assertTrue(trace.words <= words)
+        }
+    }
+
+    @Test
     fun `decline census should survive discarded and truncated windows`() {
         val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
         val trace = ArithmeticLearningTrace(maxEvents = 1, maxWords = 4).apply {

@@ -320,6 +320,8 @@ release separately.
 enablement admits Boolean conflicts in mixed models. The seed, each loaded source
 constraint and each reconstructed reason must contain only Boolean coordinates;
 integer order, equality and hole atoms keep clause fallback before Boolean indexing.
+Models without source Boolean variables skip PB analysis because they cannot supply
+a Boolean premise; explicit enablement retains its containing cancellation checks.
 An asserting native PB result takes precedence over shared clause analysis and stays
 in the CP store. Other mixed conflicts keep shared clause analysis.
 
@@ -381,6 +383,7 @@ Opposite-sign nonnegative combinations use arbitrary-precision integer coefficie
 exact activity and gcd normalization with downward rounding of the upper bound.
 Normalized rows retain sorted coordinates; cancellation merges their terms in linear
 time and removes zero coefficients before normalization.
+Unit cancellation scales retain immutable coefficient values without identity products.
 Ordered source coordinates use array normalization directly; unordered, repeated or
 zero terms pass through aggregation before normalization.
 Once the coefficient gcd reaches one, normalization copies the canonical terms and
@@ -466,6 +469,9 @@ a satisfied endpoint literal cannot discharge the row or certify a root contradi
 
 A rolling capture can focus on the first admitted integer or PB row, retaining its
 derivation and later consumers inside the fixed event and word allowances.
+Focused PB literal and weight payloads share a term allowance derived from the word
+capacity; oversized payloads are omitted without suppressing later consumers.
+PB weight serialization requires an attached, accepting trace.
 
 Single-core finite source execution can attach a native-session observer through
 the ordinary portfolio factories. The hook wraps each selected recipe's selector

@@ -54,6 +54,78 @@ import kotlin.time.Duration.Companion.hours
 
 class LpEngineTest {
     @Test
+    fun `integer box bounds compare exact fractional cutoffs`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 5)), emptyArray())
+        val session = PropagationSession(problem)
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(), SolveStatsSink("exact-box-cutoff")).use { engine ->
+            val half = BigFraction.ofLong(2).reciprocal()
+            for ((cutoff, expected) in listOf(BigFraction.ofLong(5) * half to true,
+                BigFraction.ofLong(3) to true, BigFraction.ofLong(7) * half to false)) {
+                assertEquals(expected, engine.linearBoundDominates(session, cutoff))
+            }
+        }
+    }
+
+    @Test
+    fun `the smallest integer box bound retains exact dominance`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(1, 1)), emptyArray())
+        val session = PropagationSession(problem)
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(Long.MIN_VALUE)),
+            LpParams(), SolveStatsSink("smallest-exact-box-cutoff")).use { engine ->
+
+            val dominated = engine.linearBoundDominates(session, BigFraction.ofLong(Long.MIN_VALUE))
+
+            assertTrue(dominated)
+        }
+    }
+
+    @Test
+    fun `overflowing integer box bounds retain exact dominance`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(1, 1) }, emptyArray())
+        val session = PropagationSession(problem)
+        val lower = BigFraction.ofLong(Long.MAX_VALUE) * BigFraction.ofLong(2)
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(2) { Long.MAX_VALUE }),
+            LpParams(), SolveStatsSink("overflowing-exact-box-cutoff")).use { engine ->
+            for ((cutoff, expected) in listOf(lower to true, lower + BigFraction.ONE to false)) {
+                assertEquals(expected, engine.linearBoundDominates(session, cutoff))
+            }
+        }
+    }
+
+    @Test
+    fun `exact boolean box dominance survives cached contribution overflow`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray())
+        val session = PropagationSession(problem)
+        LpEngine(problem, LinearObjective(boolWeights = LongArray(2) { Long.MAX_VALUE }),
+            LpParams(), SolveStatsSink("overflowing-boolean-box-cutoff")).use { engine ->
+            engine.linearLowerBound(LinearObjective(boolWeights = LongArray(2) { Long.MAX_VALUE }), session)
+            session.pinBool(0, true)
+            session.pinBool(1, true)
+
+            val dominated = engine.linearBoundDominates(session, BigFraction.ONE)
+
+            assertTrue(dominated)
+        }
+    }
+
+    @Test
+    fun `exact boolean box dominance follows a backtrack`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray())
+        val session = PropagationSession(problem)
+        LpEngine(problem, LinearObjective(boolWeights = longArrayOf(5, -2)),
+            LpParams(), SolveStatsSink("trailed-exact-box-cutoff")).use { engine ->
+            assertFalse(engine.linearBoundDominates(session, BigFraction.ZERO))
+            session.pinBool(0, true)
+            assertTrue(engine.linearBoundDominates(session, BigFraction.ZERO))
+
+            session.popToLevel(0)
+
+            assertFalse(engine.linearBoundDominates(session, BigFraction.ZERO))
+        }
+    }
+
+    @Test
     fun `completed preparation should charge reported construction once to both host ledgers`() {
         val problem = boundedLpEngineProblem()
         val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })

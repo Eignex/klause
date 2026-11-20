@@ -37,6 +37,7 @@ internal fun IntegerConflictRow.reduced(
         val declared = state.problem.intDomainOrNull(variables[index]) ?: return null
         val coefficient = coefficients[index]
         val origin = if (coefficient > BIG_ZERO) declared.max else declared.min
+        if (budget == null) state.checkIntegerScalarWork(coefficient, BIG_ONE) else budget.scalar(coefficient, BIG_ONE)
         val weight = coefficient.abs()
         if (weight > largestWeight) largestWeight = weight
         if (!promoted && coefficient.fitsLong()) {

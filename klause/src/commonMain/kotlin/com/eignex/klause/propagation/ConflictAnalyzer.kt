@@ -45,7 +45,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     /** The pseudo-Boolean resolvent admits only Boolean premises in each analyzed conflict. */
     private val pbResolvent: PbConflictResolvent? =
-        if (state.pbLearning) PbConflictResolvent(state, this) else null
+        if (state.pbLearning && state.problem.numBoolVars > 0) PbConflictResolvent(state, this) else null
 
     /** The resolvent that produced the most recent result — its bump sets feed VSIDS. */
     private var lastResolvent: ConflictResolvent = clauseResolvent
@@ -232,11 +232,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
     private inline fun boundedAnalysis(analyze: () -> AnalysisResult): AnalysisResult = try {
         state.finiteWork.begin()
-        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
+        if (state.pbLearning || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
             state.finiteWork.checkNow()
         }
         val result = analyze()
-        if (pbResolvent != null || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
+        if (state.pbLearning || state.integerRowLearning || state.historicalTableReasons || state.reasonPreflight) {
             state.finiteWork.checkNow()
         }
         if (state.runCancelled) AnalysisResult.NotApplicable else result
@@ -350,7 +350,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 lastResolvent = clauseResolvent
                 return row
             }
-            if (pbResolvent == null) {
+            if (pbResolvent == null && (!state.pbLearning || !state.historicalTableReasons)) {
                 lastResolvent = clauseResolvent
                 return fallback
             }
@@ -369,14 +369,16 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (!pb.failed) {
                 state.arithmeticLearningTrace?.record(if (r is AnalysisResult.LearnedPb) "pb.derived" else "pb.clause")
                 if (r is AnalysisResult.LearnedPb) {
-                    state.arithmeticLearningTrace?.clause("pb.literals", r.literals, state)
-                    if (r.weights.size <= 64 && r.weights.all { it.fitsLong() } && r.degree.fitsLong()) {
-                        val weights = LongArray(r.weights.size) { r.weights[it].toLongExact() }
-                        state.arithmeticLearningTrace?.record("pb.weights", *weights)
-                        state.arithmeticLearningTrace?.record("pb.target", r.degree.toLongExact(),
-                            r.backjumpLevel.toLong())
-                    } else {
-                        state.arithmeticLearningTrace?.omitPayload("pb.weights", r.weights.size)
+                    state.arithmeticLearningTrace?.let { trace ->
+                        trace.clause("pb.literals", r.literals, state)
+                        if (trace.accepting && r.weights.size <= trace.payloadTermLimit &&
+                            r.weights.all { it.fitsLong() } && r.degree.fitsLong()) {
+                            val weights = LongArray(r.weights.size) { r.weights[it].toLongExact() }
+                            trace.record("pb.weights", *weights)
+                            trace.record("pb.target", r.degree.toLongExact(), r.backjumpLevel.toLong())
+                        } else {
+                            trace.omitPayload("pb.weights", r.weights.size)
+                        }
                     }
                 } else if (r is AnalysisResult.Learned) {
                     state.arithmeticLearningTrace?.clause("pb.clause-result", r.literals, state)

@@ -108,6 +108,9 @@ immutable LP model or column metadata. Scope edits that preserve that model reus
 the completed check. Edits and retraction check every changed
 column; newly appended bounded definitions require evaluation before acceptance.
 Closing the component releases the point, checked state and activity caches.
+An unchanged point rechecks only changed bound columns when the exact state
+identifies its checked predecessor. A skipped state or structural edit requires
+the full column check, and auxiliary values follow their indexed affine definitions.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
 Mixed components can reuse a continuous point after checking the asserted integer
@@ -138,6 +141,9 @@ or premise; changed bounds and every successful proof require fresh evaluation.
 Unchanged inputs reuse their owned snapshot after comparing current exact sides.
 Affine-side snapshots are shared only while both immutable bound assertions
 retain their identities, including their witness and premises.
+Rows with identical exact numeric terms share an input-side snapshot for one
+immutable LP model. Changing the model clears that shared selection; thresholds
+and Boolean contributions remain local to each comparison, and close releases it.
 
 The incremental route also reads bounds on existing normalized affine slack
 columns. The normalization's scale selects the bounding side, and its offset
