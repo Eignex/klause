@@ -370,7 +370,7 @@ subtraction, preserving small gains when the constant exceeds floating precision
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
 `lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit the geometric mean of the predicted child gains; a zero
+in each direction permit the minimum of the predicted child gains; a zero
 gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.

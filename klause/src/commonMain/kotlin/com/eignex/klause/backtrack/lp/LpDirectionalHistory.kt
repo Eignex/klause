@@ -4,7 +4,6 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.math.sqrt
 
 internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
@@ -105,10 +104,15 @@ internal class LpDirectionalHistory(
         if (history.down.count != history.up.count) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
-            if (majority.stable && majority.gain > 0.0) {
-                charge(1L)
-                val minorityStamp = if (minority.count > 0) minority.stamp else majority.previousStamp
-                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minorityStamp))
+            if (majority.stable) {
+                if (majority.gain > 0.0) {
+                    charge(1L)
+                    val minorityStamp = if (minority.count > 0) minority.stamp else majority.previousStamp
+                    collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minorityStamp))
+                } else if (minority.count == 0) {
+                    charge(1L)
+                    observe("PASSIVE_COLLECTION_ZERO_MAJORITY")
+                }
             }
         }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
@@ -197,7 +201,7 @@ internal class LpDirectionalHistory(
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
-        val score = sqrt(down) * sqrt(up)
+        val score = minOf(down, up)
         return score.takeIf { it.isFinite() } ?: Double.NaN
     }
 

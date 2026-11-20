@@ -16,7 +16,6 @@ import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
-import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -68,7 +67,7 @@ class LpHintsTest {
             hints.record(current, doubleArrayOf(2.25), DoubleArray(current.model.m))
             hints.recordObjective(current, 10.0)
 
-            if (change == "none") assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9)
+            if (change == "none") assertEquals(1.0, hints.directionalScore(variable), 1e-9)
             else assertTrue(hints.directionalScore(variable).isNaN())
             assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
             assertEquals(2, events.count { it == "DOWN" })
@@ -222,7 +221,7 @@ class LpHintsTest {
         val baseline = VarRef.IntVar(0)
         val proposal = VarRef.IntVar(1)
         val costs = ArrayList<Long>()
-        for (apply in listOf(false, true)) {
+        for ((apply, asymmetricReference) in listOf(false to false, true to false, false to true, true to true)) {
             var work = 0L
             val events = ArrayList<String>()
             val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
@@ -241,7 +240,12 @@ class LpHintsTest {
                         val child = doubleArrayOf(2.25, 3.25)
                         child[variable.varId] = if (up) split + 1.0 else split.toDouble()
                         hints.record(relaxation, child, DoubleArray(0))
-                        hints.recordObjective(relaxation, if (variable == baseline) 10.0 else if (up) 13.0 else 11.0)
+                        val objective = when {
+                            variable == proposal -> if (up) 13.0 else 11.0
+                            asymmetricReference -> if (up) 26.0 else 10.5
+                            else -> 10.0
+                        }
+                        hints.recordObjective(relaxation, objective)
                     }
                 }
             }
@@ -249,7 +253,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             hints.finishNode(trail.state)
-            assertEquals(sqrt(3.0), hints.directionalScore(proposal), 1e-9)
+            assertEquals(1.0, hints.directionalScore(proposal), 1e-9)
             val before = work
             hints.beginPassiveSelection()
 
@@ -373,7 +377,7 @@ class LpHintsTest {
                     assertTrue(score.isNaN())
                     assertEquals(before, work)
                 } else {
-                    assertEquals(sqrt(3.0), score, 1e-9)
+                    assertEquals(1.0, score, 1e-9)
                     assertEquals(before + 1L, work)
                 }
             }
@@ -638,7 +642,7 @@ class LpHintsTest {
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
 
-            assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9, "constant=$constant")
+            assertEquals(1.0, hints.directionalScore(variable), 1e-9, "constant=$constant")
         }
     }
 }
