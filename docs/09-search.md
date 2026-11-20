@@ -375,8 +375,9 @@ outcomes only order the selected variable's two existing adjacent alternatives.
 Both directions need two independently aged finite normalized gains within a
 factor of two, each paired with a known completed LP-assisted pruning outcome.
 The two outcomes in each direction must agree. A repeated zero gain is stable
-only when both numeric observations are zero. The child that repeatedly pruned
-is visited first when the other direction repeatedly returned without pruning.
+only when both numeric observations are zero. The child that repeatedly returned without pruning is visited first when the
+other direction repeatedly pruned. This ordering favors another improving
+incumbent before the historically pruning alternative.
 Equal, missing, unstable or expired evidence retains ordinary order. Historical
 outcomes provide no current pruning authority or exclusion of either child.
 

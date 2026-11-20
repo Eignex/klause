@@ -203,7 +203,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable pruning outcomes reach matching applied and withheld child commitments`() {
+    fun `reliable open outcomes reach matching applied and withheld child commitments`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -228,7 +228,7 @@ class LpHintsTest {
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                     hints.recordObjective(relaxation, objective)
-                    hints.recordOutcome(decision == up)
+                    hints.recordOutcome(decision == down)
                     hints.finishNode(trail.state)
                 }
             }
