@@ -57,6 +57,18 @@ internal class LpDirectionalHistory(
 
     val hasObservations: Boolean get() = observed
 
+    fun restart() {
+        charge(3L)
+        trimParents(0)
+        pending = null
+        objective = Double.NaN
+        observe("RESTART")
+        if (gains.isNotEmpty()) {
+            charge(1L)
+            observe("RESTART_RETAINED")
+        }
+    }
+
     fun clear(report: Boolean = true) {
         charge(gains.size.toLong())
         gains.clear()
@@ -90,11 +102,13 @@ internal class LpDirectionalHistory(
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
         observed = true
-        if (history.down.count > 0 && history.up.count > 0 && history.down.count != history.up.count) {
+        if (history.down.count != history.up.count) {
             val majority = if (history.down.count > history.up.count) history.down else history.up
             val minority = if (majority === history.down) history.up else history.down
             if (majority.stable && majority.gain > 0.0) {
-                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minority.stamp))
+                charge(1L)
+                val minorityStamp = if (minority.count > 0) minority.stamp else majority.previousStamp
+                collectionStamp = maxOf(collectionStamp, minOf(majority.previousStamp, minorityStamp))
             }
         }
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) {
@@ -178,6 +192,26 @@ internal class LpDirectionalHistory(
     fun score(variable: VarRef, value: Double): Double = estimate(variable, value)
         .takeIf { it > 0.0 } ?: Double.NaN
 
+    fun predictedPruneScore(variable: VarRef, value: Double, cutoff: Double): Double =
+        predictedPruneEstimate(variable, value, cutoff).takeIf { it > 0.0 } ?: Double.NaN
+
+    fun predictedPruneEstimate(variable: VarRef, value: Double, cutoff: Double): Double {
+        val history = reliable(variable, value) ?: return Double.NaN
+        charge(7L)
+        val gap = cutoff - objective
+        if (!gap.isFinite() || gap <= 0.0) return Double.NaN
+        val fraction = value - floor(value)
+        val down = if (history.down.gain >= gap / fraction) 1 else 0
+        val up = if (history.up.gain >= gap / (1.0 - fraction)) 1 else 0
+        val count = down + up
+        observe(when (count) {
+            0 -> "PREDICTED_PRUNE_ZERO"
+            1 -> "PREDICTED_PRUNE_ONE"
+            else -> "PREDICTED_PRUNE_TWO"
+        })
+        return count.toDouble()
+    }
+
     fun estimate(variable: VarRef, value: Double): Double {
         val history = reliable(variable, value) ?: return Double.NaN
         val downGain = history.down.gain
@@ -221,7 +255,6 @@ internal class LpDirectionalHistory(
         expire(history.up)
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
-        if (history.down.count == 0 || history.up.count == 0) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
         if (history.down.count == history.up.count) return null
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up

@@ -33,7 +33,7 @@ internal class LpHints(
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
     private val passiveChoice = if (collect) LpPassiveVariableChoice(applyAdvice, observe, charge) else null
-    private val passiveValues = if (collect) LpPassiveValueChoice(applyAdvice, observe, charge) else null
+    private val passiveValues = if (collect) LpPassiveValueChoice(false, observe, charge) else null
     private val passiveCollection = if (collect) LpPassiveCollection(observe, charge) else null
     private var passivePoint: LpRelaxation? = null
     private var passiveState: LpExactState? = null
@@ -176,13 +176,15 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains || !objectiveRecorded || !history.hasReliableHistory) return Double.NaN
+        if (!collect || !directionalGains || !objectiveRecorded || !cutoff.isFinite() ||
+            !history.hasValueHistory
+        ) return Double.NaN
         if (!passivePointCurrent()) return Double.NaN
-        charge(1L)
+        charge(2L)
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)
         if (variable is VarRef.Bool && point !in 0.0..1.0) return Double.NaN
-        return history.score(variable, point).also {
+        return history.predictedPruneScore(variable, point, cutoff - scopeConstant.toDouble()).also {
             if (it.isFinite()) observe("PASSIVE_VARIABLE_RELIABLE")
         }
     }
@@ -194,7 +196,7 @@ internal class LpHints(
 
     fun beginPassiveSelection() {
         passiveChoice?.clear()
-        if (!collect || !history.hasReliableHistory) return
+        if (!collect || !cutoff.isFinite() || !history.hasValueHistory) return
         charge(4L)
         observe("PASSIVE_VARIABLE_CHECK")
     }
@@ -220,11 +222,13 @@ internal class LpHints(
         val selected = choice.select(proposed, reference, stamp,
             fresh = current,
             reliable = {
-                charge(2L)
-                val gain = history.score(proposal, proposed.point)
-                val baselineGain = if (proposal == baseline) gain else history.estimate(baseline, reference.point)
+                charge(3L)
+                val workingCutoff = cutoff - scopeConstant.toDouble()
+                val gain = history.predictedPruneScore(proposal, proposed.point, workingCutoff)
+                val baselineGain = if (proposal == baseline) gain
+                else history.predictedPruneEstimate(baseline, reference.point, workingCutoff)
                 if (!baselineGain.isFinite()) observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
-                history.hasReliableHistory && gain.isFinite() && baselineGain.isFinite() &&
+                history.hasValueHistory && gain.isFinite() && baselineGain.isFinite() &&
                     (proposal == baseline || gain > baselineGain)
             })
         if (choice.nominatedVariable != null && !current()) {
@@ -259,7 +263,7 @@ internal class LpHints(
         values.clear()
         collection.clear()
         val valueReady = history.hasValueHistory
-        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
+        val collectReady = cutoff > Double.NEGATIVE_INFINITY && collection.available && history.hasCollectionHistory
         if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
         ) return alternatives
@@ -305,6 +309,17 @@ internal class LpHints(
     private val boolRc by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numBoolVars) { Double.NaN } }
 
     private var recorded = false
+
+    fun restart() {
+        clearPassivePoint()
+        if (scopeModel != null) {
+            charge(2L)
+            history.restart()
+        }
+        freshRecord = false
+        objectiveRecorded = false
+        directionalChoice = null
+    }
 
     fun resetHistory() {
         clearPassivePoint()

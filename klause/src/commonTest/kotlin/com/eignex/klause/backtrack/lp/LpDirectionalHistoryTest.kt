@@ -11,6 +11,76 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `predicted pruning counts follow the current finite objective gap`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for ((literal, gain) in listOf(1 to 1.0, 0 to 3.0)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(10.0 + gain)
+            }
+        }
+        history.beginNode(0)
+        history.record(10.0)
+
+        for ((cutoff, count) in listOf(10.5 to 2.0, 12.0 to 1.0, 14.0 to 0.0)) {
+            assertEquals(count, history.predictedPruneEstimate(variable, 0.5, cutoff))
+        }
+        for (cutoff in listOf(10.0, 9.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            assertTrue(history.predictedPruneEstimate(variable, 0.5, cutoff).isNaN())
+        }
+    }
+
+    @Test
+    fun `known positive gains can predict zero cutoff reaching children`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(Double.MIN_VALUE)
+            }
+        }
+        history.beginNode(0)
+        history.record(0.0)
+
+        val estimate = history.predictedPruneEstimate(variable, 0.25, Double.MIN_VALUE * 2.0)
+
+        assertEquals(0.0, estimate)
+        assertTrue(history.score(variable, 0.5).isFinite())
+    }
+
+    @Test
+    fun `a reliable zero direction does not hide the other predicted cutoff crossing`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(if (literal == 0) 12.0 else 10.0)
+            }
+        }
+        history.beginNode(0)
+        history.record(10.0)
+
+        val score = history.predictedPruneScore(variable, 0.5, 11.0)
+
+        assertEquals(1.0, score)
+    }
+
+    @Test
     fun `geometric scores survive an underflowed child product`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)
@@ -77,6 +147,59 @@ class LpDirectionalHistoryTest {
 
             assertEquals(available, history.preferGainDirection(variable, 0.25) != null, "gains=$observations")
         }
+    }
+
+    @Test
+    fun `restart retains samples but discards ancestor and pending child attribution`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        history.commit(SearchDecision.Bool(1), 1)
+
+        history.restart()
+        history.beginNode(1)
+        history.record(1000.0)
+
+        assertEquals(2.0, history.score(variable, 0.5), 1e-9)
+        assertEquals(1, history.retainedEntries)
+        assertEquals(2, events.count { it == "DOWN" })
+        assertEquals(2, events.count { it == "UP" })
+        assertEquals(1, events.count { it == "RESTART_RETAINED" })
+    }
+
+    @Test
+    fun `restarts do not renew the age of retained observations`() {
+        val history = LpDirectionalHistory({}, maxAge = 6L)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        assertTrue(history.score(variable, 0.5).isFinite())
+
+        repeat(7) {
+            history.restart()
+            history.beginNode(0)
+        }
+
+        assertTrue(history.score(variable, 0.5).isNaN())
+        assertFalse(history.hasReliableHistory)
     }
 
     @Test
@@ -154,8 +277,8 @@ class LpDirectionalHistoryTest {
                 history.record(11.0)
             }
 
-            assertFalse(history.hasCollectionHistory)
-            assertNull(history.preferUnderObservedDirection(variable, 2.25))
+            assertTrue(history.hasCollectionHistory)
+            assertEquals(!firstUp, history.preferUnderObservedDirection(variable, 2.25))
             history.commit(if (firstUp) SearchDecision.IntAtMost(0, 2) else SearchDecision.IntAtLeast(0, 3), 1)
             history.beginNode(1)
             history.record(11.0)
