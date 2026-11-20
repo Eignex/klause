@@ -11,6 +11,46 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `geometric scores survive an underflowed child product`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.75)
+        repeat(2) {
+            for ((literal, gain) in listOf(1 to Double.MIN_VALUE, 0 to 1.0e300)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(gain)
+            }
+        }
+
+        val score = history.score(variable, 0.25)
+
+        assertTrue(score.isFinite() && score > 0.0)
+    }
+
+    @Test
+    fun `positive unrepresentable scores cannot supply a measured zero reference`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, if (up) 0.25 else 0.75)
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(Double.MIN_VALUE)
+            }
+        }
+
+        val score = history.estimate(variable, 0.25)
+
+        assertTrue(score.isNaN())
+    }
+
+    @Test
     fun `directional stability respects factor two agreement at floating extremes`() {
         for ((observations, available) in listOf(
             (0.0 to 0.0) to true,
