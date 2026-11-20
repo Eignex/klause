@@ -591,12 +591,12 @@ internal class LinearAuthority(
         } else null
         return LinearAuthorityQuery.prepare(source, prepared,
             ExecutionControl { cancellation() || budget.funding?.paused == true }, onCutWork = { work ->
-            cutVerificationWork += work
-            budget.observe(boundCertification = work)
-            for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
-                cutLifecycle.observe(family, "ProofVerificationWork", work)
-            }
-        }, cutMask = cutMask, onCut = cutLifecycle::observe,
+                cutVerificationWork += work
+                budget.observe(boundCertification = work)
+                for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
+                    cutLifecycle.observe(family, "ProofVerificationWork", work)
+                }
+            }, cutMask = cutMask, onCut = cutLifecycle::observe,
             checkUnselectedCuts = checkUnselectedCuts(cutMask),
             retainMaskedCuts = retainMaskedCuts(cutMask), onCutCost = ::cutCost)?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
