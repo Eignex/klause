@@ -27,21 +27,25 @@ internal object CliPreparationRuntime {
         }.sortedBy { it.name }
         require(cliJars.isNotEmpty() && benchJars.isNotEmpty())
         val cliByName = cliJars.associateBy { it.name }
-        for (jar in benchJars) cliByName[jar.name]?.let { authoritative ->
-            require(SolveEvidence.fileHashes(mapOf("jar" to jar)) ==
-                SolveEvidence.fileHashes(mapOf("jar" to authoritative))) { "shared JAR differs: ${jar.name}" }
+        for (jar in benchJars) {
+            cliByName[jar.name]?.let { authoritative ->
+                require(SolveEvidence.fileHashes(mapOf("jar" to jar)) ==
+                    SolveEvidence.fileHashes(mapOf("jar" to authoritative))) { "shared JAR differs: ${jar.name}" }
+            }
         }
         return (cliJars + benchJars.filter { it.name !in cliByName }).also(::requireSharedClasses)
     }
 
     internal fun requireSharedClasses(jars: List<File>) {
         val classes = mutableMapOf<String, String>()
-        for (file in jars) JarFile(file).use { jar ->
-            for (entry in jar.entries()) {
-                if (!entry.name.endsWith(".class") || entry.name.endsWith("module-info.class")) continue
-                val hash = jar.getInputStream(entry).use { sha256(it.readBytes()) }
-                val previous = classes.putIfAbsent(entry.name, hash)
-                require(previous == null || previous == hash) { "shared class differs: ${entry.name}" }
+        for (file in jars) {
+            JarFile(file).use { jar ->
+                for (entry in jar.entries()) {
+                    if (!entry.name.endsWith(".class") || entry.name.endsWith("module-info.class")) continue
+                    val hash = jar.getInputStream(entry).use { sha256(it.readBytes()) }
+                    val previous = classes.putIfAbsent(entry.name, hash)
+                    require(previous == null || previous == hash) { "shared class differs: ${entry.name}" }
+                }
             }
         }
     }

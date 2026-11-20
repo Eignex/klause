@@ -31,7 +31,8 @@ internal object MpsCliPreparationSuite : BenchSuite {
         "measurement" to "none", "compile-timeout-sec" to "60")
     private val supplied = setOf("plain-sha256", "timeout-ms", "seed")
 
-    override fun describe() = BenchDescriptor("mps-cli-preparation", "Installed CLI preparation, no search or source verdict")
+    override fun describe() = BenchDescriptor(
+        "mps-cli-preparation", "Installed CLI preparation, no search or source verdict")
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         require(request.parameters.keys == setOf("cases"))
@@ -102,8 +103,7 @@ internal object MpsCliPreparationSuite : BenchSuite {
                 "dry-run-presolve=true"))
         var childExit: Int? = null
         val source = SolverInvocation.withSourceInput(model, Budget(case.parameters.getValue("timeout-ms").toLong()),
-            observeHarness = { SourceHarnessObservation.start() }) {
-                plain, remaining ->
+            observeHarness = { SourceHarnessObservation.start() }) { plain, remaining ->
             require(plain.length() <= 64L * 1024 * 1024)
             val cliArgs = SolverInvocation.klauseCommand(resolved, settings, remaining, true, plain).drop(1)
             val request = buildJsonObject {

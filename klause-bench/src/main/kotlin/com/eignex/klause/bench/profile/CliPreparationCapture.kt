@@ -5,6 +5,7 @@ import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
@@ -49,7 +50,7 @@ internal object CliPreparationCapture {
         reflection.set("DeadlineAtMs", Long::class.javaObjectType, (now.invoke(null) as Long) + budgetMs)
         val debug: () -> Any = { reflection.top("PlatformKt", "platformDebugStats").invoke(null) }
         reflection.top("CliDebugStatsKt", "startDebugStatistics", commonType,
-            Boolean::class.javaPrimitiveType!!, Function0::class.java).invoke(null, common, true, debug)
+            Boolean::class.java, Function0::class.java).invoke(null, common, true, debug)
         reflection.top("CliInvocationStatsKt", "resetInvocationStatistics", commonType).invoke(null, common)
         val mode = reflection.type("MpsMode").getField("INSTANCE").get(null)
         val session = reflection.method(mode.javaClass, "newSession").invoke(mode)
@@ -57,6 +58,7 @@ internal object CliPreparationCapture {
         val solvable = reflection.method(session.javaClass, "load", String::class.java, commonType)
             .invoke(session, plain.path, common)
         reflection.set("LoadElapsedMs", Long::class.javaObjectType, (now.invoke(null) as Long) - loadStart)
+
         @Suppress("UNCHECKED_CAST")
         val deadline = reflection.core("deadlineCancellation", commonType).invoke(reflection.core, common)
             as Pair<Long?, ExecutionControl>
@@ -86,21 +88,24 @@ internal object CliPreparationCapture {
             return
         }
         val engine = reflection.top("CliModeKt", "resolvedEngine", commonType).invoke(null, common) as FiniteEngine
+
         @Suppress("UNCHECKED_CAST")
-        val allowance = reflection.core("presolveAllowance\$klause_klause_cli", commonType, ExecutionControl::class.java)
+        val allowance = reflection.core(
+            "presolveAllowance\$klause_klause_cli", commonType, ExecutionControl::class.java)
             .invoke(reflection.core, common, deadline.second) as Pair<ExecutionControl, PresolveBudget?>
+
         @Suppress("UNCHECKED_CAST")
         val parameters = reflection.get(common, "EngineParams") as List<String>
         require(parameters.count { it == "dry-run-presolve=true" } == 1)
         val emphasis = reflection.get(common, "Presolve") as String?
         val config = emphasis?.let(PresolveConfig::parse) ?: installed.presolveConfig()
-        val policy = reflection.core("executionPolicy", commonType, Boolean::class.javaPrimitiveType!!)
+        val policy = reflection.core("executionPolicy", commonType, Boolean::class.java)
             .invoke(reflection.core, common, emphasis != null) as SourceExecutionPolicy
         val factory = reflection.core("finiteRequest", FiniteSolveShape::class.java, commonType,
-            FiniteEngine::class.java, Int::class.javaPrimitiveType!!, PresolveConfig::class.java,
-            Boolean::class.javaPrimitiveType!!, ExecutionControl::class.java, PresolveBudget::class.java,
+            FiniteEngine::class.java, Int::class.java, PresolveConfig::class.java,
+            Boolean::class.java, ExecutionControl::class.java, PresolveBudget::class.java,
             ExecutionControl::class.java, Long::class.javaObjectType, NodeBudget::class.java,
-            SourceExecutionPolicy::class.java, Boolean::class.javaPrimitiveType!!, Function1::class.java)
+            SourceExecutionPolicy::class.java, Boolean::class.java, Function1::class.java)
         val sensitive = !(reflection.get(solvable, "Optimize") as Boolean) &&
             (reflection.get(common, "AllSolutions") as Boolean ||
                 ((reflection.get(common, "SolutionCap") as Long?) ?: 1L) > 1L)
@@ -127,7 +132,9 @@ internal object CliPreparationCapture {
         val mapping = libraryGet(preparation, "SourceMapping")
         val problem = preparation.problem
         val shape = invocation.finiteShape()
-        val projections = (problem as? BakedProblem)?.let { libraryGet(it, "FactorProjections") as PreparedFactorProjections? }
+        val projections = (problem as? BakedProblem)?.let {
+            libraryGet(it, "FactorProjections") as PreparedFactorProjections?
+        }
         val stages = preparation.presolve?.effort?.preparationStages.orEmpty()
         val required = setOf(PresolvePreparationStage.ENGINE_BAKE, PresolvePreparationStage.SOURCE_ENCODER)
         val checks = linkedMapOf(
@@ -164,11 +171,13 @@ internal object CliPreparationCapture {
             put("preparedPlanDecline", plan?.decline?.name)
             put("shapeInspectionComplete", false)
             put("preparationStages", buildJsonArray {
-                stages.forEach { stage -> add(buildJsonObject {
-                    put("stage", stage.stage.name)
-                    put("outcome", stage.outcome.name)
-                    put("work", stage.work)
-                }) }
+                stages.forEach { stage ->
+                    add(buildJsonObject {
+                        put("stage", stage.stage.name)
+                        put("outcome", stage.outcome.name)
+                        put("work", stage.work)
+                    })
+                }
             })
         }
         write(output, "preparation.json", prepared)
@@ -178,7 +187,7 @@ internal object CliPreparationCapture {
             prepared.forEach { (key, value) -> put(key, value) }
             put("shapeInspectionDeadlineSeconds", 20)
             put("shapeInspectionScope", "separate-after-readiness-diagnostic")
-            put("defaultAdmission", MpsLpAdmission.admission(problem, com.eignex.klause.lp.bounding.LpConfig.AUTO))
+            put("defaultAdmission", MpsLpAdmission.admission(problem, LpConfig.AUTO))
             put("full", MpsLpAdmission.shape(problem, preparation.objective, false, shapeStop))
             put("shapeInspectionComplete", !shapeStop())
         }
