@@ -63,12 +63,27 @@ class ArmNeedsTest {
 
     @Test
     fun `affordable automatic exploration supplies a relaxation beyond the monolithic forecast`() {
+        val problem = Problem(0, 600, Array(600) { IntDomain(0, 1) },
+            List(600) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(600) { 1L })
+
+        for ((spec, expected) in listOf("default" to true, "default,+sparse-trial" to true,
+            "default,-sparse-trial" to false)) {
+            val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), LpConfig.parse(spec), objective)
+
+            assertEquals(expected, facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)), spec)
+        }
+    }
+
+    @Test
+    fun `excessive automatic factor forecasts do not supply a relaxation`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
             List(600) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1) },
             settings = ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
 
-        for ((spec, expected) in listOf("default" to true, "default,+sparse-trial" to true,
+        for ((spec, expected) in listOf("default" to false, "default,+sparse-trial" to true,
             "default,-sparse-trial" to false)) {
             val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, true), LpConfig.parse(spec), objective)
 

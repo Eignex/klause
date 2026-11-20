@@ -188,26 +188,26 @@ class SparseLpAdmissionTest {
     @Test
     fun `automatic probe forecasts retain tall basis dimensions`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
-            List(600) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0) })
+            List(199) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0) })
         val model = LpBuilder().apply {
             addVar(0L, 1L)
-            repeat(600) { addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 0L) }
+            repeat(199) { addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 0L) }
         }.build(Sense.MINIMIZE)
 
         for (emitted in listOf(false, true)) {
             val result = if (emitted) {
-                estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = 16_100_000L)
+                estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = 15_900_000L)
             } else {
                 var admission: SparseLpAdmission? = null
                 sequence<Unit> {
                     admission = prepareSparseLpAdmission(problem, null, automatic = true,
-                        queryWorkAllowance = 16_100_000L)
+                        queryWorkAllowance = 15_900_000L)
                 }.forEach { }
                 requireNotNull(admission)
             }
 
             assertEquals(1L, result.metrics["DeclineQueryWork"])
-            if (emitted) assertEquals(0L, result.work) else assertTrue(result.work > 600L)
+            if (emitted) assertEquals(0L, result.work) else assertTrue(result.work > 199L)
             assertNull(result.sourceLayout)
         }
     }
@@ -251,6 +251,58 @@ class SparseLpAdmissionTest {
         assertEquals(150L, result.metrics["Components"])
         assertTrue(result.work > 300L)
         assertNotNull(result.sourceLayout)
+    }
+
+    @Test
+    fun `factor forecasts gate only automatic admission at the attempt limit`() {
+        for (merged in listOf(false, true)) {
+            val model = LpBuilder().apply {
+                repeat(1249) { addVar(0L, 1L) }
+                repeat(1249) { row ->
+                    val column = when {
+                        row < 186 -> 0
+                        row < 202 -> 1
+                        merged && row == 203 -> 202
+                        else -> row
+                    }
+                    addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 0L)
+                }
+            }.build(Sense.MINIMIZE)
+
+            for (automatic in listOf(false, true)) {
+                val result = estimateSparseLpAdmission(model, preparationWork = 100L, automatic = automatic)
+
+                assertEquals(!automatic || !merged, result.admitted)
+                assertEquals(if (merged) 8_000_006L else 8_000_000L, result.metrics["FactorAttemptForecast"])
+                assertEquals(1249L, result.metrics["Nonzeros"])
+                assertEquals(0L, result.metrics["RowIntersectionRisk"])
+                assertEquals(100L, result.work)
+            }
+        }
+    }
+
+    @Test
+    fun `source factor forecast refusal retains completed preparation`() {
+        val problem = Problem(0, 1249, Array(1249) { IntDomain(0, 1) },
+            List(1249) { row ->
+                val column = when {
+                    row < 186 -> 0
+                    row < 202 -> 1
+                    row == 203 -> 202
+                    else -> row
+                }
+                Linear(intArrayOf(1), intArrayOf(column), LinearOp.GE, 0)
+            })
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, null, automatic = true)
+        }.forEach { }
+
+        val result = requireNotNull(admission)
+        assertEquals(1L, result.metrics["DeclineFactorForecast"])
+        assertTrue(result.work > 1249L)
+        assertNull(result.sourceLayout)
     }
 
     @Test

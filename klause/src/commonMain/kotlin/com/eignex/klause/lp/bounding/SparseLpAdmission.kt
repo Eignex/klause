@@ -232,7 +232,8 @@ internal fun estimateSparseLpAdmission(
     val queryWork = sparseQueryWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
     // Sparse updates cannot connect these emitted blocks; ordering and recovery still use one owner.
     // Two predicted attempts do not bound repair or subsequent pivots under cooperative funding.
-    val factorAttemptWork = minOf(componentRowCubes + model.m.toLong() * model.m, SPARSE_LP_MAX_FACTOR_WORK)
+    val factorAttemptForecast = componentRowCubes + model.m.toLong() * model.m
+    val factorAttemptWork = minOf(factorAttemptForecast, SPARSE_LP_MAX_FACTOR_WORK)
     val probeWork = 2L * factorAttemptWork +
         sparsePassWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
     val decline = when {
@@ -240,6 +241,7 @@ internal fun estimateSparseLpAdmission(
         storage > SPARSE_LP_MAX_ALLOCATION -> "Storage"
         preparationWork > SPARSE_LP_MAX_PREPARATION_WORK -> "PreparationWork"
         automatic && fillRisk > MAX_AUTOMATIC_FILL_RISK -> "FillRisk"
+        automatic && factorAttemptForecast > SPARSE_LP_MAX_FACTOR_WORK -> "FactorForecast"
         automatic && preparationWork + probeWork > queryWorkAllowance -> "QueryWork"
         else -> null
     }
@@ -256,6 +258,7 @@ internal fun estimateSparseLpAdmission(
         if (automatic) put("FillRiskLimit", MAX_AUTOMATIC_FILL_RISK)
         put("EstimatedMonolithicQueryWork", queryWork)
         put("EstimatedFactorAttemptWork", factorAttemptWork)
+        put("FactorAttemptForecast", factorAttemptForecast)
         put("EstimatedProbeWork", probeWork)
         put("EstimatedProbeTotalWork", preparationWork + probeWork)
         put("QueryWorkAllowance", queryWorkAllowance)

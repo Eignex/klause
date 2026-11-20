@@ -360,7 +360,10 @@ automatic policy declines row-intersection risk above eight million pairs before
 source assembly and checks the emitted risk again afterward. A first-probe forecast
 combines two factor attempts with global sparse passes and fill risk. Each attempt
 uses the sum of the emitted connected blocks' row-count cubes plus a global
-row-count square, capped by the factor-work limit. Sparse factor updates stay within
+row-count square. Automatic admission requires this uncapped forecast to fit the
+factor-work limit; explicit sparse trials skip this forecast refusal. The prediction
+is a structural proxy, so refusal does not establish that a numerical build would
+exhaust its measured work cap. Sparse factor updates stay within
 those blocks; ordering, workspace and recovery retain one numerical owner. Global
 passes use one basis dimension per emitted row, including slack columns. Source
 preflight compares assembly and global passes against the cumulative root grant,
