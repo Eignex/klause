@@ -605,6 +605,8 @@ before any certified use. Integer endpoint discovery reuses unary-coordinate met
 captured by the source-row pass.
 Point ordering uses insertion sorting when its worst-case comparison count does not
 exceed the general sort bound; admission charges that bound within the same allowance.
+Ordered rows retain their funded point residuals for continuation scoring within the
+same source-and-point invocation; declined ordering leaves scoring to each continuation.
 Integer projection prioritizes rows that avoid reviving canceled continuous coordinates,
 then those opposing more active coordinates and introducing fewer. It skips an inverse
 source pair whose cancellation only adds a nonnegative constant.

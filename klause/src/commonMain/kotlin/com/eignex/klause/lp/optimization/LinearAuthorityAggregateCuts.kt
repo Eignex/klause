@@ -123,7 +123,8 @@ internal object LinearAuthorityAggregateCuts {
                 }
             }
             if (integerSingletons != null) observe("AggregateIntegerBoundSnapshotComplete", 1L)
-            if (point != null) orderPointRows(rows, incidence, point, meter, observe, source)
+            val pointProjections = if (point == null) null else
+                orderPointRows(rows, incidence, point, meter, observe, source)
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
                     "AggregateWork" -> meter.reserve(count)
@@ -147,7 +148,7 @@ internal object LinearAuthorityAggregateCuts {
             }
             val extension = if (point == null) null else {
                 meter.reserve(1L, 320L)
-                PairExtension(incidence, selectedBounds, bounds, point, meter, attemptLimits, derivedStop,
+                PairExtension(incidence, selectedBounds, bounds, point, pointProjections, meter, attemptLimits, derivedStop,
                     observe, checkNotNull(integerBounds))
             }
             if (!integerRows.isNullOrEmpty() && point != null) {
@@ -158,7 +159,7 @@ internal object LinearAuthorityAggregateCuts {
                 val integerMeter = AggregateMeter(integerLimits, derivedStop, charge)
                 try {
                     integerMeter.reserve(1L, 320L)
-                    PairExtension(incidence, selectedBounds, bounds, point, integerMeter, integerLimits,
+                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, integerMeter, integerLimits,
                         derivedStop, charge, checkNotNull(integerBounds)).integerRows(
                         integerRows, candidates, maximumCandidates)
                 } catch (stop: AggregateStop) {
@@ -174,7 +175,7 @@ internal object LinearAuthorityAggregateCuts {
                 val projectionMeter = AggregateMeter(projectionLimits, derivedStop, charge)
                 try {
                     projectionMeter.reserve(1L, 320L)
-                    PairExtension(incidence, selectedBounds, bounds, point, projectionMeter, projectionLimits,
+                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, projectionMeter, projectionLimits,
                         derivedStop, charge, checkNotNull(integerBounds)).integerProjections(
                         rows, candidates, maximumCandidates)
                 } catch (stop: AggregateStop) {
@@ -288,15 +289,15 @@ internal object LinearAuthorityAggregateCuts {
 
     private fun admitPointRowOrder(
         rows: List<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
-        meter: AggregateMeter, observe: (String, Long) -> Unit,
+        meter: AggregateMeter, observe: (String, Long) -> Unit, premiseCount: Int,
     ): Boolean {
         if (rows.size < 3) return false
         meter.reserve(rows.size.toLong() + incidence.size * 2L, 128L)
         val entries = rows.sumOf { it.coefficients.size.toLong() }
         val references = incidence.values.sumOf { it.size.toLong() }
-        val projectionWork = 9L * (entries + rows.size)
+        val projectionWork = 9L * (entries + rows.size) + premiseCount - rows.size
         val comparisonWork = sortingWork(rows.size) + incidence.values.sumOf { sortingWork(it.size) }
-        val allocation = 192L + rows.size * 80L + (entries + rows.size) * 96L +
+        val allocation = 192L + premiseCount * 8L + rows.size * 48L + (entries + rows.size) * 96L +
             references * 16L + incidence.size * 64L
         if (projectionWork + comparisonWork > meter.remainingWork / 2L ||
             allocation > meter.remainingAllocation / 2L) {
@@ -316,10 +317,10 @@ internal object LinearAuthorityAggregateCuts {
         rows: MutableList<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
         point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
         source: SourceProofContext,
-    ) {
-        if (!admitPointRowOrder(rows, incidence, meter, observe)) return
-        meter.reserve(rows.size.toLong(), 128L + rows.size * 64L)
-        val priorities = HashMap<Int, Double>()
+    ): Array<PointRowProjection?>? {
+        if (!admitPointRowOrder(rows, incidence, meter, observe, source.premiseCount)) return null
+        meter.reserve(source.premiseCount.toLong(), 128L + source.premiseCount * 8L + rows.size * 32L)
+        val projections = arrayOfNulls<PointRowProjection>(source.premiseCount)
         for (row in rows) {
             var activity = 0.0
             var normSquared = 0.0
@@ -338,18 +339,21 @@ internal object LinearAuthorityAggregateCuts {
             val rhs = row.term.inequality.rhs
             meter.reserve(4L)
             val projectedRhs = meter.number(rhs).toDouble()
-            val distance = if (complete) abs(projectedRhs - activity) / sqrt(normSquared) else Double.NaN
-            priorities[row.term.owner] = if (distance.isFinite()) {
+            val slack = if (complete) projectedRhs - activity else Double.NaN
+            val distance = abs(slack) / sqrt(normSquared)
+            val priority = if (distance.isFinite()) {
                 observe("AggregatePointRowsScored", 1L)
                 distance
             } else {
                 observe("AggregatePointRowUnavailable", 1L)
                 Double.POSITIVE_INFINITY
             }
+            projections[row.term.owner] = PointRowProjection(slack, priority)
         }
         val comparator = Comparator<ProbeRow> { left, right ->
             meter.reserve(1L)
-            val order = priorities.getValue(left.term.owner).compareTo(priorities.getValue(right.term.owner))
+            val order = checkNotNull(projections[left.term.owner]).distance.compareTo(
+                checkNotNull(projections[right.term.owner]).distance)
             if (order == 0) left.term.owner.compareTo(right.term.owner) else order
         }
         fun order(values: MutableList<ProbeRow>) {
@@ -369,11 +373,12 @@ internal object LinearAuthorityAggregateCuts {
         }
         order(rows)
         for (bucket in incidence.values) order(bucket)
-        prioritizeScopedRows(rows, priorities, source, meter, observe)
+        prioritizeScopedRows(rows, projections, source, meter, observe)
+        return projections
     }
 
     private fun prioritizeScopedRows(
-        rows: MutableList<ProbeRow>, priorities: Map<Int, Double>, source: SourceProofContext,
+        rows: MutableList<ProbeRow>, projections: Array<PointRowProjection?>, source: SourceProofContext,
         meter: AggregateMeter, observe: (String, Long) -> Unit,
     ) {
         val condition = source.scope.condition
@@ -391,7 +396,7 @@ internal object LinearAuthorityAggregateCuts {
         for (row in rows) {
             meter.reserve(1L)
             var relevant = false
-            if (priorities.getValue(row.term.owner).isFinite()) for (id in row.coefficients.keys) {
+            if (checkNotNull(projections[row.term.owner]).distance.isFinite()) for (id in row.coefficients.keys) {
                 meter.reserve(3L)
                 if (id.kind == SourceCoordinate.Kind.Integer &&
                     (condition.boundValue(id, false) != null || condition.boundValue(id, true) != null)) relevant = true
@@ -473,6 +478,8 @@ internal object LinearAuthorityAggregateCuts {
         return eligible
     }
 
+    private class PointRowProjection(val slack: Double, val distance: Double)
+
     private class ProbeRow(
         val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>,
     ) {
@@ -486,6 +493,7 @@ internal object LinearAuthorityAggregateCuts {
         private val continuousBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
         private val preferredBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
         private val point: Map<SourceCoordinate, Double>,
+        private val pointProjections: Array<PointRowProjection?>?,
         private val meter: AggregateMeter,
         private val limits: LinearAuthorityAggregateLimits,
         private val cancellation: ExecutionControl,
@@ -635,7 +643,7 @@ internal object LinearAuthorityAggregateCuts {
             meter.reserve(4L)
             val divisor = abs(meter.number(pivot).toDouble())
             if (!divisor.isFinite() || divisor == 0.0) return null
-            var slack = slacks[row.term.owner]
+            var slack = pointProjections?.get(row.term.owner)?.slack ?: slacks[row.term.owner]
             if (slack == null) {
                 meter.reserve(1L, 128L)
                 var projected = meter.number(row.term.inequality.rhs).toDouble()

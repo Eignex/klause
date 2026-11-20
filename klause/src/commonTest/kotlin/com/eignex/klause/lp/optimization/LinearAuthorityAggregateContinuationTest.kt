@@ -48,6 +48,57 @@ class LinearAuthorityAggregateContinuationTest {
     }
 
     @Test
+    fun `ordered point projections should leave funding for two independent conditional cuts`() {
+        val integers = (0 until 16).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 16).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val stocks = (16 until 30).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val backlogs = (30 until 44).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        repeat(2) { group ->
+            repeat(8) { index ->
+                val id = group * 8 + index
+                premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                    integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+            }
+            repeat(8) { index ->
+                val coefficients = linkedMapOf(flows[group * 8 + index] to BigFraction.MINUS_ONE)
+                if (index > 0) {
+                    coefficients[stocks[group * 7 + index - 1]] = BigFraction.MINUS_ONE
+                    coefficients[backlogs[group * 7 + index - 1]] = BigFraction.ONE
+                }
+                if (index < 7) {
+                    coefficients[stocks[group * 7 + index]] = BigFraction.ONE
+                    coefficients[backlogs[group * 7 + index]] = BigFraction.MINUS_ONE
+                }
+                premises["demand $group $index"] = SourcePremise(SourceInequality(coefficients,
+                    BigFraction.ofLong(-149) * BigFraction.ofLong(100).reciprocal()))
+            }
+        }
+        val source = SourceProofContext(scope, (integers + flows + stocks + backlogs).toSet(), premises)
+        val point = integers.associateWith { if (it.id % 8 == 0) 0.75 else 1.0 } +
+            flows.associateWith { if (it.id % 8 == 0) 1.5 else 2.0 } +
+            (stocks + backlogs).associateWith { 0.0 }
+
+        val observations = mutableMapOf<String, Long>()
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 2, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(
+                rows = 16, work = 17_000L), point = point)
+
+        val expected = (0 until 2).map { group ->
+            SourceInequality(integers.subList(group * 8, group * 8 + 8).associateWith { BigFraction.MINUS_ONE },
+                BigFraction.ofLong(-6))
+        }.toSet()
+        assertEquals(expected, cuts.map { it.inequality }.toSet(), observations.toString())
+        assertTrue(cuts.all { it.conditionalCandidate })
+        assertTrue(cuts.all { cut ->
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked
+        })
+    }
+
+    @Test
     fun `conditional projections should leave continuation for a separating source cut`() {
         val integers = (10 until 14).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val flows = (10 until 14).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
