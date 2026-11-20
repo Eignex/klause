@@ -294,10 +294,6 @@ internal object LinearAuthorityAggregateCuts {
         meter.reserve(rows.size.toLong() + incidence.size * 2L, 128L)
         val entries = rows.sumOf { it.coefficients.size.toLong() }
         val references = incidence.values.sumOf { it.size.toLong() }
-        fun sortingWork(size: Int): Long {
-            val levels = if (size < 2) 0 else Int.SIZE_BITS - (size - 1).countLeadingZeroBits()
-            return size.toLong() * (1L + levels)
-        }
         val projectionWork = 9L * (entries + rows.size)
         val comparisonWork = sortingWork(rows.size) + incidence.values.sumOf { sortingWork(it.size) }
         val allocation = 192L + rows.size * 80L + (entries + rows.size) * 96L +
@@ -308,6 +304,12 @@ internal object LinearAuthorityAggregateCuts {
             return false
         }
         return true
+    }
+
+    private fun sortingWork(size: Int): Long {
+        if (size < 2) return 0L
+        val levels = Int.SIZE_BITS - (size - 1).countLeadingZeroBits()
+        return size + minOf(size.toLong() * levels, size.toLong() * (size - 1L) / 2L)
     }
 
     private fun orderPointRows(
@@ -351,8 +353,19 @@ internal object LinearAuthorityAggregateCuts {
             if (order == 0) left.term.owner.compareTo(right.term.owner) else order
         }
         fun order(values: MutableList<ProbeRow>) {
+            if (values.size < 2) return
             meter.reserve(values.size.toLong(), 64L + values.size * 16L)
-            values.sortWith(comparator)
+            if (sortingWork(values.size) == values.size.toLong() * (values.size + 1L) / 2L) {
+                for (index in 1 until values.size) {
+                    val row = values[index]
+                    var insertion = index
+                    while (insertion > 0 && comparator.compare(values[insertion - 1], row) > 0) {
+                        values[insertion] = values[insertion - 1]
+                        insertion--
+                    }
+                    values[insertion] = row
+                }
+            } else values.sortWith(comparator)
         }
         order(rows)
         for (bucket in incidence.values) order(bucket)

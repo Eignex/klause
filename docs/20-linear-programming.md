@@ -603,6 +603,8 @@ A completed integer projection normalizes this owned aggregate and constructs it
 from every original weighted premise; source verification reconstructs the combination
 before any certified use. Integer endpoint discovery reuses unary-coordinate metadata
 captured by the source-row pass.
+Point ordering uses insertion sorting when its worst-case comparison count does not
+exceed the general sort bound; admission charges that bound within the same allowance.
 Integer projection prioritizes rows that avoid reviving canceled continuous coordinates,
 then those opposing more active coordinates and introducing fewer. It skips an inverse
 source pair whose cancellation only adds a nonnegative constant.

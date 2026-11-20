@@ -573,6 +573,40 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `small incidence buckets should leave a tight grant for the first useful pair`() {
+        val continuous = (1..40).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        continuous.forEachIndexed { group, id ->
+            repeat(5) { index ->
+                premises["loose $group $index"] = SourcePremise(SourceInequality(
+                    mapOf(x to BigFraction.ofLong(2), id to BigFraction.ofLong(if (index % 2 == 0) 1 else -1)),
+                    BigFraction.ofLong(100)))
+            }
+        }
+        premises["left"] = SourcePremise(left)
+        premises["right"] = SourcePremise(right)
+        val source = SourceProofContext(scope, (continuous + listOf(x, y, real)).toSet(), premises)
+        val point = continuous.associateWith { 0.0 } + mapOf(x to 0.75, y to 0.75, real to 1.5)
+        var attempts = 0L
+        var stopped = false
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
+            observe = { name, count ->
+                if (name == "AggregatePairAttempts") {
+                    attempts += count
+                    if (attempts == 2L) stopped = true
+                }
+            }, maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(work = 18_150L),
+            point = point).single()
+
+        assertEquals(setOf(200, 201), cut.owners)
+        assertEquals(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), cut.inequality.coefficients)
+        assertEquals(1L, attempts)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `point ordering should reach scoped half rounding before an unrelated separating pair`() {
         for (upper in listOf(false, true)) {
             val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
