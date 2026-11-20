@@ -27,7 +27,10 @@ internal object ComparisonProvenance {
     fun runtimeFingerprint(build: BuildProvenance): String = build.copy(
         distribution = build.distribution.filterKeys { !solverLibrary(it.substringAfterLast('/')) },
         harness = emptyMap(),
-        runtimeOptions = build.runtimeOptions - "KLAUSE_CLI_OPTS" - "KLAUSE_CLI_PREFLIGHT_OPTS",
+        runtimeOptions = (build.runtimeOptions - "KLAUSE_CLI_OPTS" - "KLAUSE_CLI_PREFLIGHT_OPTS")
+            .mapValues { (key, value) ->
+                if (key == "lab.cli.args") CLI_RECORDING_PATH.replace(value, "$1<cli-recording>") else value
+            },
     ).fingerprint
 
     internal fun capture(
@@ -65,4 +68,8 @@ internal object ComparisonProvenance {
         sha256(Reports.json.encodeToString(hashes).toByteArray())
 
     private const val PREFIX = "com/eignex/klause/bench/"
+
+    private val CLI_RECORDING_PATH = Regex(
+        """(?m)^("?-XX:StartFlightRecording=filename=)[^,"\r\n]*/out/report/cli\.jfr(?=[,"\r\n]|$)""",
+    )
 }

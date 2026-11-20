@@ -516,6 +516,10 @@ Summary generation runs in the bench process after CLI exit, outside the subproc
 These instrumented captures support attribution; use separate uninstrumented controls
 for performance comparisons.
 
+Runtime comparison identity canonicalizes the managed `out/report/cli.jfr` output
+destination in the CLI arguments. Recording settings and other JVM arguments remain
+part of that identity; raw provenance retains the complete destination.
+
 Profile reflection reads the session's nullable retained propagation owner through
 `LivePropagationState`; live-only probes fail explicitly after release. Captures retain bounded diagnostic traces
 and lifetime totals without retaining the propagation owner after retirement.
