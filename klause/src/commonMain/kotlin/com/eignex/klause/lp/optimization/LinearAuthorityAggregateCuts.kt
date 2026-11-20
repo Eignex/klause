@@ -452,7 +452,8 @@ internal object LinearAuthorityAggregateCuts {
         val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>,
     ) {
         val realCount = coefficients.keys.count { it.kind == SourceCoordinate.Kind.Real }
-        val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
+        val firstInteger = coefficients.keys.firstOrNull { it.kind == SourceCoordinate.Kind.Integer }
+        val hasInteger: Boolean get() = firstInteger != null
     }
 
     private class PairExtension(
@@ -523,6 +524,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                     if (first == null) first = other
                     val rank = if (integerProjection) projectionRank(other, aggregate) else 0L
+                    if (rank < bestRank) continue
                     val score = continuationScore(other, pivot)
                     if (score == null) {
                         observe("AggregateContinuationPointUnavailable", 1L)
@@ -638,7 +640,16 @@ internal object LinearAuthorityAggregateCuts {
                 if (!row.hasInteger || row.coefficients.size <= 1) continue
                 var coordinate: SourceCoordinate? = null
                 var fraction = CutPool.MIN_EFFICACY
-                for (id in row.coefficients.keys) {
+                if (row.coefficients.size - row.realCount == 1) {
+                    meter.reserve(4L)
+                    val id = checkNotNull(row.firstInteger)
+                    val value = point[id]?.takeIf(Double::isFinite) ?: continue
+                    val distance = abs(value - kotlin.math.round(value))
+                    if (distance > fraction) {
+                        coordinate = id
+                        fraction = distance
+                    }
+                } else for (id in row.coefficients.keys) {
                     meter.reserve(4L)
                     if (id.kind != SourceCoordinate.Kind.Integer) continue
                     val value = point[id]?.takeIf(Double::isFinite) ?: continue
@@ -684,8 +695,9 @@ internal object LinearAuthorityAggregateCuts {
                         meter.reserve(1L)
                         if (other.term.owner == row.term.owner || other.coefficients.size <= 1) continue
                         val pivot = other.coefficients.getValue(id)
-                        val score = continuationScore(other, pivot) ?: continue
                         val rank = projectionRank(other, row.coefficients)
+                        if (rank < bestRank) continue
+                        val score = continuationScore(other, pivot) ?: continue
                         if (rank > bestRank || (rank == bestRank && score < best)) {
                             best = score
                             bestRank = rank
