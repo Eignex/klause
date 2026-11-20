@@ -26,11 +26,14 @@ internal class LinearAuthorityCut(
     val mixed: Boolean = false,
     owners: Set<Int> = setOf(owner),
     val family: CutFamily = if (mixed) CutFamily.SOURCE_MIXED_ROUNDING else CutFamily.SOURCE_ROUNDING,
+    val conditionalCandidate: Boolean = false,
 ) {
     val owners: Set<Int> = owners.toSet()
 
     init {
         require(owner in this.owners && this.owners.all { it >= 0 })
+        require(!conditionalCandidate || (!mixed && family == CutFamily.SOURCE_AGGREGATION &&
+            inequality.forEachCoefficient { id, _ -> id.kind == SourceCoordinate.Kind.Integer }))
     }
 }
 

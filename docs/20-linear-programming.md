@@ -549,7 +549,12 @@ points, splits and advisory points retain their existing ownership. Matching,
 retention, solves, certification and owner transitions spend the containing source
 allowance, and checkpoint bookkeeping has its own recipe attribution.
 Installed selected aggregate cuts also test the node's active unary source sides and
-receiving bounds before another numerical query. A violated row supplies a nonnegative
+receiving bounds before another numerical query. Up to two checked integer projection
+candidates can be selected for this conditional check while excluded from LP installation;
+their source owners must be active, and candidate retirement disables their checks.
+A conditional-only pool retains the ordinary LP mask and the paid base result for later
+receiving queries. Its family follows the same aging and retirement as other candidates.
+A violated row supplies a nonnegative
 combination of that checked cut and its cited sides; original-source verification must
 accept the scoped refutation before traversal prunes. A missing side can be projected
 from one active source row by combining its other coordinates with original unary
@@ -587,7 +592,9 @@ aggregate proposals precede directed rounding proposals within the 64-addition c
 Point-seeded discovery reserves at most a quarter of its remaining allowance, capped
 at 16,384 work and 256 KiB, for integer-only projections through at most sixteen
 original rows. Fractional integer coordinates order up to eight starting rows, and
-at most two separating projections survive. Exact positive coefficient ratios cancel
+at most two projections survive. A completed integer rounding that does not separate
+the root point is retained for conditional checks; integral right-hand sides can
+continue to endpoint half rounding. Exact positive coefficient ratios cancel
 continuous coordinates without repeatedly scaling the existing combination.
 Exact coefficients, right-hand side and strictness accumulate one source row at a time.
 A completed integer projection normalizes this owned aggregate and constructs its proof

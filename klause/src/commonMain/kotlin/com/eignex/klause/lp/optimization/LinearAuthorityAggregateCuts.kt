@@ -744,6 +744,7 @@ internal object LinearAuthorityAggregateCuts {
                 meter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
                 candidates += retained
                 observe("AggregateIntegerProjectionEligible", 1L)
+                if (retained.conditionalCandidate) observe("AggregateIntegerProjectionConditional", 1L)
             }
         }
 
@@ -1059,7 +1060,13 @@ internal object LinearAuthorityAggregateCuts {
                 val cut = finalizeIntegerAggregate(terms, aggregate, rhs, strict, proofBytes,
                     meter, limits, observe, capture)
                 observe("AggregateIntegerProjectionFinalized", 1L)
-                if (cut != null && separates(cut, point, meter, observe) == true) return cut
+                if (cut != null) {
+                    if (separates(cut, point, meter, observe) == true) return cut
+                    meter.reserve(1L + cut.owners.size + cut.inequality.supportSize,
+                        128L + cut.owners.size * 32L)
+                    return LinearAuthorityCut(cut.owner, cut.inequality, cut.derivation, owners = cut.owners,
+                        family = cut.family, conditionalCandidate = true)
+                }
             }
         }
     }

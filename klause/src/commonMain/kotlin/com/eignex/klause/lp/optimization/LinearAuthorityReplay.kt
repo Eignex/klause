@@ -61,10 +61,11 @@ internal object LinearAuthorityReplay {
         val result = ArrayList<LinearAuthorityCut>(query.cuts.size)
         for ((id, cut) in query.cuts.withIndex()) {
             if (cut.id != id || cut.family == null) return null
-            if (!charge(1L + cut.owners.size, 128L + cut.owners.size * 32L)) return null
+            if (!charge(1L + cut.owners.size + if (cut.conditionalCandidate) cut.inequality.supportSize else 0,
+                    128L + cut.owners.size * 32L)) return null
             if (stop() || funding.exhausted) return null
             result += LinearAuthorityCut(cut.owner, cut.inequality, cut.derivation,
-                cut.mixed, cut.owners, cut.family)
+                cut.mixed, cut.owners, cut.family, cut.conditionalCandidate)
         }
         return result
     }

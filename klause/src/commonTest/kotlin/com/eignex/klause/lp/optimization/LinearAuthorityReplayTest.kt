@@ -61,6 +61,93 @@ class LinearAuthorityReplayTest : RuntimeInitializedTest() {
     )
 
     @Test
+    fun `a checked conditional candidate should refute receiving bounds without LP installation`() {
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val original = cuts.first()
+        val candidate = LinearAuthorityCut(original.owner, original.inequality, original.derivation,
+            owners = original.owners, family = original.family, conditionalCandidate = true)
+        val budget = SourceLpBudget()
+
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(listOf(candidate))
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = emptySet())
+        }
+
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+        assertEquals(setOf(CutFamily.SOURCE_AGGREGATION), result.cutConflictFamilies)
+        assertEquals(0, budget.operations)
+    }
+
+    @Test
+    fun `capture replay should preserve an uninstalled conditional candidate`() {
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val original = cuts.first()
+        val candidate = LinearAuthorityCut(original.owner, original.inequality, original.derivation,
+            owners = original.owners, family = original.family, conditionalCandidate = true)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use {
+            it.useReplayCuts(listOf(candidate))
+            it.capture = capture
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = emptySet())
+        }
+
+        val replay = LinearAuthorityReplay.run(capture.records.single(), emptySet(),
+            1_000_000L, 4_000_000L, ExecutionControl.Never)
+
+        val query = assertNotNull(replay.query)
+        assertTrue(query.cuts.single().conditionalCandidate)
+        assertEquals(false, query.cuts.single().installed)
+        assertEquals(0, replay.operations)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(restricted.withLinearAuthority())
+            .verify(assertNotNull(query.refutation)))
+    }
+
+    @Test
+    fun `pausing conditional materialization should withhold the query until another grant`() {
+        val original = cuts.first()
+        val candidate = LinearAuthorityCut(original.owner, original.inequality, original.derivation,
+            owners = original.owners, family = original.family, conditionalCandidate = true)
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never))
+            .withReplayCuts(listOf(candidate), ExecutionControl.Never) { _, _ -> }
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val control = ExecutionControl { funding.paused }
+
+        val paused = LinearAuthorityQuery.prepare(source, assertNotNull(template), control,
+            cutMask = emptySet(), onCutCost = { work, bytes ->
+                funding.charge(work, bytes)
+                funding.grant(0L)
+            })
+        funding.grant(1_000_000L)
+        val resumed = assertNotNull(LinearAuthorityQuery.prepare(source, template, control,
+            cutMask = emptySet(), onCutCost = funding::charge))
+
+        assertNull(paused)
+        assertTrue(resumed.installedCuts.isEmpty())
+        assertEquals(1, resumed.conditionalCutFamilies.size)
+        assertTrue(resumed.conditionalCutFamilies.keys.all { it in resumed.inactive })
+    }
+
+    @Test
+    fun `a retired conditional candidate should not authorize an early conflict`() {
+        val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO))))
+        val original = cuts.first()
+        val candidate = LinearAuthorityCut(original.owner, original.inequality, original.derivation,
+            owners = original.owners, family = original.family, conditionalCandidate = true)
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never))
+            .withReplayCuts(listOf(candidate), ExecutionControl.Never) { _, _ -> }
+        val query = assertNotNull(LinearAuthorityQuery.prepare(restricted, assertNotNull(template),
+            ExecutionControl.Never, cutMask = emptySet(), checkUnselectedCuts = false))
+
+        val conflict = query.selectedCutConflict(ExecutionControl.Never, { _, _ -> })
+
+        assertNull(conflict)
+    }
+
+    @Test
     fun `an exact conflict fallback should preserve a selected recipe when its proof is unavailable`() {
         val restricted = SourceProofContext(source.scope, source.coordinates, source.premises +
             ("sum upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
@@ -202,11 +289,16 @@ class LinearAuthorityReplayTest : RuntimeInitializedTest() {
     fun `an interrupted cut scan should leave the checked query reusable`() {
         val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
             upper = mapOf(x to BigFraction.ZERO))))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never))
-            .withReplayCuts(cuts, ExecutionControl.Never) { _, _ -> }
-        val query = assertNotNull(LinearAuthorityQuery.prepare(restricted, assertNotNull(template),
-            ExecutionControl.Never, cutMask = setOf(0)))
-        for (cancelled in listOf(false, true)) {
+        for ((conditional, cancelled) in listOf(false, true).flatMap { conditional ->
+            listOf(conditional to false, conditional to true)
+        }) {
+            val original = cuts.first()
+            val candidate = LinearAuthorityCut(original.owner, original.inequality, original.derivation,
+                owners = original.owners, family = original.family, conditionalCandidate = conditional)
+            val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never))
+                .withReplayCuts(listOf(candidate), ExecutionControl.Never) { _, _ -> }
+            val query = assertNotNull(LinearAuthorityQuery.prepare(restricted, assertNotNull(template),
+                ExecutionControl.Never, cutMask = if (conditional) emptySet() else setOf(0)))
             val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
             var stopped = false
             val control = ExecutionControl { stopped || funding.paused }
@@ -233,19 +325,22 @@ class LinearAuthorityReplayTest : RuntimeInitializedTest() {
     fun `an unverified selected cut should not authorize an early conflict`() {
         val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
             upper = mapOf(x to BigFraction.ZERO))))
-        val budget = SourceLpBudget()
         val original = cuts.first()
-        val forged = LinearAuthorityCut(original.owner, original.inequality, SourceDerivation.Premise("missing"),
-            owners = original.owners, family = original.family)
+        for (conditional in listOf(false, true)) {
+            val budget = SourceLpBudget()
+            val forged = LinearAuthorityCut(original.owner, original.inequality, SourceDerivation.Premise("missing"),
+                owners = original.owners, family = original.family, conditionalCandidate = conditional)
 
-        val result = LinearAuthority(budget, retainLp = true).use {
-            it.useReplayCuts(listOf(forged))
-            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+            val result = LinearAuthority(budget, retainLp = true).use {
+                it.useReplayCuts(listOf(forged))
+                it.advance(restricted, ExecutionControl.Never, cuts = true,
+                    cutMask = if (conditional) emptySet() else setOf(0))
+            }
+
+            assertTrue(result.cutConflictFamilies.isEmpty())
+            assertNull(result.primalStages["SelectedCutBoundConflicts"])
+            assertTrue(budget.operations > 0)
         }
-
-        assertTrue(result.cutConflictFamilies.isEmpty())
-        assertNull(result.primalStages["SelectedCutBoundConflicts"])
-        assertTrue(budget.operations > 0)
     }
 
     @Test
@@ -256,16 +351,22 @@ class LinearAuthorityReplayTest : RuntimeInitializedTest() {
             source.premises.mapValues { (id, premise) ->
                 SourcePremise(premise.inequality, if (id == "x-plus") mapOf(0 to true) else emptyMap())
             }, source.objective)
-        val budget = SourceLpBudget()
+        for (conditional in listOf(false, true)) {
+            val budget = SourceLpBudget()
+            val original = cuts.first()
+            val candidate = LinearAuthorityCut(original.owner, original.inequality, original.derivation,
+                owners = original.owners, family = original.family, conditionalCandidate = conditional)
 
-        val result = LinearAuthority(budget, retainLp = true).use {
-            it.useReplayCuts(cuts)
-            it.advance(guarded, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
+            val result = LinearAuthority(budget, retainLp = true).use {
+                it.useReplayCuts(listOf(candidate))
+                it.advance(guarded, ExecutionControl.Never, cuts = true,
+                    cutMask = if (conditional) emptySet() else setOf(0))
+            }
+
+            assertTrue(result.cutConflictFamilies.isEmpty())
+            assertNull(result.primalStages["SelectedCutBoundConflicts"])
+            assertTrue(budget.operations > 0)
         }
-
-        assertTrue(result.cutConflictFamilies.isEmpty())
-        assertNull(result.primalStages["SelectedCutBoundConflicts"])
-        assertTrue(budget.operations > 0)
     }
 
     @Test

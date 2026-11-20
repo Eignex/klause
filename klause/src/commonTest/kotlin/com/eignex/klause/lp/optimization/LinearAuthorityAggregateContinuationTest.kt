@@ -23,6 +23,31 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateContinuationTest {
     @Test
+    fun `integer projection should retain a nonseparating cut for conditioned queries`() {
+        val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-7) * BigFraction.ofLong(2).reciprocal()))
+        val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+        val point = integers.associateWith { 0.6 } + flows.associateWith { 1.2 }
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 5),
+            point = point).single()
+
+        assertTrue(cut.conditionalCandidate)
+        assertEquals(SourceInequality(integers.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `integer projection with integral rhs should retain endpoint half rounding`() {
         val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }

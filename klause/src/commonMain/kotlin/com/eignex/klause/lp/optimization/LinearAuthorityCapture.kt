@@ -52,6 +52,7 @@ internal data class LinearAuthorityCapturedCut(
     val owners: Set<Int> = setOf(owner),
     val family: CutFamily? = null,
     val mixed: Boolean = false,
+    val conditionalCandidate: Boolean = false,
 )
 
 internal data class LinearAuthorityCapturedQuery(
@@ -352,7 +353,8 @@ internal class LinearAuthorityCapture(
             }
             candidates += LinearAuthorityCapturedCut(id, cut.owner, cut.inequality, cut.derivation,
                 query != null && id in query.installedCuts, ownerActive,
-                query != null && id in query.checkedCuts, violation, cut.owners, cut.family, cut.mixed)
+                query != null && id in query.checkedCuts, violation, cut.owners, cut.family, cut.mixed,
+                cut.conditionalCandidate)
         }
         val refutation = result.evidence?.takeIf { it.claim == SourceClaim.Refutation }
         val retainedRefutation = refutation?.takeIf { projection.refutation }

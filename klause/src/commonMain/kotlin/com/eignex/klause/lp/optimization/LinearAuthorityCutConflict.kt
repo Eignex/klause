@@ -17,10 +17,12 @@ internal fun LinearAuthorityQuery.selectedCutConflict(
         if (stage == "AggregateWork") onCost(amount, 0L) else onCost(0L, amount)
     }
     return try {
-        meter.reserve(1L + cutFamilies.size, 128L + minOf(8, cutFamilies.size) * 64L)
-        val selected = cutFamilies.asSequence().filter { (row, family) ->
+        val size = cutFamilies.size + conditionalCutFamilies.size
+        meter.reserve(1L + size, 128L + minOf(8, size) * 64L)
+        val installed = cutFamilies.asSequence().filter { (row, family) ->
             row !in inactive && (family == CutFamily.SOURCE_AGGREGATION || family == CutFamily.AGGREGATION_MIR)
-        }.take(8).toList()
+        }
+        val selected = (conditionalCutFamilies.asSequence() + installed).take(8).toList()
         if (selected.isEmpty()) return null
         observe("SelectedCutBoundScans", 1L)
         val sides = CutConflictSides(this, meter, observe)

@@ -287,6 +287,11 @@ internal class LinearAuthority(
                 return base.copy(paused = base.paused || budget.funding?.paused == true)
             }
             if (baselineMask == null && selected == ordinary) {
+                if (prepared.conditionalCutFamilies.isNotEmpty()) {
+                    pointMask = selected
+                    policy.observe("ConditionalRetained", prepared.conditionalCutFamilies.size.toLong())
+                    return base.copy(paused = base.paused || budget.funding?.paused == true)
+                }
                 template = baselineFamily
                 query = baselineQuery
                 pointFamily = baselineFamily
@@ -297,7 +302,7 @@ internal class LinearAuthority(
                 cutLifecycle.families = baselineQuery.cutFamilies.values.toSet()
                 return base.copy(paused = base.paused || budget.funding?.paused == true)
             }
-            if (selected == pointMask) return base
+            if (selected == pointMask && family === baselineFamily) return base
             pointMask = selected
             pending = PointRound(prepared, base, selected, checkNotNull(family.cuts).rows)
             pointRound = pending
@@ -405,6 +410,7 @@ internal class LinearAuthority(
             if (!charge(1L + left.owners.size + right.owners.size + left.inequality.supportSize, 64L)) return false
             if (index !in query.checkedCuts || left.owner != right.owner || left.owners != right.owners ||
                 left.family != right.family || left.mixed != right.mixed ||
+                left.conditionalCandidate != right.conditionalCandidate ||
                 left.inequality.strict != right.inequality.strict) return false
             val first = left.inequality.coefficients
             val second = right.inequality.coefficients
@@ -583,7 +589,8 @@ internal class LinearAuthority(
                     }
                 }?.also(::adoptTemplate) ?: return null
         } else null
-        return LinearAuthorityQuery.prepare(source, prepared, cancellation, onCutWork = { work ->
+        return LinearAuthorityQuery.prepare(source, prepared,
+            ExecutionControl { cancellation() || budget.funding?.paused == true }, onCutWork = { work ->
             cutVerificationWork += work
             budget.observe(boundCertification = work)
             for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
@@ -591,7 +598,7 @@ internal class LinearAuthority(
             }
         }, cutMask = cutMask, onCut = cutLifecycle::observe,
             checkUnselectedCuts = checkUnselectedCuts(cutMask),
-            retainMaskedCuts = retainMaskedCuts(cutMask))?.also {
+            retainMaskedCuts = retainMaskedCuts(cutMask), onCutCost = ::cutCost)?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())

@@ -35,6 +35,7 @@ internal class LinearAuthorityQuery private constructor(
     val installedCuts: Set<Int>,
     val cutFamilies: Map<Int, CutFamily>,
     val retainMaskedCuts: Boolean,
+    val conditionalCutFamilies: Map<Int, CutFamily>,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -63,6 +64,7 @@ internal class LinearAuthorityQuery private constructor(
             onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
             checkUnselectedCuts: Boolean = true,
             retainMaskedCuts: Boolean = false,
+            onCutCost: (Long, Long) -> Unit = { _, _ -> },
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -107,21 +109,37 @@ internal class LinearAuthorityQuery private constructor(
             val accepted = active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
                 .mapTo(HashSet()) { active[it] }
             val cutFamilies = HashMap<Int, CutFamily>()
+            var conditionalCutFamilies: MutableMap<Int, CutFamily>? = null
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
+                val conditional = id in accepted && cut.conditionalCandidate &&
+                    (conditionalCutFamilies?.size ?: 0) < 2
                 onCut(cut.family, when {
                     !checkUnselectedCuts && cutMask != null && id !in cutMask -> "RETIRED_CANDIDATE"
                     id !in active -> "INACTIVE_PREMISE"
                     id !in accepted -> "VERIFICATION_DECLINED"
-                    cutMask != null && id !in cutMask -> "UNSELECTED"
+                    cutMask != null && id !in cutMask -> if (conditional) "CONDITIONAL_CANDIDATE" else "UNSELECTED"
                     else -> "INSTALLED"
                 }, 1L)
-                if (cutMask != null && id !in cutMask && !retainMaskedCuts) continue
+                if (cutMask != null && id !in cutMask && !retainMaskedCuts && !conditional) continue
                 if (id in accepted && (cutMask == null || id in cutMask)) {
                     cutFamilies[cited.size] = cut.family
                     activeCuts++
                     if (cut.mixed) activeMixedCuts++
-                } else inactive += cited.size
+                } else {
+                    inactive += cited.size
+                    if (conditional) {
+                        val support = cut.inequality.supportSize.toLong()
+                        val materialize = cutMask != null && id !in cutMask && !retainMaskedCuts
+                        onCutCost(2L + if (materialize) support * (support + 1L) else 0L,
+                            256L + if (materialize) 256L + support * 128L else 0L)
+                        if (cancellation()) return null
+                        val families = conditionalCutFamilies ?: HashMap<Int, CutFamily>().also {
+                            conditionalCutFamilies = it
+                        }
+                        families[cited.size] = cut.family
+                    }
+                }
                 cited += cut.inequality to cut.derivation
             }
             for (evidence in consequences) {
@@ -153,7 +171,7 @@ internal class LinearAuthorityQuery private constructor(
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
                 cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
                 accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
-                cutFamilies.toMap(), retainMaskedCuts)
+                cutFamilies.toMap(), retainMaskedCuts, conditionalCutFamilies?.toMap().orEmpty())
         }
     }
 }
