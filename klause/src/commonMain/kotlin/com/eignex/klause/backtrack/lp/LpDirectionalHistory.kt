@@ -224,11 +224,8 @@ internal class LpDirectionalHistory(
         val gap = cutoff - objective
         if (gap.isNaN() || gap <= 0.0) return null
         val reachesCutoff = maxOf(down, up) >= gap
-        return if (up > down) {
-            if (reachesCutoff) ChildPreference.UP_REACHABLE else ChildPreference.UP_OPEN
-        } else {
-            if (reachesCutoff) ChildPreference.DOWN_REACHABLE else ChildPreference.DOWN_OPEN
-        }
+        if (!reachesCutoff) return null
+        return if (up > down) ChildPreference.UP_REACHABLE else ChildPreference.DOWN_REACHABLE
     }
 
     private fun reliable(variable: VarRef, value: Double): Gains? {

@@ -42,15 +42,16 @@ class LpPassiveValueChoiceTest {
                     choice.commit(selected.first(), 7) { true }
                     choice.commit(selected.first(), 7) { true }
 
-                    assertEquals(if (apply) ordinary.reversed() else ordinary, selected)
+                    assertEquals(if (apply && reachesCutoff) ordinary.reversed() else ordinary, selected)
                     val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
-                    assertEquals(1, events.count { it == event })
+                    assertEquals(if (reachesCutoff) 1 else 0, events.count { it == event })
                     val role = if (apply) "COMMIT" else "COMMIT_WITHHELD"
                     val mode = if (reachesCutoff) "REACHABLE" else "OPEN"
-                    assertEquals(1, events.count { it == "PASSIVE_VALUE_${role}_${mode}_CHANGED" })
+                    assertEquals(if (reachesCutoff) 1 else 0,
+                        events.count { it == "PASSIVE_VALUE_${role}_${mode}_CHANGED" })
                     costs.add(work)
                 }
-                assertEquals(26L, costs.first())
+                assertEquals(if (reachesCutoff) 26L else 21L, costs.first())
                 assertEquals(costs.first(), costs.last())
             }
         }
@@ -109,7 +110,7 @@ class LpPassiveValueChoiceTest {
                 if (condition == "charge" || (condition == "commit-charge" && committing)) fresh = false
             })
             val alternatives = listOf(up, down)
-            val selected = choice.select(variable, 2.25, alternatives, history, 7) { fresh }
+            val selected = choice.select(variable, 2.25, alternatives, history, 7, cutoff = 12.0) { fresh }
             if (condition == "commit") fresh = false
             if (condition == "clear") choice.clear()
             committing = true

@@ -43,6 +43,7 @@ class ResumableMinimizeDirectionalTest {
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L),
             lpDirectionalGains = true,
+            objectiveBoundSupplier = { 100.0 },
             componentFactory = {
                 listOf(object : SearchComponent {
                     override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()

@@ -75,7 +75,8 @@ class LpDirectionalHistoryTest {
             history.beginNode(0)
             history.record(0.0)
 
-            assertEquals(available, history.preferGainDirection(variable, 0.25) != null, "gains=$observations")
+            assertEquals(available, history.preferGainDirection(variable, 0.25, cutoff = 0.5) != null,
+                "gains=$observations")
         }
     }
 
@@ -168,7 +169,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `reliable child preference seeks higher gains with a positive cutoff gap`() {
+    fun `reliable child preference requires a predicted gain reaching the cutoff`() {
         for (cheaperUp in listOf(false, true)) {
             val history = LpDirectionalHistory({})
             history.beginNode(0)
@@ -185,10 +186,10 @@ class LpDirectionalHistoryTest {
             history.beginNode(0)
             history.record(10.0)
 
-            assertEquals(!cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75))
-            assertEquals(!cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 14.0))
+            assertNull(history.preferGainDirection(VarRef.Bool(0), 0.75))
+            assertNull(history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 14.0))
             assertEquals(!cheaperUp, history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 12.0))
-            assertEquals(false, history.childPreference(VarRef.Bool(0), 0.75, cutoff = 14.0)?.reachesCutoff)
+            assertNull(history.childPreference(VarRef.Bool(0), 0.75, cutoff = 14.0))
             assertEquals(true, history.childPreference(VarRef.Bool(0), 0.75, cutoff = 12.0)?.reachesCutoff)
             assertNull(history.preferGainDirection(VarRef.Bool(0), 0.75, cutoff = 10.0))
         }

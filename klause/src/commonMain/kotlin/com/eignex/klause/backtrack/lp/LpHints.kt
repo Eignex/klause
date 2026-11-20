@@ -258,8 +258,8 @@ internal class LpHints(
         val values = checkNotNull(passiveValues)
         values.clear()
         collection.clear()
-        val valueReady = history.hasValueHistory
-        val collectReady = cutoff > Double.NEGATIVE_INFINITY && collection.available && history.hasCollectionHistory
+        val valueReady = cutoff.isFinite() && history.hasValueHistory
+        val collectReady = cutoff.isFinite() && collection.available && history.hasCollectionHistory
         if (!history.hasObservations || (!valueReady && !collectReady) ||
             cancelled() || !passivePointCurrent()
         ) return alternatives
