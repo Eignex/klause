@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.lab.configureLabPaths
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -39,6 +40,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal object FinitePortfolioLpCapture {
     @JvmStatic
     fun main(args: Array<String>) {
+        configureLabPaths()
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         parameters(options)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
