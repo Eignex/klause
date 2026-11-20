@@ -148,8 +148,8 @@ internal object LinearAuthorityAggregateCuts {
             }
             val extension = if (point == null) null else {
                 meter.reserve(1L, 320L)
-                PairExtension(incidence, selectedBounds, bounds, point, pointProjections, meter, attemptLimits, derivedStop,
-                    observe, checkNotNull(integerBounds))
+                PairExtension(incidence, selectedBounds, bounds, point, pointProjections, meter, attemptLimits,
+                    derivedStop, observe, checkNotNull(integerBounds))
             }
             if (!integerRows.isNullOrEmpty() && point != null) {
                 eligibilityKnown = false
@@ -159,8 +159,8 @@ internal object LinearAuthorityAggregateCuts {
                 val integerMeter = AggregateMeter(integerLimits, derivedStop, charge)
                 try {
                     integerMeter.reserve(1L, 320L)
-                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, integerMeter, integerLimits,
-                        derivedStop, charge, checkNotNull(integerBounds)).integerRows(
+                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, integerMeter,
+                        integerLimits, derivedStop, charge, checkNotNull(integerBounds)).integerRows(
                         integerRows, candidates, maximumCandidates)
                 } catch (stop: AggregateStop) {
                     charge("AggregateInteger" + stop.reason, 1L)
@@ -170,13 +170,13 @@ internal object LinearAuthorityAggregateCuts {
             if (point != null && limits.rows > 4) {
                 eligibilityKnown = false
                 val projectionLimits = attemptLimits.copy(rows = minOf(16, limits.rows),
-                    work = minOf(meter.remainingWork / 4L, 16_384L),
+                    work = minOf(meter.remainingWork / 3L, 16_384L),
                     allocation = minOf(meter.remainingAllocation / 4L, 262_144L))
                 val projectionMeter = AggregateMeter(projectionLimits, derivedStop, charge)
                 try {
                     projectionMeter.reserve(1L, 320L)
-                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, projectionMeter, projectionLimits,
-                        derivedStop, charge, checkNotNull(integerBounds)).integerProjections(
+                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, projectionMeter,
+                        projectionLimits, derivedStop, charge, checkNotNull(integerBounds)).integerProjections(
                         rows, candidates, maximumCandidates)
                 } catch (stop: AggregateStop) {
                     charge("AggregateIntegerProjection" + stop.reason, 1L)

@@ -591,10 +591,11 @@ opposite-sign continuous incidence path through at most four original rows.
 Point selection generates up to eight point-seeded proposals, then fills the remaining
 pool from unseeded source pairs. Seeded proposals precede unseeded proposals; these
 aggregate proposals precede directed rounding proposals within the 64-addition cap.
-Point-seeded discovery reserves at most a quarter of its remaining allowance, capped
-at 16,384 work and 256 KiB, for integer-only projections through at most sixteen
-original rows. Fractional integer coordinates order up to eight starting rows, and
-at most two projections survive. A completed integer rounding that does not separate
+Point-seeded discovery reserves at most a third of its remaining work and a quarter
+of its remaining storage, capped at 16,384 work and 256 KiB, for integer-only
+projections through at most sixteen original rows. Fractional integer coordinates
+order up to eight starting rows, and at most two projections survive. A completed
+integer rounding that does not separate
 the root point is retained for conditional checks; integral right-hand sides can
 continue to endpoint half rounding. Exact positive coefficient ratios cancel
 continuous coordinates without repeatedly scaling the existing combination.
