@@ -161,7 +161,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `repair should complete an advisory center through its private query before source publication`() {
+    fun `advisory repair should retain root guidance before private publication`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = arrayOf(ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
@@ -184,6 +184,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                     search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(BigFraction.ONE, objective.evaluateExact(result.sample))
                 assertTrue(repair.isProximityDiscovery(result.sample))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairRootQueries"))
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityAdvisoryConsumed"))
                 assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairImportedIncumbents") ?: 0L)
             }

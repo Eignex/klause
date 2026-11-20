@@ -536,11 +536,6 @@ internal class JointLinearRepair(
         if (rootPoint == null) {
             funding.grant(20_000_000L)
             requestIncumbentPreparation()
-            if (!rootStarted && advisoryExternalCenter() != null) {
-                rootPoint = emptyMap()
-                observe("jointRepairProximityAdvisoryPreparations")
-                return true
-            }
             if (!rootStarted && completion != null) {
                 preparedCenter = preparedCenter ?: checkedExternalCenter()
                 if (stop() || exhausted || cancellation()) return false
