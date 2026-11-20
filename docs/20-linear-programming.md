@@ -331,12 +331,15 @@ scan to the same LP effort ledger. These costs join numerical and maintenance wo
 in the worker's cumulative allowance and per-node effort observations.
 
 Optional node queries earn work credit at the configured per-node effort cap, with
-initial and stored credit bounded by the existing warmup count. Each query spends
-its complete construction, source-refresh, numerical and certification cost;
-an atomic overshoot becomes debt repaid by later observed nodes. Pruning can promote
-the usefulness ladder but cannot erase this debt. Root work outside the query uses
-its separate budget, and required real-residual queries and leaf completion retain
-their completion paths. Unfunded nodes advance the ordinary cadence counter while
+initial and stored credit bounded by the existing warmup count. The first optional
+node observation opens a cumulative work checkpoint, excluding earlier setup.
+Every later LP charge, including intervening guidance, restart refresh and leaf
+completion, reduces future optional credit exactly once. Query completion and
+failure settle the checkpoint, and each node settles it before replenishing credit
+or checking depth and cadence. An atomic overshoot becomes debt repaid by later
+observed nodes; pruning and restart cannot erase it. Root and required completion
+paths keep their own budgets and bypass optional credit gating. Unfunded nodes
+advance the ordinary cadence counter while
 the ladder's re-probe clock waits for funded eligibility. A zero per-node cap disables
 credit gating.
 

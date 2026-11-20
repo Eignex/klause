@@ -6,8 +6,18 @@ internal class LpNodeQueryFunding(private val opsPerNode: Long, warmup: Int) {
         if (opsPerNode > Long.MAX_VALUE / count) Long.MAX_VALUE else opsPerNode * count
     }
     private var credit = capacity
+    private var observedWork = -1L
 
     val available: Boolean get() = opsPerNode <= 0L || credit > 0L
+
+    fun observeWork(totalWork: Long) {
+        if (opsPerNode <= 0L) return
+        val previous = observedWork
+        observedWork = totalWork
+        if (previous >= 0L) {
+            recordWork(if (totalWork == Long.MAX_VALUE) Long.MAX_VALUE else totalWork - previous)
+        }
+    }
 
     fun observeNode() {
         if (opsPerNode <= 0L) return

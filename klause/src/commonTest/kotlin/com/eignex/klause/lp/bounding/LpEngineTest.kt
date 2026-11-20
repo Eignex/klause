@@ -198,6 +198,24 @@ class LpEngineTest {
     }
 
     @Test
+    fun `intervening LP overhead should defer an otherwise scheduled node query`() {
+        val problem = boundedLpEngineProblem()
+        val sink = SolveStatsSink("intervening-query-funding")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, boundEvery = 2, boundMaxOpsPerNode = 1L)), sink,
+            nodeWorkAllowance = { 1L }).use { engine ->
+            val session = PropagationSession(problem)
+            engine.pruneNode(session, 100.0, -1, true)
+            engine.noteNodeOverhead(128L)
+
+            engine.pruneNode(session, 100.0, -1, true)
+
+            assertEquals(128L, engine.totalSolveWork())
+            assertEquals(0.0, sink.snapshot().lp.nodePasses.sum)
+        }
+    }
+
+    @Test
     fun `metadata only queries should defer further optional node queries`() {
         val problem = boundedLpEngineProblem()
         val sink = SolveStatsSink("metadata-query-funding")

@@ -6,6 +6,54 @@ import kotlin.test.assertTrue
 
 class LpNodeQueryFundingTest {
     @Test
+    fun `initial setup should stay outside optional node funding`() {
+        val funding = LpNodeQueryFunding(10L, 2)
+
+        funding.observeWork(1_000L)
+        funding.observeWork(1_019L)
+
+        assertTrue(funding.available)
+    }
+
+    @Test
+    fun `intervening work should debit optional credit exactly once`() {
+        val funding = LpNodeQueryFunding(10L, 2)
+        funding.observeWork(1_000L)
+        funding.observeWork(1_015L)
+
+        repeat(3) { funding.observeWork(1_015L) }
+
+        assertTrue(funding.available)
+        funding.observeWork(1_021L)
+        assertFalse(funding.available)
+    }
+
+    @Test
+    fun `later completion work should defer optional queries until nodes repay it`() {
+        val funding = LpNodeQueryFunding(10L, 2)
+        funding.observeWork(1_000L)
+
+        funding.observeWork(1_050L)
+
+        repeat(3) { funding.observeNode() }
+        assertFalse(funding.available)
+        funding.observeNode()
+        assertTrue(funding.available)
+    }
+
+    @Test
+    fun `saturated cumulative observations should conservatively exhaust credit`() {
+        val funding = LpNodeQueryFunding(Long.MAX_VALUE, 1)
+        funding.observeWork(0L)
+        funding.observeWork(Long.MAX_VALUE)
+        funding.observeNode()
+
+        funding.observeWork(Long.MAX_VALUE)
+
+        assertFalse(funding.available)
+    }
+
+    @Test
     fun `query overspend should defer further queries until nodes repay it`() {
         val funding = LpNodeQueryFunding(10L, 2)
 

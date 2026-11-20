@@ -1755,6 +1755,7 @@ internal class LpEngine(
             if (rootBoundHandedOff && session.decisionLevel == 0) return false
             if (sparseTrialActive && session.decisionLevel == 0 && retainedRootCumulativeWork() <= 0L) return false
             lpEffortGovernor.observeNode()
+            if (!params.lpPlan.realResidual) nodeQueryFunding.observeWork(totalSolveWork())
             nodeQueryFunding.observeNode()
             if (!params.lpPlan.realResidual && (
                     session.decisionLevel > params.lpPlan.boundMaxDepth ||
@@ -1776,7 +1777,6 @@ internal class LpEngine(
                 null
             }
             nodeWorkStoppedAfterProgress = false
-            val beforeQuery = totalSolveWork()
             val outcome = try {
                 lpBoundAndFix(
                     lpRelaxerL,
@@ -1793,9 +1793,7 @@ internal class LpEngine(
                 )
             } finally {
                 if (!params.lpPlan.realResidual) {
-                    val afterQuery = totalSolveWork()
-                    nodeQueryFunding.recordWork(if (afterQuery == Long.MAX_VALUE) Long.MAX_VALUE
-                    else afterQuery - beforeQuery)
+                    nodeQueryFunding.observeWork(totalSolveWork())
                 }
             }
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
