@@ -180,11 +180,15 @@ internal class LpDirectionalHistory(
 
     fun estimate(variable: VarRef, value: Double): Double {
         val history = reliable(variable, value) ?: return Double.NaN
+        val downGain = history.down.gain
+        val upGain = history.up.gain
+        if (downGain == 0.0 || upGain == 0.0) return 0.0
+        charge(2L)
         val fraction = value - floor(value)
-        val down = history.down.gain * fraction
-        val up = history.up.gain * (1.0 - fraction)
-        val score = sqrt(down) * sqrt(up)
-        return score.takeIf { it.isFinite() } ?: Double.NaN
+        val downRoot = sqrt(downGain) * sqrt(fraction)
+        val upRoot = sqrt(upGain) * sqrt(1.0 - fraction)
+        val score = downRoot * upRoot
+        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
     fun preferGainDirection(variable: VarRef, value: Double, cutoff: Double = Double.POSITIVE_INFINITY): Boolean? {
