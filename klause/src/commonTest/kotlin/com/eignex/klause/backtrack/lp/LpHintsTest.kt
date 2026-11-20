@@ -432,7 +432,7 @@ class LpHintsTest {
                     assertEquals(before, work)
                 } else {
                     assertEquals(2.0, score, 1e-9)
-                    assertEquals(before + 4L, work)
+                    assertEquals(before + 8L, work)
                 }
             }
         }
@@ -646,15 +646,18 @@ class LpHintsTest {
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
-                    hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(relaxation.model.m))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
                     hints.recordOutcome(true)
                     hints.finishNode(trail.state)
                 }
             }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
+            hints.recordObjective(relaxation, 10.0)
             assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
 
-            hints.beginNode(1, 100.0)
+            hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
 
             if (change != "missing") {
