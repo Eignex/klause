@@ -353,7 +353,7 @@ data class BacktrackParams(
      * all-off [LpPlan] (no LP unless a field is set or [lpConfig] resolves one on).
      */
     val lpPlan: LpPlan = LpPlan(),
-    /** Use recent directional LP gains with validated forecasts; missing history keeps ordinary LP guidance. */
+    /** Use recent directional LP gains with prediction feedback; missing history keeps ordinary LP guidance. */
     val lpDirectionalGains: Boolean = false,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,

@@ -19,7 +19,7 @@ class LpPassiveValueChoiceTest {
             history.beginNode(0)
             history.record(10.0)
             history.branch(variable, point)
-            repeat(3) {
+            repeat(2) {
                 for ((decision, isUp) in listOf(down to false, up to true)) {
                     history.commit(decision, 1)
                     history.beginNode(1)

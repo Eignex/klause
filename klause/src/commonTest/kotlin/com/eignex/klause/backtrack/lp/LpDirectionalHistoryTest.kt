@@ -11,6 +11,64 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `rejection ages independently of the stabilized numeric pair`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add, maxAge = 8L)
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2)
+        val up = SearchDecision.IntAtLeast(0, 3)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 2.25)
+        repeat(3) {
+            for ((decision, objective) in listOf(down to 11.0, up to 13.0)) {
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.record(objective)
+            }
+        }
+        for ((decision, objective) in listOf(up to 30.0, up to 13.0, up to 13.0, down to 11.0, down to 11.0)) {
+            history.commit(decision, 1)
+            history.beginNode(1)
+            history.record(objective)
+        }
+        repeat(4) { history.beginNode(0) }
+        history.record(10.0)
+        assertNull(history.preferGainDirection(variable, 2.25))
+        history.beginNode(0)
+        history.record(10.0)
+
+        assertEquals(false, history.preferGainDirection(variable, 2.25))
+        assertEquals(1, events.count { it == "REJECTION_EXPIRED" })
+        assertTrue(history.hasValueHistory)
+        assertTrue(history.estimate(variable, 2.25).isNaN())
+    }
+
+    @Test
+    fun `stable pairs permit child ordering before cross variable validation`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.IntVar(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 2.25)
+        repeat(2) {
+            for ((decision, objective) in listOf(SearchDecision.IntAtMost(0, 2) to 11.0,
+                SearchDecision.IntAtLeast(0, 3) to 13.0)) {
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.record(objective)
+            }
+        }
+        history.beginNode(0)
+        history.record(10.0)
+
+        assertEquals(false, history.preferGainDirection(variable, 2.25))
+        assertTrue(history.estimate(variable, 2.25).isNaN())
+        assertTrue(history.hasValueHistory)
+        assertFalse(history.hasReliableHistory)
+    }
+
+    @Test
     fun `unusable child feedback revokes a validated estimate without adding a sample`() {
         for (value in listOf(-1.0, Double.NaN, Double.POSITIVE_INFINITY)) {
             val history = LpDirectionalHistory({})

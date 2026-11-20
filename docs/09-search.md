@@ -377,11 +377,13 @@ with each other before fallback, so objective units are not mixed with reduced c
 Each direction uses the lower of its latest two in-age normalized gains, so one
 large observation cannot raise its estimate alone. The two gains must agree within
 a factor of two; disagreement withholds advice until passive observations stabilize.
-The latest observation must also agree within a factor of two with the estimate
+For variable scoring, the latest observation must also agree within a factor of two with the estimate
 formed before it arrived. A rejected or unavailable forecast withholds advice until
-a subsequent stable prediction validates. An unusable child gain revokes its
-direction's validation without adding a numeric sample. The oldest of the three supporting sample
-stamps bounds that validation's lifetime. Each observation ages separately.
+a subsequent stable prediction validates or the rejection ages out. An unusable child gain revokes its
+direction's validation and records a rejection without adding a numeric sample.
+Numeric stabilization alone cannot clear a rejection. The oldest of the three supporting sample
+stamps bounds a positive validation's lifetime; a rejection ages from the rejected observation.
+Each observation ages separately.
 Replacing the ordinary LP variable requires reliable history for that reference
 as well, including measured zero gains, and a strictly greater predicted gain.
 The scope retains the most recent oldest validation-support stamp of any variable with reliable positive gains
@@ -406,7 +408,7 @@ existing adjacent alternatives. It visits the lower predicted gain first to seek
 an incumbent, unless a predicted child gain reaches the current objective gap;
 then it visits the higher predicted gain first to seek early pruning.
 Predicted gains carry no pruning authority.
-Both directions need a current validated forecast; equal or unavailable
+Both directions need stable recent pairs without an in-age rejected forecast; equal or unavailable
 estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
 creates no LP query, charges constant comparison and commitment work to the LP
 allowance, and checks the current point, scope, solve stamp and cancellation.
@@ -415,11 +417,11 @@ variable advice and missing-direction collection. Withheld advice retains ordina
 value order while paying the same comparison work.
 
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
-child first to complete passive sample or forecast readiness. It needs a recent positive
+child first to complete passive sample readiness or validate a rejected forecast. It needs a recent positive
 observation for the selected variable and only reorders the two adjacent alternatives
 around its fresh fractional LP point. Each direction needs an in-age observation
 before collection can complete a nearly reliable pair. Readiness counts the two retained
-observations and a current validated forecast; the more ready side must have a stable estimate.
+observations and stability without a current rejection; the more ready side must have a stable estimate.
 A scope-wide availability stamp skips collection lookups until such observations exist.
 Equal readiness or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most

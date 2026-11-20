@@ -129,7 +129,7 @@ class LpHintsTest {
             val events = ArrayList<String>()
             val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
                 observe = events::add, charge = { work += it })
-            repeat(3) {
+            repeat(2) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
@@ -322,7 +322,7 @@ class LpHintsTest {
                     assertEquals(before, work)
                 } else {
                     assertEquals(sqrt(3.0), score, 1e-9)
-                    assertEquals(before + 3L, work)
+                    assertEquals(before + 5L, work)
                 }
             }
         }
