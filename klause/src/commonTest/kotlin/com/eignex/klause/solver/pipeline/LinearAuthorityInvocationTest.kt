@@ -76,7 +76,8 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
                 }
 
                 assertEquals(BigFraction.ofLong(2), invocation.snapshot(TerminationReason.BudgetExhausted).value)
-                assertEquals(1L, invocation.stats.smt.completeSearchStages?.get("numericalProximityOrdinaryRetirements"))
+                assertEquals(1L,
+                    invocation.stats.smt.completeSearchStages?.get("numericalProximityOrdinaryRetirements"))
             }
     }
 

@@ -122,11 +122,12 @@ internal class LinearAuthorityInvocation(
             val key = "numericalExternalCompletion$stage"
             externalOffers[key] = (externalOffers[key] ?: 0L) + count
         } else null
-    private val proximityChecking = if (incumbentProximity) completion ?:
-        LinearIncumbentCompletion(budget, incumbentCompletionCheck) { stage, count ->
+    private val proximityChecking = if (incumbentProximity) {
+        completion ?: LinearIncumbentCompletion(budget, incumbentCompletionCheck) { stage, count ->
             val key = "numericalProximityChecking$stage"
             externalOffers[key] = (externalOffers[key] ?: 0L) + count
-        } else null
+        }
+    } else null
     val isDone: Boolean get() = result != null
     val hasIncumbent: Boolean get() = incumbent != null
     val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent

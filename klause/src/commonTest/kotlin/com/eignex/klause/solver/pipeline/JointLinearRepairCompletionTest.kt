@@ -46,6 +46,61 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     @Test
+    fun `unavailable offers should not start an advisory query`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(1e-8))
+
+        for (cancelled in listOf(false, true)) {
+            JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1), external = { seed },
+                incumbentProximity = true, incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    val before = repair.work
+
+                    search.advance(ExecutionControl { cancelled }, if (cancelled) 5_000 else 0)
+
+                    assertEquals(before, repair.work)
+                    assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairProximityCenters") ?: 0L)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a retained advisory query should complete a fractional target within its current offer`() {
+        val integers = 7
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(integers), LongArray(integers) { 1 }, null, null),
+            factors = Array(integers) { id ->
+                Linear(intArrayOf(1, 1), intArrayOf(id, (id + 1) % integers), LinearOp.GE, 1)
+            },
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = LongArray(integers) { 1 })
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val seed = Sample(booleanArrayOf(), LongArray(integers) { if (it % 2 == 0) 1 else 0 }, doubleArrayOf(1e-8))
+
+        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1, sourceCuts = false),
+            external = { seed }, incumbentProximity = true,
+            incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                search.advance(ExecutionControl.Never, 5_000)
+
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(1L, stages["jointRepairProximityCompleted"])
+                assertTrue((stages["jointRepairPrimalFractional"] ?: 0L) > 0L)
+                assertTrue((stages["jointRepairGrantedQueryResumeRequests"] ?: 0L) > 0L)
+                assertFalse(search.minimizeResult(TerminationReason.BudgetExhausted) is MinimizeResult.WithSample)
+            }
+        }
+    }
+
+    @Test
     fun `a completed advisory target should leave the ordinary fallback cutoff unchanged`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),

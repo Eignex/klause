@@ -517,7 +517,8 @@ reconstructing the advisory point. Ordinary fallback neighborhoods retain their
 own checked centers and cutoffs.
 
 Both searches share one LP operation/work/allocation ledger and containing
-decision/check allowances. Private query progress supplies no root-fixing or
+decision/check allowances. A retained joint private query uses remaining instructions
+in its current offer before yielding. Private query progress supplies no root-fixing or
 learned-clause reward. A generated witness passes complete receiving-source checks
 and exact original-source feasibility and objective checks before it can improve
 the source incumbent. Private bounds and proofs never enter parent coverage.

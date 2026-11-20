@@ -107,7 +107,8 @@ internal class FiniteNumericalCompanions private constructor(
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true,
-        gap: OptimalityGap? = null, incumbentTrials: Boolean = true, advisoryCenters: Boolean = false): List<PortfolioArmFactory> {
+        gap: OptimalityGap? = null, incumbentTrials: Boolean = true,
+        advisoryCenters: Boolean = false): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
         val binding = EngineInvocation(plan, identity, objective)
         fun factory(arm: Int, family: ArmFamily, create: (PortfolioWorkerSlot) -> PortfolioWorker) =
@@ -148,7 +149,9 @@ internal class FiniteNumericalCompanions private constructor(
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
                 val worker = context?.let {
-                    repairWorker(slot, firstArm + 1, limits, it, sharePoints, incumbentTrials, advisoryCenters) { companion }
+                    repairWorker(slot, firstArm + 1, limits, it, sharePoints, incumbentTrials, advisoryCenters) {
+                        companion
+                    }
                 }
                 companion = PortfolioWorker.ofMinimize(FiniteCompanionArms.JOINT_REPAIR, firstArm + 1,
                     countsInstructions = true,
@@ -244,7 +247,8 @@ internal class FiniteNumericalCompanions private constructor(
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
                 incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance,
                 gap = gap, useSourceGap = false,
-                incumbentProximity = (advisoryCenters || completionSharing != null) && model.binaryIntegers && !adaptiveRepair)
+                incumbentProximity =
+                (advisoryCenters || completionSharing != null) && model.binaryIntegers && !adaptiveRepair)
             private var result: MinimizeResult? = null
             private var closed = false
             override val isDone: Boolean get() = result != null
