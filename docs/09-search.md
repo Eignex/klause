@@ -401,7 +401,12 @@ LP state after charging its work and before attributing advice, using the existi
 Disabled directional gains collect no history or retained model scope and charge no
 history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
 The bounded selector reads reduced-cost scores by primitive variable ID and kind.
-Directional references are constructed only after history passes its eligibility checks.
+The ordinary variable is selected before directional candidates are visited. Missing
+reliable reference measurements skip that visit. A bounded source-scoped index reuses
+references for variables that have held reliable positive gains in both directions;
+each visit still checks the variable's own current observations and fractional point.
+Index growth, visits and reclamation charge the LP allowance. Reset invalidates an
+active visit, and equal scores retain Boolean-before-integer, ascending-ID precedence.
 
 The same recent directional estimates can order the selected variable's two
 existing adjacent alternatives. It visits the lower predicted gain first to seek

@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.arithmetic.Linear
@@ -22,7 +23,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class ResumableMinimizeDirectionalTest {
+class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
     @Test
     fun `finite search consumes both directional gains across cooperative slices`() {
         val blocks = 4
