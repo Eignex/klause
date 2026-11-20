@@ -11,6 +11,29 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `child preference follows agreeing completed pruning outcomes`() {
+        for (preferred in listOf<Boolean?>(false, true, null)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up == preferred) 13.0 else 11.0)
+                    history.finishNode(preferred == null || up == preferred)
+                }
+            }
+
+            val selected = history.preferPruningDirection(variable, 0.5)
+
+            assertEquals(preferred, selected)
+        }
+    }
+
+    @Test
     fun `pruning estimates require two agreeing completed outcomes in both directions`() {
         for (last in listOf<Boolean?>(true, false, null)) {
             val history = LpDirectionalHistory({})

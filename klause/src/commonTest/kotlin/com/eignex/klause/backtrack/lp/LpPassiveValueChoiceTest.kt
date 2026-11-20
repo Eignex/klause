@@ -23,7 +23,8 @@ class LpPassiveValueChoiceTest {
                 for ((decision, isUp) in listOf(down to false, up to true)) {
                     history.commit(decision, 1)
                     history.beginNode(1)
-                    history.record(if (isUp == preferUp) 11.0 else 13.0)
+                    history.record(if (isUp == preferUp) 13.0 else 11.0)
+                    history.finishNode(isUp == preferUp)
                 }
             }
             val ordinary = if (preferUp) listOf(down, up) else listOf(up, down)
@@ -62,6 +63,7 @@ class LpPassiveValueChoiceTest {
                     history.commit(decision, 1)
                     history.beginNode(1)
                     history.record(objective)
+                    history.finishNode(decision == up)
                 }
             }
             if (condition == "aged") repeat(5) { history.beginNode(0) }

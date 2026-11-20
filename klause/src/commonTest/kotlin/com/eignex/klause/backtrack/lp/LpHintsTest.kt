@@ -169,7 +169,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable value advice remains withheld in the variable outcome consumer`() {
+    fun `reliable pruning outcomes reach matching applied and withheld child commitments`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -194,7 +194,7 @@ class LpHintsTest {
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                     hints.recordObjective(relaxation, objective)
-                    hints.recordOutcome(true)
+                    hints.recordOutcome(decision == up)
                     hints.finishNode(trail.state)
                 }
             }
@@ -208,8 +208,8 @@ class LpHintsTest {
             val selected = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
             hints.commit(selected.first(), 1)
 
-            assertEquals(listOf(down, up), selected)
-            val event = "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
+            assertEquals(if (apply) listOf(up, down) else listOf(down, up), selected)
+            val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
             assertEquals(1, events.count { it == event })
             assertFalse("PASSIVE_COLLECTION_COMMIT_CHANGED" in events)
             costs.add(work - before)
@@ -265,11 +265,11 @@ class LpHintsTest {
 
                 val selected = assertNotNull(hints.selectVariable(proposal, baseline))
                 hints.branch(selected)
-                val changed = apply && referencePrunes < 2
+                val changed = false
                 hints.commit(SearchDecision.IntAtMost(selected.varId, if (changed) 3L else 2L), 1)
 
                 assertEquals(if (changed) proposal else baseline, selected)
-                val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                val event = "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
                 assertEquals(if (referencePrunes < 2) 1 else 0, events.count { it == event })
                 assertEquals(4, events.count { it == "UP" })
                 assertEquals(4, events.count { it == "DOWN" })
