@@ -1373,7 +1373,7 @@ class ExactLiraSearchComponent private constructor(
             val address = prepared.address
             val asserted = node.rowAssertions[address]
             if (prepared.disjunction && asserted == null) continue
-            val truth = node.rowTruth(address, prepared.row, bools) ?: continue
+            val truth = node.rowTruth(prepared, bools) ?: continue
             val comparison = prepared.form.comparison(truth) { bools[it] == LIRA_TRUE }
             val leaves = prepared.booleans.map { variable ->
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == LIRA_TRUE)))
@@ -1701,7 +1701,7 @@ class ExactLiraSearchComponent private constructor(
             operationAccounting?.charge(prepared.booleans.size.toLong() + 1L)
             if (lpStop.poll()) return false
             if (prepared.disjunction && prepared.address !in node.rowAssertions) continue
-            val truth = node.rowTruth(prepared.address, prepared.row, bools) ?: continue
+            val truth = node.rowTruth(prepared, bools) ?: continue
             val comparison = prepared.form.comparison(truth) { bools[it] == LIRA_TRUE }
             val direction = node.disequalityDirections[prepared.address]
             if (comparison.op == LinearOp.NE && direction == null) return false
@@ -2058,6 +2058,15 @@ internal fun LinearRow.truthUnder(bools: IntArray): Boolean? {
         val reference = ref(k)
         if (Term.isBool(reference) && bools[Lit.variable(Term.lit(reference))] == UNASSIGNED) return null
     }
+    return activationUnder(bools)
+}
+
+internal fun PreparedSourceRow.truthUnder(bools: IntArray): Boolean? {
+    if (booleans.any { bools[it] == UNASSIGNED }) return null
+    return row.activationUnder(bools)
+}
+
+private fun LinearRow.activationUnder(bools: IntArray): Boolean? {
     if (activator == LinearRow.ALWAYS) return true
     return when (bools[activator]) {
         LIRA_TRUE -> true
