@@ -1617,7 +1617,7 @@ internal class ResumableMinimize(
         }
 
         override fun onRestart() {
-            lpHints?.resetHistory()
+            lpHints?.restart()
             restartRootTargetsPending = incumbents.current() == null &&
                 lpEngine.rootPrimalTargets?.components?.offered == true
             lpEngine.restartRootPrimalTargets()

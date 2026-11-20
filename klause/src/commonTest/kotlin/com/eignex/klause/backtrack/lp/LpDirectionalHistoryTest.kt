@@ -80,6 +80,59 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
+    fun `restart retains samples but discards ancestor and pending child attribution`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        history.commit(SearchDecision.Bool(1), 1)
+
+        history.restart()
+        history.beginNode(1)
+        history.record(1000.0)
+
+        assertEquals(2.0, history.score(variable, 0.5), 1e-9)
+        assertEquals(1, history.retainedEntries)
+        assertEquals(2, events.count { it == "DOWN" })
+        assertEquals(2, events.count { it == "UP" })
+        assertEquals(1, events.count { it == "RESTART_RETAINED" })
+    }
+
+    @Test
+    fun `restarts do not renew the age of retained observations`() {
+        val history = LpDirectionalHistory({}, maxAge = 6L)
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (literal in listOf(0, 1)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+        }
+        assertTrue(history.score(variable, 0.5).isFinite())
+
+        repeat(7) {
+            history.restart()
+            history.beginNode(0)
+        }
+
+        assertTrue(history.score(variable, 0.5).isNaN())
+        assertFalse(history.hasReliableHistory)
+    }
+
+    @Test
     fun `parent bookkeeping pays allocation without repeatedly charging unused capacity`() {
         var work = 0L
         val history = LpDirectionalHistory({}, charge = { work += it })

@@ -306,6 +306,17 @@ internal class LpHints(
 
     private var recorded = false
 
+    fun restart() {
+        clearPassivePoint()
+        if (scopeModel != null) {
+            charge(2L)
+            history.restart()
+        }
+        freshRecord = false
+        objectiveRecorded = false
+        directionalChoice = null
+    }
+
     fun resetHistory() {
         clearPassivePoint()
         if (scopeModel != null) {
