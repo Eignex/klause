@@ -169,6 +169,41 @@ class SourceEligibilityTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = ["valid", "path", "stored", "plain", "executed", "failed"])
+    fun `identity only receipts should verify matching bytes without exposing a source`(variant: String) {
+        val file = Files.createTempFile("identity-cases-", ".jsonl").toFile()
+        try {
+            val path = "miplib2017/a.mps.zst"
+            val detailsPath = if (variant == "path") "miplib2017/b.mps.zst" else path
+            val stored = if (variant == "stored") hash('9') else hash('1')
+            val plain = if (variant == "plain") "missing" else hash('2')
+            val executed = variant == "executed"
+            val status = if (variant == "failed") "FAILED" else "DONE"
+            file.writeText("""{"index":0,"status":"$status","problem":{"benchCase":{"id":"a",
+                "inputs":[{"path":"$path","root":"CORPUS","role":"model","sha256":"${hash('1')}"}],
+                "attributes":{"recordSchema":"source-identity-v1","suite":"miplib2017","problem":"a"}}},
+                "record":{"caseId":"a","status":"success","details":{"path":"$detailsPath",
+                "packedSha256":"$stored","plainSha256":"$plain","plainBytes":42,
+                "suite":"miplib2017","problem":"a","solverExecuted":$executed}}}""".replace("\n", ""))
+
+            val manifest = SourceEligibility.exposures(listOf(file), "screen", "job 5")
+
+            assertTrue(manifest.exposures.isEmpty())
+            if (variant == "valid") {
+                assertEquals(Identity(path, "model", hash('1'), hash('2')), manifest.identities.single().inputs.single())
+                assertTrue(manifest.gaps.isEmpty())
+                assertEquals(Status.UNRESOLVED, SourceEligibility.classify("a", manifest.identities.single().inputs,
+                    manifest).status)
+            } else {
+                assertTrue(manifest.identities.isEmpty())
+                assertEquals("miplib2017", manifest.gaps.single().collection)
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = ["array", "request", "experiment", "job", "encoded-job"])
     fun `every descriptor form yields its frozen cases`(form: String) {
         val request = """{"parameters":{"cases":${JsonPrimitive(cases)}}}"""
