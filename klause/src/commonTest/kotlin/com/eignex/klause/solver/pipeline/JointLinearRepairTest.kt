@@ -184,18 +184,13 @@ class JointLinearRepairTest {
                     assertTrue(done)
                     val stages = repair.stats.smt.completeSearchStages.orEmpty()
                     assertTrue((stages["jointRepairClosedLeaves"] ?: 0L) >= 2L)
-                    if (completion) {
-                        val completed = assertIs<MinimizeResult.WithSample>(result)
-                        assertEquals(listOf(1L, 1L), completed.sample.ints.toList())
-                        assertEquals(2L, stages["jointRepairMaxFreedIntegers"])
-                        assertTrue((stages["jointRepairAdditionalRefutationSeeds"] ?: 0L) > 0L)
-                        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-                            SourceEvidence(source.scope, SourceClaim.Witness(completed.sample),
-                                SourceDerivation.SourceWitness)))
-                    } else {
-                        assertIs<MinimizeResult.Unknown>(result)
-                        assertEquals(1L, stages["jointRepairMaxFreedIntegers"])
-                    }
+                    val completed = assertIs<MinimizeResult.WithSample>(result)
+                    assertEquals(listOf(1L, 1L), completed.sample.ints.toList())
+                    assertEquals(2L, stages["jointRepairMaxFreedIntegers"])
+                    assertTrue((stages["jointRepairAdditionalRefutationSeeds"] ?: 0L) > 0L)
+                    assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                        SourceEvidence(source.scope, SourceClaim.Witness(completed.sample),
+                            SourceDerivation.SourceWitness)))
                 }
             }
         }
@@ -485,14 +480,12 @@ class JointLinearRepairTest {
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
 
                     assertTrue(done)
-                    if (completion) {
-                        val completed = assertIs<MinimizeResult.WithSample>(result)
-                        assertEquals(3.5, completed.objective)
-                        val evidence = SourceEvidence(source.scope, SourceClaim.Witness(completed.sample),
-                            SourceDerivation.SourceWitness)
-                        assertEquals(SourceEvidenceCheck.Checked,
-                            SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
-                    } else assertIs<MinimizeResult.Unknown>(result)
+                    val completed = assertIs<MinimizeResult.WithSample>(result)
+                    assertEquals(3.5, completed.objective)
+                    val evidence = SourceEvidence(source.scope, SourceClaim.Witness(completed.sample),
+                        SourceDerivation.SourceWitness)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
                 }
             }
         }

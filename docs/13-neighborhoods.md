@@ -255,6 +255,15 @@ adjacency entries; its index admits at most
 pinned to the current center, while the continuous residual remains free under
 every source row.
 
+Before a checked center or cutoff exists, compatible numerical refutations can
+guide the next proposal independently of incumbent completion. The owner retains
+at most four refuted integer pins with their values and Boolean context, using
+checked scoped refutations under its existing LP funding. Matching pins supply
+preferred connectivity roots within the same width and visit limits. A changed
+retained pin or Boolean context, or a cutoff, clears this guidance. Missing usable
+pins leave ordinary seed selection available. This guidance grants no fixing or
+global refutation authority.
+
 Explicit diagnostic callers can identify original integer declarations separately
 from integer backings of original real columns. Backings participate in connectivity
 as bridges, remain free in every residual and consume no discrete seed or freedom
