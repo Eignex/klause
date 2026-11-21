@@ -627,7 +627,7 @@ internal class JointLinearRepair(
             queryRefutationScope = querySource.scope
             querySawExternal = false
             queryOriginalCondition = condition
-            val refutationGuidance = anchor == null && preparedCenter == null &&
+            val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
                 condition.cutoff == null
             val seed = checkedProposal?.takeIf { it.condition === condition }?.sample
             query = LinearAuthorityInvocation(querySource,

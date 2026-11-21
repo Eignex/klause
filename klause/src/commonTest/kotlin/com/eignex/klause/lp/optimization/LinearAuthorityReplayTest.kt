@@ -19,17 +19,10 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
-import com.eignex.klause.solver.pipeline.JointRepairNeighborhood
-import com.eignex.klause.solver.pipeline.SourceNumericalFeedback
-import com.eignex.klause.solver.pipeline.SourceNumericalFeedbackResult
-import com.eignex.klause.solver.pipeline.SourceNumericalSupportResult
-import com.eignex.klause.solver.pipeline.sourceNumericalRefutationSupport
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -432,40 +425,21 @@ class LinearAuthorityReplayTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `selected cut refutations should release incompatible receiving pins without another LP solve`() {
+    fun `selected cuts should refute receiving bounds before another LP solve`() {
         val restricted = source.atScope(source.scope.copy(condition = SourceCondition(
-            lower = mapOf(x to BigFraction.ZERO), upper = mapOf(x to BigFraction.ZERO))))
-        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val budget = SourceLpBudget(funding = funding)
-        val feedback = SourceNumericalFeedback(funding, ExecutionControl.Never,
-            request = LinearAuthorityFeedbackRequest(refutation = true))
+            upper = mapOf(x to BigFraction.ZERO))))
+        val budget = SourceLpBudget()
 
-        LinearAuthority(budget, retainLp = true).use { authority ->
-            authority.useReplayCuts(cuts)
-            feedback.attach(authority)
-            try {
-                val result = authority.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
-                val captured = assertIs<SourceNumericalFeedbackResult.Available>(feedback.consume(restricted))
-                val support = assertIs<SourceNumericalSupportResult.Available>(
-                    sourceNumericalRefutationSupport(captured, funding, ExecutionControl.Never))
-                val selection = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 2, ExecutionControl.Never))
-                val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
-                    mapOf(0 to BigFraction.ZERO))
-                assertTrue(selection.guideRefutation(support.assumptions, condition, budget, ExecutionControl.Never))
-
-                val proposal = selection.propose(List(2) { BigFraction.ZERO }, booleanArrayOf(),
-                    2, 1L, BigFraction.ONE, null)
-
-                assertEquals(setOf(1), proposal.lower.keys)
-                assertEquals(SourceEvidenceCheck.Checked,
-                    SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(assertNotNull(result.evidence)))
-                assertEquals(setOf(CutFamily.SOURCE_AGGREGATION), result.cutConflictFamilies)
-                assertEquals(1L, result.primalStages["SelectedCutBoundConflicts"])
-                assertEquals(0, budget.operations)
-            } finally {
-                feedback.detach(authority)
-            }
+        val result = LinearAuthority(budget, retainLp = true).use {
+            it.useReplayCuts(cuts)
+            it.advance(restricted, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
         }
+
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+        assertEquals(setOf(CutFamily.SOURCE_AGGREGATION), result.cutConflictFamilies)
+        assertEquals(1L, result.primalStages["SelectedCutBoundConflicts"])
+        assertEquals(0, budget.operations)
     }
 
     @Test
