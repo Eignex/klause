@@ -263,26 +263,6 @@ retries it while the filter suppresses the completed prefix. All repair exports
 stay in the private pool; permanent scope clauses and direct global nogoods remain
 withheld. Missing, unbound or foreign portfolio pools leave private sharing alone.
 
-An additional clause-related removal choice reads that matched peer pool to release
-a complete small nogood support ([neighborhoods](13-neighborhoods.md#alns-incumbent-acquisition)).
-The original random, worst-objective and adjacency choices retain separate destroy
-bandit indices and rewards; the clause-related choice occupies a fourth index.
-Its optional snapshot, support scan and copies share a 4,096-unit local ceiling,
-charged to the receiving execution; at most 512 requested coordinates and 16
-literals enter the bounded scratch. Interrupted preparation returns the original
-adjacency request without retaining payloads. Missing, empty or ineligible pools
-consume no extra random draws; an interrupted reservoir scan can advance the
-random stream. Neighborhood choices and changed-request counters retain publisher
-origins separately from native clause use, and supply no contribution reward.
-
-An internal single-core observer can copy the clause-related choice's exact drained
-snapshot dispositions and canonical supports during that same pass. Its shared
-window admits at most four completed eligible inventories and sixteen attempts,
-spending at most 4,096 additional receiving work and 64 KiB of modeled metadata.
-Incomplete copies retain explicit gaps and cannot establish support frequencies.
-Copying can alter containing cancellation and scheduling; absent observation adds
-no inventory allocation or random draws. Observation supplies no proof authority.
-
 #### Memory observation
 
 `sharing-memory=true` enables bounded retained-memory samples, independently of

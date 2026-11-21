@@ -11,7 +11,6 @@ import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.FinitePortfolioFactory
 import com.eignex.klause.portfolio.Kind
-import com.eignex.klause.portfolio.PoolClauseNeighborhoodObserver
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioDiagnostics
 import com.eignex.klause.portfolio.PortfolioEvent
@@ -97,7 +96,6 @@ internal fun FinitePipeline.portfolioExecutor(
     onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     onSession: ((String, PropagationSession) -> Unit)? = null,
-    onNeighborhood: PoolClauseNeighborhoodObserver? = null,
     toleranceAuthority: LinearToleranceAuthority? = null,
     cutBinding: FiniteSourceCutBinding? = null,
 ): PortfolioInvocation {
@@ -142,7 +140,7 @@ internal fun FinitePipeline.portfolioExecutor(
         acceptedIncumbents = companionArms.incumbents?.let { canonical ->
             IncumbentSource { canonical.projected()?.takeIf { it.objective.isFinite() } }
         },
-        onGuidance = onGuidance, onSession = onSession, onNeighborhood = onNeighborhood,
+        onGuidance = onGuidance, onSession = onSession,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(

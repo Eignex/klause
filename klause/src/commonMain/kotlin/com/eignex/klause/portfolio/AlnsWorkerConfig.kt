@@ -11,7 +11,6 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
-import com.eignex.klause.meta.alns.DestroyOperator
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -20,7 +19,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.finiteExactNeighborhoodWorker
 import com.eignex.klause.solver.pipeline.fixedDiscreteSample
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.random.Random
@@ -60,7 +58,6 @@ internal class AlnsWorkerConfig private constructor(
     private val sharingMemoryWork: Long = 32_768L,
     private val sharingMemoryScratch: Int = 4_096,
     private val sharingMemoryBytes: Long? = null,
-    private val neighborhoodObserver: PoolClauseNeighborhoodObserver? = null,
 ) :
     WorkerConfig {
     constructor(
@@ -73,38 +70,31 @@ internal class AlnsWorkerConfig private constructor(
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, check,
             workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-            neighborhoodObserver,
         )
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         AlnsWorkerConfig(
             profile, budget, numericalCompletion, toleranceCheck,
             workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-            neighborhoodObserver,
         )
 
     fun withNumericalCompletion(): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, true, toleranceCheck,
             workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-            neighborhoodObserver,
         )
 
     fun withWorkScheduling(): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, toleranceCheck,
-            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, neighborhoodObserver,
+            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
         )
 
     fun withSharingMemory(enabled: Boolean, work: Long, scratch: Int, bytes: Long? = null): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, toleranceCheck,
-            workScheduled, enabled, work, scratch, bytes, neighborhoodObserver,
+            workScheduled, enabled, work, scratch, bytes,
         )
-
-    fun withNeighborhoodObserver(observer: PoolClauseNeighborhoodObserver): AlnsWorkerConfig =
-        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, toleranceCheck,
-            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, observer)
 
     override val label: String get() = "alns-${profile.label}"
 
@@ -134,7 +124,6 @@ internal class AlnsWorkerConfig private constructor(
             memorySampleWork = sharingMemoryWork, memorySampleScratchEntries = sharingMemoryScratch,
             softLimitBytes = sharingMemoryBytes)
         val meter = SharingMeter()
-        val rng = Random(seed + index)
         val alns = Alns(
             inner = LocalSearchSolver(
                 problem,
@@ -146,10 +135,6 @@ internal class AlnsWorkerConfig private constructor(
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
             },
-            destroyOperators = peerPools?.clauses?.let { clauses ->
-                DestroyOperator.Defaults + PoolClauseRelatedDestroy(clauses, meter,
-                    observer = neighborhoodObserver, worker = workerLabel, seed = seed + index)
-            } ?: DestroyOperator.Defaults,
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),
             backtrackParams = BacktrackParams(
@@ -165,13 +150,8 @@ internal class AlnsWorkerConfig private constructor(
             pooledIncumbents = matchedPools?.solutions,
             acceptanceFor = acceptanceFactory(),
             literalSweep = definitionalSweep,
-            rng = rng,
-            repairBandit = repairBandit(rng, peerPools?.clauses != null),
+            rng = Random(seed + index),
         )
-        if (peerPools != null) {
-            alns.iterationObserver = neighborhoodObserver?.iterations?.owner(workerLabel, seed + index,
-                problem.numBoolVars, problem.numIntVars, problem.numRealVars)
-        }
         val params = LocalSearchParams(
             randomSeed = seed + index,
             costShaping = CostShaping.Linear(lambda = lsLambda),
@@ -211,10 +191,6 @@ internal class AlnsWorkerConfig private constructor(
     }
 
     companion object {
-        internal fun repairBandit(rng: Random, boundPeerClausePool: Boolean): RouletteWheelBandit =
-            RouletteWheelBandit(BacktrackRepair.Defaults.size,
-                segmentLength = if (boundPeerClausePool) 1 else 10, random = rng)
-
         /** What an ALNS arm needs from a model: an objective to optimise. */
         val NEEDS: Set<ArmNeed> = setOf(ArmNeed.Objective)
 

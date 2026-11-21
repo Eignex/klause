@@ -104,7 +104,6 @@ object PortfolioBuilder {
         acceptedIncumbents: IncumbentSource<Sample, Double>? = null,
         onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
         onSession: ((String, PropagationSession) -> Unit)? = null,
-        onNeighborhood: PoolClauseNeighborhoodObserver? = null,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
@@ -172,10 +171,8 @@ object PortfolioBuilder {
                     tuned.withLpQueryObserver(onLpQuery) else tuned
                 val guided = if (onGuidance != null && queried is BacktrackWorkerConfig)
                     queried.withGuidanceObserver(onGuidance) else queried
-                val sessionObserved = if (onSession != null && guided is BacktrackWorkerConfig)
+                val bounded = if (onSession != null && guided is BacktrackWorkerConfig)
                     guided.withSessionObserver(onSession) else guided
-                val bounded = if (onNeighborhood != null && sessionObserved is AlnsWorkerConfig)
-                    sessionObserved.withNeighborhoodObserver(onNeighborhood) else sessionObserved
                 val privateCoordinates = objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&

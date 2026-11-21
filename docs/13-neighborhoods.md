@@ -329,27 +329,6 @@ local-search parameters declare a seed, inner repair seeds also draw from that
 stream. Unseeded ordinary invocations allow the inner solver to choose its own
 seeds.
 
-With an exactly bound peer clause pool, portfolio ALNS adds a fourth removal choice
-beside random, worst-objective and adjacency removal. This clause-related choice
-includes all coordinates of one small shared nogood, then fills from an adjacency
-neighborhood. The destroy bandit rewards each choice separately, including plain
-adjacency. An empty or ineligible pool makes the fourth choice execute adjacency,
-so the menu also changes exploration weights when no clause guides removal.
-The requested coordinate count stays fixed; caller-pin filtering and Boolean
-definition closure still determine the effective repair scope. Fixed or externally
-pinned support, oversized snapshots and interrupted or unfunded scans keep the
-original request. Shared clauses guide removal without assigning coordinate values
-or changing the repair's feasibility and objective checks.
-
-The same exactly bound portfolio configuration updates the selected repair arm
-after each completed iteration with an exponential moving average of its categorical
-reward: reaction 0.1, initial weight 1 and minimum weight 0.01. Unselected repair
-weights stay fixed. Empty scopes and unresolved repairs receive the rejected reward;
-interrupted scope construction supplies no reward. Default destroy learning and other
-default ALNS repair learners aggregate rewards in ten-update segments. Both learners retain their
-weights across slices of the same ALNS owner. Rewards describe outcomes per attempt
-and do not normalize repair cost.
-
 Before and during its bootstrap and before each iteration, ALNS acquires a supplied
 assignment and the latest shared incumbent. A supplied assignment must cover all coordinates, satisfy the
 current model and assumptions and pass the shared source witness checker. A shared
@@ -393,18 +372,6 @@ same definition closure and caller-pin filtering used to build its repair pins.
 Its best objective threshold, exact discrete value and immutable best witness remain
 separate from a current center accepted by a non-monotone policy. A cancelled
 closure leaves its effective scope explicitly unavailable.
-A separate scalar ALNS observer follows actual destroy and repair choices, including
-empty scopes, unresolved repairs and interrupted scope construction. Its source-wide
-window retains at most 32 iterations across workers and reseeds, prepaying at most 4096
-containing work units and 64 KiB of modeled metadata. Worker, owner, run and iteration
-identity distinguish resumed slices from replacement handles. Records retain requested
-and effective counts and the actual acceptance and bandit reward after update, without
-copying assignments or evaluating another objective. Offered outer allowance, CP-node
-and local-move callback deltas, and elapsed repair time remain separate; callback deltas
-do not cover all LP or source work. Cancellation leaves unavailable fields explicit.
-The bounded, endogenous observations can perturb scheduling and establish no causal
-or performance comparison.
-
 Capture has separate coordinate accounting and consumes no search random draws.
 Its default frame limit is 4096 coordinates; an explicit diagnostic allowance can
 retain at most 8192 coordinates per complete frame. Oversized frames decline as a whole.

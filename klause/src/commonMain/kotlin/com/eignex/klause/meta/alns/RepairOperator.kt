@@ -12,7 +12,6 @@ import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.TerminationReason
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -82,25 +81,7 @@ internal data class RepairContext(
     val bestObjective: Double = Double.POSITIVE_INFINITY,
     val recordInnerWork: ((nodes: Long, moves: Long) -> Unit)? = null,
     val recordRepairResult: ((MinimizeResult) -> Unit)? = null,
-    val recordRepairOutcome: ((String, TerminationReason?) -> Unit)? = null,
 )
-
-private fun RepairContext.observeOutcome(result: MinimizeResult) {
-    val observer = recordRepairOutcome ?: return
-    val verdict = when (result) {
-        is MinimizeResult.Optimal -> "Optimal"
-        is MinimizeResult.BestFound -> "BestFound"
-        is MinimizeResult.Infeasible -> "Infeasible"
-        is MinimizeResult.Unbounded -> "Unbounded"
-        is MinimizeResult.Unknown -> "Unknown"
-    }
-    val reason = when (result) {
-        is MinimizeResult.BestFound -> result.reason
-        is MinimizeResult.Unknown -> result.reason
-        else -> null
-    }
-    observer(verdict, reason)
-}
 
 /**
  * Repair via the inner LS engine: invoke `inner.minimize` with the pin assumptions
@@ -119,7 +100,6 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
             result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
         )
         context.recordRepairResult?.invoke(result)
-        context.observeOutcome(result)
         return result.assignment
     }
 
@@ -146,7 +126,6 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
                 context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation,
             )
             record?.invoke(it.stats.search.nodes.sum.toLong() - before, 0L)
-            context.recordRepairOutcome?.invoke(if (step.sample != null) "BestFound" else "Unknown", step.reason)
             context.recordRepairResult?.invoke(step.sample?.let { sample ->
                 MinimizeResult.BestFound(sample, context.objective.evaluate(sample),
                     checkNotNull(step.reason), it.stats)
@@ -168,7 +147,6 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
             result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
         )
         context.recordRepairResult?.invoke(result)
-        context.observeOutcome(result)
         return result.assignment
     }
 
