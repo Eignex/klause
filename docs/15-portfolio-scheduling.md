@@ -531,8 +531,8 @@ when its only two non-singleton occurrences are unguarded, unpinned, nonstrict
 inequalities with exactly opposite coefficients and right-hand sides. Bounded
 recognition spends the same source funding; unavailable or ambiguous definitions
 retain the original graph. The prepared row index and ordinary traversal stay
-unchanged. Closure describes reachability in this selection graph only. Support
-selection does not join components through continuous columns; all continuous
+unchanged. Closure describes reachability in this selection graph only. Integer support
+expansion does not join components through continuous columns; all continuous
 recourse and source rows remain in the query. The selection is heuristic and proves
 no independence. Width or visit-limit decline advances that root; resource or
 cancellation unavailability retains its phase. Each proposal shares one 8,192-visit
