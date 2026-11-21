@@ -316,6 +316,78 @@ class JointLinearRepairResultTest {
                 assertEquals(1L, stages["jointRepairGuidedIntegers"])
                 assertTrue((stages["jointRepairRootConsultations"] ?: 0L) > 1L)
                 assertEquals(1L, repair.stats.smt.sourceLp.operations)
+                assertFalse(repair.incumbentTrialPending)
+            }
+        }
+    }
+
+    @Test
+    fun `the initial root trial should survive pooled incumbent arrival through its first repair`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.GE, 1.75),
+            ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        var pooled: Sample? = null
+        JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2),
+            SparseSourceLpPolicy(quantum = 1L), external = { pooled },
+            observeExternalIncumbents = true).use { repair ->
+            val worker = exactNeighborhoodWorker("joint", 0, objective, ExecutionControl.Never,
+                exhausted = { repair.exhausted }, pendingIncumbentTrial = { repair.incumbentTrialPending },
+                open = { repair.search(adaptive = false) })
+            BoundedCompanionSearch(assertNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY }),
+                "finiteJointCompanion").use { search ->
+                var found: Sample? = null
+                search.runInstructionSlice(ExecutionControl.Never, 1_000, 1) { found = it.assignment }
+                assertTrue(search.incumbentTrialPending)
+                pooled = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0, 1.0))
+                var conditionedPause = false
+                repeat(128) {
+                    if (found == null && !search.isDone) {
+                        search.runInstructionSlice(ExecutionControl.Never, 1_000, 1) { found = it.assignment }
+                        if (found == null) {
+                            assertTrue(search.incumbentTrialPending)
+                            if ((repair.stats.smt.completeSearchStages?.get("jointRepairCandidates") ?: 0L) > 0L) {
+                                conditionedPause = true
+                            }
+                        }
+                    }
+                }
+
+                assertTrue(conditionedPause)
+                assertEquals(1L, assertNotNull(found).intValue(0))
+                assertFalse(search.incumbentTrialPending)
+                pooled = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(1.0, 1.0))
+                search.runInstructionSlice(ExecutionControl.Never, 1_000, 1) {}
+                assertFalse(search.incumbentTrialPending)
+            }
+        }
+    }
+
+    @Test
+    fun `a stopped initial root trial should release its scheduling claim without another slice`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        var cancelled = false
+        JointLinearRepair(model, source, objective, TheoryParams(cancellation = ExecutionControl { cancelled }),
+            SparseSourceLpPolicy(quantum = 1L)).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                assertFalse(search.advance(ExecutionControl.Never, 1))
+                assertTrue(repair.incumbentTrialPending)
+
+                cancelled = true
+                assertFalse(repair.incumbentTrialPending)
+                cancelled = false
+                repair.close()
+                assertFalse(repair.incumbentTrialPending)
             }
         }
     }

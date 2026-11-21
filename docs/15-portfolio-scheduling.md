@@ -455,6 +455,12 @@ complete before finite handles open. Finite probes keep their order and seed
 positions. Before the first incumbent, joint repair is owed 30% of scheduled search
 time beside the finite reservations, because its root preparation earns no reward
 until a proposal completes.
+Once joint repair admits its first root query, its initial trial receives
+continuation after owed complete-worker coverage through root preparation and the
+first conditioned repair. A pooled incumbent arriving during preparation preserves
+this trial. A completed repair or unavailable root guidance ends it; later root
+consultations do not renew it. The trial changes scheduling order without earning
+incumbent reward or extending any allowance.
 
 Each companion keeps four seconds of active search by default; `companion-active-ms`
 sets a lifetime of at most 60,000 milliseconds inside the unchanged solve deadline.
