@@ -438,6 +438,18 @@ before writing and stops at two million entries or eight million work units;
 declines publish no factors or rank claim. Sparse admission never changes the dense
 exact-continuation caps.
 
+An optional model-facing root observer receives synchronous ownership, query-call,
+private-copy, target, handoff and first-consultation events. Engine identity is separate
+from source, objective and point identity; a query-call ordinal supplies no numerical
+cursor lineage or evidence of advancement. Identity references belong to the callback,
+and the receiver owns bounded retention. Query pairing and a closed journal cover only
+the instrumented sites; omitted calls and numerical cursor lineage remain unknown.
+Consumer eligibility comes from its ordinary evaluated predicate; other events carry
+no such fact. Ordinary callback exceptions disable that
+owner's observation and record a diagnostic failure without changing solver authority
+or work grants. Retirement suppresses intermediate dispatch and emits its closing event
+only after normal cleanup; interrupted observation supplies no complete lifecycle claim.
+
 Completed root points can guide rounding under the same objective identity, within a
 one-MiB guidance cap. Rounding pins through propagation with nearest targets, and
 retained-root plans also try upward and downward targets; an interrupted pin restores

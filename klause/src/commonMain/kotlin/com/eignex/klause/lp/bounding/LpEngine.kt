@@ -91,6 +91,7 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.saturatedAdd
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -178,6 +179,7 @@ internal class LpEngine(
     internal val sourcePreparation: LpSourcePreparation =
         params0.lpConfig?.sourcePreparation ?: params0.lpPlan.sourcePreparation,
     private val eagerSourcePreparation: Boolean = false,
+    rootPointObserver: LpRootPointObserver? = null,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -185,6 +187,11 @@ internal class LpEngine(
             lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L))
     }
 
+    private var rootPointObserver = rootPointObserver
+    private val rootPointOwner = rootPointObserver?.let { Any() }
+    private var rootPointSequence = 0L
+    private var rootPointQuery = 0L
+    private var rootPointRetiring = false
     private var closed = false
     private val requestedPlan = params0.lpPlan
     internal var sparseTrialActive = false
@@ -198,12 +205,22 @@ internal class LpEngine(
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
-        private set
+        private set(value) {
+            val previous = field
+            field = value
+            if (rootPointObservationEnabled && previous !== value) {
+                observeRootPoint(LpRootPointStage.TARGETS,
+                    if (value == null) LpRootPointDisposition.CLEARED else LpRootPointDisposition.RETAINED,
+                    point = value?.coordinates, previousPoint = previous?.coordinates,
+                    auxiliary = value?.auxiliary == true, partial = value?.knownColumns != null)
+            }
+        }
     private var restartRootTargets: RootPrimalTargets? = null
     internal var rootComponentValues: RootComponentValues? = null
         private set
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
         set(value) {
+            val previous = field
             if (field !== value) {
                 rootProgress = null
                 field?.pinning?.releaseRetainedState()
@@ -212,6 +229,13 @@ internal class LpEngine(
                 }
             }
             field = value
+            if (rootPointObservationEnabled && previous !== value) {
+                observeRootPoint(LpRootPointStage.GUIDANCE,
+                    if (value == null) LpRootPointDisposition.CLEARED else LpRootPointDisposition.REPLACED,
+                    model = value?.relaxation?.model, point = value?.primal, previousPoint = previous?.primal,
+                    auxiliary = value?.auxiliaryPoint == true, partial = value?.knownColumns != null,
+                    pointObjective = value?.objective)
+            }
         }
     internal var rootRoundingInterrupted: Boolean = false
     internal fun handoffRootBoundSearch() {
@@ -314,6 +338,25 @@ internal class LpEngine(
     override fun close() {
         if (closed) return
         closed = true
+        try {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.CLOSE_BEGIN, LpRootPointDisposition.BEGIN,
+                    point = rootRoundingWarmStart?.primal, previousPoint = rootPrimalTargets?.coordinates)
+            }
+        } finally {
+            rootPointRetiring = true
+            try {
+                releaseOnClose()
+            } finally {
+                rootPointRetiring = false
+            }
+        }
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.CLOSE_END, LpRootPointDisposition.END)
+        }
+    }
+
+    private fun releaseOnClose() {
         discardRootLayoutPreparation()
         preparedRootRelaxation = null
         persistentRelaxation = null
@@ -373,7 +416,67 @@ internal class LpEngine(
             containingWork = { work -> if (rootProbe) chargeWork(work) },
             sourcePreparation = sourcePreparation,
             eagerSourcePreparation = eagerSourcePreparation,
+            rootPointObserver = rootPointObserver,
         ).also { it.structuralCutSupport = structuralCutSupport }
+    }
+
+    internal val rootPointObservationEnabled: Boolean get() = rootPointObserver != null && !rootPointRetiring
+
+    internal fun beginRootPointQuery(model: LpModel) {
+        if (rootPointObserver == null) return
+        if (rootPointQuery == Long.MAX_VALUE) {
+            disableRootPointObservation()
+            return
+        }
+        rootPointQuery++
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.QUERY_CALL, LpRootPointDisposition.ENTERED, model)
+        }
+    }
+
+    internal fun endRootPointQuery(model: LpModel, result: FloatLpResult?, paused: Boolean? = null,
+        termination: LpFloatTermination? = null) {
+        if (!rootPointObservationEnabled) return
+        observeRootPoint(LpRootPointStage.QUERY_CALL, when {
+            result?.optimal == true -> LpRootPointDisposition.OPTIMAL
+            result != null -> LpRootPointDisposition.NON_OPTIMAL
+            else -> LpRootPointDisposition.NO_RESULT
+        }, model, result?.primal, paused = paused, termination = termination)
+    }
+
+    internal fun observeRootPoint(
+        stage: LpRootPointStage,
+        disposition: LpRootPointDisposition,
+        model: Any? = null,
+        point: Any? = null,
+        previousPoint: Any? = null,
+        auxiliary: Boolean = false,
+        partial: Boolean = false,
+        sourceRoot: Boolean? = null,
+        paused: Boolean? = null,
+        termination: LpFloatTermination? = null,
+        pointObjective: Any? = null,
+    ) {
+        if (rootPointRetiring) return
+        val observer = rootPointObserver ?: return
+        if (rootPointSequence == Long.MAX_VALUE) {
+            disableRootPointObservation()
+            return
+        }
+        val event = LpRootPointObservation(checkNotNull(rootPointOwner), problem, objective,
+            ++rootPointSequence, rootPointQuery, stage, disposition, model, point, previousPoint,
+            automaticSparseTrial, auxiliary, partial, sourceRoot, paused, termination, pointObjective)
+        try {
+            observer.onRootPoint(event)
+        } catch (failure: Exception) {
+            if (failure is CancellationException) throw failure
+            disableRootPointObservation()
+        }
+    }
+
+    private fun disableRootPointObservation() {
+        rootPointObserver = null
+        sink.lp.observePrimalPhase("ROOT_POINT_OBSERVATION", "FAILED", 0L)
     }
 
     internal fun requireOpen() {
@@ -404,17 +507,55 @@ internal class LpEngine(
         result: FloatLpResult?,
         cancellation: ExecutionControl,
     ) {
-        if (!params.lpPlan.probe || result?.optimal != true || cancellation()) return
-        val work = result.primal.size.toLong()
-        if (!rootGuidanceFits(work * Double.SIZE_BYTES) || lpWorkAllowanceSpent(work)) return
+        val declined = when {
+            !params.lpPlan.probe -> LpRootPointDisposition.PROBE_DISABLED
+            result?.optimal != true -> LpRootPointDisposition.NO_POINT
+            cancellation() -> LpRootPointDisposition.CANCELLED
+            else -> null
+        }
+        if (declined != null) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, declined, relaxation.model, result?.primal)
+            }
+            return
+        }
+        val completed = checkNotNull(result)
+        val work = completed.primal.size.toLong()
+        val allowance = when {
+            !rootGuidanceFits(work * Double.SIZE_BYTES) -> LpRootPointDisposition.STORAGE
+            lpWorkAllowanceSpent(work) -> LpRootPointDisposition.LP_WORK
+            else -> null
+        }
+        if (allowance != null) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, allowance, relaxation.model, completed.primal)
+            }
+            return
+        }
         val remaining = if (retainedRootEnabled) retainedRootRemainingWork() else rootPrimalWorkBudget()
-        if ((retainedRootEnabled || remaining > 0L) && remaining <= work) return
+        if ((retainedRootEnabled || remaining > 0L) && remaining <= work) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, LpRootPointDisposition.ROOT_WORK,
+                    relaxation.model, completed.primal)
+            }
+            return
+        }
         val started = TimeSource.Monotonic.markNow()
         noteNodeOverhead(work)
-        val primal = result.primal.copyOf()
-        if (cancellation()) return
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal,
+        val primal = completed.primal.copyOf()
+        if (cancellation()) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.COPY, LpRootPointDisposition.CANCELLED,
+                    relaxation.model, primal, completed.primal)
+            }
+            return
+        }
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, completed.basis, primal,
             sourceProblem = problem)
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.COPY, LpRootPointDisposition.RETAINED,
+                relaxation.model, primal, completed.primal)
+        }
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
@@ -545,16 +686,39 @@ internal class LpEngine(
             SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps))
 
     internal fun retainRootPrimalTargets(cancellation: ExecutionControl): Boolean {
-        val guide = rootRoundingWarmStart ?: return false
-        val coordinates = guide.primal ?: return false
+        val guide = rootRoundingWarmStart ?: run {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.TARGETS, LpRootPointDisposition.NO_GUIDANCE)
+            }
+            return false
+        }
+        val coordinates = guide.primal ?: run {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.TARGETS, LpRootPointDisposition.NO_POINT, guide.relaxation.model)
+            }
+            return false
+        }
         val mapBytes = (guide.relaxation.intColOf.size.toLong() + guide.relaxation.boolColOf.size) * Int.SIZE_BYTES
-        if (!params.lpPlan.branching || problem.numRealVars != 0 || guide.objective !== objective ||
-            coordinates.size != guide.relaxation.model.n ||
-            (guide.knownColumns != null && guide.knownColumns.size != coordinates.size) ||
-            !rootPrimalGuidanceMatches(guide) || cancellation() ||
-            !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) || lpWorkAllowanceSpent(1L) ||
-            retainedRootRemainingWork() <= 1L
-        ) return false
+        val declined = when {
+            !params.lpPlan.branching -> LpRootPointDisposition.BRANCH_DISABLED
+            problem.numRealVars != 0 -> LpRootPointDisposition.REAL_VARIABLES
+            guide.objective !== objective -> LpRootPointDisposition.OBJECTIVE
+            coordinates.size != guide.relaxation.model.n -> LpRootPointDisposition.SHAPE
+            guide.knownColumns != null && guide.knownColumns.size != coordinates.size -> LpRootPointDisposition.MASK
+            !rootPrimalGuidanceMatches(guide) -> LpRootPointDisposition.OWNER
+            cancellation() -> LpRootPointDisposition.CANCELLED
+            !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) -> LpRootPointDisposition.STORAGE
+            lpWorkAllowanceSpent(1L) -> LpRootPointDisposition.LP_WORK
+            retainedRootRemainingWork() <= 1L -> LpRootPointDisposition.ROOT_WORK
+            else -> null
+        }
+        if (declined != null) {
+            if (rootPointObservationEnabled) {
+                observeRootPoint(LpRootPointStage.TARGETS, declined, guide.relaxation.model, coordinates,
+                    auxiliary = guide.auxiliaryPoint, partial = guide.knownColumns != null)
+            }
+            return false
+        }
         noteNodeOverhead(1L)
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
         rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
@@ -663,6 +827,9 @@ internal class LpEngine(
         noteNodeOverhead(1L)
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "OWNER_RETAINED", 0L)
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.OWNER, LpRootPointDisposition.RETAINED, relaxation.model)
+        }
     }
 
     internal fun retainRootPartialPrimalGuidance(

@@ -1,16 +1,300 @@
 package com.eignex.klause.bench.profile
 
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePortfolioLpCaptureTest {
+    @ParameterizedTest
+    @CsvSource("portfolio-policy,retained", "handoff,true", "portfolio-progress,true", "captures,1")
+    fun `root point capture requires ordinary fixed policy`(key: String, value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary",
+            "portfolio-progress" to "false", "captures" to "0", "capture-root-points" to "true")
+
+        assertFailsWith<IllegalArgumentException> {
+            FinitePortfolioLpCapture.parameters(options + (key to value))
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `root capture selection preserves ordinary algorithm parameters`(root: Boolean) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary",
+            "portfolio-progress" to "false", "captures" to "0", "capture-guidance" to "true",
+            "capture-root-points" to root.toString())
+
+        val parameters = FinitePortfolioLpCapture.parameters(options)
+
+        assertEquals(listOf("portfolio-progress=false"), parameters)
+    }
+
+    @Test
+    fun `root point identities use reference identity and preserve actual objective sharing`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        val first = String(charArrayOf('x'))
+        val second = String(charArrayOf('x'))
+        val objective = Any()
+        window.observe("bt/lp-default", RootEvent(first, 1L, objective = objective), 1L)
+        window.observe("bt/lp-aggressive", RootEvent(second, 1L, objective = objective), 2L)
+
+        val events = window.snapshot().events
+
+        assertEquals(0, events[0].owner)
+        assertEquals(1, events[1].owner)
+        assertEquals(events[0].objective, events[1].objective)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["complete", "valid-query", "guard-only", "open-query", "missing-end",
+        "sequence-gap", "reflection-failure", "mismatched-query", "mismatched-model", "query-gap",
+        "return-without-entry", "duplicate-entry", "duplicate-close-begin", "duplicate-close-end",
+        "event-after-close-begin", "event-after-close-end", "end-without-begin", "invalid-query-kind",
+        "source-change", "objective-change"])
+    fun `root journals reject broken query pairing and close order`(shape: String) {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        val event = RootEvent(Any(), 1L)
+        val model = Any()
+        var sequence = 2L
+        var query = 0L
+        window.observe("bt/lp-default", event, 1L)
+        fun send(stage: String, disposition: String, call: Long = query, observedModel: Any? = null) {
+            window.observe("bt/lp-default", event.copy(sequence = sequence++, stage = stage,
+                disposition = disposition, query = call, model = observedModel), sequence)
+        }
+        if (shape in setOf("valid-query", "open-query", "mismatched-query", "mismatched-model",
+                "query-gap", "duplicate-entry")) {
+            query = if (shape == "query-gap") 2L else 1L
+            send("QUERY_CALL", "ENTERED", observedModel = model)
+            if (shape == "duplicate-entry") send("QUERY_CALL", "ENTERED", observedModel = model)
+            if (shape != "open-query") send("QUERY_CALL", "OPTIMAL",
+                if (shape == "mismatched-query") 99L else query,
+                if (shape == "mismatched-model") Any() else model)
+        }
+        if (shape == "return-without-entry") send("QUERY_CALL", "OPTIMAL", 1L, model)
+        if (shape == "guard-only") send("QUERY_CALL", "ROOT_WORK")
+        if (shape == "invalid-query-kind") send("QUERY_CALL", "RETAINED")
+        if (shape == "source-change") window.observe("bt/lp-default",
+            event.copy(sequence = sequence++, source = Any()), 3L)
+        if (shape == "objective-change") window.observe("bt/lp-default",
+            event.copy(sequence = sequence++, objective = Any()), 3L)
+        if (shape == "sequence-gap") sequence++
+        if (shape == "reflection-failure") window.observe("bt/lp-default", Any(), 3L)
+        if (shape == "end-without-begin") send("CLOSE_END", "END")
+        send("CLOSE_BEGIN", "BEGIN")
+        if (shape == "duplicate-close-begin") send("CLOSE_BEGIN", "BEGIN")
+        if (shape == "event-after-close-begin") send("TARGETS", "RETAINED")
+        if (shape != "missing-end") send("CLOSE_END", "END")
+        if (shape == "duplicate-close-end") send("CLOSE_END", "END")
+        if (shape == "event-after-close-end") send("TARGETS", "RETAINED")
+
+        val snapshot = window.snapshot()
+        val owner = snapshot.owners.single()
+
+        assertEquals(if (shape in setOf("complete", "valid-query", "guard-only"))
+            "CLOSED_JOURNALED_SCOPE" else "UNKNOWN", owner.coverage)
+        assertTrue(snapshot.partialQueryCoverage)
+        assertEquals(false, snapshot.absenceEvidence)
+    }
+
+    @Test
+    fun `root event overflow retains bounded records and reports unknown coverage`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any",
+            FinitePortfolioLpCapture.RootPointLimits(ownerEvents = 4))
+        val event = RootEvent(Any(), 1L)
+        repeat(5) { index -> window.observe("bt/lp-default", event.copy(sequence = index + 1L), index.toLong()) }
+
+        val snapshot = window.snapshot()
+
+        assertEquals(4, snapshot.events.size)
+        assertEquals(1L, snapshot.dropped)
+        assertEquals("UNKNOWN", snapshot.owners.single().coverage)
+    }
+
+    @Test
+    fun `root owner exhaustion never aliases a new owner`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any",
+            FinitePortfolioLpCapture.RootPointLimits(owners = 4))
+        val owners = List(5) { Any() }
+        owners.forEach { window.observe("bt/lp-default", RootEvent(it, 1L), 1L) }
+
+        val snapshot = window.snapshot()
+
+        assertEquals(4, snapshot.owners.size)
+        assertEquals(4, snapshot.events.size)
+        assertEquals(1L, snapshot.identityOverflow)
+        assertEquals(1L, snapshot.dropped)
+    }
+
+    @Test
+    fun `root capture counts unselected workers without reading borrowed identities`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("bt/lp-default")
+
+        window.observe("bt/lp-aggressive", Any(), 1L)
+
+        val snapshot = window.snapshot()
+        assertEquals(1L, snapshot.unselected)
+        assertEquals(0L, snapshot.failures)
+        assertTrue(snapshot.events.isEmpty())
+    }
+
+    @Test
+    fun `concurrent root callbacks share the total event capacity`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any",
+            FinitePortfolioLpCapture.RootPointLimits(ownerEvents = 8, events = 16))
+        val owners = List(4) { Any() }
+        val threads = owners.map { owner -> Thread {
+            repeat(8) { index ->
+                window.observe("bt/lp-default", RootEvent(owner, index + 1L), index.toLong())
+            }
+        } }
+
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+
+        val snapshot = window.snapshot()
+        assertEquals(16, snapshot.events.size)
+        assertEquals(16L, snapshot.dropped)
+        assertEquals(0L, snapshot.failures)
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `root snapshot json preserves observed identities and dropped coverage`(drop: Boolean) {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any",
+            FinitePortfolioLpCapture.RootPointLimits(ownerEvents = if (drop) 2 else 512))
+        val event = RootEvent(Any(), 1L, point = Any(), previousPoint = Any(),
+            model = Any(), pointObjective = Any(), sourceRoot = true, paused = false, termination = "LIMIT")
+        window.observe("bt/lp-default", event, 11L)
+        window.observe("bt/lp-default", event.copy(sequence = 2L, stage = "CLOSE_BEGIN", disposition = "BEGIN",
+            model = null, point = null, previousPoint = null, pointObjective = null, sourceRoot = null,
+            paused = null, termination = null), 12L)
+        window.observe("bt/lp-default", event.copy(sequence = 3L, stage = "CLOSE_END", disposition = "END"), 13L)
+
+        val snapshot = window.snapshot()
+        val json = snapshot.json()
+        val owner = json.getValue("owners").jsonArray.single().jsonObject
+        val first = json.getValue("events").jsonArray.first().jsonObject
+
+        assertEquals(if (drop) "UNKNOWN" else "CLOSED_JOURNALED_SCOPE",
+            owner.getValue("coverage").jsonPrimitive.content)
+        assertEquals(if (drop) 1L else 0L, json.getValue("dropped").jsonPrimitive.long)
+        assertEquals(if (drop) 2 else 3, json.getValue("retained").jsonPrimitive.int)
+        assertEquals(if (drop) "1" else null,
+            json.getValue("droppedStages").jsonObject["CLOSE_END"]?.jsonPrimitive?.content)
+        assertEquals(setOf("worker", "owner", "source", "objective", "pointObjective", "model", "point",
+            "previousPoint", "sequence", "queryCall", "stage", "disposition", "automatic", "auxiliary",
+            "partial", "sourceRoot", "paused", "termination", "elapsedNs"), first.keys)
+        assertEquals("bt/lp-default", first.getValue("worker").jsonPrimitive.content)
+        for (name in listOf("owner", "source", "objective", "model", "point", "queryCall")) {
+            assertEquals(0L, first.getValue(name).jsonPrimitive.long)
+        }
+        assertEquals(1, first.getValue("pointObjective").jsonPrimitive.int)
+        assertEquals(1, first.getValue("previousPoint").jsonPrimitive.int)
+        assertEquals(1L, first.getValue("sequence").jsonPrimitive.long)
+        assertEquals(11L, first.getValue("elapsedNs").jsonPrimitive.long)
+        assertEquals("OWNER", first.getValue("stage").jsonPrimitive.content)
+        assertEquals("RETAINED", first.getValue("disposition").jsonPrimitive.content)
+        assertEquals("true", first.getValue("automatic").jsonPrimitive.content)
+        assertEquals("false", first.getValue("auxiliary").jsonPrimitive.content)
+        assertEquals("false", first.getValue("partial").jsonPrimitive.content)
+        assertEquals("true", first.getValue("sourceRoot").jsonPrimitive.content)
+        assertEquals("false", first.getValue("paused").jsonPrimitive.content)
+        assertEquals("LIMIT", first.getValue("termination").jsonPrimitive.content)
+        assertEquals("true", json.getValue("partialQueryCoverage").jsonPrimitive.content)
+        assertEquals("false", json.getValue("absenceEvidence").jsonPrimitive.content)
+        assertEquals("UNKNOWN", json.getValue("cursorLineage").jsonPrimitive.content)
+        val closing = json.getValue("events").jsonArray[1].jsonObject
+        for (name in listOf("model", "point", "previousPoint", "pointObjective",
+            "sourceRoot", "paused", "termination")) {
+            assertEquals(JsonNull, closing.getValue(name))
+        }
+        assertEquals(setOf("owner", "worker", "seen", "dropped", "retainedOwnerObserved", "closeBegin", "closeEnd",
+            "openQuery", "coverage"), owner.keys)
+        assertEquals(JsonNull, owner.getValue("openQuery"))
+    }
+
+    @Test
+    fun `root snapshots preserve their observed prefix after later callbacks`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        val event = RootEvent(Any(), 1L)
+        window.observe("bt/lp-default", event, 1L)
+        val before = window.snapshot()
+
+        window.observe("bt/lp-default", event.copy(sequence = 2L, stage = "CLOSE_BEGIN", disposition = "BEGIN"), 2L)
+        window.observe("bt/lp-default", event.copy(sequence = 3L, stage = "CLOSE_END", disposition = "END"), 3L)
+
+        assertEquals(1, before.events.size)
+        assertEquals("UNKNOWN", before.owners.single().coverage)
+        assertEquals(3, window.snapshot().events.size)
+        assertEquals("CLOSED_JOURNALED_SCOPE", window.snapshot().owners.single().coverage)
+    }
+
+    @Test
+    fun `root adapter records ordinary getter failures`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+
+        window.observe("bt/lp-default", RootGetterFailure(IllegalStateException("getter")), 1L)
+
+        val snapshot = window.snapshot()
+        assertEquals(1L, snapshot.failures)
+        assertTrue(snapshot.events.isEmpty())
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["cancellation", "error"])
+    fun `root adapter propagates interrupted getters`(kind: String) {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        val failure = if (kind == "cancellation") CancellationException("getter") else AssertionError("getter")
+
+        val thrown = assertFailsWith<Throwable> {
+            window.observe("bt/lp-default", RootGetterFailure(failure), 1L)
+        }
+
+        assertSame(failure, thrown)
+        assertEquals(0L, window.snapshot().failures)
+    }
+
+    class RootGetterFailure(private val failure: Throwable) {
+        val owner: Any get() = throw failure
+    }
+
+    data class RootEvent(
+        val owner: Any,
+        val sequence: Long,
+        val stage: String = "OWNER",
+        val disposition: String = "RETAINED",
+        val source: Any = owner,
+        val objective: Any = owner,
+        val pointObjective: Any? = null,
+        val model: Any? = null,
+        val point: Any? = null,
+        val previousPoint: Any? = null,
+        val query: Long = 0L,
+        val automatic: Boolean = true,
+        val auxiliary: Boolean = false,
+        val partial: Boolean = false,
+        val sourceRoot: Boolean? = null,
+        val paused: Boolean? = null,
+        val termination: String? = null,
+    )
+
+
     @ParameterizedTest
     @ValueSource(strings = ["bt/satOptimized", "bt/conflictDriven"])
     fun `unselected callbacks should preserve selected metadata and owner capacity`(worker: String) {

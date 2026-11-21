@@ -1109,6 +1109,25 @@ have separate identities. They do not establish warm replay, original-source pro
 authority, CLI equivalence or production performance; capture spends the same
 containing source deadline. Source fetching remains inside the containing lab job.
 
+For model-facing root-point lifecycle capture, use `capture-root-points=true` with
+`portfolio-policy=ordinary handoff=false portfolio-progress=false captures=0`.
+`capture-worker=any` includes every worker; a selected worker cannot explain others.
+This option is independent of `capture-guidance` and raises only its source-shape
+limit to 6,000 rows and variables, retaining the 1 MiB decoded-input bound.
+`root-points.json` stores scalar identities and events after execution and retirement:
+64 owners, 512 events per owner and 8,192 events total. Weak identity maps bound
+sources, objectives, models and points at 64, 128, 512 and 1,024 entries. Exhaustion,
+dropped events, callback errors, open queries or incomplete retirement make coverage
+unknown. A structurally closed journal reports `CLOSED_JOURNALED_SCOPE`, with
+`partialQueryCoverage=true` and `absenceEvidence=false`: it cannot explain missing
+queries or points, or prove source-owner authority. Calls match their query ordinals
+and model identities; close markers require uninterrupted retirement ordering.
+A query call does not establish numerical advancement or cursor continuity;
+a consultation is not an accepted witness or a changed search choice. Callback time
+is inside the containing allowance and excludes unmeasured dispatch/allocation cost;
+final serialization time is separate. This profile's JVM envelope and source-entry
+path do not establish CLI equivalence or production performance.
+
 For phase/lifetime diagnosis use `param.portfolio-progress=true` to retain physical
 creation/query/retirement, incumbent availability/read/import/consumption and settled
 phase/cost events in CLI stderr. `armPhase.*`, `armLifecycle.*` and

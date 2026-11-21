@@ -13,6 +13,9 @@ import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpRootPointDisposition
+import com.eignex.klause.lp.bounding.LpRootPointObserver
+import com.eignex.klause.lp.bounding.LpRootPointStage
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.linearLowerBound
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
@@ -703,6 +706,7 @@ internal class ResumableMinimize(
         lpEngine = resources.own(
             LpEngine(
                 problem, objective, params.lpParams(), sink, slackContext(), deferred = true,
+                rootPointObserver = params.branchObserver as? LpRootPointObserver,
                 nodeWorkAllowance = {
                     if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()
@@ -1507,25 +1511,77 @@ internal class ResumableMinimize(
 
     private fun handoffRootTargets(rootToken: ExecutionControl): Boolean {
         val plan = lpEngine.params.lpPlan
-        if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 ||
-            !plan.branching || plan.lbTreeSearch || !lpEngine.retainedRootEnabled
-        )
+        val declined = when {
+            !pausable -> LpRootPointDisposition.NOT_PAUSABLE
+            decisionLimit <= 0L -> LpRootPointDisposition.NO_DECISIONS
+            problem.numRealVars != 0 -> LpRootPointDisposition.REAL_VARIABLES
+            !plan.branching -> LpRootPointDisposition.BRANCH_DISABLED
+            plan.lbTreeSearch -> LpRootPointDisposition.TREE_SEARCH
+            !lpEngine.retainedRootEnabled -> LpRootPointDisposition.NOT_RETAINED
+            else -> null
+        }
+        if (declined != null) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, declined)
+            }
             return false
-        val pending = lpEngine.rootRoundingWarmStart ?: return false
+        }
+        val pending = lpEngine.rootRoundingWarmStart ?: run {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.NO_GUIDANCE)
+            }
+            return false
+        }
         if (pending.primal == null) {
             lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
         }
-        val guide = lpEngine.rootRoundingWarmStart ?: return false
-        if (guide.primal == null || rootToken()) return false
+        val guide = lpEngine.rootRoundingWarmStart ?: run {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.NO_GUIDANCE)
+            }
+            return false
+        }
+        if (guide.primal == null) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.NO_POINT,
+                    guide.relaxation.model)
+            }
+            return false
+        }
+        if (rootToken()) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.CANCELLED,
+                    guide.relaxation.model, guide.primal)
+            }
+            return false
+        }
         if (lpEngine.rootPrimalTargets?.coordinates !== guide.primal &&
             !lpEngine.retainRootPrimalTargets(rootToken)
         )
             return false
-        if (lpEngine.prepareRootComponentTrial(objective, rootToken) || rootToken()) return false
+        if (lpEngine.prepareRootComponentTrial(objective, rootToken)) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.COMPONENT_TRIAL,
+                    guide.relaxation.model, guide.primal)
+            }
+            return false
+        }
+        if (rootToken()) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.CANCELLED,
+                    guide.relaxation.model, guide.primal)
+            }
+            return false
+        }
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
         lpEngine.rootRoundingWarmStart = null
         sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "SEARCH_HANDOFF", 0L)
+        if (lpEngine.rootPointObservationEnabled) {
+            lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.HANDED_OFF,
+                guide.relaxation.model, guide.primal, auxiliary = guide.auxiliaryPoint,
+                partial = guide.knownColumns != null)
+        }
         return true
     }
 

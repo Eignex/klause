@@ -7,6 +7,7 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpRootPointObservation
 import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -360,6 +361,7 @@ internal fun FinitePipeline.solve(
     onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
+    onPortfolioRootPoint: ((String, LpRootPointObservation) -> Unit)? = null,
 ): FiniteSolveResult {
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == request.lpSolveContext) {
         "custom LP dependencies require the fixed finite route"
@@ -543,6 +545,7 @@ internal fun FinitePipeline.solve(
             onPortfolioGuidance = onPortfolioGuidance,
             onPortfolioJointRepair = onPortfolioJointRepair,
             onPortfolioSession = onPortfolioSession,
+            onPortfolioRootPoint = onPortfolioRootPoint,
             toleranceCheck = sourceCheck?.let { check ->
                 FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
                     (check as? FiniteSourceAcceptance)?.objective?.let { score ->
