@@ -165,12 +165,13 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             if (attempt.second?.optimal != true) {
                 retainRootPartialPrimalGuidance(relaxation, component, cancellation)
             }
+            if (automaticSparseTrial) retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             observeStage("AT_CERTIFICATION")
             val lower = retainedRootLowerBound(
                 relaxation.model, attempt.second, cancellation,
                 component,
             )
-            retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
+            if (!automaticSparseTrial) retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             val stopped = cancellation.pollStop()
             val bound = if (stopped) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
             observeStage(

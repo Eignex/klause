@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
@@ -45,6 +46,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `automatic root points survive a slice cancelled during bound checking`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 2L })
+        var checkingStarted = false
+        val query = ExecutionControl { checkingStarted }
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ ->
+            checkingStarted = true
+            false
+        })
+        LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO),
+            SolveStatsSink("root-point-before-bound-check"), context,
+            nodeWorkAllowance = { 1_000_000L }).use { engine ->
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+            assertTrue(engine.automaticSparseTrial)
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), query)
+            val retained = engine.retainRootPrimalTargets(ExecutionControl.Never)
+
+            assertTrue(checkingStarted)
+            assertTrue(bound.isNaN())
+            assertTrue(retained)
+        }
+    }
+
     @Test
     fun `integer box bounds compare exact fractional cutoffs`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(3, 5)), emptyArray())
