@@ -112,59 +112,6 @@ class FiniteSourceCutClausesTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `scoped cover checks should fit large source data within the publication allowance`() {
-        val source = Problem(0, 1_008, Array(1_008) { IntDomain(0, 1) }, arrayOf(
-            Linear(IntArray(8) { 1 }, IntArray(8) { it }, LinearOp.LE, 4)))
-        val model = source.bake()
-        val objective = LinearObjective(intCoefficients = LongArray(1_008) { 1 })
-        val binding = assertNotNull(FiniteSourceCutBinding.admit(LinearToleranceAuthority(source, source, objective),
-            SourceMapping(source, source, TransformationGuarantees.IDENTITY), model, objective, ExecutionControl.Never))
-        val context = assertNotNull(binding.capture(model, objective, ExecutionControl.Never))
-        val row = context.premises.entries.single { it.value.inequality.supportSize == 8 }
-        val cut = SourceEvidence(context.scope, SourceClaim.Consequence(row.value.inequality),
-            SourceDerivation.Premise(row.key))
-        val pool = SharedClausePool()
-        val funding = SourceLpFunding(1_000_000, 4_000_000).also { it.grant(1_000_000) }
-
-        val observations = FiniteSourceCutClauses(binding, model, context, SourceLpBudget(funding = funding),
-            ExecutionControl.Never, pool, 0).publish(listOf(cut))
-
-        assertEquals(16L, observations["SourceCutClausePublished"])
-        assertEquals(16L, observations["SourceCutClauseRefutationChecks"])
-        val clauses = pool.drainSince(0).clauses
-        for (clause in clauses) {
-            assertTrue(clause.boolLits.isEmpty())
-            for (index in clause.atomQuads.indices step SharedClause.QUAD) {
-                assertTrue(clause.atomQuads[index] in 0L..7L)
-                assertEquals(1L, clause.atomQuads[index + 1])
-                assertEquals(0L, clause.atomQuads[index + 3])
-            }
-        }
-        for (assignment in 0 until 256) {
-            if (assignment.countOneBits() <= 4) {
-                assertTrue(clauses.all { clause ->
-                    (clause.atomQuads.indices step SharedClause.QUAD).any { index ->
-                        val value = (assignment shr clause.atomQuads[index].toInt()) and 1
-                        value.toLong() <= clause.atomQuads[index + 2]
-                    }
-                })
-            }
-        }
-        val consumer = PropagationSession(Problem(0, 8, Array(8) { IntDomain(0, 1) }, emptyArray()))
-        PoolClauseExchange(pool, origin = 1).onSearchStart(consumer)
-        var contradicted = false
-        for (index in clauses.first().atomQuads.indices step SharedClause.QUAD) {
-            if (consumer.pinInt(clauses.first().atomQuads[index].toInt(), 1) is PropagationResult.Unsat) {
-                contradicted = true
-                break
-            }
-        }
-        assertTrue(contradicted)
-        assertTrue(funding.spent in 1L..65_536L)
-        assertTrue(funding.allocated in 1L..1_048_576L)
-    }
-
-    @Test
     fun `proved covers should preserve different cut coordinate supports`() {
         val source = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),

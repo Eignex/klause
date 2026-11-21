@@ -149,7 +149,10 @@ fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofCo
 private class LinearAggregateAuthoritySemantics(delegate: SourceSemanticsChecker) :
     SourceSemanticsChecker by delegate, SourceIntegerAggregateSemantics
 
-internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = withScope(scope)
+internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = SourceProofContext(
+    scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant, semanticsChecker,
+    semantics,
+)
 
 internal fun SourceProofContext.linearCoordinatesSupported(): Boolean = coordinates.groupBy { it.kind }.values.all {
     it.map { coordinate -> coordinate.id }.sorted() == it.indices.toList()

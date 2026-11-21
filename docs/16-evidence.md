@@ -12,11 +12,6 @@ separate from checked derivations, and the
 
 ## Source contexts and scopes
 
-`SourceProofContext` captures and validates its source data once. Internal scoped
-views share that immutable snapshot; public coordinate, premise and objective
-accessors return defensive copies. Each verification has fresh traversal state and
-a fresh allowance, and sharing source data supplies no checked proof coverage.
-
 `SourceScope` captures the original revision and declared semantics, exact
 invocation restrictions, objective identity and direction. Every check compares
 the scope before considering the derivation. Imports must name the same revision,
@@ -124,8 +119,8 @@ returning map entries; iterator storage and lookup work use the caller's allowan
 Internal inequality coefficient traversal exposes captured coordinates and values,
 stops on consumer refusal and returns no map or entries. Setup and visits use the
 caller's allowance.
-Verification reads captured coordinates and premises through internal lookups.
-Each run lazily copies the objective view only when its proof needs that objective.
+Each verification run lazily captures the immutable context's coordinate, premise
+and objective views once, so individual proof lookups do not copy the full source.
 
 ## Result capture
 

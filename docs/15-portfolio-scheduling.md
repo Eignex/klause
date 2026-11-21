@@ -397,9 +397,7 @@ unchanged source coordinates and retained source factors, and excludes restricte
 roots. Covers start from the full bad-side assignment and discard unnecessary pins;
 supersets of freshly proved covers skip repeated arithmetic and proof work. Each
 minimal binary cover is freshly refuted under exactly its exported pins using the
-checked cut and declared root sides. Scoped proof contexts share captured immutable
-source data, so each cover pays for its scoped view and fresh proof traversal
-without copying the source declarations. Portable complements enter
+checked cut and declared root sides. Portable complements enter
 finite workers through their ordinary root or restart clause exchange, and actual
 unit or conflict use credits the publishing frontier. Publication alone earns no
 use credit. Fully discharged clauses remain valid after that frontier retires.
