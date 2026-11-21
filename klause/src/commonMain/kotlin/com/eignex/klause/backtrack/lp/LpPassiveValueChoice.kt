@@ -65,7 +65,7 @@ internal class LpPassiveValueChoice(
         return if (applyAdvice && changed) alternatives.reversed() else alternatives
     }
 
-    fun commit(decision: SearchDecision, stamp: Int, fresh: () -> Boolean) {
+    internal inline fun commit(decision: SearchDecision, stamp: Int, crossinline fresh: () -> Boolean) {
         val expected = nomination ?: return
         charge(4L)
         observe("PASSIVE_VALUE_COMMIT_CHECK")

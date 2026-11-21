@@ -432,6 +432,8 @@ cancellation and retirement discard an unconsumed nomination. Withholding advice
 keeps the same producer, comparison and commitment costs while retaining ordinary
 order. Disabled directional gains retain no history or model scope and charge no
 history bookkeeping; ordinary LP guidance remains available.
+Completion, candidate visits and commitments inline their immediate freshness
+callbacks.
 
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
 child first to collect missing passive information. It uses a recent positive

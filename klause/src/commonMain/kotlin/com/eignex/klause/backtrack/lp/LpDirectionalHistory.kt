@@ -11,7 +11,7 @@ internal class LpDirectionalHistory(
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
 ) {
-    private class Outcome {
+    internal class Outcome {
         var count = 0
         var latest = false
         var previous = false
@@ -19,7 +19,7 @@ internal class LpDirectionalHistory(
         var previousStamp = 0L
     }
 
-    private class Direction {
+    internal class Direction {
         val outcome = Outcome()
         var count = 0
         var latest = 0.0
@@ -32,11 +32,11 @@ internal class LpDirectionalHistory(
         val stable: Boolean get() = count >= RELIABILITY && maxOf(latest, previous) <= minOf(latest, previous) * 2.0
     }
 
-    private class Gains(val variable: VarRef, val down: Direction = Direction(), val up: Direction = Direction()) {
+    internal class Gains(val variable: VarRef, val down: Direction = Direction(), val up: Direction = Direction()) {
         var indexed = false
     }
-    private class Parent(val objective: Double, val variable: VarRef, val value: Double)
-    private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
+    internal class Parent(val objective: Double, val variable: VarRef, val value: Double)
+    internal class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
     private val gains = HashMap<VarRef, Gains>()
     private var candidates: Array<VarRef?>? = null
@@ -169,7 +169,7 @@ internal class LpDirectionalHistory(
         history.indexed = true
     }
 
-    fun forEachCandidate(current: () -> Boolean, visit: (VarRef) -> Unit) {
+    internal inline fun forEachCandidate(crossinline current: () -> Boolean, crossinline visit: (VarRef) -> Unit) {
         val entries = candidates ?: return
         val count = candidateCount
         val version = generation
@@ -271,14 +271,14 @@ internal class LpDirectionalHistory(
         pending = null
     }
 
-    fun finishNode(pruned: Boolean? = null, current: () -> Boolean = { true }) {
+    internal inline fun finishNode(pruned: Boolean? = null, crossinline current: () -> Boolean = { true }) {
         if (pruned != null && current()) recordOutcome(pruned, current)
         pendingOutcome = null
         if (pending != null) observe("MISSING")
         pending = null
     }
 
-    private fun recordOutcome(pruned: Boolean, current: () -> Boolean) {
+    private inline fun recordOutcome(pruned: Boolean, crossinline current: () -> Boolean) {
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
