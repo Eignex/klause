@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
@@ -29,9 +30,23 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
+    private val nativeAttempts: Boolean = false,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
+    internal class NativeAttempt(
+        val decision: SearchDecision,
+        val depth: Int,
+        val version: Long,
+        val point: LpRelaxation,
+        val state: LpExactState,
+        val stamp: Int,
+        val cutoff: Double,
+        val previousConflict: PropagationResult.Unsat?,
+    )
+
+    private var nativeAttempt: NativeAttempt? = null
+    private var nativeAttemptRemaining = 128
     private var passiveVariable: LpPassiveVariableChoice? = null
     private var passiveValues: LpPassiveValueChoice? = null
     private var passiveCollection: LpPassiveCollection? = null
@@ -78,6 +93,7 @@ internal class LpHints(
         if (collect && cutoff.isFinite()) {
             charge(2L)
             observe("PASSIVE_POINT_OPTIMUM_CHECK")
+            clearNativeAttempt()
             passiveVariable?.clear()
             passiveValues?.clear()
             passiveCollection?.clear()
@@ -227,12 +243,94 @@ internal class LpHints(
     }
 
     fun commit(decision: SearchDecision, depth: Int, cancelled: ExecutionControl = ExecutionControl.Never) {
+        finishNativeAttempt(decision, null, accepted = true, cancelled)
         passiveVariable?.commit(decision) { !cancelled() && passivePointCurrent() }
         passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         if (collect && scopeModel != null) {
             history.commit(decision, depth)
         }
+    }
+
+    internal inline fun captureNativeAttempt(
+        decision: SearchDecision,
+        parentDepth: Int,
+        cancelled: ExecutionControl,
+        crossinline previousConflict: () -> PropagationResult.Unsat?,
+    ) {
+        clearNativeAttempt()
+        if (!nativeAttempts || !collect || nativeAttemptRemaining <= 0 || !cutoff.isFinite() ||
+            !history.hasValueHistory || !history.hasPruningHistory || !passivePointCurrent() || cancelled()
+        ) return
+        nativeAttemptRemaining--
+        val version = nodeStamp
+        charge(32L)
+        if (version != nodeStamp || !passivePointCurrent() || cancelled()) return
+        val attempt = NativeAttempt(decision, parentDepth, version, checkNotNull(passivePoint),
+            checkNotNull(passiveState), solveStamp, cutoff, previousConflict())
+        if (!nativeAttemptCurrent(attempt, cancelled)) return
+        nativeAttempt = attempt
+        observe("PASSIVE_NATIVE_ATTEMPT_CAPTURE")
+        if (nativeAttempt !== attempt) return
+        if (!nativeAttemptCurrent(attempt, cancelled)) {
+            clearNativeAttempt()
+            return
+        }
+        if (nativeAttemptRemaining == 0) {
+            observe("PASSIVE_NATIVE_ATTEMPT_EXHAUSTED")
+            if (nativeAttempt === attempt && !nativeAttemptCurrent(attempt, cancelled)) clearNativeAttempt()
+        }
+    }
+
+    fun observeNativeRefutation(
+        decision: SearchDecision,
+        conflict: PropagationResult.Unsat?,
+        cancelled: ExecutionControl,
+    ) {
+        finishNativeAttempt(decision, conflict, accepted = false, cancelled)
+    }
+
+    private fun nativeAttemptCurrent(attempt: NativeAttempt, cancelled: ExecutionControl): Boolean =
+        !cancelled() && nodeStamp == attempt.version && passivePoint === attempt.point &&
+            passiveState === attempt.state && solveStamp == attempt.stamp && cutoff == attempt.cutoff &&
+            passivePointCurrent()
+
+    private fun clearNativeAttempt() {
+        if (nativeAttempt == null) return
+        nativeAttempt = null
+        observe("PASSIVE_NATIVE_ATTEMPT_ABANDONED")
+    }
+
+    private fun finishNativeAttempt(
+        decision: SearchDecision,
+        conflict: PropagationResult.Unsat?,
+        accepted: Boolean,
+        cancelled: ExecutionControl,
+    ) {
+        val attempt = nativeAttempt ?: return
+        nativeAttempt = null
+        charge(16L)
+        if (attempt.decision != decision || !nativeAttemptCurrent(attempt, cancelled)) {
+            observe("PASSIVE_NATIVE_ATTEMPT_STALE_OR_FOREIGN")
+            return
+        }
+        if (accepted) {
+            observe("PASSIVE_NATIVE_ATTEMPT_ACCEPTED")
+            return
+        }
+        if (conflict == null || conflict === attempt.previousConflict) {
+            observe("PASSIVE_NATIVE_ATTEMPT_OTHER_REFUTATION")
+            return
+        }
+        observe("PASSIVE_NATIVE_ATTEMPT_FRESH_CP_REFUTATION")
+        if (!nativeAttemptCurrent(attempt, cancelled)) return
+        val context = history.refutedAttemptContext(decision, attempt.depth,
+            attempt.cutoff - attempt.point.objectiveConstant.toDouble()) {
+            nativeAttemptCurrent(attempt, cancelled)
+        } ?: return
+        observe("PASSIVE_NATIVE_ATTEMPT_CONTEXT_CHECK")
+        if (!nativeAttemptCurrent(attempt, cancelled)) return
+        observe("PASSIVE_NATIVE_ATTEMPT_CONTEXT_" + context)
     }
 
     fun directionalScore(variable: VarRef): Double {
@@ -386,6 +484,7 @@ internal class LpHints(
 
     private fun clearPassivePoint() {
         if (!collect) return
+        clearNativeAttempt()
         passiveVariable?.clear()
         passiveValues?.clear()
         passiveCollection?.clear()
@@ -513,6 +612,7 @@ internal class LpHints(
         if (collect && cutoff.isFinite()) {
             charge(2L)
             observe("PASSIVE_POINT_RECORDED")
+            clearNativeAttempt()
             passiveVariable?.clear()
             passiveCollection?.clear()
             passivePoint = relaxation

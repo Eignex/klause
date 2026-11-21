@@ -706,7 +706,7 @@ internal class ResumableMinimize(
             LpHints(problem.numIntVars, problem.numBoolVars,
                 params.lpDirectionalGains && lpEngine.params.lpPlan.bounding,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                applyAdvice = params.lpDirectionalAdvice)
+                applyAdvice = params.lpDirectionalAdvice, nativeAttempts = true)
         } else null
         lpEngine.lpHints = lpHints
         yield(Unit)
@@ -1619,6 +1619,14 @@ internal class ResumableMinimize(
 
         override fun onBranch(variable: VarRef) {
             lpHints?.branch(variable)
+        }
+
+        override fun onAttempt(decision: SearchDecision, parentDepth: Int) {
+            lpHints?.captureNativeAttempt(decision, parentDepth, params.cancellation) { cp.lastConflict }
+        }
+
+        override fun onRefutedAttempt(decision: SearchDecision, conflict: PropagationResult.Unsat?) {
+            lpHints?.observeNativeRefutation(decision, conflict, params.cancellation)
         }
 
         override fun onCommit(decision: SearchDecision, depth: Int) {

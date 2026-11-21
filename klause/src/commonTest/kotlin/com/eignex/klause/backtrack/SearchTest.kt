@@ -12,6 +12,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.CpBranching
+import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -21,6 +24,7 @@ import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
@@ -32,6 +36,45 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SearchTest {
+    @Test
+    fun `branching receives refuted attempts without committed decisions`() {
+        val cp = CpSearchComponent(PropagationSession(problemOf(IntDomain(0, 1)).bake()),
+            branching = CpBranching.None)
+        val attempts = ArrayList<Pair<SearchDecision, Int>>()
+        val conflicts = ArrayList<SearchDecision>()
+        val commits = ArrayList<SearchDecision>()
+        var native: PropagationResult.Unsat? = null
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin)
+        val brancher = BacktrackBrancher(cp.session, params, null, RestartSchedule.from(params),
+            nativeConflict = { native }, branching = object : BacktrackBranching {
+                override fun onAttempt(decision: SearchDecision, parentDepth: Int) {
+                    attempts.add(decision to parentDepth)
+                }
+                override fun onRefutedAttempt(decision: SearchDecision, conflict: PropagationResult.Unsat?) {
+                    assertTrue(conflict != null && conflict === native)
+                    conflicts.add(decision)
+                }
+                override fun onCommit(decision: SearchDecision, depth: Int) {
+                    commits.add(decision)
+                }
+            })
+        val session = SearchSession(listOf(cp, object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                native = PropagationResult.Unsat(conflictInts = intArrayOf(0))
+                return ComponentResult.Conflict()
+            }
+        }), branchers = listOf(brancher))
+        session.initialize()
+
+        val terminal = session.openRun(0, observer = brancher).next()
+
+        assertIs<SearchRunEvent.Exhausted>(terminal)
+        assertEquals(listOf(SearchDecision.IntAtMost(0, 0L) to 0,
+            SearchDecision.IntAtLeast(0, 1L) to 0), attempts)
+        assertEquals(attempts.map { it.first }, conflicts)
+        assertTrue(commits.isEmpty())
+    }
+
     @Test
     fun `variable guidance refines the configured selection and declines fixed proposals`() {
         for (fixed in listOf(false, true)) {

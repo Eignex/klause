@@ -277,28 +277,56 @@ internal class LpDirectionalHistory(
         pending = null
         pendingOutcome = null
         val parent = parents?.getOrNull(level - 1) ?: return
-        val floor = floor(parent.value)
-        val up = when (decision) {
-            is SearchDecision.Bool -> {
-                if (parent.variable != VarRef.Bool(decision.literal ushr 1)) return
-                decision.literal and 1 == 0
-            }
-            is SearchDecision.IntAtMost -> {
-                if (parent.variable != VarRef.IntVar(decision.variable) || decision.upper.toDouble() != floor) return
-                false
-            }
-            is SearchDecision.IntAtLeast -> {
-                if (parent.variable != VarRef.IntVar(decision.variable) ||
-                    decision.lower.toDouble() != floor + 1.0
-                ) return
-                true
-            }
-            else -> return
-        }
-        val distance = if (up) floor + 1.0 - parent.value else parent.value - floor
+        val up = parent.direction(decision) ?: return
+        val integral = floor(parent.value)
+        val distance = if (up) integral + 1.0 - parent.value else parent.value - integral
         if (distance <= DISTANCE_TOL || distance >= 1.0 - DISTANCE_TOL) return
         pending = Pending(parent, up, distance, level)
         pendingOutcome = pending
+    }
+
+    private fun Parent.direction(decision: SearchDecision): Boolean? {
+        val integral = floor(value)
+        return when (decision) {
+            is SearchDecision.Bool ->
+                if (variable == VarRef.Bool(decision.literal ushr 1)) decision.literal and 1 == 0 else null
+            is SearchDecision.IntAtMost ->
+                if (variable == VarRef.IntVar(decision.variable) && decision.upper.toDouble() == integral) false
+                else null
+            is SearchDecision.IntAtLeast ->
+                if (variable == VarRef.IntVar(decision.variable) && decision.lower.toDouble() == integral + 1.0) true
+                else null
+            else -> null
+        }
+    }
+
+    internal inline fun refutedAttemptContext(
+        decision: SearchDecision,
+        parentDepth: Int,
+        cutoff: Double,
+        crossinline current: () -> Boolean,
+    ): String? {
+        val version = generation
+        charge(16L)
+        if (version != generation || !current()) return null
+        val parent = parents?.getOrNull(parentDepth)
+        if (parentDepth != depth || parent == null || parent.objective != objective) return "UNMATCHED_PARTITION"
+        val up = parent.direction(decision) ?: return "UNMATCHED_PARTITION"
+        if (!hasValueHistory || !hasPruningHistory) return "POLICY_UNAVAILABLE"
+        val preference = preferDirection(parent.variable, parent.value, cutoff)
+        if (version != generation || !current()) return null
+        if (preference == null) return "POLICY_UNAVAILABLE"
+        charge(8L)
+        if (version != generation || !current()) return null
+        val history = gains[parent.variable] ?: return "UNKNOWN"
+        val rate = outcomeRate(if (up) history.up else history.down)
+        val context = when {
+            !rate.isFinite() -> "UNKNOWN"
+            preference != up -> "NONPREFERRED_REFUTED"
+            rate == 0.0 -> "PREFERRED_OPEN_REFUTED"
+            else -> "OTHER_PREFERRED_REFUTED"
+        }
+        return if (version == generation && current()) context else null
     }
 
     fun infeasible() {

@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.withModel
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
@@ -29,6 +30,213 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpHintsTest {
+    @Test
+    fun `native refuted attempts retain provenance without recording LP outcomes`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (boolean in listOf(false, true)) {
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val point = if (boolean) 0.5 else 2.5
+            val down = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2L)
+            val up = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 3L)
+            for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                val costs = ArrayList<Long>()
+                for (apply in listOf(false, true)) {
+                    val events = ArrayList<String>()
+                    var work = 0L
+                    val hints = LpHints(if (boolean) 0 else 1, if (boolean) 1 else 0,
+                        directionalGains = true, applyAdvice = apply, nativeAttempts = true,
+                        observe = events::add, charge = { work += it })
+                    val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(boolean), constant,
+                        if (boolean) IntArray(0) else intArrayOf(0),
+                        if (boolean) intArrayOf(0) else IntArray(0))
+                    val cutoff = constant.toDouble() + 1024.0
+                    val repetitions = if (!boolean && constant == 0L) 129 else 1
+                    var captureWork = 0L
+                    repeat(repetitions) {
+                        hints.resetHistory()
+                        hints.beginNode(0, cutoff)
+                        hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                        hints.recordObjective(relaxation, 0.0)
+                        hints.branch(variable)
+                        repeat(2) {
+                            for (isUp in listOf(false, true)) {
+                                hints.commit(if (isUp) up else down, 1)
+                                hints.beginNode(1, cutoff)
+                                hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                                hints.recordObjective(relaxation, if (isUp) 3.0 else 1.0)
+                                hints.recordOutcome(isUp, relaxation)
+                                hints.finishNode(trail.state)
+                            }
+                        }
+                        hints.restart()
+                        hints.beginNode(0, cutoff)
+                        hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                        hints.recordObjective(relaxation, 0.0)
+                        hints.branch(variable)
+                        val before = work
+                        val samples = events.count { it == "UP" || it == "DOWN" || it.startsWith("OUTCOME_") }
+                        val previous = PropagationResult.Unsat()
+
+                        hints.captureNativeAttempt(down, 0, ExecutionControl.Never) { previous }
+                        hints.observeNativeRefutation(down, PropagationResult.Unsat(), ExecutionControl.Never)
+                        hints.observeNativeRefutation(down, PropagationResult.Unsat(), ExecutionControl.Never)
+
+                        assertEquals(samples,
+                            events.count { it == "UP" || it == "DOWN" || it.startsWith("OUTCOME_") })
+                        captureWork += work - before
+                    }
+                    val captured = minOf(128, repetitions)
+                    assertEquals(captured, events.count { it == "PASSIVE_NATIVE_ATTEMPT_CAPTURE" })
+                    assertEquals(captured, events.count { it == "PASSIVE_NATIVE_ATTEMPT_FRESH_CP_REFUTATION" })
+                    assertEquals(captured,
+                        events.count { it == "PASSIVE_NATIVE_ATTEMPT_CONTEXT_PREFERRED_OPEN_REFUTED" })
+                    assertEquals(if (repetitions > 128) 1 else 0,
+                        events.count { it == "PASSIVE_NATIVE_ATTEMPT_EXHAUSTED" })
+                    assertEquals(0, events.count { it.endsWith("COMMIT_CHANGED") })
+                    costs.add(captureWork)
+                }
+                assertTrue(costs.first() > 0L)
+                assertEquals(costs.first(), costs.last())
+            }
+        }
+    }
+
+    @Test
+    fun `native refutation classification rejects stale foreign and invalidated attempts`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2L)
+        val up = SearchDecision.IntAtLeast(0, 3L)
+        for (action in listOf("fresh", "same", "missing", "foreign", "depth", "reset", "restart", "point",
+            "cutoff", "accepted", "capture-charge", "complete-charge", "capture-report", "refutation-report",
+            "context-report")) {
+            val events = ArrayList<String>()
+            var armed = false
+            var cancelled = false
+            lateinit var hints: LpHints
+            hints = LpHints(1, 0, directionalGains = true, nativeAttempts = true, observe = { event ->
+                events.add(event)
+                if (armed && ((action == "capture-report" && event == "PASSIVE_NATIVE_ATTEMPT_CAPTURE") ||
+                        (action == "refutation-report" && event == "PASSIVE_NATIVE_ATTEMPT_FRESH_CP_REFUTATION") ||
+                        (action == "context-report" && event == "PASSIVE_NATIVE_ATTEMPT_CONTEXT_CHECK"))) {
+                    cancelled = true
+                }
+            }, charge = { amount ->
+                if (armed && ((action == "capture-charge" && amount == 32L) ||
+                        (action == "complete-charge" && amount == 16L))) {
+                    armed = false
+                    cancelled = true
+                }
+            })
+            hints.beginNode(0, 1024.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 0.0)
+            hints.branch(variable)
+            repeat(2) {
+                for (isUp in listOf(false, true)) {
+                    hints.commit(if (isUp) up else down, 1)
+                    hints.beginNode(1, 1024.0)
+                    hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (isUp) 3.0 else 1.0)
+                    hints.recordOutcome(isUp, relaxation)
+                    hints.finishNode(trail.state)
+                }
+            }
+            hints.beginNode(0, 1024.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 0.0)
+            hints.branch(variable)
+            events.clear()
+            val previous = PropagationResult.Unsat()
+            val control = ExecutionControl { cancelled }
+            armed = action == "capture-charge" || action == "capture-report"
+            hints.captureNativeAttempt(down, if (action == "depth") 1 else 0, control) { previous }
+            when (action) {
+                "reset" -> hints.resetHistory()
+                "restart" -> hints.restart()
+                "point" -> {
+                    hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                    hints.recordObjective(relaxation, 0.0)
+                }
+                "cutoff" -> hints.beginNode(0, 2048.0)
+            }
+            armed = action in listOf("complete-charge", "refutation-report", "context-report")
+            val proof = when (action) {
+                "same" -> previous
+                "missing" -> null
+                else -> PropagationResult.Unsat()
+            }
+
+            if (action == "accepted") hints.commit(down, 1, control)
+            else hints.observeNativeRefutation(if (action == "foreign") up else down, proof, control)
+
+            assertEquals(if (action == "fresh") 1 else 0,
+                events.count { it == "PASSIVE_NATIVE_ATTEMPT_CONTEXT_PREFERRED_OPEN_REFUTED" }, action)
+            assertEquals(if (action == "depth") 1 else 0,
+                events.count { it == "PASSIVE_NATIVE_ATTEMPT_CONTEXT_UNMATCHED_PARTITION" }, action)
+            assertEquals(if (action in listOf("same", "missing")) 1 else 0,
+                events.count { it == "PASSIVE_NATIVE_ATTEMPT_OTHER_REFUTATION" }, action)
+            assertEquals(if (action == "accepted") 1 else 0,
+                events.count { it == "PASSIVE_NATIVE_ATTEMPT_ACCEPTED" }, action)
+            assertEquals(0, events.count { it.endsWith("COMMIT_CHANGED") }, action)
+        }
+    }
+
+    @Test
+    fun `unavailable native attempt observation retains the cheap fallback`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        for (context in listOf("disabled", "gains-off", "infinite", "unknown", "wide")) {
+            val events = ArrayList<String>()
+            var work = 0L
+            var proofReads = 0
+            val hints = LpHints(if (context == "wide") 8193 else 1, 0,
+                directionalGains = context != "gains-off", nativeAttempts = context != "disabled",
+                observe = events::add, charge = { work += it })
+            val cutoff = if (context == "infinite") Double.POSITIVE_INFINITY else 1024.0
+            hints.beginNode(0, cutoff)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 0.0)
+            hints.branch(VarRef.IntVar(0))
+            if (context == "disabled") repeat(2) {
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3L) else SearchDecision.IntAtMost(0, 2L), 1)
+                    hints.beginNode(1, cutoff)
+                    hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 3.0 else 1.0)
+                    hints.recordOutcome(up, relaxation)
+                    hints.finishNode(trail.state)
+                }
+            }
+            hints.beginNode(0, cutoff)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 0.0)
+            hints.branch(VarRef.IntVar(0))
+            val before = work
+
+            hints.captureNativeAttempt(SearchDecision.IntAtMost(0, 2L), 0, ExecutionControl.Never) {
+                proofReads++
+                null
+            }
+            hints.observeNativeRefutation(SearchDecision.IntAtMost(0, 2L), PropagationResult.Unsat(),
+                ExecutionControl.Never)
+
+            assertEquals(before, work, context)
+            assertEquals(0, proofReads, context)
+            assertEquals(0, events.count { it == "PASSIVE_NATIVE_ATTEMPT_CAPTURE" }, context)
+        }
+    }
+
     @Test
     fun `unmeasured baseline advice exceeds the ordinary estimate before committing`() {
         val builder = LpBuilder()

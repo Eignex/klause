@@ -11,6 +11,94 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `refuted attempt classes use the original eligible parent preference`() {
+        for (boolean in listOf(false, true)) {
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val point = if (boolean) 0.5 else 2.5
+            val down = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2L)
+            val up = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 3L)
+            for ((action, expected) in listOf("open" to "PREFERRED_OPEN_REFUTED",
+                "opposite" to "NONPREFERRED_REFUTED", "prune" to "OTHER_PREFERRED_REFUTED",
+                "zero-gap" to "POLICY_UNAVAILABLE", "missing" to "POLICY_UNAVAILABLE",
+                "depth" to "UNMATCHED_PARTITION", "foreign" to "UNMATCHED_PARTITION")) {
+                val events = ArrayList<String>()
+                val history = LpDirectionalHistory(events::add)
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, point)
+                repeat(2) { sample ->
+                    for (isUp in listOf(false, true)) {
+                        history.commit(if (isUp) up else down, 1)
+                        history.beginNode(1)
+                        history.record(if (isUp) 3.0 else 1.0)
+                        history.finishNode(if (action == "missing" && sample == 1) null else isUp)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, point)
+                events.clear()
+                val cutoff = when (action) {
+                    "prune" -> 2.0
+                    "zero-gap" -> 0.0
+                    else -> 10.0
+                }
+                val decision = when (action) {
+                    "prune", "opposite" -> up
+                    "foreign" -> if (boolean) SearchDecision.Bool(2) else SearchDecision.IntAtMost(1, 2L)
+                    else -> down
+                }
+
+                val context = history.refutedAttemptContext(decision, if (action == "depth") 1 else 0, cutoff) { true }
+
+                assertEquals(expected, context, "$boolean/$action")
+                assertFalse(events.any { it == "UP" || it == "DOWN" || it.startsWith("OUTCOME_") })
+                assertEquals(if (action == "missing") null else false, history.preferDirection(variable, point, 10.0),
+                    "$boolean/$action")
+            }
+        }
+    }
+
+    @Test
+    fun `charged refutation classification cannot retain an invalidated parent`() {
+        for (reset in listOf(false, true)) {
+            for (stopAt in 1..9) {
+                var armed = false
+                var reads = 0
+                var current = true
+                lateinit var history: LpDirectionalHistory
+                history = LpDirectionalHistory({}, charge = {
+                    if (armed && ++reads == stopAt) {
+                        armed = false
+                        if (reset) history.clear() else current = false
+                    }
+                })
+                val variable = VarRef.Bool(0)
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (up) 3.0 else 1.0)
+                        history.finishNode(up)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                armed = true
+
+                val context = history.refutedAttemptContext(SearchDecision.Bool(1), 0, 10.0) { current }
+
+                assertNull(context, "$reset/$stopAt")
+                assertFalse(armed, "$reset/$stopAt")
+            }
+        }
+    }
+
+    @Test
     fun `equal completed rates use numeric predictions with complete compatible context`() {
         for (rate in 0..2) {
             for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",

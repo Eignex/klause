@@ -128,6 +128,7 @@ internal class BacktrackBrancher(
             PooledGuidanceObservation(PooledGuidanceKind.ATTEMPT, hint != null,
                 decision = decision.guidanceText(), level = context.decisionLevel)
         }
+        branching.onAttempt(decision, context.decisionLevel)
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
@@ -151,6 +152,7 @@ internal class BacktrackBrancher(
         if (decision == null || decision in hinted) clearHint()
         val (variable, value) = decision?.asSelectorDecision() ?: return
         val conflict = nativeConflict()
+        branching.onRefutedAttempt(decision, conflict)
         if (conflict == null) variables.onConflict(variable) else variables.onConflict(variable, conflict)
         values.onConflict(variable, value)
         phase.onConflictTick()
@@ -230,6 +232,10 @@ internal fun splitIntAlternatives(
 
 /** Optional search-only branch guidance layered over the configured selectors. */
 internal interface BacktrackBranching {
+    fun onAttempt(decision: SearchDecision, parentDepth: Int) {}
+
+    fun onRefutedAttempt(decision: SearchDecision, conflict: PropagationResult.Unsat?) {}
+
     fun onBranch(variable: VarRef) {}
 
     fun onCommit(decision: SearchDecision, depth: Int) {}
