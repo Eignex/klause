@@ -29,6 +29,59 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `equal rate observation preserves child order and matched applied withheld costs`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val costs = ArrayList<Long>()
+        for (apply in listOf(false, true)) {
+            val events = ArrayList<String>()
+            var work = 0L
+            val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, charge = { work += it })
+            val variable = VarRef.IntVar(0)
+            hints.beginNode(0, 10.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 0.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(trail.state)
+            hints.branch(variable)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3L) else SearchDecision.IntAtMost(0, 2L), 1)
+                    hints.beginNode(1, 10.0)
+                    hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, if (up) 2.0 else 1.0)
+                    hints.recordOutcome(true, relaxation)
+                    hints.finishNode(trail.state)
+                }
+            }
+            hints.beginNode(0, 10.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 0.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(trail.state)
+            events.clear()
+            val before = work
+            val ordinary = listOf(SearchDecision.IntAtLeast(0, 3L), SearchDecision.IntAtMost(0, 2L))
+            hints.branch(variable)
+
+            val ordered = hints.orderAlternatives(variable, ordinary, ExecutionControl.Never)
+            hints.commit(ordered.first(), 1)
+
+            assertEquals(ordinary, ordered)
+            assertEquals(1, events.count { it == "PASSIVE_EQUAL_RATE_NUMERIC_OPEN_SEPARATED" })
+            assertEquals(1, events.count { it == "PASSIVE_EQUAL_RATE_NUMERIC_RATE_ONE" })
+            assertFalse("PASSIVE_VALUE_COMMIT_CHANGED" in events)
+            assertFalse("PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED" in events)
+            costs.add(work - before)
+        }
+        assertEquals(costs.first(), costs.last())
+    }
+
+    @Test
     fun `evidence priority preserves numeric fallbacks and requires a positive live candidate`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }

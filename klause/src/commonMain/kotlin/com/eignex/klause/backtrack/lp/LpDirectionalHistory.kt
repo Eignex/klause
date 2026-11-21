@@ -55,6 +55,7 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    private var equalRateChecks = 128
 
     fun beginNode(level: Int) {
         stamp++
@@ -337,6 +338,87 @@ internal class LpDirectionalHistory(
             observe("OUTCOME_RATE_READY")
         }
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
+    }
+
+    internal inline fun observeEqualRateNumeric(
+        variable: VarRef,
+        value: Double,
+        cutoff: Double,
+        crossinline current: () -> Boolean,
+    ) {
+        if (equalRateChecks == 0) return
+        equalRateChecks--
+        val version = generation
+        charge(88L)
+        if (version != generation || !current()) return
+        val history = reliable(variable, value)
+        val downRate = history?.let { outcomeRate(it.down) } ?: Double.NaN
+        val upRate = history?.let { outcomeRate(it.up) } ?: Double.NaN
+        var rate: String? = null
+        val kind = if (history == null || (history.down.gain <= 0.0 && history.up.gain <= 0.0) ||
+            !downRate.isFinite() || !upRate.isFinite() || downRate != upRate
+        ) "INELIGIBLE" else {
+            val gap = cutoff - objective
+            val fraction = value - floor(value)
+            val down = history.down.gain * fraction
+            val up = history.up.gain * (1.0 - fraction)
+            val downUpper = maxOf(history.down.latest, history.down.previous) * fraction
+            val upUpper = maxOf(history.up.latest, history.up.previous) * (1.0 - fraction)
+            val numericDownLatest = (cutoff - history.down.parent) / gap
+            val numericDownPrevious = (cutoff - history.down.previousParent) / gap
+            val numericUpLatest = (cutoff - history.up.parent) / gap
+            val numericUpPrevious = (cutoff - history.up.previousParent) / gap
+            val outcomeDownLatest = (cutoff - history.down.outcomeParent) / gap
+            val outcomeDownPrevious = (cutoff - history.down.outcomePreviousParent) / gap
+            val outcomeUpLatest = (cutoff - history.up.outcomeParent) / gap
+            val outcomeUpPrevious = (cutoff - history.up.outcomePreviousParent) / gap
+            when {
+                !gap.isFinite() || gap <= 0.0 || !down.isFinite() || !up.isFinite() ||
+                    !downUpper.isFinite() || !upUpper.isFinite() ||
+                    (down == 0.0 && history.down.gain > 0.0) || (up == 0.0 && history.up.gain > 0.0) ||
+                    !numericDownLatest.isFinite() ||
+                    numericDownLatest <= 0.0 ||
+                    !numericDownPrevious.isFinite() ||
+                    numericDownPrevious <= 0.0 ||
+                    !numericUpLatest.isFinite() ||
+                    numericUpLatest <= 0.0 ||
+                    !numericUpPrevious.isFinite() ||
+                    numericUpPrevious <= 0.0 ||
+                    !outcomeDownLatest.isFinite() ||
+                    outcomeDownLatest <= 0.0 ||
+                    !outcomeDownPrevious.isFinite() ||
+                    outcomeDownPrevious <= 0.0 ||
+                    !outcomeUpLatest.isFinite() ||
+                    outcomeUpLatest <= 0.0 ||
+                    !outcomeUpPrevious.isFinite() ||
+                    outcomeUpPrevious <= 0.0 -> "UNKNOWN"
+                numericDownLatest !in 0.5..2.0 ||
+                    numericDownPrevious !in 0.5..2.0 ||
+                    numericUpLatest !in 0.5..2.0 ||
+                    numericUpPrevious !in 0.5..2.0 ||
+                    outcomeDownLatest !in 0.5..2.0 ||
+                    outcomeDownPrevious !in 0.5..2.0 ||
+                    outcomeUpLatest !in 0.5..2.0 ||
+                    outcomeUpPrevious !in 0.5..2.0 -> "CONTEXT_MISMATCH"
+                else -> {
+                    rate = when (downRate) {
+                        0.0 -> "ZERO"
+                        0.5 -> "HALF"
+                        else -> "ONE"
+                    }
+                    if (maxOf(down, up) >= gap) {
+                        if (down == up) "PRUNE_TIED" else "PRUNE_DISTINCT"
+                    } else if (downUpper < up || upUpper < down) "OPEN_SEPARATED" else "OPEN_OVERLAP"
+                }
+            }
+        }
+        observe("PASSIVE_EQUAL_RATE_NUMERIC_CHECK")
+        if (version != generation || !current()) return
+        observe("PASSIVE_EQUAL_RATE_NUMERIC_$kind")
+        if (version != generation || !current()) return
+        if (rate != null) observe("PASSIVE_EQUAL_RATE_NUMERIC_RATE_$rate")
+        if (version != generation || !current()) return
+        if (equalRateChecks == 0) observe("PASSIVE_EQUAL_RATE_NUMERIC_EXHAUSTED")
     }
 
     fun preferDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {

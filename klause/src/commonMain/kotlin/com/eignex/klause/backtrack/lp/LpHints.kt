@@ -384,11 +384,15 @@ internal class LpHints(
         if (cancelled() || passivePoint !== point || passiveState !== state ||
             stamp != solveStamp || !passivePointCurrent()
         ) return alternatives
-        if (valueReady && preference == null) observe("PASSIVE_VALUE_NO_PROPOSAL")
-        if (preference == null && !collectReady) return alternatives
         fun current(): Boolean =
             !cancelled() && passivePoint === point && passiveState === state &&
                 stamp == solveStamp && passivePointCurrent()
+        if (valueReady && preference == null) {
+            history.observeEqualRateNumeric(variable, pointValue, cutoff - scopeConstant.toDouble(), ::current)
+            if (!current()) return alternatives
+            observe("PASSIVE_VALUE_NO_PROPOSAL")
+        }
+        if (preference == null && !collectReady) return alternatives
         if (preference != null) {
             val advised = values.select(variable, pointValue, alternatives, preference, stamp, fresh = ::current)
             if (values.hasNomination) return advised

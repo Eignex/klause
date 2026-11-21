@@ -11,6 +11,168 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `equal rate observation classifies numeric ranges without changing child advice`() {
+        for (rate in 0..2) {
+            for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",
+                "unknown", "missing", "unequal", "zero", "underflow")) {
+                val events = ArrayList<String>()
+                var work = 0L
+                val history = LpDirectionalHistory(events::add, charge = { work += it })
+                val variable = VarRef.Bool(0)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val parent = if (context == "numeric" && sample == 0 && !up) -30.0 else 0.0
+                        val gain = when {
+                            context == "zero" -> 0.0
+                            context == "underflow" && !up -> Double.MIN_VALUE
+                            context == "tie" -> 3.0
+                            up && context == "touch" -> 2.0
+                            up && context == "overlap" -> 1.5
+                            up -> 3.0
+                            sample == 0 && (context == "touch" || context == "overlap") -> 2.0
+                            else -> 1.0
+                        }
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(parent + gain)
+                        history.finishNode()
+                    }
+                }
+                repeat(if (context == "missing") 1 else 2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val parent = if (context == "outcome" && sample == 0 && !up) -30.0 else 0.0
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(Double.NaN)
+                        val pruned = if (context == "unequal" && up) rate == 0
+                        else rate == 2 || (rate == 1 && sample == 1)
+                        history.finishNode(pruned)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                val point = if (context == "underflow") 0.125 else 0.5
+                val cutoff = when (context) {
+                    "unknown" -> 0.0
+                    "prune", "tie" -> 2.0
+                    else -> 10.0
+                }
+                val original = history.preferDirection(variable, point, cutoff)
+                events.clear()
+                val before = work
+
+                history.observeEqualRateNumeric(variable, point, cutoff) { true }
+
+                assertEquals(88L, work - before)
+                val kind = when (context) {
+                    "numeric", "outcome" -> "CONTEXT_MISMATCH"
+                    "unknown", "underflow" -> "UNKNOWN"
+                    "missing", "unequal", "zero" -> "INELIGIBLE"
+                    "prune" -> "PRUNE_DISTINCT"
+                    "tie" -> "PRUNE_TIED"
+                    "touch", "overlap" -> "OPEN_OVERLAP"
+                    else -> "OPEN_SEPARATED"
+                }
+                val expected = arrayListOf("PASSIVE_EQUAL_RATE_NUMERIC_CHECK", "PASSIVE_EQUAL_RATE_NUMERIC_$kind")
+                if (context in listOf("separate", "touch", "overlap", "prune", "tie")) {
+                    val name = listOf("ZERO", "HALF", "ONE")[rate]
+                    expected.add("PASSIVE_EQUAL_RATE_NUMERIC_RATE_$name")
+                }
+                assertEquals(expected, events, "$rate/$context")
+                assertEquals(original, history.preferDirection(variable, point, cutoff))
+            }
+        }
+    }
+
+    @Test
+    fun `equal rate observation limits survive history resets and restarts`() {
+        val events = ArrayList<String>()
+        var work = 0L
+        val history = LpDirectionalHistory(events::add, charge = { work += it })
+        val variable = VarRef.Bool(0)
+        repeat(129) { iteration ->
+            if (iteration % 2 == 0) history.clear() else history.restart()
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 2.0 else 1.0)
+                    history.finishNode(true)
+                }
+            }
+            history.record(0.0)
+            val before = work
+
+            history.observeEqualRateNumeric(variable, 0.5, 3.0) { true }
+
+            assertEquals(if (iteration < 128) 88L else 0L, work - before)
+        }
+        assertEquals(128, events.count { it == "PASSIVE_EQUAL_RATE_NUMERIC_CHECK" })
+        assertEquals(128, events.count { it == "PASSIVE_EQUAL_RATE_NUMERIC_OPEN_SEPARATED" })
+        assertEquals(128, events.count { it == "PASSIVE_EQUAL_RATE_NUMERIC_RATE_ONE" })
+        assertEquals(1, events.count { it == "PASSIVE_EQUAL_RATE_NUMERIC_EXHAUSTED" })
+    }
+
+    @Test
+    fun `equal rate observation stops after invalidation at each charged or observed boundary`() {
+        for (reset in listOf(false, true)) {
+            for (stopAt in listOf("CHARGE", "CHECK", "OPEN_SEPARATED", "RATE_ONE", "EXHAUSTED")) {
+                val events = ArrayList<String>()
+                var reporting = false
+                var fresh = true
+                lateinit var history: LpDirectionalHistory
+                history = LpDirectionalHistory({ event ->
+                    events.add(event)
+                    if (reporting && event == "PASSIVE_EQUAL_RATE_NUMERIC_$stopAt") {
+                        reporting = false
+                        if (reset) history.clear() else fresh = false
+                    }
+                }, charge = {
+                    if (reporting && stopAt == "CHARGE") {
+                        reporting = false
+                        if (reset) history.clear() else fresh = false
+                    }
+                })
+                val variable = VarRef.Bool(0)
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (up) 2.0 else 1.0)
+                        history.finishNode(true)
+                    }
+                }
+                history.record(0.0)
+                if (stopAt == "EXHAUSTED") repeat(127) {
+                    history.observeEqualRateNumeric(variable, 0.5, 3.0) { true }
+                }
+                events.clear()
+                reporting = true
+
+                history.observeEqualRateNumeric(variable, 0.5, 3.0) { fresh }
+
+                assertFalse(reporting)
+                val reportingOrder = listOf("CHECK", "OPEN_SEPARATED", "RATE_ONE", "EXHAUSTED")
+                val expected = reportingOrder.take(if (stopAt == "CHARGE") 0 else reportingOrder.indexOf(stopAt) + 1)
+                    .map { "PASSIVE_EQUAL_RATE_NUMERIC_$it" }
+                assertEquals(expected, events.filter { it.startsWith("PASSIVE_EQUAL_RATE_NUMERIC_") })
+            }
+        }
+    }
+
+    @Test
     fun `minimum predictions require comparable gaps for every numeric parent`() {
         val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
             listOf(-1.0, 0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
