@@ -18,13 +18,121 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpAutoConfigTest {
+    @Test
+    fun `explicit sparse admission leaves automatic eligibility operands unevaluated`() {
+        val problem = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
+            .withSettings(ProblemSettings(lpMaxTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        var decision: LpAdmission? = null
+
+        sequence<Unit> {
+            with(LpAutoConfig) {
+                prepare(problem, LpConfig.parse("default,+sparse-trial"), LpPlan(), objective,
+                    captureSparseAdmission = true) { decision = it }
+            }
+        }.forEach { }
+
+        val observation = assertNotNull(assertNotNull(decision).observation)
+        assertEquals(true, observation.sparseOverride)
+        assertEquals(false, observation.automaticEligible)
+        assertEquals(1L, observation.automaticEvaluated)
+        assertEquals(0L, observation.automaticPassed)
+        assertEquals(LpRootAdmissionDisposition.ADMITTED, observation.disposition)
+        assertEquals(0L, observation.metrics["Automatic"])
+    }
+
+    @Test
+    fun `interrupted sparse helper supplies no completed admission decision`() {
+        val problem = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
+            .withSettings(ProblemSettings(lpMaxTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val decisions = mutableListOf<LpAdmission>()
+        val failure = CancellationException("preparation interrupted")
+
+        val thrown = assertFailsWith<CancellationException> {
+            sequence<Unit> {
+                with(LpAutoConfig) {
+                    prepare(problem, LpConfig.AUTO, LpPlan(), objective,
+                        cancellation = ExecutionControl { throw failure },
+                        captureSparseAdmission = true) { decisions.add(it) }
+                }
+            }.forEach { }
+        }
+
+        assertEquals(failure, thrown)
+        assertTrue(decisions.isEmpty())
+    }
+
+    @Test
+    fun `admission masks preserve first evaluated guard and later callback facts`() {
+        val problem = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
+            .withSettings(ProblemSettings(lpMaxTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        for ((config, base, expected) in listOf(
+            Triple(LpConfig.OFF, LpPlan(), 3L to 1L),
+            Triple(LpConfig.AUTO, LpPlan(bounding = true), 7L to 3L),
+        )) {
+            var decision: LpAdmission? = null
+
+            sequence<Unit> {
+                with(LpAutoConfig) {
+                    prepare(problem, config, base, objective, captureSparseAdmission = true) { decision = it }
+                }
+            }.forEach { }
+
+            val admission = assertNotNull(decision)
+            val observation = assertNotNull(admission.observation)
+            assertEquals(LpRootAdmissionDisposition.NOT_CONSIDERED, observation.disposition)
+            assertEquals(expected.first, observation.automaticEvaluated)
+            assertEquals(expected.second, observation.automaticPassed)
+            assertEquals(expected.first, observation.outerEvaluated)
+            assertEquals(expected.second, observation.outerPassed)
+            assertEquals(admission.boundingPermitted, observation.boundingPermitted)
+            assertEquals(0L, observation.outerEvaluated and 32L)
+            assertNull(observation.helperPreparationWork)
+        }
+    }
+
+    @Test
+    fun `admission distinguishes projection skips helper declines and helper admission`() {
+        val problem = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
+            .withSettings(ProblemSettings(lpMaxTableauCells = 1L))
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        for ((allowed, queryWork, expected) in listOf(
+            Triple(false, 1_000_000L, LpRootAdmissionDisposition.PROJECTION_SKIPPED),
+            Triple(true, 0L, LpRootAdmissionDisposition.ATTEMPTED_DECLINED),
+            Triple(true, 1_000_000L, LpRootAdmissionDisposition.ADMITTED),
+        )) {
+            var decision: LpAdmission? = null
+
+            sequence<Unit> {
+                with(LpAutoConfig) {
+                    prepare(problem, LpConfig.AUTO, LpPlan(), objective, sparseTrialAllowed = allowed,
+                        sparseTrialQueryWork = queryWork, captureSparseAdmission = true) { decision = it }
+                }
+            }.forEach { }
+
+            val admission = assertNotNull(decision)
+            val observation = assertNotNull(admission.observation)
+            assertEquals(expected, observation.disposition)
+            assertEquals(32767L, observation.automaticEvaluated)
+            assertEquals(32767L, observation.automaticPassed)
+            assertEquals(63L, observation.outerEvaluated)
+            assertEquals(63L, observation.outerPassed)
+            assertEquals(admission.sparseTrial?.metrics, observation.metrics)
+            assertEquals(if (allowed) queryWork else null, observation.helperQueryWork)
+        }
+    }
+
     @Test
     fun `element admission selects complete index groups alongside competing hulls`() {
         val problem = Problem(

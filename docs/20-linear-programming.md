@@ -438,8 +438,12 @@ before writing and stops at two million entries or eight million work units;
 declines publish no factors or rank claim. Sparse admission never changes the dense
 exact-continuation caps.
 
-An optional model-facing root observer receives synchronous ownership, query-call,
-private-copy, target, handoff and first-consultation events. Engine identity is separate
+An optional model-facing root observer receives synchronous admission, ownership,
+query-call, private-copy, target, handoff and first-consultation events. Admission
+records the completed resolved decision, existing funding arguments and scalar
+results of operands in their original evaluation order. Unevaluated operands and
+missing or interrupted decisions remain unknown; a resolved plan does not establish
+its later application. Engine identity is separate
 from source, objective and point identity; a query-call ordinal supplies no numerical
 cursor lineage or evidence of advancement. Identity references belong to the callback,
 and the receiver owns bounded retention. Query pairing and a closed journal cover only

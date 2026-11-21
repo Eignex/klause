@@ -456,6 +456,7 @@ internal class LpEngine(
         paused: Boolean? = null,
         termination: LpFloatTermination? = null,
         pointObjective: Any? = null,
+        admission: LpRootAdmissionObservation? = null,
     ) {
         if (rootPointRetiring) return
         val observer = rootPointObserver ?: return
@@ -465,7 +466,7 @@ internal class LpEngine(
         }
         val event = LpRootPointObservation(checkNotNull(rootPointOwner), problem, objective,
             ++rootPointSequence, rootPointQuery, stage, disposition, model, point, previousPoint,
-            automaticSparseTrial, auxiliary, partial, sourceRoot, paused, termination, pointObjective)
+            automaticSparseTrial, auxiliary, partial, sourceRoot, paused, termination, pointObjective, admission)
         try {
             observer.onRootPoint(event)
         } catch (failure: Exception) {
@@ -2126,14 +2127,29 @@ internal class LpEngine(
             (remainingMillis * params.lpPlan.lpWorkBudgetFraction * LP_WORK_PER_MILLI).toLong().coerceAtLeast(0L))
     }
 
+    private fun observeRootAdmission(admission: LpRootAdmissionObservation) {
+        if (!rootPointObservationEnabled) return
+        val disposition = when (admission.disposition) {
+            LpRootAdmissionDisposition.NOT_CONFIGURED -> LpRootPointDisposition.NOT_CONFIGURED
+            LpRootAdmissionDisposition.NOT_CONSIDERED -> LpRootPointDisposition.NOT_CONSIDERED
+            LpRootAdmissionDisposition.PROJECTION_SKIPPED -> LpRootPointDisposition.PROJECTION_SKIPPED
+            LpRootAdmissionDisposition.ATTEMPTED_DECLINED -> LpRootPointDisposition.ATTEMPTED_DECLINED
+            LpRootAdmissionDisposition.ADMITTED -> LpRootPointDisposition.ADMITTED
+        }
+        observeRootPoint(LpRootPointStage.ADMISSION, disposition, admission = admission)
+    }
+
     internal fun preparation(): Iterator<Unit> = sequence {
         params.lpConfig?.let { config ->
             val queryWork = sparseAdmissionQueryWork(config)
+            val admissionCancellation = params.cancellation
+            val projectionAllowed = projections?.builtInRelaxation != false
+            val preparationWork = retainedRootRemainingWork()
             val plan = with(LpAutoConfig) {
-                prepare(problem, config, requestedPlan, objective, params.cancellation,
-                    sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork(), sparseTrialQueryWork = queryWork,
-                    sourcePreparation = sourcePreparation) { admission ->
+                prepare(problem, config, requestedPlan, objective, admissionCancellation,
+                    sparseTrialAllowed = projectionAllowed,
+                    sparseTrialWork = preparationWork, sparseTrialQueryWork = queryWork,
+                    sourcePreparation = sourcePreparation, captureSparseAdmission = rootPointObservationEnabled) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted
@@ -2147,9 +2163,14 @@ internal class LpEngine(
                         sink.lp.sparseTrial = trial.metrics
                         noteNodeOverhead(trial.work)
                     }
+                    admission.observation?.let { observeRootAdmission(it) }
                 }
             }
             params = params.copy(lpPlan = plan)
+        } ?: run {
+            if (rootPointObservationEnabled) {
+                observeRootAdmission(LpRootAdmissionObservation(LpRootAdmissionDisposition.NOT_CONFIGURED))
+            }
         }
         structuralCutSupport = structuralCutSupport || params.lpPlan.circuit
         if (params.lpPlan.cuts && !structuralCutSupport) {

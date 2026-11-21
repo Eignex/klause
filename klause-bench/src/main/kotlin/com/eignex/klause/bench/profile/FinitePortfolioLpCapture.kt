@@ -11,6 +11,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -71,11 +72,14 @@ internal object FinitePortfolioLpCapture {
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                "source-refutation-center-step", "capture-root-points")
+                "source-refutation-center-step", "capture-root-points", "lp-ceiling")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
         val captureRootPoints = options["capture-root-points"]?.toBooleanStrict() ?: false
+        if ("lp-ceiling" in options) require(captureRootPoints && options["lp-ceiling"] == "default") {
+            "lp-ceiling=default requires ordinary root point capture"
+        }
         val captureJoint = mode == "joint-ordinary" || mode == "joint-handoff"
         val centerStep = options["source-refutation-center-step"]?.let {
             require(captureJoint) {
@@ -121,6 +125,9 @@ internal object FinitePortfolioLpCapture {
             "portfolio-proof-workers=$preset", "portfolio-proof-share=0.5")
     }
 
+    internal fun sourcePolicy(options: Map<String, String>): SourceExecutionPolicy =
+        SourceExecutionPolicy(lpCeiling = options["lp-ceiling"]?.let { LpConfig.parse(it) })
+
     internal fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
         val pairs = parameters(options)
         if (options["capture-mode"] == "joint-before") {
@@ -148,7 +155,8 @@ internal object FinitePortfolioLpCapture {
         val original = requireNotNull(Mps.parse(bytes.decodeToString()).toLinearSourceProblem(cancellation = stop))
         val shapeLimit = if (captureRootPoints) 6000 else 4096
         require(original.variables.size <= shapeLimit && original.rows.size <= shapeLimit)
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(original, ProblemSettings()),
+        val settings = ProblemSettings()
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(original, settings),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop))
         if (SourceSetup.executionKind(invocation) != SourceExecutionKind.FINITE) {
@@ -168,7 +176,7 @@ internal object FinitePortfolioLpCapture {
             }.toString())
             return
         }
-        val policy = SourceExecutionPolicy()
+        val policy = sourcePolicy(options)
         val window = QueryWindow(captureWorker, limit)
         val rootPoints = if (captureRootPoints) RootPointWindow(captureWorker) else null
         var retained = 0
@@ -351,8 +359,10 @@ internal object FinitePortfolioLpCapture {
                         val rootSerializationNs = rootPoints?.let { capture ->
                             val started = System.nanoTime()
                             val snapshot = capture.snapshot(rootLibraryFailures).json()
-                            out.resolve("root-points.json").writeText(JsonObject(snapshot +
-                                ("sourceSha256" to JsonPrimitive(sourceHash))).toString())
+                            val encoded = JsonObject(snapshot +
+                                ("sourceSha256" to JsonPrimitive(sourceHash))).toString().encodeToByteArray()
+                            require(encoded.size <= ROOT_POINT_JOURNAL_BYTE_LIMIT)
+                            out.resolve("root-points.json").writeBytes(encoded)
                             System.nanoTime() - started
                         } ?: 0L
                         out.resolve("result.json").writeText(buildJsonObject {
@@ -399,6 +409,16 @@ internal object FinitePortfolioLpCapture {
                             put("guidanceEvents", guidanceEvents)
                             put("captureGuidance", captureGuidance)
                             put("captureRootPoints", captureRootPoints)
+                            if (captureRootPoints) {
+                                put("requestedLpCeiling", options["lp-ceiling"])
+                                put("resolvedPolicyLpCeiling", policy.lpCeiling?.emphasis?.name ?: "AGGRESSIVE")
+                                put("sourceSetupSettings", "DEFAULT_PROBLEM_SETTINGS_NO_SEMANTIC_OVERRIDES")
+                                put("sourceSetupLpMaxTableauCells", settings.lpMaxTableauCells)
+                                put("sourceSetupLpCeilingTableauCells", settings.lpCeilingTableauCells)
+                                put("admissionSchema", 1)
+                                put("rootPointRecordByteLimit", ROOT_POINT_RECORD_BYTE_LIMIT)
+                                put("rootPointJournalByteLimit", ROOT_POINT_JOURNAL_BYTE_LIMIT)
+                            }
                             put("sourceInputByteLimit", sourceByteLimit(options))
                             put("rootPointSerializationNs", rootSerializationNs)
                             put("rootPointSourceShapeLimit", shapeLimit)
@@ -478,6 +498,283 @@ internal object FinitePortfolioLpCapture {
         }
     }
 
+    internal const val ROOT_POINT_RECORD_BYTE_LIMIT = 8192
+    internal const val ROOT_POINT_JOURNAL_BYTE_LIMIT = 67_371_008
+
+    private class UnsupportedAdmissionPayload : IllegalArgumentException()
+
+    internal data class RootAdmissionRecord(
+        val schema: Int,
+        val disposition: String,
+        val emphasis: String?,
+        val sparseOverride: Boolean?,
+        val sparsePermitted: Boolean?,
+        val automaticEligible: Boolean?,
+        val automaticEvaluated: Long,
+        val automaticPassed: Long,
+        val outerEvaluated: Long,
+        val outerPassed: Long,
+        val estimatedRows: Long?,
+        val estimatedColumns: Long?,
+        val estimatedCells: Long?,
+        val baseCellCap: Long?,
+        val ceilingCellCap: Long?,
+        val boundingPermitted: Boolean?,
+        val withinCeiling: Boolean?,
+        val structurallyApplicable: Boolean?,
+        val projectionAllowed: Boolean?,
+        val producerQueryWork: Long?,
+        val producerPreparationWork: Long?,
+        val helperQueryWork: Long?,
+        val helperPreparationWork: Long?,
+        val resolvedBounding: Boolean?,
+        val resolvedProbe: Boolean?,
+        val resolvedBranching: Boolean?,
+        val resolvedComponentOwnership: Boolean?,
+        val resolvedLbTreeSearch: Boolean?,
+        val resolvedRootMaxWork: Long?,
+        val resolvedBoundMaxDepth: Int?,
+        val resolvedRootBudgetMillis: Long?,
+        val resolvedRootBudgetFraction: Double?,
+        val resolvedLpWorkBudgetFraction: Double?,
+        val metrics: Map<String, Long>,
+    ) {
+        fun json(): JsonObject = buildJsonObject {
+            put("schema", schema)
+            put("disposition", disposition)
+            put("emphasis", emphasis)
+            put("sparseOverride", sparseOverride)
+            put("sparsePermitted", sparsePermitted)
+            put("automaticEligible", automaticEligible)
+            put("automaticEvaluated", automaticEvaluated)
+            put("automaticPassed", automaticPassed)
+            put("outerEvaluated", outerEvaluated)
+            put("outerPassed", outerPassed)
+            put("estimatedRows", estimatedRows)
+            put("estimatedColumns", estimatedColumns)
+            put("estimatedCells", estimatedCells)
+            put("baseCellCap", baseCellCap)
+            put("ceilingCellCap", ceilingCellCap)
+            put("boundingPermitted", boundingPermitted)
+            put("withinCeiling", withinCeiling)
+            put("structurallyApplicable", structurallyApplicable)
+            put("projectionAllowed", projectionAllowed)
+            put("producerQueryWork", producerQueryWork)
+            put("producerPreparationWork", producerPreparationWork)
+            put("helperQueryWork", helperQueryWork)
+            put("helperPreparationWork", helperPreparationWork)
+            put("resolvedBounding", resolvedBounding)
+            put("resolvedProbe", resolvedProbe)
+            put("resolvedBranching", resolvedBranching)
+            put("resolvedComponentOwnership", resolvedComponentOwnership)
+            put("resolvedLbTreeSearch", resolvedLbTreeSearch)
+            put("resolvedRootMaxWork", resolvedRootMaxWork)
+            put("resolvedBoundMaxDepth", resolvedBoundMaxDepth)
+            put("resolvedRootBudgetMillis", resolvedRootBudgetMillis)
+            put("resolvedRootBudgetFraction", resolvedRootBudgetFraction)
+            put("resolvedLpWorkBudgetFraction", resolvedLpWorkBudgetFraction)
+            put("planScope", "RESOLVED_DECISION")
+            put("unevaluatedMeaning", "UNKNOWN")
+            put("metrics", buildJsonObject { metrics.forEach { (key, value) -> put(key, value) } })
+        }
+
+        private fun validate(eventDisposition: String, eventAutomatic: Boolean) {
+            require(schema == 1 && disposition in dispositions && disposition == eventDisposition)
+            require(emphasis == null || emphasis in setOf("OFF", "CONSERVATIVE", "DEFAULT", "AGGRESSIVE"))
+            require(listOf(estimatedRows, estimatedColumns, estimatedCells, producerQueryWork,
+                producerPreparationWork, helperQueryWork, helperPreparationWork).all { it == null || it >= 0L })
+            if (listOf(resolvedRootBudgetFraction, resolvedLpWorkBudgetFraction).any {
+                it != null && !it.isFinite()
+            }) throw UnsupportedAdmissionPayload()
+            require(metrics.values.all { it >= 0L })
+            if (disposition == "NOT_CONFIGURED") {
+                require(listOf(emphasis, sparseOverride, sparsePermitted, automaticEligible, estimatedRows, estimatedColumns, estimatedCells, baseCellCap, ceilingCellCap, boundingPermitted, withinCeiling, structurallyApplicable, projectionAllowed, producerQueryWork, producerPreparationWork, helperQueryWork, helperPreparationWork, resolvedBounding, resolvedProbe, resolvedBranching, resolvedComponentOwnership, resolvedLbTreeSearch, resolvedRootMaxWork, resolvedBoundMaxDepth, resolvedRootBudgetMillis, resolvedRootBudgetFraction, resolvedLpWorkBudgetFraction).all { it == null })
+                require(automaticEvaluated == 0L && automaticPassed == 0L &&
+                    outerEvaluated == 0L && outerPassed == 0L && metrics.isEmpty() && !eventAutomatic)
+                return
+            }
+            require(listOf(emphasis, sparsePermitted, automaticEligible, estimatedRows, estimatedColumns, estimatedCells, baseCellCap, ceilingCellCap, boundingPermitted, withinCeiling, structurallyApplicable, projectionAllowed, producerQueryWork, producerPreparationWork, resolvedBounding, resolvedProbe, resolvedBranching, resolvedComponentOwnership, resolvedLbTreeSearch, resolvedRootMaxWork, resolvedBoundMaxDepth, resolvedRootBudgetMillis, resolvedRootBudgetFraction, resolvedLpWorkBudgetFraction).all { it != null })
+            val automatic = completedGuard(automaticEvaluated, automaticPassed, 15)
+            val considered = completedGuard(outerEvaluated, outerPassed, 6)
+            require(automaticEligible == automatic)
+            require((automaticPassed and 1L != 0L) == (sparseOverride != true))
+            if (automaticEvaluated and 2L != 0L) require((automaticPassed and 2L != 0L) == sparsePermitted)
+            if (outerEvaluated and 2L != 0L) require((outerPassed and 2L != 0L) == sparsePermitted)
+            if (outerEvaluated and 8L != 0L) require((outerPassed and 8L != 0L) == (sparseOverride == true || automatic))
+            if (outerEvaluated and 16L != 0L) require((outerPassed and 16L != 0L) == structurallyApplicable)
+            if (outerEvaluated and 32L != 0L) require((outerPassed and 32L != 0L) == boundingPermitted)
+            val helperReturned = disposition == "ATTEMPTED_DECLINED" || disposition == "ADMITTED"
+            require(considered == (disposition != "NOT_CONSIDERED"))
+            require((helperPreparationWork != null && helperQueryWork != null) == helperReturned)
+            require((helperPreparationWork == null && helperQueryWork == null) == !helperReturned)
+            if (helperReturned) {
+                val preparation = requireNotNull(helperPreparationWork)
+                val query = requireNotNull(helperQueryWork)
+                require(preparation <= requireNotNull(producerPreparationWork))
+                require(query <= requireNotNull(producerQueryWork))
+                metrics["QueryWorkAllowance"]?.let { require(it == query) }
+            }
+            if (!considered) require(metrics.isEmpty())
+            else {
+                require(projectionAllowed == (disposition != "PROJECTION_SKIPPED"))
+                require(metrics["Automatic"] == if (automatic) 1L else 0L)
+            }
+            when (disposition) {
+                "PROJECTION_SKIPPED" -> require(metrics == mapOf("DeclineProjection" to 1L,
+                    "Automatic" to if (automatic) 1L else 0L))
+                "ATTEMPTED_DECLINED" -> require(metrics["Admitted"] != 1L &&
+                    metrics.filterKeys { it.startsWith("Decline") }.values.toList() == listOf(1L))
+                "ADMITTED" -> require(metrics["Admitted"] == 1L && metrics.keys.none { it.startsWith("Decline") })
+            }
+            require(eventAutomatic == (disposition == "ADMITTED" && sparseOverride != true))
+        }
+
+        companion object {
+            private val dispositions = setOf("NOT_CONFIGURED", "NOT_CONSIDERED", "PROJECTION_SKIPPED",
+                "ATTEMPTED_DECLINED", "ADMITTED")
+            private val getterNames = setOf(
+                "getSchema",
+                "getDisposition",
+                "getEmphasis",
+                "getSparseOverride",
+                "getSparsePermitted",
+                "getAutomaticEligible",
+                "getAutomaticEvaluated",
+                "getAutomaticPassed",
+                "getOuterEvaluated",
+                "getOuterPassed",
+                "getEstimatedRows",
+                "getEstimatedColumns",
+                "getEstimatedCells",
+                "getBaseCellCap",
+                "getCeilingCellCap",
+                "getBoundingPermitted",
+                "getWithinCeiling",
+                "getStructurallyApplicable",
+                "getProjectionAllowed",
+                "getProducerQueryWork",
+                "getProducerPreparationWork",
+                "getHelperQueryWork",
+                "getHelperPreparationWork",
+                "getResolvedBounding",
+                "getResolvedProbe",
+                "getResolvedBranching",
+                "getResolvedComponentOwnership",
+                "getResolvedLbTreeSearch",
+                "getResolvedRootMaxWork",
+                "getResolvedBoundMaxDepth",
+                "getResolvedRootBudgetMillis",
+                "getResolvedRootBudgetFraction",
+                "getResolvedLpWorkBudgetFraction",
+                "getMetrics",
+            )
+            private val metricNames = listOf(
+                "Rows",
+                "Automatic",
+                "Columns",
+                "Nonzeros",
+                "Components",
+                "LargestComponentRows",
+                "LargestComponentColumns",
+                "ScalarBits",
+                "RowIntersectionRisk",
+                "FillRiskLimit",
+                "EstimatedMonolithicQueryWork",
+                "EstimatedFactorAttemptWork",
+                "FactorAttemptForecast",
+                "EstimatedProbeWork",
+                "EstimatedProbeTotalWork",
+                "QueryWorkAllowance",
+                "FactorEntryLimit",
+                "FactorWorkLimit",
+                "ReservedBytes",
+                "CheckingReservedBytes",
+                "PreparationWork",
+                "WorkLimit",
+                "StorageLimit",
+                "Admitted",
+                "SourceInspectedFillRisk",
+                "SourceEstimatedPassWork",
+                "SourceEstimatedPassTotalWork",
+                "DeclineProjection",
+                "DeclineShape",
+                "DeclineCancelled",
+                "DeclineQueryWork",
+                "DeclinePreparationWork",
+                "DeclineStrictRow",
+                "DeclineSource",
+                "DeclineFillRisk",
+                "DeclineStorage",
+                "DeclineScalarWidth",
+                "DeclineEntries",
+                "DeclineFactorForecast",
+            )
+
+            private fun completedGuard(evaluated: Long, passed: Long, count: Int): Boolean {
+                val full = (1L shl count) - 1L
+                require(evaluated in 1L..full && (evaluated and (evaluated + 1L)) == 0L)
+                require((passed and evaluated.inv()) == 0L)
+                val complete = evaluated == full && passed == full
+                require(complete || passed == (evaluated ushr 1))
+                return complete
+            }
+
+            fun read(value: Any, eventDisposition: String, eventAutomatic: Boolean,
+                read: (Any, String) -> Any?): RootAdmissionRecord {
+                val getters = value.javaClass.methods.filter {
+                    it.name.startsWith("get") && it.name != "getClass" && it.parameterCount == 0
+                }.map { it.name }.toSet()
+                if (getters != getterNames || read(value, "getSchema") != 1) throw UnsupportedAdmissionPayload()
+                val borrowed = read(value, "getMetrics") as Map<*, *>
+                if (borrowed.size > metricNames.size || borrowed.keys.any { it !in metricNames }) {
+                    throw UnsupportedAdmissionPayload()
+                }
+                val metrics = LinkedHashMap<String, Long>()
+                metricNames.forEach { key ->
+                    if (borrowed.containsKey(key)) metrics[key] = borrowed[key] as Long
+                }
+                val result = RootAdmissionRecord(
+                    schema = read(value, "getSchema") as Int,
+                    disposition = requireNotNull(read(value, "getDisposition")).toString(),
+                    emphasis = read(value, "getEmphasis")?.toString(),
+                    sparseOverride = read(value, "getSparseOverride") as Boolean?,
+                    sparsePermitted = read(value, "getSparsePermitted") as Boolean?,
+                    automaticEligible = read(value, "getAutomaticEligible") as Boolean?,
+                    automaticEvaluated = read(value, "getAutomaticEvaluated") as Long,
+                    automaticPassed = read(value, "getAutomaticPassed") as Long,
+                    outerEvaluated = read(value, "getOuterEvaluated") as Long,
+                    outerPassed = read(value, "getOuterPassed") as Long,
+                    estimatedRows = read(value, "getEstimatedRows") as Long?,
+                    estimatedColumns = read(value, "getEstimatedColumns") as Long?,
+                    estimatedCells = read(value, "getEstimatedCells") as Long?,
+                    baseCellCap = read(value, "getBaseCellCap") as Long?,
+                    ceilingCellCap = read(value, "getCeilingCellCap") as Long?,
+                    boundingPermitted = read(value, "getBoundingPermitted") as Boolean?,
+                    withinCeiling = read(value, "getWithinCeiling") as Boolean?,
+                    structurallyApplicable = read(value, "getStructurallyApplicable") as Boolean?,
+                    projectionAllowed = read(value, "getProjectionAllowed") as Boolean?,
+                    producerQueryWork = read(value, "getProducerQueryWork") as Long?,
+                    producerPreparationWork = read(value, "getProducerPreparationWork") as Long?,
+                    helperQueryWork = read(value, "getHelperQueryWork") as Long?,
+                    helperPreparationWork = read(value, "getHelperPreparationWork") as Long?,
+                    resolvedBounding = read(value, "getResolvedBounding") as Boolean?,
+                    resolvedProbe = read(value, "getResolvedProbe") as Boolean?,
+                    resolvedBranching = read(value, "getResolvedBranching") as Boolean?,
+                    resolvedComponentOwnership = read(value, "getResolvedComponentOwnership") as Boolean?,
+                    resolvedLbTreeSearch = read(value, "getResolvedLbTreeSearch") as Boolean?,
+                    resolvedRootMaxWork = read(value, "getResolvedRootMaxWork") as Long?,
+                    resolvedBoundMaxDepth = read(value, "getResolvedBoundMaxDepth") as Int?,
+                    resolvedRootBudgetMillis = read(value, "getResolvedRootBudgetMillis") as Long?,
+                    resolvedRootBudgetFraction = read(value, "getResolvedRootBudgetFraction") as Double?,
+                    resolvedLpWorkBudgetFraction = read(value, "getResolvedLpWorkBudgetFraction") as Double?,
+                    metrics = metrics.toMap(),
+                )
+                result.validate(eventDisposition, eventAutomatic)
+                return result
+            }
+        }
+    }
+
     internal data class RootPointRecord(
         val worker: String,
         val owner: Int,
@@ -498,6 +795,7 @@ internal object FinitePortfolioLpCapture {
         val paused: Boolean?,
         val termination: String?,
         val elapsedNs: Long,
+        val admission: RootAdmissionRecord? = null,
     ) {
         fun json(): JsonObject = buildJsonObject {
             put("worker", worker)
@@ -519,7 +817,8 @@ internal object FinitePortfolioLpCapture {
             put("paused", paused)
             put("termination", termination)
             put("elapsedNs", elapsedNs)
-        }
+            admission?.let { put("admission", it.json()) }
+        }.also { require(it.toString().encodeToByteArray().size <= ROOT_POINT_RECORD_BYTE_LIMIT) }
     }
 
     internal data class RootPointOwnerSnapshot(
@@ -559,6 +858,8 @@ internal object FinitePortfolioLpCapture {
         val droppedStages: Map<String, Long>,
         val owners: List<RootPointOwnerSnapshot>,
         val events: List<RootPointRecord>,
+        val admissionFailures: Long = 0L,
+        val admissionUnsupported: Long = 0L,
     ) {
         val partialQueryCoverage: Boolean get() = true
         val absenceEvidence: Boolean get() = false
@@ -571,6 +872,12 @@ internal object FinitePortfolioLpCapture {
             put("dropped", dropped)
             put("failures", failures)
             put("libraryFailures", libraryFailures)
+            put("admissionFailures", admissionFailures)
+            put("admissionUnsupported", admissionUnsupported)
+            put("admissionCoverage", "RECORDED_DECISIONS_ONLY")
+            put("missingAdmissionMeaning", "UNKNOWN")
+            put("rootPointRecordByteLimit", ROOT_POINT_RECORD_BYTE_LIMIT)
+            put("rootPointJournalByteLimit", ROOT_POINT_JOURNAL_BYTE_LIMIT)
             put("observerNs", observerNs)
             put("identityOverflow", identityOverflow)
             put("ownerLimit", limits.owners)
@@ -597,6 +904,8 @@ internal object FinitePortfolioLpCapture {
 
     internal class RootPointWindow(private val selectedWorker: String,
         private val limits: RootPointLimits = RootPointLimits()) {
+        init { require(selectedWorker.length <= 128) }
+
         private class WeakIds(private val limit: Int) {
             private val values = ArrayList<WeakReference<Any>>()
             var overflow = 0L
@@ -644,11 +953,14 @@ internal object FinitePortfolioLpCapture {
         private var unselected = 0L
         private var dropped = 0L
         private var failures = 0L
+        private var admissionFailures = 0L
+        private var admissionUnsupported = 0L
         private var observerNs = 0L
 
         fun observe(worker: String, event: Any, elapsedNs: Long) {
             val started = System.nanoTime()
             synchronized(lock) {
+                var admissionEvent = false
                 try {
                     seen++
                     if (selectedWorker != "any" && selectedWorker != worker) {
@@ -666,8 +978,11 @@ internal object FinitePortfolioLpCapture {
                     owner.seen++
                     val sequence = get(event, "Sequence") as Long
                     val stage = get(event, "Stage").toString()
+                    admissionEvent = stage == "ADMISSION"
                     val disposition = get(event, "Disposition").toString()
                     require(stage.length <= 64 && disposition.length <= 64)
+                    require(stage in setOf("ADMISSION", "OWNER", "QUERY_CALL", "COPY", "GUIDANCE", "TARGETS",
+                        "HANDOFF", "CONSUMER", "CLOSE_BEGIN", "CLOSE_END"))
                     if (owner.worker != worker || owner.closeEnd || sequence != owner.sequence + 1L ||
                         (owner.closeBegin && stage != "CLOSE_END")
                     ) owner.incomplete = true
@@ -734,15 +1049,26 @@ internal object FinitePortfolioLpCapture {
                         }
                         owner.closeEnd = true
                     }
+                    val automatic = get(event, "Automatic") as Boolean
+                    val auxiliary = get(event, "Auxiliary") as Boolean
+                    val partial = get(event, "Partial") as Boolean
+                    val sourceRoot = call(event, "getSourceRoot") as Boolean?
+                    val paused = call(event, "getPaused") as Boolean?
+                    val termination = call(event, "getTermination")?.toString()?.take(64)
+                    val admission = if (stage == "ADMISSION") {
+                        require(model == null && point == null && previous == null && pointObjective == null &&
+                            !auxiliary && !partial && sourceRoot == null && paused == null && termination == null)
+                        RootAdmissionRecord.read(get(event, "Admission"), disposition, automatic, ::call)
+                    } else null
                     records.add(RootPointRecord(worker, index, source, objective, pointObjective, model,
                         point, previous, sequence, query, stage, disposition,
-                        get(event, "Automatic") as Boolean, get(event, "Auxiliary") as Boolean,
-                        get(event, "Partial") as Boolean, call(event, "getSourceRoot") as Boolean?,
-                        call(event, "getPaused") as Boolean?, call(event, "getTermination")?.toString()?.take(64),
-                        elapsedNs))
+                        automatic, auxiliary, partial, sourceRoot, paused, termination,
+                        elapsedNs, admission))
                 } catch (failure: Exception) {
                     if (failure is CancellationException) throw failure
                     failures++
+                    if (admissionEvent) admissionFailures++
+                    if (failure is UnsupportedAdmissionPayload) admissionUnsupported++
                 } finally {
                     observerNs += System.nanoTime() - started
                 }
@@ -761,7 +1087,7 @@ internal object FinitePortfolioLpCapture {
                         if (owner.closeBegin && owner.closeEnd && owner.openQuery == null && !owner.incomplete &&
                             failures == 0L && libraryFailures == 0L && ownerIds.overflow == 0L
                         ) "CLOSED_JOURNALED_SCOPE" else "UNKNOWN")
-                }, records.toList())
+                }, records.toList(), admissionFailures, admissionUnsupported)
         }
 
         private fun get(event: Any, name: String): Any = requireNotNull(call(event, "get$name"))

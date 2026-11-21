@@ -42,7 +42,8 @@ class BacktrackWorkerConfigTest {
         for (root in listOf(false, true)) {
             val kinds = mutableListOf<PooledGuidanceKind>()
             val recipe = BacktrackRecipe("observed") { _, _ ->
-                BacktrackParams(lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
+                BacktrackParams(randomSeed = 0L,
+                    lpPlan = LpPlan(rootBudgetMillis = 0L, rootCutHarvest = false))
             }
             val guided = BacktrackWorkerConfig(recipe).withGuidanceObserver { _, event -> kinds.add(event.kind) }
             val config = if (root) guided.withRootPointObserver { _, event -> rootStages.add(event.stage) } else guided
@@ -56,10 +57,18 @@ class BacktrackWorkerConfigTest {
             guidance.add(kinds)
         }
 
+        assertTrue(witnesses.all { it.isNotEmpty() })
+        assertEquals(2.0, witnesses[0].last())
         assertEquals(witnesses[0], witnesses[1])
+        assertTrue(guidance.all { kinds ->
+            PooledGuidanceKind.ATTEMPT in kinds && PooledGuidanceKind.COMMIT in kinds &&
+                PooledGuidanceKind.LOCAL in kinds
+        })
         assertEquals(guidance[0], guidance[1])
         assertTrue(LpRootPointStage.CLOSE_BEGIN in rootStages)
         assertTrue(LpRootPointStage.CLOSE_END in rootStages)
+        assertTrue(rootStages.indexOf(LpRootPointStage.CLOSE_BEGIN) <
+            rootStages.indexOf(LpRootPointStage.CLOSE_END))
     }
 
 

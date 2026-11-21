@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
+import com.eignex.klause.lp.bounding.LpEmphasis
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -21,6 +22,291 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePortfolioLpCaptureTest {
+    @Test
+    fun `admission depth rejects the wrong runtime numeric type`() {
+        val original = FinitePortfolioLpCapture.RootAdmissionRecord(
+            schema = 1,
+            disposition = "PROJECTION_SKIPPED",
+            emphasis = "DEFAULT",
+            sparseOverride = null,
+            sparsePermitted = true,
+            automaticEligible = true,
+            automaticEvaluated = 32767L,
+            automaticPassed = 32767L,
+            outerEvaluated = 63L,
+            outerPassed = 63L,
+            estimatedRows = 3L,
+            estimatedColumns = 3L,
+            estimatedCells = 21L,
+            baseCellCap = 1L,
+            ceilingCellCap = 1000L,
+            boundingPermitted = true,
+            withinCeiling = true,
+            structurallyApplicable = true,
+            projectionAllowed = false,
+            producerQueryWork = 1000L,
+            producerPreparationWork = 1000L,
+            helperQueryWork = null,
+            helperPreparationWork = null,
+            resolvedBounding = true,
+            resolvedProbe = true,
+            resolvedBranching = true,
+            resolvedComponentOwnership = false,
+            resolvedLbTreeSearch = false,
+            resolvedRootMaxWork = 1000L,
+            resolvedBoundMaxDepth = 0,
+            resolvedRootBudgetMillis = 1000L,
+            resolvedRootBudgetFraction = 0.5,
+            resolvedLpWorkBudgetFraction = 0.25,
+            metrics = mapOf("DeclineProjection" to 1L, "Automatic" to 1L),
+        )
+
+        assertFailsWith<ClassCastException> {
+            FinitePortfolioLpCapture.RootAdmissionRecord.read(original, original.disposition, false) { value, getter ->
+                if (getter == "getResolvedBoundMaxDepth") Int.MAX_VALUE.toLong() + 1L
+                else value.javaClass.getMethod(getter).invoke(value)
+            }
+        }
+    }
+
+    @Test
+    fun `dropped admission lifecycle remains incomplete`() {
+        val owner = Any()
+        val window = FinitePortfolioLpCapture.RootPointWindow("any",
+            FinitePortfolioLpCapture.RootPointLimits(ownerEvents = 1))
+        val admission = FinitePortfolioLpCapture.RootAdmissionRecord(
+            schema = 1,
+            disposition = "NOT_CONFIGURED",
+            emphasis = null,
+            sparseOverride = null,
+            sparsePermitted = null,
+            automaticEligible = null,
+            automaticEvaluated = 0L,
+            automaticPassed = 0L,
+            outerEvaluated = 0L,
+            outerPassed = 0L,
+            estimatedRows = null,
+            estimatedColumns = null,
+            estimatedCells = null,
+            baseCellCap = null,
+            ceilingCellCap = null,
+            boundingPermitted = null,
+            withinCeiling = null,
+            structurallyApplicable = null,
+            projectionAllowed = null,
+            producerQueryWork = null,
+            producerPreparationWork = null,
+            helperQueryWork = null,
+            helperPreparationWork = null,
+            resolvedBounding = null,
+            resolvedProbe = null,
+            resolvedBranching = null,
+            resolvedComponentOwnership = null,
+            resolvedLbTreeSearch = null,
+            resolvedRootMaxWork = null,
+            resolvedBoundMaxDepth = null,
+            resolvedRootBudgetMillis = null,
+            resolvedRootBudgetFraction = null,
+            resolvedLpWorkBudgetFraction = null,
+            metrics = emptyMap(),
+        )
+
+        window.observe("bt/lp-default", RootEvent(owner, 1L, stage = "ADMISSION", disposition = "NOT_CONFIGURED",
+            automatic = false, admission = admission), 1L)
+        window.observe("bt/lp-default", RootEvent(owner, 2L, stage = "CLOSE_BEGIN", disposition = "BEGIN"), 2L)
+        window.observe("bt/lp-default", RootEvent(owner, 3L, stage = "CLOSE_END", disposition = "END"), 3L)
+        val snapshot = window.snapshot()
+
+        assertEquals(2L, snapshot.dropped)
+        assertEquals("UNKNOWN", snapshot.owners.single().coverage)
+        assertEquals(false, snapshot.absenceEvidence)
+        assertEquals(1, snapshot.events.size)
+        assertEquals("NOT_CONFIGURED", snapshot.events.single().admission?.disposition)
+    }
+
+    @Test
+    fun `encoded root records enforce their byte limit`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        window.observe("x".repeat(128), RootEvent(Any(), 1L), 1L)
+        val record = window.snapshot().events.single()
+
+        assertFailsWith<IllegalArgumentException> { record.copy(worker = "x".repeat(8192)).json() }
+    }
+
+    @ParameterizedTest
+    @CsvSource("true,default", "true,aggressive", "true,'default,+sparse-trial'", "false,default")
+    fun `root ceiling accepts only an explicit default cap`(root: Boolean, value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary",
+            "portfolio-progress" to "false", "captures" to "0", "capture-root-points" to "true",
+            "lp-ceiling" to value, "capture-root-points" to root.toString())
+
+        if (root && value == "default") {
+            assertEquals(listOf("portfolio-progress=false"), FinitePortfolioLpCapture.parameters(options))
+            assertEquals(LpEmphasis.DEFAULT, FinitePortfolioLpCapture.sourcePolicy(options).lpCeiling?.emphasis)
+        } else assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options) }
+    }
+
+    @Test
+    fun `absent root ceiling preserves the uncapped policy`() {
+        assertNull(FinitePortfolioLpCapture.sourcePolicy(emptyMap()).lpCeiling)
+    }
+
+    @Test
+    fun `admission metadata preserves query pairing and closed recorded scope`() {
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        val owner = Any()
+        val model = Any()
+        val admission = FinitePortfolioLpCapture.RootAdmissionRecord(
+            schema = 1,
+            disposition = "NOT_CONFIGURED",
+            emphasis = null,
+            sparseOverride = null,
+            sparsePermitted = null,
+            automaticEligible = null,
+            automaticEvaluated = 0L,
+            automaticPassed = 0L,
+            outerEvaluated = 0L,
+            outerPassed = 0L,
+            estimatedRows = null,
+            estimatedColumns = null,
+            estimatedCells = null,
+            baseCellCap = null,
+            ceilingCellCap = null,
+            boundingPermitted = null,
+            withinCeiling = null,
+            structurallyApplicable = null,
+            projectionAllowed = null,
+            producerQueryWork = null,
+            producerPreparationWork = null,
+            helperQueryWork = null,
+            helperPreparationWork = null,
+            resolvedBounding = null,
+            resolvedProbe = null,
+            resolvedBranching = null,
+            resolvedComponentOwnership = null,
+            resolvedLbTreeSearch = null,
+            resolvedRootMaxWork = null,
+            resolvedBoundMaxDepth = null,
+            resolvedRootBudgetMillis = null,
+            resolvedRootBudgetFraction = null,
+            resolvedLpWorkBudgetFraction = null,
+            metrics = emptyMap(),
+        )
+
+        window.observe("bt/lp-default", RootEvent(owner, 1L, stage = "ADMISSION", disposition = "NOT_CONFIGURED",
+            automatic = false, admission = admission), 1L)
+        window.observe("bt/lp-default", RootEvent(owner, 2L, stage = "QUERY_CALL", disposition = "ENTERED",
+            query = 1L, model = model), 2L)
+        window.observe("bt/lp-default", RootEvent(owner, 3L, stage = "QUERY_CALL", disposition = "OPTIMAL",
+            query = 1L, model = model, point = Any()), 3L)
+        window.observe("bt/lp-default", RootEvent(owner, 4L, stage = "CLOSE_BEGIN", disposition = "BEGIN",
+            query = 1L), 4L)
+        window.observe("bt/lp-default", RootEvent(owner, 5L, stage = "CLOSE_END", disposition = "END",
+            query = 1L), 5L)
+        val snapshot = window.snapshot()
+        val json = snapshot.json()
+
+        assertEquals("CLOSED_JOURNALED_SCOPE", snapshot.owners.single().coverage)
+        assertEquals("UNKNOWN", json.getValue("missingAdmissionMeaning").jsonPrimitive.content)
+        assertEquals("NOT_CONFIGURED", json.getValue("events").jsonArray.first().jsonObject
+            .getValue("admission").jsonObject.getValue("disposition").jsonPrimitive.content)
+        assertTrue(json.toString().encodeToByteArray().size <= FinitePortfolioLpCapture.ROOT_POINT_JOURNAL_BYTE_LIMIT)
+        assertEquals(false, snapshot.absenceEvidence)
+        assertEquals(true, snapshot.partialQueryCoverage)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["valid-detached", "valid-helper", "valid-signed-policy", "schema", "metric", "mask",
+        "disposition", "funding", "helper-preparation-over", "helper-query-over", "metric-allowance", "fraction"])
+    fun `admission payload validation preserves detached scalars and visible failures`(variant: String) {
+        val metrics = linkedMapOf("DeclineProjection" to 1L, "Automatic" to 1L)
+        val original = FinitePortfolioLpCapture.RootAdmissionRecord(
+            schema = 1,
+            disposition = "PROJECTION_SKIPPED",
+            emphasis = "DEFAULT",
+            sparseOverride = null,
+            sparsePermitted = true,
+            automaticEligible = true,
+            automaticEvaluated = 32767L,
+            automaticPassed = 32767L,
+            outerEvaluated = 63L,
+            outerPassed = 63L,
+            estimatedRows = 3L,
+            estimatedColumns = 3L,
+            estimatedCells = 21L,
+            baseCellCap = 1L,
+            ceilingCellCap = 1000L,
+            boundingPermitted = true,
+            withinCeiling = true,
+            structurallyApplicable = true,
+            projectionAllowed = false,
+            producerQueryWork = 1000L,
+            producerPreparationWork = 1000L,
+            helperQueryWork = null,
+            helperPreparationWork = null,
+            resolvedBounding = true,
+            resolvedProbe = true,
+            resolvedBranching = true,
+            resolvedComponentOwnership = false,
+            resolvedLbTreeSearch = false,
+            resolvedRootMaxWork = 1000L,
+            resolvedBoundMaxDepth = 0,
+            resolvedRootBudgetMillis = 1000L,
+            resolvedRootBudgetFraction = 0.5,
+            resolvedLpWorkBudgetFraction = 0.25,
+            metrics = metrics,
+        )
+        val helper = original.copy(disposition = "ADMITTED", projectionAllowed = true,
+            helperPreparationWork = 1000L, helperQueryWork = 1000L,
+            metrics = mapOf("Automatic" to 1L, "Admitted" to 1L, "QueryWorkAllowance" to 1000L))
+        val payload = when (variant) {
+            "valid-helper" -> helper
+            "valid-signed-policy" -> original.copy(baseCellCap = -1L, ceilingCellCap = -1L,
+                withinCeiling = false, resolvedBounding = false, resolvedProbe = false,
+                resolvedBoundMaxDepth = -1, resolvedRootMaxWork = -1L, resolvedRootBudgetMillis = -1L,
+                resolvedRootBudgetFraction = -0.5, resolvedLpWorkBudgetFraction = 2.0)
+            "helper-preparation-over" -> helper.copy(helperPreparationWork = 1001L)
+            "helper-query-over" -> helper.copy(helperQueryWork = 1001L)
+            "metric-allowance" -> helper.copy(metrics = helper.metrics + ("QueryWorkAllowance" to 7L))
+            "schema" -> original.copy(schema = 2)
+            "metric" -> original.copy(metrics = metrics + ("UnknownMetric" to 1L))
+            "mask" -> original.copy(automaticEvaluated = 15L)
+            "disposition" -> original.copy(disposition = "ADMITTED")
+            "funding" -> original.copy(helperQueryWork = 1L)
+            "fraction" -> original.copy(resolvedRootBudgetFraction = Double.NaN)
+            else -> original
+        }
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+
+        window.observe("bt/lp-default", RootEvent(Any(), 1L, stage = "ADMISSION", disposition = payload.disposition,
+            automatic = payload.disposition == "ADMITTED", admission = payload), 1L)
+        metrics["Automatic"] = 0L
+        val snapshot = window.snapshot()
+
+        if (variant in setOf("valid-detached", "valid-helper", "valid-signed-policy")) {
+            assertEquals(0L, snapshot.failures)
+            if (variant == "valid-signed-policy") {
+                val json = snapshot.events.single().json().getValue("admission").jsonObject
+                for (name in listOf("baseCellCap", "ceilingCellCap", "resolvedBoundMaxDepth",
+                    "resolvedRootMaxWork", "resolvedRootBudgetMillis")) {
+                    assertEquals(-1L, json.getValue(name).jsonPrimitive.long)
+                }
+                assertEquals("-0.5", json.getValue("resolvedRootBudgetFraction").jsonPrimitive.content)
+                assertEquals("2.0", json.getValue("resolvedLpWorkBudgetFraction").jsonPrimitive.content)
+            }
+            assertEquals(1L, snapshot.events.single().admission?.metrics?.get("Automatic"))
+            assertEquals(1L, snapshot.events.single().json().getValue("admission").jsonObject
+                .getValue("metrics").jsonObject.getValue("Automatic").jsonPrimitive.long)
+        } else {
+            assertEquals(1L, snapshot.failures)
+            assertEquals(1L, snapshot.admissionFailures)
+            assertEquals(if (variant in setOf("schema", "metric", "fraction")) 1L else 0L, snapshot.admissionUnsupported)
+            assertEquals("UNKNOWN", snapshot.owners.single().coverage)
+            assertTrue(snapshot.events.isEmpty())
+        }
+    }
+
     @ParameterizedTest
     @CsvSource("false,1048576,true,reader", "false,1048576,true,bytes",
         "false,1048577,false,reader", "false,1048577,false,bytes",
@@ -322,7 +608,7 @@ class FinitePortfolioLpCaptureTest {
         val owner: Any get() = throw failure
     }
 
-    data class RootEvent(
+    internal data class RootEvent(
         val owner: Any,
         val sequence: Long,
         val stage: String = "OWNER",
@@ -340,6 +626,7 @@ class FinitePortfolioLpCaptureTest {
         val sourceRoot: Boolean? = null,
         val paused: Boolean? = null,
         val termination: String? = null,
+        val admission: FinitePortfolioLpCapture.RootAdmissionRecord? = null,
     )
 
 

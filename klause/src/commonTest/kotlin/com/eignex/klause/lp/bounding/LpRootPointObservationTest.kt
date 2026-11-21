@@ -5,6 +5,9 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.portfolio.BacktrackArm
+import com.eignex.klause.portfolio.BacktrackCatalog
+import com.eignex.klause.portfolio.capLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
@@ -21,6 +24,140 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRootPointObservationTest {
+    @Test
+    fun `admission observation preserves fatal interruption and subsequent retirement`() {
+        val problem = boundedLpEngineProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3))
+        for (failure in listOf(CancellationException("admission interrupted"), AssertionError("admission failed"))) {
+            val stages = mutableListOf<LpRootPointStage>()
+            val engine = LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO),
+                SolveStatsSink("fatal-admission"), deferred = true, rootPointObserver = LpRootPointObserver {
+                    stages.add(it.stage)
+                    if (it.stage == LpRootPointStage.ADMISSION) throw failure
+                })
+
+            val thrown = assertFailsWith<Throwable> { engine.preparation().forEach { } }
+            engine.close()
+
+            assertSame(failure, thrown)
+            assertEquals(listOf(LpRootPointStage.ADMISSION, LpRootPointStage.CLOSE_BEGIN,
+                LpRootPointStage.CLOSE_END), stages)
+        }
+    }
+
+    @Test
+    fun `ordinary admission observer exceptions preserve the resolved plan`() {
+        val problem = boundedLpEngineProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3))
+        val plans = mutableListOf<LpPlan>()
+        val work = mutableListOf<Long>()
+        for (observed in listOf(false, true)) {
+            val sink = SolveStatsSink("failed-admission")
+            var callbacks = 0
+            val observer = if (observed) LpRootPointObserver {
+                callbacks++
+                error("observer failure")
+            } else null
+
+            LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO), sink,
+                rootPointObserver = observer).use {
+                plans.add(it.params.lpPlan)
+                work.add(it.totalSolveWork())
+            }
+
+            assertEquals(if (observed) 1 else 0, callbacks)
+            if (observed) assertEquals(1L,
+                sink.lp.snapshot().phases.getValue("ROOT_POINT_OBSERVATION_ROOT").outcomes["FAILED"])
+        }
+        assertEquals(plans[0], plans[1])
+        assertEquals(work[0], work[1])
+    }
+
+    @Test
+    fun `admission observation preserves preparation work and poll order`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 2L })
+        val plans = mutableListOf<LpPlan>()
+        val metrics = mutableListOf<Map<String, Long>>()
+        val work = mutableListOf<Long>()
+        val polling = mutableListOf<List<String>>()
+        for (observed in listOf(false, true)) {
+            val polls = mutableListOf<String>()
+            val decisions = mutableListOf<LpRootAdmissionObservation>()
+            val observer = if (observed) LpRootPointObserver { event ->
+                if (event.stage == LpRootPointStage.ADMISSION) decisions.add(assertNotNull(event.admission))
+            } else null
+            val sink = SolveStatsSink("admission-conservation")
+            val params = LpParams(lpConfig = LpConfig.AUTO, lpPlan = LpPlan(rootMaxWork = 100L),
+                cancellation = ExecutionControl { polls.add("cancel"); false })
+
+            LpEngine(problem, objective, params, sink, nodeWorkAllowance = {
+                polls.add("allowance"); 1_000_000L
+            }, rootPointObserver = observer).use { engine ->
+                plans.add(engine.params.lpPlan)
+                metrics.add(sink.lp.snapshot().sparseTrial)
+                work.add(engine.totalSolveWork())
+                polling.add(polls.toList())
+            }
+
+            if (observed) {
+                val decision = decisions.single()
+                assertEquals(LpRootAdmissionDisposition.ATTEMPTED_DECLINED, decision.disposition)
+                assertEquals(100L, decision.helperPreparationWork)
+                assertEquals(100L, decision.helperQueryWork)
+                assertTrue(assertNotNull(decision.producerPreparationWork) >= 100L)
+                assertTrue(assertNotNull(decision.producerQueryWork) >= 100L)
+            } else assertTrue(decisions.isEmpty())
+        }
+        assertEquals(plans[0], plans[1])
+        assertEquals(metrics[0], metrics[1])
+        assertEquals(work[0], work[1])
+        assertEquals(polling[0], polling[1])
+    }
+
+    @Test
+    fun `admission records actual capped recipe configuration`() {
+        val problem = boundedLpEngineProblem().bake()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 2L })
+        for ((arm, ceiling, expected) in listOf(
+            Triple(BacktrackArm.LpAggressive, LpConfig.AUTO, LpEmphasis.DEFAULT),
+            Triple(BacktrackArm.LpAggressive, LpConfig.AGGRESSIVE, LpEmphasis.AGGRESSIVE),
+            Triple(BacktrackArm.LpDefault, LpConfig.AGGRESSIVE, LpEmphasis.DEFAULT),
+        )) {
+            val params = BacktrackCatalog.recipe(arm).capLp(ceiling).build(0L, null).lpParams()
+            val decisions = mutableListOf<LpRootAdmissionObservation>()
+
+            LpEngine(problem, objective, params, SolveStatsSink("capped-admission"),
+                rootPointObserver = LpRootPointObserver {
+                    if (it.stage == LpRootPointStage.ADMISSION) decisions.add(assertNotNull(it.admission))
+                }).use { }
+
+            assertEquals(expected, decisions.single().emphasis)
+        }
+    }
+
+    @Test
+    fun `no config observation leaves unevaluated admission facts unknown`() {
+        val problem = boundedLpEngineProblem()
+        val objective = LinearObjective(intCoefficients = LongArray(3))
+        val decisions = mutableListOf<LpRootAdmissionObservation>()
+
+        LpEngine(problem, objective, LpParams(), SolveStatsSink("no-config-admission"),
+            rootPointObserver = LpRootPointObserver {
+                if (it.stage == LpRootPointStage.ADMISSION) decisions.add(assertNotNull(it.admission))
+            }).use { }
+
+        val decision = decisions.single()
+        assertEquals(LpRootAdmissionDisposition.NOT_CONFIGURED, decision.disposition)
+        assertEquals(0L, decision.automaticEvaluated)
+        assertEquals(0L, decision.outerEvaluated)
+        assertNull(decision.automaticEligible)
+        assertNull(decision.producerPreparationWork)
+        assertNull(decision.helperPreparationWork)
+        assertNull(decision.resolvedBounding)
+    }
+
     @Test
     fun `declined root retention emits no retained owner assertion`() {
         val problem = boundedLpEngineProblem()
@@ -122,7 +259,7 @@ class LpRootPointObservationTest {
             rootPointObserver = LpRootPointObserver { events.add(it) }).use { engine ->
             engine.retainRootPrimalGuidance(relaxation, null, ExecutionControl { error("unexpected poll") })
 
-            assertEquals(LpRootPointDisposition.PROBE_DISABLED, events.single().disposition)
+            assertEquals(LpRootPointDisposition.PROBE_DISABLED, events.single { it.stage == LpRootPointStage.COPY }.disposition)
         }
     }
 
@@ -135,7 +272,9 @@ class LpRootPointObservationTest {
             DoubleArray(relaxation.model.m), DoubleArray(relaxation.model.n) { 0.5 })
         val sink = SolveStatsSink("failed-observation")
         val engine = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
-            sink, rootPointObserver = LpRootPointObserver { error("observer failure") })
+            sink, rootPointObserver = LpRootPointObserver {
+                if (it.stage == LpRootPointStage.COPY) error("observer failure")
+            })
 
         engine.retainRootPrimalGuidance(relaxation, result, ExecutionControl.Never)
         assertNotNull(engine.rootRoundingWarmStart?.primal)
