@@ -1,5 +1,9 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.backtrack.splitIntAlternatives
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpNumber
@@ -33,6 +37,9 @@ class LpHintsTest {
         for (booleanBaseline in listOf(false, true)) {
             val baseline = if (booleanBaseline) VarRef.Bool(0) else VarRef.IntVar(0)
             val proposal = VarRef.IntVar(if (booleanBaseline) 0 else 1)
+            val domains = if (booleanBaseline) arrayOf(IntDomain(0, 10))
+            else arrayOf(IntDomain(0, 2), IntDomain(0, 10))
+            val session = PropagationSession(Problem(if (booleanBaseline) 1 else 0, domains.size, domains, emptyArray()))
             for ((baselinePoint, objective, samples) in listOf(Triple(0.0, 0.0, 2), Triple(1.0, 0.0, 2),
                 Triple(2.0, 0.0, 2), Triple(0.5, 0.0, 2), Triple(1e-8, 0.0, 2),
                 Triple(Double.NaN, 0.0, 2), Triple(Double.POSITIVE_INFINITY, 0.0, 2),
@@ -79,12 +86,12 @@ class LpHintsTest {
 
                         val selected = hints.pickVariable(baseline, { true }, ExecutionControl.Never)
                         hints.branch(selected)
-                        val decision = if (selected is VarRef.Bool) {
-                            SearchDecision.Bool(if (baselinePoint == 0.0) 1 else 0)
-                        }
-                        else SearchDecision.IntAtMost(selected.varId,
+                        val alternatives = if (selected is VarRef.Bool) {
+                            listOf(SearchDecision.Bool(0), SearchDecision.Bool(1))
+                        } else splitIntAlternatives(session, selected as VarRef.IntVar,
                             if (selected == proposal) 3L else baselinePoint.toLong())
-                        hints.commit(decision, 1)
+                        val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
+                        hints.commit(ordered.first(), 1)
 
                         val integral = baselinePoint == 0.0 || baselinePoint == 1.0 ||
                             (!booleanBaseline && baselinePoint == 2.0)
@@ -187,7 +194,7 @@ class LpHintsTest {
             booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
         for (reset in listOf(false, true)) {
             for ((integral, stopAt) in listOf(false, true).flatMap { integral ->
-                (1..if (integral) 13 else 17).map { integral to it }
+                (1..if (integral) 14 else 18).map { integral to it }
             }) {
                 val events = ArrayList<String>()
                 var reading = false
@@ -232,7 +239,11 @@ class LpHintsTest {
 
                 val selected = hints.pickVariable(VarRef.IntVar(0), { true }, control)
                 hints.branch(selected)
-                hints.commit(SearchDecision.IntAtMost(selected.varId, if (selected.varId == 0) 2L else 3L), 1, control)
+                val lower = if (selected.varId == 0) 2L else 3L
+                val alternatives = listOf(SearchDecision.IntAtMost(selected.varId, lower),
+                    SearchDecision.IntAtLeast(selected.varId, lower + 1L))
+                val ordered = hints.orderAlternatives(selected, alternatives, control)
+                hints.commit(ordered.first(), 1, control)
 
                 assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events, "$reset/$integral/$stopAt: $events")
                 assertTrue(reads >= stopAt, "$reset/$integral/$stopAt")

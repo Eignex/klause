@@ -351,6 +351,7 @@ internal class LpHints(
         alternatives: List<SearchDecision>,
         cancelled: ExecutionControl,
     ): List<SearchDecision> {
+        passiveVariable?.alternatives(variable, alternatives, solveStamp) { !cancelled() && passivePointCurrent() }
         val collection = passiveCollection ?: return alternatives
         val values = checkNotNull(passiveValues)
         collection.clear()

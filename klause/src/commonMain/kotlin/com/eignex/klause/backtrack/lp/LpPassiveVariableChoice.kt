@@ -15,6 +15,7 @@ internal class LpPassiveVariableChoice(
     private var nominationStamp = -1
     private var changed = false
     private var branched = false
+    private var partition: List<SearchDecision>? = null
 
     val nominatedVariable: VarRef? get() = nomination?.variable
 
@@ -23,6 +24,7 @@ internal class LpPassiveVariableChoice(
         nomination = null
         changed = false
         branched = false
+        partition = null
     }
 
     internal inline fun select(
@@ -58,11 +60,28 @@ internal class LpPassiveVariableChoice(
         if (!branched) clear()
     }
 
-    internal inline fun commit(decision: SearchDecision, crossinline fresh: () -> Boolean) {
+    internal inline fun alternatives(
+        variable: VarRef,
+        alternatives: List<SearchDecision>,
+        stamp: Int,
+        crossinline fresh: () -> Boolean,
+    ) {
         val current = nomination ?: return
+        charge(8L)
+        if (nomination !== current || !branched || variable != current.variable ||
+            nominationStamp != stamp || !fresh() || !current.exhaustive(alternatives)
+        ) {
+            clear()
+            return
+        }
+        partition = alternatives
+    }
+
+    internal inline fun commit(decision: SearchDecision, crossinline fresh: () -> Boolean) {
+        if (nomination == null) return
         observe("PASSIVE_VARIABLE_COMMIT_CHECK")
         charge(4L)
-        val accepted = branched && current.matches(decision) && fresh()
+        val accepted = branched && partition?.contains(decision) == true && fresh()
         val wasChanged = changed
         clear()
         if (!accepted) return
@@ -88,6 +107,23 @@ internal class LpPassiveVariableChoice(
         is SearchDecision.IntAtLeast -> variable is VarRef.IntVar && variable.varId == decision.variable &&
             decision.lower == floor(point).toLong() + 1L
         else -> false
+    }
+
+    private fun Candidate.exhaustive(alternatives: List<SearchDecision>): Boolean {
+        if (alternatives.size != 2) return false
+        val first = alternatives[0]
+        val second = alternatives[1]
+        return when (variable) {
+            is VarRef.Bool -> first is SearchDecision.Bool && second is SearchDecision.Bool &&
+                first.literal ushr 1 == variable.varId && second.literal == (first.literal xor 1)
+            is VarRef.IntVar -> {
+                val down = (first as? SearchDecision.IntAtMost) ?: (second as? SearchDecision.IntAtMost)
+                val up = (first as? SearchDecision.IntAtLeast) ?: (second as? SearchDecision.IntAtLeast)
+                down != null && up != null && down.variable == variable.varId && up.variable == variable.varId &&
+                    down.upper < Long.MAX_VALUE && up.lower == down.upper + 1L &&
+                    ((!applyAdvice && point == floor(point)) || (matches(down) && matches(up)))
+            }
+        }
     }
 
     private companion object {

@@ -396,7 +396,10 @@ by their smaller lower prediction, with variable identity breaking ties between
 improving candidates.
 A measured zero gain in a fractional baseline is known; missing numeric evidence
 there supplies no comparison. Each fractional point scales its variable's predictions. A variable
-nomination records its point and solve stamp; only its matching adjacent committed
+nomination records its point and solve stamp and captures the kernel's exhaustive
+alternatives before commitment. Fractional nominations require the adjacent split
+around their LP point; an integral withheld baseline retains the kernel's actual
+adjacent split, including an endpoint or wide-domain midpoint split. Only a captured committed
 split, after freshness and cancellation checks, counts as applied advice. Withholding
 keeps the ordinary baseline with the same selection and commitment costs.
 These predictions change only search order and supply no bound or pruning authority.
