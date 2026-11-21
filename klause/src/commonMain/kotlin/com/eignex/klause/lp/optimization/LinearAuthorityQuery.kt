@@ -36,6 +36,7 @@ internal class LinearAuthorityQuery private constructor(
     val cutFamilies: Map<Int, CutFamily>,
     val retainMaskedCuts: Boolean,
     val conditionalCutFamilies: Map<Int, CutFamily>,
+    val omittedCutRows: Int,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -110,6 +111,7 @@ internal class LinearAuthorityQuery private constructor(
                 .mapTo(HashSet()) { active[it] }
             val cutFamilies = HashMap<Int, CutFamily>()
             var conditionalCutFamilies: MutableMap<Int, CutFamily>? = null
+            var omittedCutRows = 0
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
                 val conditional = id in accepted && cut.conditionalCandidate &&
@@ -121,7 +123,10 @@ internal class LinearAuthorityQuery private constructor(
                     cutMask != null && id !in cutMask -> if (conditional) "CONDITIONAL_CANDIDATE" else "UNSELECTED"
                     else -> "INSTALLED"
                 }, 1L)
-                if (cutMask != null && id !in cutMask && !retainMaskedCuts && !conditional) continue
+                if (cutMask != null && id !in cutMask && !retainMaskedCuts && !conditional) {
+                    omittedCutRows++
+                    continue
+                }
                 if (id in accepted && (cutMask == null || id in cutMask)) {
                     cutFamilies[cited.size] = cut.family
                     activeCuts++
@@ -171,7 +176,7 @@ internal class LinearAuthorityQuery private constructor(
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
                 cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
                 accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
-                cutFamilies.toMap(), retainMaskedCuts, conditionalCutFamilies?.toMap().orEmpty())
+                cutFamilies.toMap(), retainMaskedCuts, conditionalCutFamilies?.toMap().orEmpty(), omittedCutRows)
         }
     }
 }

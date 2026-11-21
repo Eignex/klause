@@ -786,6 +786,13 @@ internal class LinearAuthority(
             }
             observePrimal(if (it.point == null) "PrimalGuidancePointUnavailable" else "PrimalGuidancePointPresent")
             observePrimal(if (it.paused) "PrimalGuidancePaused" else "PrimalGuidanceNotPaused")
+            if (!it.paused && prepared.cutMask != null && !prepared.retainMaskedCuts &&
+                pointPolicy?.candidatesRetired(template?.cuts?.rows) == true) {
+                observePrimal("RetiredLayoutGuidanceQueries")
+                observePrimal("RetiredLayoutOmittedCutRowsMax", prepared.omittedCutRows.toLong())
+                observePrimal("RetiredLayoutInputRowsMax", prepared.rows.size.toLong())
+                observePrimal("RetiredLayoutWorkingRowsMax", it.workingRows.toLong())
+            }
         }
         if (guide?.paused == true) return LinearAuthorityResult(paused = true)
         guide?.coordinateConflictWeights?.let { weights ->

@@ -533,9 +533,14 @@ without an addition starts a seven-query discovery cooldown. Unselected candidat
 retire after four completed scans without an addition, and installed rows expire
 after four consecutive slack scoring scans; a tight scan resets the count.
 Retirement only weakens the relaxation. A query's cut mask names the cut rows it
-activates; managed current masks and fully checked selected families keep
-unselected and retired rows as inactive numerical rows with free logical columns
-and zero multipliers, so a compatible owner survives additions and retirement.
+activates. During discovery, managed current masks and fully checked selected families
+keep unselected rows as inactive numerical rows with free logical columns and zero
+multipliers, so a compatible owner survives additions. After candidate discovery
+retires, subsequent queries omit uninstalled candidate rows and rebuild an incompatible
+numerical owner within the containing allowance. Immutable cut definitions and row IDs
+remain in the family; installed ordinary rows and selected additions keep their source
+checks and aging. Completed checked bounds and portable clauses retain their own proof
+authority. A suspended selected round completes with its captured layout.
 Point selection with aggregation first pays a no-cut bound-only query within its
 containing allowance. It checks a certificate without source witness recovery or branching guidance,
 then retires that numerical owner so the ordinary recipe starts from its own basis.
