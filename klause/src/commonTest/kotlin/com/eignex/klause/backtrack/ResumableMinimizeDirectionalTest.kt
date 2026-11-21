@@ -68,7 +68,8 @@ class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
                 }
 
                 val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-                val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; slices=$slices; done=${search.isDone}"
+                val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; " +
+                    "slices=$slices; done=${search.isDone}"
                 assertTrue(slices > 1, diagnostic)
                 assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
                 assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
