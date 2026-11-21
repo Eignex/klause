@@ -197,14 +197,24 @@ internal class LpDirectionalHistory(
     }
 
     fun branch(variable: VarRef, value: Double) {
+        val version = generation
         charge(8L)
+        if (version != generation) return
         trimParents(depth)
+        if (version != generation) return
         if (depth !in 0 until MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return
-        val records = parents ?: run {
-            charge(MAX_DEPTH.toLong())
-            arrayOfNulls<Parent>(MAX_DEPTH).also { parents = it }
+        var records = parents
+        if (records == null || depth >= records.size) {
+            val retained = records?.size ?: 0
+            val capacity = minOf(MAX_DEPTH, maxOf(16, depth + 1, retained * 2))
+            charge(capacity.toLong() + retained)
+            if (version != generation) return
+            val replacement = arrayOfNulls<Parent>(capacity)
+            records?.copyInto(replacement)
+            records = replacement
+            parents = replacement
         }
         records[depth] = Parent(objective, variable, value)
         parentCount++

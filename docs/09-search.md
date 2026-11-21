@@ -465,8 +465,9 @@ Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
 histories and 128 ancestor splits are retained. Ancestor records use depth-indexed
-slots allocated on the first usable split; allocation is charged once and trimming
-charges the visited slots rather than unused ancestor capacity. Trimming clears removed references and
+slots that grow with visited depth. Each growth charges its allocation and copied
+cells before publication; a history reset during growth prevents retention. Trimming
+charges the visited slots rather than unused ancestor capacity, clears removed references and
 counts only live records. Bookkeeping charges the existing LP work allowance and
 creates no extra LP query. Invocation close releases the scope.
 

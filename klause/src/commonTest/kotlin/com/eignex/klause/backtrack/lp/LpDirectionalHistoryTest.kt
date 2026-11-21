@@ -11,6 +11,75 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `parent attribution survives deeper branches through the supported depth limit`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add)
+        var observations = 0
+        for (depth in listOf(0, 15, 16, 31, 32, 63, 64, 127, 128)) {
+            history.beginNode(depth)
+            history.record(0.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            history.commit(SearchDecision.Bool(1), depth + 1)
+            history.beginNode(depth + 1)
+
+            history.record(5.0)
+
+            if (depth < 128) observations++
+            assertEquals(observations, events.count { it == "DOWN" })
+        }
+    }
+
+    @Test
+    fun `ancestor attribution survives storage growth and sibling retraction`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        history.beginNode(16)
+        history.record(10.0)
+        history.branch(VarRef.Bool(1), 0.5)
+
+        history.commit(SearchDecision.Bool(0), 1)
+        history.beginNode(1)
+        history.record(5.0)
+
+        assertEquals(1, events.count { it == "UP" })
+        assertFalse("DOWN" in events)
+    }
+
+    @Test
+    fun `history reset during paid parent growth prevents child attribution`() {
+        for (stopAt in 1..3) {
+            val events = ArrayList<String>()
+            var reading = false
+            var reads = 0
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory(events::add, charge = {
+                if (reading && ++reads == stopAt) {
+                    reading = false
+                    history.clear()
+                }
+            })
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            history.beginNode(16)
+            history.record(0.0)
+            reading = true
+
+            history.branch(VarRef.Bool(0), 0.5)
+            history.commit(SearchDecision.Bool(1), 17)
+            history.beginNode(17)
+            history.record(5.0)
+
+            assertTrue(reads >= stopAt)
+            assertFalse("DOWN" in events)
+            assertEquals(0, history.retainedEntries)
+        }
+    }
+
+    @Test
     fun `minimum child predictions distinguish measured zero from missing evidence`() {
         for (samples in 0..2) {
             for (gain in listOf(0.0, 5.0)) {
@@ -555,7 +624,7 @@ class LpDirectionalHistoryTest {
         history.beginNode(0)
         history.record(10.0)
         history.branch(VarRef.Bool(0), 0.5)
-        assertTrue(work >= 128L)
+        assertTrue(work in 1L until 128L)
         val before = work
 
         history.commit(SearchDecision.Bool(0), 1)

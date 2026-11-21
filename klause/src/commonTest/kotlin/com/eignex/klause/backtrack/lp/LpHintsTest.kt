@@ -30,8 +30,9 @@ class LpHintsTest {
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(trail.state.ownerWorkingModel())
-        for ((baselineGain, proposedGain) in listOf(0.0 to 2048.0, 256.0 to 2048.0, 256.0 to 512.0,
-            2048.0 to 4096.0, 256.0 to 256.0, 512.0 to 256.0)) {
+        for ((baselineDown, baselineUp, proposedGain) in listOf(Triple(0.0, 0.0, 2048.0),
+            Triple(256.0, 256.0, 2048.0), Triple(256.0, 256.0, 512.0), Triple(2048.0, 2048.0, 4096.0),
+            Triple(256.0, 256.0, 256.0), Triple(512.0, 512.0, 256.0), Triple(2.0, 100.0, 9.0))) {
             val costs = ArrayList<Long>()
             for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
                 val relaxation = LpRelaxation(model, intArrayOf(0, 1), booleanArrayOf(false, false),
@@ -57,7 +58,8 @@ class LpHintsTest {
                                 hints.commit(decision, 1)
                                 hints.beginNode(1, cutoff)
                                 hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
-                                val objective = if (variable.varId == 0) baselineGain else proposedGain
+                                val objective = if (variable.varId != 0) proposedGain else if (up) baselineUp
+                                else baselineDown
                                 hints.recordObjective(relaxation, objective)
                                 hints.recordOutcome(false, relaxation)
                                 hints.finishNode(trail.state)
@@ -80,7 +82,7 @@ class LpHintsTest {
                     val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
                     hints.commit(ordered.first(), 1)
 
-                    val changed = proposedGain > baselineGain
+                    val changed = proposedGain > minOf(baselineDown, baselineUp)
                     assertEquals(VarRef.IntVar(if (apply && changed) 1 else 0), selected)
                     val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
                     else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
