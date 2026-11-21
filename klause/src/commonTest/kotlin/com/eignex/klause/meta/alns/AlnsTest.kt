@@ -594,6 +594,9 @@ class AlnsTest {
             literalSweep = sweep,
         )
 
+        val observed = ArrayList<AlnsIterationObservation>()
+        alns.iterationObserver = AlnsIterationObserver { observed += it }.owner("alns/test", 7L, 301, 0, 0)
+
         alns.resumable(objective, LocalSearchParams()).use { handle ->
             val first = handle.runSlice(ExecutionControl { expanding && ++polls >= 2 }, Long.MAX_VALUE) {}
             val result = assertNotNull(first ?: handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE) {})
@@ -602,6 +605,11 @@ class AlnsTest {
             assertEquals(1, destroys)
             assertEquals(0, repairs)
         }
+        val observation = observed.single()
+        assertEquals("Censored", observation.endpoint)
+        assertFalse(observation.scopeComplete)
+        assertNull(observation.reward)
+        assertEquals(8L, observation.allowance)
     }
 
     @Test

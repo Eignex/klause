@@ -173,6 +173,7 @@ internal class Alns(
 
     internal var incumbentToleranceCheck: ((Sample) -> Boolean)? = backtrackParams?.toleranceCheck
     internal var repairTrace: RepairTrace? = null
+    internal var iterationObserver: AlnsIterationObserver.Owner? = null
 
     private var activeSearch = false
 
@@ -287,6 +288,7 @@ internal class Alns(
             currentCancellation() || backtrackParams?.cancellation?.invoke() == true
         }
         private var iter = 0
+        private val observedRun = iterationObserver?.nextRun()
 
         init {
             pooled.publish(bestSample, bestObj)
@@ -368,92 +370,134 @@ internal class Alns(
                 } else {
                     minDestroyFraction
                 }
-                val destroyed = destroyOperators[destroyIdx]
-                    .destroy(rng, inner.problem, incumbent, objective, destroyFraction,
-                        params.assumptions, params.cancellation)
-                val freed = RepairScope.effective(destroyed, params.assumptions, literalSweep, params.cancellation)
-                val attempt = repairTrace?.begin(
-                    "alns:$destroyIdx:$repairIdx", params.randomSeed, incumbent, incumbent,
-                    destroyed.bools, destroyed.ints, freed?.bools ?: intArrayOf(), freed?.ints ?: intArrayOf(),
-                )
-                tracedRepair = attempt
-                if (attempt != null) {
-                    attempt.scopeComplete = freed != null
-                    val exact = if (problem.numRealVars == 0) objective.evaluateExact(bestSample) else null
-                    repairTrace?.recordBest(attempt, bestObj, bestSample, exact)
+                val capture = observedRun?.let { run ->
+                    iterationObserver?.begin(run, iter, destroyIdx, repairIdx, destroyFraction,
+                        incumbentObj, bestObj, iterFlips, params.cancellation)
                 }
-                if (freed == null) {
-                    repairTrace?.finish(attempt, RepairEndpoint.Censored)
-                    iter++
-                    break
-                }
-                if (freed.isEmpty) {
-                    repairTrace?.finish(attempt, RepairEndpoint.Unresolved)
-                    destroyBandit.update(destroyIdx, rejectedReward)
-                    repairBandit.update(repairIdx, rejectedReward)
-                    iter++
-                    continue
-                }
+                try {
+                    val destroyed = destroyOperators[destroyIdx]
+                        .destroy(rng, inner.problem, incumbent, objective, destroyFraction,
+                            params.assumptions, params.cancellation)
+                    val freed = RepairScope.effective(destroyed, params.assumptions, literalSweep, params.cancellation)
+                    capture?.observation?.apply {
+                        requested = destroyed.bools.size + destroyed.ints.size
+                        effective = freed?.let { it.bools.size + it.ints.size }
+                        scopeComplete = freed != null
+                    }
+                    val attempt = repairTrace?.begin(
+                        "alns:$destroyIdx:$repairIdx", params.randomSeed, incumbent, incumbent,
+                        destroyed.bools, destroyed.ints, freed?.bools ?: intArrayOf(), freed?.ints ?: intArrayOf(),
+                    )
+                    tracedRepair = attempt
+                    if (attempt != null) {
+                        attempt.scopeComplete = freed != null
+                        val exact = if (problem.numRealVars == 0) objective.evaluateExact(bestSample) else null
+                        repairTrace?.recordBest(attempt, bestObj, bestSample, exact)
+                    }
+                    if (freed == null) {
+                        repairTrace?.finish(attempt, RepairEndpoint.Censored)
+                        iter++
+                        break
+                    }
+                    if (freed.isEmpty) {
+                        repairTrace?.finish(attempt, RepairEndpoint.Unresolved)
+                        destroyBandit.update(destroyIdx, rejectedReward)
+                        repairBandit.update(repairIdx, rejectedReward)
+                        capture?.observation?.apply {
+                            endpoint = "Empty"
+                            reward = rejectedReward
+                            accepted = false
+                            newBest = false
+                        }
+                        iter++
+                        continue
+                    }
 
-                val pinAssumptions = RepairScope.pins(inner.problem, incumbent, freed).mergedWith(params.assumptions)
-                val context = RepairContext(
-                    inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
-                    backtrack = backtrack, backtrackParams = backtrackParams,
-                    repairSearch = repairSearch, bestObjective = bestObj,
-                    recordInnerWork = { nodes, moves ->
-                        telemetry.repairCpNodes += nodes
-                        telemetry.repairLsMoves += moves
-                    },
-                    recordRepairResult = attempt?.let { entry ->
-                        { result -> repairTrace?.recordResult(entry, result) }
-                    },
-                )
-                val repairStarted = TimeSource.Monotonic.markNow()
-                val repaired = repairOperators[repairIdx].repair(context)
-                telemetry.repairNanos += repairStarted.elapsedNow().inWholeNanoseconds
-                if (repaired == null) {
-                    repairTrace?.finish(attempt, RepairEndpoint.Unresolved)
-                    destroyBandit.update(destroyIdx, rejectedReward)
-                    repairBandit.update(repairIdx, rejectedReward)
+                    val pinAssumptions = RepairScope.pins(inner.problem, incumbent, freed)
+                        .mergedWith(params.assumptions)
+                    val context = RepairContext(
+                        inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
+                        backtrack = backtrack, backtrackParams = backtrackParams,
+                        repairSearch = repairSearch, bestObjective = bestObj,
+                        recordInnerWork = { nodes, moves ->
+                            telemetry.repairCpNodes += nodes
+                            telemetry.repairLsMoves += moves
+                            capture?.observation?.apply {
+                                cpNodes += nodes
+                                lsMoves += moves
+                            }
+                        },
+                        recordRepairResult = attempt?.let { entry ->
+                            { result -> repairTrace?.recordResult(entry, result) }
+                        },
+                        recordRepairOutcome = capture?.let { entry ->
+                            { verdict, reason -> entry.recordOutcome(verdict, reason) }
+                        },
+                    )
+                    val repairStarted = TimeSource.Monotonic.markNow()
+                    val repaired = repairOperators[repairIdx].repair(context)
+                    val repairNanos = repairStarted.elapsedNow().inWholeNanoseconds
+                    telemetry.repairNanos += repairNanos
+                    capture?.observation?.repairNanos = repairNanos
+                    if (repaired == null) {
+                        repairTrace?.finish(attempt, RepairEndpoint.Unresolved)
+                        destroyBandit.update(destroyIdx, rejectedReward)
+                        repairBandit.update(repairIdx, rejectedReward)
+                        capture?.observation?.apply {
+                            endpoint = "Unresolved"
+                            reward = rejectedReward
+                            accepted = false
+                            newBest = false
+                        }
+                        iter++
+                        continue
+                    }
+                    val repairedObj = objective.evaluate(repaired)
+                    repairTrace?.record(attempt, "repaired", repaired)
+                    repairTrace?.finish(attempt, RepairEndpoint.Repaired)
+
+                    val isNewBest = objective.evaluateExact(repaired) < objective.evaluateExact(bestSample)
+                    val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
+                    val reward = when {
+                        isNewBest -> newBestReward
+                        accept -> acceptedReward
+                        else -> rejectedReward
+                    }
+                    destroyBandit.update(destroyIdx, reward)
+                    repairBandit.update(repairIdx, reward)
+                    capture?.observation?.apply {
+                        endpoint = "Repaired"
+                        this.repaired = repairedObj
+                        accepted = accept
+                        newBest = isNewBest
+                        this.reward = reward
+                    }
+                    _iterationLog.add(
+                        IterationRecord(
+                            destroyIdx,
+                            repairIdx,
+                            freed.bools.size + freed.ints.size,
+                            incumbentObj,
+                            repairedObj,
+                            accept,
+                            isNewBest,
+                        ),
+                    )
+
+                    if (isNewBest) {
+                        bestSample = repaired
+                        bestObj = repairedObj
+                        pooled.publish(repaired, repairedObj)
+                    }
+                    if (accept) {
+                        incumbent = repaired
+                        incumbentObj = repairedObj
+                    }
+                    if (isNewBest) onIncumbent?.invoke(result())
                     iter++
-                    continue
+                } finally {
+                    capture?.finish(capture.observation.endpoint)
                 }
-                val repairedObj = objective.evaluate(repaired)
-                repairTrace?.record(attempt, "repaired", repaired)
-                repairTrace?.finish(attempt, RepairEndpoint.Repaired)
-
-                val isNewBest = objective.evaluateExact(repaired) < objective.evaluateExact(bestSample)
-                val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
-                val reward = when {
-                    isNewBest -> newBestReward
-                    accept -> acceptedReward
-                    else -> rejectedReward
-                }
-                destroyBandit.update(destroyIdx, reward)
-                repairBandit.update(repairIdx, reward)
-                _iterationLog.add(
-                    IterationRecord(
-                        destroyIdx,
-                        repairIdx,
-                        freed.bools.size + freed.ints.size,
-                        incumbentObj,
-                        repairedObj,
-                        accept,
-                        isNewBest,
-                    ),
-                )
-
-                if (isNewBest) {
-                    bestSample = repaired
-                    bestObj = repairedObj
-                    pooled.publish(repaired, repairedObj)
-                }
-                if (accept) {
-                    incumbent = repaired
-                    incumbentObj = repairedObj
-                }
-                if (isNewBest) onIncumbent?.invoke(result())
-                iter++
             }
 
             return result()

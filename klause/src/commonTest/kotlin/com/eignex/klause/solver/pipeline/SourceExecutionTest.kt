@@ -65,17 +65,21 @@ class SourceExecutionTest {
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
         val observer: (String, Long, JointRepairObservation) -> Unit = { _, _, _ -> }
         val sessionObserver: (String, PropagationSession) -> Unit = { _, _ -> }
-        val original = SourceExecutionRequest(invocation).withPortfolioNeighborhoodObserver { _, _, _ -> }
-        val request = original.withPortfolioSessionObserver(sessionObserver)
-            .withPortfolioJointRepairObserver(observer)
-            .withPortfolioLpQueryObserver { _, _, _ -> }.withPortfolioGuidanceObserver { _, _ -> }
+        for (original in listOf(
+            SourceExecutionRequest(invocation).withPortfolioNeighborhoodObserver { _, _, _ -> },
+            SourceExecutionRequest(invocation).withPortfolioAlnsObserver {},
+        )) {
+            val request = original.withPortfolioSessionObserver(sessionObserver)
+                .withPortfolioJointRepairObserver(observer)
+                .withPortfolioLpQueryObserver { _, _, _ -> }.withPortfolioGuidanceObserver { _, _ -> }
 
-        assertSame(observer, request.onPortfolioJointRepair)
-        assertNotNull(request.onPortfolioLpQuery)
-        assertNotNull(request.onPortfolioGuidance)
-        assertSame(sessionObserver, request.withValidationCancellation(ExecutionControl.Never).onPortfolioSession)
-        assertSame(original.onPortfolioNeighborhood,
-            request.withValidationCancellation(ExecutionControl.Never).onPortfolioNeighborhood)
+            assertSame(observer, request.onPortfolioJointRepair)
+            assertNotNull(request.onPortfolioLpQuery)
+            assertNotNull(request.onPortfolioGuidance)
+            assertSame(sessionObserver, request.withValidationCancellation(ExecutionControl.Never).onPortfolioSession)
+            assertSame(original.onPortfolioNeighborhood,
+                request.withValidationCancellation(ExecutionControl.Never).onPortfolioNeighborhood)
+        }
     }
 
     @Test

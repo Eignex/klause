@@ -107,6 +107,14 @@ with `portfolio-policy=ordinary handoff=false portfolio-progress=false captures=
 The shared capture window spends at most 4096 additional receiving work and 64 KiB
 of modeled metadata; incomplete records cannot establish support frequencies.
 Observation can change scheduling and cancellation and establishes no performance.
+`capture-alns=true` records the first 32 admitted actual ALNS iterations across
+workers and reseeds with `portfolio-policy=ordinary handoff=false portfolio-progress=false captures=0`.
+It excludes other captures and writes scalar decisions to `alns-iterations.jsonl`.
+The window prepays at most 4096 containing work units and 64 KiB of modeled metadata;
+encoded output is capped at 64 KiB. Requested/effective counts, actual acceptance and
+bandit reward, outer allowance, CP-node/LS-move callback deltas and elapsed repair time
+retain distinct meanings. Missing fields and censored iterations remain explicit.
+Observation may perturb cancellation and scheduling and establishes no performance.
 `capture-mode=joint-handoff handoff=true` retains the same bounded proposal journal
 with ordinary binary-only admission and the after-incumbent gate enabled. It uses
 fixed repair, complete proof-worker coverage at share 0.5, and quiet logging.

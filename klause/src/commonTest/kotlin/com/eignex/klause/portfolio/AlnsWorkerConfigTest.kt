@@ -8,6 +8,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.meta.alns.AlnsIterationObservation
+import com.eignex.klause.meta.alns.AlnsIterationObserver
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -23,6 +25,32 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AlnsWorkerConfigTest : RuntimeInitializedTest() {
+    @Test
+    fun `only exactly bound workers should emit actual ALNS iteration outcomes`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val matching = ModelIdentity.of(problem, objective)
+        for (identity in listOf(matching, null, ModelIdentity.of(problem, null))) {
+            val observations = ArrayList<AlnsIterationObservation>()
+            val observer = PoolClauseNeighborhoodObserver(AlnsIterationObserver { observations += it })
+            val worker = AlnsWorkerConfig().withNeighborhoodObserver(observer).withToleranceCheck { true }
+                .withNumericalCompletion().withSharingMemory(false, 32_768L, 4096)
+                .materialize(problem, index = 0, armId = 1, seed = 7L, lsLambda = 1.0,
+                    objective = objective, lsObjective = null, definitionalSweep = null, onEvent = null,
+                    pools = SharedPools(SharedClausePool(), null, identity = identity))
+
+            worker.use {
+                it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never,
+                    warmStart = Sample(BooleanArray(0), longArrayOf(1, 1)), maxInstructions = 1).last()
+            }
+
+            assertEquals(identity === matching, observations.isNotEmpty())
+            assertTrue(observations.all { it.worker == "alns/balanced" && it.seed == 7L && it.ints == 2 })
+        }
+    }
+
     @Test
     fun `only matching peer clauses should guide materialized ALNS neighborhoods`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, arrayOf(

@@ -384,6 +384,18 @@ same definition closure and caller-pin filtering used to build its repair pins.
 Its best objective threshold, exact discrete value and immutable best witness remain
 separate from a current center accepted by a non-monotone policy. A cancelled
 closure leaves its effective scope explicitly unavailable.
+A separate scalar ALNS observer follows actual destroy and repair choices, including
+empty scopes, unresolved repairs and interrupted scope construction. Its source-wide
+window retains at most 32 iterations across workers and reseeds, prepaying at most 4096
+containing work units and 64 KiB of modeled metadata. Worker, owner, run and iteration
+identity distinguish resumed slices from replacement handles. Records retain requested
+and effective counts and the actual acceptance and bandit reward after update, without
+copying assignments or evaluating another objective. Offered outer allowance, CP-node
+and local-move callback deltas, and elapsed repair time remain separate; callback deltas
+do not cover all LP or source work. Cancellation leaves unavailable fields explicit.
+The bounded, endogenous observations can perturb scheduling and establish no causal
+or performance comparison.
+
 Capture has separate coordinate accounting and consumes no search random draws.
 Its default frame limit is 4096 coordinates; an explicit diagnostic allowance can
 retain at most 8192 coordinates per complete frame. Oversized frames decline as a whole.

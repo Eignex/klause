@@ -9,6 +9,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.lp.engine.LpQueryObservation
+import com.eignex.klause.meta.alns.AlnsIterationObservation
+import com.eignex.klause.meta.alns.AlnsIterationObserver
 import com.eignex.klause.portfolio.PoolClauseNeighborhoodObservation
 import com.eignex.klause.portfolio.PoolClauseNeighborhoodObserver
 import com.eignex.klause.presolve.PresolveBudget
@@ -161,6 +163,19 @@ class SourceExecutionRequest private constructor(
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
             prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession,
             automaticLinearCuts, PoolClauseNeighborhoodObserver(observer))
+    }
+
+    internal fun withPortfolioAlnsObserver(
+        observer: (AlnsIterationObservation) -> Unit,
+    ): SourceExecutionRequest {
+        require(cores == 1 && invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+            "ALNS observation requires single-core mixed finite source execution"
+        }
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+            presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession,
+            automaticLinearCuts, PoolClauseNeighborhoodObserver(AlnsIterationObserver(observer)))
     }
 
     internal fun withValidationCancellation(stop: ExecutionControl): SourceExecutionRequest {

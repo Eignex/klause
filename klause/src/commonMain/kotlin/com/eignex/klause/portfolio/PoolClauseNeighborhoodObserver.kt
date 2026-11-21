@@ -1,10 +1,15 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.meta.alns.AlnsIterationObserver
 import com.eignex.klause.util.ExecutionControl
 
-internal class PoolClauseNeighborhoodObserver(
-    private val sink: (String, Long, PoolClauseNeighborhoodObservation) -> Unit,
+internal class PoolClauseNeighborhoodObserver private constructor(
+    val iterations: AlnsIterationObserver?,
+    private val sink: ((String, Long, PoolClauseNeighborhoodObservation) -> Unit)?,
 ) {
+    constructor(sink: (String, Long, PoolClauseNeighborhoodObservation) -> Unit) : this(null, sink)
+    constructor(iterations: AlnsIterationObserver) : this(iterations, null)
+
     var calls = 0L
         private set
     var attempts = 0
@@ -27,6 +32,7 @@ internal class PoolClauseNeighborhoodObserver(
     fun begin(worker: String, seed: Long, bools: Int, ints: Int, requested: Int,
         stop: ExecutionControl,
     ): Capture? {
+        if (sink == null) return null
         calls++
         if (completedEligible >= 4 || attempts >= 16 || work > 4096L - 32L ||
             modeledBytes > 65_536L - 1024L || stop()) {
@@ -98,7 +104,7 @@ internal class PoolClauseNeighborhoodObserver(
             if (!complete) incomplete++
             if (complete && selectedIndex < 0) noEligible++
             if (!samplerCompleted) samplerDeclined++
-            sink(worker, seed, PoolClauseNeighborhoodObservation(call, bools, ints, requested, cursor,
+            sink?.invoke(worker, seed, PoolClauseNeighborhoodObservation(call, bools, ints, requested, cursor,
                 values, complete, truncated, supportPassComplete, samplerCompleted, selectedIndex,
                 usedWork, usedBytes))
         }

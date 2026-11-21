@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -118,15 +119,43 @@ class FinitePortfolioLpCaptureTest {
         assertEquals(listOf("portfolio-progress=false"), parameters)
     }
 
-    @Test
-    fun `neighborhood inventory should preserve automatic ordinary source controls`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["capture-neighborhoods", "capture-alns"])
+    fun `neighborhood inventory should preserve automatic ordinary source controls`(capture: String) {
         val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
             "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary", "portfolio-progress" to "false",
-            "captures" to "0", "capture-neighborhoods" to "true")
+            "captures" to "0", capture to "true")
 
         val parameters = FinitePortfolioLpCapture.parameters(options)
 
         assertEquals(listOf("portfolio-progress=false"), parameters)
+    }
+
+    @ParameterizedTest
+    @CsvSource("portfolio-policy,retained", "handoff,true", "portfolio-progress,true", "captures,1",
+        "capture-guidance,true", "capture-mode,joint-ordinary", "capture-neighborhoods,true")
+    fun `ALNS outcome capture should refuse other observation or policy routes`(key: String, value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "2", "handoff" to "false", "portfolio-policy" to "ordinary", "portfolio-progress" to "false",
+            "captures" to "0", "capture-alns" to "true")
+
+        assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options + (key to value)) }
+    }
+
+    @Test
+    fun `ALNS metadata should preserve unresolved scalar decisions without inventing rewards`() {
+        val type = Class.forName("com.eignex.klause.meta.alns.AlnsIterationObservation")
+        val observation = type.constructors.single().newInstance("alns/balanced", 2L, 1L, 3L, 4,
+            0, 240, 5, 3, 0, 0.25, 10260.0, 10260.0, 1000L)
+
+        val metadata = FinitePortfolioLpCapture.alnsMetadata(observation)
+
+        assertEquals("3", metadata.getValue("destroy").jsonPrimitive.content)
+        assertEquals("3", metadata.getValue("run").jsonPrimitive.content)
+        assertEquals("Censored", metadata.getValue("endpoint").jsonPrimitive.content)
+        assertEquals(JsonNull, metadata.getValue("reward"))
+        assertEquals(JsonNull, metadata.getValue("effective"))
+        assertTrue(metadata.toString().encodeToByteArray().size < 2048)
     }
 
     @Test

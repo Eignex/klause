@@ -165,6 +165,10 @@ internal class AlnsWorkerConfig private constructor(
             literalSweep = definitionalSweep,
             rng = Random(seed + index),
         )
+        if (peerPools != null) {
+            alns.iterationObserver = neighborhoodObserver?.iterations?.owner(workerLabel, seed + index,
+                problem.numBoolVars, problem.numIntVars, problem.numRealVars)
+        }
         val params = LocalSearchParams(
             randomSeed = seed + index,
             costShaping = CostShaping.Linear(lambda = lsLambda),
