@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
+import com.eignex.klause.meta.alns.DestroyOperator
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -135,6 +136,9 @@ internal class AlnsWorkerConfig private constructor(
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
             },
+            destroyOperators = peerPools?.clauses?.let { clauses ->
+                listOf(DestroyOperator.Random, DestroyOperator.WorstObjective, PoolClauseRelatedDestroy(clauses, meter))
+            } ?: DestroyOperator.Defaults,
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),
             backtrackParams = BacktrackParams(

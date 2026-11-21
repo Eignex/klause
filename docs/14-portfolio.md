@@ -263,6 +263,16 @@ retries it while the filter suppresses the completed prefix. All repair exports
 stay in the private pool; permanent scope clauses and direct global nogoods remain
 withheld. Missing, unbound or foreign portfolio pools leave private sharing alone.
 
+The adjacency removal choice can also read that matched peer pool to release a
+complete small nogood support ([neighborhoods](13-neighborhoods.md#alns-incumbent-acquisition)).
+Its optional snapshot, support scan and copies share a 4,096-unit local ceiling,
+charged to the receiving execution; at most 512 requested coordinates and 16
+literals enter the bounded scratch. Interrupted preparation returns the original
+adjacency request without retaining payloads. Missing, empty or ineligible pools
+consume no extra random draws; an interrupted reservoir scan can advance the
+random stream. Neighborhood choices and changed-request counters retain publisher
+origins separately from native clause use, and supply no contribution reward.
+
 #### Memory observation
 
 `sharing-memory=true` enables bounded retained-memory samples, independently of

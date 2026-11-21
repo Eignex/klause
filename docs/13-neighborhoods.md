@@ -329,6 +329,15 @@ local-search parameters declare a seed, inner repair seeds also draw from that
 stream. Unseeded ordinary invocations allow the inner solver to choose its own
 seeds.
 
+With an exactly bound peer clause pool, the portfolio ALNS adjacency choice can
+include all coordinates of one small shared nogood, then fill from its original
+adjacency neighborhood. Random and worst-objective choices keep their operators.
+The requested coordinate count stays fixed; caller-pin filtering and Boolean
+definition closure still determine the effective repair scope. Fixed or externally
+pinned support, oversized snapshots and interrupted or unfunded scans keep the
+original request. Shared clauses guide removal without assigning coordinate values
+or changing the repair's feasibility and objective checks.
+
 Before and during its bootstrap and before each iteration, ALNS acquires a supplied
 assignment and the latest shared incumbent. A supplied assignment must cover all coordinates, satisfy the
 current model and assumptions and pass the shared source witness checker. A shared

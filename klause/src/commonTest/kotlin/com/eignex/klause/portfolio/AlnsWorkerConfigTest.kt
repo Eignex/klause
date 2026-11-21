@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
@@ -19,8 +20,40 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class AlnsWorkerConfigTest : RuntimeInitializedTest() {
+    @Test
+    fun `only matching peer clauses should guide materialized ALNS neighborhoods`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 6, 7), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1, 1), intArrayOf(0, 6, 7), LinearOp.GE, 0),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(8) { 1L })
+        val clauses = SharedClausePool()
+        clauses.publish(listOf(SharedClause(intArrayOf(), longArrayOf(6, 0, 1, 0, 7, 0, 1, 0), 2)), origin = 0)
+        val matching = ModelIdentity.of(problem, objective)
+        val foreign = Problem(0, 8, Array(8) { IntDomain(0, 1) }, emptyArray()).bake()
+        val identities = listOf(matching, null, ModelIdentity.of(problem, null), ModelIdentity.of(foreign, objective))
+        for (identity in identities) {
+            val pools = SharedPools(clauses, null, identity = identity)
+            var changes = 0L
+            for (seed in 0L until 6L) {
+                val worker = AlnsWorkerConfig(AlnsProfile("test", 0.5, 0.5, 0.0, 0.98))
+                    .materialize(problem, index = 0, armId = 1, seed = seed, lsLambda = 1.0,
+                        objective = objective, lsObjective = null, definitionalSweep = null,
+                        onEvent = null, pools = pools)
+                val result = worker.use {
+                    it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never,
+                        warmStart = Sample(BooleanArray(0), LongArray(8) { 1L }), maxInstructions = 1).last()
+                }
+                val sample = assertNotNull(result.assignment)
+                assertTrue(sample.intValue(6) + sample.intValue(7) >= 1L)
+                changes += worker.sharingMeter?.snapshot()?.clauses?.get("neighborhoodChanges") ?: 0L
+            }
+            assertEquals(identity === matching, changes > 0L)
+        }
+    }
 
     @Test
     fun `bootstrap should consume same model peer clauses and credit their publisher`() {

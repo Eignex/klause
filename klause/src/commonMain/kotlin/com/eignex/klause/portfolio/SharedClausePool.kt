@@ -170,14 +170,18 @@ internal class SharedClausePool(
         cursor: Long,
         cancelled: () -> Boolean,
         charge: () -> Unit,
+        maxWork: Long = reclamationWork,
+        maxScratchEntries: Int = reclamationScratchEntries,
     ): Drained? = lock.withLock {
+        val allowedWork = minOf(reclamationWork, maxWork)
+        val allowedScratch = minOf(reclamationScratchEntries, maxScratchEntries)
         val from = if (generationOf(cursor) == generation) indexOf(cursor) else 0
         val size = store.size
         val count = (size - from).coerceAtLeast(0)
-        if (count.toLong() * 4L + 3L > reclamationWork || count.toLong() * 2L > reclamationScratchEntries) {
+        if (count.toLong() * 4L + 3L > allowedWork || count.toLong() * 2L > allowedScratch) {
             return@withLock null
         }
-        val budget = Budget(reclamationWork, reclamationScratchEntries, cancelled, charge)
+        val budget = Budget(allowedWork, allowedScratch, cancelled, charge)
         try {
             budget.checkpoint()
             budget.reserve(count.toLong() * 2L)

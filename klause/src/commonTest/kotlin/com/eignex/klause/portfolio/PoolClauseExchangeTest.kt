@@ -4,9 +4,11 @@ import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
@@ -19,6 +21,34 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PoolClauseExchangeTest : RuntimeInitializedTest() {
+    @Test
+    fun `integer peer clauses should propagate after a satisfied repair root changes`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, emptyArray())
+        val peer = SharedClausePool()
+        val quads = LongArray(6 * SharedClause.QUAD)
+        for (i in 0 until 6) {
+            quads[i * SharedClause.QUAD] = i.toLong()
+            quads[i * SharedClause.QUAD + 2] = 1L
+        }
+        peer.publish(listOf(SharedClause(intArrayOf(), quads, 1)), origin = 0, isGlobal = true)
+        val meter = SharingMeter()
+        val exchange = PoolClauseExchange(SharedClausePool(), meter = meter, peerPool = peer)
+        val session = PropagationSession(problem)
+        session.seed(Assumptions(ints = mapOf(5 to 1L)))
+        exchange.onSearchStart(session)
+        session.pinInt(4, 1L)
+        exchange.onSearchEnd(session)
+        assertNull(meter.snapshot().clauses["origin0Uses"])
+
+        session.reseedFrom(Assumptions(ints = (0 until 5).associateWith { 0L }))
+        exchange.onSearchStart(session)
+
+        assertEquals(IntDomain(1, 1), session.intDomain(5))
+        assertEquals(1L, meter.snapshot().clauses.getValue("origin0Uses"))
+        assertEquals(1L, meter.snapshot().channels.getValue(SharingChannel.Clauses).imported)
+        exchange.onSearchClose(session)
+    }
+
     @Test
     fun `simultaneous pool duplicates should retain peer use attribution once per session`() {
         for (native in listOf(false, true)) {
