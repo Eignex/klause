@@ -42,7 +42,7 @@ class LinearAuthorityCutsTest {
 
         for (checkUnselected in listOf(true, false)) {
             val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never,
-                maximumCutProofSteps = 1, cutMask = setOf(0), checkLpCandidates = checkUnselected))
+                maximumCutProofSteps = 1, cutMask = setOf(0), checkUnselectedCuts = checkUnselected))
 
             assertTrue(1 in query.inactive)
             assertFalse(query.unconditionalRows)
@@ -62,7 +62,7 @@ class LinearAuthorityCutsTest {
             cutMask = emptySet(), onCutWork = { ordinaryWork += it }))
 
         assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never,
-            cutMask = emptySet(), checkLpCandidates = false, onCutWork = { retiredWork += it }))
+            cutMask = emptySet(), checkUnselectedCuts = false, onCutWork = { retiredWork += it }))
 
         assertTrue(ordinaryWork > 0L)
         assertEquals(0L, retiredWork)
@@ -76,10 +76,10 @@ class LinearAuthorityCutsTest {
         ), emptyMap())
         val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val retired = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never,
-            cutMask = emptySet(), checkLpCandidates = false))
+            cutMask = emptySet(), checkUnselectedCuts = false))
 
         assertFalse(retired.matches(source, cuts = true, cutMask = emptySet()))
-        assertTrue(retired.matches(source, cuts = true, cutMask = emptySet(), checkLpCandidates = false))
+        assertTrue(retired.matches(source, cuts = true, cutMask = emptySet(), checkUnselectedCuts = false))
     }
 
     @Test

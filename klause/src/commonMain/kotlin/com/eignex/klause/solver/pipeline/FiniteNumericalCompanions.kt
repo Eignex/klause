@@ -9,6 +9,7 @@ import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioLifecycleKind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.SharedClausePool
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.WorkerConstructionCost
 import com.eignex.klause.portfolio.WorkerEligibility
@@ -96,6 +97,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val adaptiveRepair: Boolean = false,
     private val onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
     private val onObservation: ((Long, JointRepairObservation) -> Unit)? = null,
+    private val cutBinding: FiniteSourceCutBinding? = null,
 ) {
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
@@ -105,6 +107,16 @@ internal class FiniteNumericalCompanions private constructor(
     private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
         LinearIncumbentSharing() else null
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
+    private var cutPool: SharedClausePool? = null
+    private var cutOrigin = -1
+
+    fun bindCutPool(workers: List<PortfolioWorker>) {
+        val identity = ModelIdentity.of(model, objective)
+        cutOrigin = workers.indexOfFirst { it.label == FiniteCompanionArms.NUMERICAL_TRAVERSAL }
+        cutPool = workers.firstNotNullOfOrNull { worker ->
+            worker.sharedPools?.takeIf { it.identity?.matches(identity) == true }?.clauses
+        }
+    }
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true,
         gap: OptimalityGap? = null): List<PortfolioArmFactory> {
@@ -232,7 +244,14 @@ internal class FiniteNumericalCompanions private constructor(
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
                 incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance,
-                gap = gap, useSourceGap = false)
+                gap = gap, useSourceGap = false,
+                onRootConditionalCuts = if (params.sourceAggregateCuts && params.sourcePointCuts &&
+                    params.sourceCuts && cutBinding != null && cutOrigin >= 0 && cutPool != null) {
+                    { cuts, budget, stop ->
+                        FiniteSourceCutClauses(cutBinding, model, context, budget, stop,
+                            requireNotNull(cutPool), cutOrigin).publish(cuts)
+                    }
+                } else null)
             private var result: MinimizeResult? = null
             private var closed = false
             override val isDone: Boolean get() = result != null
@@ -265,18 +284,21 @@ internal class FiniteNumericalCompanions private constructor(
     companion object {
         fun admission(model: BakedProblem, objective: LinearObjective, cancellation: ExecutionControl,
             cost: WorkerConstructionCost,
-            toleranceAuthority: LinearToleranceAuthority? = null): FiniteCompanionAdmission = FiniteCompanionAdmission(
+            toleranceAuthority: LinearToleranceAuthority? = null,
+            cutBinding: FiniteSourceCutBinding? = null): FiniteCompanionAdmission = FiniteCompanionAdmission(
             cancellation, requireNotNull(cost.activeMillis), requireNotNull(cost.sliceMillis),
-            capture = { captureContext(model, objective, it, toleranceAuthority) })
+            capture = { captureContext(model, objective, it, toleranceAuthority, cutBinding) })
 
         fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: ExecutionControl, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
             incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)?,
             afterImprovement: Boolean = false, adaptiveRepair: Boolean = false,
             onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
-            onObservation: ((Long, JointRepairObservation) -> Unit)? = null): FiniteNumericalCompanions =
+            onObservation: ((Long, JointRepairObservation) -> Unit)? = null,
+            cutBinding: FiniteSourceCutBinding? = null): FiniteNumericalCompanions =
             FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
-                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison, onObservation)
+                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison, onObservation,
+                cutBinding)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: ExecutionControl, cost: WorkerConstructionCost,
@@ -287,19 +309,22 @@ internal class FiniteNumericalCompanions private constructor(
             onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
             onObservation: ((Long, JointRepairObservation) -> Unit)? = null,
             toleranceAuthority: LinearToleranceAuthority? = null,
+            cutBinding: FiniteSourceCutBinding? = null,
         ): Preparation {
             val started = clock.markNow()
-            val context = captureContext(model, objective, cancellation, toleranceAuthority)
+            val context = captureContext(model, objective, cancellation, toleranceAuthority, cutBinding)
             val companions = context?.let {
                 FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
                     incumbentCompletionCheck, adaptiveRepair = adaptiveRepair, onComparison = onComparison,
-                    onObservation = onObservation)
+                    onObservation = onObservation, cutBinding = cutBinding)
             }
             return Preparation(companions, started.elapsedNow().inWholeNanoseconds)
         }
 
         private fun captureContext(model: BakedProblem, objective: LinearObjective,
-            cancellation: ExecutionControl, toleranceAuthority: LinearToleranceAuthority? = null): SourceProofContext? {
+            cancellation: ExecutionControl, toleranceAuthority: LinearToleranceAuthority? = null,
+            cutBinding: FiniteSourceCutBinding? = null): SourceProofContext? {
+            if (cutBinding != null) return cutBinding.capture(model, objective, cancellation)
             if (toleranceAuthority != null) return toleranceAuthority.capture(model, objective, cancellation)
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())

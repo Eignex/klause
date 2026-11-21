@@ -649,6 +649,7 @@ private fun executePortfolio(
     }
     val toleranceAuthority = request.sourceInvocation?.linearSource?.toleranceAuthority
         ?.takeIf { it.compatible(request.sourceMapping, request.problem, request.objective, request.cancellation) }
+    val companionParams = request.numericalCompanionParams?.resolve(toleranceAuthority)
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,
@@ -664,8 +665,16 @@ private fun executePortfolio(
         onGuidance = request.onPortfolioGuidance,
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
-        numericalCompanions = request.numericalCompanionParams?.resolve(toleranceAuthority),
+        numericalCompanions = companionParams,
         toleranceAuthority = toleranceAuthority,
+        cutBinding = toleranceAuthority?.takeIf {
+            companionParams?.let { it.sourceCuts && it.sourcePointCuts && it.sourceAggregateCuts } == true
+        }?.let { authority ->
+            request.objective?.let { objective ->
+                FiniteSourceCutBinding.admit(authority, request.sourceMapping, request.problem,
+                    objective, request.cancellation)
+            }
+        },
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(

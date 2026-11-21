@@ -73,6 +73,7 @@ internal class LinearAuthorityInvocation(
     useSourceGap: Boolean = true,
     gapTolerance: OptimalityTolerance? = context.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = params.sourceIncumbentCompletion,
+    onRootConditionalCuts: ((List<SourceEvidence>, SourceLpBudget, ExecutionControl) -> Map<String, Long>)? = null,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -152,7 +153,7 @@ internal class LinearAuthorityInvocation(
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
         gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
-        guideIncumbent = guideIncumbent)
+        guideIncumbent = guideIncumbent, onRootConditionalCuts = onRootConditionalCuts)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {

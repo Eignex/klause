@@ -82,6 +82,8 @@ internal class LinearAuthorityTraversal(
     private val useSourceGap: Boolean = true,
     private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = false,
+    private val onRootConditionalCuts:
+        ((List<SourceEvidence>, SourceLpBudget, ExecutionControl) -> Map<String, Long>)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
@@ -497,6 +499,12 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Pause
         }
         current.pending = false
+        if (current === root && onRootConditionalCuts != null) {
+            val cuts = authority.rootConditionalCuts(source, cancellation)
+            for ((stage, count) in onRootConditionalCuts.invoke(cuts, budget, cancellation)) {
+                observations["numerical$stage"] = count
+            }
+        }
         if (current === root && repairGuidance?.remember(source, result.relaxedPoint, budget, cancellation) == true) {
             observe("numericalRepairGuidancePublished")
         }
