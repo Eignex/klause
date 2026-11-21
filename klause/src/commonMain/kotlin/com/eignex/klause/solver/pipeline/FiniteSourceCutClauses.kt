@@ -124,17 +124,36 @@ internal class FiniteSourceCutClauses(
             val weights = entries.map { (_, coefficient) ->
                 if (coefficient < BigFraction.ZERO) coefficient.negated() else coefficient
             }
-            for (mask in 1 until (1 shl entries.size)) {
-                if (proved == MAX_CLAUSES || !pay(1L + entries.size * 32L,
-                        256L + entries.size * 1_024L)) break
+            if (!pay(MAX_CLAUSES.toLong(), 128L + MAX_CLAUSES * Int.SIZE_BYTES.toLong())) break
+            val provedMasks = IntArray(MAX_CLAUSES)
+            var coverCount = 0
+            masks@ for (mask in ((1 shl entries.size) - 1) downTo 1) {
+                if (proved == MAX_CLAUSES || !pay(1L, 256L)) break
                 observe("ScannedMasks")
+                var covered = false
+                for (id in 0 until coverCount) {
+                    if (!pay(1L)) break@masks
+                    if (mask and provedMasks[id] == provedMasks[id]) {
+                        covered = true
+                        break
+                    }
+                }
+                if (covered) continue
+                if (!pay(entries.size * 32L, 256L + entries.size * 1_024L)) break
                 var activity = baseline
                 for (id in entries.indices) if (mask and (1 shl id) != 0) activity += weights[id]
                 fun conflicts(value: BigFraction): Boolean = value > row.rhs || (row.strict && value == row.rhs)
-                if (!conflicts(activity) || entries.indices.any {
-                        mask and (1 shl it) != 0 && conflicts(activity - weights[it])
-                    }) continue
-                val pins = entries.indices.filter { mask and (1 shl it) != 0 }
+                if (!conflicts(activity)) continue
+                var cover = mask
+                for (id in entries.indices) if (cover and (1 shl id) != 0) {
+                    val without = activity - weights[id]
+                    if (conflicts(without)) {
+                        cover = cover and (1 shl id).inv()
+                        activity = without
+                    }
+                }
+                if (cover == 0) break
+                val pins = entries.indices.filter { cover and (1 shl it) != 0 }
                 if (!pay(entries.size * 16L + pins.size, 1_024L + entries.size * 1_024L)) break
                 var condition = SourceCondition()
                 val terms = arrayListOf(SourceDerivation.Combination.Term(BigFraction.ONE,
@@ -144,7 +163,7 @@ internal class FiniteSourceCutClauses(
                 for ((id, entry) in entries.withIndex()) {
                     val (coordinate, coefficient) = entry
                     val positive = coefficient > BigFraction.ZERO
-                    val pinned = mask and (1 shl id) != 0
+                    val pinned = cover and (1 shl id) != 0
                     val proof = if (pinned) {
                         condition = condition.bound(coordinate,
                             if (positive) BigFraction.ONE else BigFraction.ZERO, upper = !positive)
@@ -165,6 +184,7 @@ internal class FiniteSourceCutClauses(
                 observe("RefutationChecks")
                 if (SourceEvidenceVerifier(source.atScope(scope)).verify(evidence, checking) !=
                     SourceEvidenceCheck.Checked || checking()) continue
+                provedMasks[coverCount++] = cover
                 proved++
                 observe("Proved")
                 if (!pay(2L + pins.size * 8L, 8_448L + atoms.size * Long.SIZE_BYTES + pins.size * 8L)) break

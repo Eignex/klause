@@ -54,6 +54,93 @@ import kotlin.test.assertTrue
 
 class FiniteSourceCutClausesTest : RuntimeInitializedTest() {
     @Test
+    fun `a root contradictory cut should withhold an empty nogood`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, -1)))
+        val model = source.bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val binding = assertNotNull(FiniteSourceCutBinding.admit(LinearToleranceAuthority(source, source, objective),
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), model, objective, ExecutionControl.Never))
+        val context = assertNotNull(binding.capture(model, objective, ExecutionControl.Never))
+        val row = context.premises.entries.single { it.value.inequality.rhs == BigFraction.MINUS_ONE }
+        val cut = SourceEvidence(context.scope, SourceClaim.Consequence(row.value.inequality),
+            SourceDerivation.Premise(row.key))
+        val pool = SharedClausePool()
+        val funding = SourceLpFunding(1_000_000, 4_000_000).also { it.grant(1_000_000) }
+
+        FiniteSourceCutClauses(binding, model, context, SourceLpBudget(funding = funding),
+            ExecutionControl.Never, pool, 0).publish(listOf(cut))
+
+        assertTrue(pool.drainSince(0).clauses.isEmpty())
+    }
+
+    @Test
+    fun `wide binary covers should reach finite publication within the allowance`() {
+        for (positive in listOf(false, true)) {
+            val source = Problem(0, 8, Array(8) { IntDomain(0, 1) }, arrayOf(
+                Linear(IntArray(8) { 1 }, IntArray(8) { it },
+                    if (positive) LinearOp.LE else LinearOp.GE, if (positive) 0 else 1)))
+            val model = source.bake()
+            val objective = LinearObjective(intCoefficients = LongArray(8) { 1 })
+            val binding = assertNotNull(FiniteSourceCutBinding.admit(
+                LinearToleranceAuthority(source, source, objective),
+                SourceMapping(source, source, TransformationGuarantees.IDENTITY), model, objective,
+                ExecutionControl.Never))
+            val context = assertNotNull(binding.capture(model, objective, ExecutionControl.Never))
+            val row = context.premises.entries.single { it.value.inequality.supportSize == 8 }
+            val cut = SourceEvidence(context.scope, SourceClaim.Consequence(row.value.inequality),
+                SourceDerivation.Premise(row.key))
+            val pool = SharedClausePool()
+            val funding = SourceLpFunding(1_000_000, 4_000_000).also { it.grant(1_000_000) }
+
+            val observations = FiniteSourceCutClauses(binding, model, context, SourceLpBudget(funding = funding),
+                ExecutionControl.Never, pool, 0).publish(listOf(cut))
+
+            assertEquals(if (positive) 8L else 1L, observations["SourceCutClausePublished"])
+            val consumer = PropagationSession(Problem(0, 8, Array(8) { IntDomain(0, 1) }, emptyArray()))
+            PoolClauseExchange(pool, origin = 1).onSearchStart(consumer)
+            if (positive) {
+                consumer.pinIntAtLeast(0, 0)
+                assertTrue((0..7).all { consumer.intDomain(it).max == 0L })
+            } else {
+                for (id in 0..6) assertFalse(consumer.pinInt(id, 0) is PropagationResult.Unsat)
+                assertTrue(consumer.pinInt(7, 0) is PropagationResult.Unsat)
+            }
+            assertTrue(funding.spent in 1L..65_536L)
+            assertTrue(funding.allocated in 1L..1_048_576L)
+        }
+    }
+
+    @Test
+    fun `proved covers should preserve different cut coordinate supports`() {
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1)))
+        val model = source.bake()
+        val objective = LinearObjective(intCoefficients = LongArray(4) { 1 })
+        val binding = assertNotNull(FiniteSourceCutBinding.admit(LinearToleranceAuthority(source, source, objective),
+            SourceMapping(source, source, TransformationGuarantees.IDENTITY), model, objective, ExecutionControl.Never))
+        val context = assertNotNull(binding.capture(model, objective, ExecutionControl.Never))
+        val cuts = context.premises.entries.filter { it.value.inequality.supportSize == 2 }.map {
+            SourceEvidence(context.scope, SourceClaim.Consequence(it.value.inequality),
+                SourceDerivation.Premise(it.key))
+        }
+        val pool = SharedClausePool()
+        val funding = SourceLpFunding(1_000_000, 4_000_000).also { it.grant(1_000_000) }
+
+        val observations = FiniteSourceCutClauses(binding, model, context, SourceLpBudget(funding = funding),
+            ExecutionControl.Never, pool, 0).publish(cuts)
+
+        assertEquals(2L, observations["SourceCutClausePublished"])
+        for (pair in 0..1) {
+            val consumer = PropagationSession(Problem(0, 4, Array(4) { IntDomain(0, 1) }, emptyArray()))
+            PoolClauseExchange(pool, origin = 1).onSearchStart(consumer)
+            assertFalse(consumer.pinInt(pair * 2, 0) is PropagationResult.Unsat)
+            assertTrue(consumer.pinInt(pair * 2 + 1, 0) is PropagationResult.Unsat)
+        }
+    }
+
+    @Test
     fun `missing or disabled sharing should preserve the numerical result`() {
         for ((sharing, cuts) in listOf(true to true, false to true, true to false)) {
             val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
