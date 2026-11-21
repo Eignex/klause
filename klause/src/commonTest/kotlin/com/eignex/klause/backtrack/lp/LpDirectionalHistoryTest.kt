@@ -11,6 +11,116 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `child interval observations classify independent samples at the current fraction`() {
+        for (preferredUp in listOf(false, true)) {
+            for (point in listOf(0.25, 0.5, 0.75)) {
+                for (scale in listOf(1.0, 1.5, 2.0)) {
+                    var work = 0L
+                    val events = ArrayList<String>()
+                    val history = LpDirectionalHistory(events::add, charge = { work += it })
+                    val variable = VarRef.Bool(0)
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    repeat(2) { sample ->
+                        for (up in listOf(false, true)) {
+                            history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                            history.beginNode(1)
+                            val movement = if (up) 1.0 - point else point
+                            val gain = if (up == preferredUp) 0.5 else 0.75
+                            val multiplier = if (up == preferredUp && sample == 0) scale else 1.0
+                            history.record(gain / movement * multiplier)
+                            history.finishNode(up != preferredUp)
+                        }
+                    }
+                    history.record(0.0)
+                    for (cutoff in listOf(0.75, 3.0)) {
+                        events.clear()
+                        val before = work
+
+                        val preferred = history.preferDirection(variable, point, cutoff)
+
+                        assertEquals(if (cutoff < 1.0) !preferredUp else preferredUp, preferred)
+                        assertEquals(56L, work - before)
+                        val interval = if (cutoff < 1.0) "PRUNE" else when (scale) {
+                            1.0 -> "OPEN_SEPARATED"
+                            1.5 -> "OPEN_TOUCHING"
+                            else -> "OPEN_OVERLAP"
+                        }
+                        assertEquals(listOf("PASSIVE_CHILD_INTERVAL_CHECK", "PASSIVE_CHILD_INTERVAL_$interval"), events)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `child interval observation limits survive resets and restarts`() {
+        var work = 0L
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add, charge = { work += it })
+        val variable = VarRef.Bool(0)
+        repeat(129) { iteration ->
+            if (iteration % 2 == 0) history.clear() else history.restart()
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 2.0 else 1.0)
+                    history.finishNode(up)
+                }
+            }
+            history.record(0.0)
+            val before = work
+
+            val preferred = history.preferDirection(variable, 0.5, 3.0)
+
+            assertEquals(false, preferred)
+            assertEquals(if (iteration < 128) 56L else 40L, work - before)
+        }
+        assertEquals(128, events.count { it == "PASSIVE_CHILD_INTERVAL_CHECK" })
+        assertEquals(128, events.count { it == "PASSIVE_CHILD_INTERVAL_OPEN_SEPARATED" })
+        assertEquals(1, events.count { it == "PASSIVE_CHILD_INTERVAL_EXHAUSTED" })
+    }
+
+    @Test
+    fun `reset while reporting a child interval withholds the preference`() {
+        for (resetOn in listOf("PASSIVE_CHILD_INTERVAL_CHECK", "PASSIVE_CHILD_INTERVAL_OPEN_SEPARATED")) {
+            var reporting = false
+            val events = ArrayList<String>()
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({ event ->
+                events.add(event)
+                if (reporting && event == resetOn) {
+                    reporting = false
+                    history.clear()
+                }
+            })
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 2.0 else 1.0)
+                    history.finishNode(up)
+                }
+            }
+            history.record(0.0)
+            reporting = true
+
+            assertNull(history.preferDirection(variable, 0.5, 3.0))
+            assertEquals(if (resetOn.endsWith("CHECK")) 0 else 1,
+                events.count { it == "PASSIVE_CHILD_INTERVAL_OPEN_SEPARATED" })
+        }
+    }
+
+    @Test
     fun `upper minimum predictions retain independent directional ranges at the current fraction`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)
@@ -241,7 +351,7 @@ class LpDirectionalHistoryTest {
                         val preference = history.preferDirection(variable, 0.5, cutoff)
 
                         assertEquals(if (cutoff <= 13.0) prunedUp else !prunedUp, preference)
-                        assertEquals(40L, work - before)
+                        assertEquals(56L, work - before)
                     }
                 }
             }
@@ -319,7 +429,7 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `reset during a charged preference lookup discards the result`() {
-        for (resetAt in 1..4) {
+        for (resetAt in 1..5) {
             var reading = false
             var reads = 0
             lateinit var history: LpDirectionalHistory

@@ -51,6 +51,7 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    private var childIntervalChecks = 128
 
     fun beginNode(level: Int) {
         stamp++
@@ -335,6 +336,27 @@ internal class LpDirectionalHistory(
         val preferredGain = if (preferUp) upGain else downGain
         val otherGain = if (preferUp) downGain else upGain
         if ((prune && preferredGain < gap) || (!prune && preferredGain > otherGain)) return null
+        if (childIntervalChecks > 0) {
+            childIntervalChecks--
+            charge(16L)
+            if (version != generation) return null
+            val direction = if (preferUp) history.up else history.down
+            val movement = if (preferUp) 1.0 - fraction else fraction
+            val upper = maxOf(direction.latest, direction.previous) * movement
+            val interval = when {
+                prune -> "PRUNE"
+                !upper.isFinite() -> "OPEN_UNKNOWN"
+                upper < otherGain -> "OPEN_SEPARATED"
+                upper == otherGain -> "OPEN_TOUCHING"
+                else -> "OPEN_OVERLAP"
+            }
+            observe("PASSIVE_CHILD_INTERVAL_CHECK")
+            if (version != generation) return null
+            observe("PASSIVE_CHILD_INTERVAL_$interval")
+            if (version != generation) return null
+            if (childIntervalChecks == 0) observe("PASSIVE_CHILD_INTERVAL_EXHAUSTED")
+            if (version != generation) return null
+        }
         return preferUp
     }
 
