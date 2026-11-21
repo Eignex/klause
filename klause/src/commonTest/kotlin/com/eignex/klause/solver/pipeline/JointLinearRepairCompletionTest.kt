@@ -1107,7 +1107,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `a compatible pooled incumbent should reserve completion only when enabled`() {
+    fun `a compatible pooled incumbent should request preparation continuation only with enabled completion`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
@@ -1126,9 +1126,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                         search.advance(ExecutionControl.Never, 1)
 
                         assertFalse(consumed)
-                        assertTrue(repair.incumbentTrialPending)
-                        assertEquals(if (completion) 1L else 0L,
-                            repair.stats.smt.completeSearchStages?.get("jointRepairIncumbentPreparationStarts") ?: 0L)
+                        assertEquals(completion, repair.incumbentTrialPending)
                     }
                 }
             }

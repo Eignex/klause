@@ -135,10 +135,8 @@ internal class JointLinearRepair(
     private var enlargedTrialPending = false
     private var enlargedTrialAfterWitness = false
     private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
-    private var rootTrialPending = false
-    private var completionTrialPending = false
-    val incumbentTrialPending: Boolean get() =
-        !closed && !exhausted && !stop() && (rootTrialPending || completionTrialPending)
+    var incumbentTrialPending = false
+        private set
     private var closed = false
     private var declined = false
     private var preparationWork = 0L
@@ -360,7 +358,7 @@ internal class JointLinearRepair(
                 }
                 val checkedStart = pooled != null && completion != null && !bootstrap &&
                     (round == 0L || (bootstrapTried && !relaxationAttempted))
-                if (round == 0L && completion != null) completionTrialPending = pooled != null
+                if (round == 0L && completion != null) incumbentTrialPending = pooled != null
                 val width = if (enlargedTrialAfterWitness) checkedTrialWidth + 1 else if (checkedStart) {
                     observe("jointRepairCheckedCenterStarts")
                     minOf(count, 2)
@@ -425,13 +423,13 @@ internal class JointLinearRepair(
     }
 
     private fun requestIncumbentPreparation() {
-        if (completion == null || completionTrialPending) return
+        if (completion == null || incumbentTrialPending) return
         budget.observe(preparation = 1L)
         val seed = external() ?: return
         if (seed.numBoolVars == model.numBoolVars && seed.numIntVars == model.numIntVars &&
             seed.numRealVars == model.numRealVars && seed.algebraicReals == null && seed.symbolicReals == null
         ) {
-            completionTrialPending = true
+            incumbentTrialPending = true
             observe("jointRepairIncumbentPreparationStarts")
         }
     }
@@ -474,7 +472,6 @@ internal class JointLinearRepair(
             if (!rootStarted) {
                 if (!state.work.theoryCheck()) return false
                 rootStarted = true
-                rootTrialPending = true
                 observe("jointRepairRootQueries")
             }
             val result = if (boundOrdered && params.sourceCuts && params.sourcePointCuts)
@@ -498,10 +495,7 @@ internal class JointLinearRepair(
             stages["jointRepairGuidedIntegers"] = guidance.keys.count {
                 it.kind == SourceCoordinate.Kind.Integer
             }.toLong()
-            if (guidance.isEmpty()) {
-                rootTrialPending = false
-                observe("jointRepairRootGuidanceUnavailable")
-            }
+            if (guidance.isEmpty()) observe("jointRepairRootGuidanceUnavailable")
         }
         return true
     }
@@ -556,7 +550,6 @@ internal class JointLinearRepair(
         readyCenterStep = null
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
-            rootTrialPending = false
             observation?.event(proposalSequence, observationQuery, "result", when (result.result) {
                 is ExactNeighborhoodResult.Witness -> "checked-source-witness"
                 ExactNeighborhoodResult.Refuted -> "regional-refutation"
@@ -587,7 +580,7 @@ internal class JointLinearRepair(
                 enlargedTrialProposal = null
                 checkedTrialCenter = null
             }
-            completionTrialPending = continuing
+            incumbentTrialPending = continuing
         }
         return result
     }
@@ -942,8 +935,7 @@ internal class JointLinearRepair(
     override fun close() {
         if (closed) return
         closed = true
-        rootTrialPending = false
-        completionTrialPending = false
+        incumbentTrialPending = false
         enlargedTrialPending = false
         enlargedTrialAfterWitness = false
         enlargedTrialProposal = null
