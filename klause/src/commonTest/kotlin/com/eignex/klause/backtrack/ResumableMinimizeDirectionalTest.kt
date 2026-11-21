@@ -28,7 +28,7 @@ class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
     @Test
     fun `finite search records directional lp outcomes across cooperative slices`() {
         for (automatic in listOf(false, true)) {
-            val blocks = 4
+            val blocks = 2
             val variables = blocks * 3
             val factors = ArrayList<Factor>()
             repeat(blocks) { block ->
@@ -60,14 +60,15 @@ class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
                 var slices = 0
                 while (slices < 128 && !search.isDone &&
                     ((search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("DOWN") ?: 0L) < 2L ||
-                        (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("UP") ?: 0L) < 2L)
+                        (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("UP") ?: 0L) < 2L ||
+                        (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("OUTCOME_OPEN") ?: 0L) < 4L)
                 ) {
                     slices++
-                    search.runSlice(ExecutionControl.Never, 1000L, 64L) {}
+                    search.runSlice(ExecutionControl.Never, 1000L, 4L) {}
                 }
 
                 val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-                val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
+                val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; slices=$slices; done=${search.isDone}"
                 assertTrue(slices > 1, diagnostic)
                 assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
                 assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)

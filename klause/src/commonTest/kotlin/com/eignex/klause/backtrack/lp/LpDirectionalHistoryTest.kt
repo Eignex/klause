@@ -11,6 +11,28 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `upper minimum predictions use both larger recent directional samples at the current fraction`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.5)
+        for (gain in listOf(2.0, 1.0)) {
+            for (up in listOf(false, true)) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(if (up) gain * 1.5 else gain)
+            }
+        }
+        history.record(0.0)
+
+        for ((point, lower, upper) in listOf(Triple(0.25, 0.5, 1.0), Triple(0.75, 0.75, 1.5))) {
+            assertEquals(lower, history.minimumPrediction(variable, point, 10.0))
+            assertEquals(upper, history.minimumPrediction(variable, point, 10.0, upper = true))
+        }
+    }
+
+    @Test
     fun `parent attribution survives deeper branches through the supported depth limit`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add)
@@ -97,9 +119,11 @@ class LpDirectionalHistoryTest {
                 }
                 history.record(0.0)
 
-                val prediction = history.minimumPrediction(variable, 0.5, 3.0)
+                for (upper in listOf(false, true)) {
+                    val prediction = history.minimumPrediction(variable, 0.5, 3.0, upper)
 
-                if (samples < 2) assertTrue(prediction.isNaN()) else assertEquals(gain, prediction)
+                    if (samples < 2) assertTrue(prediction.isNaN()) else assertEquals(gain, prediction)
+                }
             }
         }
     }
@@ -120,10 +144,12 @@ class LpDirectionalHistoryTest {
         }
         history.record(0.0)
 
-        assertTrue(history.minimumPrediction(variable, 0.125, 1.0).isNaN())
-        assertEquals(Double.MIN_VALUE, history.minimumPrediction(variable, 0.5, Double.MIN_VALUE))
-        for (cutoff in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.0, -1.0)) {
-            assertTrue(history.minimumPrediction(variable, 0.5, cutoff).isNaN())
+        for (upper in listOf(false, true)) {
+            assertTrue(history.minimumPrediction(variable, 0.125, 1.0, upper).isNaN())
+            assertEquals(Double.MIN_VALUE, history.minimumPrediction(variable, 0.5, Double.MIN_VALUE, upper))
+            for (cutoff in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.0, -1.0)) {
+                assertTrue(history.minimumPrediction(variable, 0.5, cutoff, upper).isNaN())
+            }
         }
     }
 
@@ -155,29 +181,31 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `reset while charging a minimum child prediction cannot return retained evidence`() {
-        var reading = false
-        lateinit var history: LpDirectionalHistory
-        history = LpDirectionalHistory({}, charge = {
-            if (reading) {
-                reading = false
-                history.clear()
+        for (upper in listOf(false, true)) {
+            var reading = false
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({}, charge = {
+                if (reading) {
+                    reading = false
+                    history.clear()
+                }
+            })
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(5.0)
+                }
             }
-        })
-        val variable = VarRef.Bool(0)
-        history.beginNode(0)
-        history.record(0.0)
-        history.branch(variable, 0.5)
-        repeat(2) {
-            for (up in listOf(false, true)) {
-                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
-                history.beginNode(1)
-                history.record(5.0)
-            }
-        }
-        history.record(0.0)
-        reading = true
+            history.record(0.0)
+            reading = true
 
-        assertTrue(history.minimumPrediction(variable, 0.5, 3.0).isNaN())
+            assertTrue(history.minimumPrediction(variable, 0.5, 3.0, upper).isNaN())
+        }
     }
 
     @Test

@@ -35,6 +35,7 @@ internal class LpHints(
     private var passiveVariable: LpPassiveVariableChoice? = null
     private var passiveValues: LpPassiveValueChoice? = null
     private var passiveCollection: LpPassiveCollection? = null
+    private var remainingIntervalChecks = 128
     private var passivePoint: LpRelaxation? = null
     private var passiveState: LpExactState? = null
     private var freshRecord = false
@@ -302,6 +303,21 @@ internal class LpHints(
         }
         if (!current()) return baseline
         val proposed = proposal ?: return baseline
+        if (remainingIntervalChecks > 0) {
+            remainingIntervalChecks--
+            val upperReference = history.minimumPrediction(baseline, value(baseline), workingCutoff, upper = true)
+            if (!current()) return baseline
+            charge(8L)
+            if (!current()) return baseline
+            observe("PASSIVE_VARIABLE_INTERVAL_CHECK")
+            if (!current()) return baseline
+            observe(when {
+                !upperReference.isFinite() -> "PASSIVE_VARIABLE_INTERVAL_UNKNOWN"
+                bestGain > upperReference -> "PASSIVE_VARIABLE_INTERVAL_SEPARATED"
+                else -> "PASSIVE_VARIABLE_INTERVAL_OVERLAP"
+            })
+            if (remainingIntervalChecks == 0) observe("PASSIVE_VARIABLE_INTERVAL_EXHAUSTED")
+        }
         if (passiveVariable == null) {
             charge(8L)
             if (!current()) return baseline

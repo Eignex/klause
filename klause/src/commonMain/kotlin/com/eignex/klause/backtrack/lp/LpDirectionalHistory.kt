@@ -180,7 +180,7 @@ internal class LpDirectionalHistory(
         }
     }
 
-    fun minimumPrediction(variable: VarRef, value: Double, cutoff: Double): Double {
+    fun minimumPrediction(variable: VarRef, value: Double, cutoff: Double, upper: Boolean = false): Double {
         val version = generation
         charge(24L)
         if (version != generation) return Double.NaN
@@ -188,10 +188,12 @@ internal class LpDirectionalHistory(
         if (!gap.isFinite() || gap <= 0.0) return Double.NaN
         val history = reliable(variable, value) ?: return Double.NaN
         val fraction = value - floor(value)
-        val down = history.down.gain * fraction
-        val up = history.up.gain * (1.0 - fraction)
+        val downRate = if (upper) maxOf(history.down.latest, history.down.previous) else history.down.gain
+        val upRate = if (upper) maxOf(history.up.latest, history.up.previous) else history.up.gain
+        val down = downRate * fraction
+        val up = upRate * (1.0 - fraction)
         if (!down.isFinite() || !up.isFinite() ||
-            (down == 0.0 && history.down.gain > 0.0) || (up == 0.0 && history.up.gain > 0.0)
+            (down == 0.0 && downRate > 0.0) || (up == 0.0 && upRate > 0.0)
         ) return Double.NaN
         return if (version == generation) minOf(down, up) else Double.NaN
     }
