@@ -103,7 +103,7 @@ internal class FiniteExecutionRequest(
     val sourceInvocation: PreparedSourceInvocation? = null,
     val sourceMapping: SourceMapping? = null,
     val sourceControls: SourceFiniteControls? = null,
-    val numericalCompanionParams: TheoryParams? = null,
+    val numericalCompanionParams: FiniteCompanionPolicy? = null,
     val objectiveCoordinates: ObjectiveCoordinateView? = null,
     val onPortfolioLpQuery: ((String, Double?, LpQueryObservation) -> Unit)? = null,
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
@@ -647,6 +647,9 @@ private fun executePortfolio(
             admitted = true, requirements = "bounded early trial with historical-reason refinement",
             declines = emptyList(), selected = true))
     }
+    val toleranceAuthority = request.sourceInvocation?.linearSource?.toleranceAuthority
+        ?.takeIf { it.compatible(request.sourceMapping, request.problem, request.objective, request.cancellation) }
+    val companionParams = request.numericalCompanionParams?.resolve(toleranceAuthority)
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,
@@ -662,7 +665,16 @@ private fun executePortfolio(
         onGuidance = request.onPortfolioGuidance,
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
-        numericalCompanions = request.numericalCompanionParams,
+        numericalCompanions = companionParams,
+        toleranceAuthority = toleranceAuthority,
+        cutBinding = toleranceAuthority?.takeIf {
+            companionParams?.let { it.sourceCuts && it.sourcePointCuts && it.sourceAggregateCuts } == true
+        }?.let { authority ->
+            request.objective?.let { objective ->
+                FiniteSourceCutBinding.admit(authority, request.sourceMapping, request.problem,
+                    objective, request.cancellation)
+            }
+        },
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->
                 invocation.heuristicHints(

@@ -502,17 +502,31 @@ An exact fallback retains its query's checked cut recipe and selected mask. A ch
 guidance bound survives a weaker exact fallback with its supporting cut families;
 only a stronger checked replacement changes that attribution.
 
-An opt-in absolute-tolerance envelope prepares MPS declarations and each stated row
+An absolute-tolerance envelope prepares MPS declarations and each stated row
 side widened by the captured absolute feasibility slack before lowering and separation.
 It preserves missing sides, exact integrality, indicator activation and the original
-objective. Relative feasibility tolerance is unsupported. Its working model requires
-exact deductions and exact leaf completion, so no second band enlarges the accepted set.
-Source publication still checks the original decimal source. Bound metadata identifies
+objective. Relative feasibility tolerance is unsupported. Mixed binary/continuous
+optimization with compatible integer sides, coordinate layouts and objective units
+retains the nominal finite model and its ordinary
+numerical witness search. The numerical companions capture their own exact envelope
+rows and root sides, without importing propagated nominal sides. Their source scope
+alone identifies accepted-set bounds; nominal bounds keep their nominal scope.
+An opaque reconstruction or changed objective withholds that separate authority.
+Explicit envelope requests with different coordinate layouts retain exact envelope execution, with no second feasibility
+band. Source publication still checks the original decimal source. Bound metadata identifies
 the accepted-set envelope separately from nominal-source bounds; neither establishes
 independent proof validation. Exact source requests retain their original model.
 
-Point selection admits at most one additional checked cut per usable point and
-waits for its completed query before scanning again. Only a strictly stronger
+Point selection admits at most eight mutually nonparallel additional checked cuts per
+usable point and waits for its completed query before scanning again. A mixed ordinary recipe with
+at least one active checked cut per numerical coordinate keeps its ordinary query
+without expanding a point family. This cut-count admission is charged to selection;
+the fallback applies to the matching source family, including integer-bound descendants,
+and avoids repeated generation or scoring. Point-directed families retain
+the ordinary checked recipe as a fixed prefix and add at most 64 distinct candidates.
+Candidate caps and aging apply to additions; ordinary rows remain installed when
+their source premises are active. Duplicate inequalities with different source owners
+retain separate definitions. Only a strictly stronger
 checked bound, a checked incumbent or terminal evidence enables the next scan
 immediately; an unchanged or unavailable bound, an unfinished round or a scan
 without an addition starts a seven-query discovery cooldown. Unselected candidates
@@ -522,14 +536,51 @@ Retirement only weakens the relaxation. A query's cut mask names the cut rows it
 activates; managed current masks and fully checked selected families keep
 unselected and retired rows as inactive numerical rows with free logical columns
 and zero multipliers, so a compatible owner survives additions and retirement.
+Point selection with aggregation first pays a no-cut bound-only query within its
+containing allowance. It checks a certificate without source witness recovery or branching guidance,
+then retires that numerical owner so the ordinary recipe starts from its own basis.
+Selected additions follow the ordinary recipe. The stronger independently
+checked no-cut, ordinary or selected bound survives; a winning no-cut bound has no
+cut attribution. The checkpoint records completion even without a bound and resumes
+unfinished no-cut work before ordinary work. Its bound is returned only under its
+exact captured scope. Integer descendants share completion, while changed source
+data, revision, objective or Boolean conditions require a new checkpoint. Ordinary
+points, splits and advisory points retain their existing ownership. Matching,
+retention, solves, certification and owner transitions spend the containing source
+allowance, and checkpoint bookkeeping has its own recipe attribution.
+Installed selected aggregate cuts also test the node's active unary source sides and
+receiving bounds before another numerical query. Up to two checked integer projection
+candidates can be selected for this conditional check while excluded from LP installation;
+their source owners must be active, and candidate retirement disables their checks.
+At a completed unrestricted root, the authority can hand the first two freshly
+checked conditional definitions to the finite portfolio's bounded nogood producer.
+That consumer rechecks each discharged refutation against its admitted accepted-set
+context before publishing a portable clause; a definition or LP installation alone
+has no finite pruning authority.
+Conditional candidates do not consume the mixed-row continuation allowance reserved
+for extending the pool after an LP-separating candidate has been retained.
+A conditional-only pool retains the ordinary LP mask and the paid base result for later
+receiving queries. Its family follows the same aging and retirement as other candidates.
+A violated row supplies a nonnegative
+combination of that checked cut and its cited sides; original-source verification must
+accept the scoped refutation before traversal prunes. A missing side can be projected
+from one active source row by combining its other coordinates with original unary
+sides. Projected sides cannot feed another projection. Missing sides decline this
+check. The bounded scan, temporary proof and verification spend the containing cut
+allowance. Each immutable scoped query attempts this optional scan once, leaving
+later grants available for the ordinary LP after a pause or decline.
 Completed base bounds survive a paused or declined separation round. A stronger checked
 selected bound retains its cut-family attribution even when primal completion is unavailable
 or interrupted; the base point and split remain guidance for an unfinished node. A new template
 first runs the ordinary checked recipe; a completed point can add one selection
 round, and a successful round retains its checked mask. Scores combine normalized
 violation, inverse square-root support and objective parallelism and guide
-selection only. `source-point-cuts=true` opts the retained frontier into
-this point-based separation; the ordinary default activates all accepted source cuts.
+selection only. Compatible absolute-tolerance MPS binary/continuous optimization
+selects point separation and aggregation automatically. Other source routes activate
+the ordinary checked recipe unless explicitly configured. Explicit true/false controls
+retain their values. The actual post-preparation mapping must preserve the accepted
+authority's coordinates and objective; incompatibility disables only automatically
+supplied settings. Failed authority capture declines companions without nominal retry.
 The containing source request owns these separation, selection and advisory
 branching settings, binds them to its admitted numerical companions and removes them
 from finite worker recipe options.
@@ -537,11 +588,37 @@ from finite worker recipe options.
 Explicit aggregation combines two to four source rows with positive exact weights
 and normalizes the integer activity by its gcd; complete continuous cancellation
 permits integer rounding, otherwise mixed rounding cites an active bound for each
-remaining continuous coordinate. `source-aggregate-cuts=true`, disabled by default,
+remaining continuous coordinate. `source-aggregate-cuts=true`
 adds a template policy that pairs rows of opposite sign on a shared continuous
 coordinate, with at least one integer-activity row, and retains at most 64
 proposals. A nonseparating mixed-row seed can continue greedily along one
 opposite-sign continuous incidence path through at most four original rows.
+Point selection generates up to eight point-seeded proposals, then fills the remaining
+pool from unseeded source pairs. Seeded proposals precede unseeded proposals; these
+aggregate proposals precede directed rounding proposals within the 64-addition cap.
+Point-seeded discovery reserves at most a third of its remaining work and storage,
+capped at 16,384 work and 256 KiB, for integer-only
+projections through at most sixteen original rows. Fractional integer coordinates
+order up to eight starting rows, and at most two projections survive. A completed
+integer rounding that does not separate
+the root point is retained for conditional checks; integral right-hand sides can
+continue to endpoint half rounding. Exact positive coefficient ratios cancel
+continuous coordinates without repeatedly scaling the existing combination.
+Exact coefficients, right-hand side and strictness accumulate one source row at a time.
+A completed integer projection normalizes this owned aggregate and constructs its proof
+from every original weighted premise; source verification reconstructs the combination
+before any certified use. Integer endpoint discovery reuses unary-coordinate metadata
+captured by the source-row pass.
+Point ordering uses insertion sorting when its worst-case comparison count does not
+exceed the general sort bound; admission charges that bound within the same allowance.
+Ordered rows retain their funded point residuals for continuation scoring within the
+same source-and-point invocation; declined ordering leaves scoring to each continuation.
+Integer projection prioritizes rows that avoid reviving canceled continuous coordinates,
+then those opposing more active coordinates and introducing fewer. It skips an inverse
+source pair whose cancellation only adds a nonnegative constant.
+The ordinary prefix is separate. Both generators share a 500,000-work, 8 MiB family
+allowance; seeded discovery uses at most 65,536 work and 1 MiB of it.
+Each derivation remains bounded by 65,536 work and 1 MiB within that allowance.
 Pure-integer points also try half rounding, two-row combinations and half scaling
 whose odd coefficients cite established endpoint premises. An established
 invocation bound can stand in for a missing stated endpoint only as a typed

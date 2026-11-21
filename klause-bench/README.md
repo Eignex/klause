@@ -25,7 +25,7 @@ Execution verifies the planned file and directory identities before each solve.
 
 Solver records retain reported numerical LP authority, objective tolerance and original-unit
 bound/gap metadata. Independent source validation remains separate from those reported claims.
-`param.source-tolerance-envelope=true` forwards the CLI's opt-in absolute MPS tolerance
+`param.source-tolerance-envelope=true` forwards the CLI's explicit absolute MPS tolerance
 envelope control; its accepted-set bounds retain a separate scope from nominal bounds.
 
 Declared-input planning uses the complete corpus-pack index even when only a subset
@@ -66,6 +66,13 @@ cap SMT suites at eight cases each, giving SMT and CSP/COP comparable aggregate 
 single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.
 
+`MpsLpAdmission` accepts `batch64` source descriptors with `suite`, `problem` and decoded
+`sha256`. An optional `engine=mixed` reports automatic source selection, prepared authority
+compatibility and numerical companion eligibility without running selection or search.
+Preparation can solve LP bounds; this diagnostic supplies no source verdict or quality evidence.
+The bounded source-setup report separately recomputes canonical binary eligibility and
+the widened model's coordinate compatibility; incomplete inspection leaves its decline unknown.
+
 `FinitePortfolioLpCapture` records bounded queries from an ordinary finite portfolio.
 Its lab profile build requires both `:klause-cli:installJvmDist` and `:klause-bench:installDist`
 because provenance includes the installed CLI distribution.
@@ -82,6 +89,11 @@ grant and at most four snapshots. A retained rejected ray does not stop capture 
 another ray passes the complete kernel check. `missingBoundSideObserved` records the
 rejection history; `stoppedOnUnresolvedMissingSide` identifies an unresolved matching
 rejection that stopped the producer. Snapshot and source-journal limits remain separate.
+This mode accepts `capture-authority=nominal|accepted` and
+`capture-cut-policy=ordinary|selected`, defaulting to nominal authority and ordinary cuts.
+Accepted authority requires the production source-mapping compatibility check; unavailable
+authority declines instead of substituting nominal rows. Selected cuts enable point
+selection and source aggregation within the same containing allowance.
 `capture-mode=joint-ordinary handoff=true` observes the actual finite portfolio's
 ordinary pre-incumbent companion with complete proof-worker coverage and progress
 logging disabled. It records bounded exact proposals, selected refutation roots,

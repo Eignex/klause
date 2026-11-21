@@ -48,10 +48,7 @@ internal class NumericalFrontierSnapshot(
         val rows = retained?.let { field(it, "rows") as List<Any> }.orEmpty()
 
         @Suppress("UNCHECKED_CAST")
-        val inactive = query?.let { field(it, "inactive") as Set<Int> }.orEmpty()
-
-        @Suppress("UNCHECKED_CAST")
-        val originals = template?.let { field(it, "rows") as List<Any> }.orEmpty()
+        val installed = query?.let { field(it, "installedCuts") as Set<Int> }.orEmpty()
         fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
             require(depth < 32 && !stop())
             return buildJsonObject {
@@ -86,7 +83,8 @@ internal class NumericalFrontierSnapshot(
                     add(buildJsonObject {
                         put("owner", field(cut, "owner") as Int)
                         put("mixed", field(cut, "mixed") as Boolean)
-                        put("active", query != null && originals.size + index !in inactive)
+                        put("conditionalCandidate", field(cut, "conditionalCandidate") as Boolean)
+                        put("active", index in installed)
                         put("coefficients", coefficients(row.coefficients))
                         put("rhs", row.rhs.toString())
                         put("derivation", proof(derivation))

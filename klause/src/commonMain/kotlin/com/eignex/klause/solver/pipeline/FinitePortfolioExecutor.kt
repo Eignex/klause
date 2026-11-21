@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.FinitePortfolioFactory
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioDiagnostics
@@ -95,6 +96,8 @@ internal fun FinitePipeline.portfolioExecutor(
     onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     onSession: ((String, PropagationSession) -> Unit)? = null,
+    toleranceAuthority: LinearToleranceAuthority? = null,
+    cutBinding: FiniteSourceCutBinding? = null,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -128,7 +131,8 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionArms = FiniteCompanionArms.assemble(problem, scenario, objective,
         FiniteCompanionControls(params = numericalCompanions, incumbentCompletionCheck = incumbentCompletionCheck,
             funded = fundedCompanions, waitForImprovement = waitForCompanionImprovement,
-            adaptiveRepair = adaptiveCompanionRepair, onJointRepair = onJointRepair),
+            adaptiveRepair = adaptiveCompanionRepair, onJointRepair = onJointRepair,
+            toleranceAuthority = toleranceAuthority, cutBinding = cutBinding),
         cancellation, onEvent)
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
@@ -151,7 +155,7 @@ internal fun FinitePipeline.portfolioExecutor(
             )
         }) { slot ->
             // The leading numerical probe does not renumber the finite workers' seed positions.
-            factory.materialize(slot.index - companionArms.finiteSeedOffset, slot.baseSeed, slot.nodeBudget)
+            factory.materialize(slot, companionArms.finiteSeedOffset)
         }
     }
     val factories = companionArms.arrange(preparedPlan, finiteFactories)
@@ -236,6 +240,9 @@ internal fun FinitePipeline.portfolioExecutor(
             onProgress = deferred)
     }
 }
+
+internal fun FinitePortfolioFactory.materialize(slot: PortfolioWorkerSlot, seedOffset: Int): PortfolioWorker =
+    materialize(slot.index, slot.baseSeed - seedOffset, slot.nodeBudget)
 
 internal fun heuristicSecondProbeRanks(workers: List<PortfolioWorker>): IntArray {
     val initial = workers.indices.filter {

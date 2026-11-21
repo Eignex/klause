@@ -58,11 +58,16 @@ internal object FinitePortfolioLpCapture {
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                "source-refutation-center-step")
+                "source-refutation-center-step", "capture-authority", "capture-cut-policy")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
         val captureJoint = mode == "joint-ordinary" || mode == "joint-handoff"
+        if ("capture-authority" in options || "capture-cut-policy" in options) {
+            require(mode == "joint-before")
+            require((options["capture-authority"] ?: "nominal") in setOf("nominal", "accepted"))
+            require((options["capture-cut-policy"] ?: "ordinary") in setOf("ordinary", "selected"))
+        }
         val centerStep = options["source-refutation-center-step"]?.let {
             require(captureJoint) {
                 "source-refutation-center-step requires joint-ordinary capture or joint-handoff capture"

@@ -23,6 +23,285 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateContinuationTest {
     @Test
+    fun `integer projection should retain a nonseparating cut for conditioned queries`() {
+        val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-7) * BigFraction.ofLong(2).reciprocal()))
+        val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+        val point = integers.associateWith { 0.6 } + flows.associateWith { 1.2 }
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 5),
+            point = point).single()
+
+        assertTrue(cut.conditionalCandidate)
+        assertEquals(SourceInequality(integers.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `ordered point projections should leave funding for two independent conditional cuts`() {
+        val integers = (0 until 16).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 16).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val stocks = (16 until 30).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val backlogs = (30 until 44).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        repeat(2) { group ->
+            repeat(8) { index ->
+                val id = group * 8 + index
+                premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                    integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+            }
+            repeat(8) { index ->
+                val coefficients = linkedMapOf(flows[group * 8 + index] to BigFraction.MINUS_ONE)
+                if (index > 0) {
+                    coefficients[stocks[group * 7 + index - 1]] = BigFraction.MINUS_ONE
+                    coefficients[backlogs[group * 7 + index - 1]] = BigFraction.ONE
+                }
+                if (index < 7) {
+                    coefficients[stocks[group * 7 + index]] = BigFraction.ONE
+                    coefficients[backlogs[group * 7 + index]] = BigFraction.MINUS_ONE
+                }
+                premises["demand $group $index"] = SourcePremise(SourceInequality(coefficients,
+                    BigFraction.ofLong(-149) * BigFraction.ofLong(100).reciprocal()))
+            }
+        }
+        val source = SourceProofContext(scope, (integers + flows + stocks + backlogs).toSet(), premises)
+        val point = integers.associateWith { if (it.id % 8 == 0) 0.75 else 1.0 } +
+            flows.associateWith { if (it.id % 8 == 0) 1.5 else 2.0 } +
+            (stocks + backlogs).associateWith { 0.0 }
+
+        val observations = mutableMapOf<String, Long>()
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 2, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(
+                rows = 16, work = 14_000L, allocation = 270_000L), point = point)
+
+        val expected = (0 until 2).map { group ->
+            SourceInequality(integers.subList(group * 8, group * 8 + 8).associateWith { BigFraction.MINUS_ONE },
+                BigFraction.ofLong(-6))
+        }.toSet()
+        assertEquals(expected, cuts.map { it.inequality }.toSet(), observations.toString())
+        assertTrue(cuts.all { it.conditionalCandidate })
+        assertTrue(cuts.all { cut ->
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked
+        })
+    }
+
+    @Test
+    fun `conditional projections should leave continuation for a separating source cut`() {
+        val integers = (10 until 14).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (10 until 14).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["loose demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-7) * BigFraction.ofLong(2).reciprocal()))
+        premises["left"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+            x to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        premises["right"] = SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+            y to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        premises["demand"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+            otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)))
+        val source = SourceProofContext(scope, (integers + flows + listOf(x, y, real, otherReal)).toSet(), premises)
+        val point = integers.associateWith { 0.6 } + flows.associateWith { 1.2 } +
+            mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5)
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 8, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16),
+            point = point)
+
+        assertTrue(cuts.any { it.conditionalCandidate })
+        val separating = cuts.single {
+            !it.conditionalCandidate && it.inequality == SourceInequality(
+                mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2))
+        }
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(separating.inequality), separating.derivation)))
+    }
+
+    @Test
+    fun `integer projection with integral rhs should retain endpoint half rounding`() {
+        val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val coefficients = listOf(3L, 3L, 2L, 2L).map(BigFraction::ofLong)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to coefficients[id].negated()), BigFraction.ZERO))
+            premises["lower $id"] = SourcePremise(SourceInequality(mapOf(integers[id] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+            premises["upper $id"] = SourcePremise(SourceInequality(mapOf(integers[id] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-4)))
+        val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+        val point = integers.zip(listOf(0.75, 0.0, 0.875, 0.0)).toMap() +
+            flows.zip(listOf(2.25, 0.0, 1.75, 0.0)).toMap()
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 5),
+            point = point).single()
+
+        assertEquals(SourceInequality(integers.zip(listOf(-1L, -2L, -1L, -1L).map(BigFraction::ofLong)).toMap(),
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `first integer projection should finish without reviving an eliminated flow coordinate`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val flows = (0 until 3).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val stocks = (3 until 5).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val backlogs = (5 until 7).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val integers = listOf(x, y, z)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["coupled"] = SourcePremise(SourceInequality(mapOf(stocks[1] to BigFraction.MINUS_ONE,
+            backlogs[0] to BigFraction.MINUS_ONE, flows[1] to BigFraction.ONE, y to BigFraction.MINUS_ONE),
+            BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()))
+        val demand = BigFraction.ofLong(-149) * BigFraction.ofLong(100).reciprocal()
+        premises["first"] = SourcePremise(SourceInequality(mapOf(flows[0] to BigFraction.MINUS_ONE,
+            stocks[0] to BigFraction.ONE, backlogs[0] to BigFraction.MINUS_ONE), demand))
+        premises["middle"] = SourcePremise(SourceInequality(mapOf(flows[1] to BigFraction.MINUS_ONE,
+            stocks[0] to BigFraction.MINUS_ONE, stocks[1] to BigFraction.ONE,
+            backlogs[0] to BigFraction.ONE, backlogs[1] to BigFraction.MINUS_ONE), demand))
+        premises["last"] = SourcePremise(SourceInequality(mapOf(flows[2] to BigFraction.MINUS_ONE,
+            stocks[1] to BigFraction.MINUS_ONE, backlogs[1] to BigFraction.ONE), demand))
+        val source = SourceProofContext(scope, (integers + flows + stocks + backlogs).toSet(), premises)
+        val point = integers.associateWith { 0.75 } + flows.associateWith { 1.5 } +
+            (stocks + backlogs).associateWith { 0.0 }
+        var attempts = 0
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { attempts > 1 },
+            observe = { name, _ -> if (name == "AggregateIntegerProjectionAttempts") attempts++ },
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 6),
+            point = point).single()
+
+        assertEquals(SourceInequality(integers.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-3)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `integer projection should finish a widened flow despite expanding and inverse rows`() {
+        val flow = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val stock = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val extra = SourceCoordinate(SourceCoordinate.Kind.Real, 3)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 4)
+        val backlog = SourceCoordinate(SourceCoordinate.Kind.Real, 5)
+        val widened = BigFraction.ofLong(149) * BigFraction.ofLong(100).reciprocal()
+        val reverse = BigFraction.ofLong(151) * BigFraction.ofLong(100).reciprocal()
+        val source = SourceProofContext(scope, setOf(x, y, real, flow, stock, extra, other, backlog), linkedMapOf(
+            "resource" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
+                extra to BigFraction.ONE, other to BigFraction.ONE), BigFraction.ofLong(3) *
+                BigFraction.ofLong(2).reciprocal())),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "reverse left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                stock to BigFraction.MINUS_ONE, backlog to BigFraction.ONE), reverse)),
+            "reverse right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.ONE,
+                stock to BigFraction.ONE, backlog to BigFraction.MINUS_ONE), reverse)),
+            "coupled" to SourcePremise(SourceInequality(mapOf(stock to BigFraction.MINUS_ONE,
+                extra to BigFraction.MINUS_ONE, x to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(-3) * BigFraction.ofLong(4).reciprocal())),
+            "forward left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                stock to BigFraction.ONE, backlog to BigFraction.MINUS_ONE), widened.negated())),
+            "forward right" to SourcePremise(SourceInequality(mapOf(flow to BigFraction.MINUS_ONE,
+                stock to BigFraction.MINUS_ONE, backlog to BigFraction.ONE), widened.negated())),
+        ))
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 5),
+            point = mapOf(x to 0.75, y to 0.75, real to 1.5, flow to 1.5,
+                stock to 0.0, extra to 0.0, other to 0.0, backlog to 0.0)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE),
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `integer projection should cancel a coupled flow within its configured row limit`() {
+        for ((count, strict) in listOf(4, 8, 15).flatMap { count -> listOf(count to false, count to true) }) {
+            val scale = BigFraction.ofLong(if (count == 4) 1L else 1_000_000_000_000L)
+            val integers = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+            val flows = (0 until count).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+            val premises = linkedMapOf<String, SourcePremise>()
+            for (id in integers.indices) {
+                val rowScale = scale * BigFraction.ofLong(id + 1L)
+                premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to rowScale,
+                    integers[id] to rowScale * BigFraction.ofLong(-2)), BigFraction.ZERO))
+            }
+            premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { scale.negated() },
+                scale * BigFraction.ofLong((if (strict) 2L else 1L) - 2L * count), strict))
+            val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+            val point = integers.associateWith { 1.0 - 0.5 / count } + flows.associateWith { 2.0 - 1.0 / count }
+            for (rows in listOf(count, count + 1)) {
+                val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
+                    maximumCandidates = 1,
+                    limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = rows), point = point)
+
+                if (rows == count) assertTrue(cuts.isEmpty()) else {
+                    val cut = cuts.single()
+                    assertEquals(SourceInequality(integers.associateWith { BigFraction.MINUS_ONE },
+                        BigFraction.ofLong(-count.toLong())), cut.inequality)
+                    assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                        SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `interrupting integer projection should withhold its unfinished source combination`() {
+        val integers = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 4).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-7)))
+        val source = SourceProofContext(scope, (integers + flows).toSet(), premises)
+        val point = integers.associateWith { 0.875 } + flows.associateWith { 1.75 }
+        for (boundary in listOf("AggregateIntegerProjectionAttempts", "AggregateIntegerProjectionRows",
+            "AggregateIntegerProjectionCompleted")) {
+            var stopped = false
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
+                observe = { name, _ -> if (name == boundary) stopped = true },
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 16), point = point)
+
+            assertTrue(stopped)
+            assertTrue(cuts.isEmpty())
+        }
+    }
+
+    @Test
     fun `point separation should cancel a third source row within its configured row limit`() {
         val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(

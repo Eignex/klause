@@ -35,6 +35,44 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityAggregateCutsTest {
     @Test
+    fun `conditional projections should survive ordinary selection for a later receiving query`() {
+        val integers = (0 until 5).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val flows = (0 until 5).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        for (id in integers.indices) {
+            premises["capacity $id"] = SourcePremise(SourceInequality(mapOf(flows[id] to BigFraction.ONE,
+                integers[id] to BigFraction.ofLong(-2)), BigFraction.ZERO))
+            premises["edge $id"] = SourcePremise(SourceInequality(mapOf(integers[id] to BigFraction.ONE,
+                integers[(id + 1) % integers.size] to BigFraction.ONE), BigFraction.ONE))
+            premises["lower $id"] = SourcePremise(SourceInequality(mapOf(integers[id] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+        }
+        premises["demand"] = SourcePremise(SourceInequality(flows.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.ofLong(-7) * BigFraction.ofLong(2).reciprocal()))
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            (integers + flows).toSet(), premises, integers.associateWith { BigFraction.ONE })
+        val child = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = integers.associateWith { BigFraction.ZERO })))
+        val capture = LinearAuthorityCapture(8, 100_000L, 4_000_000L, ExecutionControl.Never)
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            val base = authority.advanceWithPointCuts(source, ExecutionControl.Never)
+            val operations = budget.operations
+
+            val result = authority.advanceWithPointCuts(child, ExecutionControl.Never)
+
+            assertNotNull(base.bound)
+            assertTrue((authority.cutObservations()["numericalCutSelectionConditionalRetained"] ?: 0L) > 0L)
+            assertTrue(capture.records.last().cuts.any { it.conditionalCandidate && it.checked && !it.installed })
+            assertEquals(operations, budget.operations)
+            assertEquals(setOf(CutFamily.SOURCE_AGGREGATION), result.cutConflictFamilies)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
+                .verify(assertNotNull(result.evidence)))
+        }
+    }
+
+    @Test
     fun `automatic source pairs should strengthen a checked bound across an unbounded continuous coordinate`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
@@ -132,8 +170,11 @@ class LinearAuthorityAggregateCutsTest {
                 if (pause) {
                     assertTrue(initial.paused)
                     assertNull(initial.advisoryPoint)
+                    val attempts = authority.cutObservations()["numericalCutAggregatePairAttempts"]
                     funding.grant(4_000_000L)
-                    authority.advanceWithPointCuts(source, ExecutionControl.Never, retainBasePoint = true)
+                    authority.advanceWithPointCuts(source, ExecutionControl.Never, retainBasePoint = true).also {
+                        assertEquals(attempts, authority.cutObservations()["numericalCutAggregatePairAttempts"])
+                    }
                 } else initial
             }
 
@@ -428,7 +469,7 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `a full mixed point family should retain a separating aggregate within its layout limit`() {
+    fun `a dense ordinary mixed recipe should retain its checked query without point expansion`() {
         val premises = (0 until 64).associateTo(linkedMapOf()) { index ->
             "row $index" to SourcePremise(SourceInequality(
                 mapOf(x to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE),
@@ -446,13 +487,20 @@ class LinearAuthorityAggregateCutsTest {
             val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
 
             assertEquals(64L, authority.cutObservations()["numericalMaxRetainedCuts"])
-            assertEquals(64L, authority.cutObservations()["numericalCutSelectionRetainedLayout"])
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionDeclinedCutCount"])
             assertEquals(64, capture.records.last().cuts.size)
-            assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            assertTrue(capture.records.last().cuts.all { it.installed })
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(8) * BigFraction.ofLong(3).reciprocal()),
                 assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
+
+            val preparations = authority.preparations
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
+
+            assertEquals(preparations, authority.preparations)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionDeclinedCutCount"])
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionCurrentFallbackQueries"])
         }
     }
 
@@ -518,6 +566,40 @@ class LinearAuthorityAggregateCutsTest {
             }, maximumCandidates = 1, point = point).single()
 
         assertEquals(setOf(2, 3), cut.owners)
+        assertEquals(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), cut.inequality.coefficients)
+        assertEquals(1L, attempts)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `small incidence buckets should leave a tight grant for the first useful pair`() {
+        val continuous = (1..40).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val premises = linkedMapOf<String, SourcePremise>()
+        continuous.forEachIndexed { group, id ->
+            repeat(5) { index ->
+                premises["loose $group $index"] = SourcePremise(SourceInequality(
+                    mapOf(x to BigFraction.ofLong(2), id to BigFraction.ofLong(if (index % 2 == 0) 1 else -1)),
+                    BigFraction.ofLong(100)))
+            }
+        }
+        premises["left"] = SourcePremise(left)
+        premises["right"] = SourcePremise(right)
+        val source = SourceProofContext(scope, (continuous + listOf(x, y, real)).toSet(), premises)
+        val point = continuous.associateWith { 0.0 } + mapOf(x to 0.75, y to 0.75, real to 1.5)
+        var attempts = 0L
+        var stopped = false
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
+            observe = { name, count ->
+                if (name == "AggregatePairAttempts") {
+                    attempts += count
+                    if (attempts == 2L) stopped = true
+                }
+            }, maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(work = 18_150L),
+            point = point).single()
+
+        assertEquals(setOf(200, 201), cut.owners)
         assertEquals(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), cut.inequality.coefficients)
         assertEquals(1L, attempts)
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(

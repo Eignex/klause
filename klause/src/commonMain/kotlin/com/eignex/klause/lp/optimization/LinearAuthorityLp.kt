@@ -216,6 +216,8 @@ internal class LinearAuthorityLp(
         return retained.advance(
             packed, costs, constant, scope, cancellation, policy, observer,
         ) guideResult@{ guide, prepared, token ->
+            onCutMetric("GuidancePhase_${guide.phase.name}", 1L)
+            guide.termination?.let { onCutMetric("GuidanceTermination_${it.name}", 1L) }
             guide.maxLuFill?.let {
                 onCutMetric("QueryFillSamples", 1L)
                 onCutMetric("QueryMaxFillRatioMicrosSum", (it * 1_000_000.0).toLong())
@@ -236,6 +238,7 @@ internal class LinearAuthorityLp(
             val result = CertifiedLpResult(null, bound, null, null, conflict, false, { null },
                 conflictSupport = guide.conflictSupport)
             val raw = guide.primal
+            onCutMetric(if (raw == null) "GuidancePrimalUnavailable" else "GuidancePrimalAvailable", 1L)
             val point = raw?.indices?.map { column ->
                 if (token()) return@guideResult null
                 packed.columns[column].bounds.projectGuidance(raw[column]) ?: return@guideResult null

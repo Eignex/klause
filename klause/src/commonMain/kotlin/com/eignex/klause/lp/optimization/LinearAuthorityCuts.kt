@@ -26,11 +26,14 @@ internal class LinearAuthorityCut(
     val mixed: Boolean = false,
     owners: Set<Int> = setOf(owner),
     val family: CutFamily = if (mixed) CutFamily.SOURCE_MIXED_ROUNDING else CutFamily.SOURCE_ROUNDING,
+    val conditionalCandidate: Boolean = false,
 ) {
     val owners: Set<Int> = owners.toSet()
 
     init {
         require(owner in this.owners && this.owners.all { it >= 0 })
+        require(!conditionalCandidate || (!mixed && family == CutFamily.SOURCE_AGGREGATION &&
+            inequality.forEachCoefficient { id, _ -> id.kind == SourceCoordinate.Kind.Integer }))
     }
 }
 
@@ -52,6 +55,9 @@ internal class LinearAuthorityCuts private constructor(
         for (cut in additional) combined.add(cut)
         return LinearAuthorityCuts(combined, work, observations, complementary, pointDirected)
     }
+
+    fun withPointCandidates(additional: List<LinearAuthorityCut>): LinearAuthorityCuts =
+        LinearAuthorityCuts(rows + additional, work, observations, complementary = true, pointDirected = true)
 
     companion object {
         fun replay(rows: List<LinearAuthorityCut>): LinearAuthorityCuts {

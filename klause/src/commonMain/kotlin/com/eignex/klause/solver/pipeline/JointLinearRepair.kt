@@ -474,7 +474,8 @@ internal class JointLinearRepair(
                 observe("jointRepairRootQueries")
             }
             val result = if (boundOrdered && params.sourceCuts && params.sourcePointCuts)
-                authority.advanceWithPointCuts(source, stop, retainBasePoint = true)
+                authority.advanceWithPointCuts(source, stop, retainBasePoint = true,
+                    preserveUncutBound = params.sourceAggregateCuts)
             else authority.advance(source, stop, cuts = boundOrdered && params.sourceCuts)
             for ((stage, count) in result.primalStages) {
                 val key = "jointRepairRoot$stage"

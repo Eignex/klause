@@ -19,7 +19,7 @@ import kotlin.math.abs
 internal enum class SourceFloatMode { CONTINUOUS }
 
 internal class SourceOptions {
-    var linearToleranceEnvelope = false
+    var linearToleranceEnvelope: Boolean? = null
     var floatMode: SourceFloatMode? = null
     var absoluteTolerance: SemanticRational? = null
     var relativeTolerance: SemanticRational? = null
@@ -30,7 +30,7 @@ internal class SourceOptions {
 internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticOverrides {
     var resolved = semanticOverrides
     val fields = sourceOptions
-    require(!fields.linearToleranceEnvelope || declared.format == SourceFormat.MPS) {
+    require(fields.linearToleranceEnvelope != true || declared.format == SourceFormat.MPS) {
         "linear tolerance envelopes require an MPS source"
     }
     if (fields.floatMode == SourceFloatMode.CONTINUOUS) {

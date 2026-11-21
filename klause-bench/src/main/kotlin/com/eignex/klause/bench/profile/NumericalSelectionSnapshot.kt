@@ -155,6 +155,7 @@ internal class NumericalSelectionSnapshot(private val stop: ExecutionControl) {
                         put("owner", field(cut, "owner") as Int)
                         put("family", (field(cut, "family") as Enum<*>?)?.name)
                         put("mixed", field(cut, "mixed") as Boolean)
+                        put("conditionalCandidate", field(cut, "conditionalCandidate") as Boolean)
                         put("owners", buildJsonArray {
                             (field(cut, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
                         })

@@ -566,7 +566,8 @@ class LinearAuthorityIntegerRecipesTest {
         val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
-                if (name == "AggregateIntegerBoundSnapshotReuseAttempts") stopped = true
+                if (name == "AggregateIntegerBoundSnapshotReuseAttempts" &&
+                    (observations["AggregateIntegerBoundScanComplete"] ?: 0L) > 0L) stopped = true
             }, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.0, y to 0.0, a to 0.75, b to 0.5))
 

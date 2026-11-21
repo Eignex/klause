@@ -22,6 +22,8 @@ internal class FiniteCompanionControls(
     val waitForImprovement: Boolean = false,
     val adaptiveRepair: Boolean = false,
     val onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
+    val toleranceAuthority: LinearToleranceAuthority? = null,
+    val cutBinding: FiniteSourceCutBinding? = null,
 )
 
 /**
@@ -59,6 +61,7 @@ internal class FiniteCompanionArms private constructor(
     }
 
     fun bindWorkers(workers: List<PortfolioWorker>) {
+        companions?.bindCutPool(workers)
         if (companions != null && controls.params?.sourceIncumbentCompletion == true) {
             for (worker in workers) if (worker.controlsObjectiveCutoff) worker.canonicalIncumbentIsCutoff = true
         }
@@ -106,7 +109,7 @@ internal class FiniteCompanionArms private constructor(
             val admission = if (funded && eligibility?.admitted == true) {
                 FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
                     cancellation or requireNotNull(params).cancellation or params.timeout,
-                    eligibility.requirements.construction)
+                    eligibility.requirements.construction, controls.toleranceAuthority, controls.cutBinding)
             } else null
             val comparison: ((SearchEvent.CompanionComparison) -> Unit)? =
                 if (scenario.reportPortfolioProgress && onEvent != null) { event -> onEvent(JOINT_REPAIR, event) }
@@ -119,13 +122,15 @@ internal class FiniteCompanionArms private constructor(
                 FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(params),
                     cancellation, eligibility.requirements.construction, scenario.companionAfterIncumbent,
                     controls.incumbentCompletionCheck, adaptiveRepair = adaptive, onComparison = comparison,
-                    onObservation = observation)
+                    onObservation = observation, toleranceAuthority = controls.toleranceAuthority,
+                    cutBinding = controls.cutBinding)
             } else null
             val companions = if (admission?.initiallyFunded == true) {
                 FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(params),
                     cancellation, requireNotNull(eligibility).requirements.construction, admission,
                     controls.incumbentCompletionCheck, afterImprovement = controls.waitForImprovement,
-                    adaptiveRepair = adaptive, onComparison = comparison, onObservation = observation)
+                    adaptiveRepair = adaptive, onComparison = comparison, onObservation = observation,
+                    cutBinding = controls.cutBinding)
             } else preparation?.companions
             eligibility?.let { reportAdmission(it, admission, companions, onEvent) }
             return FiniteCompanionArms(controls, admission, preparation, companions, scenario.optimalityGap)

@@ -83,9 +83,13 @@ row stays an explicit contradiction.
 Witness checks use the original decimals with exact rational arithmetic. Rows
 permit `max(absolute, relative * max(abs(bound), sum(abs(a(i) * x(i)))))` and
 column bounds `max(absolute, relative * abs(bound))`; integrality stays exact.
-The opt-in absolute-tolerance envelope states those widened sides as exact rational
+The absolute-tolerance envelope states those widened sides as exact rational
 rows before source separation. It requires zero relative tolerance, retains open
-sides and indicators, and uses exact completion without adding another slack.
+sides and indicators, and adds no second slack. Compatible finite coordinates keep
+ordinary witness search while a separate exact envelope supplies cut authority.
+Mixed binary/continuous MPS optimization selects this authority automatically when
+the lowered coordinates and objective match. Explicit source controls can opt out;
+unsupported automatic layouts retain nominal execution.
 Its native accepted-set bounds have scope `absolute-tolerance-envelope`; nominal
 source bounds keep their separate scope.
 Under the default policy both reduce to the absolute slack, so a row whose terms

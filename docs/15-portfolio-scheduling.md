@@ -388,6 +388,24 @@ seed positions. `FiniteCompanionArms` owns companion admission, construction, ar
 order, preparation telemetry and scheduler shares; the finite portfolio only seats
 the arms it returns.
 
+Sharing origins use the workers' actual portfolio positions, including the leading
+frontier; finite recipe seeds retain their positions before companion insertion.
+With admitted accepted-tolerance authority and an existing finite clause pool, the
+frontier can publish binary nogoods from its first two checked root conditional
+cuts. This path binds the exact working model and captured source context, requires
+unchanged source coordinates and retained source factors, and excludes restricted
+roots. Covers start from the full bad-side assignment and discard unnecessary pins;
+supersets of freshly proved covers skip repeated arithmetic and proof work. Each
+minimal binary cover is freshly refuted under exactly its exported pins using the
+checked cut and declared root sides. Portable complements enter
+finite workers through their ordinary root or restart clause exchange, and actual
+unit or conflict use credits the publishing frontier. Publication alone earns no
+use credit. Fully discharged clauses remain valid after that frontier retires.
+Enumeration admits at most eight binary coordinates per cut, 64-bit integral
+scalars and sixteen clauses, within 65,536 work and 1 MiB of modeled allocation
+from the existing source allowance. Proof checks and bounded pool insertion spend
+that allowance; unavailable funding, mapping or sharing withholds publication.
+
 ### Companion admission
 
 Automatic admission appends both companions to curated sequential mixed optimization

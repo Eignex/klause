@@ -62,17 +62,26 @@ internal object JointRepairLpCapture {
         require(model.numIntVars + model.numRealVars <= 4096 && model.numFactors <= 16384 && !stop())
         val companionType = Class.forName(PIPELINE + "FiniteNumericalCompanions")
         val companion = companionType.getField("Companion").get(null)
+        val original = requireNotNull(call(invocation, "getLinearSource"))
+        val mapping = call(preparation, "getSourceMapping")
+        val authorityKind = options["capture-authority"] ?: "nominal"
+        val toleranceAuthority = if (authorityKind == "accepted") {
+            requireNotNull(call(original, "getToleranceAuthority")).also {
+                require(call(it, "compatible", mapping, model, objective, stop) == true)
+            }
+        } else null
         val captureContext = companion.javaClass.declaredMethods.single { it.name == "captureContext" }
             .apply { isAccessible = true }
-        val context = requireNotNull(captureContext.invoke(companion, model, objective, stop))
-        val original = requireNotNull(call(invocation, "getLinearSource"))
+        val context = requireNotNull(captureContext.invoke(companion, model, objective, stop, toleranceAuthority))
         val checker = Class.forName(PIPELINE + "FiniteIncumbentCompletionKt").methods.single {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
-        }.invoke(null, original, call(preparation, "getSourceMapping"))
+        }.invoke(null, original, mapping)
         val active = stop or ExecutionControl.after(4_000.milliseconds)
+        val cutPolicy = options["capture-cut-policy"] ?: "ordinary"
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
             sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
-            sourceIncumbentCompletion = true)
+            sourceIncumbentCompletion = true,
+            sourcePointCuts = cutPolicy == "selected", sourceAggregateCuts = cutPolicy == "selected")
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
         val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
             .newInstance(model, context, objective, params, policy, true, { null }, active, null,
@@ -186,6 +195,8 @@ internal object JointRepairLpCapture {
             out.resolve("source-queries.json").writeText(snapshots.capture(journal).toString())
             out.resolve("result.json").writeText(buildJsonObject {
                 put("captureMode", "standalone-joint-before")
+                put("captureAuthority", authorityKind)
+                put("captureCutPolicy", cutPolicy)
                 put("sourceSha256", sha256(bytes))
                 put("sourceSeed", seed)
                 put("workerSeed", seed + 9)

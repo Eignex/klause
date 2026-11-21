@@ -16,7 +16,11 @@ internal class LinearAuthorityPointCuts(
     private val maximumCuts: Int = 64,
     private val maximumSupport: Int = 8192,
     private val onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
+    private val maximumBatchCuts: Int = 1,
 ) {
+    init {
+        require(maximumBatchCuts in 1..64)
+    }
     private data class Scored(
         val id: Int, val values: Map<SourceCoordinate, Double>, val norm: Double, val score: Double,
     )
@@ -97,10 +101,13 @@ internal class LinearAuthorityPointCuts(
         installed: Set<Int>,
         cancellation: ExecutionControl,
         adoptCurrent: Boolean = false,
+        ordinary: Set<Int> = emptySet(),
     ): Set<Int> {
+        require(ordinary.all { it in installed && it in checked })
         adoptedCurrent = false
         if (rows.isEmpty()) return installed
-        if (installed.size >= maximumCuts) observe("PoolLimited")
+        val additionalInstalled = installed.size - ordinary.size
+        if (additionalInstalled >= maximumCuts) observe("PoolLimited")
         if (family !== rows) {
             family = rows
             cooldown = 0
@@ -113,9 +120,10 @@ internal class LinearAuthorityPointCuts(
         }
         if (retired) {
             observe("RetiredQueries")
-            if (installed.isEmpty()) return installed
+            if (installed.size == ordinary.size) return installed
         }
-        val complete = rows.size <= maximumCuts && installed.size == rows.size && checked.size == rows.size
+        val complete = rows.size <= maximumCuts + ordinary.size &&
+            installed.size == rows.size && checked.size == rows.size
         if (cooldown > 0 && !complete) {
             cooldown--
             observe("CooldownQueries")
@@ -133,7 +141,7 @@ internal class LinearAuthorityPointCuts(
             val values = HashMap<SourceCoordinate, Double>()
             val objective = HashMap<SourceCoordinate, Double>()
             var objectiveNormSquared = 0.0
-            var integerOnly = adoptCurrent
+            var integerOnly = adoptCurrent && ordinary.isEmpty()
             for (id in coordinates.indices) {
                 integerOnly = integerOnly && coordinates[id].kind == SourceCoordinate.Kind.Integer
                 val value = meter.scalar(point[id]) ?: run {
@@ -147,7 +155,7 @@ internal class LinearAuthorityPointCuts(
                     objectiveNormSquared += cost * cost
                 }
             }
-            var aggregateOnly = adoptCurrent && rows.size <= maximumCuts
+            var aggregateOnly = adoptCurrent && ordinary.isEmpty() && rows.size <= maximumCuts
             if (aggregateOnly) {
                 for (row in rows) {
                     if (!meter.charge(1L)) return installed
@@ -179,6 +187,11 @@ internal class LinearAuthorityPointCuts(
             val observedInactive = HashMap<Int, Int>()
             var support = 0
             for ((id, row) in rows.withIndex()) {
+                if (id in ordinary) {
+                    if (!meter.charge(1L)) break
+                    onCut(row.family, "POINT_ORDINARY_RETAINED", 1L)
+                    continue
+                }
                 if (retired && id !in installed) {
                     if (!meter.charge(1L)) break
                     continue
@@ -239,7 +252,7 @@ internal class LinearAuthorityPointCuts(
                 }
             }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
-                .thenBy { it.id }), minOf(1, maximumCuts - installed.size),
+                .thenBy { it.id }), minOf(maximumBatchCuts, maximumCuts - additionalInstalled),
                 1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
                 if (!meter.charge(a.values.size.toLong() + b.values.size)) Double.POSITIVE_INFINITY else {
                     var dot = 0.0
@@ -252,7 +265,7 @@ internal class LinearAuthorityPointCuts(
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
             val layoutPending = !retainedLayout && (installed.isNotEmpty() || selected.isNotEmpty())
             val installedPending = complete && !managedInstalled
-            val layoutCovered = (layoutPending || installedPending) && rows.size <= maximumCuts &&
+            val layoutCovered = (layoutPending || installedPending) && rows.size <= maximumCuts + ordinary.size &&
                 checked.size == rows.size && !meter.limited && meter.charge(rows.size * 2L) &&
                 rows.indices.all { it in checked && (!installedPending || it in installed) }
             var retained = installed

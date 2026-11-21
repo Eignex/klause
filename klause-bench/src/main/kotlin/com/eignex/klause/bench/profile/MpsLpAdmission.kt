@@ -2,6 +2,7 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.lab.configureLabPaths
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
@@ -25,13 +26,16 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -45,6 +49,7 @@ import kotlin.time.Duration.Companion.seconds
 internal object MpsLpAdmission {
     @JvmStatic
     fun main(args: Array<String>) {
+        configureLabPaths()
         require(args.size in 1..2 && args[0].startsWith("batch64="))
         require(args.size == 1 || args[1] in setOf("queries=true", "queries=checkpoint"))
         val requests = Json.decodeFromString<List<List<String>>>(
@@ -60,7 +65,13 @@ internal object MpsLpAdmission {
 
     private fun inspect(request: List<String>, out: File, queries: String?) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys == setOf("suite", "problem", "sha256"))
+        require(options.keys.containsAll(setOf("suite", "problem", "sha256")) &&
+            (options.keys - setOf("suite", "problem", "sha256")).all { it == "engine" })
+        val engine = when (options["engine"]) {
+            null, "cp" -> FiniteEngine.BACKTRACK
+            "mixed" -> FiniteEngine.MIXED
+            else -> error("unsupported admission engine")
+        }
         val source = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(source.source)).use { it.readNBytes(16 * 1024 * 1024 + 1) }
@@ -70,17 +81,21 @@ internal object MpsLpAdmission {
         val stop = ExecutionControl.after(20.seconds)
         val original = requireNotNull(parsed.toLinearSourceProblem(cancellation = stop))
         val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+            SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, engine,
             maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop,
         ))
         val plan = requireNotNull(invocation.preparedPlan)
         val canonical = requireNotNull(plan.model)
         val sourceObjective = preparedObjective(plan)
+        val linear = NumericalResidualProfile.call(invocation, "getLinearSource")
+        val numerical = engine == FiniteEngine.MIXED &&
+            original.semantics.effective.feasibilityTolerance?.isExact == false &&
+            linear?.let { NumericalResidualProfile.call(it, "getAcceptedModelExact") } != true
         val budget = PresolveBudget(1_650_000_000L)
         val preparation = FinitePipeline.prepare(FinitePipelineRequest(
-            canonical, FiniteEngine.BACKTRACK, sourceObjective,
+            canonical, engine, sourceObjective,
             cancellation = stop, solveCancellation = stop, presolveBudget = budget,
-            randomSeed = 3L, preparedPlan = plan,
+            randomSeed = 3L, preparedPlan = plan, numericalLp = numerical,
         ))
         check(preparation.presolve?.infeasible != true) { "preparation refuted source" }
         val problem = preparation.problem
@@ -93,12 +108,16 @@ internal object MpsLpAdmission {
             put("scope", "prepared-root-relaxation-diagnostic")
             put("searchExecuted", false)
             put("sourceVerdictClaim", false)
+            put("engine", engine.id)
+            put("numericalLp", numerical)
             put("preparationWorkAllowance", budget.allowance)
             put("preparationWork", budget.spent())
             put("preparationDeadlineSeconds", 20)
             put("preparationCancelled", stop())
             put("preparationMaySolveBounds", true)
             put("canonicalFactors", canonical.factors.size)
+            put("canonicalIntegers", canonical.numIntVars)
+            put("canonicalReals", canonical.numRealVars)
             put("preparedObjectivePresent", sourceObjective != null)
             put("sourceSemantics", original.semantics.toString())
             put("route", invocation.route::class.simpleName)
@@ -116,8 +135,14 @@ internal object MpsLpAdmission {
             put("aggressiveAdmission", admission(problem, LpConfig.AGGRESSIVE))
             put("mixedRecipes", recipes(problem as BakedProblem, objective, EngineMix.MIXED))
             put("cpRecipes", recipes(problem, objective, EngineMix.BACKTRACK))
-            put("full", shape(problem, objective, false, stop))
-            put("objectiveCone", shape(problem, objective, true, stop))
+            if (engine == FiniteEngine.MIXED) {
+                put("sourceCompanionAdmission", companionAdmission(invocation, preparation, stop,
+                    preparationComplete = budget.remaining() > 0L))
+                put("sourceCutSetupGuards", SourceCutAdmission.inspect(original, ProblemSettings(), stop))
+            } else {
+                put("full", shape(problem, objective, false, stop))
+                put("objectiveCone", shape(problem, objective, true, stop))
+            }
             put("javaVersion", System.getProperty("java.version"))
             put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
             put("os", System.getProperty("os.name"))
@@ -131,6 +156,45 @@ internal object MpsLpAdmission {
         when (queries) {
             "queries=true" -> MpsLpQuery.measure(problem, checkNotNull(objective), out)
             "queries=checkpoint" -> MpsLpCheckpoint.measure(problem, checkNotNull(objective), out)
+        }
+    }
+
+    internal fun companionAdmission(invocation: PreparedSourceInvocation, preparation: FinitePipelinePreparation,
+        stop: ExecutionControl, preparationComplete: Boolean = true): JsonObject {
+        val linear = NumericalResidualProfile.call(invocation, "getLinearSource")
+        val automatic = linear?.let { NumericalResidualProfile.call(it, "getAutomaticCutSelection") } == true
+        val authority = linear?.let { NumericalResidualProfile.call(it, "getToleranceAuthority") }
+        val mapping = NumericalResidualProfile.call(preparation, "getSourceMapping")
+        val compatible = authority?.let {
+            NumericalResidualProfile.call(it, "compatible", mapping, preparation.problem, preparation.objective, stop)
+        } == true
+        val theory = Class.forName("com.eignex.klause.solver.pipeline.SourceCutSelectionKt").methods
+            .single { it.name.substringBefore('$') == "defaultSourceTheory" }.invoke(null, invocation)
+        val scenario = PortfolioScenario.sequential(Kind.COP, EngineMix.MIXED, seed = 3L)
+        val eligibility = Class.forName("com.eignex.klause.solver.pipeline.FiniteNumericalCompanionsKt").methods
+            .single { it.name.substringBefore('$') == "finiteNumericalCompanionEligibility" }
+            .invoke(null, preparation.problem, scenario, preparation.objective, theory)
+        val admitted = get(eligibility, "Admitted") as Boolean
+        val cancelled = stop()
+        val complete = preparationComplete && !cancelled
+        val mappingGuards = SourceMappingAdmission.inspect(authority, mapping, preparation.problem,
+            preparation.objective, ExecutionControl { !complete || stop() })
+        return buildJsonObject {
+            put("scope", "source-setup-and-finite-preparation")
+            put("complete", complete)
+            put("diagnosticCancelled", cancelled)
+            put("preparationWorkAvailable", preparationComplete)
+            put("initialAutomaticSelection", automatic)
+            put("acceptedAuthorityPrepared", authority != null)
+            put("preparedMappingCompatible", if (complete) JsonPrimitive(compatible) else JsonNull)
+            put("mappingGuards", mappingGuards)
+            put("workerStructurallyAdmitted", if (complete) JsonPrimitive(admitted) else JsonNull)
+            put("declines", if (!complete) JsonNull else buildJsonArray {
+                (get(eligibility, "Declines") as List<*>).forEach { add(JsonPrimitive(it.toString())) }
+            })
+            put("automaticPolicyStructurallyAdmitted",
+                if (complete) JsonPrimitive(automatic && compatible && admitted) else JsonNull)
+            put("selectionOrSearchExecuted", false)
         }
     }
 
