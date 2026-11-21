@@ -608,7 +608,6 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
                 listOf(BigFraction.ONE), installed, ExecutionControl.Never)
         }
         assertTrue(selection.candidatesRetired(rows))
-        assertFalse(selection.retainsCandidateLayout(rows))
         repeat(3) {
             installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
                 listOf(BigFraction.ZERO), installed, ExecutionControl.Never)
@@ -619,7 +618,6 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
             listOf(BigFraction.ZERO), installed, ExecutionControl.Never)
 
         assertTrue(selected.isEmpty())
-        assertFalse(selection.retainsCandidateLayout(rows))
         assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
     }
 
@@ -782,7 +780,7 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `retiring an installed source row should compact the numerical owner once`() {
+    fun `retiring an installed source row should suspend it without replacing the numerical owner`() {
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = linkedMapOf("rounded" to SourcePremise(SourceInequality(
             mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
@@ -800,27 +798,23 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
         val child = root.atScope(root.scope.copy(condition = SourceCondition(upper = mapOf(
             x to BigFraction.ZERO, y to BigFraction.ZERO))))
         val capture = LinearAuthorityCapture(128, 100_000L, 10_000_000L, ExecutionControl.Never)
-        val shapes = ArrayList<LinearAuthorityLpShape>()
-        LinearAuthority(SourceLpBudget(), onLpShape = shapes::add, retainLp = true).use { authority ->
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
             authority.advanceWithPointCuts(root, ExecutionControl.Never)
-            authority.advanceWithPointCuts(child, ExecutionControl.Never)
-            val fullRows = shapes.last().inputRows
-            repeat(31) { authority.advanceWithPointCuts(child, ExecutionControl.Never) }
+            repeat(32) { authority.advanceWithPointCuts(child, ExecutionControl.Never) }
 
             val result = authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
             assertTrue(capture.records.last().cuts.none { it.installed })
-            assertEquals(fullRows - 1, shapes.last().inputRows)
-            assertEquals(2L, authority.preparations)
+            assertEquals(1L, authority.preparations)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
         }
     }
 
     @Test
-    fun `a retired family should compact its layout while retaining ordinary rows`() {
+    fun `an aged mask should retain ordinary rows without reinstalling retired additions`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
         val triangle = listOf(y, z, w)
@@ -836,51 +830,15 @@ class LinearAuthorityPointCutsTest : RuntimeInitializedTest() {
             (triangle + x).associateWith { BigFraction.ONE })
         val child = root.atScope(root.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
         val capture = LinearAuthorityCapture(128, 100_000L, 10_000_000L, ExecutionControl.Never)
-        val shapes = ArrayList<LinearAuthorityLpShape>()
-        val funding = SourceLpFunding(10_000_000L, 16_000_000L).apply { grant(10_000_000L) }
-        var pausePreparation = false
-        var blocked = false
-        val budget = SourceLpBudget(funding = funding, onWork = {
-            if (pausePreparation && !blocked) {
-                blocked = true
-                funding.grant(0L)
-            }
-        })
-        LinearAuthority(budget, onLpShape = shapes::add, retainLp = true).use { authority ->
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.capture = capture
             authority.advanceWithPointCuts(root, ExecutionControl.Never)
-            authority.advanceWithPointCuts(child, ExecutionControl.Never)
-            val fullRows = shapes.last().inputRows
-            repeat(31) {
-                if (authority.cutObservations()["numericalCutSelectionRetiredFamilies"] != 1L) {
-                    authority.advanceWithPointCuts(child, ExecutionControl.Never)
-                }
-            }
-            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredFamilies"])
-            pausePreparation = true
-            assertTrue(authority.advanceWithPointCuts(child, ExecutionControl.Never).paused)
-            assertTrue(blocked)
-            funding.grant(10_000_000L)
-            val compacted = authority.advanceWithPointCuts(child, ExecutionControl.Never)
-            val compactRows = shapes.last().inputRows
-            assertTrue(compactRows < fullRows)
-            assertEquals((fullRows - compactRows).toLong(),
-                compacted.primalStages["RetiredLayoutOmittedCutRowsMax"])
-            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
-                .verify(assertNotNull(compacted.bound)))
+            repeat(32) { authority.advanceWithPointCuts(child, ExecutionControl.Never) }
             val work = authority.cutObservations()["numericalCutSelectionWork"]
-            val basisWork = authority.cutObservations().filterKeys {
-                it.startsWith("numericalCutLifecycleRECIPE_") && it.endsWith("_BasisBuildWork")
-            }
-            repeat(8) { authority.advanceWithPointCuts(child, ExecutionControl.Never) }
 
             val result = authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
-            assertEquals(compactRows, shapes.last().inputRows)
-            assertEquals(basisWork, authority.cutObservations().filterKeys {
-                it.startsWith("numericalCutLifecycleRECIPE_") && it.endsWith("_BasisBuildWork")
-            })
             assertEquals(capture.records.first().cuts.filter { it.installed }.map { it.inequality },
                 capture.records.last().cuts.filter { it.installed }.map { it.inequality })
             assertEquals(work, authority.cutObservations()["numericalCutSelectionWork"])

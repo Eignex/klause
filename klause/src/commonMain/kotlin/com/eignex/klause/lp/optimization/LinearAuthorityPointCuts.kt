@@ -44,7 +44,7 @@ internal class LinearAuthorityPointCuts(
         rows != null && family === rows && managedCurrent
 
     fun retainsCandidateLayout(rows: List<LinearAuthorityCut>?): Boolean =
-        rows != null && family === rows && retainedLayout && !retired
+        rows != null && family === rows && retainedLayout
 
     fun releaseCandidates() {
         family = null
@@ -263,7 +263,7 @@ internal class LinearAuthorityPointCuts(
             }
             observe("Selected", selected.size.toLong())
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
-            val layoutPending = !retired && !retainedLayout && (installed.isNotEmpty() || selected.isNotEmpty())
+            val layoutPending = !retainedLayout && (installed.isNotEmpty() || selected.isNotEmpty())
             val installedPending = complete && !managedInstalled
             val layoutCovered = (layoutPending || installedPending) && rows.size <= maximumCuts + ordinary.size &&
                 checked.size == rows.size && !meter.limited && meter.charge(rows.size * 2L) &&
@@ -286,8 +286,6 @@ internal class LinearAuthorityPointCuts(
                     misses = if (selected.isEmpty()) misses + 1 else 0
                     if (misses >= 4) {
                         retired = true
-                        if (retainedLayout) observe("ReleasedLayout")
-                        retainedLayout = false
                         observe("RetiredFamilies")
                         for (family in visitedFamilies) onCut(family, "POINT_CANDIDATES_RETIRED", 1L)
                     }
