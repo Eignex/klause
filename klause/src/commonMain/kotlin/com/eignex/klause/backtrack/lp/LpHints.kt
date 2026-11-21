@@ -29,9 +29,10 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
+    private val outcomeCalibration: Boolean = false,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe, charge = charge)
+    private val history = LpDirectionalHistory(observe, charge = charge, outcomeCalibration = outcomeCalibration)
     private var passiveVariable: LpPassiveVariableChoice? = null
     private var passiveValues: LpPassiveValueChoice? = null
     private var passiveCollection: LpPassiveCollection? = null
@@ -231,7 +232,19 @@ internal class LpHints(
         passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         if (collect && scopeModel != null) {
-            history.commit(decision, depth)
+            if (outcomeCalibration && objectiveRecorded && history.hasValueHistory && history.hasPruningHistory &&
+                cutoff.isFinite() && passivePointCurrent() && !cancelled()
+            ) {
+                val version = nodeStamp
+                val point = passivePoint
+                val state = passiveState
+                val stamp = solveStamp
+                val bound = cutoff
+                history.commit(decision, depth, bound - scopeConstant.toDouble()) {
+                    !cancelled() && nodeStamp == version && passivePoint === point && passiveState === state &&
+                        solveStamp == stamp && cutoff == bound && passivePointCurrent()
+                }
+            } else history.commit(decision, depth)
         }
     }
 

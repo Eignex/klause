@@ -11,6 +11,155 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `outcome calibration freezes prior rates before the next numeric and outcome samples`() {
+        for (variable in listOf(VarRef.Bool(0), VarRef.IntVar(0))) {
+            for (rate in 0..2) {
+                for (up in listOf(false, true)) {
+                    for (pruned in listOf(false, true)) {
+                        val events = ArrayList<String>()
+                        val history = LpDirectionalHistory(events::add, outcomeCalibration = true)
+                        val down = if (variable is VarRef.Bool) SearchDecision.Bool(1)
+                        else SearchDecision.IntAtMost(0, 0L)
+                        val above = if (variable is VarRef.Bool) SearchDecision.Bool(0)
+                        else SearchDecision.IntAtLeast(0, 1L)
+                        repeat(2) {
+                            for (decision in listOf(down, above)) {
+                                history.beginNode(0)
+                                history.record(0.0)
+                                history.branch(variable, 0.5)
+                                history.commit(decision, 1)
+                                history.beginNode(1)
+                                history.record(if (decision == above) 3.0 else 1.0)
+                                history.finishNode(true)
+                            }
+                        }
+                        repeat(2) { sample ->
+                            for (decision in listOf(down, above)) {
+                                history.beginNode(0)
+                                history.record(0.0)
+                                history.branch(variable, 0.5)
+                                history.commit(decision, 1)
+                                history.beginNode(1)
+                                history.finishNode(rate == 2 || (rate == 1 && sample == 1))
+                            }
+                        }
+                        history.beginNode(0)
+                        history.record(0.0)
+                        history.branch(variable, 0.5)
+                        events.clear()
+
+                        history.commit(if (up) above else down, 1, 10.0)
+                        history.beginNode(1)
+                        if (pruned) history.infeasible() else history.record(20.0)
+                        history.finishNode(pruned)
+                        history.finishNode(!pruned)
+
+                        val result = when {
+                            rate == 1 -> "MIXED"
+                            pruned == (rate == 2) -> "MET"
+                            else -> "CONTRADICTED"
+                        }
+                        val role = if (up) "OTHER" else "PREFERRED"
+                        assertEquals(1, events.count { it == "PASSIVE_OUTCOME_CALIBRATION_CAPTURE" })
+                        assertEquals(listOf("PASSIVE_OUTCOME_CALIBRATION_${role}_$result"), events.filter {
+                            it.startsWith("PASSIVE_OUTCOME_CALIBRATION_PREFERRED_") ||
+                                it.startsWith("PASSIVE_OUTCOME_CALIBRATION_OTHER_")
+                        })
+                        assertEquals(1, events.count { it == if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN" })
+                        assertEquals(if (pruned) 0 else 1, events.count { it == if (up) "UP" else "DOWN" })
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `outcome calibration does not renew checks or complete dropped children`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add, outcomeCalibration = true)
+        val variable = VarRef.Bool(0)
+        repeat(129) { attempt ->
+            history.clear()
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 3.0 else 1.0)
+                    history.finishNode(true)
+                }
+            }
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(SearchDecision.Bool(1), 1, 10.0)
+            when (attempt % 5) {
+                0 -> history.restart()
+                1 -> history.clear()
+                2 -> history.beginNode(2)
+                3 -> history.commit(SearchDecision.Bool(0), 1)
+                else -> history.finishNode()
+            }
+            history.finishNode(false)
+        }
+
+        assertEquals(128, events.count { it == "PASSIVE_OUTCOME_CALIBRATION_CHECK" })
+        assertEquals(128, events.count { it == "PASSIVE_OUTCOME_CALIBRATION_CAPTURE" })
+        assertEquals(128, events.count { it == "PASSIVE_OUTCOME_CALIBRATION_DROPPED" })
+        assertEquals(1, events.count { it == "PASSIVE_OUTCOME_CALIBRATION_EXHAUSTED" })
+        assertFalse(events.any { it.startsWith("PASSIVE_OUTCOME_CALIBRATION_PREFERRED_") ||
+            it.startsWith("PASSIVE_OUTCOME_CALIBRATION_OTHER_") })
+    }
+
+    @Test
+    fun `outcome calibration validates freshness after every charged capture and completion stage`() {
+        for (reset in listOf(false, true)) {
+            for (stopStage in 1..13) {
+                var stage = 0
+                var checking = false
+                var cancelled = false
+                val events = ArrayList<String>()
+                lateinit var history: LpDirectionalHistory
+                history = LpDirectionalHistory(events::add, outcomeCalibration = true, charge = {
+                    if (checking && ++stage == stopStage) {
+                        checking = false
+                        if (reset) history.clear() else cancelled = true
+                    }
+                })
+                val variable = VarRef.Bool(0)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.beginNode(0)
+                        history.record(0.0)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (up) 3.0 else 1.0)
+                        history.finishNode(true)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                events.clear()
+                checking = true
+
+                history.commit(SearchDecision.Bool(1), 1, 10.0) { !cancelled }
+                history.beginNode(1)
+                history.finishNode(true) { !cancelled }
+
+                assertEquals(if (stopStage >= 12) 1 else 0,
+                    events.count { it == "PASSIVE_OUTCOME_CALIBRATION_CAPTURE" }, "$reset/$stopStage")
+                assertEquals(if (stopStage == 13) 1 else 0,
+                    events.count { it == "PASSIVE_OUTCOME_CALIBRATION_PREFERRED_MET" }, "$reset/$stopStage")
+                assertFalse("OUTCOME_PRUNED" in events, "$reset/$stopStage")
+            }
+        }
+    }
+
+    @Test
     fun `equal completed rates use numeric predictions with complete compatible context`() {
         for (rate in 0..2) {
             for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",

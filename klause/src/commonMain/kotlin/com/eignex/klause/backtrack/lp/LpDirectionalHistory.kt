@@ -10,6 +10,7 @@ internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
+    private val outcomeCalibration: Boolean = false,
 ) {
     internal class Direction {
         var count = 0
@@ -37,6 +38,7 @@ internal class LpDirectionalHistory(
     }
     internal class Parent(val objective: Double, val variable: VarRef, val value: Double)
     internal class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
+    internal class Calibration(val child: Pending, val generation: Long, val expected: Boolean?, val preferred: Boolean)
 
     private val gains = HashMap<VarRef, Gains>()
     private var candidates: Array<VarRef?>? = null
@@ -47,6 +49,8 @@ internal class LpDirectionalHistory(
     private var parentLimit = 0
     private var pending: Pending? = null
     private var pendingOutcome: Pending? = null
+    private var calibration: Calibration? = null
+    private var calibrationChecks = 0
     private var stamp = 0L
     private var depth = 0
     private var objective = Double.NaN
@@ -62,6 +66,7 @@ internal class LpDirectionalHistory(
         objective = Double.NaN
         if (pending?.depth != level) pending = null
         if (pendingOutcome?.depth != level) pendingOutcome = null
+        if (calibration?.child !== pendingOutcome) clearCalibration()
     }
 
     val retainedEntries: Int get() = gains.size + parentCount
@@ -81,6 +86,7 @@ internal class LpDirectionalHistory(
         trimParents(0)
         pending = null
         pendingOutcome = null
+        clearCalibration()
         objective = Double.NaN
         observe("RESTART")
         if (gains.isNotEmpty()) {
@@ -99,6 +105,7 @@ internal class LpDirectionalHistory(
         trimParents(0)
         pending = null
         pendingOutcome = null
+        clearCalibration()
         objective = Double.NaN
         reliableStamp = -1L
         valueStamp = -1L
@@ -271,7 +278,23 @@ internal class LpDirectionalHistory(
         parentLimit = start
     }
 
-    fun commit(decision: SearchDecision, level: Int) {
+    internal inline fun commit(
+        decision: SearchDecision,
+        level: Int,
+        cutoff: Double = Double.NaN,
+        crossinline current: () -> Boolean = { true },
+    ) {
+        val version = generation
+        clearCalibration()
+        commitChild(decision, level)
+        val child = pending ?: return
+        if (outcomeCalibration && version == generation && depth == level - 1 &&
+            objective == child.parent.objective && cutoff.isFinite() && hasValueHistory && hasPruningHistory &&
+            calibrationChecks < 128 && current()
+        ) captureCalibration(child, cutoff, current)
+    }
+
+    private fun commitChild(decision: SearchDecision, level: Int) {
         charge(8L)
         trimParents(level)
         pending = null
@@ -301,6 +324,41 @@ internal class LpDirectionalHistory(
         pendingOutcome = pending
     }
 
+    private fun clearCalibration() {
+        if (calibration == null) return
+        calibration = null
+        observe("PASSIVE_OUTCOME_CALIBRATION_DROPPED")
+    }
+
+    private inline fun captureCalibration(child: Pending, cutoff: Double, crossinline current: () -> Boolean) {
+        val version = generation
+        charge(8L)
+        if (version != generation || !current() || pendingOutcome !== child) return
+        val history = reliable(child.parent.variable, child.parent.value) ?: return
+        if (!outcomeRate(history.down).isFinite() || !outcomeRate(history.up).isFinite()) return
+        calibrationChecks++
+        observe("PASSIVE_OUTCOME_CALIBRATION_CHECK")
+        if (calibrationChecks == 128) observe("PASSIVE_OUTCOME_CALIBRATION_EXHAUSTED")
+        if (version != generation || !current() || pendingOutcome !== child) return
+        val preference = preferDirection(child.parent.variable, child.parent.value, cutoff)
+        if (version != generation || !current() || pendingOutcome !== child) return
+        if (preference == null) {
+            observe("PASSIVE_OUTCOME_CALIBRATION_DECLINED")
+            return
+        }
+        charge(8L)
+        if (version != generation || !current() || pendingOutcome !== child) return
+        val rate = outcomeRate(if (child.up) history.up else history.down)
+        if (!rate.isFinite()) return
+        val expected = when (rate) {
+            0.0 -> false
+            1.0 -> true
+            else -> null
+        }
+        calibration = Calibration(child, version, expected, preference == child.up)
+        observe("PASSIVE_OUTCOME_CALIBRATION_CAPTURE")
+    }
+
     fun infeasible() {
         if (pending != null) observe("INFEASIBLE")
         pending = null
@@ -309,6 +367,7 @@ internal class LpDirectionalHistory(
     internal inline fun finishNode(pruned: Boolean? = null, crossinline current: () -> Boolean = { true }) {
         if (pruned != null && current()) recordOutcome(pruned, current)
         pendingOutcome = null
+        clearCalibration()
         if (pending != null) observe("MISSING")
         pending = null
     }
@@ -317,6 +376,7 @@ internal class LpDirectionalHistory(
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
+        completeCalibration(child, pruned, current)
         charge(13L)
         if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
@@ -337,6 +397,24 @@ internal class LpDirectionalHistory(
             observe("OUTCOME_RATE_READY")
         }
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
+    }
+
+    private inline fun completeCalibration(child: Pending, pruned: Boolean, crossinline current: () -> Boolean) {
+        val captured = calibration ?: return
+        calibration = null
+        if (captured.child !== child || captured.generation != generation || !current()) {
+            observe("PASSIVE_OUTCOME_CALIBRATION_DROPPED")
+            return
+        }
+        charge(16L)
+        if (captured.generation != generation || !current()) return
+        val result = when {
+            captured.expected == null -> "MIXED"
+            captured.expected == pruned -> "MET"
+            else -> "CONTRADICTED"
+        }
+        val role = if (captured.preferred) "PREFERRED" else "OTHER"
+        observe("PASSIVE_OUTCOME_CALIBRATION_${role}_$result")
     }
 
     fun preferDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {
