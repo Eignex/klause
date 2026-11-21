@@ -11,21 +11,17 @@ internal class LpDirectionalHistory(
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
 ) {
-    internal class Outcome {
-        var count = 0
-        var latest = false
-        var previous = false
-        var stamp = 0L
-        var previousStamp = 0L
-    }
-
     internal class Direction {
-        val outcome = Outcome()
         var count = 0
         var latest = 0.0
         var previous = 0.0
         var stamp = 0L
         var previousStamp = 0L
+        var outcomeCount = 0
+        var outcomeLatest = false
+        var outcomePrevious = false
+        var outcomeStamp = 0L
+        var outcomePreviousStamp = 0L
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -293,16 +289,18 @@ internal class LpDirectionalHistory(
         charge(9L)
         if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
-        val outcome = (if (child.up) history.up else history.down).outcome
-        if (outcome.count > 0 && stamp - outcome.stamp > maxAge) outcome.count = 0
-        else if (outcome.count >= RELIABILITY && stamp - outcome.previousStamp > maxAge) outcome.count = 1
-        outcome.previous = outcome.latest
-        outcome.previousStamp = outcome.stamp
-        outcome.latest = pruned
-        outcome.stamp = stamp
-        outcome.count = minOf(RELIABILITY, outcome.count + 1)
-        if (outcome.count >= RELIABILITY && (pruned || outcome.previous)) {
-            prunedStamp = maxOf(prunedStamp, outcome.previousStamp)
+        val direction = if (child.up) history.up else history.down
+        if (direction.outcomeCount > 0 && stamp - direction.outcomeStamp > maxAge) direction.outcomeCount = 0
+        else if (direction.outcomeCount >= RELIABILITY && stamp - direction.outcomePreviousStamp > maxAge) {
+            direction.outcomeCount = 1
+        }
+        direction.outcomePrevious = direction.outcomeLatest
+        direction.outcomePreviousStamp = direction.outcomeStamp
+        direction.outcomeLatest = pruned
+        direction.outcomeStamp = stamp
+        direction.outcomeCount = minOf(RELIABILITY, direction.outcomeCount + 1)
+        if (direction.outcomeCount >= RELIABILITY && (pruned || direction.outcomePrevious)) {
+            prunedStamp = maxOf(prunedStamp, direction.outcomePreviousStamp)
             observe("OUTCOME_RATE_READY")
         }
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
@@ -316,8 +314,8 @@ internal class LpDirectionalHistory(
         if (history.down.gain <= 0.0 && history.up.gain <= 0.0) return null
         charge(8L)
         if (version != generation) return null
-        val down = outcomeRate(history.down.outcome)
-        val up = outcomeRate(history.up.outcome)
+        val down = outcomeRate(history.down)
+        val up = outcomeRate(history.up)
         if (!down.isFinite() || !up.isFinite() || down == up) return null
         charge(16L)
         if (version != generation) return null
@@ -345,20 +343,20 @@ internal class LpDirectionalHistory(
         val version = generation
         charge(8L)
         if (version != generation) return Double.NaN
-        val down = outcomeEstimate(history.down.outcome)
-        val up = outcomeEstimate(history.up.outcome)
+        val down = outcomeEstimate(history.down)
+        val up = outcomeEstimate(history.up)
         return down + up
     }
 
-    private fun outcomeRate(outcome: Outcome): Double {
-        if (outcome.count < RELIABILITY || stamp - outcome.previousStamp > maxAge) return Double.NaN
-        return (if (outcome.latest) 0.5 else 0.0) + (if (outcome.previous) 0.5 else 0.0)
+    private fun outcomeRate(direction: Direction): Double {
+        if (direction.outcomeCount < RELIABILITY || stamp - direction.outcomePreviousStamp > maxAge) return Double.NaN
+        return (if (direction.outcomeLatest) 0.5 else 0.0) + (if (direction.outcomePrevious) 0.5 else 0.0)
     }
 
-    private fun outcomeEstimate(outcome: Outcome): Double =
-        if (outcome.count < RELIABILITY || stamp - outcome.previousStamp > maxAge ||
-            outcome.latest != outcome.previous
-        ) Double.NaN else if (outcome.latest) 1.0 else 0.0
+    private fun outcomeEstimate(direction: Direction): Double =
+        if (direction.outcomeCount < RELIABILITY || stamp - direction.outcomePreviousStamp > maxAge ||
+            direction.outcomeLatest != direction.outcomePrevious
+        ) Double.NaN else if (direction.outcomeLatest) 1.0 else 0.0
 
     fun score(variable: VarRef, value: Double): Double = estimate(variable, value)
         .takeIf { it > 0.0 } ?: Double.NaN
