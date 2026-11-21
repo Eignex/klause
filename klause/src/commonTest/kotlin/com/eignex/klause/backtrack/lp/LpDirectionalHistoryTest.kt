@@ -11,6 +11,135 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `variable context observes every numeric parent without changing predictions`() {
+        val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
+            listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
+        } + (Double.MIN_VALUE to Double.POSITIVE_INFINITY)
+        for ((cutoff, ratio) in contexts) {
+            for (parentSlot in 0..3) {
+                val events = ArrayList<String>()
+                var work = 0L
+                val history = LpDirectionalHistory(events::add, charge = { work += it })
+                val variable = VarRef.Bool(0)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val slot = 2 * sample + if (up) 1 else 0
+                        val parent = when {
+                            slot != parentSlot -> 0.0
+                            ratio.isInfinite() -> -1.0
+                            else -> cutoff * (1.0 - ratio)
+                        }
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(parent + 1.0)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                val prediction = history.minimumPrediction(variable, 0.5, cutoff)
+                events.clear()
+                val before = work
+
+                history.observeVariableContext(variable, 0.5, cutoff) { true }
+
+                assertEquals(24L, work - before)
+                val kind = when {
+                    ratio == 0.0 || ratio.isInfinite() -> "UNKNOWN"
+                    ratio in 0.5..2.0 -> "MATCHED"
+                    else -> "MISMATCH"
+                }
+                assertEquals(listOf("PASSIVE_VARIABLE_NUMERIC_GAP_CHECK", "PASSIVE_VARIABLE_NUMERIC_GAP_$kind"),
+                    events)
+                assertEquals(prediction, history.minimumPrediction(variable, 0.5, cutoff))
+            }
+        }
+    }
+
+    @Test
+    fun `variable context observation limits survive resets and restarts`() {
+        var work = 0L
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add, charge = { work += it })
+        val variable = VarRef.Bool(0)
+        repeat(129) { iteration ->
+            if (iteration % 2 == 0) history.clear() else history.restart()
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(1.0)
+                }
+            }
+            history.record(0.0)
+            val before = work
+
+            history.observeVariableContext(variable, 0.5, 3.0) { true }
+
+            assertEquals(if (iteration < 128) 24L else 0L, work - before)
+        }
+        assertEquals(128, events.count { it == "PASSIVE_VARIABLE_NUMERIC_GAP_CHECK" })
+        assertEquals(128, events.count { it == "PASSIVE_VARIABLE_NUMERIC_GAP_MATCHED" })
+        assertEquals(1, events.count { it == "PASSIVE_VARIABLE_NUMERIC_GAP_EXHAUSTED" })
+    }
+
+    @Test
+    fun `variable context invalidation stops reporting after each charged or observed boundary`() {
+        for (reset in listOf(false, true)) {
+            for (stopAt in listOf("CHARGE", "CHECK", "MATCHED", "EXHAUSTED")) {
+                var reporting = false
+                var fresh = true
+                val events = ArrayList<String>()
+                lateinit var history: LpDirectionalHistory
+                history = LpDirectionalHistory({ event ->
+                    events.add(event)
+                    if (reporting && event == "PASSIVE_VARIABLE_NUMERIC_GAP_$stopAt") {
+                        reporting = false
+                        if (reset) history.clear() else fresh = false
+                    }
+                }, charge = {
+                    if (reporting && stopAt == "CHARGE") {
+                        reporting = false
+                        if (reset) history.clear() else fresh = false
+                    }
+                })
+                val variable = VarRef.Bool(0)
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(1.0)
+                    }
+                }
+                history.record(0.0)
+                if (stopAt == "EXHAUSTED") repeat(127) {
+                    history.observeVariableContext(variable, 0.5, 3.0) { true }
+                }
+                events.clear()
+                reporting = true
+
+                history.observeVariableContext(variable, 0.5, 3.0) { fresh }
+
+                assertFalse(reporting)
+                assertEquals(if (stopAt == "CHARGE") 0 else 1,
+                    events.count { it == "PASSIVE_VARIABLE_NUMERIC_GAP_CHECK" })
+                assertEquals(if (stopAt == "MATCHED" || stopAt == "EXHAUSTED") 1 else 0,
+                    events.count { it == "PASSIVE_VARIABLE_NUMERIC_GAP_MATCHED" })
+                assertEquals(if (stopAt == "EXHAUSTED") 1 else 0,
+                    events.count { it == "PASSIVE_VARIABLE_NUMERIC_GAP_EXHAUSTED" })
+            }
+        }
+    }
+
+    @Test
     fun `child advice requires comparable gaps for every numeric parent independently of outcomes`() {
         val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
             listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }

@@ -324,6 +324,8 @@ internal class LpHints(
         }
         if (!current()) return baseline
         val proposed = proposal ?: return baseline
+        history.observeVariableContext(proposed, value(proposed), workingCutoff, ::current)
+        if (!current()) return baseline
         if (passiveVariable == null) {
             charge(8L)
             if (!current()) return baseline

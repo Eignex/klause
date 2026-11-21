@@ -55,6 +55,7 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    private var variableGapChecks = 128
 
     fun beginNode(level: Int) {
         stamp++
@@ -194,6 +195,38 @@ internal class LpDirectionalHistory(
         val version = generation
         charge(8L)
         return version == generation && reliable(variable, value) != null && version == generation
+    }
+
+    internal inline fun observeVariableContext(
+        variable: VarRef,
+        value: Double,
+        cutoff: Double,
+        crossinline current: () -> Boolean,
+    ) {
+        if (variableGapChecks == 0) return
+        variableGapChecks--
+        val version = generation
+        charge(24L)
+        if (version != generation || !current()) return
+        val history = reliable(variable, value) ?: return
+        val gap = cutoff - objective
+        val downLatest = (cutoff - history.down.parent) / gap
+        val downPrevious = (cutoff - history.down.previousParent) / gap
+        val upLatest = (cutoff - history.up.parent) / gap
+        val upPrevious = (cutoff - history.up.previousParent) / gap
+        val kind = when {
+            !gap.isFinite() || gap <= 0.0 ||
+                !downLatest.isFinite() || downLatest <= 0.0 || !downPrevious.isFinite() || downPrevious <= 0.0 ||
+                !upLatest.isFinite() || upLatest <= 0.0 || !upPrevious.isFinite() || upPrevious <= 0.0 -> "UNKNOWN"
+            downLatest !in 0.5..2.0 || downPrevious !in 0.5..2.0 ||
+                upLatest !in 0.5..2.0 || upPrevious !in 0.5..2.0 -> "MISMATCH"
+            else -> "MATCHED"
+        }
+        observe("PASSIVE_VARIABLE_NUMERIC_GAP_CHECK")
+        if (version != generation || !current()) return
+        observe("PASSIVE_VARIABLE_NUMERIC_GAP_$kind")
+        if (version != generation || !current()) return
+        if (variableGapChecks == 0) observe("PASSIVE_VARIABLE_NUMERIC_GAP_EXHAUSTED")
     }
 
     fun minimumPrediction(variable: VarRef, value: Double, cutoff: Double, upper: Boolean = false): Double {

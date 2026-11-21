@@ -278,7 +278,7 @@ class LpHintsTest {
             booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
         for (reset in listOf(false, true)) {
             for ((reference, stopAt) in listOf("integral", "measured", "unmeasured").flatMap { reference ->
-                (1..if (reference == "integral") 14 else 18).map { reference to it }
+                (1..if (reference == "integral") 15 else 19).map { reference to it }
             }) {
                 val events = ArrayList<String>()
                 var reading = false
