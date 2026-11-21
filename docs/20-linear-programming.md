@@ -673,12 +673,6 @@ certificate allowances, and retained MIP callers fund consultations through
 `SourceLpFunding`, where caller cancellation closes the owner and exhaustion is an
 incomplete result.
 
-Joint repair prepares its root hint with its configured cut selection, without a
-separate no-cut bound checkpoint. The hint guides neighborhoods and supplies no
-witness authority. Scoped repair queries preserve their no-cut bound checkpoint;
-all preparation shares the same cumulative funding. The numerical frontier owns
-selected global bounds and the conditional-cut handoff to finite workers.
-
 Source primal statistics report each returned guidance consultation's native phase,
 floating termination, native and projected point availability and pause status.
 Repeated consultations of a retained result count separately. These observations

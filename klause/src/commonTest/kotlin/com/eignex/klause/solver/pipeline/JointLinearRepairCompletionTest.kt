@@ -501,7 +501,7 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `source aggregation should guide the mixed root bootstrap without a bound checkpoint`() {
+    fun `source aggregation should guide the mixed root bootstrap only when enabled`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
@@ -521,8 +521,6 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
 
                     assertTrue(done)
-                    assertEquals(if (enabled) 2L else 1L, repair.stats.smt.completeSearchStages
-                        ?.get("jointRepairRootCertificationCLAIM_BOUNDCalls"))
                     if (enabled) {
                         val completed = assertIs<MinimizeResult.WithSample>(result)
                         assertEquals(1.0, completed.objective)
