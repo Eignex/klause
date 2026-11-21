@@ -381,12 +381,17 @@ live decision eligibility. The index has at most 8,192 entries and resets with i
 source history. When the ordinary live baseline has a current, exactly integral LP
 value, a reliable fractional candidate with positive predictions can take priority.
 The integral point supplies current fractionality information, not a measured zero
-child gain. Fractional baselines require their own reliable numeric evidence.
-Missing, nonfinite, unrepresentable or merely near-integral baseline points cannot
-use the integral case. Both cases require a positive finite remaining gap.
+child gain. A current fractional baseline without its own reliable numeric pairs
+also gives priority to a candidate with stable positive pairs. This preference
+uses the candidate's evidence without assigning a numerical gain to the baseline
+or claiming a measured improvement over it. Missing, nonfinite, unrepresentable or
+merely near-integral baseline points cannot use either priority case. A baseline
+with reliable pairs whose prediction cannot be represented keeps ordinary order.
+Every case requires a positive finite remaining gap.
 Candidate directions use the lower of their two
 recent samples; fractional baseline directions use the larger. For a fractional
-baseline, after scaling by the current fractional movement, the candidate's smaller
+baseline with reliable pairs, after scaling by the current fractional movement,
+the candidate's smaller
 directional prediction must strictly
 exceed the baseline's smaller directional prediction. Equal or overlapping observed
 ranges keep the ordinary baseline. The comparison also applies when both minima
@@ -394,8 +399,9 @@ are below the positive finite remaining gap. A nonpositive or unavailable gap,
 or positive underflow in a lower prediction, declines selection. Candidates rank
 by their smaller lower prediction, with variable identity breaking ties between
 improving candidates.
-A measured zero gain in a fractional baseline is known; missing numeric evidence
-there supplies no comparison. Each fractional point scales its variable's predictions. A variable
+A measured zero gain in a fractional baseline is known and retains the numerical
+comparison. Unavailable numeric evidence supplies no measured reference gain.
+Each fractional point scales its variable's predictions. A variable
 nomination records its point and solve stamp and captures the kernel's exhaustive
 alternatives before commitment. Fractional nominations require the adjacent split
 around their LP point; an integral withheld baseline retains the kernel's actual

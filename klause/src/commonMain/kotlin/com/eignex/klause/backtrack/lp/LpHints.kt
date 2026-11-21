@@ -283,18 +283,28 @@ internal class LpHints(
             charge(12L)
             if (!current() || !history.hasPositiveGap(workingCutoff)) return Double.NaN
             val baselineValue = value(baseline)
-            val integral = baselineValue.isFinite() && baselineValue == floor(baselineValue) && when (baseline) {
+            val validPoint = baselineValue.isFinite() && when (baseline) {
                 is VarRef.Bool -> baselineValue in 0.0..1.0
                 is VarRef.IntVar -> baselineValue >= Long.MIN_VALUE.toDouble() &&
                     baselineValue < Long.MAX_VALUE.toDouble()
             }
-            if (!integral) return history.minimumPrediction(baseline, baselineValue, workingCutoff, upper = true)
-            observe("PASSIVE_VARIABLE_INTEGRAL_BASELINE")
-            return if (current()) 0.0 else Double.NaN
+            if (validPoint && baselineValue == floor(baselineValue)) {
+                observe("PASSIVE_VARIABLE_INTEGRAL_BASELINE")
+                return if (current()) 0.0 else Double.NaN
+            }
+            val prediction = history.minimumPrediction(baseline, baselineValue, workingCutoff, upper = true)
+            if (!current()) return Double.NaN
+            if (prediction.isFinite()) return prediction
+            val fraction = baselineValue - floor(baselineValue)
+            if (!validPoint || fraction <= INT_TOL || fraction >= 1.0 - INT_TOL ||
+                history.hasReliablePair(baseline, baselineValue) || !current()
+            ) return Double.NaN
+            observe("PASSIVE_VARIABLE_UNMEASURED_BASELINE")
+            return if (current()) UNMEASURED_REFERENCE else Double.NaN
         }
         val reference = baselineThreshold()
         if (!current()) return baseline
-        if (!reference.isFinite()) {
+        if (!reference.isFinite() && reference != UNMEASURED_REFERENCE) {
             observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
             return baseline
         }
@@ -306,7 +316,7 @@ internal class LpHints(
                 val previous = proposal
                 val precedes = previous != null && if ((variable is VarRef.Bool) == (previous is VarRef.Bool))
                     variable.varId < previous.varId else variable is VarRef.Bool
-                if (gain > bestGain || (gain == bestGain && precedes)) {
+                if (gain.isFinite() && gain > 0.0 && (gain > bestGain || (gain == bestGain && precedes))) {
                     bestGain = gain
                     proposal = variable
                 }
@@ -327,7 +337,9 @@ internal class LpHints(
                 val proposedGain = history.minimumPrediction(proposed, value(proposed), workingCutoff)
                 val baselineGain = baselineThreshold()
                 current() && available(proposed) && available(baseline) &&
-                    proposedGain.isFinite() && baselineGain.isFinite() && proposedGain > baselineGain
+                    proposedGain.isFinite() && proposedGain > 0.0 &&
+                    (baselineGain == UNMEASURED_REFERENCE ||
+                        (baselineGain.isFinite() && proposedGain > baselineGain))
             },
         )
         if (!current()) {
@@ -557,6 +569,8 @@ internal class LpHints(
     }
 
     private companion object {
+        const val UNMEASURED_REFERENCE = Double.NEGATIVE_INFINITY
+
         /** Below this, a reduced cost is treated as zero (basic column) — no pseudo-cost update. */
         const val RC_TOL = 1e-7
 
