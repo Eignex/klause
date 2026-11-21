@@ -250,7 +250,18 @@ no keys. Bounded work and scratch do not promise a hard pause latency.
 `importWork` covers drain visits, translation and native attachment; later fixpoint
 work is ordinary propagation work. `uses` drains the origin-use counter once,
 sharing that observation with contribution rewards, so it counts consumption once
-per reduction window rather than exports or checks.
+per reduction window rather than exports or checks. Per-origin counters retain
+the admitted publisher's contribution within that same drain.
+
+ALNS bootstrap and repair searches can import an existing portfolio clause pool
+when its model and objective identities match. They import peers before their
+private repair pool at root and restart boundaries, with independent generation
+cursors and one session duplicate filter. A private copy already in the session
+keeps its original attribution. Both drains and bounded filter operations charge
+the receiving search. An interrupted suffix keeps its cursor, and a later grant
+retries it while the filter suppresses the completed prefix. All repair exports
+stay in the private pool; permanent scope clauses and direct global nogoods remain
+withheld. Missing, unbound or foreign portfolio pools leave private sharing alone.
 
 #### Memory observation
 

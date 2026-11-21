@@ -115,6 +115,7 @@ internal class AlnsWorkerConfig private constructor(
         }
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
+        val peerPools = pools?.takeIf { it.identity?.matches(evidenceModel) == true }
         val workerLabel = "alns/${profile.label}"
         // One pool carries globally-valid learned clauses across repair fragments. A repair learns under
         // pins and an incumbent, so its permanent (objective-bound, blocking) clauses and LP Farkas nogoods
@@ -139,7 +140,8 @@ internal class AlnsWorkerConfig private constructor(
             backtrackParams = BacktrackParams(
                 randomSeed = seed + index,
                 clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true,
-                    shareGlobalNogoods = false, meter = meter),
+                    shareGlobalNogoods = false, meter = meter, peerPool = peerPools?.clauses,
+                    tally = peerPools?.contributions),
                 nodeBudget = nodeBudget,
                 toleranceCheck = toleranceCheck,
             ),

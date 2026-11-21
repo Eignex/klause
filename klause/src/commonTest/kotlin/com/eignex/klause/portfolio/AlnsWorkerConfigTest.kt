@@ -1,19 +1,80 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.RuntimeInitializedTest
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.arrays.emptyIntArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
-class AlnsWorkerConfigTest {
+class AlnsWorkerConfigTest : RuntimeInitializedTest() {
+
+    @Test
+    fun `bootstrap should consume same model peer clauses and credit their publisher`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val clauses = SharedClausePool()
+        clauses.publish(listOf(SharedClause(emptyIntArray(), longArrayOf(1, 0, 1, 0), 1)),
+            origin = 0, isGlobal = true)
+        val tally = ContributionTally()
+        val pools = SharedPools(clauses, null, contributions = tally, identity = ModelIdentity.of(problem, objective))
+        val worker = AlnsWorkerConfig().materialize(problem, index = 0, armId = 1, seed = 0,
+            lsLambda = 1.0, objective = objective, lsObjective = null, definitionalSweep = null,
+            onEvent = null, pools = pools)
+
+        val result = worker.use {
+            it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never, maxInstructions = 1).last()
+        }
+        val credits = HashMap<Pair<Contribution, Int>, Double>()
+        tally.drain { kind, origin, amount -> credits[kind to origin] = amount }
+
+        assertEquals(1L, assertNotNull(result.assignment).intValue(1))
+        assertEquals(mapOf((Contribution.Clause to 0) to 1.0), credits)
+    }
+
+    @Test
+    fun `bootstrap should withhold peer clauses without the exact pool identity`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val foreign = Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()).bake()
+        for (identity in listOf(null, ModelIdentity.of(problem, null), ModelIdentity.of(foreign, objective))) {
+            val clauses = SharedClausePool()
+            clauses.publish(listOf(SharedClause(emptyIntArray(), longArrayOf(1, 0, 1, 0), 1)), origin = 0)
+            val tally = ContributionTally()
+            val pools = SharedPools(clauses, null, contributions = tally, identity = identity)
+            val worker = AlnsWorkerConfig().materialize(problem, index = 0, armId = 1, seed = 0,
+                lsLambda = 1.0, objective = objective, lsObjective = null, definitionalSweep = null,
+                onEvent = null, pools = pools)
+
+            val result = worker.use {
+                it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never, maxInstructions = 1).last()
+            }
+            val credits = HashMap<Pair<Contribution, Int>, Double>()
+            tally.drain { kind, origin, amount -> credits[kind to origin] = amount }
+
+            assertEquals(1L, assertNotNull(result.assignment).intValue(1))
+            assertEquals(emptyMap(), credits)
+        }
+    }
 
     @Test
     fun `inner search should initialize shared definitions before spending moves`() {

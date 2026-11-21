@@ -480,14 +480,17 @@ internal class PoolClauseExchange(
     private val shareGlobalNogoods: Boolean = true,
     /** Where this arm's clause traffic is recorded; null records nothing. */
     private val meter: SharingMeter? = null,
+    peerPool: SharedClausePool? = null,
 ) : ClauseExchange {
+    private val peerPool = peerPool?.takeUnless { it === pool }
     private var cursor = 0L
+    private var peerCursor = 0L
     private val seen = LongHashSet()
     private var sessionIdentity: Any? = null
 
     internal fun conditioned(): ClauseExchange {
         val exchange = PoolClauseExchange(pool, origin, tally, maxLbd, maxLen,
-            skipPermanent = true, shareGlobalNogoods = false, meter = meter)
+            skipPermanent = true, shareGlobalNogoods = false, meter = meter, peerPool = peerPool)
         return object : ClauseExchange by exchange, ConditionedClauseExchange {}
     }
 
@@ -520,7 +523,7 @@ internal class PoolClauseExchange(
     }
 
     private fun admit(key: Long, session: PropagationSession? = null): Boolean? {
-        val limit = pool.softLimitBytes ?: return seen.add(key)
+        val limit = pool.softLimitBytes ?: if (peerPool == null) return seen.add(key) else Long.MAX_VALUE
         val added = seen.tryAddBounded(
             key, limit, pool.reclamationWork, pool.reclamationScratchEntries.toLong() * Long.SIZE_BYTES,
             cancelled = { session?.cancelRequested == true },
@@ -532,41 +535,56 @@ internal class PoolClauseExchange(
 
     override fun onRestart(session: PropagationSession) = metered {
         retainSession(session)
-        val drained = if (pool.softLimitBytes == null) pool.drainSince(cursor) else pool.drainSinceFunded(
-            cursor, { session.cancelRequested }, { session.chargeSharingWork(1L) },
-        )
-        if (drained == null) {
-            meter?.clauseCount("drainPreparationDeclined", 1L)
-            return@metered
-        }
-        cursor = drained.cursor
-        var imported = 0
-        var duplicates = 0
-        val before = session.work
-        session.chargeSharingWork(drained.clauses.size.toLong())
-        var literalVisits = 0L
-        for (i in drained.clauses.indices) {
-            val c = drained.clauses[i]
-            // An arm's own clause, re-imported into a rebuilt session, earns it nothing.
-            val from = drained.origins[i].takeIf { it != origin } ?: SharedClausePool.NO_ORIGIN
-            val admitted = admit(c.key, session)
-            if (admitted == true) {
-                literalVisits += c.boolLits.size + c.atomQuads.size / SharedClause.QUAD
-                session.importClause(c, from)
-                imported++
-            }
-            if (admitted == false) duplicates++
-        }
-        meter?.clauseCount("inspected", drained.clauses.size.toLong())
-        meter?.clauseCount("translatedLiterals", literalVisits)
-        meter?.clauseCount("importWork", session.work - before)
-        meter?.clauseMemory(mapOf("drainReferenceSlots" to drained.clauses.size.toLong(),
-            "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES))
-        meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
-        meter?.duplicates(SharingChannel.Clauses, duplicates)
+        // A simultaneously unseen peer copy keeps its publisher rather than a private export's anonymous origin.
+        peerPool?.let { peer -> peerCursor = importFrom(session, peer, peerCursor) ?: return@metered }
+        cursor = importFrom(session, pool, cursor) ?: return@metered
         countUses(session)
         export(session, retiring = false)
         observe(session)
+    }
+
+    private fun importFrom(session: PropagationSession, source: SharedClausePool, fromCursor: Long): Long? {
+        val before = session.work
+        val drained = if (peerPool == null && source.softLimitBytes == null) source.drainSince(fromCursor)
+        else source.drainSinceFunded(
+            fromCursor, { session.cancelRequested }, { session.chargeSharingWork(1L) },
+        )
+        if (drained == null) {
+            meter?.clauseCount("drainPreparationDeclined", 1L)
+            meter?.clauseCount("importWork", session.work - before)
+            return null
+        }
+        var imported = 0
+        var duplicates = 0
+        var inspected = 0
+        session.chargeSharingWork(drained.clauses.size.toLong())
+        var literalVisits = 0L
+        var advanced = fromCursor
+        try {
+            for (i in drained.clauses.indices) {
+                if (session.cancelRequested) return null
+                val c = drained.clauses[i]
+                inspected++
+                // An arm's own clause, re-imported into a rebuilt session, earns it nothing.
+                val from = drained.origins[i].takeIf { it != origin } ?: SharedClausePool.NO_ORIGIN
+                val admitted = admit(c.key, session) ?: return null
+                if (admitted) {
+                    literalVisits += c.boolLits.size + c.atomQuads.size / SharedClause.QUAD
+                    session.importClause(c, from)
+                    imported++
+                } else duplicates++
+            }
+            advanced = drained.cursor
+            return advanced
+        } finally {
+            meter?.clauseCount("inspected", inspected.toLong())
+            meter?.clauseCount("translatedLiterals", literalVisits)
+            meter?.clauseCount("importWork", session.work - before)
+            meter?.clauseMemory(mapOf("drainReferenceSlots" to drained.clauses.size.toLong(),
+                "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES))
+            meter?.imported(SharingChannel.Clauses, imported, advanced)
+            meter?.duplicates(SharingChannel.Clauses, duplicates)
+        }
     }
 
     override fun onSearchStart(session: PropagationSession) {
@@ -574,6 +592,7 @@ internal class PoolClauseExchange(
         // Rebinding assumptions on the same store preserves its imports and duplicate filter.
         if (sessionIdentity !== session.sharingIdentity) {
             cursor = 0L
+            peerCursor = 0L
             seen.release()
             sessionIdentity = session.sharingIdentity
             meter?.clauseCount("sessions", 1L)
@@ -609,6 +628,7 @@ internal class PoolClauseExchange(
             session.retainedSharingSize = null
             sessionIdentity = null
             cursor = 0L
+            peerCursor = 0L
             seen.release()
             meter?.clauseMemory(mapOf("seenKeys" to 0L, "seenCapacityBytes" to 0L))
         }
@@ -619,6 +639,7 @@ internal class PoolClauseExchange(
         session.drainImportUses { from, uses ->
             tally?.note(Contribution.Clause, from, uses.toDouble())
             meter?.clauseCount("uses", uses)
+            if (from >= 0) meter?.clauseCount("origin${from}Uses", uses)
         }
     }
 
