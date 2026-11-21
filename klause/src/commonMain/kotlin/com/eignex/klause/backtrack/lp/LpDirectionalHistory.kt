@@ -26,6 +26,10 @@ internal class LpDirectionalHistory(
         var outcomePreviousStamp = 0L
         var outcomeParent = 0.0
         var outcomePreviousParent = 0.0
+        var parentDepth = -1
+        var previousParentDepth = -1
+        var outcomeParentDepth = -1
+        var outcomePreviousParentDepth = -1
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -119,7 +123,7 @@ internal class LpDirectionalHistory(
             return
         }
         val version = generation
-        charge(4L)
+        charge(6L)
         if (version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
@@ -128,6 +132,8 @@ internal class LpDirectionalHistory(
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
         direction.previousParent = direction.parent
+        direction.previousParentDepth = direction.parentDepth
+        direction.parentDepth = child.depth - 1
         direction.parent = child.parent.objective
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
@@ -317,7 +323,7 @@ internal class LpDirectionalHistory(
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
-        charge(13L)
+        charge(15L)
         if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         val direction = if (child.up) history.up else history.down
@@ -328,6 +334,8 @@ internal class LpDirectionalHistory(
         direction.outcomePrevious = direction.outcomeLatest
         direction.outcomePreviousStamp = direction.outcomeStamp
         direction.outcomePreviousParent = direction.outcomeParent
+        direction.outcomePreviousParentDepth = direction.outcomeParentDepth
+        direction.outcomeParentDepth = child.depth - 1
         direction.outcomeLatest = pruned
         direction.outcomeParent = child.parent.objective
         direction.outcomeStamp = stamp
@@ -403,6 +411,16 @@ internal class LpDirectionalHistory(
             numericDownLatest !in 0.5..2.0 || numericDownPrevious !in 0.5..2.0 ||
             numericUpLatest !in 0.5..2.0 || numericUpPrevious !in 0.5..2.0
         ) return null
+        charge(32L)
+        if (version != generation) return null
+        if (depth < 0 || history.down.parentDepth != depth || history.down.previousParentDepth != depth ||
+            history.up.parentDepth != depth || history.up.previousParentDepth != depth ||
+            history.down.outcomeParentDepth != depth || history.down.outcomePreviousParentDepth != depth ||
+            history.up.outcomeParentDepth != depth || history.up.outcomePreviousParentDepth != depth
+        ) {
+            observe("PASSIVE_VALUE_DEPTH_CONTEXT_DECLINED")
+            return null
+        }
         return preferUp
     }
 

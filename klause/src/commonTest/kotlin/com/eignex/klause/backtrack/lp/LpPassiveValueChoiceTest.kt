@@ -49,6 +49,7 @@ class LpPassiveValueChoiceTest {
                     history.finishNode(isUp == preferUp)
                 }
             }
+            history.beginNode(0)
             history.record(10.0)
             val ordinary = if (preferUp) listOf(down, up) else listOf(up, down)
             val costs = ArrayList<Long>()
@@ -90,6 +91,7 @@ class LpPassiveValueChoiceTest {
                     history.finishNode(decision == up)
                 }
             }
+            history.beginNode(0)
             history.record(10.0)
             if (condition == "aged") repeat(5) { history.beginNode(0) }
             var fresh = condition != "selection"
@@ -97,6 +99,7 @@ class LpPassiveValueChoiceTest {
             val choice = LpPassiveValueChoice(true, events::add, { if (condition == "charge") fresh = false })
             val alternatives = listOf(down, up)
             val preference = history.preferDirection(variable, 2.25, 10.25)
+            assertEquals(if (condition in listOf("missing", "aged")) null else true, preference, condition)
             val selected = choice.select(variable, 2.25, alternatives, preference, 7) { fresh }
             if (condition == "commit") fresh = false
             if (condition == "clear") choice.clear()

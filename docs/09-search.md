@@ -462,6 +462,10 @@ two of the current parent gap, using the same working cutoff. Unavailable,
 nonpositive or unrepresentable gap ratios keep ordinary order. Numeric and outcome
 parent objectives age independently with their own samples; context comparisons
 and metadata writes spend the containing work allowance.
+Each numeric sample and completed outcome also retains its parent decision depth.
+All eight retained parent depths must equal the current node's decision depth;
+different depths keep ordinary child order. This context check applies only to
+child ordering and spends the containing work allowance before reading the metadata.
 Predictions supply only this ordering, never
 a bound or pruning authority. Numerical gain reliability is checked independently, including
 two stable finite gains in each direction and a positive gain in at least one.

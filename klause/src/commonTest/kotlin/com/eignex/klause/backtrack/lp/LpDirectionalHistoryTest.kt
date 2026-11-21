@@ -11,6 +11,94 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `child advice requires the current depth for every numeric and outcome parent`() {
+        for ((cutoff, preferred) in listOf(2.0 to true, 10.0 to false)) {
+            for (boolean in listOf(false, true)) {
+                val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+                val offset = if (boolean) 0.0 else 2.0
+                for (slot in 0..7) {
+                    for ((parentDepth, matched) in listOf(0 to false, 1 to false, 4 to true, 127 to false)) {
+                        var work = 0L
+                        val history = LpDirectionalHistory({}, charge = { work += it })
+                        for (category in 0..1) {
+                            repeat(2) { sample ->
+                                for (up in listOf(false, true)) {
+                                    val origin = category * 4 + sample * 2 + if (up) 1 else 0
+                                    val level = if (origin == slot) parentDepth else 4
+                                    history.beginNode(level)
+                                    history.record(0.0)
+                                    history.branch(variable, offset + 0.5)
+                                    val decision = if (boolean) SearchDecision.Bool(if (up) 0 else 1)
+                                    else if (up) SearchDecision.IntAtLeast(0, 3L)
+                                    else SearchDecision.IntAtMost(0, 2L)
+                                    history.commit(decision, level + 1)
+                                    history.beginNode(level + 1)
+                                    history.record(if (category == 0) (if (up) 3.0 else 1.0) else Double.NaN)
+                                    history.finishNode(if (category == 1) false else null)
+                                }
+                            }
+                        }
+                        history.beginNode(4)
+                        history.record(0.0)
+                        val before = work
+
+                        val actual = history.preferDirection(variable, offset + 0.5, cutoff)
+
+                        assertEquals(if (matched) preferred else null, actual, "$boolean/$slot/$parentDepth/$cutoff")
+                        assertEquals(if (preferred) 120L else 128L, work - before)
+                        assertEquals(1.0, history.minimumPrediction(variable, offset + 0.5, cutoff))
+                        history.beginNode(-1)
+                        history.record(0.0)
+                        assertNull(history.preferDirection(variable, offset + 0.5, cutoff))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `parent depth metadata cannot publish after reset or cancelled outcomes`() {
+        for (action in listOf("numeric-reset", "outcome-reset", "outcome-cancel")) {
+            var armed = false
+            var current = true
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({}, charge = { amount ->
+                if (armed && amount == if (action == "numeric-reset") 6L else 15L) {
+                    armed = false
+                    if (action.endsWith("reset")) history.clear() else current = false
+                }
+            })
+            val variable = VarRef.Bool(0)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 3.0 else 1.0)
+                    history.finishNode(false)
+                }
+            }
+            history.beginNode(1)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(SearchDecision.Bool(1), 2)
+            history.beginNode(2)
+            armed = true
+
+            history.record(if (action == "numeric-reset") 1.0 else Double.NaN)
+            history.finishNode(false) { current }
+            history.beginNode(0)
+            history.record(0.0)
+            val preferred = history.preferDirection(variable, 0.5, 10.0)
+
+            assertFalse(armed)
+            assertEquals(if (action.endsWith("reset")) null else false, preferred, action)
+        }
+    }
+
+    @Test
     fun `equal completed rates use numeric predictions with complete compatible context`() {
         for (rate in 0..2) {
             for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",
@@ -163,7 +251,8 @@ class LpDirectionalHistoryTest {
                 val preferred = history.preferDirection(variable, 0.5, cutoff)
 
                 assertEquals(if (ratio in 0.5..2.0) cutoff <= 1.0 else null, preferred)
-                assertEquals(if (cutoff <= 1.0) 88L else 96L, work - before)
+                assertEquals((if (cutoff <= 1.0) 88L else 96L) +
+                    (if (ratio in 0.5..2.0) 32L else 0L), work - before)
             }
         }
     }
@@ -230,7 +319,7 @@ class LpDirectionalHistoryTest {
                 val preferred = history.preferDirection(variable, 0.5, cutoff)
 
                 assertEquals(if (ratio in 0.5..2.0) cutoff <= 1.0 else null, preferred)
-                assertEquals((if (cutoff <= 1.0) 64L else 72L) + (if (preferred != null) 24L else 0L),
+                assertEquals((if (cutoff <= 1.0) 64L else 72L) + (if (preferred != null) 56L else 0L),
                     work - before)
             }
         }
@@ -258,6 +347,7 @@ class LpDirectionalHistoryTest {
                             history.finishNode(up != preferredUp)
                         }
                     }
+                    history.beginNode(0)
                     history.record(0.0)
                     for (cutoff in listOf(0.75, 3.0)) {
                         val before = work
@@ -269,7 +359,7 @@ class LpDirectionalHistoryTest {
                             preferredGain == 0.0 || scale == 1.0 -> preferredUp
                             else -> null
                         }, preferred)
-                        assertEquals((if (cutoff < 1.0) 40L else 48L) + (if (preferred != null) 48L else 0L),
+                        assertEquals((if (cutoff < 1.0) 40L else 48L) + (if (preferred != null) 80L else 0L),
                             work - before)
                     }
                 }
@@ -501,6 +591,7 @@ class LpDirectionalHistoryTest {
                             history.finishNode(up == prunedUp && (!mixed || sample == 0))
                         }
                     }
+                    history.beginNode(0)
                     history.record(10.0)
                     for (cutoff in listOf(11.0, 12.0, 13.0, 14.0)) {
                         val before = work
@@ -512,7 +603,7 @@ class LpDirectionalHistoryTest {
                             sameGain -> null
                             else -> !prunedUp
                         }, preference)
-                        assertEquals((if (cutoff <= 13.0) 40L else 48L) + (if (preference != null) 48L else 0L),
+                        assertEquals((if (cutoff <= 13.0) 40L else 48L) + (if (preference != null) 80L else 0L),
                             work - before)
                     }
                 }
@@ -536,6 +627,7 @@ class LpDirectionalHistoryTest {
                     history.finishNode(up != higherUp)
                 }
             }
+            history.beginNode(0)
             history.record(10.0)
 
             for (cutoff in listOf(11.0, 12.0, 14.0)) {
@@ -561,6 +653,7 @@ class LpDirectionalHistoryTest {
                 history.finishNode(up)
             }
         }
+        history.beginNode(0)
         history.record(10.0)
 
         for (cutoff in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 10.0, 9.0)) {
@@ -583,6 +676,7 @@ class LpDirectionalHistoryTest {
                 history.finishNode(up)
             }
         }
+        history.beginNode(0)
         history.record(0.0)
 
         assertNull(history.preferDirection(variable, 0.125, 1.0))
@@ -596,7 +690,7 @@ class LpDirectionalHistoryTest {
         for ((cutoff, equalRates) in listOf(10.25, 15.0).flatMap { cutoff ->
             listOf(cutoff to false, cutoff to true)
         }) {
-            for (resetAt in 1..if (cutoff == 10.25) 6 else 7) {
+            for (resetAt in 1..if (cutoff == 10.25) 7 else 8) {
                 var reading = false
                 var reads = 0
                 lateinit var history: LpDirectionalHistory
@@ -618,6 +712,7 @@ class LpDirectionalHistoryTest {
                         history.finishNode(if (equalRates) true else up)
                     }
                 }
+                history.beginNode(0)
                 history.record(10.0)
                 reading = true
 
@@ -664,6 +759,7 @@ class LpDirectionalHistoryTest {
                 }
             }
 
+            history.beginNode(0)
             history.record(10.0)
             val preferred = history.preferDirection(variable, 0.5, 10.25)
 
@@ -738,6 +834,7 @@ class LpDirectionalHistoryTest {
                 history.infeasible()
                 history.finishNode(true)
                 if (observation == 0) {
+                    history.beginNode(0)
                     history.record(10.0)
                     assertTrue(history.hasPruningHistory)
                     assertTrue(history.prunedDirections(variable, 0.5).isNaN())

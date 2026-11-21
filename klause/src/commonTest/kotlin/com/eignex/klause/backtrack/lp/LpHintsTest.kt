@@ -30,6 +30,82 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `child depth contexts preserve matched commitments and reject mismatches or cancellation`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (boolean in listOf(false, true)) {
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val point = if (boolean) 0.5 else 2.5
+            val down = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2L)
+            val up = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 3L)
+            for (action in listOf("matched", "different", "reset", "cancel")) {
+                for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                    val costs = ArrayList<Long>()
+                    for (apply in listOf(false, true)) {
+                        val events = ArrayList<String>()
+                        var work = 0L
+                        var armed = false
+                        var cancelled = false
+                        lateinit var hints: LpHints
+                        hints = LpHints(if (boolean) 0 else 1, if (boolean) 1 else 0,
+                            directionalGains = true, applyAdvice = apply, observe = events::add, charge = { amount ->
+                                work += amount
+                                if (armed && amount == 32L && action in listOf("reset", "cancel")) {
+                                    armed = false
+                                    if (action == "reset") hints.resetHistory() else cancelled = true
+                                }
+                            })
+                        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(boolean), constant,
+                            if (boolean) IntArray(0) else intArrayOf(0),
+                            if (boolean) intArrayOf(0) else IntArray(0))
+                        val cutoff = constant.toDouble() + 1024.0
+                        repeat(2) { sample ->
+                            for (isUp in listOf(false, true)) {
+                                hints.beginNode(0, cutoff)
+                                hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                                hints.recordObjective(relaxation, 0.0)
+                                hints.branch(variable)
+                                hints.commit(if (isUp) up else down, 1)
+                                hints.beginNode(1, cutoff)
+                                hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                                hints.recordObjective(relaxation, if (isUp) 3.0 else 1.0)
+                                hints.recordOutcome(sample == 1, relaxation)
+                                hints.finishNode(trail.state)
+                            }
+                        }
+                        val depth = if (action == "different") 1 else 0
+                        hints.beginNode(depth, cutoff)
+                        hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                        hints.recordObjective(relaxation, 0.0)
+                        hints.branch(variable)
+                        events.clear()
+                        val before = work
+                        armed = true
+                        val control = ExecutionControl { cancelled }
+
+                        val ordered = hints.orderAlternatives(variable, listOf(up, down), control)
+                        hints.commit(ordered.first(), depth + 1, control)
+
+                        val diagnostic = "$boolean/$action/$constant/$apply"
+                        val matched = action == "matched"
+                        assertEquals(if (matched && apply) listOf(down, up) else listOf(up, down), ordered, diagnostic)
+                        val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED"
+                        else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
+                        assertEquals(if (matched) 1 else 0, events.count { it == event }, diagnostic)
+                        assertEquals(if (action == "different") 1 else 0,
+                            events.count { it == "PASSIVE_VALUE_DEPTH_CONTEXT_DECLINED" }, diagnostic)
+                        assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events)
+                        costs.add(work - before)
+                    }
+                    assertEquals(costs.first(), costs.last(), "$boolean/$action/$constant")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `unmeasured baseline advice exceeds the ordinary estimate before committing`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 2L)
