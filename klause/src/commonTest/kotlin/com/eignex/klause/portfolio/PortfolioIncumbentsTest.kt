@@ -5,6 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.util.numbers.BigFraction
@@ -16,6 +17,39 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PortfolioIncumbentsTest {
+    @Test
+    fun `exact cutoff reads should preserve supplied snapshots after an improvement`() {
+        val values = listOf(
+            BigFraction.of(bigIntOf(1), bigIntOf(3)) to BigFraction.of(bigIntOf(1), bigIntOf(4)),
+            BigFraction.of(bigIntOf(-1), bigIntOf(4)) to BigFraction.of(bigIntOf(-1), bigIntOf(3)),
+            BigFraction.of(parseBigInt("100000000000000000001"), bigIntOf(1)) to
+                BigFraction.of(parseBigInt("100000000000000000000"), bigIntOf(1)),
+        )
+        for ((initialValue, improvedValue) in values) {
+            val incumbents = PortfolioIncumbents.exact(LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+            val initialSample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(initialValue.toDouble()),
+                exactReals = listOf(initialValue))
+            val initial = assertIs<Publication.Installed<Sample, BigFraction>>(
+                incumbents.exchange.offer(initialSample, initialValue),
+            ).incumbent
+            val initialBound = incumbents.bound(initial)
+
+            val improved = assertIs<Publication.Installed<Sample, BigFraction>>(
+                incumbents.exchange.offer(initialSample.copy(reals = doubleArrayOf(improvedValue.toDouble()),
+                    exactReals = listOf(improvedValue)), improvedValue),
+            ).incumbent
+            val improvedBound = incumbents.bound(improved)
+            val retainedBound = incumbents.bound(initial)
+            val currentBound = incumbents.bound()
+            val repeatedBound = incumbents.bound()
+
+            assertEquals(initialBound, retainedBound)
+            assertEquals(improvedBound, currentBound)
+            assertEquals(currentBound, repeatedBound)
+            assertTrue(improvedBound < retainedBound)
+        }
+    }
+
     @Test
     fun `algebraic sharing should order exact rational objectives with identical floating scores`() {
         val arithmetic = AlgebraicArithmetic()

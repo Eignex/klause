@@ -12,6 +12,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.util.concurrent.Mutex
 import com.eignex.util.numbers.BigFraction
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal class PortfolioIncumbents<V>(
     val valueOf: (MinimizeResult.WithSample) -> V?,
@@ -35,13 +37,26 @@ internal class PortfolioIncumbents<V>(
     }
 
     companion object {
-        fun exact(objective: LinearObjective): PortfolioIncumbents<BigFraction> = PortfolioIncumbents(
-            valueOf = { objective.evaluateExact(it.sample) },
-            improves = { candidate, standing -> candidate < standing },
-            approximateValue = { it.toDouble() },
-            gain = { standing, candidate -> (standing - candidate).toDouble() },
-            upperBound = ::roundedUpperBound,
-        )
+        @OptIn(ExperimentalAtomicApi::class)
+        fun exact(objective: LinearObjective): PortfolioIncumbents<BigFraction> {
+            val projection = AtomicReference<RationalUpperBound?>(null)
+            return PortfolioIncumbents(
+                valueOf = { objective.evaluateExact(it.sample) },
+                improves = { candidate, standing -> candidate < standing },
+                approximateValue = { it.toDouble() },
+                gain = { standing, candidate -> (standing - candidate).toDouble() },
+                upperBound = { exact ->
+                    val retained = projection.load()
+                    if (retained != null && retained.exact === exact) {
+                        retained.upper
+                    } else {
+                        val upper = roundedUpperBound(exact)
+                        projection.store(RationalUpperBound(exact, upper))
+                        upper
+                    }
+                },
+            )
+        }
 
         fun algebraic(
             valueOf: (MinimizeResult.WithSample) -> AlgebraicReal?,
@@ -93,6 +108,8 @@ internal class PortfolioIncumbents<V>(
         )
     }
 }
+
+private class RationalUpperBound(val exact: BigFraction, val upper: Double)
 
 internal fun roundedUpperBound(exact: BigFraction): Double {
     val approximate = exact.toDouble()

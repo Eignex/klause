@@ -186,6 +186,11 @@ witness checker. A pure local-search pool has no shared pools; learned clauses a
 exchanged only when at least two backtrack workers exist, and cuts only when the
 scenario opts in.
 
+Exact rational cutoffs use one atomic projection record per incumbent owner. Reads
+reuse the outward-rounded double only for the same rational identity; older supplied
+snapshots retain their own projection. The record holds one rational and double,
+retains no assignment and has no byte limit.
+
 In curated single-core mixed finite integer optimization without Boolean or
 real columns and with a containing deadline, `portfolio-publications=segment`
 coalesces private local-search offers within one query: the worker retains one
