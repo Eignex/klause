@@ -302,6 +302,24 @@ internal class LpHints(
             observe("PASSIVE_VARIABLE_UNMEASURED_BASELINE")
             return if (current()) UNMEASURED_REFERENCE else Double.NaN
         }
+        fun preservesUnmeasuredFractionality(variable: VarRef, reference: Double): Boolean {
+            if (reference != UNMEASURED_REFERENCE) return true
+            charge(8L)
+            if (!current()) return false
+            val baselineValue = value(baseline)
+            val proposedValue = value(variable)
+            if (!baselineValue.isFinite() || !proposedValue.isFinite()) return false
+            val baselineFraction = baselineValue - floor(baselineValue)
+            val proposedFraction = proposedValue - floor(proposedValue)
+            if (baselineFraction <= INT_TOL || baselineFraction >= 1.0 - INT_TOL ||
+                proposedFraction <= INT_TOL || proposedFraction >= 1.0 - INT_TOL
+            ) return false
+            if (min(proposedFraction, 1.0 - proposedFraction) < min(baselineFraction, 1.0 - baselineFraction)) {
+                observe("PASSIVE_VARIABLE_FRACTIONALITY_DECLINED")
+                return false
+            }
+            return current()
+        }
         val reference = baselineThreshold()
         if (!current()) return baseline
         if (!reference.isFinite() && reference != UNMEASURED_REFERENCE) {
@@ -311,7 +329,9 @@ internal class LpHints(
         var proposal: VarRef? = null
         var bestGain = reference
         history.forEachCandidate(::current) { variable ->
-            if (variable != baseline && available(variable) && current()) {
+            if (variable != baseline && available(variable) && current() &&
+                preservesUnmeasuredFractionality(variable, reference)
+            ) {
                 val gain = history.minimumPrediction(variable, value(variable), workingCutoff)
                 val previous = proposal
                 val precedes = previous != null && if ((variable is VarRef.Bool) == (previous is VarRef.Bool))
@@ -338,7 +358,8 @@ internal class LpHints(
                 val baselineGain = baselineThreshold()
                 current() && available(proposed) && available(baseline) &&
                     proposedGain.isFinite() && proposedGain > 0.0 &&
-                    (baselineGain == UNMEASURED_REFERENCE ||
+                    ((baselineGain == UNMEASURED_REFERENCE &&
+                        preservesUnmeasuredFractionality(proposed, baselineGain)) ||
                         (baselineGain.isFinite() && proposedGain > baselineGain))
             },
         )

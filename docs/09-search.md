@@ -382,8 +382,13 @@ source history. When the ordinary live baseline has a current, exactly integral 
 value, a reliable fractional candidate with positive predictions can take priority.
 The integral point supplies current fractionality information, not a measured zero
 child gain. A current fractional baseline without its own reliable numeric pairs
-also gives priority to a candidate with stable positive pairs. This preference
-uses the candidate's evidence without assigning a numerical gain to the baseline
+also gives priority to a candidate with stable positive pairs when its current
+fractionality is at least the baseline's. Fractionality is the distance from the LP
+point to its nearest integer. This comparison is checked before prediction lookup
+and during revalidation, and spends the containing work allowance. It applies to
+unmeasured-baseline priority; measured comparisons and integral-baseline priority
+retain their own criteria. This preference uses the candidate's evidence without
+assigning a numerical gain to the baseline
 or claiming a measured improvement over it. Missing, nonfinite, unrepresentable or
 merely near-integral baseline points cannot use either priority case. A baseline
 with reliable pairs whose prediction cannot be represented keeps ordinary order.
