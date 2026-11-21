@@ -81,6 +81,7 @@ internal class LinearAuthorityInvocation(
     borrowedBudget: SourceLpBudget? = null,
     private val recordProgress: Boolean = true,
     private val proximityCenter: Sample? = null,
+    private val proximityRounding: Boolean = false,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -173,7 +174,13 @@ internal class LinearAuthorityInvocation(
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
         gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
-        guideIncumbent = guideIncumbent && !incumbentProximity, proximityCenter = proximityCenter)
+        guideIncumbent = guideIncumbent && !incumbentProximity, proximityCenter = proximityCenter,
+        claimProximityDecision = if (proximityRounding) {
+            {
+                !stop() && state.remainingDecisions() > 0 &&
+                    state.work.theoryDecision() && state.decisionBudget.consume()
+            }
+        } else null)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {
@@ -352,7 +359,7 @@ internal class LinearAuthorityInvocation(
         }
         proximity = LinearAuthorityInvocation(source, params.copy(sourceIncumbentCompletion = false), state = state,
             boundOrdered = true, funding = funding, useSourceGap = false, guideIncumbent = false,
-            borrowedBudget = budget, recordProgress = false, proximityCenter = sample)
+            borrowedBudget = budget, recordProgress = false, proximityCenter = sample, proximityRounding = true)
         proximityTurn = true
         observeProximity("Centers")
     }

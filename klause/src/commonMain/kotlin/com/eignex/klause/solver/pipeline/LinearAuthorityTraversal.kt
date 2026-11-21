@@ -83,6 +83,7 @@ internal class LinearAuthorityTraversal(
     private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = false,
     private val proximityCenter: Sample? = null,
+    claimProximityDecision: (() -> Boolean)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
@@ -93,6 +94,14 @@ internal class LinearAuthorityTraversal(
         !useRefutationPropagation && !useRefutationResolution) LinearAggregateBranches(budget) else null
 
     private val ownsAuthority = borrowedAuthority == null
+    private val proximityStop = cancellation or ExecutionControl(pause)
+    private val proximityCompletion = proximityCenter?.takeIf { claimProximityDecision != null }?.let { center ->
+        LinearProximityCompletion(source, center, budget, requireNotNull(claimProximityDecision)) { stage, count ->
+            val key = "numericalProximityCompletion$stage"
+            observations[key] = (observations[key] ?: 0L) + count
+        }
+    }
+    private var proximityRootResult: LinearAuthorityResult? = null
     private val authority = borrowedAuthority ?: LinearAuthority(budget, { shape ->
         observations["numericalLpInputMaxRows"] =
             maxOf(observations["numericalLpInputMaxRows"] ?: 0L, shape.inputRows.toLong())
@@ -131,6 +140,8 @@ internal class LinearAuthorityTraversal(
     }
 
     override fun close() {
+        proximityCompletion?.close()
+        proximityRootResult = null
         activeRows?.close()
         feedback?.detach(authority)
         refutations?.clear()
@@ -475,9 +486,10 @@ internal class LinearAuthorityTraversal(
                 queriedNode = current
                 queriedSource = it
             }
-        val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
-        else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
-        else authority.check(branch, cancellation)
+        val queried = proximityRootResult.takeIf { current === root }
+            ?: if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
+            else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
+            else authority.check(branch, cancellation)
         val strongestBound = strongerLinearBound(current.partialBound, queried.bound)
         val result = queried.copy(bound = strongestBound,
             cutBoundFamilies = if (strongestBound != null && strongestBound === current.partialBound) {
@@ -487,6 +499,16 @@ internal class LinearAuthorityTraversal(
             val key = "numerical$stage"
             val previous = observations[key] ?: 0L
             observations[key] = if ("Max" in stage) maxOf(previous, count) else previous + count
+        }
+        if (current === root && proximityCompletion != null && !result.paused) {
+            proximityRootResult = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
+            current.pending = true
+            if (proximityCompletion.advance(result, context, proximityStop)) return SearchNodeDisposition.Pause
+            proximityCompletion.takeChecked()?.let { sample ->
+                onIncumbent(sample)
+                return SearchNodeDisposition.Pause
+            }
+            proximityRootResult = null
         }
         if (result.paused) {
             current.partialBound = result.bound

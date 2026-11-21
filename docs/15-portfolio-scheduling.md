@@ -520,7 +520,18 @@ The numerical owner alternates private consultations with its retained ordinary
 frontier inside the same turn offers, using at most half the remaining offered time
 and work for each private consultation. The private search visits the center's side
 of each integer split first and retains sibling alternatives; ordinary traversal
-retains bound order. Advisory joint repair retains ordinary root guidance for
+retains bound order. A private root with fractional binary guidance can try one
+rounded assignment before branching, with ties directed away from its center.
+Receiving integer pins constrain that assignment and continuous coordinates are
+completed under the full private source, including the aspiration and radius rows.
+The trial spends one shared decision and complete check and uses the same LP
+operation, work and allocation ledger. Its rounded-point preparation and active
+recovery cursors survive pauses without another claim or root relaxation. Query
+setup interrupted before retaining its seed point ends that trial, retaining its
+cost instead of repeating its reservation on another offer. A declined trial retains the
+ordinary root result and its alternatives; it supplies no bound or refutation.
+Only a completed source witness enters the existing publication checks.
+Advisory joint repair retains ordinary root guidance for
 fallback before preparing private neighborhoods. Its first query uses the ordinary
 rounded root; completed advisory queries alternate with ordinary repair queries.
 Paused queries retain their turn. A default checked center passes private completion
