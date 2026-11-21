@@ -442,6 +442,9 @@ work at 5,000. Atomic preparation and certification can overrun; overspend retir
 that worker at its next turn without claiming exhaustion, and workers cannot reseed
 to renew these limits. The two owners divide the containing numerical work and
 allocation ceilings equally and keep their query funding across slices.
+A joint root paused inside an admitted LP operation can resume that operation
+after the operation cap prevents new admissions. Cumulative work, allocation and
+cancellation limits still apply.
 
 With source-incumbent completion enabled, built-in backtrack workers see the
 canonical incumbent only as the finite upper cutoff: an exact improvement with the
