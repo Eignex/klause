@@ -180,8 +180,7 @@ internal class FiniteSourceCutClauses(
                 val scope = source.scope.copy(condition = condition)
                 // Every published literal discharges exactly one of these freshly checked restrictions.
                 val evidence = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Combination(terms))
-                val contextBytes = 256L + 128L * (source.coordinateCount + source.premiseCount)
-                if (!pay(1L + source.coordinateCount + source.premiseCount, contextBytes)) break
+                if (!pay(1L, 256L)) break
                 val checking = ExecutionControl { !pay(1L, 64L) }
                 observe("RefutationChecks")
                 if (SourceEvidenceVerifier(source.atScope(scope)).verify(evidence, checking) !=

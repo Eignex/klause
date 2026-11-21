@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.defaultIrSemantics
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
@@ -10,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class SourceEvidenceVerifierTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -55,18 +57,34 @@ class SourceEvidenceVerifierTest {
     fun `premise traversal should retain captured source order after external mutation`() {
         val upper = SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(2)))
         val original = linkedMapOf("lower" to SourcePremise(lower), "upper" to upper)
-        val source = SourceProofContext(scope, setOf(x), original)
-        val snapshot = source.premises as MutableMap<String, SourcePremise>
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val coordinates = linkedSetOf(x, other)
+        val objective = linkedMapOf(x to BigFraction.ONE, other to BigFraction.ONE)
+        val source = SourceProofContext(scope, coordinates, original, objective)
+        val contexts = listOf(source,
+            source.withScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE)))),
+            source.withScope(scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ofLong(2))))))
 
         original.clear()
-        snapshot.clear()
-        val visited = mutableListOf<Pair<String, SourcePremise>>()
-        source.forEachPremise { name, premise -> visited += name to premise }
+        coordinates.clear()
+        objective.clear()
+        for (view in contexts) {
+            (view.premises as MutableMap<String, SourcePremise>).clear()
+            (view.coordinates as MutableSet<SourceCoordinate>).clear()
+            (view.objective as MutableMap<SourceCoordinate, BigFraction>).clear()
+        }
 
-        assertEquals(listOf("lower", "upper"), visited.map { it.first })
-        assertEquals(listOf(lower, upper.inequality), visited.map { it.second.inequality })
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))))
+        for (view in contexts) {
+            val visited = mutableListOf<Pair<String, SourcePremise>>()
+            view.forEachPremise { name, premise -> visited += name to premise }
+
+            assertEquals(listOf("lower", "upper"), visited.map { it.first })
+            assertEquals(listOf(lower, upper.inequality), visited.map { it.second.inequality })
+            assertEquals(setOf(x, other), view.coordinates)
+            assertEquals(mapOf(x to BigFraction.ONE, other to BigFraction.ONE), view.objective)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(view).verify(
+                SourceEvidence(view.scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))))
+        }
     }
 
     @Test
@@ -87,13 +105,17 @@ class SourceEvidenceVerifierTest {
 
     @Test
     fun `batched consequences should share one proof allowance`() {
-        val evidence = SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))
+        for (view in listOf(context, context.withScope(scope.copy(condition =
+            SourceCondition(lower = mapOf(x to BigFraction.ONE)))))) {
+            val evidence = SourceEvidence(view.scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))
+            val verifier = SourceEvidenceVerifier(view, maximumSteps = 4)
 
-        val checks = SourceEvidenceVerifier(context, maximumSteps = 4)
-            .verifyAll(listOf(evidence, evidence), ExecutionControl.Never)
+            val checks = verifier.verifyAll(listOf(evidence, evidence), ExecutionControl.Never)
 
-        assertEquals(SourceEvidenceCheck.Checked, checks.first())
-        assertIs<SourceEvidenceCheck.Unavailable>(checks.last())
+            assertEquals(SourceEvidenceCheck.Checked, checks.first())
+            assertIs<SourceEvidenceCheck.Unavailable>(checks.last())
+            assertEquals(SourceEvidenceCheck.Checked, verifier.verify(evidence))
+        }
     }
 
     @Test
@@ -309,6 +331,9 @@ class SourceEvidenceVerifierTest {
         for (other in scopes) {
             val evidence = SourceEvidence(other, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("lower"))
             assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
+            val view = context.withScope(other)
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(view).verify(
+                SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("lower"))))
         }
     }
 
@@ -735,23 +760,27 @@ class SourceEvidenceVerifierTest {
 
     @Test
     fun `cancelled verification should not publish checked proof coverage`() {
-        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("lower"))
+        for (view in listOf(context, context.withScope(scope.copy(condition =
+            SourceCondition(lower = mapOf(x to BigFraction.ONE)))))) {
+            val evidence =
+                SourceEvidence(view.scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("lower"))
+            val verifier = SourceEvidenceVerifier(view)
 
-        assertIs<SourceEvidenceCheck.Unavailable>(
-            SourceEvidenceVerifier(context).verify(
-                evidence,
-                ExecutionControl { true },
-            ),
-        )
+            assertIs<SourceEvidenceCheck.Unavailable>(verifier.verify(evidence, ExecutionControl { true }))
+            assertEquals(SourceEvidenceCheck.Checked, verifier.verify(evidence))
+        }
     }
 
     @Test
     fun `proof traversal should not reset its containing allowance through imports`() {
         val claim = SourceClaim.Bound(BigFraction.ONE)
-        var evidence = SourceEvidence(scope, claim, SourceDerivation.Premise("lower"))
-        repeat(5) { evidence = SourceEvidence(scope, claim, SourceDerivation.Import(evidence)) }
+        for (view in listOf(context, context.withScope(scope.copy(condition =
+            SourceCondition(lower = mapOf(x to BigFraction.ONE)))))) {
+            var evidence = SourceEvidence(view.scope, claim, SourceDerivation.Premise("lower"))
+            repeat(5) { evidence = SourceEvidence(view.scope, claim, SourceDerivation.Import(evidence)) }
 
-        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context, maximumSteps = 5).verify(evidence))
+            assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(view, maximumSteps = 5).verify(evidence))
+        }
     }
 
     @Test
@@ -790,14 +819,18 @@ class SourceEvidenceVerifierTest {
             premises,
             mapOf(x to BigFraction.ONE),
             semanticsChecker = checker,
+            semantics = defaultIrSemantics,
         )
         val claim = SourceClaim.Optimal(sample, SourceValue.Rational(BigFraction.ONE))
         val proof = SourceDerivation.Optimum(SourceDerivation.SourceWitness, SourceDerivation.Premise("lower"))
 
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(context).verify(SourceEvidence(scope, claim, proof)),
-        )
+        for (view in listOf(context, context.withScope(scope.copy(condition =
+            SourceCondition(lower = mapOf(x to BigFraction.ONE)))))) {
+            assertSame(checker, view.semanticsChecker)
+            assertSame(defaultIrSemantics, view.semantics)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(view).verify(SourceEvidence(view.scope, claim, proof)))
+        }
     }
 
     @Test
@@ -910,18 +943,29 @@ class SourceEvidenceVerifierTest {
             SourceDerivation.Combination(emptyList()),
         )
 
-        assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(context).verify(evidence))
+        for (view in listOf(context, context.withScope(scope.copy(condition =
+            SourceCondition(lower = mapOf(x to BigFraction.ONE)))))) {
+            assertIs<SourceEvidenceCheck.Unavailable>(SourceEvidenceVerifier(view).verify(
+                SourceEvidence(view.scope, evidence.claim, evidence.derivation)))
+        }
     }
 
     @Test
     fun `an explicitly declared constant affine objective should admit its constant bound`() {
-        val context = SourceProofContext(scope, setOf(x), emptyMap(), objective = emptyMap())
+        val constant = BigFraction.ofLong(3)
+        val context =
+            SourceProofContext(scope, setOf(x), emptyMap(), objective = emptyMap(), objectiveConstant = constant)
         val evidence = SourceEvidence(
             scope,
-            SourceClaim.Bound(BigFraction.ZERO),
+            SourceClaim.Bound(constant),
             SourceDerivation.Combination(emptyList()),
         )
 
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(evidence))
+        for (view in listOf(context, context.withScope(scope.copy(condition =
+            SourceCondition(lower = mapOf(x to BigFraction.ONE)))))) {
+            assertEquals(constant, view.objectiveConstant)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(view).verify(
+                SourceEvidence(view.scope, evidence.claim, evidence.derivation)))
+        }
     }
 }

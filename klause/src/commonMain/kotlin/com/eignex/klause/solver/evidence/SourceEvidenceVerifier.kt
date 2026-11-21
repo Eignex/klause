@@ -61,24 +61,56 @@ interface SourceSemanticsChecker {
 }
 
 /** Immutable consumer-owned original-source premises and objective, independent of a proof producer. */
-class SourceProofContext(
+class SourceProofContext private constructor(
     /** Original-source invocation and objective. */
     val scope: SourceScope,
-    coordinates: Set<SourceCoordinate>,
-    premises: Map<String, SourcePremise>,
-    objective: Map<SourceCoordinate, BigFraction>? = null,
+    private val captured: CapturedData,
     /** Exact original-source objective constant. */
     val objectiveConstant: BigFraction = BigFraction.ZERO,
     internal val semanticsChecker: SourceSemanticsChecker? = null,
     /** Captured source interpretation, absent when the context has no bound source owner. */
     val semantics: EffectiveSourceSemantics? = null,
 ) {
-    private val capturedCoordinates = coordinates.toSet()
-    private val capturedPremises = premises.toMap()
-    private val capturedObjective = objective?.filterValues { !it.isZero }?.toMap()
+    /** Capture original-source data independently of caller-owned collections. */
+    constructor(
+        scope: SourceScope,
+        coordinates: Set<SourceCoordinate>,
+        premises: Map<String, SourcePremise>,
+        objective: Map<SourceCoordinate, BigFraction>? = null,
+        objectiveConstant: BigFraction = BigFraction.ZERO,
+        semanticsChecker: SourceSemanticsChecker? = null,
+        semantics: EffectiveSourceSemantics? = null,
+    ) : this(scope, CapturedData(coordinates, premises, objective), objectiveConstant, semanticsChecker, semantics)
+
+    private class CapturedData(
+        coordinates: Set<SourceCoordinate>, premises: Map<String, SourcePremise>,
+        objective: Map<SourceCoordinate, BigFraction>?,
+    ) {
+        val coordinates = coordinates.toSet()
+        val premises = premises.toMap()
+        val objective = objective?.filterValues { !it.isZero }?.toMap()
+
+        init {
+            require(this.premises.keys.none { it.isBlank() })
+            require(this.objective.orEmpty().keys.all { it in this.coordinates })
+            require(this.premises.values.all { premise ->
+                premise.inequality.hasOnlyCoordinates(this.coordinates) &&
+                    premise.guards.keys.all {
+                        SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
+                    } && premise.integerPins.keys.all { it in this.coordinates }
+            })
+        }
+    }
+
+    private val capturedCoordinates get() = captured.coordinates
+    private val capturedPremises get() = captured.premises
+    private val capturedObjective get() = captured.objective
     internal val coordinateCount: Int get() = capturedCoordinates.size
     internal val premiseCount: Int get() = capturedPremises.size
     internal val affineObjectiveAvailable: Boolean get() = capturedObjective != null
+
+    internal fun withScope(scope: SourceScope): SourceProofContext =
+        SourceProofContext(scope, captured, objectiveConstant, semanticsChecker, semantics)
 
     /** Declared source coordinates. */
     val coordinates: Set<SourceCoordinate> get() = capturedCoordinates.toSet()
@@ -106,18 +138,6 @@ class SourceProofContext(
         capturedCoordinates == other.capturedCoordinates && capturedPremises == other.capturedPremises &&
             capturedObjective.orEmpty() == other.capturedObjective.orEmpty() &&
             objectiveConstant == other.objectiveConstant
-
-    init {
-        require(capturedPremises.keys.none { it.isBlank() })
-        require(capturedObjective.orEmpty().keys.all { it in capturedCoordinates })
-        require(capturedPremises.values.all { premise ->
-            premise.inequality.hasOnlyCoordinates(capturedCoordinates) &&
-                premise.guards.keys.all {
-                    SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in capturedCoordinates
-                } &&
-                premise.integerPins.keys.all { it in capturedCoordinates }
-        })
-    }
 }
 
 /** Checks retained derivations against a consumer's original source, with bounded traversal and cancellation. */
@@ -162,8 +182,6 @@ class SourceEvidenceVerifier(
         private val allowance: SourceProofAllowance,
     ) {
         private val integerScopes = mutableMapOf<SourceCondition, SourceIntegerBounds>()
-        private val coordinates by lazy { context.coordinates }
-        private val premises by lazy { context.premises }
         private val objectiveCoefficients by lazy { context.objective }
 
         private fun step(depth: Int) {
@@ -184,15 +202,18 @@ class SourceEvidenceVerifier(
         }
 
         private fun validCondition(condition: SourceCondition): Boolean =
-            condition.bools.keys.all { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in coordinates } &&
-                (condition.lower.keys + condition.upper.keys).all { it in coordinates } &&
+            condition.bools.keys.all {
+                context.containsCoordinate(SourceCoordinate(SourceCoordinate.Kind.Boolean, it))
+            } &&
+                (condition.lower.keys + condition.upper.keys).all { context.containsCoordinate(it) } &&
                 condition.integerRows.size <= 128 && condition.integerRows.all { validIntegerRow(it) }
 
         private fun validIntegerRow(row: SourceInequality): Boolean =
             !row.strict && row.supportSize in 1..32 && row.rhs.den == BIG_ONE &&
                 row.rhs.num.magnitudeBitLength() <= 4096 && row.coefficients.all { (id, value) ->
                     step(0)
-                    id.kind == SourceCoordinate.Kind.Integer && id in coordinates && value.den == BIG_ONE &&
+                    id.kind == SourceCoordinate.Kind.Integer && context.containsCoordinate(id) &&
+                        value.den == BIG_ONE &&
                         value.num.magnitudeBitLength() <= 4096
                 }
 
@@ -269,7 +290,7 @@ class SourceEvidenceVerifier(
                 is SourceDerivation.BooleanSplit -> {
                     if (derivation.id < 0) return reject("Boolean coverage references an invalid coordinate")
                     val coordinate = SourceCoordinate(SourceCoordinate.Kind.Boolean, derivation.id)
-                    if (coordinate !in coordinates || derivation.id in scope.condition.bools) {
+                    if (!context.containsCoordinate(coordinate) || derivation.id in scope.condition.bools) {
                         return reject("Boolean coverage must split an unpinned declared coordinate")
                     }
                     return both(
@@ -282,7 +303,7 @@ class SourceEvidenceVerifier(
                 }
                 is SourceDerivation.IntegerSplit -> {
                     val id = derivation.coordinate
-                    if (id.kind != SourceCoordinate.Kind.Integer || id !in coordinates ||
+                    if (id.kind != SourceCoordinate.Kind.Integer || !context.containsCoordinate(id) ||
                         derivation.threshold.den != BIG_ONE
                     ) return reject("integer coverage requires a declared integer and integral threshold")
                     return both(
@@ -346,7 +367,7 @@ class SourceEvidenceVerifier(
                     val discharged = derivation as? SourceDerivation.Discharge
                         ?: return reject("clause requires a checked conditional refutation")
                     if (claim.literals.keys.any {
-                            SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in coordinates ||
+                            !context.containsCoordinate(SourceCoordinate(SourceCoordinate.Kind.Boolean, it)) ||
                                 it in scope.condition.bools
                         }
                     ) return reject("clause discharge requires unpinned declared source Booleans")
@@ -366,7 +387,7 @@ class SourceEvidenceVerifier(
                     SourceEvidenceCheck.Checked
                 } else reject("derivation is not a contradiction")
                 is SourceClaim.Consequence -> if (claim.inequality.coefficients.keys.any {
-                        it !in coordinates
+                        !context.containsCoordinate(it)
                     }
                 ) {
                     reject("consequence references undeclared source coordinates")
@@ -389,7 +410,7 @@ class SourceEvidenceVerifier(
                     derivation.row
                 }
                 is SourceDerivation.Premise -> {
-                    val premise = premises[derivation.id]
+                    val premise = context.premise(derivation.id)
                         ?: rejectProof("unknown original-source premise ${derivation.id}")
                     if (premise.guards.any { (id, value) -> scope.condition.bools[id] != value }) {
                         rejectProof("original-source premise guard is not established")
@@ -411,7 +432,7 @@ class SourceEvidenceVerifier(
                     premise.inequality
                 }
                 is SourceDerivation.Assumption -> {
-                    if (derivation.coordinate !in coordinates) {
+                    if (!context.containsCoordinate(derivation.coordinate)) {
                         rejectProof("assumption references an undeclared coordinate")
                     }
                     val restrictions = if (derivation.upper) scope.condition.upper else scope.condition.lower
@@ -442,8 +463,8 @@ class SourceEvidenceVerifier(
                     val coefficients = row.coefficients
                     for ((coordinate, coefficient) in coefficients) {
                         step(depth)
-                        if (coordinate !in coordinates || coordinate.kind != SourceCoordinate.Kind.Integer ||
-                            coefficient.den != BIG_ONE
+                        if (!context.containsCoordinate(coordinate) ||
+                            coordinate.kind != SourceCoordinate.Kind.Integer || coefficient.den != BIG_ONE
                         ) rejectProof("integer rounding requires integral activity over declared integers")
                     }
                     val rhs = if (row.strict) BigFraction.of(row.rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
@@ -453,7 +474,7 @@ class SourceEvidenceVerifier(
                 is SourceDerivation.MixedIntegerRounding -> {
                     val row = inequality(derivation.inequality, scope, depth + 1)
                     val bounds = derivation.bounds.map { inequality(it, scope, depth + 1) }
-                    if (row.coefficients.keys.any { it !in coordinates }) {
+                    if (row.coefficients.keys.any { !context.containsCoordinate(it) }) {
                         rejectProof("mixed integer rounding references an undeclared coordinate")
                     }
                     mixedIntegerRounding(row, bounds, ExecutionControl {
