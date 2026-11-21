@@ -385,9 +385,15 @@ child gain. A current fractional baseline without its own reliable numeric pairs
 also gives priority to a candidate with stable positive pairs when its current
 fractionality is at least the baseline's. Fractionality is the distance from the LP
 point to its nearest integer. This comparison is checked before prediction lookup
-and during revalidation, and spends the containing work allowance. It applies to
-unmeasured-baseline priority; measured comparisons and integral-baseline priority
-retain their own criteria. This preference uses the candidate's evidence without
+and during revalidation, and spends the containing work allowance. Unmeasured-baseline
+priority also requires the candidate's conservative minimum gain to strictly exceed
+the baseline's finite nonnegative ordinary reduced-cost/fractionality score, both
+before ranking and during revalidation. That score retains its ordinary unseen-cost
+weight and supplies an advisory estimate, not a measured child gain or a calibrated
+bound. Equal or lower candidate predictions and unavailable baseline estimates keep
+ordinary order. These comparisons
+apply to unmeasured-baseline priority; measured comparisons and integral-baseline
+priority retain their own criteria. This preference uses the candidate's evidence without
 assigning a numerical gain to the baseline
 or claiming a measured improvement over it. Missing, nonfinite, unrepresentable or
 merely near-integral baseline points cannot use either priority case. A baseline

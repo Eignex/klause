@@ -320,6 +320,17 @@ internal class LpHints(
             }
             return current()
         }
+        fun exceedsUnmeasuredEstimate(gain: Double, reference: Double): Boolean {
+            if (reference != UNMEASURED_REFERENCE) return true
+            charge(8L)
+            if (!current()) return false
+            val estimate = branchScore(baseline)
+            if (!estimate.isFinite() || estimate < 0.0 || gain <= estimate) {
+                observe("PASSIVE_VARIABLE_BASELINE_ESTIMATE_DECLINED")
+                return false
+            }
+            return current()
+        }
         val reference = baselineThreshold()
         if (!current()) return baseline
         if (!reference.isFinite() && reference != UNMEASURED_REFERENCE) {
@@ -336,7 +347,9 @@ internal class LpHints(
                 val previous = proposal
                 val precedes = previous != null && if ((variable is VarRef.Bool) == (previous is VarRef.Bool))
                     variable.varId < previous.varId else variable is VarRef.Bool
-                if (gain.isFinite() && gain > 0.0 && (gain > bestGain || (gain == bestGain && precedes))) {
+                if (gain.isFinite() && gain > 0.0 && exceedsUnmeasuredEstimate(gain, reference) &&
+                    (gain > bestGain || (gain == bestGain && precedes))
+                ) {
                     bestGain = gain
                     proposal = variable
                 }
@@ -359,7 +372,8 @@ internal class LpHints(
                 current() && available(proposed) && available(baseline) &&
                     proposedGain.isFinite() && proposedGain > 0.0 &&
                     ((baselineGain == UNMEASURED_REFERENCE &&
-                        preservesUnmeasuredFractionality(proposed, baselineGain)) ||
+                        preservesUnmeasuredFractionality(proposed, baselineGain) &&
+                        exceedsUnmeasuredEstimate(proposedGain, baselineGain)) ||
                         (baselineGain.isFinite() && proposedGain > baselineGain))
             },
         )

@@ -30,6 +30,97 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `unmeasured baseline advice exceeds the ordinary estimate before committing`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 2L)
+        builder.addVar(0, 10, cost = 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, 10L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (booleanBaseline in listOf(false, true)) {
+            val baseline = if (booleanBaseline) VarRef.Bool(0) else VarRef.IntVar(0)
+            val proposal = VarRef.IntVar(if (booleanBaseline) 0 else 1)
+            val session = PropagationSession(Problem(if (booleanBaseline) 1 else 0,
+                if (booleanBaseline) 1 else 2,
+                Array(if (booleanBaseline) 1 else 2) { IntDomain(0, 10) }, emptyArray()))
+            for (reference in listOf("unmeasured", "known-zero", "known-positive", "integral")) {
+                for ((predicted, context) in listOf(1.0 to "below", 1.0000005 to "equal",
+                    2.0 to "above", (1.0000005 - 1e-12) to "below",
+                    (1.0000005 + 1e-12) to "above", 2.0 to "unavailable")) {
+                    for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                        val costs = ArrayList<Long>()
+                        for (apply in listOf(false, true)) {
+                            val events = ArrayList<String>()
+                            var work = 0L
+                            val hints = LpHints(if (booleanBaseline) 1 else 2, if (booleanBaseline) 1 else 0,
+                                directionalGains = true, applyAdvice = apply,
+                                observe = events::add, charge = { work += it })
+                            val relaxation = LpRelaxation(model, intArrayOf(0, proposal.varId),
+                                booleanArrayOf(booleanBaseline, false), constant,
+                                if (booleanBaseline) intArrayOf(1) else intArrayOf(0, 1),
+                                if (booleanBaseline) intArrayOf(0) else IntArray(0))
+                            val cutoff = constant.toDouble() + 1024.0
+                            val duals = doubleArrayOf(if (context == "unavailable") Double.POSITIVE_INFINITY else 0.0)
+                            for (variable in listOf(baseline, proposal)) {
+                                if (variable == baseline && reference in listOf("unmeasured", "integral")) continue
+                                hints.beginNode(0, cutoff)
+                                hints.record(relaxation, doubleArrayOf(0.5, 3.5), duals)
+                                hints.recordObjective(relaxation, 0.0)
+                                hints.branch(variable)
+                                repeat(2) {
+                                    for (up in listOf(false, true)) {
+                                        val decision = if (variable is VarRef.Bool) {
+                                            SearchDecision.Bool(if (up) 0 else 1)
+                                        } else {
+                                            val lower = if (variable == baseline) 0L else 3L
+                                            if (up) SearchDecision.IntAtLeast(variable.varId, lower + 1L)
+                                            else SearchDecision.IntAtMost(variable.varId, lower)
+                                        }
+                                        hints.commit(decision, 1)
+                                        hints.beginNode(1, cutoff)
+                                        hints.record(relaxation, doubleArrayOf(0.5, 3.5), duals)
+                                        hints.recordObjective(relaxation, if (variable == proposal) predicted
+                                        else if (reference == "known-zero") 0.0 else 0.25)
+                                        hints.recordOutcome(false, relaxation)
+                                        hints.finishNode(trail.state)
+                                    }
+                                }
+                            }
+                            val baselinePoint = if (reference == "integral") 0.0 else 0.5
+                            hints.beginNode(0, cutoff)
+                            hints.record(relaxation, doubleArrayOf(baselinePoint, 3.5), duals)
+                            hints.recordObjective(relaxation, 0.0)
+                            events.clear()
+                            val before = work
+
+                            val selected = hints.pickVariable(baseline, { true }, ExecutionControl.Never)
+                            hints.branch(selected)
+                            val alternatives = if (selected is VarRef.Bool) {
+                                listOf(SearchDecision.Bool(0), SearchDecision.Bool(1))
+                            } else splitIntAlternatives(session, selected as VarRef.IntVar,
+                                if (selected == proposal) 3L else 0L)
+                            val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
+                            hints.commit(ordered.first(), 1)
+
+                            val decline = reference == "unmeasured" && context != "above"
+                            val diagnostic = "$booleanBaseline/$reference/$predicted/$context/$constant"
+                            assertEquals(if (apply && !decline) proposal else baseline, selected, diagnostic)
+                            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                            assertEquals(if (decline) 0 else 1, events.count { it == event }, diagnostic)
+                            assertEquals(if (decline) 1 else 0,
+                                events.count { it == "PASSIVE_VARIABLE_BASELINE_ESTIMATE_DECLINED" }, diagnostic)
+                            costs.add(work - before)
+                        }
+                        assertTrue(costs.first() > 0L)
+                        assertEquals(costs.first(), costs.last())
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `unmeasured baseline priority preserves current fractionality before committing advice`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
@@ -376,7 +467,11 @@ class LpHintsTest {
             booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
         for (reset in listOf(false, true)) {
             for ((reference, stopAt) in listOf("integral", "measured", "unmeasured").flatMap { reference ->
-                (1..if (reference == "integral") 16 else 22)
+                (1..when (reference) {
+                    "integral" -> 16
+                    "unmeasured" -> 24
+                    else -> 22
+                })
                     .map { reference to it }
             }) {
                 val events = ArrayList<String>()
