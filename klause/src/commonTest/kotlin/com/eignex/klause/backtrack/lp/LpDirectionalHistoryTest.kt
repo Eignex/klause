@@ -11,6 +11,45 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `child advice requires comparable gaps for every retained outcome parent`() {
+        val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
+            listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
+        } + (Double.MIN_VALUE to Double.POSITIVE_INFINITY)
+        for ((cutoff, ratio) in contexts) {
+            for (parentSlot in 0..3) {
+                var work = 0L
+                val history = LpDirectionalHistory({}, charge = { work += it })
+                val variable = VarRef.Bool(0)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val slot = 2 * sample + if (up) 1 else 0
+                        val parent = when {
+                            slot != parentSlot -> 0.0
+                            ratio.isInfinite() -> -1.0
+                            else -> cutoff * (1.0 - ratio)
+                        }
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(parent + if (up) 2.0 else 0.5)
+                        history.finishNode(up)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                val before = work
+
+                val preferred = history.preferDirection(variable, 0.5, cutoff)
+
+                assertEquals(if (ratio in 0.5..2.0) cutoff <= 1.0 else null, preferred)
+                assertEquals(if (cutoff <= 1.0) 64L else 72L, work - before)
+            }
+        }
+    }
+
+    @Test
     fun `open child advice requires separated gain ranges at the current fraction`() {
         for (preferredUp in listOf(false, true)) {
             for (point in listOf(0.25, 0.5, 0.75)) {
@@ -43,7 +82,8 @@ class LpDirectionalHistoryTest {
                             preferredGain == 0.0 || scale == 1.0 -> preferredUp
                             else -> null
                         }, preferred)
-                        assertEquals(if (cutoff < 1.0) 40L else 48L, work - before)
+                        assertEquals((if (cutoff < 1.0) 40L else 48L) + (if (preferred != null) 24L else 0L),
+                            work - before)
                     }
                 }
             }
@@ -285,7 +325,8 @@ class LpDirectionalHistoryTest {
                             sameGain -> null
                             else -> !prunedUp
                         }, preference)
-                        assertEquals(if (cutoff <= 13.0) 40L else 48L, work - before)
+                        assertEquals((if (cutoff <= 13.0) 40L else 48L) + (if (preference != null) 24L else 0L),
+                            work - before)
                     }
                 }
             }
@@ -366,7 +407,7 @@ class LpDirectionalHistoryTest {
     @Test
     fun `reset during a charged preference lookup discards the result`() {
         for (cutoff in listOf(10.25, 15.0)) {
-            for (resetAt in 1..if (cutoff == 10.25) 4 else 5) {
+            for (resetAt in 1..if (cutoff == 10.25) 5 else 6) {
                 var reading = false
                 var reads = 0
                 lateinit var history: LpDirectionalHistory

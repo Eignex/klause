@@ -22,6 +22,8 @@ internal class LpDirectionalHistory(
         var outcomePrevious = false
         var outcomeStamp = 0L
         var outcomePreviousStamp = 0L
+        var outcomeParent = 0.0
+        var outcomePreviousParent = 0.0
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -286,7 +288,7 @@ internal class LpDirectionalHistory(
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
-        charge(9L)
+        charge(13L)
         if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         val direction = if (child.up) history.up else history.down
@@ -296,7 +298,9 @@ internal class LpDirectionalHistory(
         }
         direction.outcomePrevious = direction.outcomeLatest
         direction.outcomePreviousStamp = direction.outcomeStamp
+        direction.outcomePreviousParent = direction.outcomeParent
         direction.outcomeLatest = pruned
+        direction.outcomeParent = child.parent.objective
         direction.outcomeStamp = stamp
         direction.outcomeCount = minOf(RELIABILITY, direction.outcomeCount + 1)
         if (direction.outcomeCount >= RELIABILITY && (pruned || direction.outcomePrevious)) {
@@ -343,6 +347,17 @@ internal class LpDirectionalHistory(
             val upper = maxOf(direction.latest, direction.previous) * movement
             if (!upper.isFinite() || upper >= otherGain) return null
         }
+        charge(24L)
+        if (version != generation) return null
+        val downLatest = (cutoff - history.down.outcomeParent) / gap
+        val downPrevious = (cutoff - history.down.outcomePreviousParent) / gap
+        val upLatest = (cutoff - history.up.outcomeParent) / gap
+        val upPrevious = (cutoff - history.up.outcomePreviousParent) / gap
+        if (!downLatest.isFinite() || !downPrevious.isFinite() ||
+            !upLatest.isFinite() || !upPrevious.isFinite() ||
+            downLatest !in 0.5..2.0 || downPrevious !in 0.5..2.0 ||
+            upLatest !in 0.5..2.0 || upPrevious !in 0.5..2.0
+        ) return null
         return preferUp
     }
 

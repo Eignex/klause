@@ -400,7 +400,8 @@ needs two recent finite normalized gains agreeing within a factor of two, and at
 least one direction must have a positive lower-of-two gain. Two measured zero
 directions keep ordinary order; unknown gains cannot supply measured zero.
 
-Each side also retains its own latest two known completed LP-node outcomes. A
+Each side also retains its own latest two known completed LP-node outcomes and
+their parent LP objectives. A
 completed optimal pass that keeps the node records an open outcome. Accepted LP
 bounds, fixings, mixed deductions and infeasibility can record a prune without
 supplying a numerical gain. Missing, interrupted or incomplete cut work supplies
@@ -419,7 +420,11 @@ floating values keep ordinary order. Prune-first advice requires its preferred
 lower prediction to reach the gap. Open-first advice uses the preferred direction's
 larger recent gain, scaled by its current fractional movement; that upper prediction
 must be strictly smaller than the other child's lower prediction. Equal, touching
-or overlapping ranges decline open-first advice.
+or overlapping ranges decline open-first advice. Both intents also require each
+retained outcome's parent gap to be within a factor of two of the current parent
+gap, using the same working cutoff. Unavailable, nonpositive or unrepresentable
+gap ratios keep ordinary order. Parent objectives age with their own outcomes;
+context comparisons and metadata writes spend the containing work allowance.
 Predictions supply only this ordering, never
 a bound or pruning authority. Numerical gain reliability is checked independently, including
 two stable finite gains in each direction and a positive gain in at least one.

@@ -170,26 +170,28 @@ class LpHintsTest {
         val variable = VarRef.IntVar(0)
         val down = SearchDecision.IntAtMost(0, 2L)
         val up = SearchDecision.IntAtLeast(0, 3L)
-        val costs = HashMap<Pair<Double, Double>, MutableList<Long>>()
+        val costs = HashMap<Triple<Double, Double, Double>, MutableList<Long>>()
         for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
             val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
                 constant, intArrayOf(0), IntArray(0))
             val cutoff = constant.toDouble() + 1024.0
             for ((apply, currentObjective) in listOf(false to 10.0, true to 10.0, false to 1023.0, true to 1023.0)) {
-                for (scale in listOf(1.0, 1.5, 2.0)) {
+                for ((scale, gapScale) in listOf(1.0 to 1.0, 1.5 to 1.0, 2.0 to 1.0,
+                    1.0 to 0.5, 1.0 to 2.0, 1.0 to 4.0, 1.0 to 0.25)) {
                     var work = 0L
                     val events = ArrayList<String>()
                     val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
                         observe = events::add, charge = { work += it })
+                    val parentObjective = 1024.0 - (1024.0 - currentObjective) * gapScale
                     repeat(2) { sample ->
                         hints.beginNode(0, cutoff)
                         hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
-                        hints.recordObjective(relaxation, 10.0)
+                        hints.recordObjective(relaxation, parentObjective)
                         hints.recordOutcome(false, relaxation)
                         hints.finishNode(trail.state)
                         hints.branch(variable)
-                        val upObjective = 10.0 + if (sample == 0) scale else 1.0
-                        for ((decision, point, objective) in listOf(Triple(down, 2.0, 11.5),
+                        val upObjective = parentObjective + if (sample == 0) scale else 1.0
+                        for ((decision, point, objective) in listOf(Triple(down, 2.0, parentObjective + 1.5),
                             Triple(up, 3.0, upObjective))) {
                             hints.commit(decision, 1)
                             hints.beginNode(1, cutoff)
@@ -211,13 +213,13 @@ class LpHintsTest {
                     val ordered = hints.orderAlternatives(variable, ordinary, ExecutionControl.Never)
                     hints.commit(ordered.first(), 1)
 
-                    val changed = currentObjective == 1023.0 || scale < 1.5
+                    val changed = gapScale in 0.5..2.0 && (currentObjective == 1023.0 || scale < 1.5)
                     assertEquals(if (apply && changed) ordinary.reversed() else ordinary, ordered)
                     val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
                     assertEquals(if (changed) 1 else 0, events.count { it == event })
                     assertFalse("PASSIVE_VARIABLE_SCORE" in events)
                     assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events)
-                    costs.getOrPut(currentObjective to scale) { ArrayList() }.add(work - before)
+                    costs.getOrPut(Triple(currentObjective, scale, gapScale)) { ArrayList() }.add(work - before)
                 }
             }
         }
