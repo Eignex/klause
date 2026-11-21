@@ -423,16 +423,6 @@ numerical owner for root preparation and retained neighborhood queries. Before i
 first checked incumbent, it can seed a neighborhood with integer pins cited by refuted
 root queries, and `source-refutation-center-step=true` lets a compatible root
 refutation move its center one legal integer step away from a cited bound side.
-The automatic accepted-tolerance finite policy enables these steps independently
-of external incumbent completion; incompatible prepared authority withholds the
-automatic setting. Explicit settings remain explicit, and nominal and exact
-callers retain their default disabled setting. A step requires a completed checked
-regional refutation and matching proposal identity, pinned values and Boolean
-context under the owner's existing funding. Unavailable certificates authorize no
-center change.
-With center advice alone, an offer without exact reals is withheld when its real
-objective makes it inadmissible to the receiving query. This bounded check spends
-source funding; other offers retain ordinary admission and handoff guards.
 These seeds and centers are advisory: the refutation keeps its complete scope and
 every discovered point needs full source checking. Each owner also keeps at most four
 completed pre-incumbent regional refutations keyed by every Boolean pin, numeric

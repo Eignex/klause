@@ -88,9 +88,7 @@ rows before source separation. It requires zero relative tolerance, retains open
 sides and indicators, and adds no second slack. Compatible finite coordinates keep
 ordinary witness search while a separate exact envelope supplies cut authority.
 Mixed binary/continuous MPS optimization selects this authority automatically when
-the lowered coordinates and objective match. Its joint repair uses paid
-checked-refutation advice for legal integer center steps without enabling external
-incumbent completion. Explicit source controls can opt out;
+the lowered coordinates and objective match. Explicit source controls can opt out;
 unsupported automatic layouts retain nominal execution.
 Its native accepted-set bounds have scope `absolute-tolerance-envelope`; nominal
 source bounds keep their separate scope.

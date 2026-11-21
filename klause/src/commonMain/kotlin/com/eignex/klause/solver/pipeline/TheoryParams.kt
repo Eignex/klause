@@ -123,6 +123,9 @@ data class TheoryParams(
     val sourceRefutationCenterStep: Boolean = false,
 ) {
     init {
+        require(!sourceRefutationCenterStep || sourceIncumbentCompletion) {
+            "source-refutation-center-step requires source-incumbent-completion"
+        }
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
         require(maxFlips >= 0) { "heuristic proposal cap must not be negative" }
         require(maxInstructions == null || maxInstructions >= 0) { "heuristic instruction cap must not be negative" }

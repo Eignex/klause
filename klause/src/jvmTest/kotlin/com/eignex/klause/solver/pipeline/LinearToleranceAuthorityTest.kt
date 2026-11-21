@@ -67,11 +67,8 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
         assertSame(source.semantics, invocation.linearSource?.view?.model?.semantics)
         assertTrue(request.theory.sourcePointCuts)
         assertTrue(request.theory.sourceAggregateCuts)
-        assertTrue(request.theory.sourceRefutationCenterStep)
-        assertFalse(request.theory.sourceIncumbentCompletion)
         assertTrue(request.automaticLinearCuts.point)
         assertTrue(request.automaticLinearCuts.aggregate)
-        assertTrue(request.automaticLinearCuts.centerStep)
     }
 
     @Test
@@ -89,25 +86,21 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
 
         assertFalse(resolved.sourcePointCuts)
         assertFalse(resolved.sourceAggregateCuts)
-        assertFalse(resolved.sourceRefutationCenterStep)
     }
 
     @Test
-    fun `explicit source controls should survive an unavailable automatic authority`() {
+    fun `explicit point controls should survive an unavailable automatic authority`() {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
         for (enabled in listOf(false, true)) {
             val request = SourceExecutionRequest(invocation,
-                ExecutionOptions(ExecutionOption.sourcePointCuts(enabled),
-                    ExecutionOption.sourceRefutationCenterStep(enabled)))
+                ExecutionOptions(ExecutionOption.sourcePointCuts(enabled)))
 
             val resolved = FiniteCompanionPolicy(request.theory, request.automaticLinearCuts).resolve(null)
 
             assertEquals(enabled, request.theory.sourceAggregateCuts)
             assertEquals(enabled, resolved.sourcePointCuts)
             assertFalse(resolved.sourceAggregateCuts)
-            assertEquals(enabled, resolved.sourceRefutationCenterStep)
-            assertFalse(request.automaticLinearCuts.centerStep)
         }
     }
 
@@ -122,10 +115,8 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
 
         assertFalse(explicit.automaticLinearCuts.point)
         assertFalse(explicit.automaticLinearCuts.aggregate)
-        assertFalse(explicit.automaticLinearCuts.centerStep)
         assertTrue(resolved.sourcePointCuts)
         assertTrue(resolved.sourceAggregateCuts)
-        assertTrue(resolved.sourceRefutationCenterStep)
     }
 
     @Test
@@ -139,7 +130,6 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
         assertFalse(assertNotNull(invocation.linearSource).automaticCutSelection)
         assertFalse(request.theory.sourcePointCuts)
         assertFalse(request.theory.sourceAggregateCuts)
-        assertFalse(request.theory.sourceRefutationCenterStep)
     }
 
     @Test
@@ -154,7 +144,6 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
         assertNull(invocation.linearSource?.toleranceAuthority)
         assertFalse(assertNotNull(invocation.linearSource).acceptedModelExact)
         assertSame(relative.semantics, invocation.linearSource?.view?.model?.semantics)
-        assertFalse(SourceExecutionRequest(invocation).theory.sourceRefutationCenterStep)
     }
 
     @Test
@@ -171,39 +160,6 @@ class LinearToleranceAuthorityTest(private val sense: ObjectiveSense) {
         assertFalse(assertNotNull(invocation.linearSource).acceptedModelExact)
         assertFalse(assertNotNull(invocation.linearSource).automaticCutSelection)
         assertSame(integral.semantics, invocation.linearSource?.view?.model?.semantics)
-        assertFalse(SourceExecutionRequest(invocation).theory.sourceRefutationCenterStep)
-    }
-
-    @Test
-    fun `automatic center progress should retain explicit ordinary cut controls`() {
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
-        val authority = assertNotNull(assertNotNull(invocation.linearSource).toleranceAuthority)
-        for (cuts in listOf(false, true)) {
-            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf(
-                "source-cuts=$cuts", "source-point-cuts=false", "source-aggregate-cuts=false")))
-
-            val resolved = FiniteCompanionPolicy(request.theory, request.automaticLinearCuts).resolve(authority)
-
-            assertEquals(cuts, resolved.sourceCuts)
-            assertFalse(resolved.sourcePointCuts)
-            assertFalse(resolved.sourceAggregateCuts)
-            assertTrue(resolved.sourceRefutationCenterStep)
-            assertFalse(resolved.sourceIncumbentCompletion)
-        }
-    }
-
-    @Test
-    fun `exact feasibility should retain disabled automatic center progress`() {
-        val exact = LinearSourceProblem(source.variableValues.toList(), source.rowValues.toList(), source.objective,
-            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = SourceTolerance()).resolve())
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(exact, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
-
-        val request = SourceExecutionRequest(invocation)
-
-        assertFalse(assertNotNull(invocation.linearSource).automaticCutSelection)
-        assertFalse(request.theory.sourceRefutationCenterStep)
     }
 
     @Test
