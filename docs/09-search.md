@@ -378,18 +378,24 @@ The ordinary reduced-cost/fractionality score and configured selector supply the
 baseline variable. A paid sparse index retains variables whose own two directional
 gain pairs have been stable and positive; each lookup rechecks their age and current
 live decision eligibility. The index has at most 8,192 entries and resets with its
-source history. A variable proposal requires reliable numeric evidence for the
-baseline and another live variable. Candidate directions use the lower of their two
-recent samples; baseline directions use the larger. After scaling by the current
-fractional movement, the candidate's smaller directional prediction must strictly
+source history. When the ordinary live baseline has a current, exactly integral LP
+value, a reliable fractional candidate with positive predictions can take priority.
+The integral point supplies current fractionality information, not a measured zero
+child gain. Fractional baselines require their own reliable numeric evidence.
+Missing, nonfinite, unrepresentable or merely near-integral baseline points cannot
+use the integral case. Both cases require a positive finite remaining gap.
+Candidate directions use the lower of their two
+recent samples; fractional baseline directions use the larger. For a fractional
+baseline, after scaling by the current fractional movement, the candidate's smaller
+directional prediction must strictly
 exceed the baseline's smaller directional prediction. Equal or overlapping observed
 ranges keep the ordinary baseline. The comparison also applies when both minima
 are below the positive finite remaining gap. A nonpositive or unavailable gap,
 or positive underflow in a lower prediction, declines selection. Candidates rank
 by their smaller lower prediction, with variable identity breaking ties between
 improving candidates.
-A measured zero baseline is known; missing evidence supplies no comparison.
-The same current fractional point scales both variables' predictions. A variable
+A measured zero gain in a fractional baseline is known; missing numeric evidence
+there supplies no comparison. Each fractional point scales its variable's predictions. A variable
 nomination records its point and solve stamp; only its matching adjacent committed
 split, after freshness and cancellation checks, counts as applied advice. Withholding
 keeps the ordinary baseline with the same selection and commitment costs.

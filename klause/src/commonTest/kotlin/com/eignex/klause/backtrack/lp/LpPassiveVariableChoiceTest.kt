@@ -56,7 +56,7 @@ class LpPassiveVariableChoiceTest {
     @Test
     fun `a matching passive commitment is attributed once`() {
         for ((baseline, proposal, decision) in listOf(
-            Triple(LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25),
+            Triple(LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.0),
                 LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 1.75), SearchDecision.IntAtLeast(1, 2L)),
             Triple(LpPassiveVariableChoice.Candidate(VarRef.Bool(0), 0.25),
                 LpPassiveVariableChoice.Candidate(VarRef.Bool(1), 0.75), SearchDecision.Bool(2)),
@@ -76,7 +76,7 @@ class LpPassiveVariableChoiceTest {
 
     @Test
     fun `withheld passive commitments remain distinct from applied changes`() {
-        val baseline = LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25)
+        val baseline = LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.0)
         val proposal = LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75)
         val events = ArrayList<String>()
         val choice = LpPassiveVariableChoice(false, events::add, {})
@@ -113,20 +113,26 @@ class LpPassiveVariableChoiceTest {
     @Test
     fun `unreliable or invalid passive points supply no nomination`() {
         val baseline = LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25)
-        for ((proposal, reliable) in listOf(
-            LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75) to false,
-            LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), Double.NaN) to true,
-            LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 1.0) to true,
-            LpPassiveVariableChoice.Candidate(VarRef.Bool(1), 1.5) to true,
+        for ((reference, proposal, reliable) in listOf(
+            Triple(baseline, LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75), false),
+            Triple(baseline, LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), Double.NaN), true),
+            Triple(baseline, LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 1.0), true),
+            Triple(baseline, LpPassiveVariableChoice.Candidate(VarRef.Bool(1), 1.5), true),
+            Triple(LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), Double.NaN),
+                LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75), true),
+            Triple(LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), Long.MAX_VALUE.toDouble()),
+                LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75), true),
+            Triple(LpPassiveVariableChoice.Candidate(VarRef.Bool(0), 1.5),
+                LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75), true),
         )) {
             val events = ArrayList<String>()
             val choice = LpPassiveVariableChoice(true, events::add, {})
 
-            val selected = choice.select(proposal, baseline, 1, { true }, { reliable })
-            choice.branch(baseline.variable, 1)
+            val selected = choice.select(proposal, reference, 1, { true }, { reliable })
+            choice.branch(reference.variable, 1)
             choice.commit(SearchDecision.IntAtMost(0, 0L)) { true }
 
-            assertEquals(baseline.variable, selected)
+            assertEquals(reference.variable, selected)
             assertNull(choice.nominatedVariable)
             assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
         }

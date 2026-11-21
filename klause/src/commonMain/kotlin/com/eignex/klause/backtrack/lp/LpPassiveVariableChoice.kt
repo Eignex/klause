@@ -36,7 +36,7 @@ internal class LpPassiveVariableChoice(
         observe("PASSIVE_VARIABLE_SELECTION")
         charge(16L)
         if (!fresh()) return baseline.variable.also { observe("PASSIVE_VARIABLE_STALE") }
-        if (!proposal.fractional() || !baseline.fractional() || !reliable()) {
+        if (!proposal.fractional() || !baseline.validPoint() || !reliable()) {
             observe("PASSIVE_VARIABLE_UNRELIABLE")
             return baseline.variable
         }
@@ -73,8 +73,12 @@ internal class LpPassiveVariableChoice(
 
     private fun Candidate.fractional(): Boolean {
         val fraction = point - floor(point)
-        return point.isFinite() && fraction > POINT_TOLERANCE && fraction < 1.0 - POINT_TOLERANCE &&
-            (variable !is VarRef.Bool || point in 0.0..1.0)
+        return validPoint() && fraction > POINT_TOLERANCE && fraction < 1.0 - POINT_TOLERANCE
+    }
+
+    private fun Candidate.validPoint(): Boolean = point.isFinite() && when (variable) {
+        is VarRef.Bool -> point in 0.0..1.0
+        is VarRef.IntVar -> point >= Long.MIN_VALUE.toDouble() && point < Long.MAX_VALUE.toDouble()
     }
 
     private fun Candidate.matches(decision: SearchDecision): Boolean = when (decision) {

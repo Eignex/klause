@@ -279,7 +279,20 @@ internal class LpHints(
                 solveStamp == stamp && passivePointCurrent()
         val workingCutoff = cutoff - scopeConstant.toDouble()
         if (!available(baseline) || !current()) return baseline
-        val reference = history.minimumPrediction(baseline, value(baseline), workingCutoff, upper = true)
+        fun baselineThreshold(): Double {
+            charge(12L)
+            if (!current() || !history.hasPositiveGap(workingCutoff)) return Double.NaN
+            val baselineValue = value(baseline)
+            val integral = baselineValue.isFinite() && baselineValue == floor(baselineValue) && when (baseline) {
+                is VarRef.Bool -> baselineValue in 0.0..1.0
+                is VarRef.IntVar -> baselineValue >= Long.MIN_VALUE.toDouble() &&
+                    baselineValue < Long.MAX_VALUE.toDouble()
+            }
+            if (!integral) return history.minimumPrediction(baseline, baselineValue, workingCutoff, upper = true)
+            observe("PASSIVE_VARIABLE_INTEGRAL_BASELINE")
+            return if (current()) 0.0 else Double.NaN
+        }
+        val reference = baselineThreshold()
         if (!current()) return baseline
         if (!reference.isFinite()) {
             observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
@@ -312,7 +325,7 @@ internal class LpHints(
             LpPassiveVariableChoice.Candidate(baseline, value(baseline)), stamp, ::current,
             reliable = {
                 val proposedGain = history.minimumPrediction(proposed, value(proposed), workingCutoff)
-                val baselineGain = history.minimumPrediction(baseline, value(baseline), workingCutoff, upper = true)
+                val baselineGain = baselineThreshold()
                 current() && available(proposed) && available(baseline) &&
                     proposedGain.isFinite() && baselineGain.isFinite() && proposedGain > baselineGain
             },

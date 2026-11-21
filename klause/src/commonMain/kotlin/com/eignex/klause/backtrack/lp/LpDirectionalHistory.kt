@@ -178,6 +178,11 @@ internal class LpDirectionalHistory(
         }
     }
 
+    fun hasPositiveGap(cutoff: Double): Boolean {
+        val gap = cutoff - objective
+        return gap.isFinite() && gap > 0.0
+    }
+
     fun minimumPrediction(variable: VarRef, value: Double, cutoff: Double, upper: Boolean = false): Double {
         val version = generation
         charge(24L)
