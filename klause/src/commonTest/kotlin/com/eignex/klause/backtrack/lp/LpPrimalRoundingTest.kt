@@ -6,10 +6,13 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
+import com.eignex.klause.lp.bounding.boundedLpEngineProblem
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -37,6 +40,40 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalRoundingTest {
+    @Test
+    fun `automatic continued root points survive a slice cancelled during bound checking`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 2L })
+        var checkingArmed = false
+        var checkingStarted = false
+        val query = ExecutionControl { checkingStarted }
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ ->
+            if (checkingArmed) checkingStarted = true
+            !checkingArmed
+        })
+        LpEngine(problem, objective, LpParams(lpConfig = LpConfig.AUTO),
+            SolveStatsSink("continued-root-point-before-bound-check"), context,
+            nodeWorkAllowance = { 1_000_000L }).use { engine ->
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            assertTrue(engine.automaticSparseTrial)
+            val completed = assertNotNull(engine.rootRoundingWarmStart)
+            assertNotNull(completed.primal)
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, completed.relaxation,
+                completed.basis, sourceProblem = problem)
+            checkingArmed = true
+
+            val sample = engine.lpRoundingProbe(objective, query)
+            val retained = engine.retainRootPrimalTargets(ExecutionControl.Never)
+
+            assertTrue(checkingStarted)
+            assertNull(sample)
+            assertTrue(retained)
+        }
+    }
+
     @Test
     fun `ordinary integer rounding keeps nearest targets without a retained root plan`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) },

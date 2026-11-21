@@ -101,13 +101,16 @@ internal fun LpEngine.lpRoundingProbe(
                     if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
                         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis,
                             sourceProblem = sourceProblem)
+                        if (automaticSparseTrial && iterate.optimal && ownsRootPrimalModel(relaxation.model)) {
+                            retainRootPrimalGuidance(relaxation, iterate, cancellation)
+                        }
                     }
                 }
             } catch (_: CheckedLongOverflowException) {
                 return null
             } ?: return null
             if (ownsRootPrimalModel(relaxation.model)) {
-                retainRootPrimalGuidance(relaxation, result, cancellation)
+                if (!automaticSparseTrial) retainRootPrimalGuidance(relaxation, result, cancellation)
             } else retainRoundingPrimalGuidance(relaxation, result, objective, sourceProblem)
             rootRoundingWarmStart?.takeIf {
                 it.objective === objective && it.relaxation === relaxation && it.knownColumns == null
@@ -776,12 +779,14 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
             observed = true
             observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
         }
-        if (result != null) checkContinuedRootBound(model, result, token)
         val termination = propagator.floatTermination
+        val observedBeforeCheck = automaticSparseTrial && result?.optimal == true && observeResult != null
+        if (observedBeforeCheck) observeResult?.invoke(result, termination)
+        if (result != null) checkContinuedRootBound(model, result, token)
         outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {
             "RETAINED_${termination?.name ?: "OTHER"}"
         }
-        observeResult?.invoke(result, termination)
+        if (!observedBeforeCheck) observeResult?.invoke(result, termination)
         if (result?.optimal != true && (propagator.floatPaused || termination == LpFloatTermination.WORK ||
                 termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED)
         ) {

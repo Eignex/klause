@@ -411,8 +411,9 @@ handoff. This scheduling hint supplies no point or certificate and spends the ex
 caller slices and cumulative root grant. Replacing the root owner or warm start clears it.
 The handoff retires the unfinished cursor and skips further root consultations for
 that search binding; the accepted global bound remains available.
-An automatic source-root query copies its completed point before checking the bound,
-within the same work and storage grants. A query slice cancelled during that check can
+Automatic initial queries and completed rounding continuations copy their full
+source-root point before checking the bound, within the same work and storage grants.
+A query slice cancelled during that check can
 leave the private point available to the live invocation; it supplies no bound or witness.
 When an automatic query completes a full source-root point during a consultation,
 the same sliced finite worker can transfer it through the ordinary target handoff
