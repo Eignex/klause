@@ -768,6 +768,18 @@ rational reconstruction and primal-only exact basis verification, publishing no 
 bound or conflict; recovery declines supply neither a conflict nor exhaustion
 authority.
 
+Private rounded-incumbent completion can retain an exact recovery cursor bound to
+the same coordinate, point, row and inactive-row objects and cumulative limits.
+Row scans, reconstruction, substitution, component preparation and satisfaction
+checks retain their entry positions across offers. Paid scalar and entry steps
+commit before observing another offer stop; a changed input or terminal limit
+retires the cursor. Residual owners retain their immutable local rows, and every
+completed point still requires the full private-source witness check. Ordinary
+numerical recovery keeps its own completion policy.
+Private residual completion can retain a fully prepared sparse admission when an
+offer stops before the solve begins. Its owner resumes under the same cumulative
+budget, including the consumed admission; this grants no additional operation.
+
 `solver.pipeline.SourceNumericalFeedback` delivers completed queries to decision
 consumers. Latest-query consumers own one bounded slot; prefix consumers and
 inspection observers share a bounded archive of the first queries. A record exposes

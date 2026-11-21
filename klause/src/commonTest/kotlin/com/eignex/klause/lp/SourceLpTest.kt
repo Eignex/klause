@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -17,7 +18,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.TimeSource
 
-class SourceLpTest {
+class SourceLpTest : RuntimeInitializedTest() {
     @Test
     fun `small input admission should distinguish dimension entry and scalar bit declines`() {
         val cases = listOf(

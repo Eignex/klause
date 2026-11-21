@@ -35,6 +35,7 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -48,6 +49,76 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `a private numerical pause should retain completion eligibility at the final admission`() {
+        val source = SourceProofContext(scope, setOf(integer, real), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE,
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(integer to BigFraction.ONE, real to BigFraction.ofLong(2)))
+        val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L)
+        val budget = SourceLpBudget(maxOperations = 1, funding = funding)
+
+        LinearAuthority(budget, retainLp = true,
+            guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
+            val invocation = LinearAuthorityInvocation(source, TheoryParams(sourceLpOperations = 1),
+                borrowedAuthority = authority, borrowedBudget = budget, boundOrdered = true,
+                proximityCenter = Sample(booleanArrayOf(), longArrayOf(3), doubleArrayOf(0.0)),
+                proximityRounding = true)
+            invocation.use {
+                assertNull(it.runSlice(ExecutionControl.Never, 100, -1) { _, _ -> })
+                assertEquals(1, budget.operations)
+                assertNull(it.stats.smt.completeSearchStages?.get("numericalProximityCompletionTrials"))
+                assertTrue(it.hasPendingProximityCompletion)
+
+                repeat(32) { _ -> if (!it.isDone) it.runSlice(ExecutionControl.Never, 100, -1) { _, _ -> } }
+
+                assertEquals(BigFraction.ofLong(3), it.snapshot(TerminationReason.BudgetExhausted).value)
+                assertEquals(1, budget.operations)
+                assertFalse(it.hasPendingProximityCompletion)
+            }
+            assertFalse(invocation.hasPendingProximityCompletion)
+        }
+    }
+
+    @Test
+    fun `private root completion should retain its paid phase before claiming a rounded trial`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val rows = columns.flatMapIndexed { index, column ->
+            listOf(
+                "lower$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "upper$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.ONE), BigFraction.ONE)),
+                "cover$index" to SourcePremise(SourceInequality(mapOf(column to BigFraction.MINUS_ONE,
+                    columns[(index + 1) % columns.size] to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            )
+        }.toMap()
+        val source = SourceProofContext(scope, columns.toSet(), rows, columns.associateWith { BigFraction.ONE })
+        val invocation = LinearAuthorityInvocation(source,
+            TheoryParams(maxDecisions = 1, sourceLpOperations = 1, sourceCuts = false), boundOrdered = true,
+            proximityCenter = Sample(booleanArrayOf(), LongArray(3) { 1 }), proximityRounding = true)
+
+        invocation.use {
+            assertNull(it.runSlice(ExecutionControl.Never, 100, -1) { _, _ -> })
+            assertTrue(it.hasPendingProximityCompletion)
+            val before = it.stats
+            assertEquals(0L, before.openTheory.openTheoryDecisions)
+            assertNull(before.smt.completeSearchStages?.get("numericalProximityCompletionTrials"))
+            assertEquals(1L, before.smt.completeSearchStages?.get("numericalPrimalGuidanceNativePointPresent"))
+
+            repeat(8) { _ -> if (!it.isDone) it.runSlice(ExecutionControl.Never, 100, -1) { _, _ -> } }
+
+            assertFalse(it.hasPendingProximityCompletion)
+            assertEquals(1L, it.stats.openTheory.openTheoryDecisions)
+            assertEquals(before.openTheory.openTheoryChecks + 1L, it.stats.openTheory.openTheoryChecks)
+            assertEquals(1L, it.stats.smt.sourceLp.operations)
+            assertEquals(before.smt.completeSearchStages?.get("numericalPrimalGuidanceNativePointPresent"),
+                it.stats.smt.completeSearchStages?.get("numericalPrimalGuidanceNativePointPresent"))
+        }
+        assertFalse(invocation.hasPendingProximityCompletion)
+    }
 
     @Test
     fun `an ordinary improvement should retire an active advisory query`() {

@@ -33,6 +33,7 @@ internal class LinearProximityCompletion(
     private var seed: Sample? = null
     var checked: Sample? = null
         private set
+    val pending: Boolean get() = claimed && !finished
 
     fun takeChecked(): Sample? = checked.also { checked = null }
 

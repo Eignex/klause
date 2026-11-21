@@ -18,11 +18,12 @@ internal data class LinearPrimalRecoveryLimits(
     val entries: Long = 65_536L,
 )
 
-internal class LinearPrimalRecoveryProgress {
+internal class LinearPrimalRecoveryProgress(val retainPreparation: Boolean = false) {
     var work: Long = 0L
     var allocation: Long = 0L
     var pending = false
     val completed = mutableMapOf<Int, List<BigFraction>>()
+    var cursor: LinearPrimalRecoveryCursor? = null
 }
 
 // Recovered coordinates remain proposals; the original-source checker owns witness admission.
@@ -43,6 +44,18 @@ internal fun recoverLinearPrimal(
     val meter = LinearPrimalMeter(limits, cancellation, progress)
     observe("PrimalRecoveryAttempts", 1L)
     return try {
+        if (progress.retainPreparation) {
+            val cursor = progress.cursor ?: LinearPrimalRecoveryCursor(coordinates, point, rows, inactive, limits)
+                .also { progress.cursor = it }
+            if (!cursor.matches(coordinates, point, rows, inactive, limits)) {
+                observe("PrimalRecoveryInputChanged", 1L)
+                return cursor.finish()
+            }
+            val recovered = cursor.advance(meter, cancellation, complete, observe)
+            if (cancellation()) return null
+            if (recovered == null && !progress.pending) cursor.finish()
+            return recovered
+        }
         meter.reserve(coordinates.size.toLong() + rows.size, 256L * coordinates.size + 96L * rows.size)
         if (coordinates.size != point.size) return null
         for (id in coordinates.indices) {
@@ -182,6 +195,7 @@ internal fun recoverLinearPrimal(
         } else null
     } catch (stop: LinearPrimalStop) {
         progress.pending = false
+        if (stop.reason != "Stopped") progress.cursor?.finish()
         observe("PrimalRecovery${stop.reason}", 1L)
         null
     } finally {
@@ -190,7 +204,7 @@ internal fun recoverLinearPrimal(
     }
 }
 
-private class LinearPrimalStop(val reason: String) : RuntimeException()
+internal class LinearPrimalStop(val reason: String) : RuntimeException()
 
 internal fun refineLinearPrimal(
     coordinates: List<SourceCoordinate>,
@@ -268,15 +282,30 @@ internal fun refineLinearPrimal(
     }
 }
 
-private class LinearPrimalMeter(
+internal class LinearPrimalMeter(
     private val limits: LinearPrimalRecoveryLimits,
     private val token: ExecutionControl,
     private val progress: LinearPrimalRecoveryProgress,
 ) {
+    private var committing = false
+
+    fun checkpoint() {
+        if (token()) throw LinearPrimalStop("Stopped")
+    }
+
+    fun <T> atomic(step: () -> T): T {
+        checkpoint()
+        committing = true
+        return try {
+            step()
+        } finally {
+            committing = false
+        }
+    }
 
     fun reserve(units: Long, bytes: Long = 0L) {
         val reason = when {
-            token() -> "Stopped"
+            !committing && token() -> "Stopped"
             units > limits.work - progress.work -> "WorkLimit"
             bytes > limits.allocation - progress.allocation -> "AllocationLimit"
             else -> null
@@ -285,7 +314,7 @@ private class LinearPrimalMeter(
         progress.work += units
         progress.allocation += bytes
         token.charge(units)
-        if (token()) throw LinearPrimalStop("Stopped")
+        if (!committing && token()) throw LinearPrimalStop("Stopped")
     }
 
     fun number(value: BigFraction): BigFraction {

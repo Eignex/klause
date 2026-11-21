@@ -77,10 +77,15 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
                 var done = false
                 repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
+                val diagnostic = "lp=${repair.stats.smt.sourceLp} " +
+                    repair.stats.smt.completeSearchStages?.filterKeys {
+                        "CutLifecycle" !in it && ("Proximity" in it || "Primal" in it)
+                    }
                 val result = assertIs<MinimizeResult.WithSample>(
-                    search.minimizeResult(TerminationReason.BudgetExhausted))
-                assertEquals(BigFraction.ofLong(2), objective.evaluateExact(result.sample))
+                    search.minimizeResult(TerminationReason.BudgetExhausted), diagnostic)
+                assertEquals(BigFraction.ofLong(2), objective.evaluateExact(result.sample), diagnostic)
                 assertTrue(repair.isProximityDiscovery(result.sample))
+                assertTrue(repair.stats.smt.sourceLp.operations <= 4L)
                 assertEquals(SourceEvidenceCheck.Checked, verifier.verify(SourceEvidence(source.scope,
                     SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
             }

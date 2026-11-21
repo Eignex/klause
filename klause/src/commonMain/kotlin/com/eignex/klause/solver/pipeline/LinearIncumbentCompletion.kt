@@ -35,10 +35,11 @@ internal class LinearIncumbentCompletion(
     private val ownedSeed: Boolean = false,
     private val observe: (String, Long) -> Unit,
 ) : AutoCloseable {
-    private class Attempt(val key: LinearIncumbentSharing.Key) {
+    private class Attempt(val key: LinearIncumbentSharing.Key, ownedSeed: Boolean) {
         var query: LinearAuthorityQuery? = null
         var point: List<BigFraction>? = null
-        val progress = LinearPrimalRecoveryProgress()
+        var pointPreparation: ArrayList<BigFraction>? = null
+        val progress = LinearPrimalRecoveryProgress(retainPreparation = ownedSeed)
         var residual: LinearResidualCompletion? = null
         var finished = false
         var checked: Sample? = null
@@ -68,7 +69,7 @@ internal class LinearIncumbentCompletion(
         } finally {
             val attempt = ownedAttempt?.attempt
             if (returned && completed == null && ownedSeed &&
-                (attempt == null || attempt.query == null || attempt.point == null) &&
+                (attempt == null || attempt.query == null) &&
                 (cancellation() || budget.funding?.paused == true)) {
                 preparationInterrupted = true
                 observe("PreparationInterrupted", 1L)
@@ -85,7 +86,7 @@ internal class LinearIncumbentCompletion(
         val token = metered(cancellation, checking = false)
         if (token()) return null
         val owned = ownedAttempt
-        if (owned != null && (source !== owned.source || seed !== owned.seed)) return null
+        if (owned != null && (source !== owned.source || seed !== owned.seed)) return finish(owned.attempt, null)
         val attempt = owned?.attempt ?: findAttempt(source, seed, token)?.also {
             if (ownedSeed) ownedAttempt = OwnedAttempt(source, seed, it)
         } ?: return null
@@ -99,19 +100,24 @@ internal class LinearIncumbentCompletion(
             return finish(attempt, point)
         }
         if (token()) return null
-        if (attempt.query == null) {
-            val prepared = prepare(source, seed, token)
+        if (attempt.query == null || attempt.point == null) {
+            val prepared = attempt.query ?: prepare(source, seed, token)
             if (prepared == null) {
                 if (!token()) finish(attempt, null)
                 return null
             }
-            val point = seedPoint(prepared, seed, token)
+            if (ownedSeed && attempt.query == null) {
+                attempt.query = prepared
+                observe("QueryRetained", 1L)
+            }
+            val point = seedPoint(prepared, seed, token, attempt.takeIf { ownedSeed })
             if (point == null) {
                 if (!token()) finish(attempt, null)
                 return null
             }
             attempt.query = prepared
             attempt.point = point
+            attempt.pointPreparation = null
         }
         val query = requireNotNull(attempt.query)
         val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), query.rows,
@@ -125,7 +131,8 @@ internal class LinearIncumbentCompletion(
                 if (budget.funding?.exhausted == true) return@recovery null
                 val costs = List(columns.size) { query.costs[columns[it]] }
                 val objective = costs.takeIf { it.any { cost -> !cost.isZero } }
-                val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy())
+                val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy(),
+                    retainPreparation = ownedSeed)
                     .also { attempt.residual = it }
                 residual.complete(rows, columns.size, active, ::recoveryCost, costs = objective) {
                     if (objective != null) null else LinearAuthorityLp(budget).use { completion ->
@@ -193,7 +200,7 @@ internal class LinearIncumbentCompletion(
             observe("RetentionAllocation", 1L)
             return null
         }
-        return Attempt(LinearIncumbentSharing.Key(source, seed, originalCheck)).also {
+        return Attempt(LinearIncumbentSharing.Key(source, seed, originalCheck), ownedSeed).also {
             budget.funding?.charge(0L, seedBytes)
             attempts += it
             observe("Attempts", 1L)
@@ -261,10 +268,20 @@ internal class LinearIncumbentCompletion(
         return LinearIncumbentSharing.Key(source, seed, originalCheck).takeUnless { checking() }
     }
 
-    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl): List<BigFraction>? {
-        val point = ArrayList<BigFraction>(query.coordinates.size)
-        for (coordinate in query.coordinates) {
+    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl,
+        attempt: Attempt? = null): List<BigFraction>? {
+        val point = attempt?.pointPreparation ?: run {
+            if (attempt != null) {
+                val bytes = 256L + 16L * query.coordinates.size
+                if (token() || budget.funding?.remainingAllocation?.let { it < bytes } == true) return null
+                budget.observe(preparation = 1L)
+                budget.funding?.charge(0L, bytes)
+            }
+            ArrayList<BigFraction>(query.coordinates.size).also { attempt?.pointPreparation = it }
+        }
+        while (point.size < query.coordinates.size) {
             if (token()) return null
+            val coordinate = query.coordinates[point.size]
             // Floating coordinates guide reconstruction; source checks establish exact authority.
             val value = if (coordinate.kind == SourceCoordinate.Kind.Integer) {
                 BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
@@ -355,7 +372,9 @@ internal class LinearIncumbentCompletion(
         attempt.finished = true
         attempt.query = null
         attempt.point = null
+        attempt.pointPreparation = null
         attempt.progress.completed.clear()
+        attempt.progress.cursor = null
         attempt.residual?.close()
         attempt.residual = null
         return point

@@ -1256,6 +1256,28 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `an exhausted private owner without a pending trial should refuse fresh queries`() {
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), null)
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceLpOperations = 0),
+            incumbentProximity = true).use { repair ->
+            repeat(2) {
+                assertTrue(repair.exhausted)
+                val attempt = repair.attempt(condition, ExecutionControl.Never)
+
+                assertEquals(ExactNeighborhoodResult.Undecided, attempt.result)
+                assertEquals(TerminationReason.BudgetExhausted, attempt.reason)
+                assertEquals(0L, repair.stats.smt.sourceLp.operations)
+            }
+        }
+    }
+
+    @Test
     fun `a checked center should improve within one LP operation`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = arrayOf(

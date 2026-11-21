@@ -198,9 +198,14 @@ internal class SourceLpBudget(
 
     fun admitSparse(
         cancellation: ExecutionControl,
+        retainPreparedOnStop: Boolean = false,
         prepare: (ExecutionControl) -> SparseSourceLpPreparation,
-    ): SourceLpSparseAdmission? = runSparse(cancellation, prepare) { prepared, _ ->
-        SourceLpSparseAdmission(this, prepared)
+    ): SourceLpSparseAdmission? {
+        var completed: SparseSourceLp? = null
+        val admitted = runSparse(cancellation, { active ->
+            prepare(active).also { completed = it.prepared }
+        }) { prepared, _ -> SourceLpSparseAdmission(this, prepared) }
+        return admitted ?: completed?.takeIf { retainPreparedOnStop }?.let { SourceLpSparseAdmission(this, it) }
     }
 
     fun admitSparse(prepared: SparseSourceLp, cancellation: ExecutionControl): SourceLpSparseAdmission? =

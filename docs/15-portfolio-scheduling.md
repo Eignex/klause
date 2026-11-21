@@ -522,15 +522,25 @@ and work for each private consultation. The private search visits the center's s
 of each integer split first and retains sibling alternatives; ordinary traversal
 retains bound order. A private root with fractional binary guidance can try one
 rounded assignment before branching, with ties directed away from its center.
+The completed fractional root yields once before the rounded trial starts, retaining
+its result and charged observations for the next existing consultation.
 Receiving integer pins constrain that assignment and continuous coordinates are
 completed under the full private source, including the aspiration and radius rows.
 The trial spends one shared decision and complete check and uses the same LP
 operation, work and allocation ledger. Its rounded-point preparation and active
-recovery cursors survive pauses without another claim or root relaxation. Query
-setup interrupted before retaining its seed point ends that trial, retaining its
-cost instead of repeating its reservation on another offer. A declined trial retains the
+recovery cursors survive pauses without another claim or root relaxation. Private
+recovery retains row validation, reconstruction, discrete substitution, component
+preparation and exact row checks at paid entry boundaries under immutable query and
+seed identity. Resumption retains the same cumulative recovery limits. Query
+setup interrupted before retaining a complete query ends that trial, retaining its
+cost instead of repeating its reservation on another offer. A retained query owns
+its paid seed-point prefix and resumes at the next coordinate. A declined trial retains the
 ordinary root result and its alternatives; it supplies no bound or refutation.
 Only a completed source witness enters the existing publication checks.
+An admitted private numerical query or residual can finish within its existing
+owner after the LP operation count reaches its cap; the budget refuses every fresh
+admission. A completed private sparse preparation retains its admission when its offer ends
+before the solve starts. Other limits and retirement conditions still apply.
 Advisory joint repair retains ordinary root guidance for
 fallback before preparing private neighborhoods. Its first query uses the ordinary
 rounded root; completed advisory queries alternate with ordinary repair queries.

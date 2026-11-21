@@ -102,6 +102,11 @@ internal class LinearAuthorityTraversal(
         }
     }
     private var proximityRootResult: LinearAuthorityResult? = null
+    private var proximityRootCompletionPending = false
+    private var closed = false
+    val hasPendingProximityCompletion: Boolean get() =
+        !closed && (proximityRootCompletionPending || proximityCompletion?.pending == true ||
+            (proximityCompletion != null && current.pending))
     private val authority = borrowedAuthority ?: LinearAuthority(budget, { shape ->
         observations["numericalLpInputMaxRows"] =
             maxOf(observations["numericalLpInputMaxRows"] ?: 0L, shape.inputRows.toLong())
@@ -140,8 +145,11 @@ internal class LinearAuthorityTraversal(
     }
 
     override fun close() {
+        if (closed) return
+        closed = true
         proximityCompletion?.close()
         proximityRootResult = null
+        proximityRootCompletionPending = false
         activeRows?.close()
         feedback?.detach(authority)
         refutations?.clear()
@@ -501,9 +509,15 @@ internal class LinearAuthorityTraversal(
             observations[key] = if ("Max" in stage) maxOf(previous, count) else previous + count
         }
         if (current === root && proximityCompletion != null && !result.paused) {
+            val retained = proximityRootResult != null
             proximityRootResult = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
             current.pending = true
+            if (!retained && result.evidence == null && result.incumbent == null && result.fractional.isNotEmpty()) {
+                proximityRootCompletionPending = true
+                return SearchNodeDisposition.Pause
+            }
             if (proximityCompletion.advance(result, context, proximityStop)) return SearchNodeDisposition.Pause
+            proximityRootCompletionPending = false
             proximityCompletion.takeChecked()?.let { sample ->
                 onIncumbent(sample)
                 return SearchNodeDisposition.Pause

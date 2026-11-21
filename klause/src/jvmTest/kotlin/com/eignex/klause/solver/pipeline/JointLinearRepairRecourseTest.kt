@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -19,13 +20,16 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class JointLinearRepairRecourseTest : RuntimeInitializedTest() {
+@RunWith(Parameterized::class)
+class JointLinearRepairRecourseTest(private val quantum: Long) : RuntimeInitializedTest() {
     @Test
     fun `private exchanges should follow continuous recourse between binary decisions`() {
         val links = (0..3).map { id ->
@@ -48,6 +52,7 @@ class JointLinearRepairRecourseTest : RuntimeInitializedTest() {
         val verifier = SourceEvidenceVerifier(source.withLinearAuthority())
 
         JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 3, sourceLpOperations = 4),
+            guidancePolicy = SparseSourceLpPolicy(quantum = quantum),
             external = { seed }, incumbentProximity = true, incumbentCompletionCheck = { sample, _, token ->
                 verifier.verify(SourceEvidence(source.scope, SourceClaim.Witness(sample),
                     SourceDerivation.SourceWitness), token) == SourceEvidenceCheck.Checked
@@ -56,13 +61,24 @@ class JointLinearRepairRecourseTest : RuntimeInitializedTest() {
                 var done = false
                 repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
+                val diagnostic = "lp=${repair.stats.smt.sourceLp} " +
+                    repair.stats.smt.completeSearchStages?.filterKeys {
+                        "CutLifecycle" !in it && ("Proximity" in it || "Primal" in it)
+                    }
                 val result = assertIs<MinimizeResult.WithSample>(
-                    search.minimizeResult(TerminationReason.BudgetExhausted))
-                assertEquals(BigFraction.ofLong(2), objective.evaluateExact(result.sample))
+                    search.minimizeResult(TerminationReason.BudgetExhausted), diagnostic)
+                assertEquals(BigFraction.ofLong(2), objective.evaluateExact(result.sample), diagnostic)
                 assertTrue(repair.isProximityDiscovery(result.sample))
+                assertTrue(repair.stats.smt.sourceLp.operations <= 4L)
                 assertEquals(SourceEvidenceCheck.Checked, verifier.verify(SourceEvidence(source.scope,
                     SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
             }
         }
+    }
+
+    companion object {
+        @JvmStatic
+        @Parameterized.Parameters(name = "quantum={0}")
+        fun cases() = listOf(SparseSourceLpPolicy().quantum, 1L).map { arrayOf(it) }
     }
 }

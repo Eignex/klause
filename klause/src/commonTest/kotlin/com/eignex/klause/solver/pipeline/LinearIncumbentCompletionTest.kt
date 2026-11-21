@@ -42,6 +42,113 @@ class LinearIncumbentCompletionTest {
     private val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.333))
 
     @Test
+    fun `owned seed point preparation should retain its completed query and paid scalar prefix`() {
+        var expectedAllocation: Long? = null
+        for (phase in listOf("none", "query", "scalar")) {
+            val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
+            var ready = false
+            var paused = false
+            var interrupted = false
+            var pointCharges = 0
+            var queries = 0L
+            var attempts = 0L
+            var originalChecks = 0
+            val budget = SourceLpBudget(funding = funding, onWork = {
+                if (ready && it.preparationWork > 0L) {
+                    pointCharges++
+                    if (phase == "scalar" && pointCharges == 2 && !interrupted) {
+                        interrupted = true
+                        paused = true
+                    }
+                }
+            })
+            val token = ExecutionControl { paused }
+            LinearIncumbentCompletion(budget, originalCheck = { _, _, _ ->
+                originalChecks++
+                true
+            }, ownedSeed = true) { stage, count ->
+                if (stage == "Attempts") attempts += count
+                if (stage == "QueryRetained") {
+                    queries += count
+                    ready = true
+                    if (phase == "query") {
+                        interrupted = true
+                        paused = true
+                    }
+                }
+            }.use { completion ->
+                var point = completion.complete(source, seed, token)
+                if (phase != "none") {
+                    assertNull(point)
+                    assertTrue(interrupted)
+                    paused = false
+                    point = completion.complete(source, seed, token)
+                }
+
+                assertEquals(listOf(third), assertNotNull(point).exactReals)
+                assertEquals(1L, attempts)
+                assertEquals(1L, queries)
+                assertEquals(1, originalChecks)
+                if (expectedAllocation == null) expectedAllocation = funding.allocated
+                assertEquals(expectedAllocation, funding.allocated)
+            }
+        }
+    }
+
+    @Test
+    fun `changed owned seed identity should retire a retained query before recovery`() {
+        val budget = SourceLpBudget()
+        var paused = false
+        var queries = 0L
+        var originalChecks = 0
+        val token = ExecutionControl { paused }
+        LinearIncumbentCompletion(budget, originalCheck = { _, _, _ ->
+            originalChecks++
+            true
+        }, ownedSeed = true) { stage, count ->
+            if (stage == "QueryRetained") {
+                queries += count
+                paused = true
+            }
+        }.use { completion ->
+            assertNull(completion.complete(source, seed, token))
+            paused = false
+
+            assertNull(completion.complete(source, seed.copy(), token))
+            assertNull(completion.complete(source, seed, token))
+
+            assertEquals(1L, queries)
+            assertEquals(0, originalChecks)
+            assertEquals(0, budget.operations)
+        }
+    }
+
+    @Test
+    fun `resumed owned recovery should retain original source rejection`() {
+        var paused = false
+        var interrupted = false
+        var originalChecks = 0
+        val token = ExecutionControl { paused }
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck = { _, _, _ ->
+            originalChecks++
+            false
+        }, ownedSeed = true) { stage, _ ->
+            if (stage == "PrimalRecoveryAttempts" && !interrupted) {
+                interrupted = true
+                paused = true
+            }
+        }.use { completion ->
+            assertNull(completion.complete(source, seed, token))
+            paused = false
+            assertNull(completion.complete(source, seed, token))
+            assertNull(completion.complete(source, seed, token))
+        }
+
+        assertTrue(interrupted)
+        assertEquals(1, originalChecks)
+    }
+
+    @Test
     fun `residual completion should optimize disconnected real components in the source direction`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val premises = mapOf(

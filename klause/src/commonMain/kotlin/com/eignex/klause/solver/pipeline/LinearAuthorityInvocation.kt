@@ -133,6 +133,7 @@ internal class LinearAuthorityInvocation(
     val hasIncumbent: Boolean get() = incumbent != null
     val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent
     val incumbentIsProximity: Boolean get() = incumbent != null && incumbent === proximityIncumbent
+    val hasPendingProximityCompletion: Boolean get() = component.hasPendingProximityCompletion
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
     val stats: SolveStats get() = SolveStats(

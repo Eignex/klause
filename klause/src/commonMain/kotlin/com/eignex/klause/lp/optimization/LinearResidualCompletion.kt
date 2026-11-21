@@ -25,6 +25,7 @@ internal class LinearResidualCompletion(
     private val budget: SourceLpBudget,
     private val policy: SparseSourceLpPolicy,
     private val lifetimeLimit: LpFloatAllowance? = null,
+    private val retainPreparation: Boolean = false,
 ) : AutoCloseable {
     private var rows: List<ExactRationalInequality>? = null
     private var columns = 0
@@ -83,7 +84,7 @@ internal class LinearResidualCompletion(
         currentToken = cancellation
         if (admission == null) {
             val packed = LinearAuthorityModel.prepare(residual, variables, cancellation) ?: return null
-            admission = budget.admitSparse(cancellation) { active ->
+            admission = budget.admitSparse(cancellation, retainPreparedOnStop = retainPreparation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns, costs ?: List(variables) { BigFraction.ZERO },
                     BigFraction.ZERO, policy, active).also {
                     observe("PrimalRecoverySparseInputEntries", it.metrics.inputEntries)
