@@ -499,6 +499,9 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Pause
         }
         current.pending = false
+        current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
+        if (current === root) rootBound = result.bound
+        result.incumbent?.let(onIncumbent)
         if (current === root && onRootConditionalCuts != null) {
             val cuts = authority.rootConditionalCuts(source, cancellation)
             for ((stage, count) in onRootConditionalCuts.invoke(cuts, budget, cancellation)) {
@@ -512,7 +515,6 @@ internal class LinearAuthorityTraversal(
         val lateBefore = feedback?.lateCollections
         val numericalFeedback = feedback?.consume(branch)?.also { onNumericalFeedback?.invoke(it) }
         val lateFeedback = feedback != null && feedback.lateCollections != lateBefore
-        current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
         observe("numericalChecks")
         result.evidence?.takeIf { it.claim == SourceClaim.Refutation }?.let { refutations?.retain(it) }
         if (result.evidence?.claim == SourceClaim.Refutation) {
@@ -568,8 +570,6 @@ internal class LinearAuthorityTraversal(
         } else if (result.split == null) {
             observe("numericalUnavailableGuidance")
         }
-        result.incumbent?.let(onIncumbent)
-        if (current === root) rootBound = result.bound
         if (gapBound() != null && !cancellation()) return SearchNodeDisposition.Pause
         if (result.evidence?.claim is SourceClaim.Ray) {
             ray = checked(result.evidence.claim, SourceDerivation.SourceRay)

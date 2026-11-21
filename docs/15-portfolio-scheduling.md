@@ -401,6 +401,10 @@ checked cut and declared root sides. Portable complements enter
 finite workers through their ordinary root or restart clause exchange, and actual
 unit or conflict use credits the publishing frontier. Publication alone earns no
 use credit. Fully discharged clauses remain valid after that frontier retires.
+Completed numerical queries install their node result and checked bound, then offer
+their primal through ordinary source witness admission before optional root-cut,
+guidance and feedback work. Cancellation during that optional work retains an
+admitted incumbent and its value while withholding terminal proof claims.
 Enumeration admits at most eight binary coordinates per cut, 64-bit integral
 scalars and sixteen clauses, within 65,536 work and 1 MiB of modeled allocation
 from the existing source allowance. Proof checks and bounded pool insertion spend

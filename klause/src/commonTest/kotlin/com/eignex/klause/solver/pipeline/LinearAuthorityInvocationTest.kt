@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticRational
@@ -39,7 +40,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class LinearAuthorityInvocationTest {
+class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -47,6 +48,36 @@ class LinearAuthorityInvocationTest {
         SourceRevision("conditioned-linear", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `a checked root incumbent should survive a stop in optional cut publication`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+        for (timeout in listOf(false, true)) {
+            var publications = 0
+            val stop = ExecutionControl { publications > 0 }
+            val params = TheoryParams(sourceCuts = false,
+                timeout = if (timeout) stop else ExecutionControl.Never,
+                cancellation = if (timeout) ExecutionControl.Never else stop)
+
+            val result = LinearAuthorityInvocation(source, params, boundOrdered = true,
+                onRootConditionalCuts = { _, _, _ ->
+                    publications++
+                    emptyMap()
+                }).use { it.run { _, _ -> } }
+
+            val sample = assertNotNull(result.incumbent)
+            assertEquals(1, publications)
+            assertEquals(if (timeout) TerminationReason.Timeout else TerminationReason.Cancelled, result.reason)
+            assertEquals(1L, sample.intValue(0))
+            assertEquals(BigFraction.ONE, result.value)
+            assertNull(result.terminal)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+        }
+    }
 
     @Test
     fun `a checked incumbent dive should improve before breadth exhausts the decision grant`() {
