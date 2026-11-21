@@ -51,6 +51,7 @@ internal class LpHints(
     private var nodeStamp = 0L
     private var pruningOutcome: Boolean? = null
     private var pruningScope: LpRelaxation? = null
+    private var unmeasuredBaselineChecks = 128
 
     fun beginNode(depth: Int, bound: Double) {
         nodeStamp++
@@ -296,6 +297,7 @@ internal class LpHints(
         if (!current()) return baseline
         if (!reference.isFinite()) {
             observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
+            inspectUnmeasuredBaseline(baseline, workingCutoff, available, ::current)
             return baseline
         }
         var proposal: VarRef? = null
@@ -335,6 +337,46 @@ internal class LpHints(
             return baseline
         }
         return selected
+    }
+
+    private inline fun inspectUnmeasuredBaseline(
+        baseline: VarRef,
+        workingCutoff: Double,
+        crossinline available: (VarRef) -> Boolean,
+        crossinline current: () -> Boolean,
+    ) {
+        if (unmeasuredBaselineChecks <= 0) return
+        unmeasuredBaselineChecks--
+        charge(12L)
+        if (!current()) return
+        observe("UNMEASURED_BASELINE_CHECK")
+        if (!current()) return
+        val point = value(baseline)
+        val fraction = point - floor(point)
+        val validPoint = point.isFinite() && fraction > 1e-6 && fraction < 1.0 - 1e-6 && when (baseline) {
+            is VarRef.Bool -> point in 0.0..1.0
+            is VarRef.IntVar -> point >= Long.MIN_VALUE.toDouble() && point < Long.MAX_VALUE.toDouble()
+        }
+        val eligible = validPoint && history.hasPositiveGap(workingCutoff) && available(baseline)
+        if (!current()) return
+        val kind = if (!eligible) "INELIGIBLE" else {
+            val paired = history.hasReliablePair(baseline, point)
+            if (!current()) return
+            if (paired) "UNREPRESENTABLE" else {
+                var found = false
+                history.forEachCandidate({ current() && !found }) { variable ->
+                    if (variable != baseline && available(variable) && current()) {
+                        val gain = history.minimumPrediction(variable, value(variable), workingCutoff)
+                        if (current() && gain.isFinite() && gain > 0.0) found = true
+                    }
+                }
+                if (found) "AVAILABLE" else "NONE"
+            }
+        }
+        if (!current()) return
+        observe("UNMEASURED_BASELINE_$kind")
+        if (!current()) return
+        if (unmeasuredBaselineChecks == 0) observe("UNMEASURED_BASELINE_EXHAUSTED")
     }
 
     private fun clearPassivePoint() {

@@ -190,6 +190,12 @@ internal class LpDirectionalHistory(
         return gap.isFinite() && gap > 0.0
     }
 
+    fun hasReliablePair(variable: VarRef, value: Double): Boolean {
+        val version = generation
+        charge(8L)
+        return version == generation && reliable(variable, value) != null && version == generation
+    }
+
     fun minimumPrediction(variable: VarRef, value: Double, cutoff: Double, upper: Boolean = false): Double {
         val version = generation
         charge(24L)
