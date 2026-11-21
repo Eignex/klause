@@ -97,6 +97,39 @@ application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
 }
 
+val cliHarnessJar = tasks.register<Jar>("cliHarnessJar") {
+    archiveBaseName.set("klause-bench-cli")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+    from(sourceSets["main"].output) {
+        val profiles = "com/eignex/klause/bench/profile/"
+        val shared = setOf("HarnessRecording", "SourcePreparationCapture")
+        exclude { file ->
+            !file.isDirectory && file.path.startsWith(profiles) &&
+                file.path.removePrefix(profiles).substringBefore('$').removeSuffix(".class") !in shared
+        }
+        includeEmptyDirs = false
+    }
+}
+
+val cliHarnessDirectory = layout.buildDirectory.dir("install/klause-bench-cli")
+val installCliHarness = tasks.register<Sync>("installCliHarness") {
+    group = "distribution"
+    description = "Install the lab CLI driver without standalone profiling programs."
+    into(cliHarnessDirectory)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    // A launch classpath must not retain jars left by another installation.
+    outputs.upToDateWhen { false }
+    from(cliHarnessJar) { into("lib") }
+    from(configurations.runtimeClasspath) { into("lib") }
+}
+
+tasks.named<Test>("test") {
+    dependsOn(installCliHarness)
+    inputs.dir(cliHarnessDirectory)
+    systemProperty("klause.bench.cliHarness", cliHarnessDirectory.get().asFile.absolutePath)
+}
+
 /** Forward `-Dklause.*` props into the JavaExec child JVM so callers can tune any bench knob
  *  from the gradle invocation. doFirst keeps the property snapshot config-cache safe. */
 fun JavaExec.forwardBenchProps() {
