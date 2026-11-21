@@ -17,6 +17,8 @@ internal class LpDirectionalHistory(
         var previous = 0.0
         var stamp = 0L
         var previousStamp = 0L
+        var parent = 0.0
+        var previousParent = 0.0
         var outcomeCount = 0
         var outcomeLatest = false
         var outcomePrevious = false
@@ -53,6 +55,7 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    private var numericGapChecks = 128
 
     fun beginNode(level: Int) {
         stamp++
@@ -116,12 +119,17 @@ internal class LpDirectionalHistory(
             observe("UNUSABLE")
             return
         }
+        val version = generation
+        charge(4L)
+        if (version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
         expire(history.up)
         val direction = if (child.up) history.up else history.down
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
+        direction.previousParent = direction.parent
+        direction.parent = child.parent.objective
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
         direction.stamp = stamp
@@ -363,6 +371,31 @@ internal class LpDirectionalHistory(
             downLatest !in 0.5..2.0 || downPrevious !in 0.5..2.0 ||
             upLatest !in 0.5..2.0 || upPrevious !in 0.5..2.0
         ) return null
+        if (numericGapChecks > 0) {
+            numericGapChecks--
+            charge(24L)
+            if (version != generation) return null
+            val numericDownLatest = (cutoff - history.down.parent) / gap
+            val numericDownPrevious = (cutoff - history.down.previousParent) / gap
+            val numericUpLatest = (cutoff - history.up.parent) / gap
+            val numericUpPrevious = (cutoff - history.up.previousParent) / gap
+            val kind = when {
+                !numericDownLatest.isFinite() || numericDownLatest <= 0.0 ||
+                    !numericDownPrevious.isFinite() || numericDownPrevious <= 0.0 ||
+                    !numericUpLatest.isFinite() || numericUpLatest <= 0.0 ||
+                    !numericUpPrevious.isFinite() || numericUpPrevious <= 0.0 -> "UNKNOWN"
+                numericDownLatest !in 0.5..2.0 || numericDownPrevious !in 0.5..2.0 ||
+                    numericUpLatest !in 0.5..2.0 || numericUpPrevious !in 0.5..2.0 -> "MISMATCH"
+                else -> "MATCHED"
+            }
+            observe("PASSIVE_CHILD_NUMERIC_GAP_CHECK")
+            if (version != generation) return null
+            val intent = if (prune) "PRUNE" else "OPEN"
+            observe("PASSIVE_CHILD_NUMERIC_GAP_${intent}_$kind")
+            if (version != generation) return null
+            if (numericGapChecks == 0) observe("PASSIVE_CHILD_NUMERIC_GAP_EXHAUSTED")
+            if (version != generation) return null
+        }
         return preferUp
     }
 

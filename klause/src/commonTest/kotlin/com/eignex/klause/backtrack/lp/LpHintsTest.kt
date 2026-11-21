@@ -3,7 +3,6 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.splitIntAlternatives
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpNumber
@@ -17,6 +16,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.withModel
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
@@ -39,7 +39,8 @@ class LpHintsTest {
             val proposal = VarRef.IntVar(if (booleanBaseline) 0 else 1)
             val domains = if (booleanBaseline) arrayOf(IntDomain(0, 10))
             else arrayOf(IntDomain(0, 2), IntDomain(0, 10))
-            val session = PropagationSession(Problem(if (booleanBaseline) 1 else 0, domains.size, domains, emptyArray()))
+            val session =
+                PropagationSession(Problem(if (booleanBaseline) 1 else 0, domains.size, domains, emptyArray()))
             for ((baselinePoint, objective, samples) in listOf(Triple(0.0, 0.0, 2), Triple(1.0, 0.0, 2),
                 Triple(2.0, 0.0, 2), Triple(0.5, 0.0, 2), Triple(1e-8, 0.0, 2),
                 Triple(Double.NaN, 0.0, 2), Triple(Double.POSITIVE_INFINITY, 0.0, 2),
