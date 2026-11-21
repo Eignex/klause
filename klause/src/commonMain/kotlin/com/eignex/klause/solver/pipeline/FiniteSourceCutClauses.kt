@@ -145,11 +145,13 @@ internal class FiniteSourceCutClauses(
                 fun conflicts(value: BigFraction): Boolean = value > row.rhs || (row.strict && value == row.rhs)
                 if (!conflicts(activity)) continue
                 var cover = mask
-                for (id in entries.indices) if (cover and (1 shl id) != 0) {
-                    val without = activity - weights[id]
-                    if (conflicts(without)) {
-                        cover = cover and (1 shl id).inv()
-                        activity = without
+                for (id in entries.indices) {
+                    if (cover and (1 shl id) != 0) {
+                        val without = activity - weights[id]
+                        if (conflicts(without)) {
+                            cover = cover and (1 shl id).inv()
+                            activity = without
+                        }
                     }
                 }
                 if (cover == 0) break

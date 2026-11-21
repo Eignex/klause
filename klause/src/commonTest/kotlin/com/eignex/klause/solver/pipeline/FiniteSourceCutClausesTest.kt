@@ -27,8 +27,8 @@ import com.eignex.klause.portfolio.SharedClausePool
 import com.eignex.klause.portfolio.SharedPools
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.TransformationGuarantees
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.bake
@@ -279,8 +279,9 @@ class FiniteSourceCutClausesTest : RuntimeInitializedTest() {
         val context = assertNotNull(binding.capture(model, objective, ExecutionControl.Never))
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val premises = context.premises.entries.filter { it.value.inequality.supportSize == 2 &&
-            it.value.inequality.coefficient(real) != null }
+        val premises = context.premises.entries.filter {
+            it.value.inequality.supportSize == 2 && it.value.inequality.coefficient(real) != null
+        }
         val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(premises.map {
             SourceDerivation.Combination.Term(BigFraction.ofLong(2).reciprocal(), SourceDerivation.Premise(it.key))
         }))
@@ -349,8 +350,8 @@ class FiniteSourceCutClausesTest : RuntimeInitializedTest() {
             val consumer = PropagationSession(Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray()))
             PoolClauseExchange(pool, origin = 1).onSearchStart(consumer)
             var refuted = false
-            for (id in values.indices) if (!refuted) {
-                refuted = consumer.pinInt(id, values[id]) is PropagationResult.Unsat
+            for (id in values.indices) {
+                if (!refuted) refuted = consumer.pinInt(id, values[id]) is PropagationResult.Unsat
             }
             assertEquals(2 * values[0] - 3 * values[1] + values[2] > 0, refuted)
         }

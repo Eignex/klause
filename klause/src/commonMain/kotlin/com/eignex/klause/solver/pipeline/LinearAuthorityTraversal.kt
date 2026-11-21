@@ -83,7 +83,7 @@ internal class LinearAuthorityTraversal(
     private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = false,
     private val onRootConditionalCuts:
-        ((List<SourceEvidence>, SourceLpBudget, ExecutionControl) -> Map<String, Long>)? = null,
+    ((List<SourceEvidence>, SourceLpBudget, ExecutionControl) -> Map<String, Long>)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
