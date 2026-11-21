@@ -1769,6 +1769,7 @@ internal class LpEngine(
                 warm = warm,
                 cutsAllowed = cutsAllowed,
             )
+            lpHints?.recordOutcome(outcome.prune.takeIf { outcome.completed }, outcome.scope)
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
             lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
                 nodeWorkStoppedAfterProgress && outcome.basis == null)

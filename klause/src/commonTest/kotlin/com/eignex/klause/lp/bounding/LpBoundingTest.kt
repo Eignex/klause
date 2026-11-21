@@ -54,6 +54,38 @@ class LpBoundingTest : RuntimeInitializedTest() {
     private val sumObjective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
 
     @Test
+    fun `cancellation after an optimum leaves its pruning outcome incomplete`() {
+        for (cancel in listOf(false, true)) {
+            val problem = triangle(3)
+            val session = PropagationSession(problem)
+            val sink = SolveStatsSink(backend = "outcome-hints")
+            var stopped = false
+            var objectives = 0
+            val token = ExecutionControl { stopped }
+            val hints = object : LpHintSink {
+                override fun clear() = Unit
+
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) = Unit
+
+                override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+                    objectives++
+                    stopped = cancel
+                }
+            }
+            LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true), cancellation = token), sink)
+                .use { engine ->
+                    val outcome = engine.sparseSafePrune(assertNotNull(engine.lpRelaxer), session,
+                        Double.POSITIVE_INFINITY, sink, token, -1, true, hints = hints)
+
+                    assertEquals(1, objectives)
+                    assertFalse(outcome.prune)
+                    assertEquals(!cancel, outcome.completed)
+                    if (!cancel) assertNotNull(assertNotNull(outcome.scope).model.exactState)
+                }
+        }
+    }
+
+    @Test
     fun `lp bounding should preserve the optimum`() {
         val problem = triangle()
         val off = BacktrackSolver(problem.bake()).minimize(sumObjective, BacktrackParams(randomSeed = 1L))
@@ -233,6 +265,7 @@ class LpBoundingTest : RuntimeInitializedTest() {
             )
 
             assertFalse(outcome.prune)
+            assertFalse(outcome.completed)
             assertEquals(2, queries)
             assertEquals(5.0, base.intColOf.sumOf { points.single()[it] }, 1e-8)
             assertTrue(objectives.isEmpty())
@@ -285,6 +318,7 @@ class LpBoundingTest : RuntimeInitializedTest() {
             )
 
             assertFalse(outcome.prune)
+            assertFalse(outcome.completed)
             assertEquals(2, queries)
             assertEquals(4.5, base.intColOf.sumOf { points.single()[it] }, 1e-8)
             assertEquals(4.5, objectives.single(), 1e-8)
@@ -339,6 +373,7 @@ class LpBoundingTest : RuntimeInitializedTest() {
             )
 
             assertFalse(outcome.prune)
+            assertFalse(outcome.completed)
             assertEquals(2, queries)
             assertTrue(points.isEmpty())
             assertTrue(objectives.isEmpty())
@@ -356,6 +391,7 @@ class LpBoundingTest : RuntimeInitializedTest() {
         var points = 0
         var objectives = 0
         var infeasible = 0
+        var infeasibleScope: LpRelaxation? = null
         val hints = object : LpHintSink {
             override fun clear() = Unit
 
@@ -367,8 +403,9 @@ class LpBoundingTest : RuntimeInitializedTest() {
                 objectives++
             }
 
-            override fun recordInfeasible() {
+            override fun recordInfeasible(relaxation: LpRelaxation?) {
                 infeasible++
+                infeasibleScope = relaxation
             }
         }
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
@@ -381,7 +418,10 @@ class LpBoundingTest : RuntimeInitializedTest() {
             )
 
             assertTrue(outcome.prune)
+            assertTrue(outcome.completed)
+            assertTrue(outcome.scope === infeasibleScope)
             assertEquals(1, infeasible)
+            assertNotNull(assertNotNull(infeasibleScope).model.exactState)
             assertEquals(0, points)
             assertEquals(0, objectives)
         }

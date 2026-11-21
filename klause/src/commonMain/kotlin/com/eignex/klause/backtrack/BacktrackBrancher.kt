@@ -75,10 +75,11 @@ internal class BacktrackBrancher(
     }
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
-        val variable = branching.pick(session)
+        val baseline = branching.pick(session)
             ?.takeIf(::isOpen)
             ?: variables.pick(session, rng)
             ?: return null
+        val variable = branching.select(baseline, session).takeIf(::isOpen) ?: baseline
         if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
         branching.onBranch(variable)
         val preferred = branching.orderValues(
@@ -236,6 +237,8 @@ internal interface BacktrackBranching {
     fun onRestart() {}
 
     fun pick(session: PropagationSession): VarRef? = null
+
+    fun select(baseline: VarRef, session: PropagationSession): VarRef = baseline
 
     fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> = values
 

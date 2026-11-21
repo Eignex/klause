@@ -369,80 +369,149 @@ The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
 The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit the geometric mean of the predicted child gains; a zero
-gain in either direction keeps the fallback. Otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
-Geometric scoring scales square roots before multiplication and charges the additional work.
-An underflowed positive score supplies no measured-zero reference.
-Each direction uses the lower of its latest two in-age normalized gains, so one
-large observation cannot raise its estimate alone. The two gains must agree within
-a factor of two; disagreement withholds advice until passive observations stabilize.
-A zero estimate is stable only when both recent observations are zero.
-Each observation ages separately.
-Replacing the ordinary LP variable requires reliable history for that reference
-as well, including measured zero gains, and a strictly greater predicted gain.
-The scope retains the most recent oldest-sample stamp of any variable with reliable positive gains
-and skips history lookups until such a variable has been observed, or after all
-such observations have aged out. Samples from different variables cannot open that
-gate. Passing it still requires the variable's own recent samples; it grants no
-score or authority. History reset clears the prerequisite.
-Selection rechecks that the fractional point and optimum belong to the same current
-relaxation and exact state, and declines on cancellation or stale information. A
-nomination retains only its variable, point and solve stamp. Proposal and
-baseline roles share one immutable candidate when they name the same variable.
-Clearing an already-empty nomination leaves its state untouched; transient selection
-flags still clear. Comparison and changed-proposal observations remain separate from
-the actual variable and matching
-adjacent split committed by search; replacement, retraction and retirement discard
-an unconsumed nomination. Variable commitment rechecks cancellation and current
-LP state after charging its work and before attributing advice, using the existing LP allowance.
-Disabled directional gains collect no history or retained model scope and charge no
-history bookkeeping. Ordinary LP value preferences and reduced-cost scores remain available.
-The bounded selector reads reduced-cost scores by primitive variable ID and kind.
-The ordinary variable is selected before directional candidates are visited. Missing
-reliable reference measurements skip that visit. A bounded source-scoped index reuses
-references for variables that have held reliable positive gains in both directions;
-each visit still checks the variable's own current observations and fractional point.
-Index growth, visits and reclamation charge the LP allowance. Reset invalidates an
-active visit, and equal scores retain Boolean-before-integer, ascending-ID precedence.
+`lp-directional-gains=true`, with resolved LP bounding and branching enabled. History
+and passive point retention start at a finite incumbent cutoff; ordinary LP guidance
+remains available before admission. Child-choice and collection owners initialize
+once at the first finite cutoff. Leaving a finite cutoff clears retained history
+without renewing those owners or their invocation-wide collection limits.
+The ordinary reduced-cost/fractionality score and configured selector supply the
+baseline variable. A paid sparse index retains variables whose own two directional
+gain pairs have been stable and positive; each lookup rechecks their age and current
+live decision eligibility. The index has at most 8,192 entries and resets with its
+source history. When the ordinary live baseline has a current, exactly integral LP
+value, a reliable fractional candidate with positive predictions can take priority.
+The integral point supplies current fractionality information, not a measured zero
+child gain. A current fractional baseline without its own reliable numeric pairs
+also gives priority to a candidate with stable positive pairs when its current
+fractionality is at least the baseline's. Fractionality is the distance from the LP
+point to its nearest integer. This comparison is checked before prediction lookup
+and during revalidation, and spends the containing work allowance. Unmeasured-baseline
+priority also requires the candidate's conservative minimum gain to strictly exceed
+the baseline's finite nonnegative ordinary reduced-cost/fractionality score, both
+before ranking and during revalidation. That score retains its ordinary unseen-cost
+weight and supplies an advisory estimate, not a measured child gain or a calibrated
+bound. Equal or lower candidate predictions and unavailable baseline estimates keep
+ordinary order. These comparisons
+apply to unmeasured-baseline priority; measured comparisons and integral-baseline
+priority retain their own criteria. This preference uses the candidate's evidence without
+assigning a numerical gain to the baseline
+or claiming a measured improvement over it. Missing, nonfinite, unrepresentable or
+merely near-integral baseline points cannot use either priority case. A baseline
+with reliable pairs whose prediction cannot be represented keeps ordinary order.
+Every case requires a positive finite remaining gap.
+Every numeric sample used in a variable comparison must have a parent gap within
+a factor of two of the current gap, using the same working cutoff. Nonpositive,
+nonfinite or unrepresentable ratios exclude that numerical prediction. A measured baseline
+outside that context remains measured and cannot use unmeasured-baseline priority.
+Parent objectives follow their own numeric samples; context comparisons spend the
+containing work allowance.
+Candidate directions use the lower of their two
+recent samples; fractional baseline directions use the larger. For a fractional
+baseline with reliable pairs, after scaling by the current fractional movement,
+the candidate's smaller
+directional prediction must strictly
+exceed the baseline's smaller directional prediction. Equal or overlapping observed
+ranges keep the ordinary baseline. The comparison also applies when both minima
+are below the positive finite remaining gap. A nonpositive or unavailable gap,
+or positive underflow in a lower prediction, declines selection. Candidates rank
+by their smaller lower prediction, with variable identity breaking ties between
+improving candidates.
+A measured zero gain in a fractional baseline is known and retains the numerical
+comparison. Unavailable numeric evidence supplies no measured reference gain.
+Each fractional point scales its variable's predictions. A variable
+nomination records its point and solve stamp and captures the kernel's exhaustive
+alternatives before commitment. Fractional nominations require the adjacent split
+around their LP point; an integral withheld baseline retains the kernel's actual
+adjacent split, including an endpoint or wide-domain midpoint split. Only a captured committed
+split, after freshness and cancellation checks, counts as applied advice. Withholding
+keeps the ordinary baseline with the same selection and commitment costs.
+These predictions change only search order and supply no bound or pruning authority.
 
-The same recent directional estimates can order the selected variable's two
-existing adjacent alternatives. It visits the lower predicted gain first to seek
-an incumbent, unless a predicted child gain reaches the current objective gap;
-then it visits the higher predicted gain first to seek early pruning.
-Predicted gains carry no pruning authority.
-Both directions need two in-age observations; equal or unavailable
-estimates keep ordinary order. Pooled point replay keeps precedence. This consumer
-creates no LP query, charges constant comparison and commitment work to the LP
-allowance, and checks the current point, scope, solve stamp and cancellation.
-Value nominations and matching committed changes have separate counters from
-variable advice and missing-direction collection. Withheld advice retains ordinary
-value order while paying the same comparison work.
+Historical observations can also order the selected variable's adjacent children. Each direction
+needs two recent finite normalized gains agreeing within a factor of two, and at
+least one direction must have a positive lower-of-two gain. Two measured zero
+directions keep ordinary order; unknown gains cannot supply measured zero.
+
+Each side also retains its own latest two known completed LP-node outcomes and
+their parent LP objectives. A
+completed optimal pass that keeps the node records an open outcome. Accepted LP
+bounds, fixings, mixed deductions and infeasibility can record a prune without
+supplying a numerical gain. Missing, interrupted or incomplete cut work supplies
+neither outcome. Final publication validates the returned source scope and owner
+state, and checks cancellation after charging its work and before storing data.
+Numeric samples and completed outcomes age independently, without renewal on restart.
+
+Both directions must have two known recent outcomes. Their observed prune fractions
+are zero, one half or one; zero requires two observed open outcomes. Unknown rates
+keep ordinary order. The current remaining incumbent gap determines
+the search intent: if either stable gain, scaled by its current fractional branch
+movement, reaches that gap, the child with the greater prune fraction goes first.
+Otherwise the child with the smaller prune fraction goes first. When the known
+rates are equal, the larger lower numeric prediction goes first if it reaches the
+gap; otherwise the smaller lower prediction goes first. Equal numeric predictions
+keep ordinary order. Both cases retain the same checks on numeric ranges and
+parent context. This numerical preference supplies no measured difference in prune rates.
+Nonfinite or nonpositive gaps and positive predictions that cannot be represented as positive
+floating values keep ordinary order. Prune-first advice requires its preferred
+lower prediction to reach the gap. Open-first advice uses the preferred direction's
+larger recent gain, scaled by its current fractional movement; that upper prediction
+must be strictly smaller than the other child's lower prediction. Equal, touching
+or overlapping ranges decline open-first advice. Both intents also require the
+parent gap of every retained numeric sample and outcome to be within a factor of
+two of the current parent gap, using the same working cutoff. Unavailable,
+nonpositive or unrepresentable gap ratios keep ordinary order. Numeric and outcome
+parent objectives age independently with their own samples; context comparisons
+and metadata writes spend the containing work allowance.
+Each numeric sample and completed outcome also retains its parent decision depth.
+All eight retained parent depths must equal the current node's decision depth;
+different depths keep ordinary child order. This context check applies only to
+child ordering and spends the containing work allowance before reading the metadata.
+Predictions supply only this ordering, never
+a bound or pruning authority. Numerical gain reliability is checked independently, including
+two stable finite gains in each direction and a positive gain in at least one.
+These historical outcomes supply no bound or pruning authority at another node.
+Coarse recent positive-gain and positive-prune-rate stamps skip lookups until such
+observations exist; the current variable still needs its own complete numeric and
+outcome records. Reset clears those prerequisites.
+
+History eligibility precedes nomination bookkeeping; unavailable preferences use a
+bounded lookup without retaining a freshness closure. Selection requires the
+fractional point and optimum from the same current
+relaxation and exact state. It recognizes only the two adjacent partitions of that
+point and retains both alternatives. A nomination carries the proposed decision
+and solve stamp. Only the matching committed child, with current scope and point
+after its bookkeeping charge, counts as applied advice. Replacement, retraction,
+cancellation and retirement discard an unconsumed nomination. Withholding advice
+keeps the same producer, comparison and commitment costs while retaining ordinary
+order. Disabled directional gains retain no history or model scope and charge no
+history bookkeeping; ordinary LP guidance remains available.
+Completion, candidate visits and commitments inline their immediate freshness
+callbacks.
 
 With a finite incumbent cutoff, the same opt-in path can visit an under-observed
 child first to collect missing passive information. It uses a recent positive
 directional estimate for the selected variable and only reorders the two adjacent alternatives
-around its fresh fractional LP point. Each direction needs an in-age observation
-before collection can complete a nearly reliable pair, and the more observed side
-must have a stable positive estimate. A scope-wide availability
+around its fresh fractional LP point. The more observed side needs two in-age,
+stable positive gains; the missing side may have no observation. A scope-wide availability
 stamp skips collection lookups until such observations exist. Equal sample counts or two reliable directions
 keep ordinary order. Pooled point replay keeps precedence. Collection checks at most
 128 eligible branches and nominates at most 32 splits per invocation; restarts and
 history resets do not renew those limits. It creates no LP query and charges the
 existing LP allowance. Collection comparisons and changed committed splits have
-separate counters from reliable variable advice. Withholding reliable advice keeps
-this collection policy and its costs enabled. `lp-directional-advice=false` keeps
-the ordinary variable and value choices while retaining enabled directional observation,
-nomination and comparison work; the corresponding backtrack setting is
+separate counters from reliable child advice. Withholding reliable advice keeps
+this collection policy and its costs enabled. `lp-directional-advice=false` withholds
+reliable child-order proposals while retaining directional observation, collection,
+nomination, comparison and commitment work; the corresponding backtrack setting is
 `BacktrackParams.lpDirectionalAdvice`.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
 replacement arrays are checked element by element. Scope capture borrows those arrays,
 and comparison work charges the visited elements. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+history and pending comparisons. Assumption reseeding clears history. Internal restart
+discards ancestors, pending child attribution and current nominations while retaining
+compatible numeric observations and their original age. Advice after restart requires
+a fresh point and optimum under the complete retained scope.
 Invalidations report the first differing scope facet: base model, active rows,
 objective constant, incumbent cutoff, variable mapping or variable kind, in that order.
 Initial scope capture reports no invalidation. The additional reason observation
@@ -451,8 +520,9 @@ Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
 histories and 128 ancestor splits are retained. Ancestor records use depth-indexed
-slots allocated on the first usable split; allocation is charged once and trimming
-charges the visited slots rather than unused ancestor capacity. Trimming clears removed references and
+slots that grow with visited depth. Each growth charges its allocation and copied
+cells before publication; a history reset during growth prevents retention. Trimming
+charges the visited slots rather than unused ancestor capacity, clears removed references and
 counts only live records. Bookkeeping charges the existing LP work allowance and
 creates no extra LP query. Invocation close releases the scope.
 

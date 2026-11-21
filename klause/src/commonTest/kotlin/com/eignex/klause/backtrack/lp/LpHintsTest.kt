@@ -1,5 +1,8 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.backtrack.splitIntAlternatives
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpNumber
@@ -13,9 +16,11 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.withModel
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
+import kotlin.math.floor
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +30,791 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
-    fun `cancellation discards a reliable variable commitment`() {
+    fun `child depth contexts preserve matched commitments and reject mismatches or cancellation`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (boolean in listOf(false, true)) {
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val point = if (boolean) 0.5 else 2.5
+            val down = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2L)
+            val up = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 3L)
+            for (action in listOf("matched", "different", "reset", "cancel")) {
+                for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                    val costs = ArrayList<Long>()
+                    for (apply in listOf(false, true)) {
+                        val events = ArrayList<String>()
+                        var work = 0L
+                        var armed = false
+                        var cancelled = false
+                        lateinit var hints: LpHints
+                        hints = LpHints(if (boolean) 0 else 1, if (boolean) 1 else 0,
+                            directionalGains = true, applyAdvice = apply, observe = events::add, charge = { amount ->
+                                work += amount
+                                if (armed && amount == 32L && action in listOf("reset", "cancel")) {
+                                    armed = false
+                                    if (action == "reset") hints.resetHistory() else cancelled = true
+                                }
+                            })
+                        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(boolean), constant,
+                            if (boolean) IntArray(0) else intArrayOf(0),
+                            if (boolean) intArrayOf(0) else IntArray(0))
+                        val cutoff = constant.toDouble() + 1024.0
+                        repeat(2) { sample ->
+                            for (isUp in listOf(false, true)) {
+                                hints.beginNode(0, cutoff)
+                                hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                                hints.recordObjective(relaxation, 0.0)
+                                hints.branch(variable)
+                                hints.commit(if (isUp) up else down, 1)
+                                hints.beginNode(1, cutoff)
+                                hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                                hints.recordObjective(relaxation, if (isUp) 3.0 else 1.0)
+                                hints.recordOutcome(sample == 1, relaxation)
+                                hints.finishNode(trail.state)
+                            }
+                        }
+                        val depth = if (action == "different") 1 else 0
+                        hints.beginNode(depth, cutoff)
+                        hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                        hints.recordObjective(relaxation, 0.0)
+                        hints.branch(variable)
+                        events.clear()
+                        val before = work
+                        armed = true
+                        val control = ExecutionControl { cancelled }
+
+                        val ordered = hints.orderAlternatives(variable, listOf(up, down), control)
+                        hints.commit(ordered.first(), depth + 1, control)
+
+                        val diagnostic = "$boolean/$action/$constant/$apply"
+                        val matched = action == "matched"
+                        assertEquals(if (matched && apply) listOf(down, up) else listOf(up, down), ordered, diagnostic)
+                        val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED"
+                        else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
+                        assertEquals(if (matched) 1 else 0, events.count { it == event }, diagnostic)
+                        assertEquals(if (action == "different") 1 else 0,
+                            events.count { it == "PASSIVE_VALUE_DEPTH_CONTEXT_DECLINED" }, diagnostic)
+                        assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events)
+                        costs.add(work - before)
+                    }
+                    assertEquals(costs.first(), costs.last(), "$boolean/$action/$constant")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `unmeasured baseline advice exceeds the ordinary estimate before committing`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 2L)
+        builder.addVar(0, 10, cost = 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, 10L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (booleanBaseline in listOf(false, true)) {
+            val baseline = if (booleanBaseline) VarRef.Bool(0) else VarRef.IntVar(0)
+            val proposal = VarRef.IntVar(if (booleanBaseline) 0 else 1)
+            val session = PropagationSession(Problem(if (booleanBaseline) 1 else 0,
+                if (booleanBaseline) 1 else 2,
+                Array(if (booleanBaseline) 1 else 2) { IntDomain(0, 10) }, emptyArray()))
+            for (reference in listOf("unmeasured", "known-zero", "known-positive", "integral")) {
+                for ((predicted, context) in listOf(1.0 to "below", 1.0000005 to "equal",
+                    2.0 to "above", (1.0000005 - 1e-12) to "below",
+                    (1.0000005 + 1e-12) to "above", 2.0 to "unavailable")) {
+                    for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                        val costs = ArrayList<Long>()
+                        for (apply in listOf(false, true)) {
+                            val events = ArrayList<String>()
+                            var work = 0L
+                            val hints = LpHints(if (booleanBaseline) 1 else 2, if (booleanBaseline) 1 else 0,
+                                directionalGains = true, applyAdvice = apply,
+                                observe = events::add, charge = { work += it })
+                            val relaxation = LpRelaxation(model, intArrayOf(0, proposal.varId),
+                                booleanArrayOf(booleanBaseline, false), constant,
+                                if (booleanBaseline) intArrayOf(1) else intArrayOf(0, 1),
+                                if (booleanBaseline) intArrayOf(0) else IntArray(0))
+                            val cutoff = constant.toDouble() + 1024.0
+                            val duals = doubleArrayOf(if (context == "unavailable") Double.POSITIVE_INFINITY else 0.0)
+                            for (variable in listOf(baseline, proposal)) {
+                                if (variable == baseline && reference in listOf("unmeasured", "integral")) continue
+                                hints.beginNode(0, cutoff)
+                                hints.record(relaxation, doubleArrayOf(0.5, 3.5), duals)
+                                hints.recordObjective(relaxation, 0.0)
+                                hints.branch(variable)
+                                repeat(2) {
+                                    for (up in listOf(false, true)) {
+                                        val decision = if (variable is VarRef.Bool) {
+                                            SearchDecision.Bool(if (up) 0 else 1)
+                                        } else {
+                                            val lower = if (variable == baseline) 0L else 3L
+                                            if (up) SearchDecision.IntAtLeast(variable.varId, lower + 1L)
+                                            else SearchDecision.IntAtMost(variable.varId, lower)
+                                        }
+                                        hints.commit(decision, 1)
+                                        hints.beginNode(1, cutoff)
+                                        hints.record(relaxation, doubleArrayOf(0.5, 3.5), duals)
+                                        hints.recordObjective(relaxation, if (variable == proposal) predicted
+                                        else if (reference == "known-zero") 0.0 else 0.25)
+                                        hints.recordOutcome(false, relaxation)
+                                        hints.finishNode(trail.state)
+                                    }
+                                }
+                            }
+                            val baselinePoint = if (reference == "integral") 0.0 else 0.5
+                            hints.beginNode(0, cutoff)
+                            hints.record(relaxation, doubleArrayOf(baselinePoint, 3.5), duals)
+                            hints.recordObjective(relaxation, 0.0)
+                            events.clear()
+                            val before = work
+
+                            val selected = hints.pickVariable(baseline, { true }, ExecutionControl.Never)
+                            hints.branch(selected)
+                            val alternatives = if (selected is VarRef.Bool) {
+                                listOf(SearchDecision.Bool(0), SearchDecision.Bool(1))
+                            } else splitIntAlternatives(session, selected as VarRef.IntVar,
+                                if (selected == proposal) 3L else 0L)
+                            val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
+                            hints.commit(ordered.first(), 1)
+
+                            val decline = reference == "unmeasured" && context != "above"
+                            val diagnostic = "$booleanBaseline/$reference/$predicted/$context/$constant"
+                            assertEquals(if (apply && !decline) proposal else baseline, selected, diagnostic)
+                            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                            assertEquals(if (decline) 0 else 1, events.count { it == event }, diagnostic)
+                            assertEquals(if (decline) 1 else 0,
+                                events.count { it == "PASSIVE_VARIABLE_BASELINE_ESTIMATE_DECLINED" }, diagnostic)
+                            costs.add(work - before)
+                        }
+                        assertTrue(costs.first() > 0L)
+                        assertEquals(costs.first(), costs.last())
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `unmeasured baseline priority preserves current fractionality before committing advice`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (booleanBaseline in listOf(false, true)) {
+            val baseline = if (booleanBaseline) VarRef.Bool(0) else VarRef.IntVar(0)
+            val proposal = VarRef.IntVar(if (booleanBaseline) 0 else 1)
+            val session = PropagationSession(Problem(if (booleanBaseline) 1 else 0,
+                if (booleanBaseline) 1 else 2,
+                Array(if (booleanBaseline) 1 else 2) { IntDomain(0, 10) }, emptyArray()))
+            for (reference in listOf("unmeasured", "known-zero", "known-positive")) {
+                for ((baselinePoint, proposedPoint, context) in listOf(Triple(0.5, 3.25, "lower"),
+                    Triple(0.5, 3.75, "lower"), Triple(0.5, 3.5, "equal"), Triple(0.25, 3.5, "higher"),
+                    Triple(0.75, 3.5, "higher"), Triple(0.5, 3.5 - 1e-12, "lower"),
+                    Triple(0.0, 3.25, "integral"), Triple(1.0, 3.75, "integral"),
+                    Triple(0.5, Double.NaN, "invalid"), Triple(0.5, 3.00000001, "invalid"),
+                    Triple(0.5, 3.0, "invalid"))) {
+                    for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                        val costs = ArrayList<Long>()
+                        for (apply in listOf(false, true)) {
+                            val events = ArrayList<String>()
+                            var work = 0L
+                            val hints = LpHints(if (booleanBaseline) 1 else 2, if (booleanBaseline) 1 else 0,
+                                directionalGains = true, applyAdvice = apply,
+                                observe = events::add, charge = { work += it })
+                            val relaxation = LpRelaxation(model, intArrayOf(0, proposal.varId),
+                                booleanArrayOf(booleanBaseline, false), constant,
+                                if (booleanBaseline) intArrayOf(1) else intArrayOf(0, 1),
+                                if (booleanBaseline) intArrayOf(0) else IntArray(0))
+                            val cutoff = constant.toDouble() + 1024.0
+                            for (variable in listOf(baseline, proposal)) {
+                                if (variable == baseline && reference == "unmeasured") continue
+                                hints.beginNode(0, cutoff)
+                                hints.record(relaxation, doubleArrayOf(0.5, 3.5), DoubleArray(0))
+                                hints.recordObjective(relaxation, 0.0)
+                                hints.branch(variable)
+                                repeat(2) {
+                                    for (up in listOf(false, true)) {
+                                        val decision = if (variable is VarRef.Bool) {
+                                            SearchDecision.Bool(if (up) 0 else 1)
+                                        } else {
+                                            val lower = if (variable == baseline) 0L else 3L
+                                            if (up) SearchDecision.IntAtLeast(variable.varId, lower + 1L)
+                                            else SearchDecision.IntAtMost(variable.varId, lower)
+                                        }
+                                        hints.commit(decision, 1)
+                                        hints.beginNode(1, cutoff)
+                                        hints.record(relaxation, doubleArrayOf(0.5, 3.5), DoubleArray(0))
+                                        hints.recordObjective(relaxation, if (variable == proposal) 2.0
+                                        else if (reference == "known-zero") 0.0 else 0.5)
+                                        hints.recordOutcome(false, relaxation)
+                                        hints.finishNode(trail.state)
+                                    }
+                                }
+                            }
+                            hints.beginNode(0, cutoff)
+                            hints.record(relaxation, doubleArrayOf(baselinePoint, proposedPoint), DoubleArray(0))
+                            hints.recordObjective(relaxation, 0.0)
+                            events.clear()
+                            val before = work
+
+                            val selected = hints.pickVariable(baseline, { true }, ExecutionControl.Never)
+                            hints.branch(selected)
+                            val alternatives = if (selected is VarRef.Bool) {
+                                listOf(SearchDecision.Bool(0), SearchDecision.Bool(1))
+                            } else splitIntAlternatives(session, selected as VarRef.IntVar,
+                                floor(if (selected == proposal) proposedPoint else baselinePoint).toLong())
+                            val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
+                            hints.commit(ordered.first(), 1)
+
+                            val decline = reference == "unmeasured" && context == "lower"
+                            val eligible = context != "invalid" && !decline
+                            val diagnostic = "$booleanBaseline/$reference/$baselinePoint/$proposedPoint/$constant"
+                            assertEquals(if (apply && eligible) proposal else baseline, selected, diagnostic)
+                            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                            assertEquals(if (eligible) 1 else 0, events.count { it == event }, diagnostic)
+                            assertEquals(if (decline) 1 else 0,
+                                events.count { it == "PASSIVE_VARIABLE_FRACTIONALITY_DECLINED" }, diagnostic)
+                            costs.add(work - before)
+                        }
+                        assertTrue(costs.first() > 0L)
+                        assertEquals(costs.first(), costs.last())
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `evidence priority preserves numeric fallbacks and requires a positive live candidate`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+        val session = PropagationSession(Problem(0, 2, Array(2) { IntDomain(0, 10) }, emptyArray()))
+        for (context in listOf("unknown", "single-baseline", "unstable", "expired", "zero-baseline",
+            "single-proposal", "fixed", "missing", "near", "underflow", "gap", "zero-candidate",
+            "candidate-context", "baseline-context")) {
+            val costs = ArrayList<Long>()
+            for (apply in listOf(false, true)) {
+                var work = 0L
+                val events = ArrayList<String>()
+                val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
+                    observe = events::add, charge = { work += it })
+                for (id in 0..1) {
+                    if (id == 1 && context == "expired") repeat(257) { hints.beginNode(0, 1000.0) }
+                    val samples = if (id == 0) when (context) {
+                        "single-baseline" -> 1
+                        "unstable", "expired", "zero-baseline", "underflow", "baseline-context" -> 2
+                        else -> 0
+                    } else if (context == "single-proposal") 1 else if (context == "zero-candidate") 4 else 2
+                    val parent = if ((id == 0 && context == "baseline-context") ||
+                        (id == 1 && context == "candidate-context")) -3000.0 else 0.0
+                    hints.beginNode(0, 1000.0)
+                    hints.record(relaxation, doubleArrayOf(0.5, 3.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, parent)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(trail.state)
+                    hints.branch(VarRef.IntVar(id))
+                    repeat(samples) { sample ->
+                        for (up in listOf(false, true)) {
+                            val lower = if (id == 0) 0L else 3L
+                            hints.commit(if (up) SearchDecision.IntAtLeast(id, lower + 1L)
+                            else SearchDecision.IntAtMost(id, lower), 1)
+                            hints.beginNode(1, 1000.0)
+                            hints.record(relaxation, doubleArrayOf(0.5, 3.5), DoubleArray(0))
+                            val objective = when {
+                                id == 0 && context == "underflow" -> Double.MIN_VALUE
+                                id == 0 && context == "zero-baseline" -> 0.0
+                                id == 0 && context == "baseline-context" -> 1.0
+                                id == 0 && context == "unstable" -> if (sample == 0) 1.0 else 4.0
+                                id == 1 && context == "zero-candidate" && sample >= 2 -> 0.0
+                                else -> 2.0
+                            }
+                            hints.recordObjective(relaxation, parent + objective)
+                            hints.recordOutcome(false, relaxation)
+                            hints.finishNode(trail.state)
+                        }
+                    }
+                }
+                val point = when (context) {
+                    "missing" -> Double.NaN
+                    "near" -> 0.00000001
+                    "underflow" -> 0.000002
+                    else -> 0.5
+                }
+                hints.beginNode(0, 1000.0)
+                hints.record(relaxation, doubleArrayOf(point, 3.5), DoubleArray(0))
+                hints.recordObjective(relaxation, if (context == "gap") 1000.0 else 0.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(trail.state)
+                events.clear()
+                val before = work
+
+                val selected = hints.pickVariable(VarRef.IntVar(0), { it.varId == 0 || context != "fixed" },
+                    ExecutionControl.Never)
+                hints.branch(selected)
+                val alternatives = splitIntAlternatives(session, selected as VarRef.IntVar,
+                    if (selected.varId == 1) 3L else point.toLong())
+                val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
+                hints.commit(ordered.first(), 1)
+
+                val eligible = context in listOf("unknown", "single-baseline", "unstable", "expired", "zero-baseline")
+                assertEquals(VarRef.IntVar(if (apply && eligible) 1 else 0), selected, context)
+                val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                assertEquals(if (eligible) 1 else 0, events.count { it == event }, context)
+                if (context == "zero-baseline" || context == "baseline-context") {
+                    assertFalse("PASSIVE_VARIABLE_UNMEASURED_BASELINE" in events)
+                }
+                costs.add(work - before)
+            }
+            assertEquals(costs.first(), costs.last(), context)
+        }
+    }
+
+    @Test
+    fun `reliable fractional variables can replace integral or unmeasured current LP baselines`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (booleanBaseline in listOf(false, true)) {
+            val baseline = if (booleanBaseline) VarRef.Bool(0) else VarRef.IntVar(0)
+            val proposal = VarRef.IntVar(if (booleanBaseline) 0 else 1)
+            val domains = if (booleanBaseline) arrayOf(IntDomain(0, 10))
+            else arrayOf(IntDomain(0, 2), IntDomain(0, 10))
+            val session =
+                PropagationSession(Problem(if (booleanBaseline) 1 else 0, domains.size, domains, emptyArray()))
+            for ((baselinePoint, objective, samples) in listOf(Triple(0.0, 0.0, 2), Triple(1.0, 0.0, 2),
+                Triple(2.0, 0.0, 2), Triple(0.5, 0.0, 2), Triple(1e-8, 0.0, 2),
+                Triple(Double.NaN, 0.0, 2), Triple(Double.POSITIVE_INFINITY, 0.0, 2),
+                Triple(Long.MAX_VALUE.toDouble(), 0.0, 2), Triple(0.0, 1024.0, 2),
+                Triple(0.0, 1025.0, 2), Triple(0.0, 0.0, 1))) {
+                val costs = ArrayList<Long>()
+                for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                    val relaxation = LpRelaxation(model, intArrayOf(0, proposal.varId),
+                        booleanArrayOf(booleanBaseline, false), constant,
+                        if (booleanBaseline) intArrayOf(1) else intArrayOf(0, 1),
+                        if (booleanBaseline) intArrayOf(0) else IntArray(0))
+                    val cutoff = constant.toDouble() + 1024.0
+                    for (apply in listOf(false, true)) {
+                        var work = 0L
+                        val events = ArrayList<String>()
+                        val hints = LpHints(if (booleanBaseline) 1 else 2, if (booleanBaseline) 1 else 0,
+                            directionalGains = true, applyAdvice = apply, observe = events::add,
+                            charge = { work += it })
+                        hints.beginNode(0, cutoff)
+                        hints.record(relaxation, doubleArrayOf(baselinePoint, 3.5), DoubleArray(0))
+                        hints.recordObjective(relaxation, 0.0)
+                        hints.recordOutcome(false, relaxation)
+                        hints.finishNode(trail.state)
+                        hints.branch(proposal)
+                        repeat(samples) {
+                            for (up in listOf(false, true)) {
+                                val decision = if (up) SearchDecision.IntAtLeast(proposal.varId, 4L)
+                                else SearchDecision.IntAtMost(proposal.varId, 3L)
+                                hints.commit(decision, 1)
+                                hints.beginNode(1, cutoff)
+                                hints.record(relaxation, doubleArrayOf(baselinePoint, 3.5), DoubleArray(0))
+                                hints.recordObjective(relaxation, 2.0)
+                                hints.recordOutcome(false, relaxation)
+                                hints.finishNode(trail.state)
+                            }
+                        }
+                        hints.beginNode(0, cutoff)
+                        hints.record(relaxation, doubleArrayOf(baselinePoint, 3.5), DoubleArray(0))
+                        hints.recordObjective(relaxation, objective)
+                        hints.recordOutcome(false, relaxation)
+                        hints.finishNode(trail.state)
+                        events.clear()
+                        val before = work
+
+                        val selected = hints.pickVariable(baseline, { true }, ExecutionControl.Never)
+                        hints.branch(selected)
+                        val alternatives = if (selected is VarRef.Bool) {
+                            listOf(SearchDecision.Bool(0), SearchDecision.Bool(1))
+                        } else splitIntAlternatives(session, selected as VarRef.IntVar,
+                            if (selected == proposal) 3L else baselinePoint.toLong())
+                        val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
+                        hints.commit(ordered.first(), 1)
+
+                        val integral = baselinePoint == 0.0 || baselinePoint == 1.0 ||
+                            (!booleanBaseline && baselinePoint == 2.0)
+                        val eligible = (integral || baselinePoint == 0.5) && objective < 1024.0 && samples == 2
+                        assertEquals(if (apply && eligible) proposal else baseline, selected)
+                        val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                        else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                        assertEquals(if (eligible) 1 else 0, events.count { it == event })
+                        costs.add(work - before)
+                    }
+                }
+                assertTrue(costs.all { it == costs.first() })
+            }
+        }
+    }
+
+    @Test
+    fun `separated gain ranges reach matched applied and withheld variable commitments`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for ((baselineDown, baselineUp, proposedGain) in listOf(Triple(0.0, 0.0, 2048.0),
+            Triple(256.0, 256.0, 2048.0), Triple(256.0, 256.0, 512.0), Triple(2048.0, 2048.0, 4096.0),
+            Triple(256.0, 256.0, 256.0), Triple(512.0, 512.0, 256.0), Triple(2.0, 100.0, 9.0))) {
+            for (baselineScale in listOf(1.0, 2.0)) {
+                for (proposedScale in listOf(1.0, 2.0)) {
+                    val costs = ArrayList<Long>()
+                    for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                        val relaxation = LpRelaxation(model, intArrayOf(0, 1), booleanArrayOf(false, false),
+                            constant, intArrayOf(0, 1), IntArray(0))
+                        val cutoff = constant.toDouble() + 1024.0
+                        for (apply in listOf(false, true)) {
+                            var work = 0L
+                            val events = ArrayList<String>()
+                            val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
+                                observe = events::add, charge = { work += it })
+                            for (variable in listOf(VarRef.IntVar(0), VarRef.IntVar(1))) {
+                                hints.beginNode(0, cutoff)
+                                hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+                                hints.recordObjective(relaxation, 0.0)
+                                hints.recordOutcome(false, relaxation)
+                                hints.finishNode(trail.state)
+                                hints.branch(variable)
+                                repeat(2) { sample ->
+                                    for (up in listOf(false, true)) {
+                                        val lower = if (variable.varId == 0) 2L else 3L
+                                        val decision = if (up) SearchDecision.IntAtLeast(variable.varId, lower + 1L)
+                                        else SearchDecision.IntAtMost(variable.varId, lower)
+                                        hints.commit(decision, 1)
+                                        hints.beginNode(1, cutoff)
+                                        hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+                                        val objective = if (variable.varId != 0) proposedGain else if (up) baselineUp
+                                        else baselineDown
+                                        val scale = if (sample > 0) 1.0 else if (variable.varId == 0) baselineScale
+                                        else proposedScale
+                                        hints.recordObjective(relaxation, objective * scale)
+                                        hints.recordOutcome(false, relaxation)
+                                        hints.finishNode(trail.state)
+                                    }
+                                }
+                            }
+                            hints.beginNode(0, cutoff)
+                            hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+                            hints.recordObjective(relaxation, 0.0)
+                            hints.recordOutcome(false, relaxation)
+                            hints.finishNode(trail.state)
+                            events.clear()
+                            val before = work
+
+                            val selected = hints.pickVariable(VarRef.IntVar(0), { true }, ExecutionControl.Never)
+                            hints.branch(selected)
+                            val lower = if (selected.varId == 0) 2L else 3L
+                            val alternatives = listOf(SearchDecision.IntAtMost(selected.varId, lower),
+                                SearchDecision.IntAtLeast(selected.varId, lower + 1L))
+                            val ordered = hints.orderAlternatives(selected, alternatives, ExecutionControl.Never)
+                            hints.commit(ordered.first(), 1)
+
+                            val changed = proposedGain > minOf(baselineDown, baselineUp) * baselineScale
+                            assertEquals(VarRef.IntVar(if (apply && changed) 1 else 0), selected)
+                            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                            assertEquals(if (changed) 1 else 0, events.count { it == event })
+                            costs.add(work - before)
+                        }
+                    }
+                    assertTrue(costs.first() > 0L)
+                    assertTrue(costs.all { it == costs.first() })
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `reset or cancellation at charged variable selection stages cannot attribute advice`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 10, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+        for (reset in listOf(false, true)) {
+            for ((reference, stopAt) in listOf("integral", "measured", "unmeasured").flatMap { reference ->
+                (1..when (reference) {
+                    "integral" -> 16
+                    "unmeasured" -> 24
+                    else -> 22
+                })
+                    .map { reference to it }
+            }) {
+                val events = ArrayList<String>()
+                var reading = false
+                var reads = 0
+                var fresh = true
+                lateinit var hints: LpHints
+                hints = LpHints(2, 0, directionalGains = true, observe = events::add, charge = {
+                    if (reading && ++reads == stopAt) {
+                        reading = false
+                        if (reset) hints.resetHistory() else fresh = false
+                    }
+                })
+                for (variable in listOf(VarRef.IntVar(0), VarRef.IntVar(1))) {
+                    if (reference == "unmeasured" && variable.varId == 0) continue
+                    hints.beginNode(0, 3.0)
+                    hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, 0.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(trail.state)
+                    hints.branch(variable)
+                    repeat(2) {
+                        for (up in listOf(false, true)) {
+                            val lower = if (variable.varId == 0) 2L else 3L
+                            val decision = if (up) SearchDecision.IntAtLeast(variable.varId, lower + 1L)
+                            else SearchDecision.IntAtMost(variable.varId, lower)
+                            hints.commit(decision, 1)
+                            hints.beginNode(1, 3.0)
+                            hints.record(relaxation, doubleArrayOf(2.5, 3.5), DoubleArray(0))
+                            hints.recordObjective(relaxation, if (variable.varId == 0) 0.0 else 5.0)
+                            hints.recordOutcome(false, relaxation)
+                            hints.finishNode(trail.state)
+                        }
+                    }
+                }
+                hints.beginNode(0, 3.0)
+                hints.record(relaxation, doubleArrayOf(if (reference == "integral") 2.0 else 2.5, 3.5), DoubleArray(0))
+                hints.recordObjective(relaxation, 0.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(trail.state)
+                events.clear()
+                reading = true
+                val control = ExecutionControl { !fresh }
+
+                val selected = hints.pickVariable(VarRef.IntVar(0), { true }, control)
+                hints.branch(selected)
+                val lower = if (selected.varId == 0) 2L else 3L
+                val alternatives = listOf(SearchDecision.IntAtMost(selected.varId, lower),
+                    SearchDecision.IntAtLeast(selected.varId, lower + 1L))
+                val ordered = hints.orderAlternatives(selected, alternatives, control)
+                hints.commit(ordered.first(), 1, control)
+
+                assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events, "$reset/$reference/$stopAt: $events")
+                assertTrue(reads >= stopAt, "$reset/$reference/$stopAt")
+            }
+        }
+    }
+
+    @Test
+    fun `child gain ranges reach matched applied and withheld commitments`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2L)
+        val up = SearchDecision.IntAtLeast(0, 3L)
+        val costs = HashMap<Triple<Double, Double, Double>, MutableList<Long>>()
+        for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
+                constant, intArrayOf(0), IntArray(0))
+            val cutoff = constant.toDouble() + 1024.0
+            for ((apply, currentObjective) in listOf(false to 10.0, true to 10.0, false to 1023.0, true to 1023.0)) {
+                for ((scale, gapScale, equalRates) in listOf(1.0 to 1.0, 1.5 to 1.0, 2.0 to 1.0,
+                    1.0 to 0.5, 1.0 to 2.0, 1.0 to 4.0, 1.0 to 0.25).flatMap { (scale, gapScale) ->
+                    listOf(Triple(scale, gapScale, false), Triple(scale, gapScale, true))
+                }) {
+                    var work = 0L
+                    val events = ArrayList<String>()
+                    val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                        observe = events::add, charge = { work += it })
+                    val parentObjective = 1024.0 - (1024.0 - currentObjective) * gapScale
+                    repeat(2) { sample ->
+                        hints.beginNode(0, cutoff)
+                        hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+                        hints.recordObjective(relaxation, parentObjective)
+                        hints.recordOutcome(false, relaxation)
+                        hints.finishNode(trail.state)
+                        hints.branch(variable)
+                        val upObjective = parentObjective + if (sample == 0) scale else 1.0
+                        for ((decision, point, objective) in listOf(Triple(down, 2.0, parentObjective + 1.5),
+                            Triple(up, 3.0, upObjective))) {
+                            hints.commit(decision, 1)
+                            hints.beginNode(1, cutoff)
+                            hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                            hints.recordObjective(relaxation, objective)
+                            hints.recordOutcome(equalRates || (decision == down && sample == 0), relaxation)
+                            hints.finishNode(trail.state)
+                        }
+                    }
+                    hints.beginNode(0, cutoff)
+                    hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+                    hints.recordObjective(relaxation, currentObjective)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(trail.state)
+                    hints.branch(variable)
+                    val before = work
+
+                    val ordinary = if (currentObjective == 1023.0) listOf(up, down) else listOf(down, up)
+                    val ordered = hints.orderAlternatives(variable, ordinary, ExecutionControl.Never)
+                    hints.commit(ordered.first(), 1)
+
+                    val changed = gapScale in 0.5..2.0 && (currentObjective == 1023.0 || scale < 1.5)
+                    assertEquals(if (apply && changed) ordinary.reversed() else ordinary, ordered)
+                    val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
+                    assertEquals(if (changed) 1 else 0, events.count { it == event })
+                    assertFalse("PASSIVE_VARIABLE_SCORE" in events)
+                    assertFalse("PASSIVE_VARIABLE_COMMIT_CHANGED" in events)
+                    costs.getOrPut(Triple(currentObjective, scale, gapScale)) { ArrayList() }.add(work - before)
+                }
+            }
+        }
+        for (caseCosts in costs.values) {
+            assertTrue(caseCosts.first() > 0L)
+            assertTrue(caseCosts.all { it == caseCosts.first() })
+        }
+    }
+
+    @Test
+    fun `cancelled final publication discards a completed outcome`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val events = ArrayList<String>()
+        val hints = LpHints(1, 0, directionalGains = true, observe = events::add)
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+        hints.recordObjective(relaxation, 10.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(trail.state)
+        hints.branch(VarRef.IntVar(0))
+        hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
+        hints.beginNode(1, 100.0)
+        hints.recordOutcome(true, relaxation)
+
+        hints.finishNode(trail.state, ExecutionControl { true })
+        hints.finishNode(trail.state)
+
+        assertFalse("OUTCOME_PRUNED" in events)
+    }
+
+    @Test
+    fun `completed outcomes with missing or changed scope discard retained history`() {
+        for (change in listOf("missing", "mapping", "constant", "cutoff")) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val model = assertNotNull(trail.state.ownerWorkingModel())
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
+                0L, intArrayOf(0), IntArray(0))
+            val variable = VarRef.IntVar(0)
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = events::add)
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
+            hints.branch(variable)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3L) else SearchDecision.IntAtMost(0, 2L), 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordObjective(relaxation, 12.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
+                }
+            }
+            hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
+            hints.beginNode(1, if (change == "cutoff") 99.0 else 100.0)
+            val changed = when (change) {
+                "missing" -> null
+                "mapping" -> LpRelaxation(model, intArrayOf(1), booleanArrayOf(false),
+                    0L, intArrayOf(0), IntArray(0))
+                "constant" -> LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
+                    1L, intArrayOf(0), IntArray(0))
+                else -> relaxation
+            }
+
+            hints.recordOutcome(true, changed)
+            hints.finishNode(relaxation.model.exactState)
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
+
+            assertTrue(hints.directionalScore(variable).isNaN())
+            assertEquals(1, events.count { it == "RESET" })
+            assertFalse("OUTCOME_PRUNED" in events)
+        }
+    }
+
+    @Test
+    fun `restart advice requires a fresh optimum with matching retained scope`() {
+        for (change in listOf("none", "cutoff", "rows")) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1L)
+            builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, 10L)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+            val events = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = events::add)
+            val variable = VarRef.IntVar(0)
+            val down = SearchDecision.IntAtMost(0, 2)
+            val up = SearchDecision.IntAtLeast(0, 3)
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), doubleArrayOf(0.0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
+                hints.branch(variable)
+                for ((decision, point, objective) in listOf(Triple(down, 2.0, 11.0), Triple(up, 3.0, 13.0))) {
+                    hints.commit(decision, 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(point), doubleArrayOf(0.0))
+                    hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), doubleArrayOf(0.0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
+            hints.branch(variable)
+
+            hints.restart()
+            hints.commit(down, 1)
+            assertTrue(hints.directionalScore(variable).isNaN())
+            if (change == "rows") {
+                assertTrue(trail.push())
+                assertTrue(trail.deactivate(setOf(0L)))
+            }
+            val current = relaxation.withModel(assertNotNull(trail.state.ownerWorkingModel()))
+            hints.beginNode(0, if (change == "cutoff") 99.0 else 100.0)
+            hints.record(current, doubleArrayOf(2.25), DoubleArray(current.model.m))
+            hints.recordObjective(current, 10.0)
+            hints.recordOutcome(false, current)
+            hints.finishNode(current.model.exactState)
+
+            if (change == "none") assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9)
+            else assertTrue(hints.directionalScore(variable).isNaN())
+            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+            assertEquals(2, events.count { it == "DOWN" })
+            assertEquals(2, events.count { it == "UP" })
+        }
+    }
+
+    @Test
+    fun `cancellation discards a reliable child commitment`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -41,26 +830,32 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 11.0))) {
                     hints.commit(decision, 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                     hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(decision == down, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.finishNode(trail.state)
-            assertEquals(variable, hints.selectVariable(variable, variable))
             hints.branch(variable)
 
-            hints.commit(down, 1, ExecutionControl { true })
+            val ordered = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
+            hints.commit(ordered.first(), 1, ExecutionControl { true })
 
-            assertTrue("PASSIVE_VARIABLE_COMPARED" in events)
-            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
-            assertFalse("PASSIVE_VARIABLE_COMMIT_WITHHELD" in events)
+            assertTrue("PASSIVE_VALUE_COMPARED" in events)
+            assertFalse("PASSIVE_VALUE_COMMITTED" in events)
+            assertFalse("PASSIVE_VALUE_COMMIT_WITHHELD" in events)
         }
     }
 
@@ -77,10 +872,14 @@ class LpHintsTest {
             val hints = LpHints(width, 0, directionalGains = true, charge = { work += it })
             hints.beginNode(0, 100.0)
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             val rebound = relaxation.withModel(assertNotNull(trail.state.ownerWorkingModel()))
             val before = work
 
             hints.recordObjective(rebound, 10.0)
+            hints.recordOutcome(false, rebound)
+            hints.finishNode(rebound.model.exactState)
 
             costs.add(work - before)
         }
@@ -102,11 +901,15 @@ class LpHintsTest {
             val hints = LpHints(width, 0, directionalGains = true, charge = { work += it })
             hints.beginNode(0, 100.0)
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             val replacement = LpRelaxation(model, relaxation.colVarId.copyOf(), relaxation.colIsBool.copyOf(),
                 0L, relaxation.intColOf, relaxation.boolColOf)
             val before = work
 
             hints.recordObjective(replacement, 10.0)
+            hints.recordOutcome(false, replacement)
+            hints.finishNode(replacement.model.exactState)
 
             costs.add(work - before)
         }
@@ -114,7 +917,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable value advice reaches matching applied and withheld commitments`() {
+    fun `reliable child history leaves variable advice isolated`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -133,17 +936,23 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 for ((decision, point, objective) in listOf(Triple(down, 2.0, 13.0), Triple(up, 3.0, 10.0))) {
                     hints.commit(decision, 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                     hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.finishNode(trail.state)
             val before = work
             hints.branch(variable)
@@ -151,9 +960,8 @@ class LpHintsTest {
             val selected = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
             hints.commit(selected.first(), 1)
 
-            assertEquals(if (apply) listOf(up, down) else listOf(down, up), selected)
-            val event = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED" else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
+            assertEquals(listOf(down, up), selected)
+            assertTrue(events.none { it.startsWith("PASSIVE_VALUE_") })
             assertFalse("PASSIVE_COLLECTION_COMMIT_CHANGED" in events)
             costs.add(work - before)
         }
@@ -161,204 +969,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `reliable passive history reaches matching applied and withheld commitments`() {
-        val builder = LpBuilder()
-        repeat(2) { builder.addVar(0, 10, cost = 1L) }
-        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
-            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
-        val baseline = VarRef.IntVar(0)
-        val proposal = VarRef.IntVar(1)
-        val costs = ArrayList<Long>()
-        for (apply in listOf(false, true)) {
-            var work = 0L
-            val events = ArrayList<String>()
-            val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
-                observe = events::add, charge = { work += it })
-            repeat(2) {
-                for (variable in listOf(baseline, proposal)) {
-                    hints.beginNode(0, 100.0)
-                    hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
-                    hints.recordObjective(relaxation, 10.0)
-                    hints.branch(variable)
-                    val split = if (variable == baseline) 2L else 3L
-                    for (up in listOf(false, true)) {
-                        hints.commit(if (up) SearchDecision.IntAtLeast(variable.varId, split + 1L)
-                        else SearchDecision.IntAtMost(variable.varId, split), 1)
-                        hints.beginNode(1, 100.0)
-                        val child = doubleArrayOf(2.25, 3.25)
-                        child[variable.varId] = if (up) split + 1.0 else split.toDouble()
-                        hints.record(relaxation, child, DoubleArray(0))
-                        hints.recordObjective(relaxation, if (variable == baseline) 10.0 else if (up) 13.0 else 11.0)
-                    }
-                }
-            }
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
-            hints.finishNode(trail.state)
-            assertEquals(sqrt(3.0), hints.directionalScore(proposal), 1e-9)
-            val before = work
-
-            val selected = assertNotNull(hints.pickVariable(baseline, 1e-9, { true }, { false }))
-            hints.branch(selected)
-            hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
-
-            assertEquals(if (apply) proposal else baseline, selected)
-            val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
-            assertEquals(1, events.count { it == event })
-            assertEquals(4, events.count { it == "UP" })
-            assertEquals(4, events.count { it == "DOWN" })
-            costs.add(work - before)
-        }
-        assertEquals(costs.first(), costs.last())
-    }
-
-    @Test
-    fun `missing reference measurements keep ordinary selection`() {
-        val builder = LpBuilder()
-        repeat(2) { builder.addVar(0, 10, cost = 1L) }
-        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
-            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
-        val baseline = VarRef.IntVar(0)
-        val proposal = VarRef.IntVar(1)
-        val events = ArrayList<String>()
-        val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
-        repeat(2) {
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
-            hints.branch(proposal)
-            for (up in listOf(false, true)) {
-                hints.commit(if (up) SearchDecision.IntAtLeast(1, 4) else SearchDecision.IntAtMost(1, 3), 1)
-                hints.beginNode(1, 100.0)
-                hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
-                hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
-            }
-        }
-        hints.beginNode(0, 100.0)
-        hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
-        hints.recordObjective(relaxation, 10.0)
-
-        for (reference in listOf(null, baseline)) {
-            val selected = hints.selectVariable(proposal, reference)
-
-            assertEquals(reference, selected)
-        }
-        assertTrue("PASSIVE_VARIABLE_BASELINE_UNRELIABLE" in events)
-        events.clear()
-
-        assertEquals(baseline, hints.pickVariable(baseline, 1e-9, { true }, { false }))
-
-        assertTrue("PASSIVE_VARIABLE_BASELINE_UNRELIABLE" in events)
-        assertFalse("PASSIVE_VARIABLE_SCORE" in events)
-    }
-
-    @Test
-    fun `sparse candidate ties retain kind and variable order among available variables`() {
-        val builder = LpBuilder()
-        repeat(4) { builder.addVar(0, 1, cost = 1L) }
-        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 0, 1),
-            booleanArrayOf(true, true, false, false), 0L, intArrayOf(2, 3), intArrayOf(0, 1))
-        val baseline = VarRef.IntVar(1)
-        val hints = LpHints(2, 2, directionalGains = true)
-        for (variable in listOf(VarRef.IntVar(0), VarRef.Bool(1), VarRef.Bool(0), baseline)) {
-            val column = variable.varId + if (variable is VarRef.Bool) 0 else 2
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
-            hints.branch(variable)
-            repeat(2) {
-                for (up in listOf(false, true)) {
-                    val decision = when (variable) {
-                        is VarRef.Bool -> SearchDecision.Bool(variable.varId * 2 + if (up) 0 else 1)
-                        is VarRef.IntVar -> if (up) SearchDecision.IntAtLeast(variable.varId, 1L)
-                        else SearchDecision.IntAtMost(variable.varId, 0L)
-                    }
-                    hints.commit(decision, 1)
-                    hints.beginNode(1, 100.0)
-                    hints.record(relaxation, DoubleArray(4) { if (it == column) if (up) 1.0 else 0.0 else 0.5 },
-                        DoubleArray(0))
-                    hints.recordObjective(relaxation, if (variable == baseline) 10.0 else 12.0)
-                }
-            }
-        }
-        hints.beginNode(0, 100.0)
-        hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
-        hints.recordObjective(relaxation, 10.0)
-        for ((unavailable, expected) in listOf(
-            emptySet<VarRef>() to VarRef.Bool(0),
-            setOf<VarRef>(VarRef.Bool(0)) to VarRef.Bool(1),
-            setOf<VarRef>(VarRef.Bool(0), VarRef.Bool(1)) to VarRef.IntVar(0),
-        )) {
-            val selected = hints.pickVariable(baseline, 1e-9, { it !in unavailable }, { false })
-
-            assertEquals(expected, selected)
-        }
-    }
-
-    @Test
-    fun `sparse selection invalidated during candidate scoring keeps the ordinary variable`() {
-        for (reset in listOf(false, true)) {
-            val builder = LpBuilder()
-            repeat(2) { builder.addVar(0, 1, cost = 1L) }
-            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
-                booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
-            val baseline = VarRef.IntVar(0)
-            var selecting = false
-            var scoring = false
-            var cancelled = false
-            val events = ArrayList<String>()
-            lateinit var hints: LpHints
-            hints = LpHints(2, 0, directionalGains = true, observe = {
-                events.add(it)
-                if (selecting && it == "PASSIVE_VARIABLE_SCORE") scoring = true
-            }, charge = {
-                if (scoring) {
-                    scoring = false
-                    selecting = false
-                    if (reset) hints.resetHistory() else cancelled = true
-                }
-            })
-            for (variable in listOf(baseline, VarRef.IntVar(1))) {
-                hints.beginNode(0, 100.0)
-                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-                hints.recordObjective(relaxation, 10.0)
-                hints.branch(variable)
-                repeat(2) {
-                    for (up in listOf(false, true)) {
-                        hints.commit(if (up) SearchDecision.IntAtLeast(variable.varId, 1L)
-                        else SearchDecision.IntAtMost(variable.varId, 0L), 1)
-                        hints.beginNode(1, 100.0)
-                        hints.record(relaxation, DoubleArray(2) {
-                            if (it == variable.varId) if (up) 1.0 else 0.0 else 0.5
-                        }, DoubleArray(0))
-                        hints.recordObjective(relaxation, if (variable == baseline) 10.0 else 12.0)
-                    }
-                }
-            }
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
-            events.clear()
-            selecting = true
-
-            val selected = assertNotNull(hints.pickVariable(baseline, 1e-9, { true }, { cancelled }))
-            hints.branch(selected)
-            hints.commit(SearchDecision.IntAtMost(selected.varId, 0L), 1)
-
-            assertEquals(baseline, selected)
-            assertTrue("PASSIVE_VARIABLE_SCORE" in events)
-            assertFalse("PASSIVE_VARIABLE_COMPARED" in events)
-            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
-        }
-    }
-
-    @Test
-    fun `passive selection withholds advice from an unmatched current point`() {
+    fun `child selection withholds advice from an unmatched current point`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -372,27 +983,35 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
             hints.branch(proposal)
             for (up in listOf(false, true)) {
                 hints.commit(if (up) SearchDecision.IntAtLeast(1, 4L) else SearchDecision.IntAtMost(1, 3L), 1)
                 hints.beginNode(1, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25, if (up) 4.0 else 3.0), DoubleArray(0))
                 hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                hints.recordOutcome(up, relaxation)
+                hints.finishNode(relaxation.model.exactState)
             }
         }
         hints.beginNode(0, 100.0)
         hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
+        hints.recordObjective(relaxation, 10.0)
+        val ordinary = listOf(SearchDecision.IntAtLeast(1, 4L), SearchDecision.IntAtMost(1, 3L))
+        assertEquals(ordinary.reversed(), hints.orderAlternatives(proposal, ordinary, ExecutionControl.Never))
+        events.clear()
         hints.recordObjective(LpRelaxation(model, intArrayOf(0, 1), booleanArrayOf(false, false),
             0L, intArrayOf(0, 1), IntArray(0)), 10.0)
 
-        val selected = hints.selectVariable(proposal, VarRef.IntVar(0))
-        hints.branch(VarRef.IntVar(0))
-        hints.commit(SearchDecision.IntAtMost(0, 2L), 1)
+        val selected = hints.orderAlternatives(proposal, ordinary, ExecutionControl.Never)
+        hints.branch(proposal)
+        hints.commit(selected.first(), 1)
 
-        assertEquals(VarRef.IntVar(0), selected)
+        assertEquals(ordinary, selected)
         assertTrue(hints.directionalScore(proposal).isNaN())
-        assertFalse("PASSIVE_VARIABLE_COMPARED" in events)
-        assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+        assertFalse("PASSIVE_VALUE_COMPARED" in events)
+        assertFalse("PASSIVE_VALUE_COMMITTED" in events)
     }
 
     @Test
@@ -416,15 +1035,21 @@ class LpHintsTest {
                     hints.beginNode(0, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                     hints.recordObjective(relaxation, 10.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                     hints.branch(variable)
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 val before = work
 
                 val score = if (primitive) hints.directionalScore(variable.varId, isBool = false)
@@ -529,11 +1154,15 @@ class LpHintsTest {
         hints.beginNode(0, 100.0)
         hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
         hints.recordObjective(relaxation, 10.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(relaxation.model.exactState)
         hints.branch(VarRef.IntVar(0))
         hints.commit(SearchDecision.IntAtMost(0, 2), 1)
         hints.beginNode(1, 100.0)
         hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
         hints.recordObjective(relaxation, 11.0)
+        hints.recordOutcome(false, relaxation)
+        hints.finishNode(relaxation.model.exactState)
         hints.finishNode()
         hints.resetHistory()
 
@@ -573,6 +1202,8 @@ class LpHintsTest {
             val parent = relaxation()
             hints.record(parent, doubleArrayOf(2.25), DoubleArray(parent.model.m))
             hints.recordObjective(parent, 10.0)
+            hints.recordOutcome(false, parent)
+            hints.finishNode(parent.model.exactState)
             hints.branch(VarRef.IntVar(0))
             hints.commit(SearchDecision.IntAtMost(0, 2), 1)
             assertTrue(trail.push())
@@ -597,6 +1228,8 @@ class LpHintsTest {
             hints.record(child, doubleArrayOf(2.0), DoubleArray(child.model.m))
 
             hints.recordObjective(child, 11.0)
+            hints.recordOutcome(false, child)
+            hints.finishNode(child.model.exactState)
 
             assertEquals(0, observations.count { it == "DOWN" }, change)
             assertEquals(listOf(reason), observations.filter { it.startsWith("INCOMPATIBLE_") }, change)
@@ -645,12 +1278,16 @@ class LpHintsTest {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(VarRef.IntVar(0))
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
             assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
@@ -660,6 +1297,8 @@ class LpHintsTest {
 
             if (change != "missing") {
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 if (change == "retire") {
                     assertTrue(trail.deactivate(setOf(0L)))
                 } else if (change == "cut") {
@@ -699,20 +1338,26 @@ class LpHintsTest {
             val hints = LpHints(1, 0, directionalGains = true)
             val variable = VarRef.IntVar(0)
             repeat(2) {
-                hints.beginNode(0, Double.POSITIVE_INFINITY)
+                hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
                 hints.recordObjective(relaxation, 10.0)
+                hints.recordOutcome(false, relaxation)
+                hints.finishNode(relaxation.model.exactState)
                 hints.branch(variable)
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
-                    hints.beginNode(1, Double.POSITIVE_INFINITY)
+                    hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
                     hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordOutcome(false, relaxation)
+                    hints.finishNode(relaxation.model.exactState)
                 }
             }
-            hints.beginNode(0, Double.POSITIVE_INFINITY)
+            hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
+            hints.recordOutcome(false, relaxation)
+            hints.finishNode(relaxation.model.exactState)
 
             assertEquals(sqrt(3.0), hints.directionalScore(variable), 1e-9, "constant=$constant")
         }

@@ -28,13 +28,13 @@ internal class LpPassiveCollection(
         changed = false
     }
 
-    fun select(
+    internal inline fun select(
         variable: VarRef,
         point: Double,
         alternatives: List<SearchDecision>,
         history: LpDirectionalHistory,
         stamp: Int,
-        fresh: () -> Boolean,
+        crossinline fresh: () -> Boolean,
     ): List<SearchDecision> {
         clear()
         if (!available) return alternatives
@@ -71,7 +71,7 @@ internal class LpPassiveCollection(
         return if (differs) alternatives.reversed() else alternatives
     }
 
-    fun commit(decision: SearchDecision, stamp: Int, fresh: () -> Boolean) {
+    internal inline fun commit(decision: SearchDecision, stamp: Int, crossinline fresh: () -> Boolean) {
         val expected = nomination ?: return
         charge(4L)
         observe("PASSIVE_COLLECTION_COMMIT_CHECK")

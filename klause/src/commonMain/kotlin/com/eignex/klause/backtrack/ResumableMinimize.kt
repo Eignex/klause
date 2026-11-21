@@ -577,13 +577,7 @@ internal class ResumableMinimize(
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
     // The engine records each node's LP solution into it; the descent reads it for variable/value order.
-    private val lpHints: LpHints? =
-        if (params.lpPlan.branching) {
-            LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
-                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                applyAdvice = params.lpDirectionalAdvice)
-        } else
-            null
+    private var lpHints: LpHints? = null
 
     private lateinit var cp: CpSearchComponent
     private val session: PropagationSession get() = cp.session
@@ -708,6 +702,12 @@ internal class ResumableMinimize(
             ),
         )
         lpEngine.preparation().forEach { yield(Unit) }
+        lpHints = if (params.lpPlan.branching) {
+            LpHints(problem.numIntVars, problem.numBoolVars,
+                params.lpDirectionalGains && lpEngine.params.lpPlan.bounding,
+                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
+                applyAdvice = params.lpDirectionalAdvice)
+        } else null
         lpEngine.lpHints = lpHints
         yield(Unit)
         brancher = BacktrackBrancher(
@@ -1609,6 +1609,14 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
+        override fun select(baseline: VarRef, session: PropagationSession): VarRef =
+            lpHints?.pickVariable(baseline, available = { variable ->
+                when (variable) {
+                    is VarRef.Bool -> session.boolValue(variable.varId) == null
+                    is VarRef.IntVar -> !session.intDomain(variable.varId).isFixed
+                }
+            }, cancelled = params.cancellation) ?: baseline
+
         override fun onBranch(variable: VarRef) {
             lpHints?.branch(variable)
         }
@@ -1618,7 +1626,7 @@ internal class ResumableMinimize(
         }
 
         override fun onRestart() {
-            lpHints?.resetHistory()
+            lpHints?.restart()
             restartRootTargetsPending = incumbents.current() == null &&
                 lpEngine.rootPrimalTargets?.components?.offered == true
             lpEngine.restartRootPrimalTargets()
@@ -1627,7 +1635,6 @@ internal class ResumableMinimize(
         override fun pick(session: PropagationSession): VarRef? {
             if (incumbents.current() == null) {
                 lpEngine.pickRootComponent(session, params.cancellation)?.let {
-                    lpHints?.selected(null)
                     return it
                 }
             }
@@ -1689,7 +1696,7 @@ internal class ResumableMinimize(
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
                 singleObj?.ascending ?: true, deferSimplex = deferSimplex)
             lpEngine.fixingCutoff = Double.NaN
-            lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
+            lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState, params.cancellation)
             // Fixings read the incumbent's own cutoff, so only a prune whose bound stays below that cutoff relies on
             // the gap; it and everything learned from it hold only for points below the recorded bound.
             val gap = params.optimalityGap

@@ -42,12 +42,12 @@ class LpPassiveCollectionTest {
 
     @Test
     fun `unavailable history points and splits retain ordinary order`() {
-        for (condition in listOf("missing", "one-sided", "equal", "reliable", "integral", "foreign", "cancelled")) {
+        for (condition in listOf("missing", "one-sample", "equal", "reliable", "integral", "foreign", "cancelled")) {
             val history = LpDirectionalHistory({})
             val variable = VarRef.IntVar(0)
             val directions = when (condition) {
                 "missing" -> emptyList()
-                "one-sided" -> listOf(false, false)
+                "one-sample" -> listOf(false)
                 "equal" -> listOf(false, true)
                 "reliable" -> listOf(false, true, false, true)
                 else -> listOf(false, true, false)

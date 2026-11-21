@@ -20,22 +20,23 @@ internal class LpPassiveValueChoice(
         changed = false
     }
 
-    fun select(
+    internal inline fun select(
         variable: VarRef,
         point: Double,
         alternatives: List<SearchDecision>,
-        history: LpDirectionalHistory,
+        preferUp: Boolean?,
         stamp: Int,
-        cutoff: Double = Double.POSITIVE_INFINITY,
-        fresh: () -> Boolean,
+        crossinline fresh: () -> Boolean,
     ): List<SearchDecision> {
         clear()
-        if (alternatives.size != 2) return alternatives
-        charge(20L)
+        if (alternatives.size != 2 || preferUp == null) return alternatives
+        charge(16L)
         observe("PASSIVE_VALUE_CHECK")
         if (!fresh()) return alternatives.also { observe("PASSIVE_VALUE_STALE") }
-        val preferUp = history.preferGainDirection(variable, point, cutoff)
-            ?: return alternatives.also { observe("PASSIVE_VALUE_NO_PROPOSAL") }
+        if (!point.isFinite() || (variable is VarRef.Bool && point !in 0.0..1.0)) return alternatives
+        val integral = floor(point)
+        val fraction = point - integral
+        if (fraction <= POINT_TOLERANCE || fraction >= 1.0 - POINT_TOLERANCE) return alternatives
         val down: SearchDecision
         val up: SearchDecision
         when (variable) {
@@ -44,8 +45,8 @@ internal class LpPassiveValueChoice(
                 up = SearchDecision.Bool(variable.varId shl 1)
             }
             is VarRef.IntVar -> {
-                down = SearchDecision.IntAtMost(variable.varId, floor(point).toLong())
-                up = SearchDecision.IntAtLeast(variable.varId, floor(point).toLong() + 1L)
+                down = SearchDecision.IntAtMost(variable.varId, integral.toLong())
+                up = SearchDecision.IntAtLeast(variable.varId, integral.toLong() + 1L)
             }
         }
         if (alternatives != listOf(down, up) && alternatives != listOf(up, down)) return alternatives
@@ -64,7 +65,7 @@ internal class LpPassiveValueChoice(
         return if (applyAdvice && changed) alternatives.reversed() else alternatives
     }
 
-    fun commit(decision: SearchDecision, stamp: Int, fresh: () -> Boolean) {
+    internal inline fun commit(decision: SearchDecision, stamp: Int, crossinline fresh: () -> Boolean) {
         val expected = nomination ?: return
         charge(4L)
         observe("PASSIVE_VALUE_COMMIT_CHECK")
@@ -75,5 +76,9 @@ internal class LpPassiveValueChoice(
         observe(if (applyAdvice) "PASSIVE_VALUE_COMMITTED" else "PASSIVE_VALUE_COMMIT_WITHHELD")
         if (wasChanged) observe(if (applyAdvice) "PASSIVE_VALUE_COMMIT_CHANGED"
         else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED")
+    }
+
+    internal companion object {
+        const val POINT_TOLERANCE = 1e-6
     }
 }

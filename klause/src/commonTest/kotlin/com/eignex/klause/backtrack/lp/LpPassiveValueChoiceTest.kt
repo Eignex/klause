@@ -8,6 +8,28 @@ import kotlin.test.assertFalse
 
 class LpPassiveValueChoiceTest {
     @Test
+    fun `a supplied preference cannot bypass point or partition validation`() {
+        for ((variable, point, alternatives) in listOf(
+            Triple(VarRef.Bool(0), Double.NaN, listOf(SearchDecision.Bool(1), SearchDecision.Bool(0))),
+            Triple(VarRef.Bool(0), 1.25, listOf(SearchDecision.Bool(1), SearchDecision.Bool(0))),
+            Triple(VarRef.IntVar(0), 2.0,
+                listOf(SearchDecision.IntAtMost(0, 2L), SearchDecision.IntAtLeast(0, 3L))),
+            Triple(VarRef.IntVar(0), 2.25,
+                listOf(SearchDecision.IntAtMost(0, 2L), SearchDecision.IntAtLeast(0, 4L))),
+        )) {
+            val events = ArrayList<String>()
+            val choice = LpPassiveValueChoice(true, events::add, {})
+
+            val selected = choice.select(variable, point, alternatives, true, 1) { true }
+            choice.commit(selected.first(), 1) { true }
+
+            assertEquals(alternatives, selected)
+            assertFalse(choice.hasNomination)
+            assertFalse("PASSIVE_VALUE_COMMITTED" in events)
+        }
+    }
+
+    @Test
     fun `withheld value advice preserves comparison and commitment cost`() {
         for ((variable, point, preferUp) in listOf(
             Triple(VarRef.Bool(0), 0.75, false),
@@ -24,8 +46,11 @@ class LpPassiveValueChoiceTest {
                     history.commit(decision, 1)
                     history.beginNode(1)
                     history.record(if (isUp == preferUp) 11.0 else 13.0)
+                    history.finishNode(isUp == preferUp)
                 }
             }
+            history.beginNode(0)
+            history.record(10.0)
             val ordinary = if (preferUp) listOf(down, up) else listOf(up, down)
             val costs = ArrayList<Long>()
             for (apply in listOf(false, true)) {
@@ -33,7 +58,8 @@ class LpPassiveValueChoiceTest {
                 var work = 0L
                 val choice = LpPassiveValueChoice(apply, events::add, { work += it })
 
-                val selected = choice.select(variable, point, ordinary, history, 7) { true }
+                val preference = history.preferDirection(variable, point, 10.25)
+                val selected = choice.select(variable, point, ordinary, preference, 7) { true }
                 choice.commit(selected.first(), 7) { true }
                 choice.commit(selected.first(), 7) { true }
 
@@ -42,7 +68,7 @@ class LpPassiveValueChoiceTest {
                 assertEquals(1, events.count { it == event })
                 costs.add(work)
             }
-            assertEquals(24L, costs.first())
+            assertEquals(20L, costs.first())
             assertEquals(costs.first(), costs.last())
         }
     }
@@ -62,14 +88,19 @@ class LpPassiveValueChoiceTest {
                     history.commit(decision, 1)
                     history.beginNode(1)
                     history.record(objective)
+                    history.finishNode(decision == up)
                 }
             }
+            history.beginNode(0)
+            history.record(10.0)
             if (condition == "aged") repeat(5) { history.beginNode(0) }
             var fresh = condition != "selection"
             val events = ArrayList<String>()
             val choice = LpPassiveValueChoice(true, events::add, { if (condition == "charge") fresh = false })
             val alternatives = listOf(down, up)
-            val selected = choice.select(variable, 2.25, alternatives, history, 7) { fresh }
+            val preference = history.preferDirection(variable, 2.25, 10.25)
+            assertEquals(if (condition in listOf("missing", "aged")) null else true, preference, condition)
+            val selected = choice.select(variable, 2.25, alternatives, preference, 7) { fresh }
             if (condition == "commit") fresh = false
             if (condition == "clear") choice.clear()
 
