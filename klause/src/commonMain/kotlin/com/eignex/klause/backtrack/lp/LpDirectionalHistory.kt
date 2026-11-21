@@ -10,6 +10,7 @@ internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
+    private val depthContexts: Boolean = false,
 ) {
     internal class Direction {
         var count = 0
@@ -26,6 +27,11 @@ internal class LpDirectionalHistory(
         var outcomePreviousStamp = 0L
         var outcomeParent = 0.0
         var outcomePreviousParent = 0.0
+
+        var parentDepth = -1
+        var previousParentDepth = -1
+        var outcomeParentDepth = -1
+        var outcomePreviousParentDepth = -1
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -119,7 +125,7 @@ internal class LpDirectionalHistory(
             return
         }
         val version = generation
-        charge(4L)
+        charge(if (depthContexts) 6L else 4L)
         if (version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
@@ -128,6 +134,10 @@ internal class LpDirectionalHistory(
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
         direction.previousParent = direction.parent
+        if (depthContexts) {
+            direction.previousParentDepth = direction.parentDepth
+            direction.parentDepth = child.depth - 1
+        }
         direction.parent = child.parent.objective
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
@@ -317,7 +327,7 @@ internal class LpDirectionalHistory(
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
-        charge(13L)
+        charge(if (depthContexts) 15L else 13L)
         if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         val direction = if (child.up) history.up else history.down
@@ -328,6 +338,10 @@ internal class LpDirectionalHistory(
         direction.outcomePrevious = direction.outcomeLatest
         direction.outcomePreviousStamp = direction.outcomeStamp
         direction.outcomePreviousParent = direction.outcomeParent
+        if (depthContexts) {
+            direction.outcomePreviousParentDepth = direction.outcomeParentDepth
+            direction.outcomeParentDepth = child.depth - 1
+        }
         direction.outcomeLatest = pruned
         direction.outcomeParent = child.parent.objective
         direction.outcomeStamp = stamp
@@ -404,6 +418,40 @@ internal class LpDirectionalHistory(
             numericUpLatest !in 0.5..2.0 || numericUpPrevious !in 0.5..2.0
         ) return null
         return preferUp
+    }
+
+    internal inline fun depthContext(
+        variable: VarRef,
+        value: Double,
+        crossinline current: () -> Boolean,
+    ): String? {
+        if (!depthContexts) return null
+        val version = generation
+        charge(32L)
+        if (version != generation || !current()) return null
+        val history = reliable(variable, value)
+        val context = if (depth < 0 || history == null || !outcomeRate(history.down).isFinite() ||
+            !outcomeRate(history.up).isFinite()
+        ) "UNKNOWN" else {
+            val downLatest = history.down.parentDepth
+            val downPrevious = history.down.previousParentDepth
+            val upLatest = history.up.parentDepth
+            val upPrevious = history.up.previousParentDepth
+            val outcomeDownLatest = history.down.outcomeParentDepth
+            val outcomeDownPrevious = history.down.outcomePreviousParentDepth
+            val outcomeUpLatest = history.up.outcomeParentDepth
+            val outcomeUpPrevious = history.up.outcomePreviousParentDepth
+            when {
+                downLatest < 0 || downPrevious < 0 || upLatest < 0 || upPrevious < 0 ||
+                    outcomeDownLatest < 0 || outcomeDownPrevious < 0 ||
+                    outcomeUpLatest < 0 || outcomeUpPrevious < 0 -> "UNKNOWN"
+                downLatest != depth || downPrevious != depth || upLatest != depth || upPrevious != depth ||
+                    outcomeDownLatest != depth || outcomeDownPrevious != depth ||
+                    outcomeUpLatest != depth || outcomeUpPrevious != depth -> "DEPTH_MISMATCH"
+                else -> "DEPTH_MATCHED"
+            }
+        }
+        return if (version == generation && current()) context else null
     }
 
     fun prunedDirections(variable: VarRef, value: Double): Double {

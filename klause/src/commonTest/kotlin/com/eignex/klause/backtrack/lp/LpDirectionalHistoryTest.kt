@@ -11,6 +11,99 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `depth contexts retain every numeric and completed outcome origin`() {
+        for (boolean in listOf(false, true)) {
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val offset = if (boolean) 0.0 else 2.0
+            for (slot in 0..7) {
+                for ((parentDepth, expected) in listOf(0 to "DEPTH_MISMATCH", 1 to "DEPTH_MISMATCH",
+                    4 to "DEPTH_MATCHED", 127 to "DEPTH_MISMATCH")) {
+                    var work = 0L
+                    val history = LpDirectionalHistory({}, charge = { work += it }, depthContexts = true)
+                    for (category in 0..1) {
+                        repeat(2) { sample ->
+                            for (up in listOf(false, true)) {
+                                val origin = category * 4 + sample * 2 + if (up) 1 else 0
+                                val level = if (origin == slot) parentDepth else 4
+                                history.beginNode(level)
+                                history.record(0.0)
+                                history.branch(variable, offset + 0.5)
+                                val decision = if (boolean) SearchDecision.Bool(if (up) 0 else 1)
+                                else if (up) SearchDecision.IntAtLeast(0, 3L) else SearchDecision.IntAtMost(0, 2L)
+                                history.commit(decision, level + 1)
+                                history.beginNode(level + 1)
+                                history.record(if (category == 0) (if (up) 3.0 else 1.0) else Double.NaN)
+                                history.finishNode(if (category == 1) false else null)
+                            }
+                        }
+                    }
+                    history.beginNode(4)
+                    history.record(0.0)
+                    val preference = history.preferDirection(variable, offset + 0.5, 10.0)
+                    val before = work
+
+                    val context = history.depthContext(variable, offset + 0.5) { true }
+
+                    assertEquals(false, preference)
+                    assertEquals(expected, context, "$boolean/$slot/$parentDepth")
+                    assertEquals(before + 32L, work)
+                    assertEquals("UNKNOWN", history.depthContext(variable, Double.NaN) { true })
+                    history.beginNode(-1)
+                    assertEquals("UNKNOWN", history.depthContext(variable, offset + 0.5) { true })
+                    repeat(257) { history.beginNode(0) }
+                    assertEquals("UNKNOWN", history.depthContext(variable, offset + 0.5) { true })
+                }
+            }
+        }
+        var work = 0L
+        val disabled = LpDirectionalHistory({}, charge = { work += it })
+        assertNull(disabled.depthContext(VarRef.Bool(0), 0.5) { true })
+        assertEquals(0L, work)
+    }
+
+    @Test
+    fun `depth metadata cannot publish after charged invalidation`() {
+        for (action in listOf("numeric-reset", "outcome-reset", "outcome-cancel")) {
+            var armed = false
+            var current = true
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({}, depthContexts = true, charge = { amount ->
+                if (armed && amount == if (action == "numeric-reset") 6L else 15L) {
+                    armed = false
+                    if (action.endsWith("reset")) history.clear() else current = false
+                }
+            })
+            val variable = VarRef.Bool(0)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 3.0 else 1.0)
+                    history.finishNode(false)
+                }
+            }
+            history.beginNode(1)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(SearchDecision.Bool(1), 2)
+            history.beginNode(2)
+            armed = true
+
+            history.record(if (action == "numeric-reset") 1.0 else Double.NaN)
+            history.finishNode(false) { current }
+            history.beginNode(0)
+            history.record(0.0)
+            val context = history.depthContext(variable, 0.5) { true }
+
+            assertFalse(armed)
+            assertEquals(if (action.endsWith("reset")) "UNKNOWN" else "DEPTH_MATCHED", context, action)
+        }
+    }
+
+    @Test
     fun `equal completed rates use numeric predictions with complete compatible context`() {
         for (rate in 0..2) {
             for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",

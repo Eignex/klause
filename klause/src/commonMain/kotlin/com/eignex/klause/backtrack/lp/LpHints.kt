@@ -29,9 +29,11 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
+    private val childContexts: Boolean = false,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe, charge = charge)
+    private val history = LpDirectionalHistory(observe, charge = charge, depthContexts = childContexts)
+    private var childContextRemaining = 128
     private var passiveVariable: LpPassiveVariableChoice? = null
     private var passiveValues: LpPassiveValueChoice? = null
     private var passiveCollection: LpPassiveCollection? = null
@@ -425,11 +427,33 @@ internal class LpHints(
             !cancelled() && passivePoint === point && passiveState === state &&
                 stamp == solveStamp && passivePointCurrent()
         if (preference != null) {
-            val advised = values.select(variable, pointValue, alternatives, preference, stamp, fresh = ::current)
+            val context = captureChildContext(variable, pointValue, ::current)
+            if (!current()) return alternatives
+            val advised = values.select(variable, pointValue, alternatives, preference, stamp,
+                context = context, fresh = ::current)
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
         return collection.select(variable, pointValue, alternatives, history, stamp, ::current)
+    }
+
+    private inline fun captureChildContext(
+        variable: VarRef,
+        value: Double,
+        crossinline current: () -> Boolean,
+    ): String? {
+        if (!childContexts || childContextRemaining <= 0) return null
+        childContextRemaining--
+        val context = history.depthContext(variable, value, current) ?: return null
+        observe("PASSIVE_VALUE_DEPTH_CONTEXT_CHECK")
+        if (!current()) return null
+        observe("PASSIVE_VALUE_DEPTH_CONTEXT_NOMINATION_" + context)
+        if (!current()) return null
+        if (childContextRemaining == 0) {
+            observe("PASSIVE_VALUE_DEPTH_CONTEXT_EXHAUSTED")
+            if (!current()) return null
+        }
+        return context
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
