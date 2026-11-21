@@ -15209,11 +15209,14 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveCallbacks { // com.eign
 
 final class com.eignex.klause.solver.pipeline/FiniteSolveImprovement { // com.eignex.klause.solver.pipeline/FiniteSolveImprovement|null[0]
     constructor <init>(com.eignex.klause.solver/Sample, kotlin/String, kotlin/Long, kotlin/Double) // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.String;kotlin.Long;kotlin.Double){}[0]
+    constructor <init>(com.eignex.klause.solver/Sample, kotlin/String, kotlin/Long, kotlin/Double, kotlin/Boolean) // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.String;kotlin.Long;kotlin.Double;kotlin.Boolean){}[0]
 
     final val elapsedMs // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.elapsedMs|{}elapsedMs[0]
         final fun <get-elapsedMs>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.elapsedMs.<get-elapsedMs>|<get-elapsedMs>(){}[0]
     final val objective // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.objective|{}objective[0]
         final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.objective.<get-objective>|<get-objective>(){}[0]
+    final val privateIncumbentReuse // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.privateIncumbentReuse|{}privateIncumbentReuse[0]
+        final fun <get-privateIncumbentReuse>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.privateIncumbentReuse.<get-privateIncumbentReuse>|<get-privateIncumbentReuse>(){}[0]
     final val sample // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.sample|{}sample[0]
         final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.sample.<get-sample>|<get-sample>(){}[0]
     final val workerLabel // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.workerLabel|{}workerLabel[0]

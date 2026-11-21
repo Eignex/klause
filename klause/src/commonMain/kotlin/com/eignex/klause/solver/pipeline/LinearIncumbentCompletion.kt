@@ -32,29 +32,49 @@ internal class LinearIncumbentCompletion(
     private val budget: SourceLpBudget,
     private val originalCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     private val shared: LinearIncumbentSharing? = null,
+    private val ownedSeed: Boolean = false,
     private val observe: (String, Long) -> Unit,
 ) : AutoCloseable {
-    private class Attempt(val key: LinearIncumbentSharing.Key) {
+    private class Attempt(val key: LinearIncumbentSharing.Key, ownedSeed: Boolean) {
         var query: LinearAuthorityQuery? = null
         var point: List<BigFraction>? = null
-        val progress = LinearPrimalRecoveryProgress()
+        var pointPreparation: ArrayList<BigFraction>? = null
+        val progress = LinearPrimalRecoveryProgress(retainPreparation = ownedSeed)
         var residual: LinearResidualCompletion? = null
         var finished = false
         var checked: Sample? = null
     }
 
     private class ExactCheck(val key: LinearIncumbentSharing.Key, val accepted: Boolean)
+    private class OwnedAttempt(val source: SourceProofContext, val seed: Sample, val attempt: Attempt)
 
     // Entries are never evicted: exhausting retention cannot renew a failed attempt.
     private val attempts = ArrayList<Attempt>()
     private var exactCheck: ExactCheck? = null
+    private var ownedAttempt: OwnedAttempt? = null
     private var closed = false
+    var preparationInterrupted: Boolean = false
+        private set
 
     fun complete(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
+        preparationInterrupted = false
         val started = TimeSource.Monotonic.markNow()
+        var completed: Sample? = null
+        var returned = false
         return try {
-            completeSeed(source, seed, cancellation)
+            completeSeed(source, seed, cancellation).also {
+                completed = it
+                returned = true
+            }
         } finally {
+            val attempt = ownedAttempt?.attempt
+            if (returned && completed == null && ownedSeed &&
+                (attempt == null || attempt.query == null) &&
+                (cancellation() || budget.funding?.paused == true)) {
+                preparationInterrupted = true
+                observe("PreparationInterrupted", 1L)
+                attempt?.let { finish(it, null) }
+            }
             observe("Nanos", started.elapsedNow().inWholeNanoseconds)
         }
     }
@@ -65,39 +85,14 @@ internal class LinearIncumbentCompletion(
         if (seed.exactReals != null) return checkedExact(source, seed, cancellation)
         val token = metered(cancellation, checking = false)
         if (token()) return null
-        if (seed.algebraicReals != null || seed.symbolicReals != null) {
-            observe("UnsupportedSeed", 1L)
-            return null
-        }
-        var seedBytes = 256L + 16L * seed.numBoolVars + 8L * seed.numRealVars
-        for (id in 0 until seed.numIntVars) {
-            if (token()) return null
-            val bits = seed.exactIntValue(id).magnitudeBitLength()
-            budget.observe(preparation = 1L + bits / 64L)
-            if (bits > 4096) {
-                observe("SeedScalarLimit", 1L)
-                return null
-            }
-            seedBytes += 64L + bits / 4L
-        }
-        val previous = attempts.firstOrNull { it.key.matches(source, seed, originalCheck, token, budget) }
-        if (previous?.finished == true) {
-            observe(if (previous.checked == null) "DeclineReused" else "CheckedReused", 1L)
-            return previous.checked.takeUnless { token() }
-        }
-        if (token()) return null
-        if (previous == null && attempts.size >= MAX_ATTEMPTS) {
-            observe("RetentionExhausted", 1L)
-            return null
-        }
-        if (previous == null && budget.funding?.let { seedBytes > it.remainingAllocation } == true) {
-            observe("RetentionAllocation", 1L)
-            return null
-        }
-        val attempt = previous ?: Attempt(LinearIncumbentSharing.Key(source, seed, originalCheck)).also {
-            budget.funding?.charge(0L, seedBytes)
-            attempts += it
-            observe("Attempts", 1L)
+        val owned = ownedAttempt
+        if (owned != null && (source !== owned.source || seed !== owned.seed)) return finish(owned.attempt, null)
+        val attempt = owned?.attempt ?: findAttempt(source, seed, token)?.also {
+            if (ownedSeed) ownedAttempt = OwnedAttempt(source, seed, it)
+        } ?: return null
+        if (attempt.finished) {
+            observe(if (attempt.checked == null) "DeclineReused" else "CheckedReused", 1L)
+            return attempt.checked.takeUnless { token() }
         }
         if (budget.funding?.exhausted == true) return finish(attempt, null)
         shared?.find(attempt.key, budget, token)?.let { point ->
@@ -105,15 +100,24 @@ internal class LinearIncumbentCompletion(
             return finish(attempt, point)
         }
         if (token()) return null
-        if (attempt.query == null) {
-            val prepared = prepare(source, seed, token)
+        if (attempt.query == null || attempt.point == null) {
+            val prepared = attempt.query ?: prepare(source, seed, token)
             if (prepared == null) {
                 if (!token()) finish(attempt, null)
                 return null
             }
-            val point = seedPoint(prepared, seed, token) ?: return null
+            if (ownedSeed && attempt.query == null) {
+                attempt.query = prepared
+                observe("QueryRetained", 1L)
+            }
+            val point = seedPoint(prepared, seed, token, attempt.takeIf { ownedSeed })
+            if (point == null) {
+                if (!token()) finish(attempt, null)
+                return null
+            }
             attempt.query = prepared
             attempt.point = point
+            attempt.pointPreparation = null
         }
         val query = requireNotNull(attempt.query)
         val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), query.rows,
@@ -127,7 +131,8 @@ internal class LinearIncumbentCompletion(
                 if (budget.funding?.exhausted == true) return@recovery null
                 val costs = List(columns.size) { query.costs[columns[it]] }
                 val objective = costs.takeIf { it.any { cost -> !cost.isZero } }
-                val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy())
+                val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy(),
+                    retainPreparation = ownedSeed)
                     .also { attempt.residual = it }
                 residual.complete(rows, columns.size, active, ::recoveryCost, costs = objective) {
                     if (objective != null) null else LinearAuthorityLp(budget).use { completion ->
@@ -166,6 +171,40 @@ internal class LinearIncumbentCompletion(
             observe("SharedRetained", 1L)
         }
         return point
+    }
+
+    private fun findAttempt(source: SourceProofContext, seed: Sample, token: ExecutionControl): Attempt? {
+        if (seed.algebraicReals != null || seed.symbolicReals != null) {
+            observe("UnsupportedSeed", 1L)
+            return null
+        }
+        var seedBytes = 256L + 16L * seed.numBoolVars + 8L * seed.numRealVars
+        for (id in 0 until seed.numIntVars) {
+            if (token()) return null
+            val bits = seed.exactIntValue(id).magnitudeBitLength()
+            budget.observe(preparation = 1L + bits / 64L)
+            if (bits > 4096) {
+                observe("SeedScalarLimit", 1L)
+                return null
+            }
+            seedBytes += 64L + bits / 4L
+        }
+        val previous = attempts.firstOrNull { it.key.matches(source, seed, originalCheck, token, budget) }
+        if (token()) return null
+        if (previous != null) return previous
+        if (attempts.size >= MAX_ATTEMPTS) {
+            observe("RetentionExhausted", 1L)
+            return null
+        }
+        if (budget.funding?.let { seedBytes > it.remainingAllocation } == true) {
+            observe("RetentionAllocation", 1L)
+            return null
+        }
+        return Attempt(LinearIncumbentSharing.Key(source, seed, originalCheck), ownedSeed).also {
+            budget.funding?.charge(0L, seedBytes)
+            attempts += it
+            observe("Attempts", 1L)
+        }
     }
 
     private fun checkedExact(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
@@ -229,10 +268,20 @@ internal class LinearIncumbentCompletion(
         return LinearIncumbentSharing.Key(source, seed, originalCheck).takeUnless { checking() }
     }
 
-    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl): List<BigFraction>? {
-        val point = ArrayList<BigFraction>(query.coordinates.size)
-        for (coordinate in query.coordinates) {
+    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl,
+        attempt: Attempt? = null): List<BigFraction>? {
+        val point = attempt?.pointPreparation ?: run {
+            if (attempt != null) {
+                val bytes = 256L + 16L * query.coordinates.size
+                if (token() || budget.funding?.remainingAllocation?.let { it < bytes } == true) return null
+                budget.observe(preparation = 1L)
+                budget.funding?.charge(0L, bytes)
+            }
+            ArrayList<BigFraction>(query.coordinates.size).also { attempt?.pointPreparation = it }
+        }
+        while (point.size < query.coordinates.size) {
             if (token()) return null
+            val coordinate = query.coordinates[point.size]
             // Floating coordinates guide reconstruction; source checks establish exact authority.
             val value = if (coordinate.kind == SourceCoordinate.Kind.Integer) {
                 BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
@@ -246,25 +295,38 @@ internal class LinearIncumbentCompletion(
     }
 
     private fun prepare(source: SourceProofContext, seed: Sample, token: ExecutionControl): LinearAuthorityQuery? {
+        val original = source.scope.condition
+        val mapEntries = 1L + source.coordinateCount + source.premiseCount + original.coordinateRestrictionCount
+        val mapWork = 16L * mapEntries
+        val mapBytes = 512L * mapEntries
+        if (token() || budget.funding?.let {
+                it.availableWork <= mapWork || it.remainingAllocation <= mapBytes
+            } == true) return null
+        budget.observe(preparation = mapWork)
+        budget.funding?.charge(0L, mapBytes)
+        val coordinates = source.coordinates
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported() ||
-            source.coordinates.count { it.kind == SourceCoordinate.Kind.Boolean } != seed.numBoolVars ||
-            source.coordinates.count { it.kind == SourceCoordinate.Kind.Integer } != seed.numIntVars ||
-            source.coordinates.count { it.kind == SourceCoordinate.Kind.Real } != seed.numRealVars
+            coordinates.count { it.kind == SourceCoordinate.Kind.Boolean } != seed.numBoolVars ||
+            coordinates.count { it.kind == SourceCoordinate.Kind.Integer } != seed.numIntVars ||
+            coordinates.count { it.kind == SourceCoordinate.Kind.Real } != seed.numRealVars
         ) return null
-        var condition = source.scope.condition
-        for (coordinate in source.coordinates) {
+        val bools = original.bools.toMutableMap()
+        val lower = original.lower.toMutableMap()
+        val upper = original.upper.toMutableMap()
+        for (coordinate in coordinates) {
             if (token()) return null
             when (coordinate.kind) {
                 SourceCoordinate.Kind.Boolean -> {
                     val value = seed.boolValue(coordinate.id)
-                    if (condition.bools[coordinate.id]?.let { it != value } == true) return null
-                    condition = condition.pin(coordinate.id, value)
+                    if (bools[coordinate.id]?.let { it != value } == true) return null
+                    bools[coordinate.id] = value
                 }
                 SourceCoordinate.Kind.Integer -> {
                     val value = BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
-                    if (condition.lower[coordinate]?.let { it > value } == true ||
-                        condition.upper[coordinate]?.let { it < value } == true) return null
-                    condition = condition.bound(coordinate, value, upper = false).bound(coordinate, value, upper = true)
+                    if (lower[coordinate]?.let { it > value } == true ||
+                        upper[coordinate]?.let { it < value } == true) return null
+                    lower[coordinate] = value
+                    upper[coordinate] = value
                 }
                 SourceCoordinate.Kind.Real -> Unit
             }
@@ -280,6 +342,7 @@ internal class LinearIncumbentCompletion(
         }
         budget.funding?.charge(0L, allocation)
         if (token()) return null
+        val condition = original.copy(bools = bools, lower = lower, upper = upper)
         return LinearAuthorityQuery.prepare(source.atScope(source.scope.copy(condition = condition)), null, token)
     }
 
@@ -309,7 +372,9 @@ internal class LinearIncumbentCompletion(
         attempt.finished = true
         attempt.query = null
         attempt.point = null
+        attempt.pointPreparation = null
         attempt.progress.completed.clear()
+        attempt.progress.cursor = null
         attempt.residual?.close()
         attempt.residual = null
         return point
@@ -326,6 +391,7 @@ internal class LinearIncumbentCompletion(
             val sharingWork = shared?.release(this) ?: 0
             budget.observe(preparation = attempts.size.toLong() + sharingWork)
             attempts.clear()
+            ownedAttempt = null
             exactCheck = null
         }
     }

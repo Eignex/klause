@@ -5,6 +5,7 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ReseedGuard
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -23,6 +24,7 @@ internal fun exactNeighborhoodWorker(
     exhausted: () -> Boolean,
     declined: () -> Boolean = { false },
     pendingIncumbentTrial: () -> Boolean = { false },
+    privateCandidate: (Sample) -> Boolean = { false },
     open: () -> ExactNeighborhood,
 ): PortfolioWorker {
     fun stop(global: ExecutionControl) = lifetime.includingStop( global) or ExecutionControl(exhausted)
@@ -89,7 +91,8 @@ internal fun exactNeighborhoodWorker(
                     val done = search.advance(slice(global, sliceMillis),
                         if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions) { sample, value ->
                         onIncumbent(MinimizeResult.BestFound(sample, requireNotNull(value).toDouble(),
-                            TerminationReason.BudgetExhausted, search.stats))
+                            TerminationReason.BudgetExhausted,
+                            IncumbentProximity.candidateStats(search.stats, privateCandidate(sample))))
                     }
                     if (done || stop(global)()) result = search.minimizeResult(reason(global))
                     return result

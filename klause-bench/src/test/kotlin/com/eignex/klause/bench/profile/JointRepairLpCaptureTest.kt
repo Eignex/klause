@@ -1,5 +1,16 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -7,16 +18,45 @@ import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class JointRepairLpCaptureTest {
     companion object {
         private lateinit var solveContext: Any
+        private lateinit var model: Problem
+        private lateinit var context: SourceProofContext
+        private lateinit var objective: LinearObjective
 
         @BeforeAll
         @JvmStatic
         fun initializeContext() {
             solveContext = Class.forName("com.eignex.klause.lp.engine.LpSolveContext").getConstructor().newInstance()
             NumericalResidualProfile.call(solveContext, "getNumericalDeductions")
+            model = Problem.of(0, 1, arrayOf(IntDomain(0, 1)), emptyList())
+            val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+            context = SourceProofContext(SourceScope(SourceRevision("capture", "exact")),
+                setOf(coordinate), emptyMap(), mapOf(coordinate to BigFraction.ONE))
+            objective = LinearObjective(intCoefficients = longArrayOf(1))
+            JointRepairLpCapture.openOwner(model, context, objective,
+                TheoryParams(sourceIncumbentCompletion = true), ExecutionControl.Never, null).close()
+        }
+    }
+
+    @Test
+    fun `standalone capture should open an ordinary joint owner`() {
+        val checker: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> true }
+
+        val owner = JointRepairLpCapture.openOwner(model, context, objective,
+            TheoryParams(sourceIncumbentCompletion = true), ExecutionControl.Never, checker)
+
+        owner.use {
+            val type = it.javaClass
+            assertEquals(true, type.getDeclaredField("observeExternalIncumbents")
+                .apply { isAccessible = true }.get(it))
+            assertEquals(false, type.getDeclaredField("incumbentProximity")
+                .apply { isAccessible = true }.get(it))
+            assertSame(checker, type.getDeclaredField("incumbentCompletionCheck")
+                .apply { isAccessible = true }.get(it))
         }
     }
 

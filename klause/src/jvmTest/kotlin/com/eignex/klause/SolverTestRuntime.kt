@@ -11,6 +11,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
@@ -18,16 +19,25 @@ import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteNumericalCompanions
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.PortfolioInvocationResources
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.TheoryParams
+import com.eignex.klause.solver.pipeline.finiteNumericalCompanionEligibility
 import com.eignex.klause.solver.pipeline.pipelineRoute
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.skema.SchemaDef
 import com.eignex.util.numbers.BigFraction
 
@@ -95,6 +105,24 @@ internal object SolverTestRuntime {
         check(BacktrackSolver(problem.bake()).minimize(
             LinearObjective(realCoefficients = doubleArrayOf(1.0)), params,
         ) is MinimizeResult.Optimal)
+        val mixed = Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val plan = mixed.prepareExecutionPlan(objective, preferFinite = true)
+        val theory = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
+        val cost = finiteNumericalCompanionEligibility(mixed, PortfolioScenario.sequential(Kind.COP),
+            objective, theory).requirements.construction
+        val companions = requireNotNull(FiniteNumericalCompanions.prepare(mixed, objective, theory,
+            ExecutionControl.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
+        companions.incumbents.exchange.offer(Sample(booleanArrayOf(), longArrayOf(1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO)), BigFraction.ofLong(2))
+        PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
+            companions.factories(plan, 0).last().materialize(plan, resources.slots[1]).use { worker ->
+                requireNotNull(worker.newResumableSearch { 2.0 }).use { search ->
+                    search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
+                }
+            }
+        }
     }
 
     private fun initializeSmt() {

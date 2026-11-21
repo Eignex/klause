@@ -82,6 +82,8 @@ internal class LinearAuthorityTraversal(
     private val useSourceGap: Boolean = true,
     private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
     private val guideIncumbent: Boolean = false,
+    private val proximityCenter: Sample? = null,
+    claimProximityDecision: (() -> Boolean)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
@@ -92,6 +94,19 @@ internal class LinearAuthorityTraversal(
         !useRefutationPropagation && !useRefutationResolution) LinearAggregateBranches(budget) else null
 
     private val ownsAuthority = borrowedAuthority == null
+    private val proximityStop = cancellation or ExecutionControl(pause)
+    private val proximityCompletion = proximityCenter?.takeIf { claimProximityDecision != null }?.let { center ->
+        LinearProximityCompletion(source, center, budget, requireNotNull(claimProximityDecision)) { stage, count ->
+            val key = "numericalProximityCompletion$stage"
+            observations[key] = (observations[key] ?: 0L) + count
+        }
+    }
+    private var proximityRootResult: LinearAuthorityResult? = null
+    private var proximityRootCompletionPending = false
+    private var closed = false
+    val hasPendingProximityCompletion: Boolean get() =
+        !closed && (proximityRootCompletionPending || proximityCompletion?.pending == true ||
+            (proximityCompletion != null && current.pending))
     private val authority = borrowedAuthority ?: LinearAuthority(budget, { shape ->
         observations["numericalLpInputMaxRows"] =
             maxOf(observations["numericalLpInputMaxRows"] ?: 0L, shape.inputRows.toLong())
@@ -130,6 +145,11 @@ internal class LinearAuthorityTraversal(
     }
 
     override fun close() {
+        if (closed) return
+        closed = true
+        proximityCompletion?.close()
+        proximityRootResult = null
+        proximityRootCompletionPending = false
         activeRows?.close()
         feedback?.detach(authority)
         refutations?.clear()
@@ -474,9 +494,10 @@ internal class LinearAuthorityTraversal(
                 queriedNode = current
                 queriedSource = it
             }
-        val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
-        else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
-        else authority.check(branch, cancellation)
+        val queried = proximityRootResult.takeIf { current === root }
+            ?: if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
+            else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
+            else authority.check(branch, cancellation)
         val strongestBound = strongerLinearBound(current.partialBound, queried.bound)
         val result = queried.copy(bound = strongestBound,
             cutBoundFamilies = if (strongestBound != null && strongestBound === current.partialBound) {
@@ -486,6 +507,22 @@ internal class LinearAuthorityTraversal(
             val key = "numerical$stage"
             val previous = observations[key] ?: 0L
             observations[key] = if ("Max" in stage) maxOf(previous, count) else previous + count
+        }
+        if (current === root && proximityCompletion != null && !result.paused) {
+            val retained = proximityRootResult != null
+            proximityRootResult = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
+            current.pending = true
+            if (!retained && result.evidence == null && result.incumbent == null && result.fractional.isNotEmpty()) {
+                proximityRootCompletionPending = true
+                return SearchNodeDisposition.Pause
+            }
+            if (proximityCompletion.advance(result, context, proximityStop)) return SearchNodeDisposition.Pause
+            proximityRootCompletionPending = false
+            proximityCompletion.takeChecked()?.let { sample ->
+                onIncumbent(sample)
+                return SearchNodeDisposition.Pause
+            }
+            proximityRootResult = null
         }
         if (result.paused) {
             current.partialBound = result.bound
@@ -614,13 +651,18 @@ internal class LinearAuthorityTraversal(
             return listOf(true, false).map { SearchDecision.Theory(AggregateAlternative(split.row, it)) }
         }
         val split = current.split as? CoverageSplit.Integer ?: return null
-        val preferUpper = if (guideIncumbent && !cancellation() &&
+        val preferUpper = if ((guideIncumbent || proximityCenter != null) && !cancellation() &&
             (budget.funding?.availableWork ?: Long.MAX_VALUE) > 1L) {
             budget.observe(preparation = 1L)
-            incumbent()?.first?.let { sample ->
+            (proximityCenter ?: incumbent()?.first)?.let { sample ->
                 if (split.coordinate.id !in 0 until sample.numIntVars) false
-                else BigFraction.of(sample.exactIntValue(split.coordinate.id), BIG_ONE) >
-                    split.threshold
+                else {
+                    val above = BigFraction.of(sample.exactIntValue(split.coordinate.id), BIG_ONE) > split.threshold
+                    if (proximityCenter == null) above else {
+                        observe("numericalProximityBranchPreferences")
+                        above
+                    }
+                }
             } ?: false
         } else false
         if (preferUpper) observe("numericalIncumbentBranchPreferences")

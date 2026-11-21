@@ -18,6 +18,30 @@ import kotlin.test.assertTrue
 
 class LinearResidualCompletionTest {
     @Test
+    fun `closing a private prepared residual should withhold its point across later offers`() {
+        val budget = SourceLpBudget(maxOperations = 1)
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))
+        var paused = false
+        val token = ExecutionControl { paused }
+        val completion = LinearResidualCompletion(budget, SparseSourceLpPolicy(), retainPreparation = true)
+        assertNull(completion.complete(rows, 1, token, { stage, _ ->
+            if (stage == "PrimalRecoverySparsePreparationWork") paused = true
+        }, costs = listOf(BigFraction.ONE), small = { null }))
+        assertTrue(paused)
+        assertEquals(1, budget.operations)
+
+        completion.close()
+        paused = false
+        val point = completion.use {
+            it.complete(rows, 1, token, { _, _ -> }, costs = listOf(BigFraction.ONE), small = { null })
+        }
+
+        assertNull(point)
+        assertEquals(1, budget.operations)
+        assertEquals(0L, budget.measuredFloatWork)
+    }
+
+    @Test
     fun `an objective lifetime cap should survive fresh caller funding`() {
         val funding = SourceLpFunding(1_000_000L, 64L * 1024L * 1024L)
         val budget = SourceLpBudget(funding = funding)

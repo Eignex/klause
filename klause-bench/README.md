@@ -25,6 +25,8 @@ Execution verifies the planned file and directory identities before each solve.
 
 Solver records retain reported numerical LP authority, objective tolerance and original-unit
 bound/gap metadata. Independent source validation remains separate from those reported claims.
+Accepted incumbent attribution marks candidates produced by private incumbent reuse,
+including candidates whose publication was deferred inside the portfolio.
 `param.source-tolerance-envelope=true` forwards the CLI's opt-in absolute MPS tolerance
 envelope control; its accepted-set bounds retain a separate scope from nominal bounds.
 
@@ -35,6 +37,12 @@ The standard and Linux JVM lab manifests request source snapshots: the lab stage
 Git pack with its original commit identity. Builds and tools use the current revision without requiring ancestors or tags.
 Use `lab/bench-mps-linux.json` for MPS-only selections; it uses the same Linux adapter and runtime without staging
 the MiniZinc compiler. `lab/bench-linux.json` includes that compiler for MiniZinc workloads.
+
+These manifests build `:klause-bench:installCliHarness` and run `LabAdapterKt` from
+`klause-bench/build/install/klause-bench-cli/lib/*`. That distribution contains the
+CLI driver and its shared recording helpers, without standalone profiling programs.
+Strict comparison identities cover every shipped bench class and dependency.
+Profiles and the other lab adapters use `:klause-bench:installDist`.
 
 `ObjectiveSymmetryCapture` accepts exact `suite/problem` selections in a lab profile
 and records original-source identity, bounded default/protected preparation, and
@@ -96,6 +104,17 @@ fixed repair, complete proof-worker coverage at share 0.5, and quiet logging.
 `source-refutation-center-step=true|false` is accepted in `joint-ordinary` and `joint-handoff` modes
 and forwards the source option to that producer. Omission leaves its default false.
 The existing observation and companion limits apply.
+`portfolio-policy=ordinary handoff=false portfolio-progress=false capture-joint=true captures=0`
+records the bounded joint journal under ordinary source defaults, including automatic
+incumbent reuse where the source admits it. This observer does not select explicit
+completion or change admission, scheduling, companion limits or cutoff accounting.
+Observation costs remain in the containing execution and the existing producer grant.
+The joint journal records actual private integer pass centers, root and phase before
+ordinary fallback, including bounded support and the edge at a structural decline.
+Prepared row ordinals follow non-singleton source-premise rows; columns put integers
+before reals. Real-center values are approximate guidance with an explicit completeness
+flag, so they do not establish a witness or exact mixed-row slack. Selection metadata
+shares the existing journal entry, byte, record and source-funding caps.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs
@@ -440,10 +459,10 @@ block cannot certify hidden coordinates; capture itself is not an independent ch
 
 The [lab repository](https://github.com/Eignex/eignex-lab) owns submission, execution
 and artifact collection. The adapter manifest is [lab/bench.json](lab/bench.json).
-Its build tasks install the CLI, bench and pinned MiniZinc runtime:
+Its build tasks install the CLI, CLI benchmark driver and pinned MiniZinc runtime:
 
 ```sh
-./gradlew :klause-cli:installJvmDist :klause-bench:installDist :klause-bench:prepareLabRuntime
+./gradlew :klause-cli:installJvmDist :klause-bench:installCliHarness :klause-bench:prepareLabRuntime
 ```
 
 The adapter supports macOS ARM64/x86_64 and Linux x86_64 with JDK 25.

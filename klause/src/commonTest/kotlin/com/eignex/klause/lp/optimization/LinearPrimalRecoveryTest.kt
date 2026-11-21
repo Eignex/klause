@@ -3,6 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntIndexedCollection
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
@@ -14,6 +15,128 @@ import kotlin.test.assertNull
 class LinearPrimalRecoveryTest {
     private val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+
+    @Test
+    fun `small recovery offers should complete without rebuilding prepared rows`() {
+        val coordinates = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val guess = List(2) { BigFraction.ZERO }
+        val rows = List(80) {
+            ExactRationalInequality(intArrayOf(it % 2), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
+        }
+        val limits = LinearPrimalRecoveryLimits(work = 20_000L, allocation = 1_000_000L)
+        val uninterrupted = LinearPrimalRecoveryProgress(retainPreparation = true)
+        val expected = recoverLinearPrimal(coordinates, guess, rows, emptySet(), ExecutionControl.Never,
+            complete = { _, columns, _ -> List(columns.size) { BigFraction.ONE } }, observe = { _, _ -> },
+            limits = limits, progress = uninterrupted)
+        val sliced = LinearPrimalRecoveryProgress(retainPreparation = true)
+        var offerWork = 0L
+        val token = ExecutionControl({ offerWork >= 100L }, WorkMeter { offerWork += it })
+        var actual: List<BigFraction>? = null
+
+        repeat(256) {
+            if (actual == null) {
+                offerWork = 0L
+                actual = recoverLinearPrimal(coordinates, guess, rows, emptySet(), token,
+                    complete = { _, columns, _ -> List(columns.size) { BigFraction.ONE } }, observe = { _, _ -> },
+                    limits = limits, progress = sliced)
+            }
+        }
+
+        assertEquals(List(2) { BigFraction.ONE }, assertNotNull(expected))
+        assertEquals(expected, assertNotNull(actual))
+        assertEquals(uninterrupted.allocation, sliced.allocation)
+        assertEquals(uninterrupted.work, sliced.work)
+    }
+
+    @Test
+    fun `retained recovery should refuse changed immutable inputs`() {
+        val coordinates = listOf(real)
+        val point = listOf(BigFraction.ZERO)
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))
+        val progress = LinearPrimalRecoveryProgress(retainPreparation = true)
+        val inactive = emptySet<Int>()
+
+        assertNull(recoverLinearPrimal(coordinates, point, rows, inactive, ExecutionControl { true },
+            complete = { _, _, _ -> error("cancelled preparation") }, observe = { _, _ -> }, progress = progress))
+        assertNull(recoverLinearPrimal(coordinates, listOf(BigFraction.ONE), rows, inactive, ExecutionControl.Never,
+            complete = { _, _, _ -> error("changed input") }, observe = { _, _ -> }, progress = progress))
+        assertNull(recoverLinearPrimal(coordinates, point, rows, inactive, ExecutionControl.Never,
+            complete = { _, _, _ -> error("retired input") }, observe = { _, _ -> }, progress = progress))
+    }
+
+    @Test
+    fun `retained recovery limits should remain exhausted across offers`() {
+        val coordinates = listOf(real)
+        val point = listOf(BigFraction.ZERO)
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))
+        for (limits in listOf(LinearPrimalRecoveryLimits(work = 0L),
+            LinearPrimalRecoveryLimits(allocation = 0L), LinearPrimalRecoveryLimits(entries = 0L))) {
+            val progress = LinearPrimalRecoveryProgress(retainPreparation = true)
+            val complete = { _: List<ExactRationalInequality>, _: IntIndexedCollection, _: ExecutionControl ->
+                error("exhausted preparation")
+            }
+
+            assertNull(recoverLinearPrimal(coordinates, point, rows, emptySet(), ExecutionControl.Never, complete,
+                observe = { _, _ -> }, limits = limits, progress = progress))
+            val spent = progress.work to progress.allocation
+            assertNull(recoverLinearPrimal(coordinates, point, rows, emptySet(), ExecutionControl.Never, complete,
+                observe = { _, _ -> }, limits = limits, progress = progress))
+
+            assertEquals(spent, progress.work to progress.allocation)
+        }
+    }
+
+    @Test
+    fun `retained recovery should resume its active component without repeating completed components`() {
+        val coordinates = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
+        val guess = List(2) { BigFraction.ZERO }
+        val rows = (0..1).map {
+            ExactRationalInequality(intArrayOf(it), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
+        }
+        val progress = LinearPrimalRecoveryProgress(retainPreparation = true)
+        var paused = false
+        var calls = 0
+        val token = ExecutionControl { paused }
+        val complete: (List<ExactRationalInequality>, IntIndexedCollection, ExecutionControl) -> List<BigFraction>? =
+            { _, _, _ ->
+                calls++
+                if (calls == 2) {
+                    paused = true
+                    null
+                } else listOf(BigFraction.ONE)
+            }
+
+        assertNull(recoverLinearPrimal(coordinates, guess, rows, emptySet(), token, complete,
+            observe = { _, _ -> }, progress = progress))
+        paused = false
+        val resumed = recoverLinearPrimal(coordinates, guess, rows, emptySet(), token, complete,
+            observe = { _, _ -> }, progress = progress)
+
+        assertEquals(List(2) { BigFraction.ONE }, assertNotNull(resumed))
+        assertEquals(3, calls)
+    }
+
+    @Test
+    fun `declined retained components should not acquire another completion attempt`() {
+        val coordinates = listOf(real)
+        val guess = listOf(BigFraction.ZERO)
+        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))
+        for (supplied in listOf(null, emptyList(), listOf(BigFraction.ZERO))) {
+            val progress = LinearPrimalRecoveryProgress(retainPreparation = true)
+            var calls = 0
+            val complete = { _: List<ExactRationalInequality>, _: IntIndexedCollection, _: ExecutionControl ->
+                calls++
+                supplied
+            }
+
+            repeat(2) {
+                assertNull(recoverLinearPrimal(coordinates, guess, rows, emptySet(), ExecutionControl.Never,
+                    complete, observe = { _, _ -> }, progress = progress))
+            }
+
+            assertEquals(1, calls)
+        }
+    }
 
     @Test
     fun `an exhausted recovery allowance should retire a preceding component pause`() {

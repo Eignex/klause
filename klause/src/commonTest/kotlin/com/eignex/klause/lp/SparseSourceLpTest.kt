@@ -272,6 +272,43 @@ class SparseSourceLpTest {
     }
 
     @Test
+    fun `private sparse admission should retain completed preparation at an offer boundary`() {
+        for (retain in listOf(false, true)) {
+            val budget = SourceLpBudget(maxOperations = 1)
+            var paused = false
+            val token = ExecutionControl { paused }
+
+            val admission = budget.admitSparse(token, retainPreparedOnStop = retain) {
+                prepare(emptyList(), limits).also { paused = true }
+            }
+            paused = false
+
+            assertEquals(1, budget.operations)
+            if (retain) {
+                assertTrue(assertNotNull(budget.resumeSparse(assertNotNull(admission), token) { _, _ -> true }))
+                admission.close()
+            } else assertNull(admission)
+            assertNull(budget.admitSparse(token, retainPreparedOnStop = retain) { error("exhausted admission") })
+            assertEquals(1, budget.operations)
+        }
+    }
+
+    @Test
+    fun `private sparse admission should not retain a failed preparation`() {
+        val budget = SourceLpBudget(maxOperations = 1)
+
+        val admission = budget.admitSparse(ExecutionControl.Never, retainPreparedOnStop = true) {
+            prepare(emptyList(), SparseSourceLpLimits(0L, 0L))
+        }
+
+        assertNull(admission)
+        assertNull(budget.admitSparse(ExecutionControl.Never, retainPreparedOnStop = true) {
+            error("exhausted admission")
+        })
+        assertEquals(1, budget.operations)
+    }
+
+    @Test
     fun `changed sparse consultations should spend operations without repeating matrix reservations`() {
         val budget = SourceLpBudget(maxOperations = 2)
         val initial = assertNotNull(budget.admitSparse(ExecutionControl.Never) { prepare(emptyList(), limits) })

@@ -499,6 +499,100 @@ completion.
 
 ### Incumbent completion and repair
 
+Admitted nominal MPS binary companions with ordinary admission and fixed repair can
+use a finite-accepted point lacking exact real coordinates as an advisory private
+search center under the declared default numerical policy. Explicit
+`source-incumbent-completion=false` withholds this consumer default. Other source
+interpretations and repair/admission controls retain explicit selection. Automatic
+reuse keeps ordinary finite cutoff windows and scheduling; only the explicit
+completion option selects its cutoff accounting and first-proposal trial.
+
+Shared points with exact real coordinates pass private completion and original-source
+checks before centering a query. A replacement retires the prior target even when
+checking withholds the new center.
+
+The advisory point supplies binary coordinates for a bounded change neighborhood
+and a floating objective evaluated as a rational aspiration. It supplies no feasible
+incumbent, parent cutoff or bound. A private query retains the original objective,
+all receiving conditions and source rows, adds the aspiration target and change
+radius, and leaves continuous coordinates free. Its first query is an LP relaxation.
+The numerical owner alternates private consultations with its retained ordinary
+frontier inside the same turn offers, using at most half the remaining offered time
+and work for each private consultation. The private search visits the center's side
+of each integer split first and retains sibling alternatives; ordinary traversal
+retains bound order. A private root with fractional binary guidance can try one
+rounded assignment before branching, with ties directed away from its center.
+The completed fractional root yields once before the rounded trial starts, retaining
+its result and charged observations for the next existing consultation.
+Receiving integer pins constrain that assignment and continuous coordinates are
+completed under the full private source, including the aspiration and radius rows.
+The trial spends one shared decision and complete check and uses the same LP
+operation, work and allocation ledger. Its rounded-point preparation and active
+recovery cursors survive pauses without another claim or root relaxation. Private
+recovery retains row validation, reconstruction, discrete substitution, component
+preparation and exact row checks at paid entry boundaries under immutable query and
+seed identity. Resumption retains the same cumulative recovery limits. Query
+setup interrupted before retaining a complete query ends that trial, retaining its
+cost instead of repeating its reservation on another offer. A retained query owns
+its paid seed-point prefix and resumes at the next coordinate. A declined trial retains the
+ordinary root result and its alternatives; it supplies no bound or refutation.
+Only a completed source witness enters the existing publication checks.
+An admitted private numerical query or residual can finish within its existing
+owner after the LP operation count reaches its cap; the budget refuses every fresh
+admission. A completed private sparse preparation retains its admission when its offer ends
+before the solve starts. Other limits and retirement conditions still apply.
+Advisory joint repair retains ordinary root guidance for
+fallback before preparing private neighborhoods. Its first query uses the ordinary
+rounded root; completed advisory queries alternate with ordinary repair queries.
+Paused queries retain their turn. A default checked center passes private completion
+and original-source checks, and its first connected private neighborhood replaces the
+all-pinned cutoff query while retaining ordinary root preparation. Later private
+queries alternate with ordinary repair. Both center kinds first free at most two
+connected binary coordinates. If that query completes without an accepted witness,
+the same root can expand to its integer row-support component, with at most 32 free
+coordinates, after ordinary fallback. Pairs already known to cover their support
+need no expansion. Private adjacency omits an isolated real objective definition
+when its only two non-singleton occurrences are unguarded, unpinned, nonstrict
+inequalities with exactly opposite coefficients and right-hand sides. Bounded
+recognition spends the same source funding; unavailable or ambiguous definitions
+retain the original graph. The prepared row index and ordinary traversal stay
+unchanged. Closure describes reachability in this selection graph only. Integer support
+expansion does not join components through continuous columns; all continuous
+recourse and source rows remain in the query. The selection is heuristic and proves
+no independence. Width or visit-limit decline advances that root; resource or
+cancellation unavailability retains its phase. Each proposal shares one 8,192-visit
+ceiling between private selection and ordinary fallback, and declined work stays
+charged. A completed integer component of at most two coordinates that repeats or
+narrows its pair can use one bounded breadth-first selection through continuous
+recourse. Its width is the existing proximity radius, at most 32 coordinates; a
+selection stopped at that width is not graph closure. Traversal storage and setup
+spend the same source funding, and transient unavailability retains the phase.
+Each root gets at most one expanded query, including an unclosed continuous-support
+selection. Repeated or narrower selections are skipped. Other integers stay pinned
+to the center, intersecting the private change-radius row. A pass visits each
+eligible root within the existing allowances; its identity includes the binary
+coordinates and aspiration, so a new sample wrapper does not restart it. Completion
+updates only that pass and supplies no source refutation. Ordinary fallback neighborhoods retain their own
+checked centers and cutoffs.
+
+Each owner charges ordinary and private work to one LP operation/work/allocation
+ledger and containing decision/check allowances. With incumbent reuse, an active joint
+query whose original condition matches the paused proposal can use remaining instructions
+in its current offer before yielding. Resumption requires charged progress and retains
+all cumulative caps and cancellation checks. Private query progress supplies no root-fixing or
+learned-clause reward. A generated witness passes complete receiving-source checks
+and exact original-source feasibility and objective checks before it can improve
+the source incumbent. Private bounds and proofs never enter parent coverage.
+A private query retires after a checked improvement or a completed target; the
+numerical frontier also retires a target made obsolete by an ordinary improvement.
+Unchanged advisory points do not restart completed targets. Explicit completion can
+start private queries from imported checked improvements. All containing allowances
+stay cumulative.
+Accepted improvement attribution retains whether its candidate came from the
+private query, including candidates whose source publication was deferred.
+Objective-coordinate conversion retains the producer's candidate statistics while
+replacing its objective and proof authority.
+
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
 approximate real coordinates guiding rational reconstruction without authority. A
@@ -557,6 +651,25 @@ fixing or coverage. Other integer models can pin the
 eligible integers agreeing with the paid point, releasing every disagreement.
 Continuous columns remain free. Missing guidance, cancellation and unavailable
 funding retain the connected two-integer start.
+Fixed binary companion repair instead searches near a checked center under the
+original pins. Its private objective retains the original cost and continuous
+residuals remain free. A Hamming row bounds changed binary
+coordinates to ten percent of the integer columns rounded up, clamped between four
+and thirty-two changes and limited by the integer count. A separate original-cost
+row requests improvement by the largest of the declared positive objective allowance,
+one percent of the current variable objective magnitude, and one thousandth of the
+smallest nonzero objective coefficient.
+Source constants and maximization direction stay in that row. Preparation and
+native progress spend the existing query grants. Only a freshly source- and
+original-checked strict improvement can leave this search; its private objective bounds,
+refutations and optima supply no parent objective or coverage evidence. A failed
+target ends undecided and is not retried at the same cutoff; unavailable preparation
+falls back to ordinary neighborhoods.
+After a checked private improvement, joint repair leaves the improved cutoff to
+ordinary neighborhoods until a better shared center arrives.
+A newer checked shared incumbent replaces the target before its query opens, or
+retires an already pending private query. Its replacement keeps the same containing
+allowance and original receiving conditions.
 The all-pinned rounded-root bootstrap serves a center without that handoff.
 Before a checked center exists, root repair can keep the ordinary
 pre-selection relaxation point for advisory centering and neighborhood order,
@@ -614,6 +727,15 @@ existing LP funding, reporting time stays inside the worker's active lifetime, a
 disabled reporting does no extra scoring. Companion statistics separate active-time
 retirement, checked completions, publication checks and the actual width of opened
 queries; these counts grant no publication or proof authority.
+An opt-in proposal journal distinguishes ordinary, checked private and advisory
+centers. Private selection records bind an integer pass, aspiration, root coordinate
+and pair or expansion phase before ordinary fallback. Structural declines retain
+bounded partial support, the prepared row and boundary coordinate, and charged visits.
+Integer coordinates come from that pass; available finite real coordinates are
+approximate guidance with an explicit completeness flag. Prepared row ordinals refer
+to non-singleton source-premise rows, and columns place integers before reals. All
+metadata spends the existing observation, source-work and allocation limits; it has
+no witness or proof authority.
 
 ## Statistics
 

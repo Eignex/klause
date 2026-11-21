@@ -95,6 +95,7 @@ internal fun FinitePipeline.portfolioExecutor(
     onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     onJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     onSession: ((String, PropagationSession) -> Unit)? = null,
+    companionIncumbentReuse: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -128,7 +129,8 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionArms = FiniteCompanionArms.assemble(problem, scenario, objective,
         FiniteCompanionControls(params = numericalCompanions, incumbentCompletionCheck = incumbentCompletionCheck,
             funded = fundedCompanions, waitForImprovement = waitForCompanionImprovement,
-            adaptiveRepair = adaptiveCompanionRepair, onJointRepair = onJointRepair),
+            adaptiveRepair = adaptiveCompanionRepair, onJointRepair = onJointRepair,
+            reuseIncumbents = companionIncumbentReuse),
         cancellation, onEvent)
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,

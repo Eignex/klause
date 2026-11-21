@@ -58,7 +58,7 @@ internal object FinitePortfolioLpCapture {
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                "source-refutation-center-step")
+                "source-refutation-center-step", "capture-joint")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
@@ -76,6 +76,10 @@ internal object FinitePortfolioLpCapture {
         require(preset in setOf("ordinary", "retained", "complete")) { "unsupported portfolio policy: $preset" }
         val handoff = options.getValue("handoff").toBooleanStrict()
         val progress = options["portfolio-progress"]?.toBooleanStrict() ?: (mode == "portfolio")
+        if (options["capture-joint"]?.toBooleanStrict() == true) {
+            require(mode == "portfolio" && preset == "ordinary" && !handoff && !progress)
+            require((options["captures"]?.toInt() ?: 0) == 0)
+        }
         if (mode == "joint-before" || captureJoint) {
             require(handoff && preset == "complete" && !progress)
             require(options.keys.none {
@@ -108,7 +112,8 @@ internal object FinitePortfolioLpCapture {
             return
         }
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
-        val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff")
+        val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff") ||
+            options["capture-joint"]?.toBooleanStrict() == true
         val limit = options["captures"]?.toInt() ?: if (captureJoint) 0 else 1
         val captureGuidance = options["capture-guidance"]?.toBooleanStrict() ?: false
         val seed = options.getValue("seed").toLong()
@@ -387,10 +392,10 @@ internal object FinitePortfolioLpCapture {
             put("sourceSha256", sourceHash)
             for (name in listOf("Proposal", "Query", "Phase", "Disposition", "Operator", "SchedulingRound",
                 "ProposalRound", "RequestedCount", "EffectiveCount", "CenterKind", "Cutoff",
-                "IntegerCount", "RealCount", "BooleanCount")) {
+                "IntegerCount", "RealCount", "BooleanCount", "RealCentersComplete")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, call(observation, "get$name")?.toString())
             }
-            for (name in listOf("Centers", "Bools", "Lower", "Upper")) {
+            for (name in listOf("Centers", "Bools", "Lower", "Upper", "RealCenters")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, buildJsonObject {
                     (get(observation, name) as Map<*, *>).forEach { (key, value) ->
                         put(key.toString(), value.toString())
@@ -400,6 +405,17 @@ internal object FinitePortfolioLpCapture {
             for (name in listOf("Freed", "RefutationRoots")) {
                 put(name.replaceFirstChar { it.lowercaseChar() },
                     JsonArray((get(observation, name) as List<*>).map { JsonPrimitive(it as Int) }))
+            }
+            put("realCentersAuthority", "approximate-guidance")
+            call(observation, "getSelection")?.let { selection ->
+                put("selection", buildJsonObject {
+                    for (name in listOf("Pass", "RootIndex", "RootCoordinate", "Expanded", "Visits", "Closed",
+                        "Row", "Column", "Peer", "SourceRevision", "SourceSemantics")) {
+                        put(name.replaceFirstChar { it.lowercaseChar() }, call(selection, "get$name")?.toString())
+                    }
+                    put("rowOrder", "prepared non-singleton source-premise rows")
+                    put("columnOrder", "integers followed by continuous coordinates")
+                })
             }
             put("support", JsonArray((get(observation, "Support") as List<*>).map { bound ->
                 val value = requireNotNull(bound)

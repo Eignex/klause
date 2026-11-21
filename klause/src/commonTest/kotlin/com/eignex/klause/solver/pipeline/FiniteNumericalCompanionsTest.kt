@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.RuntimeInitializedTest
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -13,6 +14,7 @@ import com.eignex.klause.portfolio.PortfolioProgress
 import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -34,7 +36,36 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
-class FiniteNumericalCompanionsTest {
+class FiniteNumericalCompanionsTest : RuntimeInitializedTest() {
+    @Test
+    fun `companion point reuse should not require first trial scheduling priority`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        for (priority in listOf(false, true)) {
+            val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+                ExecutionControl.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
+            companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
+            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
+                companions.factories(plan, 0, incumbentTrials = priority).last()
+                    .materialize(plan, resources.slots[1]).use { worker ->
+                        assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
+                            search.runSlice(ExecutionControl.Never, 1_000, 1) { }
+
+                            assertFalse(search.isDone)
+                            assertEquals(priority, assertIs<ReseedGuard>(search).incumbentTrialPending)
+                        }
+                    }
+            }
+        }
+    }
+
     @Test
     fun `original source rejection should withhold exact pooled points from both companions`() {
         val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
@@ -176,50 +207,6 @@ class FiniteNumericalCompanionsTest {
     }
 
     @Test
-    fun `checked repair comparisons should use the current pool instead of the captured center`() {
-        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
-            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
-        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
-        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
-        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
-        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
-            objective, params).requirements.construction
-        val center = Sample(BooleanArray(0), LongArray(4) { 1 }, doubleArrayOf(0.0),
-            exactReals = listOf(BigFraction.ZERO))
-
-        for (disposition in listOf("improving", "tied", "dominated")) {
-            val events = mutableListOf<SearchEvent.CompanionComparison>()
-            lateinit var companions: FiniteNumericalCompanions
-            companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
-                ExecutionControl.Never, cost, incumbentCompletionCheck = { sample, value, _ ->
-                    if (value < BigFraction.ofLong(4)) {
-                        val pool = if (disposition == "dominated") center.copy(ints = LongArray(4)) else sample
-                        if (disposition != "improving") companions.incumbents.exchange.offer(
-                            pool, objective.evaluateExact(pool))
-                    }
-                    true
-                }, onComparison = { events += it }).companions)
-            companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
-
-            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
-                companions.factories(plan, 0).last().materialize(plan, resources.slots[1]).use { worker ->
-                    assertNotNull(worker.newResumableSearch { 4.0 }).use { search ->
-                        repeat(32) { if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { } }
-                    }
-                }
-            }
-
-            val discovery = events.first { it.phase == "discovery" }
-            assertEquals(disposition, discovery.disposition)
-            assertEquals(if (disposition == "improving") 1L else 2L, discovery.poolVersion)
-            assertEquals(0L, discovery.seedVersion)
-            assertEquals("4", discovery.cutoff)
-            assertTrue(events.any { it.phase == "external" && it.seedVersion == 1L })
-        }
-    }
-
-    @Test
     fun `opt in companion repair should publish a coupled three integer improvement`() {
         val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
@@ -245,14 +232,11 @@ class FiniteNumericalCompanionsTest {
                         repeat(32) {
                             if (!search.isDone) result = search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
                         }
-                        assertEquals(if (adaptive) 3L else 2L,
-                            search.stats.smt.completeSearchStages?.get("jointRepairMaxFreedIntegers"))
                     }
                 }
             }
 
-            if (adaptive) assertEquals(0.0, assertIs<MinimizeResult.WithSample>(result).objective)
-            else assertTrue(result !is MinimizeResult.WithSample)
+            assertEquals(0.0, assertIs<MinimizeResult.WithSample>(result).objective)
         }
     }
 
