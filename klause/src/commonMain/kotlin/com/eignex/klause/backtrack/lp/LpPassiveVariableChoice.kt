@@ -13,6 +13,7 @@ internal class LpPassiveVariableChoice(
 
     private var nomination: Candidate? = null
     private var nominationStamp = -1
+    private var nominationContext: String? = null
     private var changed = false
     private var branched = false
     private var partition: List<SearchDecision>? = null
@@ -22,6 +23,7 @@ internal class LpPassiveVariableChoice(
     fun clear() {
         if (nomination == null && !changed && !branched) return
         nomination = null
+        nominationContext = null
         changed = false
         branched = false
         partition = null
@@ -33,10 +35,12 @@ internal class LpPassiveVariableChoice(
         stamp: Int,
         crossinline fresh: () -> Boolean,
         crossinline reliable: () -> Boolean,
+        context: String? = null,
     ): VarRef {
         clear()
         observe("PASSIVE_VARIABLE_SELECTION")
         charge(16L)
+        if (context != null) charge(4L)
         if (!fresh()) return baseline.variable.also { observe("PASSIVE_VARIABLE_STALE") }
         if (!proposal.fractional() || !baseline.validPoint() || !reliable()) {
             observe("PASSIVE_VARIABLE_UNRELIABLE")
@@ -49,6 +53,7 @@ internal class LpPassiveVariableChoice(
         observe(if (applyAdvice) "PASSIVE_VARIABLE_CONSUMED" else "PASSIVE_VARIABLE_WITHHELD")
         nomination = if (applyAdvice) proposal else baseline
         nominationStamp = stamp
+        nominationContext = context
         return checkNotNull(nomination).variable
     }
 
@@ -78,16 +83,22 @@ internal class LpPassiveVariableChoice(
     }
 
     internal inline fun commit(decision: SearchDecision, crossinline fresh: () -> Boolean) {
-        if (nomination == null) return
+        val current = nomination ?: return
         observe("PASSIVE_VARIABLE_COMMIT_CHECK")
         charge(4L)
-        val accepted = branched && partition?.contains(decision) == true && fresh()
+        val context = nominationContext
+        if (context != null) charge(4L)
+        val accepted = nomination === current && branched && partition?.contains(decision) == true && fresh()
         val wasChanged = changed
         clear()
         if (!accepted) return
         observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMITTED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD")
         if (wasChanged) observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMIT_CHANGED"
         else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED")
+        if (wasChanged && context != null && fresh()) {
+            observe((if (applyAdvice) "PASSIVE_VARIABLE_COMMIT_CONTEXT_"
+            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CONTEXT_") + context)
+        }
     }
 
     private fun Candidate.fractional(): Boolean {

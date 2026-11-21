@@ -14,6 +14,46 @@ import kotlin.test.assertTrue
 
 class LpPassiveVariableChoiceTest {
     @Test
+    fun `variable context tags require one matching fresh changed commitment`() {
+        for (apply in listOf(false, true)) {
+            for (action in listOf("commit", "replay", "clear", "foreign", "stale", "charge", "report")) {
+                val events = ArrayList<String>()
+                var fresh = true
+                var committing = false
+                var stage = 0
+                var work = 0L
+                val choice = LpPassiveVariableChoice(apply, observe = { event ->
+                    events.add(event)
+                    if (action == "report" && event.contains("COMMIT") && event.endsWith("_CHANGED")) fresh = false
+                }, charge = {
+                    work += it
+                    if (committing && action == "charge" && stage++ == 1) fresh = false
+                })
+                val selected = choice.select(LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75),
+                    LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25), 1, { fresh }, { true },
+                    context = "UNMEASURED_GAIN_BELOW_SCORE")
+                choice.branch(selected, 1)
+                val down = SearchDecision.IntAtMost(selected.varId, 0L)
+                choice.alternatives(selected, listOf(down, SearchDecision.IntAtLeast(selected.varId, 1L)), 1) { fresh }
+                if (action == "clear") choice.clear()
+                if (action == "stale") fresh = false
+                val before = work
+                committing = true
+
+                choice.commit(if (action == "foreign") SearchDecision.IntAtMost(3, 0L) else down) { fresh }
+                if (action == "replay") choice.commit(down) { fresh }
+
+                val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CONTEXT_"
+                else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CONTEXT_"
+                val accepted = action == "commit" || action == "replay"
+                assertEquals(if (accepted) 1 else 0, events.count { it == event + "UNMEASURED_GAIN_BELOW_SCORE" }, action)
+                assertEquals(before + if (action == "clear") 0L else 8L, work)
+                assertNull(choice.nominatedVariable)
+            }
+        }
+    }
+
+    @Test
     fun `commitment invalidated while bookkeeping is charged supplies no attribution`() {
         for (apply in listOf(false, true)) {
             var fresh = true
