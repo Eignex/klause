@@ -34,6 +34,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
+import java.io.InputStream
 import java.lang.ref.WeakReference
 import java.lang.reflect.InvocationTargetException
 import java.util.IdentityHashMap
@@ -49,11 +50,20 @@ internal object FinitePortfolioLpCapture {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
-        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(1_048_577) }
-        require(bytes.size <= 1_048_576 && sha256(bytes) == options.getValue("sha256"))
+        val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { readSource(options, it) }
         out.resolve("source.mps").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         inspect(options, bytes, out)
+    }
+
+    internal fun sourceByteLimit(options: Map<String, String>): Int =
+        if (options["capture-root-points"]?.toBooleanStrict() == true) 2_097_152 else 1_048_576
+
+    internal fun readSource(options: Map<String, String>, source: InputStream): ByteArray =
+        source.readNBytes(sourceByteLimit(options) + 1).also { validateSource(options, it) }
+
+    internal fun validateSource(options: Map<String, String>, bytes: ByteArray) {
+        require(bytes.size <= sourceByteLimit(options) && sha256(bytes) == options.getValue("sha256"))
     }
 
     internal fun parameters(options: Map<String, String>): List<String> {
@@ -129,7 +139,7 @@ internal object FinitePortfolioLpCapture {
         require(captureWorker in setOf("bt/lp-default", "any"))
         require(captureRoute in setOf("any", "SESSION", "SCOPED_FLOAT", "SCOPED_CONTINUATION"))
         require(timeout in 1L..30_000L && limit in 0..4)
-        require(bytes.size <= 1_048_576 && sha256(bytes) == options.getValue("sha256"))
+        validateSource(options, bytes)
         out.mkdirs()
         out.resolve("source.mps").writeBytes(bytes)
         val sourceHash = sha256(bytes)
@@ -144,6 +154,7 @@ internal object FinitePortfolioLpCapture {
         if (SourceSetup.executionKind(invocation) != SourceExecutionKind.FINITE) {
             out.resolve("result.json").writeText(buildJsonObject {
                 put("captureDeclined", "finite source route unavailable after preparation")
+                put("sourceInputByteLimit", sourceByteLimit(options))
                 put("executionKind", SourceSetup.executionKind(invocation).name)
                 put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
                 put("finiteEngine", FiniteEngine.MIXED.id)
@@ -388,6 +399,7 @@ internal object FinitePortfolioLpCapture {
                             put("guidanceEvents", guidanceEvents)
                             put("captureGuidance", captureGuidance)
                             put("captureRootPoints", captureRootPoints)
+                            put("sourceInputByteLimit", sourceByteLimit(options))
                             put("rootPointSerializationNs", rootSerializationNs)
                             put("rootPointSourceShapeLimit", shapeLimit)
                             put("rootPointScope", "model-facing lifecycle; numerical cursor lineage UNKNOWN")

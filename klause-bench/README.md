@@ -1112,8 +1112,12 @@ containing source deadline. Source fetching remains inside the containing lab jo
 For model-facing root-point lifecycle capture, use `capture-root-points=true` with
 `portfolio-policy=ordinary handoff=false portfolio-progress=false captures=0`.
 `capture-worker=any` includes every worker; a selected worker cannot explain others.
-This option is independent of `capture-guidance` and raises only its source-shape
-limit to 6,000 rows and variables, retaining the 1 MiB decoded-input bound.
+This option is independent of `capture-guidance`. It accepts up to 6,000 rows and
+variables and 2 MiB of decoded source input.
+Other capture modes accept at most 1 MiB of decoded source input.
+The source reader detects overflow at the selected bound plus one byte and requires
+the exact requested decoded SHA256. `result.json` reports `sourceInputByteLimit`;
+query payloads retain their separate `captureByteLimit`.
 `root-points.json` stores scalar identities and events after execution and retirement:
 64 owners, 512 events per owner and 8,192 events total. Weak identity maps bound
 sources, objectives, models and points at 64, 128, 512 and 1,024 entries. Exhaustion,

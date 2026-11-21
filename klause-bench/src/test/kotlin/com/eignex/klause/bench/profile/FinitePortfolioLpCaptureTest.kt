@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.bench.metric.sha256
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -11,6 +12,7 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -19,6 +21,52 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePortfolioLpCaptureTest {
+    @ParameterizedTest
+    @CsvSource("false,1048576,true,reader", "false,1048576,true,bytes",
+        "false,1048577,false,reader", "false,1048577,false,bytes",
+        "true,2097152,true,reader", "true,2097152,true,bytes",
+        "true,2097153,false,reader", "true,2097153,false,bytes",
+        "true,1055074,true,reader", "true,1055074,true,bytes")
+    fun `source input paths enforce the selected byte bound`(root: Boolean, size: Int,
+        accepted: Boolean, path: String) {
+        val bytes = ByteArray(size)
+        val options = mapOf("capture-root-points" to root.toString(), "sha256" to sha256(bytes))
+
+        fun read(): ByteArray = if (path == "reader") {
+            bytes.inputStream().use { FinitePortfolioLpCapture.readSource(options, it) }
+        } else {
+            FinitePortfolioLpCapture.validateSource(options, bytes)
+            bytes
+        }
+
+        if (accepted) assertContentEquals(bytes, read())
+        else assertFailsWith<IllegalArgumentException> { read() }
+    }
+
+    @ParameterizedTest
+    @CsvSource("false,reader", "false,bytes", "true,reader", "true,bytes")
+    fun `source input paths reject a different content hash`(root: Boolean, path: String) {
+        val bytes = "NAME fixture\nENDATA\n".encodeToByteArray()
+        val options = mapOf("capture-root-points" to root.toString(), "sha256" to "0".repeat(64))
+
+        assertFailsWith<IllegalArgumentException> {
+            if (path == "reader") bytes.inputStream().use { FinitePortfolioLpCapture.readSource(options, it) }
+            else FinitePortfolioLpCapture.validateSource(options, bytes)
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource("false,1048576", "true,2097152")
+    fun `source reader stops after the overflow sentinel`(root: Boolean, limit: Int) {
+        val bytes = ByteArray(limit + 32)
+        val options = mapOf("capture-root-points" to root.toString(), "sha256" to sha256(bytes))
+        val input = bytes.inputStream()
+
+        assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.readSource(options, input) }
+
+        assertEquals(31, input.available())
+    }
+
     @ParameterizedTest
     @CsvSource("portfolio-policy,retained", "handoff,true", "portfolio-progress,true", "captures,1")
     fun `root point capture requires ordinary fixed policy`(key: String, value: String) {
