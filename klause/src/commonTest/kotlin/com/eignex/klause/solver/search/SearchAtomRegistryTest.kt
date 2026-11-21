@@ -7,6 +7,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -174,8 +175,11 @@ class SearchAtomRegistryTest {
         )
 
         assertEquals(setOf(1, 3), assertNotNull(session.explainAtoms(premise)).literals.toSet())
+        assertTrue(session.canExplainAtoms(premise))
         assertNull(session.explainAtoms(SearchAtomPremise.All(listOf(premise, SearchAtomPremise.Unavailable))))
+        assertFalse(session.canExplainAtoms(SearchAtomPremise.All(listOf(premise, SearchAtomPremise.Unavailable))))
         assertNull(session.explainAtoms(premise, maxNodes = 2))
+        assertFalse(session.canExplainAtoms(premise, maxNodes = 2))
         assertNull(
             session.explainAtoms(
                 SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
@@ -184,8 +188,10 @@ class SearchAtomRegistryTest {
             ),
         )
         assertNull(session.explainAtoms(SearchAtomPremise.Asserted(SearchDecision.Theory(Symbol("opaque")))))
+        assertFalse(session.canExplainAtoms(SearchAtomPremise.Asserted(SearchDecision.Theory(Symbol("opaque")))))
         session.popTo(1)
         assertNull(session.explainAtoms(premise))
+        assertFalse(session.canExplainAtoms(premise))
         assertEquals(0, session.learnedClauseCount)
     }
 
@@ -205,6 +211,8 @@ class SearchAtomRegistryTest {
         val explanation = session.explainAtoms(premise)
 
         assertEquals(setOf(1, 3), assertNotNull(explanation).literals.toSet())
+        assertTrue(session.canExplainAtoms(premise, maxNodes = 27))
+        assertFalse(session.canExplainAtoms(premise, maxNodes = 26))
     }
 
     @Test
@@ -219,6 +227,7 @@ class SearchAtomRegistryTest {
         val explanation = session.explainAtoms(premise)
 
         assertNull(explanation)
+        assertFalse(session.canExplainAtoms(premise))
     }
 
     @Test
@@ -239,6 +248,17 @@ class SearchAtomRegistryTest {
         val explanation = session.explainAtoms(premise)
 
         assertNull(explanation)
+        assertFalse(session.canExplainAtoms(premise))
+    }
+
+    @Test
+    fun `an empty root premise should require one validation visit`() {
+        val session = SearchSession(emptyList())
+        val premise = SearchAtomPremise.All(emptyList())
+
+        for (nodes in listOf(0, 1)) {
+            assertEquals(nodes == 1, session.canExplainAtoms(premise, maxNodes = nodes))
+        }
     }
 
     @Test

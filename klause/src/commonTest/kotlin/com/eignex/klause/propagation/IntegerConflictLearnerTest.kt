@@ -48,6 +48,62 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     @Test
+    fun `disabled row admission should keep the completed derivation and clause fallback`() {
+        val sessions = listOf(false, true).map { admission ->
+            PropagationSession(Problem(0, 3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                )), pbLearning = false).apply {
+                enableIntegerRowLearning()
+                configureIntegerRowAdmission(admission)
+                assertIs<PropagationResult.Implied>(pinIntAtMost(2, 7))
+            }
+        }
+
+        val conflicts = sessions.map { assertIs<PropagationResult.Unsat>(it.pinIntAtLeast(0, 2)) }
+
+        val suppressed = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflicts[0].learnedClause)
+        val row = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflicts[1].learnedClause)
+        assertEquals(row.fallbackClause, suppressed.fallbackClause)
+        assertEquals(sessions[1].work, sessions[0].work)
+        sessions[0].popToLevel(suppressed.backjumpLevel)
+        assertIs<PropagationResult.Implied>(sessions[0].addLearnedIntegerRow(suppressed))
+        assertEquals(1L, sessions[0].learnedLifecycle()["learningIntegerDerived"])
+        assertEquals(1L, sessions[0].learnedLifecycle()["learningIntegerAdmissionDeclined"])
+        assertEquals(1L, sessions[0].learnedLifecycle()["learningClauseAdmitted"])
+        assertEquals(0L, sessions[0].learnedLifecycle()["learningIntegerAdmitted"] ?: 0L)
+    }
+
+    @Test
+    fun `disabled row admission should preserve native conflict selection and mapped clause assertion`() {
+        for (admission in listOf(false, true)) {
+            val native = PropagationSession(Problem(0, 3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                )), pbLearning = false).apply {
+                enableIntegerRowLearning()
+                configureIntegerRowAdmission(admission)
+            }
+            val cp = CpSearchComponent(native)
+            val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(shared.initialize())
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(2, 7)))
+
+            assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
+
+            assertTrue(cp.prefersNativeConflictAnalysis)
+            val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+            shared.popTo(backjump.decisionLevel)
+            assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+            assertEquals(1L, shared.intUpperBound(0))
+            assertEquals(if (admission) 1L else 0L,
+                native.learnedLifecycle()["learningIntegerAdmitted"] ?: 0L)
+        }
+    }
+
+    @Test
     fun `a table endpoint should preserve an available arithmetic assertion`() {
         val native = PropagationSession(Problem(0, 4,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 1)), arrayOf(
@@ -265,6 +321,45 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
         assertContentEquals(intArrayOf(0, 1, 3), learned.row.variables)
         assertContentEquals(longArrayOf(4, 1, -1), learned.row.coefficients.map { it.toLongExact() }.toLongArray())
         assertEquals(1, trace.events.count { it.kind == "integer.endpoint-row" })
+    }
+
+    @Test
+    fun `a selected eager endpoint should retain its grant beside an unselected wide source`() {
+        val width = 512
+        val native = PropagationSession(Problem(0, width + 4,
+            Array(width + 4) { index ->
+                IntDomain(0, when (index) {
+                    0 -> 6
+                    1 -> 12
+                    2 -> 24
+                    3 -> 36
+                    else -> 0
+                })
+            }, arrayOf(Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0))),
+            pbLearning = false).apply { enableIntegerRowLearning() }
+        val older = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 1) + IntArray(width) { it + 4 },
+            Array(width + 2) {
+                bigIntOf(when (it) {
+                    0 -> 2
+                    1 -> -1
+                    else -> 1
+                })
+            }, bigIntOf(0), useLo = true))
+        val newest = assertNotNull(IntegerConflictRow.source(intArrayOf(0, 2, 3),
+            arrayOf(bigIntOf(2), bigIntOf(1), bigIntOf(-1)), bigIntOf(0), useLo = true))
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(older, 3))
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(newest, 3))
+        native.explanationState.arithmeticLearningLimits = ArithmeticLearningLimits(work = 512)
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(3, 11))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertContentEquals(intArrayOf(0, 1, 3), learned.row.variables)
+        assertContentEquals(longArrayOf(4, 1, -1), learned.row.coefficients.map { it.toLongExact() }.toLongArray())
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned))
+        assertEquals(1L, native.intDomain(0).max)
     }
 
     @Test

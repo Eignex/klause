@@ -159,6 +159,9 @@ internal class ExactRowForm(
     private val ordered: ExactOrderedTerms,
 ) {
     val hasBooleanTerms get() = booleanLiterals.isNotEmpty()
+    private val fixedComparison = if (booleanLiterals.isEmpty()) {
+        ExactComparison(terms, rhs, relation, strict, hasReals, ordered)
+    } else null
 
     fun sameNumericInputs(previous: List<BigFraction>, current: List<BigFraction>, visit: () -> Boolean): Boolean =
         terms.keys.all { visit() && previous[it] == current[it] }
@@ -181,11 +184,12 @@ internal class ExactRowForm(
                 if (!admit(bound)) return null
             }
         }
-        return ExactComparison(terms, bound, relation, strict, hasReals, ordered)
+        return fixedComparison ?: ExactComparison(terms, bound, relation, strict, hasReals, ordered)
     }
 
     /** The comparison the row states when its activator holds [truth] under [booleanValue]. */
     fun comparison(truth: Boolean, booleanValue: (Int) -> Boolean): ExactComparison {
+        if (truth) fixedComparison?.let { return it }
         var bound = rhs
         for (k in booleanLiterals.indices) {
             val literal = booleanLiterals[k]

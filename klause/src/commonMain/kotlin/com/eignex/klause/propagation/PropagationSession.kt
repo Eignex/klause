@@ -1035,6 +1035,10 @@ class PropagationSession private constructor(
         state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
     }
 
+    internal fun configureIntegerRowAdmission(enabled: Boolean) {
+        state.integerRowAdmission = enabled
+    }
+
     /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
     fun enableIntegerRowLearning() {
         check(!state.incremental)
@@ -1049,8 +1053,13 @@ class PropagationSession private constructor(
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
-        val result = addLearnedIntegerRow(learned.row, learned.lbd)
-        if (result is PropagationResult.Unsat || fixpointCancelled) return result
+        if (state.integerRowAdmission) {
+            val result = addLearnedIntegerRow(learned.row, learned.lbd)
+            if (result is PropagationResult.Unsat || fixpointCancelled) return result
+        } else {
+            state.integerRowAdmissionsDeclined++
+            state.arithmeticLearningTrace?.record("integer.decline.admission-disabled")
+        }
         val fallback = learned.fallbackClause
         return registerAndPropagate(base = publicationBase) {
             state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
@@ -1461,7 +1470,11 @@ class PropagationSession private constructor(
         val counts = it.learned.lifecycle.snapshot() +
             (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
             (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
-        if (it.integerRowLearning) counts + ("learningIntegerSessions" to 1L) else counts
+        if (it.integerRowLearning) counts + mapOf(
+            "learningIntegerSessions" to 1L,
+            "learningIntegerDerived" to it.integerRowsDerived,
+            "learningIntegerAdmissionDeclined" to it.integerRowAdmissionsDeclined,
+        ) else counts
     } ?: retiredLifecycle
 
     internal fun affineParityStatistics(factorId: Int): Map<String, Long> {

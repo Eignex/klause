@@ -199,9 +199,8 @@ class LpHintsTest {
             hints.finishNode(trail.state)
             assertEquals(sqrt(3.0), hints.directionalScore(proposal), 1e-9)
             val before = work
-            hints.beginPassiveSelection()
 
-            val selected = assertNotNull(hints.selectVariable(proposal, baseline))
+            val selected = assertNotNull(hints.pickVariable(baseline, 1e-9, { true }, { false }))
             hints.branch(selected)
             hints.commit(SearchDecision.IntAtMost(selected.varId, if (apply) 3L else 2L), 1)
 
@@ -248,6 +247,114 @@ class LpHintsTest {
             assertEquals(reference, selected)
         }
         assertTrue("PASSIVE_VARIABLE_BASELINE_UNRELIABLE" in events)
+        events.clear()
+
+        assertEquals(baseline, hints.pickVariable(baseline, 1e-9, { true }, { false }))
+
+        assertTrue("PASSIVE_VARIABLE_BASELINE_UNRELIABLE" in events)
+        assertFalse("PASSIVE_VARIABLE_SCORE" in events)
+    }
+
+    @Test
+    fun `sparse candidate ties retain kind and variable order among available variables`() {
+        val builder = LpBuilder()
+        repeat(4) { builder.addVar(0, 1, cost = 1L) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 0, 1),
+            booleanArrayOf(true, true, false, false), 0L, intArrayOf(2, 3), intArrayOf(0, 1))
+        val baseline = VarRef.IntVar(1)
+        val hints = LpHints(2, 2, directionalGains = true)
+        for (variable in listOf(VarRef.IntVar(0), VarRef.Bool(1), VarRef.Bool(0), baseline)) {
+            val column = variable.varId + if (variable is VarRef.Bool) 0 else 2
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            hints.branch(variable)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    val decision = when (variable) {
+                        is VarRef.Bool -> SearchDecision.Bool(variable.varId * 2 + if (up) 0 else 1)
+                        is VarRef.IntVar -> if (up) SearchDecision.IntAtLeast(variable.varId, 1L)
+                        else SearchDecision.IntAtMost(variable.varId, 0L)
+                    }
+                    hints.commit(decision, 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, DoubleArray(4) { if (it == column) if (up) 1.0 else 0.0 else 0.5 },
+                        DoubleArray(0))
+                    hints.recordObjective(relaxation, if (variable == baseline) 10.0 else 12.0)
+                }
+            }
+        }
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, DoubleArray(4) { 0.5 }, DoubleArray(0))
+        hints.recordObjective(relaxation, 10.0)
+        for ((unavailable, expected) in listOf(
+            emptySet<VarRef>() to VarRef.Bool(0),
+            setOf<VarRef>(VarRef.Bool(0)) to VarRef.Bool(1),
+            setOf<VarRef>(VarRef.Bool(0), VarRef.Bool(1)) to VarRef.IntVar(0),
+        )) {
+            val selected = hints.pickVariable(baseline, 1e-9, { it !in unavailable }, { false })
+
+            assertEquals(expected, selected)
+        }
+    }
+
+    @Test
+    fun `sparse selection invalidated during candidate scoring keeps the ordinary variable`() {
+        for (reset in listOf(false, true)) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 1, cost = 1L) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
+            val baseline = VarRef.IntVar(0)
+            var selecting = false
+            var scoring = false
+            var cancelled = false
+            val events = ArrayList<String>()
+            lateinit var hints: LpHints
+            hints = LpHints(2, 0, directionalGains = true, observe = {
+                events.add(it)
+                if (selecting && it == "PASSIVE_VARIABLE_SCORE") scoring = true
+            }, charge = {
+                if (scoring) {
+                    scoring = false
+                    selecting = false
+                    if (reset) hints.resetHistory() else cancelled = true
+                }
+            })
+            for (variable in listOf(baseline, VarRef.IntVar(1))) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        hints.commit(if (up) SearchDecision.IntAtLeast(variable.varId, 1L)
+                        else SearchDecision.IntAtMost(variable.varId, 0L), 1)
+                        hints.beginNode(1, 100.0)
+                        hints.record(relaxation, DoubleArray(2) {
+                            if (it == variable.varId) if (up) 1.0 else 0.0 else 0.5
+                        }, DoubleArray(0))
+                        hints.recordObjective(relaxation, if (variable == baseline) 10.0 else 12.0)
+                    }
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            events.clear()
+            selecting = true
+
+            val selected = assertNotNull(hints.pickVariable(baseline, 1e-9, { true }, { cancelled }))
+            hints.branch(selected)
+            hints.commit(SearchDecision.IntAtMost(selected.varId, 0L), 1)
+
+            assertEquals(baseline, selected)
+            assertTrue("PASSIVE_VARIABLE_SCORE" in events)
+            assertFalse("PASSIVE_VARIABLE_COMPARED" in events)
+            assertFalse("PASSIVE_VARIABLE_COMMITTED" in events)
+        }
     }
 
     @Test
@@ -290,7 +397,12 @@ class LpHintsTest {
 
     @Test
     fun `directional scoring skips lookup work until both directions have enough samples`() {
-        for (prefix in listOf(listOf(false, false), listOf(false, true))) {
+        for ((prefix, primitive) in listOf(
+            listOf(false, false) to false,
+            listOf(false, false) to true,
+            listOf(false, true) to false,
+            listOf(false, true) to true,
+        )) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -315,7 +427,8 @@ class LpHintsTest {
                 hints.recordObjective(relaxation, 10.0)
                 val before = work
 
-                val score = hints.directionalScore(variable)
+                val score = if (primitive) hints.directionalScore(variable.varId, isBool = false)
+                else hints.directionalScore(variable)
 
                 if (phase == 0) {
                     assertTrue(score.isNaN())
@@ -385,6 +498,21 @@ class LpHintsTest {
         hints.record(relaxation, doubleArrayOf(3.5), doubleArrayOf(-4.0))
 
         assertEquals(1.0, hints.branchScore(VarRef.IntVar(0)), 1e-6)
+    }
+
+    @Test
+    fun `primitive branch scores keep boolean and integer coordinates distinct`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 1, cost = 1L)
+        builder.addVar(0, 10, cost = 4L)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 0),
+            booleanArrayOf(true, false), 0L, intArrayOf(1), intArrayOf(0))
+        val hints = LpHints(numIntVars = 1, numBoolVars = 1)
+
+        hints.record(relaxation, doubleArrayOf(0.25, 3.5), DoubleArray(0))
+
+        assertEquals(0.25, hints.branchScore(0, isBool = true), 1e-6)
+        assertEquals(2.0, hints.branchScore(0, isBool = false), 1e-6)
     }
 
     @Test

@@ -700,7 +700,8 @@ internal class LinearAuthority(
             if (evidence != null) return LinearAuthorityResult(evidence = evidence, lpConflict = true,
                 cutConflictFamilies = conflictFamilies)
             return if (guide != null && budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
-                checkSource(source, cancellation)
+                observePrimal("ConflictExactFallback")
+                checkSource(source, cancellation, cuts = cuts, cutMask = cutMask)
             } else LinearAuthorityResult()
         }
         guide?.point?.let { point ->
@@ -803,8 +804,7 @@ internal class LinearAuthority(
             if (budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
                 observePrimal("PrimalExactFallback")
                 val exact = checkSource(source, cancellation, cuts = cuts, cutMask = cutMask)
-                return exact.copy(bound = exact.bound ?: bound, incumbent = exact.incumbent ?: candidate,
-                    cutBoundFamilies = if (exact.bound != null) exact.cutBoundFamilies else boundFamilies)
+                return exact.retainingBound(bound, boundFamilies).copy(incumbent = exact.incumbent ?: candidate)
             }
             if (candidate == null) observePrimal("PrimalExactDimension")
             return LinearAuthorityResult(bound = bound, cutBoundFamilies = boundFamilies, incumbent = candidate)
@@ -906,6 +906,14 @@ private fun sample(source: SourceProofContext, coordinates: List<SourceCoordinat
         source.scope.condition.bools.getValue(it)
     }, if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() } else longArrayOf(),
         DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals, exactInts = integers)
+}
+
+internal fun LinearAuthorityResult.retainingBound(
+    previous: SourceEvidence?, families: Set<CutFamily>,
+): LinearAuthorityResult {
+    val strongest = strongerLinearBound(previous, bound)
+    val strongestFamilies = if (strongest != null && strongest === previous) families else cutBoundFamilies
+    return copy(bound = strongest, cutBoundFamilies = strongestFamilies)
 }
 
 internal fun strongerLinearBound(left: SourceEvidence?, right: SourceEvidence?): SourceEvidence? {

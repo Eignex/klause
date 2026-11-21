@@ -498,6 +498,10 @@ keeps the identity row layout unless it retains masked cuts. Certificates cite t
 nested rounding derivation, and final source checking repeats Boolean substitution
 independently.
 
+An exact fallback retains its query's checked cut recipe and selected mask. A checked
+guidance bound survives a weaker exact fallback with its supporting cut families;
+only a stronger checked replacement changes that attribution.
+
 An opt-in absolute-tolerance envelope prepares MPS declarations and each stated row
 side widened by the captured absolute feasibility slack before lowering and separation.
 It preserves missing sides, exact integrality, indicator activation and the original

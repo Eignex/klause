@@ -11,6 +11,63 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `candidate visits include each mature positive variable once`() {
+        val history = LpDirectionalHistory({})
+        val variables = (0 until 20).map { VarRef.Bool(it) }
+        for (variable in variables) {
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(if (variable.varId == 19) 1 else 3) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(variable.varId * 2 + if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (variable.varId == 18) 10.0 else 12.0)
+                }
+            }
+        }
+        val visited = ArrayList<VarRef>()
+
+        history.forEachCandidate({ true }, visited::add)
+
+        assertEquals(variables.take(18).toSet(), visited.toSet())
+        assertEquals(18, visited.size)
+    }
+
+    @Test
+    fun `reset during a charged candidate visit stops the old traversal`() {
+        for (reset in listOf(false, true)) {
+            var visiting = false
+            var current = true
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({}, charge = {
+                if (visiting) {
+                    visiting = false
+                    if (reset) history.clear() else current = false
+                }
+            })
+            for (variable in listOf(VarRef.Bool(0), VarRef.Bool(1))) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 0.5)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool(variable.varId * 2 + if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(12.0)
+                    }
+                }
+            }
+            val visited = ArrayList<VarRef>()
+            visiting = true
+
+            history.forEachCandidate({ current }, visited::add)
+
+            assertTrue(visited.isEmpty())
+        }
+    }
+
+    @Test
     fun `geometric scores survive an underflowed child product`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)

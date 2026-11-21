@@ -22,6 +22,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
@@ -39,6 +40,73 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfLraSystemTest {
+    @Test
+    fun `mixed source atoms should preserve typed coordinates in a shared term`() {
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(-10L, -10L), longArrayOf(10L, 10L), null, null),
+            numRealVars = 2,
+            realLower = doubleArrayOf(-10.0, -10.0),
+            realUpper = doubleArrayOf(10.0, 10.0),
+            factors = arrayOf(),
+        )
+        for (upper in listOf(true, false)) {
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source, lp)
+                assertTrue(system.install())
+                assertTrue(system.assertRow(row(listOf(1, 2, 3, 4), 20), axiom))
+                val atom = assertNotNull(SourceBoundAtom.side(listOf(
+                    SourceBoundTerm(SearchRealValue(1), BigFraction.ofLong(2L)),
+                    SourceBoundTerm(SearchIntValue(0), BigFraction.ofLong(3L)),
+                    SourceBoundTerm(SearchRealValue(0), BigFraction.ONE),
+                    SourceBoundTerm(SearchIntValue(1), BigFraction.ofLong(4L)),
+                ), BigFraction.ofLong(10L), upper))
+
+                assertTrue(system.assertAtom(atom, axiom))
+
+                val point = assertNotNull(assertNotNull(lp.solve()).exactPrimal)
+                val activity = point[0] + BigFraction.ofLong(2L) * point[1] +
+                    BigFraction.ofLong(3L) * point[2] + BigFraction.ofLong(4L) * point[3]
+                assertTrue(if (upper) activity <= BigFraction.ofLong(10L) else activity >= BigFraction.ofLong(10L))
+                assertEquals(1, assertNotNull(lp.state).model.m)
+            }
+        }
+    }
+
+    @Test
+    fun `out of range source atom coordinates should leave the state intact`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val before = lp.state
+            val atom = assertNotNull(SourceBoundAtom.side(
+                listOf(SourceBoundTerm(SearchRealValue(2), BigFraction.ONE)), BigFraction.ZERO, true,
+            ))
+
+            assertFalse(system.assertAtom(atom, axiom))
+
+            assertSame(before, lp.state)
+        }
+    }
+
+    @Test
+    fun `affine input sides should omit bounds on direct source columns`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+            doubleArrayOf(1.0), LinearOp.LE, 1.0)
+        val source = source().withFactors(arrayOf(factor))
+        val form = factor.linearRows.single().exactForm(2)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            val comparison = form.comparison(true) { false }
+            assertTrue(system.assertComparison(comparison, null, premise(0)))
+
+            val sides = system.affineInputSides(comparison, ExecutionControl.Never)
+
+            assertEquals(listOf(null, null), sides)
+        }
+    }
+
     @Test
     fun `affine input sides should follow strict bounds across sibling scopes`() {
         val factors = Array<Factor>(2) { guard ->

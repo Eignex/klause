@@ -345,6 +345,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 state.arithmeticLearningTrace?.record("integer.decline.no-clausal-fallback")
             }
             if (row != null) {
+                state.integerRowsDerived++
                 state.arithmeticLearningTrace?.row("integer.derived", row.row, state)
                 state.arithmeticLearningTrace?.record("integer.native-target", row.backjumpLevel.toLong())
                 lastResolvent = clauseResolvent

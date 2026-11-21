@@ -257,21 +257,39 @@ internal class ReconstructionAuthority(val model: LpModel, val meter: Reconstruc
         meter.storage(captureSize * 8L)
         if (!model.finiteExactInput()) throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
         var entries = 0
-        matrix = List(size) { j ->
-            meter.step()
-            val column = ArrayList<Pair<Int, BigFraction>>()
-            model.forEachRationalColumn(j) { row, value ->
-                if (++entries > meter.limits.maxEntries) throw ReconstructionStop(ReconstructionDecline.DIMENSION)
-                meter.storage(32L)
-                column += row to meter.fraction(value)
+        fun admit(value: BigFraction) {
+            if (++entries > meter.limits.maxEntries) throw ReconstructionStop(ReconstructionDecline.DIMENSION)
+            meter.storage(32L)
+            meter.fraction(value)
+        }
+        val source = model.exactState?.model
+        val retained = source?.reconstructionColumns()
+        matrix = if (retained == null) {
+            List(size) { j ->
+                meter.step()
+                val column = ArrayList<Pair<Int, BigFraction>>()
+                model.forEachRationalColumn(j) { row, value ->
+                    admit(value)
+                    column += row to value
+                }
+                column.toList()
+            }.also { source?.retainReconstructionColumns(it) }
+        } else {
+            for (column in retained) {
+                meter.step()
+                for ((_, value) in column) admit(value)
             }
-            column.toList()
+            retained
         }
         var openStructuralBounds = false
         bounds = List(size) { j ->
             model.exactBounds(j).also { b ->
                 if (j < n && (b.lower == null || b.upper == null)) openStructuralBounds = true
-                for (side in listOfNotNull(b.lower, b.upper)) {
+                b.lower?.let { side ->
+                    meter.fraction(side.number.value)
+                    chargePremises(side.premises)
+                }
+                b.upper?.let { side ->
                     meter.fraction(side.number.value)
                     chargePremises(side.premises)
                 }

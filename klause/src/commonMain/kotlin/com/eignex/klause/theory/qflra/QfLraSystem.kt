@@ -431,7 +431,7 @@ internal class LiveQfLraSystem(
         if (stop.pollStop()) return null
         val key = preparedTerms[comparison.ordered]?.positive
         val slot = key?.let { it.slot ?: normalized[it] }
-        val column = slot?.term?.let { definitions[it.coefficients] }
+        val column = slot?.let(::affineColumn)
         val state = lp.state ?: return null
         if (column == null) return EMPTY_AFFINE_INPUTS
         val lower = state.activeSide(column, false)
@@ -454,11 +454,12 @@ internal class LiveQfLraSystem(
         stop.charge(comparison.terms.size.toLong() + 1L)
         if (stop()) return null
         val key = preparedTerms[comparison.ordered]?.positive ?: return null
-        val term = (key.slot ?: normalized[key])?.term ?: return null
+        val slot = key.slot ?: normalized[key] ?: return null
+        val term = slot.term
         if (term.coefficients.size < 2) return null
         stop.charge(term.coefficients.size.toLong() + 1L)
         if (stop()) return null
-        val column = definitions[term.coefficients] ?: return null
+        val column = affineColumn(slot) ?: return null
         val state = lp.state ?: return null
         val arithmetic = PartialImplicationArithmetic(stop)
         if (!arithmetic.admit(comparison.bound)) return null
@@ -473,6 +474,9 @@ internal class LiveQfLraSystem(
             ExplainedLinearBound(value, active.side.strict, term.premise(premise))
         }, stop)
     }
+
+    private fun affineColumn(slot: SmtTermSlot): Int? = slot.column.takeIf { it >= pointColumns }
+        ?: definitions[slot.term.coefficients]?.also { slot.column = it }
 
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
@@ -499,8 +503,33 @@ internal class LiveQfLraSystem(
     }
 
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
-        val expression = sourceTerms(atom) ?: return false
-        return assertTerms(SmtTermKey.of(expression), atom.upper, atom.threshold, atom.strict, premise)
+        val terms = atom.terms
+        val columns = IntArray(terms.size)
+        val coefficients = MutableList(terms.size) { BigFraction.ZERO }
+        // Canonical source terms sort each typed segment; LP columns place real coordinates first.
+        var real = 0
+        var integer = terms.count { it.source is SearchRealValue }
+        for (term in terms) {
+            val index: Int
+            val column = when (val key = term.source) {
+                is SearchIntValue -> {
+                    if (key.variable !in 0 until source.numIntVars) return false
+                    index = integer++
+                    source.numRealVars + key.variable
+                }
+
+                is SearchRealValue -> {
+                    if (key.variable !in 0 until source.numRealVars) return false
+                    index = real++
+                    key.variable
+                }
+
+                else -> return false
+            }
+            columns[index] = column
+            coefficients[index] = term.coefficient
+        }
+        return assertTerms(SmtTermKey(columns, coefficients), atom.upper, atom.threshold, atom.strict, premise)
     }
 
     fun sourceTerms(atom: SourceBoundAtom): Map<Int, BigFraction>? {

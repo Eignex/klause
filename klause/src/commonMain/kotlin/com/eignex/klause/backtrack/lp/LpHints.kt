@@ -176,8 +176,21 @@ internal class LpHints(
     }
 
     fun directionalScore(variable: VarRef): Double {
-        if (!collect || !directionalGains || !objectiveRecorded || !history.hasReliableHistory) return Double.NaN
-        if (!passivePointCurrent()) return Double.NaN
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(variable)
+    }
+
+    fun directionalScore(varId: Int, isBool: Boolean): Double {
+        if (!hasDirectionalScore()) return Double.NaN
+        return readyDirectionalScore(if (isBool) VarRef.Bool(varId) else VarRef.IntVar(varId))
+    }
+
+    private fun hasDirectionalScore(): Boolean = collect && directionalGains && objectiveRecorded &&
+        history.hasReliableHistory && passivePointCurrent()
+
+    val hasDirectionalCandidates: Boolean get() = hasDirectionalScore()
+
+    private fun readyDirectionalScore(variable: VarRef): Double {
         charge(1L)
         observe("PASSIVE_VARIABLE_SCORE")
         val point = value(variable)
@@ -197,6 +210,48 @@ internal class LpHints(
         if (!collect || !history.hasReliableHistory) return
         charge(4L)
         observe("PASSIVE_VARIABLE_CHECK")
+    }
+
+    fun pickVariable(
+        baseline: VarRef?,
+        minimumScore: Double,
+        available: (VarRef) -> Boolean,
+        cancelled: () -> Boolean,
+    ): VarRef? {
+        beginPassiveSelection()
+        if (!hasDirectionalScore()) return baseline.also { selected(null) }
+        if (baseline == null) return selectVariable(null, null, cancelled)
+        val point = passivePoint
+        val state = passiveState
+        val stamp = solveStamp
+        val current = {
+            !cancelled() && passivePoint === point && passiveState === state &&
+                stamp == solveStamp && passivePointCurrent()
+        }
+        charge(1L)
+        val reference = history.estimate(baseline, value(baseline))
+        if (!current()) return baseline.also { selected(null) }
+        if (!reference.isFinite()) {
+            observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
+            return baseline.also { selected(null) }
+        }
+        var proposal: VarRef? = null
+        var bestScore = minimumScore
+        history.forEachCandidate(current) { variable ->
+            if (available(variable)) {
+                val score = readyDirectionalScore(variable)
+                val previous = proposal
+                val precedes = previous != null && if ((variable is VarRef.Bool) == (previous is VarRef.Bool))
+                    variable.varId < previous.varId else variable is VarRef.Bool
+                if (score > bestScore || (score == bestScore && precedes)) {
+                    bestScore = score
+                    proposal = variable
+                }
+            }
+        }
+        if (!current()) return baseline.also { selected(null) }
+        return if (proposal == null) baseline.also { selected(null) }
+        else selectVariable(proposal, baseline, cancelled)
     }
 
     fun selectVariable(proposal: VarRef?, baseline: VarRef?, cancelled: () -> Boolean = { false }): VarRef? {
@@ -386,13 +441,10 @@ internal class LpHints(
      * A variable the LP already pins to an integer scores `0` (no branching needed); one with no LP
      * value scores `NaN` (the selector falls back). Higher = branch here first.
      */
-    fun branchScore(varRef: VarRef): Double {
+    fun branchScore(varRef: VarRef): Double = branchScore(varRef.varId, varRef is VarRef.Bool)
+
+    fun branchScore(id: Int, isBool: Boolean): Double {
         if (!recorded) return Double.NaN
-        val isBool = varRef is VarRef.Bool
-        val id = when (varRef) {
-            is VarRef.IntVar -> varRef.varId
-            is VarRef.Bool -> varRef.varId
-        }
         val vals = if (isBool) boolVal else intVal
         if (id < 0 || id >= vals.size) return Double.NaN
         if ((if (isBool) boolStamp else intStamp)[id] != solveStamp) return Double.NaN

@@ -125,28 +125,52 @@ fun SearchContext.explainAtoms(
     if (maxNodes <= 0) return null
     val literals = LinkedHashSet<Int>()
     if (conclusion != null) literals.add(atomLiteral(conclusion) ?: return null)
+    if (!visitAtomPremises(premise, maxNodes) { literals.add(it) }) return null
+    if (literals.size > maxNodes) return null
+    return SearchExplanation(literals.toIntArray())
+}
+
+internal fun SearchContext.canExplainAtoms(premise: SearchAtomPremise, maxNodes: Int = 4096): Boolean =
+    visitAtomPremises(premise, maxNodes) {}
+
+private inline fun SearchContext.visitAtomPremises(
+    premise: SearchAtomPremise,
+    maxNodes: Int,
+    literal: (Int) -> Unit,
+): Boolean {
+    if (maxNodes <= 0) return false
+    when (premise) {
+        is SearchAtomPremise.Asserted -> {
+            val active = atomLiteral(premise.decision) ?: return false
+            if (boolValue(active ushr 1) != (active and 1 == 0)) return false
+            literal(active xor 1)
+            return true
+        }
+
+        is SearchAtomPremise.All -> if (premise.premises.isEmpty()) return true
+        SearchAtomPremise.Unavailable -> return false
+    }
     val pending = ArrayDeque<SearchAtomPremise>()
     pending.add(premise)
     val expanded = HashSet<SearchAtomPremise.All>()
     var remaining = maxNodes
     while (pending.isNotEmpty()) {
-        if (remaining-- <= 0) return null
+        if (remaining-- <= 0) return false
         when (val current = pending.removeLast()) {
             is SearchAtomPremise.Asserted -> {
-                val literal = atomLiteral(current.decision) ?: return null
-                if (boolValue(literal ushr 1) != (literal and 1 == 0)) return null
-                literals.add(literal xor 1)
+                val active = atomLiteral(current.decision) ?: return false
+                if (boolValue(active ushr 1) != (active and 1 == 0)) return false
+                literal(active xor 1)
             }
 
             is SearchAtomPremise.All -> {
                 if (!expanded.add(current)) continue
-                if (current.premises.size > remaining - pending.size) return null
+                if (current.premises.size > remaining - pending.size) return false
                 pending.addAll(current.premises)
             }
 
-            SearchAtomPremise.Unavailable -> return null
+            SearchAtomPremise.Unavailable -> return false
         }
     }
-    if (literals.size > maxNodes) return null
-    return SearchExplanation(literals.toIntArray())
+    return true
 }

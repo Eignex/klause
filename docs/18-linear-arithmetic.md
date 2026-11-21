@@ -62,6 +62,9 @@ Thresholds and premises belong to each asserted source side.
 Prepared source forms share identical exact coefficient maps and ordered arrays
 within one preparation. Each row retains its own threshold, relation, strictness
 and Boolean terms; a fresh source preparation owns a fresh pool.
+Boolean-independent comparisons are retained by their immutable row form. Prepared
+Boolean dependencies also serve source-row truth reads; assignments and disjunct
+directions are read from the current search node.
 Other terms first seen under a branch or disjunct get their definition row appended
 on first use, and siblings reuse it. At the root, fixed columns are substituted as
 constants, keeping the premises of both fixing bounds.
@@ -75,6 +78,9 @@ Only fully committed source comparisons receive assertion markers; a declined
 batch publishes neither its staged witnesses nor its markers. Root batches commit
 direct source-column bounds before the next comparison, so its normalization can
 substitute earlier root fixings; affine-column bounds can share a root batch.
+Each search-node snapshot retains the prefix of source branches fully asserted in
+its matching LP scope. Later checks retry only the unfinished suffix; interrupted
+assertions cannot advance the prefix, and retraction restores it with the node.
 
 #### A check
 
@@ -148,6 +154,9 @@ and Boolean contributions remain local to each comparison, and close releases it
 The incremental route also reads bounds on existing normalized affine slack
 columns. The normalization's scale selects the bounding side, and its offset
 reconstructs source activity under the same rational-size and operation limits.
+Prepared term slots retain installed physical definition columns for the component
+lifetime; direct source columns stay outside affine hints. Definitions survive bound
+retraction, while each read uses the current state's sides and premises.
 Each successful implication uses the current active bound premise and the
 normalization's declared-fixing premises. Probing creates no LP definition and
 retains no reason. Decline reuse includes both the individual-coordinate bounds

@@ -5,6 +5,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.SparseSourceLpRowPolicy
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.ReconstructionLimits
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -40,6 +41,38 @@ class LinearAuthorityTest {
         SourceRevision("affine-fixture", "exact-affine"),
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
+
+    @Test
+    fun `an exact fallback should retain a stronger previous bound with its cut families`() {
+        for (sense in ObjectiveSense.entries) {
+            val active = scope.copy(objective = SourceObjective("x", sense))
+            val previous = SourceEvidence(active,
+                SourceClaim.Bound(if (sense == ObjectiveSense.MINIMIZE) BigFraction.ofLong(2) else BigFraction.ZERO),
+                SourceDerivation.Premise("selected bound"))
+            val weaker = SourceEvidence(active, SourceClaim.Bound(BigFraction.ONE),
+                SourceDerivation.Premise("fallback bound"))
+            val exact = LinearAuthorityResult(bound = weaker, split = integer to BigFraction.ZERO,
+                cutBoundFamilies = setOf(CutFamily.SOURCE_ROUNDING))
+
+            val retained = exact.retainingBound(previous, setOf(CutFamily.SOURCE_AGGREGATION))
+
+            assertEquals(exact.copy(bound = previous, cutBoundFamilies = setOf(CutFamily.SOURCE_AGGREGATION)),
+                retained)
+        }
+    }
+
+    @Test
+    fun `an exact fallback should keep its tighter bound and cut families`() {
+        val previous = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE),
+            SourceDerivation.Premise("previous bound"))
+        val tighter = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ofLong(2)),
+            SourceDerivation.Premise("fallback bound"))
+        val exact = LinearAuthorityResult(bound = tighter, cutBoundFamilies = setOf(CutFamily.SOURCE_AGGREGATION))
+
+        val retained = exact.retainingBound(previous, setOf(CutFamily.SOURCE_ROUNDING))
+
+        assertEquals(exact, retained)
+    }
 
     @Test
     fun `pinned refutation scope reduction should require complete Boolean substitution`() {

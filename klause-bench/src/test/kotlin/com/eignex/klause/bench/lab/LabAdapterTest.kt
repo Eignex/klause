@@ -291,6 +291,7 @@ class LabAdapterTest {
             val args = Files.readString(root.resolve("out with spaces/cli.args"))
             val preflight = Files.readString(root.resolve("out with spaces/preflight.args"))
             assertTrue(args.contains("-XX:StartFlightRecording=filename="))
+            assertTrue(args.contains("jdk.ClassLoad#enabled=true,jdk.ClassLoad#threshold=0ms"))
             assertTrue(args.contains("-XX:+LogCompilation"))
             assertFalse(preflight.contains("StartFlightRecording"))
             assertEquals("false", environment["KLAUSE_DEBUG"])
