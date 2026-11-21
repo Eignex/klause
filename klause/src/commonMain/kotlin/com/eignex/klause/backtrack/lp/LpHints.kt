@@ -29,6 +29,7 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
+    private val variableContexts: Boolean = false,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
@@ -51,6 +52,7 @@ internal class LpHints(
     private var nodeStamp = 0L
     private var pruningOutcome: Boolean? = null
     private var pruningScope: LpRelaxation? = null
+    private var variableContextRemaining = 128
 
     fun beginNode(depth: Int, bound: Double) {
         nodeStamp++
@@ -324,6 +326,8 @@ internal class LpHints(
         }
         if (!current()) return baseline
         val proposed = proposal ?: return baseline
+        val context = captureVariableContext(baseline, proposed, reference, ::current)
+        if (!current()) return baseline
         if (passiveVariable == null) {
             charge(8L)
             if (!current()) return baseline
@@ -341,12 +345,53 @@ internal class LpHints(
                     (baselineGain == UNMEASURED_REFERENCE ||
                         (baselineGain.isFinite() && proposedGain > baselineGain))
             },
+            context = context,
         )
         if (!current()) {
             choice.clear()
             return baseline
         }
         return selected
+    }
+
+    private inline fun captureVariableContext(
+        baseline: VarRef,
+        proposal: VarRef,
+        reference: Double,
+        crossinline current: () -> Boolean,
+    ): String? {
+        if (!variableContexts || variableContextRemaining <= 0) return null
+        variableContextRemaining--
+        charge(12L)
+        if (!current()) return null
+        observe("PASSIVE_VARIABLE_CONTEXT_CHECK")
+        if (!current()) return null
+        val baselinePoint = value(baseline)
+        val proposedPoint = value(proposal)
+        val baselineFraction = baselinePoint - floor(baselinePoint)
+        val proposedFraction = proposedPoint - floor(proposedPoint)
+        val context = when {
+            !baselinePoint.isFinite() || !proposedPoint.isFinite() ||
+                proposedFraction <= INT_TOL || proposedFraction >= 1.0 - INT_TOL -> "UNKNOWN"
+            baselineFraction == 0.0 -> "INTEGRAL_BASELINE"
+            reference != UNMEASURED_REFERENCE -> "KNOWN_FRACTIONAL"
+            else -> {
+                val ordinary = min(baselineFraction, 1.0 - baselineFraction)
+                val proposed = min(proposedFraction, 1.0 - proposedFraction)
+                when {
+                    proposed < ordinary -> "UNMEASURED_LOWER"
+                    proposed > ordinary -> "UNMEASURED_HIGHER"
+                    else -> "UNMEASURED_EQUAL"
+                }
+            }
+        }
+        observe("PASSIVE_VARIABLE_CONTEXT_NOMINATION_" + context)
+        if (!current()) return null
+        if (variableContextRemaining == 0) {
+            observe("PASSIVE_VARIABLE_CONTEXT_EXHAUSTED")
+            if (!current()) return null
+        }
+        return context
     }
 
     private fun clearPassivePoint() {
