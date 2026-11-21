@@ -29,6 +29,8 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
+    private val applyVariableAdvice: Boolean = true,
+    private val applyChildAdvice: Boolean = true,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
@@ -67,7 +69,7 @@ internal class LpHints(
             if (passiveValues == null) {
                 charge(16L)
                 if (version != nodeStamp) return
-                passiveValues = LpPassiveValueChoice(applyAdvice, observe, charge)
+                passiveValues = LpPassiveValueChoice(applyAdvice && applyChildAdvice, observe, charge)
                 passiveCollection = LpPassiveCollection(observe, charge)
             }
             history.beginNode(depth)
@@ -327,7 +329,7 @@ internal class LpHints(
         if (passiveVariable == null) {
             charge(8L)
             if (!current()) return baseline
-            passiveVariable = LpPassiveVariableChoice(applyAdvice, observe, charge)
+            passiveVariable = LpPassiveVariableChoice(applyAdvice && applyVariableAdvice, observe, charge)
         }
         val choice = checkNotNull(passiveVariable)
         val selected = choice.select(

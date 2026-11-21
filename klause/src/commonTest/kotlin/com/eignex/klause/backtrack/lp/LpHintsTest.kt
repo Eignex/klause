@@ -40,10 +40,15 @@ class LpHintsTest {
             "single-proposal", "fixed", "missing", "near", "underflow", "gap", "zero-candidate",
             "candidate-context", "baseline-context")) {
             val costs = ArrayList<Long>()
-            for (apply in listOf(false, true)) {
+            for ((overall, variableAdvice, childAdvice) in listOf(Triple(false, false, false),
+                Triple(false, false, true),
+                Triple(false, true, false), Triple(false, true, true), Triple(true, false, false),
+                Triple(true, false, true), Triple(true, true, false), Triple(true, true, true))) {
+                val apply = overall && variableAdvice
                 var work = 0L
                 val events = ArrayList<String>()
-                val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
+                val hints = LpHints(2, 0, directionalGains = true, applyAdvice = overall,
+                    applyVariableAdvice = variableAdvice, applyChildAdvice = childAdvice,
                     observe = events::add, charge = { work += it })
                 for (id in 0..1) {
                     if (id == 1 && context == "expired") repeat(257) { hints.beginNode(0, 1000.0) }
@@ -113,7 +118,7 @@ class LpHintsTest {
                 }
                 costs.add(work - before)
             }
-            assertEquals(costs.first(), costs.last(), context)
+            assertTrue(costs.all { it == costs.first() }, context)
         }
     }
 
@@ -357,14 +362,21 @@ class LpHintsTest {
             val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
                 constant, intArrayOf(0), IntArray(0))
             val cutoff = constant.toDouble() + 1024.0
-            for ((apply, currentObjective) in listOf(false to 10.0, true to 10.0, false to 1023.0, true to 1023.0)) {
+            for ((settings, currentObjective) in listOf(Triple(false, false, false), Triple(false, false, true),
+                Triple(false, true, false), Triple(false, true, true), Triple(true, false, false),
+                Triple(true, false, true), Triple(true, true, false), Triple(true, true, true)).flatMap { settings ->
+                listOf(settings to 10.0, settings to 1023.0)
+            }) {
+                val (overall, variableAdvice, childAdvice) = settings
+                val apply = overall && childAdvice
                 for ((scale, gapScale, equalRates) in listOf(1.0 to 1.0, 1.5 to 1.0, 2.0 to 1.0,
                     1.0 to 0.5, 1.0 to 2.0, 1.0 to 4.0, 1.0 to 0.25).flatMap { (scale, gapScale) ->
                     listOf(Triple(scale, gapScale, false), Triple(scale, gapScale, true))
                 }) {
                     var work = 0L
                     val events = ArrayList<String>()
-                    val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                    val hints = LpHints(1, 0, directionalGains = true, applyAdvice = overall,
+                        applyVariableAdvice = variableAdvice, applyChildAdvice = childAdvice,
                         observe = events::add, charge = { work += it })
                     val parentObjective = 1024.0 - (1024.0 - currentObjective) * gapScale
                     repeat(2) { sample ->

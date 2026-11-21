@@ -221,6 +221,25 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `directional application classes reach fixed and portfolio workers independently`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams(lpDirectionalGains = true)
+        for (variable in listOf(false, true)) {
+            for (child in listOf(false, true)) {
+                val settings = listOf("lp-directional-variable-advice=$variable",
+                    "lp-directional-child-advice=$child")
+                val workers = listOf(applyBacktrackParams(base, EngineParams(settings)),
+                    applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true))
+
+                for (worker in workers) {
+                    assertTrue(worker.lpDirectionalGains && worker.lpDirectionalAdvice)
+                    assertEquals(variable, worker.lpDirectionalVariableAdvice)
+                    assertEquals(child, worker.lpDirectionalChildAdvice)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `early objective core admission should reject parallel portfolios`() {
         assertFailsWith<PipelineConfigException> { scenario(2, listOf("core-early=true")) }
     }

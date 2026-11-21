@@ -459,6 +459,11 @@ Coarse recent positive-gain and positive-prune-rate stamps skip lookups until su
 observations exist; the current variable still needs its own complete numeric and
 outcome records. Reset clears those prerequisites.
 
+`lp-directional-variable-advice=false` independently withholds variable applications;
+`lp-directional-child-advice=false` independently withholds reliable child applications.
+The overall advice switch must also be enabled for either application. Withholding
+keeps nomination, revalidation, commitment and collection work.
+
 History eligibility precedes nomination bookkeeping; unavailable preferences use a
 bounded lookup without retaining a freshness closure. Selection requires the
 fractional point and optimum from the same current
