@@ -30,6 +30,144 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `child movement tags require committed advice and retain the capture lifetime`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        for (boolean in listOf(false, true)) {
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val offset = if (boolean) 0.0 else 2.0
+            val down = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2L)
+            val up = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 3L)
+            for (context in listOf("MOVEMENT_MATCHED", "MOVEMENT_MISMATCH")) {
+                for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+                    val costs = ArrayList<Long>()
+                    for (apply in listOf(false, true)) {
+                        val events = ArrayList<String>()
+                        var work = 0L
+                        val hints = LpHints(if (boolean) 0 else 1, if (boolean) 1 else 0,
+                            directionalGains = true, applyAdvice = apply, childContexts = true,
+                            observe = events::add, charge = { work += it })
+                        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(boolean), constant,
+                            if (boolean) IntArray(0) else intArrayOf(0),
+                            if (boolean) intArrayOf(0) else IntArray(0))
+                        val cutoff = constant.toDouble() + 1024.0
+                        val repetitions =
+                            if (!boolean && context == "MOVEMENT_MISMATCH" && constant == 0L) 129 else 1
+                        var selectionWork = 0L
+                        repeat(repetitions) {
+                            hints.resetHistory()
+                            repeat(2) { sample ->
+                                for (isUp in listOf(false, true)) {
+                                    hints.beginNode(0, cutoff)
+                                    hints.record(relaxation, doubleArrayOf(offset + 0.5), DoubleArray(0))
+                                    hints.recordObjective(relaxation, 0.0)
+                                    hints.branch(variable)
+                                    hints.commit(if (isUp) up else down, 1)
+                                    hints.beginNode(1, cutoff)
+                                    hints.record(relaxation, doubleArrayOf(offset + 0.5), DoubleArray(0))
+                                    hints.recordObjective(relaxation, if (isUp) 3.0 else 1.0)
+                                    hints.recordOutcome(sample == 1, relaxation)
+                                    hints.finishNode(trail.state)
+                                }
+                            }
+                            hints.restart()
+                            hints.beginNode(0, cutoff)
+                            val point = offset + if (context == "MOVEMENT_MATCHED") 0.5 else 0.1
+                            hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                            hints.recordObjective(relaxation, 0.0)
+                            val before = work
+                            hints.branch(variable)
+
+                            val ordered = hints.orderAlternatives(variable, listOf(up, down), ExecutionControl.Never)
+                            hints.commit(ordered.first(), 1)
+
+                            assertEquals(if (apply) listOf(down, up) else listOf(up, down), ordered)
+                            selectionWork += work - before
+                        }
+                        val classified = minOf(128, repetitions)
+                        val prefix = if (apply) "PASSIVE_VALUE_COMMIT_MOVEMENT_CONTEXT_"
+                        else "PASSIVE_VALUE_COMMIT_WITHHELD_MOVEMENT_CONTEXT_"
+                        assertEquals(classified, events.count { it == prefix + context })
+                        assertEquals(classified, events.count { it == "PASSIVE_VALUE_MOVEMENT_CONTEXT_CHECK" })
+                        assertEquals(classified,
+                            events.count { it == "PASSIVE_VALUE_MOVEMENT_CONTEXT_NOMINATION_" + context })
+                        assertEquals(if (repetitions > 128) 1 else 0,
+                            events.count { it == "PASSIVE_VALUE_MOVEMENT_CONTEXT_EXHAUSTED" })
+                        val changed = if (apply) "PASSIVE_VALUE_COMMIT_CHANGED"
+                        else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
+                        assertEquals(repetitions, events.count { it == changed })
+                        costs.add(selectionWork)
+                    }
+                    assertTrue(costs.first() > 0L)
+                    assertEquals(costs.first(), costs.last())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `child movement capture invalidation keeps the ordinary alternatives`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2L)
+        val up = SearchDecision.IntAtLeast(0, 3L)
+        for (trigger in listOf("charge", "PASSIVE_VALUE_MOVEMENT_CONTEXT_CHECK",
+            "PASSIVE_VALUE_MOVEMENT_CONTEXT_NOMINATION_MOVEMENT_MISMATCH")) {
+            for (reset in listOf(false, true)) {
+                var armed = false
+                var cancelled = false
+                val events = ArrayList<String>()
+                lateinit var hints: LpHints
+                hints = LpHints(1, 0, directionalGains = true, childContexts = true, observe = { event ->
+                    events.add(event)
+                    if (armed && event == trigger) {
+                        if (reset) hints.resetHistory() else cancelled = true
+                    }
+                }, charge = { amount ->
+                    if (armed && trigger == "charge" && amount == 64L) {
+                        armed = false
+                        if (reset) hints.resetHistory() else cancelled = true
+                    }
+                })
+                repeat(2) { sample ->
+                    for (isUp in listOf(false, true)) {
+                        hints.beginNode(0, 1000.0)
+                        hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+                        hints.recordObjective(relaxation, 0.0)
+                        hints.branch(variable)
+                        hints.commit(if (isUp) up else down, 1)
+                        hints.beginNode(1, 1000.0)
+                        hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+                        hints.recordObjective(relaxation, if (isUp) 3.0 else 1.0)
+                        hints.recordOutcome(sample == 1, relaxation)
+                        hints.finishNode(trail.state)
+                    }
+                }
+                hints.beginNode(0, 1000.0)
+                hints.record(relaxation, doubleArrayOf(2.1), DoubleArray(0))
+                hints.recordObjective(relaxation, 0.0)
+                hints.branch(variable)
+                events.clear()
+                armed = true
+                val control = ExecutionControl { cancelled }
+
+                val ordered = hints.orderAlternatives(variable, listOf(up, down), control)
+                hints.commit(ordered.first(), 1, control)
+
+                assertEquals(listOf(up, down), ordered, "$trigger/$reset")
+                assertFalse("PASSIVE_VALUE_COMPARED" in events)
+                assertFalse(events.any { it.startsWith("PASSIVE_VALUE_COMMIT_MOVEMENT_CONTEXT_") })
+            }
+        }
+    }
+
+    @Test
     fun `unmeasured baseline advice exceeds the ordinary estimate before committing`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 2L)

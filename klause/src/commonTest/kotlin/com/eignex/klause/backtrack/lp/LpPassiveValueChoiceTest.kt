@@ -8,6 +8,55 @@ import kotlin.test.assertFalse
 
 class LpPassiveValueChoiceTest {
     @Test
+    fun `child context tags require a fresh changed matching commitment`() {
+        for (apply in listOf(false, true)) {
+            for (action in listOf("commit", "replay", "clear", "foreign", "stamp", "stale", "charge",
+                "report", "replaced")) {
+                val events = ArrayList<String>()
+                var fresh = true
+                var committing = false
+                var stage = 0
+                var work = 0L
+                lateinit var choice: LpPassiveValueChoice
+                choice = LpPassiveValueChoice(apply, observe = { event ->
+                    events.add(event)
+                    if (committing && action == "report" && event.endsWith("_CHANGED")) fresh = false
+                }, charge = {
+                    work += it
+                    if (committing) {
+                        if (action == "charge" && stage++ == 1) fresh = false
+                        if (action == "replaced") choice.clear()
+                    }
+                })
+                val down = SearchDecision.Bool(1)
+                val up = SearchDecision.Bool(0)
+                val selected = choice.select(VarRef.Bool(0), 0.5, listOf(down, up), true, 1,
+                    context = "MOVEMENT_MISMATCH") { fresh }
+                if (action == "clear") choice.clear()
+                if (action == "stale") fresh = false
+                val before = work
+                committing = true
+
+                choice.commit(if (action == "foreign") SearchDecision.Bool(4) else selected.first(),
+                    if (action == "stamp") 2 else 1) { fresh }
+                if (action == "replay") choice.commit(selected.first(), 1) { fresh }
+
+                val prefix = if (apply) "PASSIVE_VALUE_COMMIT_MOVEMENT_CONTEXT_"
+                else "PASSIVE_VALUE_COMMIT_WITHHELD_MOVEMENT_CONTEXT_"
+                val accepted = action == "commit" || action == "replay"
+                assertEquals(if (accepted) 1 else 0, events.count { it == prefix + "MOVEMENT_MISMATCH" }, action)
+                val commitWork = when (action) {
+                    "clear" -> 0L
+                    "replaced" -> 4L
+                    else -> 8L
+                }
+                assertEquals(before + commitWork, work, action)
+                assertFalse(choice.hasNomination)
+            }
+        }
+    }
+
+    @Test
     fun `a supplied preference cannot bypass point or partition validation`() {
         for ((variable, point, alternatives) in listOf(
             Triple(VarRef.Bool(0), Double.NaN, listOf(SearchDecision.Bool(1), SearchDecision.Bool(0))),

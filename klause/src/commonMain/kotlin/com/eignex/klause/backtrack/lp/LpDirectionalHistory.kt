@@ -10,6 +10,7 @@ internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
+    private val movementContexts: Boolean = false,
 ) {
     internal class Direction {
         var count = 0
@@ -26,6 +27,11 @@ internal class LpDirectionalHistory(
         var outcomePreviousStamp = 0L
         var outcomeParent = 0.0
         var outcomePreviousParent = 0.0
+
+        var movement = Double.NaN
+        var previousMovement = Double.NaN
+        var outcomeMovement = Double.NaN
+        var outcomePreviousMovement = Double.NaN
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -119,7 +125,7 @@ internal class LpDirectionalHistory(
             return
         }
         val version = generation
-        charge(4L)
+        charge(if (movementContexts) 6L else 4L)
         if (version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
@@ -128,6 +134,10 @@ internal class LpDirectionalHistory(
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
         direction.previousParent = direction.parent
+        if (movementContexts) {
+            direction.previousMovement = direction.movement
+            direction.movement = child.distance
+        }
         direction.parent = child.parent.objective
         direction.latest = normalized
         direction.count = minOf(direction.count + 1, RELIABILITY)
@@ -317,7 +327,7 @@ internal class LpDirectionalHistory(
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
-        charge(13L)
+        charge(if (movementContexts) 15L else 13L)
         if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         val direction = if (child.up) history.up else history.down
@@ -328,6 +338,10 @@ internal class LpDirectionalHistory(
         direction.outcomePrevious = direction.outcomeLatest
         direction.outcomePreviousStamp = direction.outcomeStamp
         direction.outcomePreviousParent = direction.outcomeParent
+        if (movementContexts) {
+            direction.outcomePreviousMovement = direction.outcomeMovement
+            direction.outcomeMovement = child.distance
+        }
         direction.outcomeLatest = pruned
         direction.outcomeParent = child.parent.objective
         direction.outcomeStamp = stamp
@@ -404,6 +418,46 @@ internal class LpDirectionalHistory(
             numericUpLatest !in 0.5..2.0 || numericUpPrevious !in 0.5..2.0
         ) return null
         return preferUp
+    }
+
+    internal inline fun movementContext(
+        variable: VarRef,
+        value: Double,
+        crossinline current: () -> Boolean,
+    ): String? {
+        if (!movementContexts) return null
+        val version = generation
+        charge(64L)
+        if (version != generation || !current()) return null
+        val history = reliable(variable, value)
+        val context = if (history == null || !outcomeRate(history.down).isFinite() ||
+            !outcomeRate(history.up).isFinite()
+        ) "UNKNOWN" else {
+            val fraction = value - floor(value)
+            val downLatest = fraction / history.down.movement
+            val downPrevious = fraction / history.down.previousMovement
+            val upLatest = (1.0 - fraction) / history.up.movement
+            val upPrevious = (1.0 - fraction) / history.up.previousMovement
+            val outcomeDownLatest = fraction / history.down.outcomeMovement
+            val outcomeDownPrevious = fraction / history.down.outcomePreviousMovement
+            val outcomeUpLatest = (1.0 - fraction) / history.up.outcomeMovement
+            val outcomeUpPrevious = (1.0 - fraction) / history.up.outcomePreviousMovement
+            when {
+                !downLatest.isFinite() || downLatest <= 0.0 ||
+                    !downPrevious.isFinite() || downPrevious <= 0.0 ||
+                    !upLatest.isFinite() || upLatest <= 0.0 || !upPrevious.isFinite() || upPrevious <= 0.0 ||
+                    !outcomeDownLatest.isFinite() || outcomeDownLatest <= 0.0 ||
+                    !outcomeDownPrevious.isFinite() || outcomeDownPrevious <= 0.0 ||
+                    !outcomeUpLatest.isFinite() || outcomeUpLatest <= 0.0 ||
+                    !outcomeUpPrevious.isFinite() || outcomeUpPrevious <= 0.0 -> "UNKNOWN"
+                downLatest !in 0.5..2.0 || downPrevious !in 0.5..2.0 ||
+                    upLatest !in 0.5..2.0 || upPrevious !in 0.5..2.0 ||
+                    outcomeDownLatest !in 0.5..2.0 || outcomeDownPrevious !in 0.5..2.0 ||
+                    outcomeUpLatest !in 0.5..2.0 || outcomeUpPrevious !in 0.5..2.0 -> "MOVEMENT_MISMATCH"
+                else -> "MOVEMENT_MATCHED"
+            }
+        }
+        return if (version == generation && current()) context else null
     }
 
     fun prunedDirections(variable: VarRef, value: Double): Double {

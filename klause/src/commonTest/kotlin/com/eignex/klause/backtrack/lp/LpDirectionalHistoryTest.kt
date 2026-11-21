@@ -11,6 +11,99 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `movement contexts retain every numeric and completed outcome origin`() {
+        for (boolean in listOf(false, true)) {
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val offset = if (boolean) 0.0 else 2.0
+            for (slot in 0..7) {
+                for ((movement, expected) in listOf(0.1 to "MOVEMENT_MISMATCH",
+                    0.25 to "MOVEMENT_MATCHED", 0.5 to "MOVEMENT_MATCHED", 0.9 to "MOVEMENT_MATCHED",
+                    0.249999999 to "MOVEMENT_MISMATCH")) {
+                    var work = 0L
+                    val history = LpDirectionalHistory({}, charge = { work += it }, movementContexts = true)
+                    for (category in 0..1) {
+                        repeat(2) { sample ->
+                            for (up in listOf(false, true)) {
+                                val origin = category * 4 + sample * 2 + if (up) 1 else 0
+                                val distance = if (origin == slot) movement else 0.5
+                                val point = offset + if (up) 1.0 - distance else distance
+                                history.beginNode(0)
+                                history.record(0.0)
+                                history.branch(variable, point)
+                                val decision = if (boolean) SearchDecision.Bool(if (up) 0 else 1)
+                                else if (up) SearchDecision.IntAtLeast(0, 3L) else SearchDecision.IntAtMost(0, 2L)
+                                history.commit(decision, 1)
+                                history.beginNode(1)
+                                history.record(if (category == 0) (if (up) 6.0 else 2.0) * distance else Double.NaN)
+                                history.finishNode(if (category == 1) false else null)
+                            }
+                        }
+                    }
+                    history.beginNode(0)
+                    history.record(0.0)
+                    val preference = history.preferDirection(variable, offset + 0.5, 10.0)
+                    val before = work
+
+                    val context = history.movementContext(variable, offset + 0.5) { true }
+
+                    assertEquals(false, preference)
+                    assertEquals(expected, context, "$boolean/$slot/$movement")
+                    assertEquals(before + 64L, work)
+                    assertEquals("UNKNOWN", history.movementContext(variable, Double.NaN) { true })
+                    repeat(257) { history.beginNode(0) }
+                    assertEquals("UNKNOWN", history.movementContext(variable, offset + 0.5) { true })
+                }
+            }
+        }
+        var work = 0L
+        val disabled = LpDirectionalHistory({}, charge = { work += it })
+        assertNull(disabled.movementContext(VarRef.Bool(0), 0.5) { true })
+        assertEquals(0L, work)
+    }
+
+    @Test
+    fun `movement metadata cannot publish after charged invalidation`() {
+        for (action in listOf("numeric-reset", "outcome-reset", "outcome-cancel")) {
+            var armed = false
+            var current = true
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({}, movementContexts = true, charge = { amount ->
+                if (armed && amount == if (action == "numeric-reset") 6L else 15L) {
+                    armed = false
+                    if (action.endsWith("reset")) history.clear() else current = false
+                }
+            })
+            val variable = VarRef.Bool(0)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 3.0 else 1.0)
+                    history.finishNode(false)
+                }
+            }
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.1)
+            history.commit(SearchDecision.Bool(1), 1)
+            history.beginNode(1)
+            armed = true
+
+            history.record(if (action == "numeric-reset") 0.2 else Double.NaN)
+            history.finishNode(false) { current }
+            history.beginNode(0)
+            history.record(0.0)
+            val context = history.movementContext(variable, 0.5) { true }
+
+            assertFalse(armed)
+            assertEquals(if (action.endsWith("reset")) "UNKNOWN" else "MOVEMENT_MATCHED", context, action)
+        }
+    }
+
+    @Test
     fun `equal completed rates use numeric predictions with complete compatible context`() {
         for (rate in 0..2) {
             for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",
