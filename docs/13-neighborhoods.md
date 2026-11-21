@@ -341,6 +341,15 @@ pinned support, oversized snapshots and interrupted or unfunded scans keep the
 original request. Shared clauses guide removal without assigning coordinate values
 or changing the repair's feasibility and objective checks.
 
+The same exactly bound portfolio configuration updates the selected repair arm
+after each completed iteration with an exponential moving average of its categorical
+reward: reaction 0.1, initial weight 1 and minimum weight 0.01. Unselected repair
+weights stay fixed. Empty scopes and unresolved repairs receive the rejected reward;
+interrupted scope construction supplies no reward. Default destroy learning and other
+default ALNS repair learners aggregate rewards in ten-update segments. Both learners retain their
+weights across slices of the same ALNS owner. Rewards describe outcomes per attempt
+and do not normalize repair cost.
+
 Before and during its bootstrap and before each iteration, ALNS acquires a supplied
 assignment and the latest shared incumbent. A supplied assignment must cover all coordinates, satisfy the
 current model and assumptions and pass the shared source witness checker. A shared

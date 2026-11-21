@@ -20,6 +20,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.finiteExactNeighborhoodWorker
 import com.eignex.klause.solver.pipeline.fixedDiscreteSample
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.random.Random
@@ -133,6 +134,7 @@ internal class AlnsWorkerConfig private constructor(
             memorySampleWork = sharingMemoryWork, memorySampleScratchEntries = sharingMemoryScratch,
             softLimitBytes = sharingMemoryBytes)
         val meter = SharingMeter()
+        val rng = Random(seed + index)
         val alns = Alns(
             inner = LocalSearchSolver(
                 problem,
@@ -163,7 +165,8 @@ internal class AlnsWorkerConfig private constructor(
             pooledIncumbents = matchedPools?.solutions,
             acceptanceFor = acceptanceFactory(),
             literalSweep = definitionalSweep,
-            rng = Random(seed + index),
+            rng = rng,
+            repairBandit = repairBandit(rng, peerPools?.clauses != null),
         )
         if (peerPools != null) {
             alns.iterationObserver = neighborhoodObserver?.iterations?.owner(workerLabel, seed + index,
@@ -208,6 +211,10 @@ internal class AlnsWorkerConfig private constructor(
     }
 
     companion object {
+        internal fun repairBandit(rng: Random, boundPeerClausePool: Boolean): RouletteWheelBandit =
+            RouletteWheelBandit(BacktrackRepair.Defaults.size,
+                segmentLength = if (boundPeerClausePool) 1 else 10, random = rng)
+
         /** What an ALNS arm needs from a model: an objective to optimise. */
         val NEEDS: Set<ArmNeed> = setOf(ArmNeed.Objective)
 
