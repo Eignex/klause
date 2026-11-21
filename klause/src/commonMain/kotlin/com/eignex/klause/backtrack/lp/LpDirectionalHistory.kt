@@ -22,6 +22,8 @@ internal class LpDirectionalHistory(
         var outcomePrevious = false
         var outcomeStamp = 0L
         var outcomePreviousStamp = 0L
+        var outcomeParent = 0.0
+        var outcomePreviousParent = 0.0
 
         val gain: Double get() = if (count >= RELIABILITY) minOf(latest, previous) else latest
 
@@ -51,6 +53,7 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    private var gapContextChecks = 128
 
     fun beginNode(level: Int) {
         stamp++
@@ -286,7 +289,7 @@ internal class LpDirectionalHistory(
         val child = pendingOutcome ?: return
         pendingOutcome = null
         val version = generation
-        charge(9L)
+        charge(13L)
         if (!current() || version != generation) return
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         val direction = if (child.up) history.up else history.down
@@ -296,7 +299,9 @@ internal class LpDirectionalHistory(
         }
         direction.outcomePrevious = direction.outcomeLatest
         direction.outcomePreviousStamp = direction.outcomeStamp
+        direction.outcomePreviousParent = direction.outcomeParent
         direction.outcomeLatest = pruned
+        direction.outcomeParent = child.parent.objective
         direction.outcomeStamp = stamp
         direction.outcomeCount = minOf(RELIABILITY, direction.outcomeCount + 1)
         if (direction.outcomeCount >= RELIABILITY && (pruned || direction.outcomePrevious)) {
@@ -342,6 +347,31 @@ internal class LpDirectionalHistory(
             val movement = if (preferUp) 1.0 - fraction else fraction
             val upper = maxOf(direction.latest, direction.previous) * movement
             if (!upper.isFinite() || upper >= otherGain) return null
+        }
+        if (gapContextChecks > 0) {
+            gapContextChecks--
+            charge(24L)
+            if (version != generation) return null
+            val downLatest = (cutoff - history.down.outcomeParent) / gap
+            val downPrevious = (cutoff - history.down.outcomePreviousParent) / gap
+            val upLatest = (cutoff - history.up.outcomeParent) / gap
+            val upPrevious = (cutoff - history.up.outcomePreviousParent) / gap
+            val kind = when {
+                !downLatest.isFinite() || downLatest <= 0.0 ||
+                    !downPrevious.isFinite() || downPrevious <= 0.0 ||
+                    !upLatest.isFinite() || upLatest <= 0.0 ||
+                    !upPrevious.isFinite() || upPrevious <= 0.0 -> "UNKNOWN"
+                downLatest !in 0.5..2.0 || downPrevious !in 0.5..2.0 ||
+                    upLatest !in 0.5..2.0 || upPrevious !in 0.5..2.0 -> "MISMATCH"
+                else -> "MATCHED"
+            }
+            observe("PASSIVE_CHILD_GAP_CHECK")
+            if (version != generation) return null
+            val intent = if (prune) "PRUNE" else "OPEN"
+            observe("PASSIVE_CHILD_GAP_${intent}_$kind")
+            if (version != generation) return null
+            if (gapContextChecks == 0) observe("PASSIVE_CHILD_GAP_EXHAUSTED")
+            if (version != generation) return null
         }
         return preferUp
     }

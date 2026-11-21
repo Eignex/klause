@@ -11,6 +11,120 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `child gap context observations retain independent directional parent samples`() {
+        for (cutoff in listOf(1.0, 10.0)) {
+            for (parentSlot in 0..3) {
+                for (ratio in listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0)) {
+                    val events = ArrayList<String>()
+                    var work = 0L
+                    val history = LpDirectionalHistory(events::add, charge = { work += it })
+                    val variable = VarRef.Bool(0)
+                    repeat(2) { sample ->
+                        for (up in listOf(false, true)) {
+                            val slot = 2 * sample + if (up) 1 else 0
+                            val parent = if (slot == parentSlot) cutoff * (1.0 - ratio) else 0.0
+                            history.beginNode(0)
+                            history.record(parent)
+                            history.branch(variable, 0.5)
+                            history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                            history.beginNode(1)
+                            history.record(parent + if (up) 2.0 else 0.5)
+                            history.finishNode(up)
+                        }
+                    }
+                    history.beginNode(0)
+                    history.record(0.0)
+                    events.clear()
+                    val before = work
+
+                    val preferred = history.preferDirection(variable, 0.5, cutoff)
+
+                    assertEquals(cutoff == 1.0, preferred)
+                    assertEquals(if (cutoff == 1.0) 64L else 72L, work - before)
+                    val intent = if (cutoff == 1.0) "PRUNE" else "OPEN"
+                    val kind = when {
+                        ratio == 0.0 -> "UNKNOWN"
+                        ratio in 0.5..2.0 -> "MATCHED"
+                        else -> "MISMATCH"
+                    }
+                    assertEquals(listOf("PASSIVE_CHILD_GAP_CHECK", "PASSIVE_CHILD_GAP_${intent}_$kind"), events)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `child gap context observation limits survive resets and restarts`() {
+        var work = 0L
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add, charge = { work += it })
+        val variable = VarRef.Bool(0)
+        repeat(129) { iteration ->
+            if (iteration % 2 == 0) history.clear() else history.restart()
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 2.0 else 1.0)
+                    history.finishNode(up)
+                }
+            }
+            history.record(0.0)
+            val before = work
+
+            val preferred = history.preferDirection(variable, 0.5, 3.0)
+
+            assertEquals(false, preferred)
+            assertEquals(if (iteration < 128) 72L else 48L, work - before)
+        }
+        assertEquals(128, events.count { it == "PASSIVE_CHILD_GAP_CHECK" })
+        assertEquals(128, events.count { it == "PASSIVE_CHILD_GAP_OPEN_MATCHED" })
+        assertEquals(1, events.count { it == "PASSIVE_CHILD_GAP_EXHAUSTED" })
+    }
+
+    @Test
+    fun `reset while reporting a child gap context withholds the preference`() {
+        for (resetOn in listOf("PASSIVE_CHILD_GAP_CHECK", "PASSIVE_CHILD_GAP_OPEN_MATCHED",
+            "PASSIVE_CHILD_GAP_EXHAUSTED")) {
+            var reporting = false
+            val events = ArrayList<String>()
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({ event ->
+                events.add(event)
+                if (reporting && event == resetOn) {
+                    reporting = false
+                    history.clear()
+                }
+            })
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 2.0 else 1.0)
+                    history.finishNode(up)
+                }
+            }
+            history.record(0.0)
+            if (resetOn.endsWith("EXHAUSTED")) repeat(127) {
+                assertEquals(false, history.preferDirection(variable, 0.5, 3.0))
+            }
+            events.clear()
+            reporting = true
+
+            assertNull(history.preferDirection(variable, 0.5, 3.0))
+            assertEquals(if (resetOn.endsWith("CHECK")) 0 else 1,
+                events.count { it == "PASSIVE_CHILD_GAP_OPEN_MATCHED" })
+        }
+    }
+
+    @Test
     fun `open child advice requires separated gain ranges at the current fraction`() {
         for (preferredUp in listOf(false, true)) {
             for (point in listOf(0.25, 0.5, 0.75)) {
@@ -43,7 +157,8 @@ class LpDirectionalHistoryTest {
                             preferredGain == 0.0 || scale == 1.0 -> preferredUp
                             else -> null
                         }, preferred)
-                        assertEquals(if (cutoff < 1.0) 40L else 48L, work - before)
+                        assertEquals((if (cutoff < 1.0) 40L else 48L) + (if (preferred != null) 24L else 0L),
+                            work - before)
                     }
                 }
             }
@@ -285,7 +400,8 @@ class LpDirectionalHistoryTest {
                             sameGain -> null
                             else -> !prunedUp
                         }, preference)
-                        assertEquals(if (cutoff <= 13.0) 40L else 48L, work - before)
+                        assertEquals((if (cutoff <= 13.0) 40L else 48L) + (if (preference != null) 24L else 0L),
+                            work - before)
                     }
                 }
             }
@@ -366,7 +482,7 @@ class LpDirectionalHistoryTest {
     @Test
     fun `reset during a charged preference lookup discards the result`() {
         for (cutoff in listOf(10.25, 15.0)) {
-            for (resetAt in 1..if (cutoff == 10.25) 4 else 5) {
+            for (resetAt in 1..if (cutoff == 10.25) 5 else 6) {
                 var reading = false
                 var reads = 0
                 lateinit var history: LpDirectionalHistory
