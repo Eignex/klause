@@ -280,23 +280,22 @@ internal class LpHints(
         }
         val workingCutoff = cutoff - scopeConstant.toDouble()
         if (!available(baseline) || !current()) return baseline
-        val reference = history.closureMargin(baseline, value(baseline), workingCutoff)
+        val reference = history.minimumPrediction(baseline, value(baseline), workingCutoff)
         if (!current()) return baseline
         if (!reference.isFinite()) {
             observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
             return baseline
         }
-        if (reference >= 0.0) return baseline
         var proposal: VarRef? = null
-        var bestMargin = -1.0
+        var bestGain = reference
         history.forEachCandidate(current) { variable ->
             if (variable != baseline && available(variable) && current()) {
-                val margin = history.closureMargin(variable, value(variable), workingCutoff)
+                val gain = history.minimumPrediction(variable, value(variable), workingCutoff)
                 val previous = proposal
                 val precedes = previous != null && if ((variable is VarRef.Bool) == (previous is VarRef.Bool))
                     variable.varId < previous.varId else variable is VarRef.Bool
-                if (margin >= 0.0 && (margin > bestMargin || (margin == bestMargin && precedes))) {
-                    bestMargin = margin
+                if (gain > bestGain || (gain == bestGain && precedes)) {
+                    bestGain = gain
                     proposal = variable
                 }
             }
@@ -313,10 +312,10 @@ internal class LpHints(
             LpPassiveVariableChoice.Candidate(proposed, value(proposed)),
             LpPassiveVariableChoice.Candidate(baseline, value(baseline)), stamp, current,
             reliable = {
-                val proposedMargin = history.closureMargin(proposed, value(proposed), workingCutoff)
-                val baselineMargin = history.closureMargin(baseline, value(baseline), workingCutoff)
+                val proposedGain = history.minimumPrediction(proposed, value(proposed), workingCutoff)
+                val baselineGain = history.minimumPrediction(baseline, value(baseline), workingCutoff)
                 current() && available(proposed) && available(baseline) &&
-                    proposedMargin >= 0.0 && baselineMargin.isFinite() && baselineMargin < 0.0
+                    proposedGain.isFinite() && baselineGain.isFinite() && proposedGain > baselineGain
             },
         )
         if (!current()) {

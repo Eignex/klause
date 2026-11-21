@@ -180,7 +180,7 @@ internal class LpDirectionalHistory(
         }
     }
 
-    fun closureMargin(variable: VarRef, value: Double, cutoff: Double): Double {
+    fun minimumPrediction(variable: VarRef, value: Double, cutoff: Double): Double {
         val version = generation
         charge(24L)
         if (version != generation) return Double.NaN
@@ -193,7 +193,7 @@ internal class LpDirectionalHistory(
         if (!down.isFinite() || !up.isFinite() ||
             (down == 0.0 && history.down.gain > 0.0) || (up == 0.0 && history.up.gain > 0.0)
         ) return Double.NaN
-        return if (version == generation) minOf(down, up) - gap else Double.NaN
+        return if (version == generation) minOf(down, up) else Double.NaN
     }
 
     fun branch(variable: VarRef, value: Double) {

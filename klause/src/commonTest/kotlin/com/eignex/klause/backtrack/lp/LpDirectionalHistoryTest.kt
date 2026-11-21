@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
-    fun `predicted closure margins distinguish measured zero from missing evidence`() {
+    fun `minimum child predictions distinguish measured zero from missing evidence`() {
         for (samples in 0..2) {
             for (gain in listOf(0.0, 5.0)) {
                 val history = LpDirectionalHistory({})
@@ -28,15 +28,15 @@ class LpDirectionalHistoryTest {
                 }
                 history.record(0.0)
 
-                val margin = history.closureMargin(variable, 0.5, 3.0)
+                val prediction = history.minimumPrediction(variable, 0.5, 3.0)
 
-                if (samples < 2) assertTrue(margin.isNaN()) else assertEquals(gain - 3.0, margin)
+                if (samples < 2) assertTrue(prediction.isNaN()) else assertEquals(gain, prediction)
             }
         }
     }
 
     @Test
-    fun `closure margins require representable predictions and a current positive finite gap`() {
+    fun `minimum child predictions require representable values and a current positive finite gap`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)
         history.beginNode(0)
@@ -51,10 +51,10 @@ class LpDirectionalHistoryTest {
         }
         history.record(0.0)
 
-        assertTrue(history.closureMargin(variable, 0.125, 1.0).isNaN())
-        assertEquals(0.0, history.closureMargin(variable, 0.5, Double.MIN_VALUE))
+        assertTrue(history.minimumPrediction(variable, 0.125, 1.0).isNaN())
+        assertEquals(Double.MIN_VALUE, history.minimumPrediction(variable, 0.5, Double.MIN_VALUE))
         for (cutoff in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.0, -1.0)) {
-            assertTrue(history.closureMargin(variable, 0.5, cutoff).isNaN())
+            assertTrue(history.minimumPrediction(variable, 0.5, cutoff).isNaN())
         }
     }
 
@@ -85,7 +85,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `reset while charging a closure prediction cannot return retained evidence`() {
+    fun `reset while charging a minimum child prediction cannot return retained evidence`() {
         var reading = false
         lateinit var history: LpDirectionalHistory
         history = LpDirectionalHistory({}, charge = {
@@ -108,7 +108,7 @@ class LpDirectionalHistoryTest {
         history.record(0.0)
         reading = true
 
-        assertTrue(history.closureMargin(variable, 0.5, 3.0).isNaN())
+        assertTrue(history.minimumPrediction(variable, 0.5, 3.0).isNaN())
     }
 
     @Test
