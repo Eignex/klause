@@ -78,6 +78,12 @@ Its lab profile build requires both `:klause-cli:installJvmDist` and `:klause-be
 because provenance includes the installed CLI distribution.
 Select `portfolio-policy=ordinary|retained|complete`; omitted policy retains the companion preset.
 The ordinary preset requires `handoff=false` and leaves algorithm controls at source defaults.
+`capture-joint=true captures=0` attaches the bounded joint proposal and result journal
+to that portfolio without changing its algorithm controls. Observation spends the
+existing source funding and companion lifetime; missing or dropped records remain explicit.
+`presolve=off|default` selects the same preparation setting for the canonical source
+and finite workers; omission retains the source default. Both options apply to
+`capture-mode=portfolio`.
 `portfolio-progress=false` disables progress logging; its default is `true`.
 Its `capture-route=SESSION|SCOPED_FLOAT|SCOPED_CONTINUATION|any` filter selects the
 query boundary to retain; `capture-worker=bt/lp-default|any` selects its worker.

@@ -11,6 +11,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -58,11 +59,22 @@ internal object FinitePortfolioLpCapture {
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                "source-refutation-center-step", "capture-authority", "capture-cut-policy")
+                "source-refutation-center-step", "capture-authority", "capture-cut-policy", "capture-joint", "presolve")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
         val captureJoint = mode == "joint-ordinary" || mode == "joint-handoff"
+        options["presolve"]?.let {
+            require(mode == "portfolio" && it in setOf("off", "default")) {
+                "presolve requires portfolio capture and off or default"
+            }
+        }
+        options["capture-joint"]?.let {
+            require(mode == "portfolio") { "capture-joint requires portfolio capture" }
+            if (it.toBooleanStrict()) require((options["captures"]?.toInt() ?: 0) == 0) {
+                "joint observation does not retain LP snapshots"
+            }
+        }
         if ("capture-authority" in options || "capture-cut-policy" in options) {
             require(mode == "joint-before")
             require((options["capture-authority"] ?: "nominal") in setOf("nominal", "accepted"))
@@ -113,7 +125,8 @@ internal object FinitePortfolioLpCapture {
             return
         }
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
-        val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff")
+        val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff") ||
+            options["capture-joint"] == "true"
         val limit = options["captures"]?.toInt() ?: if (captureJoint) 0 else 1
         val captureGuidance = options["capture-guidance"]?.toBooleanStrict() ?: false
         val seed = options.getValue("seed").toLong()
@@ -150,7 +163,8 @@ internal object FinitePortfolioLpCapture {
             }.toString())
             return
         }
-        val policy = SourceExecutionPolicy()
+        val presolve = options["presolve"]?.let(PresolveConfig::parse)
+        val policy = SourceExecutionPolicy(explicitPresolve = presolve != null)
         val window = QueryWindow(captureWorker, limit)
         var retained = 0
         var eventCount = 0
@@ -170,6 +184,7 @@ internal object FinitePortfolioLpCapture {
                         val request = SourceExecutionRequest(invocation, policy, ExecutionOptions.parse(pairs),
                             finiteRequest = { shape ->
                                 policy.finiteRequest(shape, FiniteEngine.MIXED,
+                                    presolveConfig = presolve ?: PresolveConfig.DEFAULT,
                                     cancellation = stop, randomSeed = seed,
                                     onPortfolioEvent = { worker, event ->
                                         if (event.javaClass.simpleName in setOf(
@@ -180,7 +195,8 @@ internal object FinitePortfolioLpCapture {
                                             }.toString()) else eventsDropped++
                                         }
                                     })
-                            }, cores = 1, randomSeed = seed, timeout = stop, cancellation = stop)
+                            }, cores = 1, randomSeed = seed, timeout = stop, cancellation = stop,
+                            presolveConfig = presolve, presolveCancellation = stop)
                         val observer: (String, Double?, Any) -> Unit = { worker, cutoff, query ->
                             val started = System.nanoTime()
                             try {
@@ -318,6 +334,7 @@ internal object FinitePortfolioLpCapture {
                             put("nativeResultKind", result.javaClass.simpleName)
                             put("sourceSemantics", original.semantics.toString())
                             put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
+                            put("presolve", options["presolve"] ?: "source-default")
                             put("finiteEngine", FiniteEngine.MIXED.id)
                             put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
                             put("seed", seed)

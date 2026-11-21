@@ -143,6 +143,16 @@ class FinitePortfolioLpCaptureTest {
     }
 
     @Test
+    fun `joint observation should preserve ordinary portfolio algorithm controls`() {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary")
+
+        val parameters = FinitePortfolioLpCapture.parameters(options + ("capture-joint" to "true"))
+
+        assertEquals(FinitePortfolioLpCapture.parameters(options), parameters)
+    }
+
+    @Test
     fun `ordinary joint capture should preserve quiet production companion controls`() {
         val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
             "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary")
