@@ -1,5 +1,8 @@
 package com.eignex.klause.bench.profile
 
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
@@ -113,6 +116,47 @@ class FinitePortfolioLpCaptureTest {
         val parameters = FinitePortfolioLpCapture.parameters(options)
 
         assertEquals(listOf("portfolio-progress=false"), parameters)
+    }
+
+    @Test
+    fun `neighborhood inventory should preserve automatic ordinary source controls`() {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary", "portfolio-progress" to "false",
+            "captures" to "0", "capture-neighborhoods" to "true")
+
+        val parameters = FinitePortfolioLpCapture.parameters(options)
+
+        assertEquals(listOf("portfolio-progress=false"), parameters)
+    }
+
+    @Test
+    fun `neighborhood metadata should preserve snapshot identity aliases and rejected entries`() {
+        val type = Class.forName("com.eignex.klause.portfolio.PoolClauseNeighborhoodObservation")
+        val observation = type.constructors.single().newInstance(1L, 4, 4, 4, 4_294_967_299L,
+            arrayOf(intArrayOf(0, 2, 6, 7), intArrayOf(3, 2, 7, 6), intArrayOf(0, -5)),
+            true, false, true, true, 0, 100L, 1024L)
+
+        val metadata = FinitePortfolioLpCapture.neighborhoodMetadata("alns/balanced", 5L, observation)
+
+        assertEquals("4294967299", metadata.getValue("cursor").jsonPrimitive.content)
+        assertEquals("1", metadata.getValue("snapshotGeneration").jsonPrimitive.content)
+        val entries = metadata.getValue("entries").jsonArray.map { it.jsonObject }
+        assertEquals(listOf("0", "3", "0"), entries.map { it.getValue("origin").jsonPrimitive.content })
+        assertEquals(entries[0].getValue("support").jsonArray.toSet(),
+            entries[1].getValue("support").jsonArray.toSet())
+        assertEquals("-5", entries[2].getValue("eligibility").jsonPrimitive.content)
+        assertEquals(0, entries[2].getValue("support").jsonArray.size)
+    }
+
+    @ParameterizedTest
+    @CsvSource("portfolio-policy,retained", "handoff,true", "portfolio-progress,true", "captures,1",
+        "capture-guidance,true", "capture-mode,joint-ordinary")
+    fun `neighborhood inventory should refuse other observation or policy routes`(key: String, value: String) {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary", "portfolio-progress" to "false",
+            "captures" to "0", "capture-neighborhoods" to "true")
+
+        assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options + (key to value)) }
     }
 
     @ParameterizedTest

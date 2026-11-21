@@ -9,6 +9,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.lp.engine.LpQueryObservation
+import com.eignex.klause.portfolio.PoolClauseNeighborhoodObservation
+import com.eignex.klause.portfolio.PoolClauseNeighborhoodObserver
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.effortStats
@@ -94,6 +96,7 @@ class SourceExecutionRequest private constructor(
     internal val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     internal val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
     internal val automaticLinearCuts: AutomaticLinearCuts = AutomaticLinearCuts(),
+    internal val onPortfolioNeighborhood: PoolClauseNeighborhoodObserver? = null,
 ) {
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
@@ -104,7 +107,8 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession, automaticLinearCuts)
+            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession,
+            automaticLinearCuts, onPortfolioNeighborhood)
     }
 
     internal fun withPortfolioGuidanceObserver(
@@ -116,7 +120,8 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair, onPortfolioSession, automaticLinearCuts)
+            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair, onPortfolioSession,
+            automaticLinearCuts, onPortfolioNeighborhood)
     }
 
     internal fun withPortfolioJointRepairObserver(
@@ -128,7 +133,8 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer, onPortfolioSession, automaticLinearCuts)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer, onPortfolioSession,
+            automaticLinearCuts, onPortfolioNeighborhood)
     }
 
     internal fun withPortfolioSessionObserver(
@@ -140,7 +146,21 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, observer, automaticLinearCuts)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, observer,
+            automaticLinearCuts, onPortfolioNeighborhood)
+    }
+
+    internal fun withPortfolioNeighborhoodObserver(
+        observer: (String, Long, PoolClauseNeighborhoodObservation) -> Unit,
+    ): SourceExecutionRequest {
+        require(cores == 1 && invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+            "neighborhood observation requires single-core mixed finite source execution"
+        }
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+            presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession,
+            automaticLinearCuts, PoolClauseNeighborhoodObserver(observer))
     }
 
     internal fun withValidationCancellation(stop: ExecutionControl): SourceExecutionRequest {
@@ -153,7 +173,7 @@ class SourceExecutionRequest private constructor(
             },
             transcendental?.let { it.copy(cancellation = it.cancellation or stop) }, nodeBudget, policy,
             prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession,
-            automaticLinearCuts)
+            automaticLinearCuts, onPortfolioNeighborhood)
     }
 
     /**
@@ -520,7 +540,7 @@ private fun executeCapturedSource(
                 if (invocation.requestsFiniteNumericalCompanions)
                     FiniteCompanionPolicy(request.theory.boundTo(invocation), request.automaticLinearCuts) else null,
                 request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair,
-                request.onPortfolioSession)
+                request.onPortfolioSession, request.onPortfolioNeighborhood)
             SourceExecutionResult.Finite(invocation, result)
         }
 

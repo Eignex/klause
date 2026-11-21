@@ -11,6 +11,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -31,9 +32,11 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.util.IdentityHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -58,7 +61,7 @@ internal object FinitePortfolioLpCapture {
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                "source-refutation-center-step", "capture-authority", "capture-cut-policy")
+                "source-refutation-center-step", "capture-authority", "capture-cut-policy", "capture-neighborhoods")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
@@ -81,6 +84,12 @@ internal object FinitePortfolioLpCapture {
         require(preset in setOf("ordinary", "retained", "complete")) { "unsupported portfolio policy: $preset" }
         val handoff = options.getValue("handoff").toBooleanStrict()
         val progress = options["portfolio-progress"]?.toBooleanStrict() ?: (mode == "portfolio")
+        if (options["capture-neighborhoods"]?.toBooleanStrict() == true) {
+            require(mode == "portfolio" && preset == "ordinary" && !handoff && !progress &&
+                options["captures"] == "0" && options["capture-guidance"]?.toBooleanStrict() != true) {
+                "neighborhood capture requires ordinary automatic policy without other captures or progress logging"
+            }
+        }
         if (mode == "joint-before" || captureJoint) {
             require(handoff && preset == "complete" && !progress)
             require(options.keys.none {
@@ -116,13 +125,20 @@ internal object FinitePortfolioLpCapture {
         val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff")
         val limit = options["captures"]?.toInt() ?: if (captureJoint) 0 else 1
         val captureGuidance = options["capture-guidance"]?.toBooleanStrict() ?: false
+        val captureNeighborhoods = options["capture-neighborhoods"]?.toBooleanStrict() ?: false
+        val neighborhoods = out.resolve("neighborhoods.jsonl")
+        if (captureNeighborhoods) neighborhoods.writeText("")
+        var neighborhoodRecords = 0
+        var neighborhoodObserverNs = 0L
+        var neighborhoodEncodedBytes = 0L
+        var neighborhoodEncodingOmitted = 0
         val seed = options.getValue("seed").toLong()
         val cutoffBits = options["cutoff-bits"]?.toLong()
         val captureWorker = options["capture-worker"] ?: "bt/lp-default"
         val captureRoute = options["capture-route"] ?: "any"
         require(captureWorker in setOf("bt/lp-default", "any"))
         require(captureRoute in setOf("any", "SESSION", "SCOPED_FLOAT", "SCOPED_CONTINUATION"))
-        require(timeout in 1L..30_000L && limit in 0..4)
+        require(timeout in 1L..(if (captureNeighborhoods) 60_000L else 30_000L) && limit in 0..4)
         require(bytes.size <= 1_048_576 && sha256(bytes) == options.getValue("sha256"))
         out.mkdirs()
         out.resolve("source.mps").writeBytes(bytes)
@@ -150,7 +166,8 @@ internal object FinitePortfolioLpCapture {
             }.toString())
             return
         }
-        val policy = SourceExecutionPolicy()
+        val policy = SourceExecutionPolicy(explicitPresolve = captureNeighborhoods)
+        val preparation = if (captureNeighborhoods) PresolveConfig.NONE else PresolveConfig.DEFAULT
         val window = QueryWindow(captureWorker, limit)
         var retained = 0
         var eventCount = 0
@@ -168,10 +185,11 @@ internal object FinitePortfolioLpCapture {
                 out.resolve("queries.jsonl").bufferedWriter().use { records ->
                     out.resolve("events.jsonl").bufferedWriter().use { events ->
                         val request = SourceExecutionRequest(invocation, policy, ExecutionOptions.parse(pairs),
+                            presolveConfig = if (captureNeighborhoods) preparation else null,
                             finiteRequest = { shape ->
                                 policy.finiteRequest(shape, FiniteEngine.MIXED,
-                                    cancellation = stop, randomSeed = seed,
-                                    onPortfolioEvent = { worker, event ->
+                                    presolveConfig = preparation, cancellation = stop, randomSeed = seed,
+                                    onPortfolioEvent = if (captureNeighborhoods) null else { worker, event ->
                                         if (event.javaClass.simpleName in setOf(
                                                 "PortfolioDiagnostic", "CompanionComparison", "WorkerAdmission")) {
                                             if (eventCount++ < 1024) events.appendLine(buildJsonObject {
@@ -246,6 +264,26 @@ internal object FinitePortfolioLpCapture {
                             }
                         }
                         var observed = request
+                        if (captureNeighborhoods) {
+                            val neighborhoodObserver: (String, Long, Any) -> Unit = { worker, workerSeed, value ->
+                                val started = System.nanoTime()
+                                try {
+                                    val text = neighborhoodMetadata(worker, workerSeed, value).toString()
+                                    val encodedBytes = text.encodeToByteArray().size.toLong() + 1L
+                                    if (encodedBytes <= 65_536L - neighborhoodEncodedBytes) {
+                                        neighborhoods.appendText(text + "\n")
+                                        neighborhoodRecords++
+                                        neighborhoodEncodedBytes += encodedBytes
+                                    } else neighborhoodEncodingOmitted++
+                                } finally {
+                                    neighborhoodObserverNs += System.nanoTime() - started
+                                }
+                            }
+                            val attach = observed.javaClass.methods.single {
+                                it.name.startsWith("withPortfolioNeighborhoodObserver") && it.parameterCount == 1
+                            }
+                            observed = attach.invoke(observed, neighborhoodObserver) as SourceExecutionRequest
+                        }
                         if (limit > 0) {
                             val attach = request.javaClass.methods.single {
                                 it.name.startsWith("withPortfolioLpQueryObserver") && it.parameterCount == 1
@@ -301,19 +339,21 @@ internal object FinitePortfolioLpCapture {
                             }
                             observed = attach.invoke(observed, jointObserver) as SourceExecutionRequest
                         }
-                        val result = SourceSetup.execute(observed, SourceExecutionCallbacks(
-                            onLinearSourceIncumbent = { witness ->
-                                pointVersion++
-                                val text = buildJsonObject {
-                                    put("version", pointVersion)
-                                    put("objective", witness.objective?.toString())
-                                    put("exact", witness.exact)
-                                    put("values", JsonArray(witness.values.map { JsonPrimitive(it.toString()) }))
-                                }.toString()
-                                point = if (text.length <= 65_536) {
-                                    Reports.json.parseToJsonElement(text) as JsonObject
-                                } else null
-                            }, finite = FiniteSolveCallbacks({}, { producer = it.workerLabel })))
+                        val callbacks = FiniteSolveCallbacks({}, { producer = it.workerLabel })
+                        val sourceCallbacks = if (captureNeighborhoods) SourceExecutionCallbacks(finite = callbacks)
+                        else SourceExecutionCallbacks(onLinearSourceIncumbent = { witness ->
+                            pointVersion++
+                            val text = buildJsonObject {
+                                put("version", pointVersion)
+                                put("objective", witness.objective?.toString())
+                                put("exact", witness.exact)
+                                put("values", JsonArray(witness.values.map { JsonPrimitive(it.toString()) }))
+                            }.toString()
+                            point = if (text.length <= 65_536) {
+                                Reports.json.parseToJsonElement(text) as JsonObject
+                            } else null
+                        }, finite = callbacks)
+                        val result = SourceSetup.execute(observed, sourceCallbacks)
                         out.resolve("result.json").writeText(buildJsonObject {
                             put("nativeResultKind", result.javaClass.simpleName)
                             put("sourceSemantics", original.semantics.toString())
@@ -340,9 +380,10 @@ internal object FinitePortfolioLpCapture {
                                 "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits")
                             val finite = (result as? SourceExecutionResult.Finite)?.result?.outcome
                                 as? FiniteSolveOutcome.Completed
-                            if (captureJoint) {
+                            if (captureJoint || captureNeighborhoods) {
                                 put("sourceSha256", sourceHash)
-                                put("captureMode", "ordinary-finite-joint")
+                                put("captureMode", if (captureNeighborhoods) "ordinary-clause-neighborhood"
+                                else "ordinary-finite-joint")
                                 put("completeSearchAdmitted", (result as? SourceExecutionResult.Finite)
                                     ?.result?.completeSearchAdmitted)
                                 put("stages", buildJsonObject {
@@ -358,6 +399,34 @@ internal object FinitePortfolioLpCapture {
                             put("queryObserverNs", queryObserverNs)
                             put("guidanceObserverNs", guidanceObserverNs)
                             put("guidanceEvents", guidanceEvents)
+                            put("captureNeighborhoods", captureNeighborhoods)
+                            if (captureNeighborhoods) put("presolve", "off")
+                            put("neighborhoodRecords", neighborhoodRecords)
+                            put("neighborhoodObserverNs", neighborhoodObserverNs)
+                            put("neighborhoodEncodedBytes", neighborhoodEncodedBytes)
+                            put("neighborhoodEncodingOmitted", neighborhoodEncodingOmitted)
+                            if (captureNeighborhoods) {
+                                put("profileJvmArgs", JsonArray(ManagementFactory.getRuntimeMXBean()
+                                    .inputArguments.map(::JsonPrimitive)))
+                                put("profileProcessors", Runtime.getRuntime().availableProcessors())
+                                put("profileMaxHeapBytes", Runtime.getRuntime().maxMemory())
+                                put("profileJavaVersion", System.getProperty("java.version"))
+                                put("profileOsName", System.getProperty("os.name"))
+                                put("profileOsArch", System.getProperty("os.arch"))
+                                val inventory = get(observed, "OnPortfolioNeighborhood")
+                                put("neighborhoodCounters", buildJsonObject {
+                                    for (name in listOf("Calls", "Attempts", "CompletedEligible", "Omitted", "Work",
+                                        "ModeledBytes", "Incomplete", "NoEligible", "SamplerDeclined")) {
+                                        put(name.replaceFirstChar { it.lowercaseChar() },
+                                            get(inventory, name).toString())
+                                    }
+                                })
+                                put("neighborhoodLimits", "first4 completed eligible calls; at most16 attempts; " +
+                                    "4096 additional receiving work and65536 modeled bytes across the entire window")
+                                put("neighborhoodScope", "bounded-size adjacency calls on matched peer pools; " +
+                                    "exact drained snapshot and existing support pass; " +
+                                    "copying may perturb containing cancellation and scheduling; no performance claim")
+                            }
                             put("captureGuidance", captureGuidance)
                             put("captureQueries", limit > 0)
                             put("guidanceObjectiveUnits", "native-minimized")
@@ -475,6 +544,39 @@ internal object FinitePortfolioLpCapture {
         val text = (basisMetadata(call(query, "captureBasis")) ?: JsonNull).toString()
         file.writeText(text)
         return sha256(text.encodeToByteArray())
+    }
+
+    internal fun neighborhoodMetadata(worker: String, seed: Long, value: Any): JsonObject = buildJsonObject {
+        put("worker", worker)
+        put("workerSeed", seed)
+        for (name in listOf("Call", "Bools", "Ints", "Requested", "Cursor", "Complete", "Truncated",
+            "SupportPassComplete", "SamplerCompleted", "SelectedIndex", "Work", "ModeledBytes")) {
+            val field = call(value, "get$name")
+            put(name.replaceFirstChar { it.lowercaseChar() }, when (field) {
+                is Boolean -> JsonPrimitive(field)
+                is Number -> JsonPrimitive(field)
+                else -> JsonNull
+            })
+        }
+        val cursor = call(value, "getCursor") as Long?
+        put("snapshotGeneration", cursor?.ushr(32))
+        put("coordinateNamespace", "booleans first, then integer ids offset by bools")
+        put("eligibilityCodes", "positive=support size,-1=payload shape,-2=Boolean namespace," +
+            "-3=Boolean pinned/fixed,-4=integer namespace/atom,-5=integer pinned/fixed,-6=support size")
+        val entries = call(value, "getEntries") as Array<*>?
+        put("entries", buildJsonArray {
+            entries?.forEachIndexed { index, raw ->
+                if (raw == null) add(JsonNull) else {
+                    val entry = raw as IntArray
+                    add(buildJsonObject {
+                        put("index", index)
+                        put("origin", entry[0])
+                        put("eligibility", entry[1])
+                        put("support", buildJsonArray { for (i in 2 until entry.size) add(JsonPrimitive(entry[i])) })
+                    })
+                }
+            }
+        })
     }
 
     internal fun basisMetadata(basis: Any?): JsonObject? = basis?.let { value ->

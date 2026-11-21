@@ -59,6 +59,7 @@ internal class AlnsWorkerConfig private constructor(
     private val sharingMemoryWork: Long = 32_768L,
     private val sharingMemoryScratch: Int = 4_096,
     private val sharingMemoryBytes: Long? = null,
+    private val neighborhoodObserver: PoolClauseNeighborhoodObserver? = null,
 ) :
     WorkerConfig {
     constructor(
@@ -71,31 +72,38 @@ internal class AlnsWorkerConfig private constructor(
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, check,
             workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            neighborhoodObserver,
         )
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         AlnsWorkerConfig(
             profile, budget, numericalCompletion, toleranceCheck,
             workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            neighborhoodObserver,
         )
 
     fun withNumericalCompletion(): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, true, toleranceCheck,
             workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            neighborhoodObserver,
         )
 
     fun withWorkScheduling(): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, toleranceCheck,
-            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+            true, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, neighborhoodObserver,
         )
 
     fun withSharingMemory(enabled: Boolean, work: Long, scratch: Int, bytes: Long? = null): AlnsWorkerConfig =
         AlnsWorkerConfig(
             profile, nodeBudget, numericalCompletion, toleranceCheck,
-            workScheduled, enabled, work, scratch, bytes,
+            workScheduled, enabled, work, scratch, bytes, neighborhoodObserver,
         )
+
+    fun withNeighborhoodObserver(observer: PoolClauseNeighborhoodObserver): AlnsWorkerConfig =
+        AlnsWorkerConfig(profile, nodeBudget, numericalCompletion, toleranceCheck,
+            workScheduled, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes, observer)
 
     override val label: String get() = "alns-${profile.label}"
 
@@ -137,7 +145,9 @@ internal class AlnsWorkerConfig private constructor(
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
             },
             destroyOperators = peerPools?.clauses?.let { clauses ->
-                listOf(DestroyOperator.Random, DestroyOperator.WorstObjective, PoolClauseRelatedDestroy(clauses, meter))
+                listOf(DestroyOperator.Random, DestroyOperator.WorstObjective,
+                    PoolClauseRelatedDestroy(clauses, meter, observer = neighborhoodObserver,
+                        worker = workerLabel, seed = seed + index))
             } ?: DestroyOperator.Defaults,
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),

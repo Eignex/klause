@@ -102,6 +102,11 @@ no LP snapshots. Observation spends the existing four-second companion lifetime
 and source funding. `result.json` retains capture counters and callback time, which
 is included in containing execution and core capture time. This diagnostic grants
 no production performance or source-verdict authority.
+`capture-neighborhoods=true` records bounded clause-related ALNS support inventories
+with `portfolio-policy=ordinary handoff=false portfolio-progress=false captures=0`.
+The shared capture window spends at most 4096 additional receiving work and 64 KiB
+of modeled metadata; incomplete records cannot establish support frequencies.
+Observation can change scheduling and cancellation and establishes no performance.
 `capture-mode=joint-handoff handoff=true` retains the same bounded proposal journal
 with ordinary binary-only admission and the after-incumbent gate enabled. It uses
 fixed repair, complete proof-worker coverage at share 0.5, and quiet logging.

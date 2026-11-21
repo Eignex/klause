@@ -273,6 +273,14 @@ consume no extra random draws; an interrupted reservoir scan can advance the
 random stream. Neighborhood choices and changed-request counters retain publisher
 origins separately from native clause use, and supply no contribution reward.
 
+An internal single-core observer can copy the adjacency choice's exact drained
+snapshot dispositions and canonical supports during that same pass. Its shared
+window admits at most four completed eligible inventories and sixteen attempts,
+spending at most 4,096 additional receiving work and 64 KiB of modeled metadata.
+Incomplete copies retain explicit gaps and cannot establish support frequencies.
+Copying can alter containing cancellation and scheduling; absent observation adds
+no inventory allocation or random draws. Observation supplies no proof authority.
+
 #### Memory observation
 
 `sharing-memory=true` enables bounded retained-memory samples, independently of

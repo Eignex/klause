@@ -25,6 +25,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.portfolio.LocalSearchCatalog
+import com.eignex.klause.portfolio.PoolClauseNeighborhoodObserver
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.capLp
 import com.eignex.klause.portfolio.editing
@@ -109,6 +110,7 @@ internal class FiniteExecutionRequest(
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
+    val onPortfolioNeighborhood: PoolClauseNeighborhoodObserver? = null,
     /** Source optimality gap over [objective]; see [BacktrackParams.optimalityGap]. */
     val optimalityGap: OptimalityGap? = null,
 )
@@ -665,6 +667,7 @@ private fun executePortfolio(
         onGuidance = request.onPortfolioGuidance,
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
+        onNeighborhood = request.onPortfolioNeighborhood,
         numericalCompanions = companionParams,
         toleranceAuthority = toleranceAuthority,
         cutBinding = toleranceAuthority?.takeIf {

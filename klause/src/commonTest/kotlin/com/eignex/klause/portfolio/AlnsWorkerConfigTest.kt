@@ -38,8 +38,15 @@ class AlnsWorkerConfigTest : RuntimeInitializedTest() {
         for (identity in identities) {
             val pools = SharedPools(clauses, null, identity = identity)
             var changes = 0L
+            val observed = ArrayList<PoolClauseNeighborhoodObservation>()
+            val observer = PoolClauseNeighborhoodObserver { worker, _, value ->
+                assertEquals("alns/test", worker)
+                observed += value
+            }
             for (seed in 0L until 6L) {
                 val worker = AlnsWorkerConfig(AlnsProfile("test", 0.5, 0.5, 0.0, 0.98))
+                    .withNeighborhoodObserver(observer).withToleranceCheck { true }.withNumericalCompletion()
+                    .withSharingMemory(false, 32_768L, 4096)
                     .materialize(problem, index = 0, armId = 1, seed = seed, lsLambda = 1.0,
                         objective = objective, lsObjective = null, definitionalSweep = null,
                         onEvent = null, pools = pools)
@@ -52,6 +59,7 @@ class AlnsWorkerConfigTest : RuntimeInitializedTest() {
                 changes += worker.sharingMeter?.snapshot()?.clauses?.get("neighborhoodChanges") ?: 0L
             }
             assertEquals(identity === matching, changes > 0L)
+            assertEquals(identity === matching, observed.any { it.complete && it.samplerCompleted })
         }
     }
 

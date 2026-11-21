@@ -16,6 +16,9 @@ internal class PoolClauseRelatedDestroy(
     private val pool: SharedClausePool,
     private val meter: SharingMeter? = null,
     private val fallback: DestroyOperator = DestroyOperator.AdjacencyRelated,
+    private val observer: PoolClauseNeighborhoodObserver? = null,
+    private val worker: String = "alns",
+    private val seed: Long = 0L,
 ) : DestroyOperator {
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
         objective: LinearObjective, fraction: Double,
@@ -28,6 +31,8 @@ internal class PoolClauseRelatedDestroy(
         val size = original.bools.size.toLong() + original.ints.size
         if (size !in 2L..MAX_COORDINATES.toLong() ||
             problem.numBoolVars.toLong() + problem.numIntVars > Int.MAX_VALUE) return original
+        val capture = observer?.begin(worker, seed, problem.numBoolVars, problem.numIntVars,
+            size.toInt(), cancellation)
         val budget = Budget(cancellation)
         try {
             val drained = pool.drainSinceFunded(0L, budget::cancelled, { budget.pay(1L) },
@@ -36,7 +41,11 @@ internal class PoolClauseRelatedDestroy(
                 meter?.clauseCount("neighborhoodDeclined", 1L)
                 return original
             }
-            if (drained.clauses.isEmpty()) return original
+            capture?.snapshot(drained.cursor, drained.clauses.size)
+            if (drained.clauses.isEmpty()) {
+                capture?.supportPassComplete = true
+                return original
+            }
             budget.pay(MAX_SUPPORT * 2L)
             val candidateSupport = IntArray(MAX_SUPPORT)
             val selected = IntArray(MAX_SUPPORT)
@@ -46,15 +55,18 @@ internal class PoolClauseRelatedDestroy(
             for (i in drained.clauses.indices) {
                 budget.pay(1L)
                 val count = support(drained.clauses[i], problem, assumptions, size.toInt(), candidateSupport, budget)
-                if (count == 0) continue
+                capture?.record(i, drained.origins[i], count, candidateSupport)
+                if (count <= 0) continue
                 eligible++
                 if (eligible == 1 || rng.nextInt(eligible) == 0) {
                     budget.pay(count.toLong())
                     candidateSupport.copyInto(selected, endIndex = count)
                     selectedSize = count
                     selectedOrigin = drained.origins[i]
+                    capture?.selectedIndex = i
                 }
             }
+            capture?.supportPassComplete = true
             if (selectedSize == 0) return original
             budget.pay(size + MAX_SUPPORT)
             val coordinates = IntArray(size.toInt())
@@ -105,12 +117,14 @@ internal class PoolClauseRelatedDestroy(
                 meter?.clauseCount("neighborhoodChanges", 1L)
                 if (selectedOrigin >= 0) meter?.clauseCount("neighborhoodOrigin${selectedOrigin}Changes", 1L)
             }
+            capture?.samplerCompleted = true
             return result
         } catch (_: Stopped) {
             meter?.clauseCount("neighborhoodDeclined", 1L)
             return original
         } finally {
             meter?.clauseCount("neighborhoodWork", budget.work)
+            capture?.finish()
         }
     }
 
@@ -118,7 +132,7 @@ internal class PoolClauseRelatedDestroy(
         size: Int, output: IntArray, budget: Budget,
     ): Int {
         val literals = clause.boolLits.size.toLong() + clause.atomQuads.size / SharedClause.QUAD
-        if (literals !in 2L..MAX_SUPPORT.toLong() || clause.atomQuads.size % SharedClause.QUAD != 0) return 0
+        if (literals !in 2L..MAX_SUPPORT.toLong() || clause.atomQuads.size % SharedClause.QUAD != 0) return -1
         var count = 0
         fun add(coordinate: Int) {
             for (i in 0 until count) {
@@ -132,8 +146,8 @@ internal class PoolClauseRelatedDestroy(
             // Both pin lookups are binary searches over Int-indexed arrays.
             budget.pay(65L)
             val id = Lit.variable(literal)
-            if (literal < 0 || id !in 0 until problem.numBoolVars ||
-                assumptions.isFrozenBool(id) || fixed?.boolValueOrNull(id) != null) return 0
+            if (literal < 0 || id !in 0 until problem.numBoolVars) return -2
+            if (assumptions.isFrozenBool(id) || fixed?.boolValueOrNull(id) != null) return -3
             add(id)
         }
         var at = 0
@@ -141,13 +155,13 @@ internal class PoolClauseRelatedDestroy(
             budget.pay(33L)
             val id = clause.atomQuads[at]
             if (id !in 0L until problem.numIntVars.toLong() || clause.atomQuads[at + 1] !in 0L..2L ||
-                clause.atomQuads[at + 3] !in 0L..1L) return 0
+                clause.atomQuads[at + 3] !in 0L..1L) return -4
             val variable = id.toInt()
-            if (assumptions.isFrozenInt(variable) || problem.rootIntDomain(variable).isFixed) return 0
+            if (assumptions.isFrozenInt(variable) || problem.rootIntDomain(variable).isFixed) return -5
             add(problem.numBoolVars + variable)
             at += SharedClause.QUAD
         }
-        return count.takeIf { it in 2..size } ?: 0
+        return count.takeIf { it in 2..size } ?: -6
     }
 
     private class Budget(private val stop: ExecutionControl) {

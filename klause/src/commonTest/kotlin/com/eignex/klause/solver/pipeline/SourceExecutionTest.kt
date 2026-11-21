@@ -65,7 +65,8 @@ class SourceExecutionTest {
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
         val observer: (String, Long, JointRepairObservation) -> Unit = { _, _, _ -> }
         val sessionObserver: (String, PropagationSession) -> Unit = { _, _ -> }
-        val request = SourceExecutionRequest(invocation).withPortfolioSessionObserver(sessionObserver)
+        val original = SourceExecutionRequest(invocation).withPortfolioNeighborhoodObserver { _, _, _ -> }
+        val request = original.withPortfolioSessionObserver(sessionObserver)
             .withPortfolioJointRepairObserver(observer)
             .withPortfolioLpQueryObserver { _, _, _ -> }.withPortfolioGuidanceObserver { _, _ -> }
 
@@ -73,6 +74,8 @@ class SourceExecutionTest {
         assertNotNull(request.onPortfolioLpQuery)
         assertNotNull(request.onPortfolioGuidance)
         assertSame(sessionObserver, request.withValidationCancellation(ExecutionControl.Never).onPortfolioSession)
+        assertSame(original.onPortfolioNeighborhood,
+            request.withValidationCancellation(ExecutionControl.Never).onPortfolioNeighborhood)
     }
 
     @Test
