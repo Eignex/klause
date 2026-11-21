@@ -75,6 +75,7 @@ internal class LpHints(
     }
 
     override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
+        val version = nodeStamp
         if (collect && cutoff.isFinite()) {
             charge(2L)
             observe("PASSIVE_POINT_OPTIMUM_CHECK")
@@ -101,7 +102,10 @@ internal class LpHints(
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         objectiveRecorded = objective.isFinite()
         if (collect && passivePoint === relaxation) passiveState = state
-        history.record(objective)
+        history.record(objective, cutoff - scopeConstant.toDouble()) {
+            nodeStamp == version && relaxation.model.exactState === state &&
+                scopeModel === state.baseModel && scopeRows === state.rows && scopeCutoff == cutoff
+        }
     }
 
     private fun scopeDifference(relaxation: LpRelaxation, state: LpExactState): String? = when {

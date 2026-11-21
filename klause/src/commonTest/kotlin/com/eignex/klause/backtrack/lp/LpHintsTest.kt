@@ -29,6 +29,65 @@ import kotlin.test.assertTrue
 
 class LpHintsTest {
     @Test
+    fun `later child calibration preserves matched advice work across objective constants`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(trail.state.ownerWorkingModel())
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2L)
+        val up = SearchDecision.IntAtLeast(0, 3L)
+        val costs = ArrayList<Long>()
+        for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+            for (apply in listOf(false, true)) {
+                val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false),
+                    constant, intArrayOf(0), IntArray(0))
+                val cutoff = constant.toDouble() + 1024.0
+                val events = ArrayList<String>()
+                var work = 0L
+                val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
+                    observe = events::add, charge = { work += it })
+                repeat(2) {
+                    hints.beginNode(0, cutoff)
+                    hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+                    hints.recordObjective(relaxation, 0.0)
+                    hints.branch(variable)
+                    for ((decision, point, gain) in listOf(Triple(down, 2.0, 2.0), Triple(up, 3.0, 1.0))) {
+                        hints.commit(decision, 1)
+                        hints.beginNode(1, cutoff)
+                        hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
+                        hints.recordObjective(relaxation, gain)
+                        hints.recordOutcome(true, relaxation)
+                        hints.finishNode(trail.state)
+                    }
+                }
+                hints.beginNode(0, cutoff)
+                hints.record(relaxation, doubleArrayOf(2.75), DoubleArray(0))
+                hints.recordObjective(relaxation, 0.0)
+                hints.branch(variable)
+                events.clear()
+                val before = work
+
+                val ordered = hints.orderAlternatives(variable, listOf(down, up), ExecutionControl.Never)
+                hints.commit(ordered.first(), 1)
+                hints.beginNode(1, cutoff)
+                hints.record(relaxation, doubleArrayOf(if (apply) 3.0 else 2.0), DoubleArray(0))
+                hints.recordObjective(relaxation, if (apply) 1.0 else 2.0)
+
+                assertEquals(if (apply) listOf(up, down) else listOf(down, up), ordered)
+                assertEquals(1, events.count { it == "PASSIVE_NUMERIC_NEXT_CHECK" })
+                assertEquals(1, events.count { it == "PASSIVE_NUMERIC_NEXT_WITHIN_RANGE" })
+                assertEquals(1, events.count { it == "PASSIVE_NUMERIC_NEXT_GAP_NOT_MET" })
+                assertEquals(if (apply) 1 else 0, events.count { it == "PASSIVE_VALUE_COMMIT_CHANGED" })
+                assertEquals(if (apply) 0 else 1, events.count { it == "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED" })
+                costs.add(work - before)
+            }
+        }
+        assertTrue(costs.first() > 0L)
+        assertTrue(costs.all { it == costs.first() })
+    }
+
+    @Test
     fun `evidence priority preserves numeric fallbacks and requires a positive live candidate`() {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }

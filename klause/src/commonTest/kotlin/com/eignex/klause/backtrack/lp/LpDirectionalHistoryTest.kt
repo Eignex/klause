@@ -11,6 +11,163 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `later numeric gains are classified against prior pairs before they are updated`() {
+        val cases = listOf(Triple("within", 7.0, 1000.0), Triple("near-low", 4.0, 1000.0),
+            Triple("near-high", 15.0, 1000.0), Triple("low", 1.0, 1000.0),
+            Triple("high", 25.0, 1000.0), Triple("overpredicted", 1.0, 4.0),
+            Triple("met", 7.0, 4.0), Triple("unpredicted", 9.0, 8.0),
+            Triple("zero-to-positive", 1.0, 1000.0), Triple("zero", 7.0, 1000.0),
+            Triple("missing", 7.0, 1000.0), Triple("expired", 7.0, 1000.0),
+            Triple("gap", 7.0, 0.0), Triple("infinite", 7.0, Double.POSITIVE_INFINITY),
+            Triple("underflow", Double.MIN_VALUE, 1000.0)) +
+            (0..3).map { Triple("parent-$it", 7.0, 1000.0) }
+        for ((context, actual, cutoff) in cases) {
+            val events = ArrayList<String>()
+            var work = 0L
+            val history = LpDirectionalHistory(events::add, charge = { work += it })
+            val variable = VarRef.Bool(0)
+            repeat(2) { sample ->
+                for (up in listOf(false, true)) {
+                    if (context == "missing" && up && sample == 1) continue
+                    val slot = 2 * sample + if (up) 1 else 0
+                    val parent = if (context == "parent-$slot") -4000.0 else 0.0
+                    history.beginNode(0)
+                    history.record(parent)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    val gain = when {
+                        context == "zero" || (context == "zero-to-positive" && !up) -> 0.0
+                        context == "underflow" && !up -> Double.MIN_VALUE
+                        up || sample == 1 -> 10.0
+                        else -> 5.0
+                    }
+                    history.record(parent + gain)
+                }
+            }
+            if (context == "expired") repeat(257) { history.beginNode(0) }
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, if (context == "underflow") 0.125 else 0.5)
+            history.commit(SearchDecision.Bool(1), 1)
+            history.beginNode(1)
+            events.clear()
+            val before = work
+
+            history.record(actual, cutoff)
+
+            val expected = when {
+                context in listOf("zero", "missing", "expired") -> null
+                context.startsWith("parent-") -> "CONTEXT_MISMATCH"
+                context in listOf("gap", "infinite", "underflow") -> "UNKNOWN"
+                context == "low" || context == "overpredicted" -> "LOW_OUTLIER"
+                context == "high" || context == "zero-to-positive" -> "HIGH_OUTLIER"
+                context.startsWith("near-") -> "NEAR_RANGE"
+                else -> "WITHIN_RANGE"
+            }
+            val samples = events.filter { it.startsWith("PASSIVE_NUMERIC_NEXT_") &&
+                it != "PASSIVE_NUMERIC_NEXT_CHECK" && !it.startsWith("PASSIVE_NUMERIC_NEXT_GAP_") }
+            assertEquals(expected?.let { listOf("PASSIVE_NUMERIC_NEXT_$it") } ?: emptyList(), samples, context)
+            assertEquals(if (expected == null) 0 else 1,
+                events.count { it == "PASSIVE_NUMERIC_NEXT_CHECK" }, context)
+            if (expected != null) assertEquals(44L, work - before, context)
+            val gapEvent = when {
+                expected == null || expected == "UNKNOWN" || expected == "CONTEXT_MISMATCH" -> null
+                context == "overpredicted" -> "GAP_OVERPREDICTED"
+                context == "met" -> "GAP_MET"
+                context == "unpredicted" -> "GAP_UNPREDICTED"
+                else -> "GAP_NOT_MET"
+            }
+            assertEquals(gapEvent?.let { listOf("PASSIVE_NUMERIC_NEXT_$it") } ?: emptyList(),
+                events.filter { it.startsWith("PASSIVE_NUMERIC_NEXT_GAP_") }, context)
+            assertTrue("DOWN" in events)
+        }
+    }
+
+    @Test
+    fun `numeric calibration capacity survives history resets and restarts`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add)
+        val variable = VarRef.Bool(0)
+        repeat(129) {
+            history.clear(report = false)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(5.0)
+                }
+            }
+            history.restart()
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(SearchDecision.Bool(1), 1)
+            history.beginNode(1)
+
+            history.record(5.0, 1000.0)
+        }
+
+        assertEquals(128, events.count { it == "PASSIVE_NUMERIC_NEXT_CHECK" })
+        assertEquals(128, events.count { it == "PASSIVE_NUMERIC_NEXT_WITHIN_RANGE" })
+        assertEquals(1, events.count { it == "PASSIVE_NUMERIC_NEXT_EXHAUSTED" })
+        assertEquals(387, events.count { it == "DOWN" })
+    }
+
+    @Test
+    fun `numeric calibration stops publication after charged or reported invalidation`() {
+        for (trigger in listOf("charge-0", "charge-1", "charge-2", "CHECK", "WITHIN_RANGE", "GAP_NOT_MET")) {
+            for (reset in listOf(false, true)) {
+                val events = ArrayList<String>()
+                var armed = false
+                var current = true
+                var stage = 0
+                lateinit var history: LpDirectionalHistory
+                history = LpDirectionalHistory(observe = { event ->
+                    events.add(event)
+                    if (armed && event == "PASSIVE_NUMERIC_NEXT_$trigger") {
+                        if (reset) history.clear(report = false) else current = false
+                    }
+                }, charge = {
+                    if (armed && trigger == "charge-${stage++}") {
+                        if (reset) history.clear(report = false) else current = false
+                    }
+                })
+                val variable = VarRef.Bool(0)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        history.beginNode(0)
+                        history.record(0.0)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (up || sample == 1) 10.0 else 5.0)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                events.clear()
+                armed = true
+
+                history.record(7.0, 1000.0) { current }
+
+                armed = false
+                assertFalse("DOWN" in events, "$trigger/$reset")
+                history.beginNode(0)
+                history.record(0.0)
+                val prediction = history.minimumPrediction(variable, 0.5, 1000.0)
+                if (reset) assertTrue(prediction.isNaN()) else assertEquals(5.0, prediction)
+            }
+        }
+    }
+
+    @Test
     fun `equal completed rates use numeric predictions with complete compatible context`() {
         for (rate in 0..2) {
             for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",

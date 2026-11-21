@@ -34,6 +34,7 @@ internal class LpDirectionalHistory(
 
     internal class Gains(val variable: VarRef, val down: Direction = Direction(), val up: Direction = Direction()) {
         var indexed = false
+        val hasNumericPair: Boolean get() = down.count >= RELIABILITY && up.count >= RELIABILITY
     }
     internal class Parent(val objective: Double, val variable: VarRef, val value: Double)
     internal class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
@@ -55,6 +56,7 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
+    private var calibrationRemaining = 128
 
     fun beginNode(level: Int) {
         stamp++
@@ -108,7 +110,11 @@ internal class LpDirectionalHistory(
         if (report) observe("RESET")
     }
 
-    fun record(value: Double) {
+    internal inline fun record(
+        value: Double,
+        cutoff: Double = Double.NaN,
+        crossinline current: () -> Boolean = { true },
+    ) {
         objective = value
         val child = pending ?: return
         pending = null
@@ -124,6 +130,11 @@ internal class LpDirectionalHistory(
         val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
         expire(history.up)
+        if (!observeNextGain(history, child, gain, cutoff, version, current)) return
+        recordGain(history, child, normalized)
+    }
+
+    private fun recordGain(history: Gains, child: Pending, normalized: Double) {
         val direction = if (child.up) history.up else history.down
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
@@ -153,6 +164,71 @@ internal class LpDirectionalHistory(
             } else observe("UNSTABLE")
         }
         observe(if (child.up) "UP" else "DOWN")
+    }
+
+    private inline fun observeNextGain(
+        history: Gains,
+        child: Pending,
+        gain: Double,
+        cutoff: Double,
+        version: Long,
+        crossinline current: () -> Boolean,
+    ): Boolean {
+        if (cutoff.isNaN() || calibrationRemaining <= 0 || !history.hasNumericPair) return true
+        charge(8L)
+        if (version != generation || !current()) return false
+        if (!history.down.stable || !history.up.stable ||
+            (history.down.gain <= 0.0 && history.up.gain <= 0.0)
+        ) return true
+        calibrationRemaining--
+        charge(32L)
+        if (version != generation || !current()) return false
+        if (!reportCalibration("CHECK", version, current)) return false
+        val gap = cutoff - child.parent.objective
+        val downLatest = (cutoff - history.down.parent) / gap
+        val downPrevious = (cutoff - history.down.previousParent) / gap
+        val upLatest = (cutoff - history.up.parent) / gap
+        val upPrevious = (cutoff - history.up.previousParent) / gap
+        val direction = if (child.up) history.up else history.down
+        val lower = direction.gain * child.distance
+        val upper = maxOf(direction.latest, direction.previous) * child.distance
+        val result = when {
+            !gap.isFinite() || gap <= 0.0 || !lower.isFinite() || !upper.isFinite() ||
+                (lower == 0.0 && direction.gain > 0.0) -> "UNKNOWN"
+            !downLatest.isFinite() || !downPrevious.isFinite() ||
+                !upLatest.isFinite() || !upPrevious.isFinite() ||
+                downLatest !in 0.5..2.0 || downPrevious !in 0.5..2.0 ||
+                upLatest !in 0.5..2.0 || upPrevious !in 0.5..2.0 -> "CONTEXT_MISMATCH"
+            else -> {
+                val tolerance = 1e-9 * maxOf(1.0, abs(gain), abs(lower), abs(upper))
+                when {
+                    gain + tolerance >= lower && gain - tolerance <= upper -> "WITHIN_RANGE"
+                    gain + tolerance < 0.5 * lower -> "LOW_OUTLIER"
+                    gain - tolerance > 2.0 * upper -> "HIGH_OUTLIER"
+                    else -> "NEAR_RANGE"
+                }
+            }
+        }
+        if (!reportCalibration(result, version, current)) return false
+        if (result != "UNKNOWN" && result != "CONTEXT_MISMATCH") {
+            val gapResult = when {
+                lower >= gap && gain < gap -> "GAP_OVERPREDICTED"
+                lower >= gap -> "GAP_MET"
+                gain >= gap -> "GAP_UNPREDICTED"
+                else -> "GAP_NOT_MET"
+            }
+            if (!reportCalibration(gapResult, version, current)) return false
+        }
+        return calibrationRemaining != 0 || reportCalibration("EXHAUSTED", version, current)
+    }
+
+    private inline fun reportCalibration(
+        event: String,
+        version: Long,
+        crossinline current: () -> Boolean,
+    ): Boolean {
+        observe("PASSIVE_NUMERIC_NEXT_" + event)
+        return version == generation && current()
     }
 
     private fun index(history: Gains) {
