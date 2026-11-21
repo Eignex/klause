@@ -379,10 +379,15 @@ baseline variable. A paid sparse index retains variables whose own two direction
 gain pairs have been stable and positive; each lookup rechecks their age and current
 live decision eligibility. The index has at most 8,192 entries and resets with its
 source history. A variable proposal requires reliable numeric evidence for the
-baseline and a strictly larger minimum predicted child gain for another live variable.
-The comparison also applies when both minima are below the positive finite remaining
-gap. A nonpositive or unavailable gap declines selection. The larger minimum predicted
-gain wins, with variable identity breaking ties between improving candidates.
+baseline and another live variable. Candidate directions use the lower of their two
+recent samples; baseline directions use the larger. After scaling by the current
+fractional movement, the candidate's smaller directional prediction must strictly
+exceed the baseline's smaller directional prediction. Equal or overlapping observed
+ranges keep the ordinary baseline. The comparison also applies when both minima
+are below the positive finite remaining gap. A nonpositive or unavailable gap,
+or positive underflow in a lower prediction, declines selection. Candidates rank
+by their smaller lower prediction, with variable identity breaking ties between
+improving candidates.
 A measured zero baseline is known; missing evidence supplies no comparison.
 The same current fractional point scales both variables' predictions. A variable
 nomination records its point and solve stamp; only its matching adjacent committed

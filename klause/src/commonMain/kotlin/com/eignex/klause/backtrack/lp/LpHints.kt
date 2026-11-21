@@ -280,7 +280,7 @@ internal class LpHints(
         }
         val workingCutoff = cutoff - scopeConstant.toDouble()
         if (!available(baseline) || !current()) return baseline
-        val reference = history.minimumPrediction(baseline, value(baseline), workingCutoff)
+        val reference = history.minimumPrediction(baseline, value(baseline), workingCutoff, upper = true)
         if (!current()) return baseline
         if (!reference.isFinite()) {
             observe("PASSIVE_VARIABLE_BASELINE_UNRELIABLE")
@@ -313,7 +313,7 @@ internal class LpHints(
             LpPassiveVariableChoice.Candidate(baseline, value(baseline)), stamp, current,
             reliable = {
                 val proposedGain = history.minimumPrediction(proposed, value(proposed), workingCutoff)
-                val baselineGain = history.minimumPrediction(baseline, value(baseline), workingCutoff)
+                val baselineGain = history.minimumPrediction(baseline, value(baseline), workingCutoff, upper = true)
                 current() && available(proposed) && available(baseline) &&
                     proposedGain.isFinite() && baselineGain.isFinite() && proposedGain > baselineGain
             },
