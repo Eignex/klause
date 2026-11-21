@@ -85,15 +85,17 @@ internal fun bindSourceExecutionControls(
         options.validateKnown()
         val point = reader[ExecutionOption.sourcePointCuts]
         val aggregate = reader[ExecutionOption.sourceAggregateCuts]
+        val centerStep = reader[ExecutionOption.sourceRefutationCenterStep]
         val automatic = AutomaticLinearCuts(invocation.linearSource?.automaticCutSelection == true && point == null,
-            invocation.linearSource?.automaticCutSelection == true && aggregate == null)
+            invocation.linearSource?.automaticCutSelection == true && aggregate == null,
+            invocation.linearSource?.automaticCutSelection == true && centerStep == null)
         val defaults = defaultSourceTheory(invocation).copy(nodeBudget = budget, randomSeed = seed, timeout = timeout,
             cancellation = stop)
         val configured = if (companions) defaults.copy(
             maxDecisions = reader[ExecutionOption.maxDecisions] ?: defaults.maxDecisions,
             maxFlips = reader[ExecutionOption.maxFlips] ?: defaults.maxFlips,
             maxInstructions = reader[ExecutionOption.maxInstructions],
-        ).withSourceCompanionControls(reader, point, aggregate) else defaults
+        ).withSourceCompanionControls(reader, point, aggregate, centerStep) else defaults
         val theory = if (automatic.aggregate && !configured.sourcePointCuts)
             configured.copy(sourceAggregateCuts = false) else configured
         return SourceExecutionControls(
@@ -219,7 +221,8 @@ internal fun bindSourceExecutionControls(
 
 private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionReader,
     point: Boolean? = reader[ExecutionOption.sourcePointCuts],
-    aggregate: Boolean? = reader[ExecutionOption.sourceAggregateCuts]): TheoryParams = copy(
+    aggregate: Boolean? = reader[ExecutionOption.sourceAggregateCuts],
+    centerStep: Boolean? = reader[ExecutionOption.sourceRefutationCenterStep]): TheoryParams = copy(
     sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit,
         sourceLpWorkLimit) ?: Long.MAX_VALUE,
     sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
@@ -231,8 +234,7 @@ private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionRead
     sourceAggregateCuts = aggregate ?: sourceAggregateCuts,
     sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
         ?: sourceIncumbentCompletion,
-    sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
-        ?: sourceRefutationCenterStep,
+    sourceRefutationCenterStep = centerStep ?: sourceRefutationCenterStep,
     sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: sourceRefutationReuse,
     sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
         ?: sourceRefutationPropagation,

@@ -35,10 +35,13 @@ class JointLinearRepairTest {
         val objective = LinearObjective(realCoefficients = DoubleArray(3) { 1.0 })
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             ExecutionControl.Never))
-        for (enabled in listOf(false, true)) {
-            val params = TheoryParams(sourceIncumbentCompletion = true, sourceRefutationCenterStep = enabled,
+        val nominal = Sample(booleanArrayOf(), LongArray(3) { 1 }, DoubleArray(3) { 1.0 })
+        for ((completion, enabled, pooled) in listOf(Triple(false, false, false), Triple(false, true, false),
+            Triple(true, false, false), Triple(true, true, false), Triple(false, true, true))) {
+            val params = TheoryParams(sourceIncumbentCompletion = completion, sourceRefutationCenterStep = enabled,
                 sourceCuts = false, maxFlips = 6)
-            JointLinearRepair(model, source, objective, params).use { repair ->
+            JointLinearRepair(model, source, objective, params,
+                external = { if (pooled) nominal else null }).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     var done = false
                     var found: Sample? = null
@@ -80,15 +83,17 @@ class JointLinearRepairTest {
             ExecutionControl.Never))
         val pooled = Sample(booleanArrayOf(), LongArray(3) { 1 }, DoubleArray(3) { 1.0 },
             exactReals = List(3) { BigFraction.ONE })
-        val params = TheoryParams(sourceIncumbentCompletion = true, sourceRefutationCenterStep = true,
-            sourceCuts = false, maxFlips = 4)
+        for (completion in listOf(false, true)) {
+            val params = TheoryParams(sourceIncumbentCompletion = completion, sourceRefutationCenterStep = true,
+                sourceCuts = false, maxFlips = 4)
 
-        JointLinearRepair(model, source, objective, params, external = { pooled }).use { repair ->
-            repair.search(adaptive = false).use { search ->
-                var done = false
-                repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
-                assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairAdvisoryCenterMoves") ?: 0L)
-                assertContentEquals(LongArray(3) { 1 }, pooled.ints)
+            JointLinearRepair(model, source, objective, params, external = { pooled }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    var done = false
+                    repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+                    assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairAdvisoryCenterMoves") ?: 0L)
+                    assertContentEquals(LongArray(3) { 1 }, pooled.ints)
+                }
             }
         }
     }
@@ -103,21 +108,23 @@ class JointLinearRepairTest {
         val objective = LinearObjective(realCoefficients = DoubleArray(3) { 1.0 })
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             ExecutionControl.Never))
-        val params = TheoryParams(sourceIncumbentCompletion = true, sourceRefutationCenterStep = true,
-            sourceCuts = false, maxFlips = 6)
-        var originalChecks = 0
+        for (completion in listOf(false, true)) {
+            val params = TheoryParams(sourceIncumbentCompletion = completion, sourceRefutationCenterStep = true,
+                sourceCuts = false, maxFlips = 6)
+            var originalChecks = 0
 
-        JointLinearRepair(model, source, objective, params, incumbentCompletionCheck = { _, _, _ ->
-            originalChecks++
-            false
-        }).use { repair ->
-            repair.search(adaptive = false).use { search ->
-                var done = false
-                repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
+            JointLinearRepair(model, source, objective, params, incumbentCompletionCheck = { _, _, _ ->
+                originalChecks++
+                false
+            }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    var done = false
+                    repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
-                assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
-                assertTrue(originalChecks > 0)
-                assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairCheckedIncumbents") ?: 0L)
+                    assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                    assertTrue(originalChecks > 0)
+                    assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairCheckedIncumbents") ?: 0L)
+                }
             }
         }
     }

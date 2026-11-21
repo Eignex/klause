@@ -195,6 +195,21 @@ internal class JointLinearRepair(
 
     private fun externalIncumbent(cutoff: BigFraction? = pending?.cutoff, allowEqual: Boolean = false): Sample? {
         val offered = external() ?: return null
+        if (completion == null && centerProgress != null && offered.exactReals == null) {
+            val coordinates = source.coordinateCount.toLong()
+            val work = 1L + 2L * coordinates
+            val bytes = 256L + 128L * coordinates
+            if (stop() || funding.remainingWork <= work || funding.remainingAllocation <= bytes) return null
+            budget.observe(preparation = work)
+            funding.charge(0L, bytes)
+            if (stop() || funding.exhausted) return null
+            val coefficients = source.objective
+            if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Real }) {
+                observeExternal("MissingExactReals")
+                compare("external", "missing-exact-reals", cutoff = cutoff)
+                return null
+            }
+        }
         val raw = if (completion != null && offered.exactReals != null && cutoff != null)
             objectiveValue(offered) else comparisonValue(offered)
         val declined = cutoff != null && raw != null && (if (allowEqual) raw > cutoff else raw >= cutoff)
@@ -627,7 +642,8 @@ internal class JointLinearRepair(
             queryRefutationScope = querySource.scope
             querySawExternal = false
             queryOriginalCondition = condition
-            val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
+            val refutationGuidance = (completion != null || centerProgress != null) &&
+                anchor == null && preparedCenter == null &&
                 condition.cutoff == null
             val seed = checkedProposal?.takeIf { it.condition === condition }?.sample
             query = LinearAuthorityInvocation(querySource,
@@ -894,7 +910,7 @@ internal class JointLinearRepair(
         condition: ExactNeighborhoodCondition, cancellation: ExecutionControl) {
         val step = readyCenterStep
         readyCenterStep = null
-        if (step == null || anchor != null || preparedCenter != null || completion == null ||
+        if (step == null || anchor != null || preparedCenter != null ||
             proposalHasCheckedCenter) return
         if (centerProgress?.apply(step, centers, bools, condition, cancellation) != true) {
             observe("jointRepairAdvisoryCenterDeclined")
