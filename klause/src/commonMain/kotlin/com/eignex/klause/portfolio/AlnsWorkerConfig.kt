@@ -145,9 +145,8 @@ internal class AlnsWorkerConfig private constructor(
                 matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
             },
             destroyOperators = peerPools?.clauses?.let { clauses ->
-                listOf(DestroyOperator.Random, DestroyOperator.WorstObjective,
-                    PoolClauseRelatedDestroy(clauses, meter, observer = neighborhoodObserver,
-                        worker = workerLabel, seed = seed + index))
+                DestroyOperator.Defaults + PoolClauseRelatedDestroy(clauses, meter,
+                    observer = neighborhoodObserver, worker = workerLabel, seed = seed + index)
             } ?: DestroyOperator.Defaults,
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),

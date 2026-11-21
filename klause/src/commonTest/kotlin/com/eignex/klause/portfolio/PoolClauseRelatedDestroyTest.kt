@@ -7,8 +7,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.meta.alns.Alns
+import com.eignex.klause.meta.alns.AlnsTestFixtures.bootstrapAt
 import com.eignex.klause.meta.alns.DestroyOperator
 import com.eignex.klause.meta.alns.FreedVars
+import com.eignex.klause.meta.alns.RepairOperator
 import com.eignex.klause.meta.alns.RepairScope
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.SharedClause
@@ -17,6 +21,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,6 +30,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PoolClauseRelatedDestroyTest : RuntimeInitializedTest() {
+    @Test
+    fun `plain and guided adjacency should retain separate rejected repair rewards`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, emptyArray()).bake()
+        val incumbent = Sample(BooleanArray(0), LongArray(8) { 1L })
+        val objective = LinearObjective(intCoefficients = LongArray(8) { 1L })
+        for ((chosen, published) in listOf(2 to false, 2 to true, 3 to false, 3 to true)) {
+            val pool = SharedClausePool()
+            if (published) pool.publish(listOf(SharedClause(intArrayOf(),
+                longArrayOf(6, 0, 1, 0, 7, 0, 1, 0), 2)), origin = 0)
+            val meter = SharingMeter()
+            val updates = ArrayList<Pair<Int, Double>>()
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = 4
+                override val random = Random(17)
+                override fun choose() = chosen
+                override fun update(armIndex: Int, value: Double, weight: Double) {
+                    updates += armIndex to value
+                }
+                override fun reset() = Unit
+            }
+            var repairs = 0
+            val alns = Alns(inner = bootstrapAt(problem, incumbent),
+                destroyOperators = DestroyOperator.Defaults + PoolClauseRelatedDestroy(pool, meter),
+                repairOperators = listOf(RepairOperator { context ->
+                    repairs++
+                    if (chosen == 3 && published) assertTrue(listOf(6, 7).all { it in context.freed.ints })
+                    null
+                }),
+                destroyBandit = bandit, maxIterations = 1, minDestroyFraction = 0.5,
+                maxDestroyFraction = 0.5, rng = Random(17))
+
+            alns.minimize(objective, LocalSearchParams(randomSeed = 17L))
+
+            assertEquals(1, repairs)
+            assertEquals(listOf(chosen to 0.0), updates)
+            assertEquals(if (chosen == 3 && published) 1L else null,
+                meter.snapshot().clauses["neighborhoodOrigin0Choices"])
+            assertNull(meter.snapshot().clauses["uses"])
+        }
+    }
+
     @Test
     fun `peer support should join a disconnected adjacency neighborhood without enlarging it`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, emptyArray()).bake()

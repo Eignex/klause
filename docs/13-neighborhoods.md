@@ -329,9 +329,12 @@ local-search parameters declare a seed, inner repair seeds also draw from that
 stream. Unseeded ordinary invocations allow the inner solver to choose its own
 seeds.
 
-With an exactly bound peer clause pool, the portfolio ALNS adjacency choice can
-include all coordinates of one small shared nogood, then fill from its original
-adjacency neighborhood. Random and worst-objective choices keep their operators.
+With an exactly bound peer clause pool, portfolio ALNS adds a fourth removal choice
+beside random, worst-objective and adjacency removal. This clause-related choice
+includes all coordinates of one small shared nogood, then fills from an adjacency
+neighborhood. The destroy bandit rewards each choice separately, including plain
+adjacency. An empty or ineligible pool makes the fourth choice execute adjacency,
+so the menu also changes exploration weights when no clause guides removal.
 The requested coordinate count stays fixed; caller-pin filtering and Boolean
 definition closure still determine the effective repair scope. Fixed or externally
 pinned support, oversized snapshots and interrupted or unfunded scans keep the

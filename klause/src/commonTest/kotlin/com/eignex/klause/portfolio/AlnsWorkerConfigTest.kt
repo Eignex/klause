@@ -37,7 +37,7 @@ class AlnsWorkerConfigTest : RuntimeInitializedTest() {
         val identities = listOf(matching, null, ModelIdentity.of(problem, null), ModelIdentity.of(foreign, objective))
         for (identity in identities) {
             val pools = SharedPools(clauses, null, identity = identity)
-            var changes = 0L
+            var choices = 0L
             val observed = ArrayList<PoolClauseNeighborhoodObservation>()
             val observer = PoolClauseNeighborhoodObserver { worker, _, value ->
                 assertEquals("alns/test", worker)
@@ -56,9 +56,9 @@ class AlnsWorkerConfigTest : RuntimeInitializedTest() {
                 }
                 val sample = assertNotNull(result.assignment)
                 assertTrue(sample.intValue(6) + sample.intValue(7) >= 1L)
-                changes += worker.sharingMeter?.snapshot()?.clauses?.get("neighborhoodChanges") ?: 0L
+                choices += worker.sharingMeter?.snapshot()?.clauses?.get("neighborhoodChoices") ?: 0L
             }
-            assertEquals(identity === matching, changes > 0L)
+            assertEquals(identity === matching, choices > 0L)
             assertEquals(identity === matching, observed.any { it.complete && it.samplerCompleted })
         }
     }
