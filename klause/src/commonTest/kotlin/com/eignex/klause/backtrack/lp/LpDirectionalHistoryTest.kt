@@ -11,6 +11,71 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `equal completed rates use numeric predictions with complete compatible context`() {
+        for (rate in 0..2) {
+            for (context in listOf("separate", "touch", "overlap", "prune", "tie", "numeric", "outcome",
+                "unknown", "missing", "unequal", "zero", "underflow")) {
+                val history = LpDirectionalHistory({})
+                val variable = VarRef.Bool(0)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val parent = if (context == "numeric" && sample == 0 && !up) -30.0 else 0.0
+                        val gain = when {
+                            context == "zero" -> 0.0
+                            context == "underflow" && !up -> Double.MIN_VALUE
+                            context == "tie" -> 3.0
+                            up && context == "touch" -> 2.0
+                            up && context == "overlap" -> 1.5
+                            up -> 3.0
+                            sample == 0 && (context == "touch" || context == "overlap") -> 2.0
+                            else -> 1.0
+                        }
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(parent + gain)
+                        history.finishNode()
+                    }
+                }
+                repeat(if (context == "missing") 1 else 2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val parent = if (context == "outcome" && sample == 0 && !up) -30.0 else 0.0
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(Double.NaN)
+                        val pruned = if (context == "unequal" && up) rate == 0
+                        else rate == 2 || (rate == 1 && sample == 1)
+                        history.finishNode(pruned)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                val point = if (context == "underflow") 0.125 else 0.5
+                val cutoff = when (context) {
+                    "unknown" -> 0.0
+                    "prune", "tie" -> 2.0
+                    else -> 10.0
+                }
+
+                val preferred = history.preferDirection(variable, point, cutoff)
+
+                val expected = when (context) {
+                    "separate" -> false
+                    "prune" -> true
+                    "unequal" -> if (rate == 0) false else null
+                    else -> null
+                }
+                assertEquals(expected, preferred, "$rate/$context")
+            }
+        }
+    }
+
+    @Test
     fun `minimum predictions require comparable gaps for every numeric parent`() {
         val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
             listOf(-1.0, 0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
@@ -56,7 +121,9 @@ class LpDirectionalHistoryTest {
         val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
             listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
         } + (Double.MIN_VALUE to Double.POSITIVE_INFINITY)
-        for ((cutoff, ratio) in contexts) {
+        for ((cutoff, ratio, equalRates) in contexts.flatMap { (cutoff, ratio) ->
+            listOf(Triple(cutoff, ratio, false), Triple(cutoff, ratio, true))
+        }) {
             for (parentSlot in 0..3) {
                 var work = 0L
                 val history = LpDirectionalHistory({}, charge = { work += it })
@@ -86,7 +153,7 @@ class LpDirectionalHistoryTest {
                         history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
                         history.beginNode(1)
                         history.record(Double.NaN)
-                        history.finishNode(up)
+                        history.finishNode(if (equalRates) true else up)
                     }
                 }
                 history.beginNode(0)
@@ -132,7 +199,9 @@ class LpDirectionalHistoryTest {
         val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
             listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
         } + (Double.MIN_VALUE to Double.POSITIVE_INFINITY)
-        for ((cutoff, ratio) in contexts) {
+        for ((cutoff, ratio, equalRates) in contexts.flatMap { (cutoff, ratio) ->
+            listOf(Triple(cutoff, ratio, false), Triple(cutoff, ratio, true))
+        }) {
             for (parentSlot in 0..3) {
                 var work = 0L
                 val history = LpDirectionalHistory({}, charge = { work += it })
@@ -151,7 +220,7 @@ class LpDirectionalHistoryTest {
                         history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
                         history.beginNode(1)
                         history.record(parent + if (up) 2.0 else 0.5)
-                        history.finishNode(up)
+                        history.finishNode(if (equalRates) true else up)
                     }
                 }
                 history.beginNode(0)
@@ -524,7 +593,9 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `reset during a charged preference lookup discards the result`() {
-        for (cutoff in listOf(10.25, 15.0)) {
+        for ((cutoff, equalRates) in listOf(10.25, 15.0).flatMap { cutoff ->
+            listOf(cutoff to false, cutoff to true)
+        }) {
             for (resetAt in 1..if (cutoff == 10.25) 6 else 7) {
                 var reading = false
                 var reads = 0
@@ -544,7 +615,7 @@ class LpDirectionalHistoryTest {
                         history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
                         history.beginNode(1)
                         history.record(if (up) 14.0 else 12.0)
-                        history.finishNode(up)
+                        history.finishNode(if (equalRates) true else up)
                     }
                 }
                 history.record(10.0)
@@ -597,7 +668,7 @@ class LpDirectionalHistoryTest {
             val preferred = history.preferDirection(variable, 0.5, 10.25)
 
             assertEquals(when (pruned) {
-                "up", "mixedUp" -> true
+                "up", "mixedUp", "both", "neither", "mixedEqual" -> true
                 "down", "mixedDown", "fullDownMixedUp" -> false
                 else -> null
             }, preferred)

@@ -358,8 +358,10 @@ class LpHintsTest {
                 constant, intArrayOf(0), IntArray(0))
             val cutoff = constant.toDouble() + 1024.0
             for ((apply, currentObjective) in listOf(false to 10.0, true to 10.0, false to 1023.0, true to 1023.0)) {
-                for ((scale, gapScale) in listOf(1.0 to 1.0, 1.5 to 1.0, 2.0 to 1.0,
-                    1.0 to 0.5, 1.0 to 2.0, 1.0 to 4.0, 1.0 to 0.25)) {
+                for ((scale, gapScale, equalRates) in listOf(1.0 to 1.0, 1.5 to 1.0, 2.0 to 1.0,
+                    1.0 to 0.5, 1.0 to 2.0, 1.0 to 4.0, 1.0 to 0.25).flatMap { (scale, gapScale) ->
+                    listOf(Triple(scale, gapScale, false), Triple(scale, gapScale, true))
+                }) {
                     var work = 0L
                     val events = ArrayList<String>()
                     val hints = LpHints(1, 0, directionalGains = true, applyAdvice = apply,
@@ -379,7 +381,7 @@ class LpHintsTest {
                             hints.beginNode(1, cutoff)
                             hints.record(relaxation, doubleArrayOf(point), DoubleArray(0))
                             hints.recordObjective(relaxation, objective)
-                            hints.recordOutcome(decision == down && sample == 0, relaxation)
+                            hints.recordOutcome(equalRates || (decision == down && sample == 0), relaxation)
                             hints.finishNode(trail.state)
                         }
                     }

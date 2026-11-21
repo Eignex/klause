@@ -431,12 +431,16 @@ state, and checks cancellation after charging its work and before storing data.
 Numeric samples and completed outcomes age independently, without renewal on restart.
 
 Both directions must have two known recent outcomes. Their observed prune fractions
-are zero, one half or one; zero requires two observed open outcomes. Equal or
-unknown rates keep ordinary order. The current remaining incumbent gap determines
+are zero, one half or one; zero requires two observed open outcomes. Unknown rates
+keep ordinary order. The current remaining incumbent gap determines
 the search intent: if either stable gain, scaled by its current fractional branch
 movement, reaches that gap, the child with the greater prune fraction goes first.
-Otherwise the child with the smaller prune fraction goes first. Nonfinite or
-nonpositive gaps and positive predictions that cannot be represented as positive
+Otherwise the child with the smaller prune fraction goes first. When the known
+rates are equal, the larger lower numeric prediction goes first if it reaches the
+gap; otherwise the smaller lower prediction goes first. Equal numeric predictions
+keep ordinary order. Both cases retain the same checks on numeric ranges and
+parent context. This numerical preference supplies no measured difference in prune rates.
+Nonfinite or nonpositive gaps and positive predictions that cannot be represented as positive
 floating values keep ordinary order. Prune-first advice requires its preferred
 lower prediction to reach the gap. Open-first advice uses the preferred direction's
 larger recent gain, scaled by its current fractional movement; that upper prediction

@@ -349,7 +349,7 @@ internal class LpDirectionalHistory(
         if (version != generation) return null
         val down = outcomeRate(history.down)
         val up = outcomeRate(history.up)
-        if (!down.isFinite() || !up.isFinite() || down == up) return null
+        if (!down.isFinite() || !up.isFinite()) return null
         charge(16L)
         if (version != generation) return null
         val gap = cutoff - objective
@@ -364,7 +364,12 @@ internal class LpDirectionalHistory(
         charge(8L)
         if (version != generation) return null
         val prune = maxOf(downGain, upGain) >= gap
-        val preferUp = if (prune) up > down else up < down
+        if (down == up && downGain == upGain) return null
+        val preferUp = when {
+            down == up -> if (prune) upGain > downGain else upGain < downGain
+            prune -> up > down
+            else -> up < down
+        }
         val preferredGain = if (preferUp) upGain else downGain
         val otherGain = if (preferUp) downGain else upGain
         if ((prune && preferredGain < gap) || (!prune && preferredGain > otherGain)) return null
