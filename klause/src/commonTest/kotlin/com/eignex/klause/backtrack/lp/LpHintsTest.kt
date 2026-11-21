@@ -37,7 +37,8 @@ class LpHintsTest {
             booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
         val session = PropagationSession(Problem(0, 2, Array(2) { IntDomain(0, 10) }, emptyArray()))
         for (context in listOf("unknown", "single-baseline", "unstable", "expired", "zero-baseline",
-            "single-proposal", "fixed", "missing", "near", "underflow", "gap", "zero-candidate")) {
+            "single-proposal", "fixed", "missing", "near", "underflow", "gap", "zero-candidate",
+            "candidate-context", "baseline-context")) {
             val costs = ArrayList<Long>()
             for (apply in listOf(false, true)) {
                 var work = 0L
@@ -48,12 +49,14 @@ class LpHintsTest {
                     if (id == 1 && context == "expired") repeat(257) { hints.beginNode(0, 1000.0) }
                     val samples = if (id == 0) when (context) {
                         "single-baseline" -> 1
-                        "unstable", "expired", "zero-baseline", "underflow" -> 2
+                        "unstable", "expired", "zero-baseline", "underflow", "baseline-context" -> 2
                         else -> 0
                     } else if (context == "single-proposal") 1 else if (context == "zero-candidate") 4 else 2
+                    val parent = if ((id == 0 && context == "baseline-context") ||
+                        (id == 1 && context == "candidate-context")) -3000.0 else 0.0
                     hints.beginNode(0, 1000.0)
                     hints.record(relaxation, doubleArrayOf(0.5, 3.5), DoubleArray(0))
-                    hints.recordObjective(relaxation, 0.0)
+                    hints.recordObjective(relaxation, parent)
                     hints.recordOutcome(false, relaxation)
                     hints.finishNode(trail.state)
                     hints.branch(VarRef.IntVar(id))
@@ -67,11 +70,12 @@ class LpHintsTest {
                             val objective = when {
                                 id == 0 && context == "underflow" -> Double.MIN_VALUE
                                 id == 0 && context == "zero-baseline" -> 0.0
+                                id == 0 && context == "baseline-context" -> 1.0
                                 id == 0 && context == "unstable" -> if (sample == 0) 1.0 else 4.0
                                 id == 1 && context == "zero-candidate" && sample >= 2 -> 0.0
                                 else -> 2.0
                             }
-                            hints.recordObjective(relaxation, objective)
+                            hints.recordObjective(relaxation, parent + objective)
                             hints.recordOutcome(false, relaxation)
                             hints.finishNode(trail.state)
                         }
@@ -104,7 +108,9 @@ class LpHintsTest {
                 val event = if (apply) "PASSIVE_VARIABLE_COMMIT_CHANGED"
                 else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
                 assertEquals(if (eligible) 1 else 0, events.count { it == event }, context)
-                if (context == "zero-baseline") assertFalse("PASSIVE_VARIABLE_UNMEASURED_BASELINE" in events)
+                if (context == "zero-baseline" || context == "baseline-context") {
+                    assertFalse("PASSIVE_VARIABLE_UNMEASURED_BASELINE" in events)
+                }
                 costs.add(work - before)
             }
             assertEquals(costs.first(), costs.last(), context)
@@ -278,7 +284,8 @@ class LpHintsTest {
             booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
         for (reset in listOf(false, true)) {
             for ((reference, stopAt) in listOf("integral", "measured", "unmeasured").flatMap { reference ->
-                (1..if (reference == "integral") 14 else 18).map { reference to it }
+                (1..if (reference == "integral") 16 else if (reference == "measured") 22 else 20)
+                    .map { reference to it }
             }) {
                 val events = ArrayList<String>()
                 var reading = false

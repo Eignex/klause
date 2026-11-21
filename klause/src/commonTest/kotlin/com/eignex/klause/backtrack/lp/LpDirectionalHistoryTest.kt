@@ -11,6 +11,47 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `minimum predictions require comparable gaps for every numeric parent`() {
+        val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
+            listOf(-1.0, 0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
+        } + (Double.MIN_VALUE to Double.POSITIVE_INFINITY)
+        for ((cutoff, ratio) in contexts) {
+            for (parentSlot in 0..3) {
+                var work = 0L
+                val history = LpDirectionalHistory({}, charge = { work += it })
+                val variable = VarRef.Bool(0)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val slot = 2 * sample + if (up) 1 else 0
+                        val parent = when {
+                            slot != parentSlot -> 0.0
+                            ratio.isInfinite() -> -1.0
+                            else -> cutoff * (1.0 - ratio)
+                        }
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(parent + 1.0)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                for (upper in listOf(false, true)) {
+                    val before = work
+
+                    val prediction = history.minimumPrediction(variable, 0.5, cutoff, upper)
+
+                    if (ratio in 0.5..2.0) assertEquals(1.0, prediction) else assertTrue(prediction.isNaN())
+                    assertEquals(48L + if (upper && ratio in 0.5..2.0) 8L else 0L, work - before)
+                    assertTrue(history.hasReliablePair(variable, 0.5))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `child advice requires comparable gaps for every numeric parent independently of outcomes`() {
         val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
             listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
@@ -342,7 +383,7 @@ class LpDirectionalHistoryTest {
     @Test
     fun `reset while charging a minimum child prediction cannot return retained evidence`() {
         for (upper in listOf(false, true)) {
-            for (stopAt in 1..if (upper) 2 else 1) {
+            for (stopAt in 1..if (upper) 3 else 2) {
                 var reading = false
                 var reads = 0
                 lateinit var history: LpDirectionalHistory

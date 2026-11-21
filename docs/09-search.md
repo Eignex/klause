@@ -388,6 +388,12 @@ or claiming a measured improvement over it. Missing, nonfinite, unrepresentable 
 merely near-integral baseline points cannot use either priority case. A baseline
 with reliable pairs whose prediction cannot be represented keeps ordinary order.
 Every case requires a positive finite remaining gap.
+Every numeric sample used in a variable comparison must have a parent gap within
+a factor of two of the current gap, using the same working cutoff. Nonpositive,
+nonfinite or unrepresentable ratios exclude that numerical prediction. A measured baseline
+outside that context remains measured and cannot use unmeasured-baseline priority.
+Parent objectives follow their own numeric samples; context comparisons spend the
+containing work allowance.
 Candidate directions use the lower of their two
 recent samples; fractional baseline directions use the larger. For a fractional
 baseline with reliable pairs, after scaling by the current fractional movement,

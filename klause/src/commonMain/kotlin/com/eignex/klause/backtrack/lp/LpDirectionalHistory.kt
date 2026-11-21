@@ -203,6 +203,17 @@ internal class LpDirectionalHistory(
         val gap = cutoff - objective
         if (!gap.isFinite() || gap <= 0.0) return Double.NaN
         val history = reliable(variable, value) ?: return Double.NaN
+        charge(24L)
+        if (version != generation) return Double.NaN
+        val downLatest = (cutoff - history.down.parent) / gap
+        val downPrevious = (cutoff - history.down.previousParent) / gap
+        val upLatest = (cutoff - history.up.parent) / gap
+        val upPrevious = (cutoff - history.up.previousParent) / gap
+        if (!downLatest.isFinite() || !downPrevious.isFinite() ||
+            !upLatest.isFinite() || !upPrevious.isFinite() ||
+            downLatest !in 0.5..2.0 || downPrevious !in 0.5..2.0 ||
+            upLatest !in 0.5..2.0 || upPrevious !in 0.5..2.0
+        ) return Double.NaN
         val fraction = value - floor(value)
         val down = history.down.gain * fraction
         val up = history.up.gain * (1.0 - fraction)
