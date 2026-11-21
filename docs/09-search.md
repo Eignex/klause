@@ -416,8 +416,10 @@ movement, reaches that gap, the child with the greater prune fraction goes first
 Otherwise the child with the smaller prune fraction goes first. Nonfinite or
 nonpositive gaps and positive predictions that cannot be represented as positive
 floating values keep ordinary order. Prune-first advice requires its preferred
-prediction to reach the gap; open-first advice requires its prediction to be no
-greater than the other child's. Disagreement keeps ordinary order.
+lower prediction to reach the gap. Open-first advice uses the preferred direction's
+larger recent gain, scaled by its current fractional movement; that upper prediction
+must be strictly smaller than the other child's lower prediction. Equal, touching
+or overlapping ranges decline open-first advice.
 Predictions supply only this ordering, never
 a bound or pruning authority. Numerical gain reliability is checked independently, including
 two stable finite gains in each direction and a positive gain in at least one.

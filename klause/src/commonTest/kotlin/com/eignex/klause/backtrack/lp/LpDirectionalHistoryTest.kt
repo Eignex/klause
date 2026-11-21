@@ -11,6 +11,46 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `open child advice requires separated gain ranges at the current fraction`() {
+        for (preferredUp in listOf(false, true)) {
+            for (point in listOf(0.25, 0.5, 0.75)) {
+                for ((preferredGain, scale) in listOf(0.0 to 1.0, 1.0 to 1.0, 1.0 to 1.5, 1.0 to 2.0)) {
+                    var work = 0L
+                    val history = LpDirectionalHistory({}, charge = { work += it })
+                    val variable = VarRef.Bool(0)
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    repeat(2) { sample ->
+                        for (up in listOf(false, true)) {
+                            history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                            history.beginNode(1)
+                            val movement = if (up) 1.0 - point else point
+                            val gain = if (up == preferredUp) 0.5 * preferredGain else 0.75
+                            val multiplier = if (up == preferredUp && sample == 0) scale else 1.0
+                            history.record(gain / movement * multiplier)
+                            history.finishNode(up != preferredUp)
+                        }
+                    }
+                    history.record(0.0)
+                    for (cutoff in listOf(0.75, 3.0)) {
+                        val before = work
+
+                        val preferred = history.preferDirection(variable, point, cutoff)
+
+                        assertEquals(when {
+                            cutoff < 1.0 -> !preferredUp
+                            preferredGain == 0.0 || scale == 1.0 -> preferredUp
+                            else -> null
+                        }, preferred)
+                        assertEquals(if (cutoff < 1.0) 40L else 48L, work - before)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `upper minimum predictions retain independent directional ranges at the current fraction`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.Bool(0)
@@ -240,8 +280,12 @@ class LpDirectionalHistoryTest {
 
                         val preference = history.preferDirection(variable, 0.5, cutoff)
 
-                        assertEquals(if (cutoff <= 13.0) prunedUp else !prunedUp, preference)
-                        assertEquals(40L, work - before)
+                        assertEquals(when {
+                            cutoff <= 13.0 -> prunedUp
+                            sameGain -> null
+                            else -> !prunedUp
+                        }, preference)
+                        assertEquals(if (cutoff <= 13.0) 40L else 48L, work - before)
                     }
                 }
             }
@@ -315,36 +359,41 @@ class LpDirectionalHistoryTest {
 
         assertNull(history.preferDirection(variable, 0.125, 1.0))
         assertEquals(true, history.preferDirection(variable, 0.5, 1.0))
+        assertNull(history.preferDirection(variable, 0.125, 2.0))
+        assertEquals(false, history.preferDirection(variable, 0.5, 2.0))
     }
 
     @Test
     fun `reset during a charged preference lookup discards the result`() {
-        for (resetAt in 1..4) {
-            var reading = false
-            var reads = 0
-            lateinit var history: LpDirectionalHistory
-            history = LpDirectionalHistory({}, charge = {
-                if (reading && ++reads == resetAt) {
-                    reading = false
-                    history.clear()
+        for (cutoff in listOf(10.25, 15.0)) {
+            for (resetAt in 1..if (cutoff == 10.25) 4 else 5) {
+                var reading = false
+                var reads = 0
+                lateinit var history: LpDirectionalHistory
+                history = LpDirectionalHistory({}, charge = {
+                    if (reading && ++reads == resetAt) {
+                        reading = false
+                        history.clear()
+                    }
+                })
+                val variable = VarRef.Bool(0)
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(variable, 0.5)
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(if (up) 14.0 else 12.0)
+                        history.finishNode(up)
+                    }
                 }
-            })
-            val variable = VarRef.Bool(0)
-            history.beginNode(0)
-            history.record(10.0)
-            history.branch(variable, 0.5)
-            repeat(2) {
-                for (up in listOf(false, true)) {
-                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
-                    history.beginNode(1)
-                    history.record(12.0)
-                    history.finishNode(up)
-                }
-            }
-            history.record(10.0)
-            reading = true
+                history.record(10.0)
+                reading = true
 
-            assertNull(history.preferDirection(variable, 0.5, 10.25))
+                assertNull(history.preferDirection(variable, 0.5, cutoff))
+                assertTrue(reads >= resetAt)
+            }
         }
     }
 

@@ -335,6 +335,14 @@ internal class LpDirectionalHistory(
         val preferredGain = if (preferUp) upGain else downGain
         val otherGain = if (preferUp) downGain else upGain
         if ((prune && preferredGain < gap) || (!prune && preferredGain > otherGain)) return null
+        if (!prune) {
+            charge(8L)
+            if (version != generation) return null
+            val direction = if (preferUp) history.up else history.down
+            val movement = if (preferUp) 1.0 - fraction else fraction
+            val upper = maxOf(direction.latest, direction.previous) * movement
+            if (!upper.isFinite() || upper >= otherGain) return null
+        }
         return preferUp
     }
 
