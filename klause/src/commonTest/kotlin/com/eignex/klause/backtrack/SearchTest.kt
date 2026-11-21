@@ -33,6 +33,27 @@ import kotlin.test.assertTrue
 
 class SearchTest {
     @Test
+    fun `variable guidance refines the configured selection and declines fixed proposals`() {
+        for (fixed in listOf(false, true)) {
+            val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin)
+            val brancher = BacktrackBrancher(
+                PropagationSession(problemOf(IntDomain(0, 10), if (fixed) IntDomain(0, 0) else IntDomain(0, 10))),
+                params, sink = null, restart = RestartSchedule.from(params),
+                branching = object : BacktrackBranching {
+                    override fun select(baseline: VarRef, session: PropagationSession): VarRef {
+                        assertEquals(VarRef.IntVar(0), baseline)
+                        return VarRef.IntVar(1)
+                    }
+                },
+            )
+
+            val alternatives = brancher.nextBranch(SearchSession(emptyList()))
+
+            assertEquals(SearchDecision.IntAtMost(if (fixed) 0 else 1, 0L), alternatives?.first())
+        }
+    }
+
+    @Test
     fun `pooled point replay keeps precedence over alternative ordering`() {
         for (replay in listOf(false, true)) {
             val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin)

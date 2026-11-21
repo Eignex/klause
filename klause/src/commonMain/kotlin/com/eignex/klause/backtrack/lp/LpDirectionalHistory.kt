@@ -32,11 +32,15 @@ internal class LpDirectionalHistory(
         val stable: Boolean get() = count >= RELIABILITY && maxOf(latest, previous) <= minOf(latest, previous) * 2.0
     }
 
-    private class Gains(val down: Direction = Direction(), val up: Direction = Direction())
+    private class Gains(val variable: VarRef, val down: Direction = Direction(), val up: Direction = Direction()) {
+        var indexed = false
+    }
     private class Parent(val objective: Double, val variable: VarRef, val value: Double)
     private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
     private val gains = HashMap<VarRef, Gains>()
+    private var candidates: Array<VarRef?>? = null
+    private var candidateCount = 0
     private var generation = 0L
     private var parents: Array<Parent?>? = null
     private var parentCount = 0
@@ -87,7 +91,10 @@ internal class LpDirectionalHistory(
 
     fun clear(report: Boolean = true) {
         generation++
-        charge(gains.size.toLong())
+        val retainedCandidates = candidateCount
+        candidates = null
+        candidateCount = 0
+        charge(gains.size.toLong() + retainedCandidates)
         gains.clear()
         trimParents(0)
         pending = null
@@ -111,7 +118,7 @@ internal class LpDirectionalHistory(
             observe("UNUSABLE")
             return
         }
-        val history = gains.getOrPut(child.parent.variable) { Gains() }
+        val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         expire(history.down)
         expire(history.up)
         val direction = if (child.up) history.up else history.down
@@ -136,10 +143,57 @@ internal class LpDirectionalHistory(
                 if (history.down.gain > 0.0 || history.up.gain > 0.0) valueStamp = maxOf(valueStamp, pairStamp)
                 if (history.down.gain > 0.0 && history.up.gain > 0.0) {
                     reliableStamp = maxOf(reliableStamp, pairStamp)
+                    index(history)
                 }
             } else observe("UNSTABLE")
         }
         observe(if (child.up) "UP" else "DOWN")
+    }
+
+    private fun index(history: Gains) {
+        if (history.indexed || candidateCount >= MAX_CANDIDATES) return
+        val version = generation
+        var entries = candidates
+        if (entries == null || candidateCount == entries.size) {
+            val capacity = minOf(MAX_CANDIDATES, maxOf(16, candidateCount * 2))
+            charge(capacity.toLong() + candidateCount)
+            if (generation != version) return
+            val replacement = arrayOfNulls<VarRef>(capacity)
+            entries?.copyInto(replacement, endIndex = candidateCount)
+            entries = replacement
+            candidates = replacement
+        }
+        charge(1L)
+        if (generation != version) return
+        entries[candidateCount++] = history.variable
+        history.indexed = true
+    }
+
+    fun forEachCandidate(current: () -> Boolean, visit: (VarRef) -> Unit) {
+        val entries = candidates ?: return
+        val count = candidateCount
+        val version = generation
+        for (index in 0 until count) {
+            charge(4L)
+            if (version != generation || !current()) return
+            visit(checkNotNull(entries[index]))
+        }
+    }
+
+    fun closureMargin(variable: VarRef, value: Double, cutoff: Double): Double {
+        val version = generation
+        charge(24L)
+        if (version != generation) return Double.NaN
+        val gap = cutoff - objective
+        if (!gap.isFinite() || gap <= 0.0) return Double.NaN
+        val history = reliable(variable, value) ?: return Double.NaN
+        val fraction = value - floor(value)
+        val down = history.down.gain * fraction
+        val up = history.up.gain * (1.0 - fraction)
+        if (!down.isFinite() || !up.isFinite() ||
+            (down == 0.0 && history.down.gain > 0.0) || (up == 0.0 && history.up.gain > 0.0)
+        ) return Double.NaN
+        return if (version == generation) minOf(down, up) - gap else Double.NaN
     }
 
     fun branch(variable: VarRef, value: Double) {
@@ -220,7 +274,7 @@ internal class LpDirectionalHistory(
         val version = generation
         charge(9L)
         if (!current() || version != generation) return
-        val history = gains.getOrPut(child.parent.variable) { Gains() }
+        val history = gains.getOrPut(child.parent.variable) { Gains(child.parent.variable) }
         val outcome = (if (child.up) history.up else history.down).outcome
         if (outcome.count > 0 && stamp - outcome.stamp > maxAge) outcome.count = 0
         else if (outcome.count >= RELIABILITY && stamp - outcome.previousStamp > maxAge) outcome.count = 1
@@ -360,6 +414,7 @@ internal class LpDirectionalHistory(
 
     private companion object {
         const val MAX_DEPTH = 128
+        const val MAX_CANDIDATES = 8192
         const val RELIABILITY = 2
         const val DISTANCE_TOL = 1e-6
     }

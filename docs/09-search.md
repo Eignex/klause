@@ -374,9 +374,22 @@ and passive point retention start at a finite incumbent cutoff; ordinary LP guid
 remains available before admission. Child-choice and collection owners initialize
 once at the first finite cutoff. Leaving a finite cutoff clears retained history
 without renewing those owners or their invocation-wide collection limits.
-The ordinary reduced-cost/fractionality score and configured selector choose the
-variable. Directional history retains no variable-candidate index or variable
-nomination. Historical observations order only the selected variable's adjacent children. Each direction
+The ordinary reduced-cost/fractionality score and configured selector supply the
+baseline variable. A paid sparse index retains variables whose own two directional
+gain pairs have been stable and positive; each lookup rechecks their age and current
+live decision eligibility. The index has at most 8,192 entries and resets with its
+source history. A variable proposal requires reliable numeric evidence for the
+baseline, with at least one predicted child gain below the positive finite remaining
+gap, and another variable whose two predicted child gains both reach that gap.
+The larger minimum predicted gain wins, with variable identity breaking ties.
+A measured zero baseline is known; missing evidence supplies no comparison.
+The same current fractional point scales both variables' predictions. A variable
+nomination records its point and solve stamp; only its matching adjacent committed
+split, after freshness and cancellation checks, counts as applied advice. Withholding
+keeps the ordinary baseline with the same selection and commitment costs.
+These predictions change only search order and supply no bound or pruning authority.
+
+Historical observations can also order the selected variable's adjacent children. Each direction
 needs two recent finite normalized gains agreeing within a factor of two, and at
 least one direction must have a positive lower-of-two gain. Two measured zero
 directions keep ordinary order; unknown gains cannot supply measured zero.

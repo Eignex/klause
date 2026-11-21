@@ -11,6 +11,107 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `predicted closure margins distinguish measured zero from missing evidence`() {
+        for (samples in 0..2) {
+            for (gain in listOf(0.0, 5.0)) {
+                val history = LpDirectionalHistory({})
+                val variable = VarRef.Bool(0)
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                repeat(samples) {
+                    for (up in listOf(false, true)) {
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(gain)
+                    }
+                }
+                history.record(0.0)
+
+                val margin = history.closureMargin(variable, 0.5, 3.0)
+
+                if (samples < 2) assertTrue(margin.isNaN()) else assertEquals(gain - 3.0, margin)
+            }
+        }
+    }
+
+    @Test
+    fun `closure margins require representable predictions and a current positive finite gap`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(if (up) 1.0 else Double.MIN_VALUE)
+            }
+        }
+        history.record(0.0)
+
+        assertTrue(history.closureMargin(variable, 0.125, 1.0).isNaN())
+        assertEquals(0.0, history.closureMargin(variable, 0.5, Double.MIN_VALUE))
+        for (cutoff in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.0, -1.0)) {
+            assertTrue(history.closureMargin(variable, 0.5, cutoff).isNaN())
+        }
+    }
+
+    @Test
+    fun `sparse candidates retain one entry per reliable variable and clear with the source`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(5.0)
+                }
+            }
+        }
+        history.restart()
+        val candidates = ArrayList<VarRef>()
+
+        history.forEachCandidate({ true }, candidates::add)
+        history.clear()
+        history.forEachCandidate({ true }, candidates::add)
+
+        assertEquals(listOf<VarRef>(variable), candidates)
+    }
+
+    @Test
+    fun `reset while charging a closure prediction cannot return retained evidence`() {
+        var reading = false
+        lateinit var history: LpDirectionalHistory
+        history = LpDirectionalHistory({}, charge = {
+            if (reading) {
+                reading = false
+                history.clear()
+            }
+        })
+        val variable = VarRef.Bool(0)
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(variable, 0.5)
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(5.0)
+            }
+        }
+        history.record(0.0)
+        reading = true
+
+        assertTrue(history.closureMargin(variable, 0.5, 3.0).isNaN())
+    }
+
+    @Test
     fun `child order seeks open outcomes until a predicted gain reaches the cutoff`() {
         for (prunedUp in listOf(false, true)) {
             for (mixed in listOf(false, true)) {
