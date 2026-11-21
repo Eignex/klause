@@ -38,6 +38,12 @@ Git pack with its original commit identity. Builds and tools use the current rev
 Use `lab/bench-mps-linux.json` for MPS-only selections; it uses the same Linux adapter and runtime without staging
 the MiniZinc compiler. `lab/bench-linux.json` includes that compiler for MiniZinc workloads.
 
+These manifests build `:klause-bench:installCliHarness` and run `LabAdapterKt` from
+`klause-bench/build/install/klause-bench-cli/lib/*`. That distribution contains the
+CLI driver and its shared recording helpers, without standalone profiling programs.
+Strict comparison identities cover every shipped bench class and dependency.
+Profiles and the other lab adapters use `:klause-bench:installDist`.
+
 `ObjectiveSymmetryCapture` accepts exact `suite/problem` selections in a lab profile
 and records original-source identity, bounded default/protected preparation, and
 generators that move objective columns. It does not solve or establish performance.
@@ -453,10 +459,10 @@ block cannot certify hidden coordinates; capture itself is not an independent ch
 
 The [lab repository](https://github.com/Eignex/eignex-lab) owns submission, execution
 and artifact collection. The adapter manifest is [lab/bench.json](lab/bench.json).
-Its build tasks install the CLI, bench and pinned MiniZinc runtime:
+Its build tasks install the CLI, CLI benchmark driver and pinned MiniZinc runtime:
 
 ```sh
-./gradlew :klause-cli:installJvmDist :klause-bench:installDist :klause-bench:prepareLabRuntime
+./gradlew :klause-cli:installJvmDist :klause-bench:installCliHarness :klause-bench:prepareLabRuntime
 ```
 
 The adapter supports macOS ARM64/x86_64 and Linux x86_64 with JDK 25.
