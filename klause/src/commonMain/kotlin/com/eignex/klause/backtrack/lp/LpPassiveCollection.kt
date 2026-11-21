@@ -28,13 +28,13 @@ internal class LpPassiveCollection(
         changed = false
     }
 
-    fun select(
+    internal inline fun select(
         variable: VarRef,
         point: Double,
         alternatives: List<SearchDecision>,
         history: LpDirectionalHistory,
         stamp: Int,
-        fresh: () -> Boolean,
+        crossinline fresh: () -> Boolean,
     ): List<SearchDecision> {
         clear()
         if (!available) return alternatives

@@ -274,10 +274,9 @@ internal class LpHints(
         val point = passivePoint
         val state = passiveState
         val stamp = solveStamp
-        val current = {
+        fun current(): Boolean =
             !cancelled() && nodeStamp == version && passivePoint === point && passiveState === state &&
                 solveStamp == stamp && passivePointCurrent()
-        }
         val workingCutoff = cutoff - scopeConstant.toDouble()
         if (!available(baseline) || !current()) return baseline
         val reference = history.minimumPrediction(baseline, value(baseline), workingCutoff, upper = true)
@@ -288,7 +287,7 @@ internal class LpHints(
         }
         var proposal: VarRef? = null
         var bestGain = reference
-        history.forEachCandidate(current) { variable ->
+        history.forEachCandidate(::current) { variable ->
             if (variable != baseline && available(variable) && current()) {
                 val gain = history.minimumPrediction(variable, value(variable), workingCutoff)
                 val previous = proposal
@@ -310,7 +309,7 @@ internal class LpHints(
         val choice = checkNotNull(passiveVariable)
         val selected = choice.select(
             LpPassiveVariableChoice.Candidate(proposed, value(proposed)),
-            LpPassiveVariableChoice.Candidate(baseline, value(baseline)), stamp, current,
+            LpPassiveVariableChoice.Candidate(baseline, value(baseline)), stamp, ::current,
             reliable = {
                 val proposedGain = history.minimumPrediction(proposed, value(proposed), workingCutoff)
                 val baselineGain = history.minimumPrediction(baseline, value(baseline), workingCutoff, upper = true)
@@ -361,16 +360,15 @@ internal class LpHints(
         ) return alternatives
         if (valueReady && preference == null) observe("PASSIVE_VALUE_NO_PROPOSAL")
         if (preference == null && !collectReady) return alternatives
-        val current = {
+        fun current(): Boolean =
             !cancelled() && passivePoint === point && passiveState === state &&
                 stamp == solveStamp && passivePointCurrent()
-        }
         if (preference != null) {
-            val advised = values.select(variable, pointValue, alternatives, preference, stamp, fresh = current)
+            val advised = values.select(variable, pointValue, alternatives, preference, stamp, fresh = ::current)
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
-        return collection.select(variable, pointValue, alternatives, history, stamp, current)
+        return collection.select(variable, pointValue, alternatives, history, stamp, ::current)
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {

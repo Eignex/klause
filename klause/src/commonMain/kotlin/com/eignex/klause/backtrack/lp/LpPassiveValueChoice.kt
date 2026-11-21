@@ -20,13 +20,13 @@ internal class LpPassiveValueChoice(
         changed = false
     }
 
-    fun select(
+    internal inline fun select(
         variable: VarRef,
         point: Double,
         alternatives: List<SearchDecision>,
         preferUp: Boolean?,
         stamp: Int,
-        fresh: () -> Boolean,
+        crossinline fresh: () -> Boolean,
     ): List<SearchDecision> {
         clear()
         if (alternatives.size != 2 || preferUp == null) return alternatives
@@ -78,7 +78,7 @@ internal class LpPassiveValueChoice(
         else "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED")
     }
 
-    private companion object {
+    internal companion object {
         const val POINT_TOLERANCE = 1e-6
     }
 }

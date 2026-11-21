@@ -25,12 +25,12 @@ internal class LpPassiveVariableChoice(
         branched = false
     }
 
-    fun select(
+    internal inline fun select(
         proposal: Candidate,
         baseline: Candidate,
         stamp: Int,
-        fresh: () -> Boolean,
-        reliable: () -> Boolean,
+        crossinline fresh: () -> Boolean,
+        crossinline reliable: () -> Boolean,
     ): VarRef {
         clear()
         observe("PASSIVE_VARIABLE_SELECTION")
