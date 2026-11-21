@@ -11,6 +11,82 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `child advice requires comparable gaps for every numeric parent independently of outcomes`() {
+        val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
+            listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
+        } + (Double.MIN_VALUE to Double.POSITIVE_INFINITY)
+        for ((cutoff, ratio) in contexts) {
+            for (parentSlot in 0..3) {
+                var work = 0L
+                val history = LpDirectionalHistory({}, charge = { work += it })
+                val variable = VarRef.Bool(0)
+                repeat(2) { sample ->
+                    for (up in listOf(false, true)) {
+                        val slot = 2 * sample + if (up) 1 else 0
+                        val parent = when {
+                            slot != parentSlot -> 0.0
+                            ratio.isInfinite() -> -1.0
+                            else -> cutoff * (1.0 - ratio)
+                        }
+                        history.beginNode(0)
+                        history.record(parent)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(parent + if (up) 2.0 else 0.5)
+                        history.finishNode()
+                    }
+                }
+                repeat(2) {
+                    for (up in listOf(false, true)) {
+                        history.beginNode(0)
+                        history.record(0.0)
+                        history.branch(variable, 0.5)
+                        history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                        history.beginNode(1)
+                        history.record(Double.NaN)
+                        history.finishNode(up)
+                    }
+                }
+                history.beginNode(0)
+                history.record(0.0)
+                val before = work
+
+                val preferred = history.preferDirection(variable, 0.5, cutoff)
+
+                assertEquals(if (ratio in 0.5..2.0) cutoff <= 1.0 else null, preferred)
+                assertEquals(if (cutoff <= 1.0) 88L else 96L, work - before)
+            }
+        }
+    }
+
+    @Test
+    fun `reset before numeric parent metadata publication cannot restore observations`() {
+        var recording = false
+        val events = ArrayList<String>()
+        lateinit var history: LpDirectionalHistory
+        history = LpDirectionalHistory(events::add, charge = {
+            if (recording) {
+                recording = false
+                history.clear()
+            }
+        })
+        history.beginNode(0)
+        history.record(0.0)
+        history.branch(VarRef.Bool(0), 0.5)
+        history.commit(SearchDecision.Bool(1), 1)
+        history.beginNode(1)
+        recording = true
+
+        history.record(1.0)
+
+        assertFalse(recording)
+        assertFalse(history.hasObservations)
+        assertEquals(0, history.retainedEntries)
+        assertFalse("DOWN" in events)
+    }
+
+    @Test
     fun `child advice requires comparable gaps for every retained outcome parent`() {
         val contexts = listOf(1.0, 10.0).flatMap { cutoff ->
             listOf(0.0, 0.25, 0.5, 1.0, 2.0, 4.0).map { cutoff to it }
@@ -44,7 +120,8 @@ class LpDirectionalHistoryTest {
                 val preferred = history.preferDirection(variable, 0.5, cutoff)
 
                 assertEquals(if (ratio in 0.5..2.0) cutoff <= 1.0 else null, preferred)
-                assertEquals(if (cutoff <= 1.0) 64L else 72L, work - before)
+                assertEquals((if (cutoff <= 1.0) 64L else 72L) + (if (preferred != null) 24L else 0L),
+                    work - before)
             }
         }
     }
@@ -82,7 +159,7 @@ class LpDirectionalHistoryTest {
                             preferredGain == 0.0 || scale == 1.0 -> preferredUp
                             else -> null
                         }, preferred)
-                        assertEquals((if (cutoff < 1.0) 40L else 48L) + (if (preferred != null) 24L else 0L),
+                        assertEquals((if (cutoff < 1.0) 40L else 48L) + (if (preferred != null) 48L else 0L),
                             work - before)
                     }
                 }
@@ -325,7 +402,7 @@ class LpDirectionalHistoryTest {
                             sameGain -> null
                             else -> !prunedUp
                         }, preference)
-                        assertEquals((if (cutoff <= 13.0) 40L else 48L) + (if (preference != null) 24L else 0L),
+                        assertEquals((if (cutoff <= 13.0) 40L else 48L) + (if (preference != null) 48L else 0L),
                             work - before)
                     }
                 }
@@ -407,7 +484,7 @@ class LpDirectionalHistoryTest {
     @Test
     fun `reset during a charged preference lookup discards the result`() {
         for (cutoff in listOf(10.25, 15.0)) {
-            for (resetAt in 1..if (cutoff == 10.25) 5 else 6) {
+            for (resetAt in 1..if (cutoff == 10.25) 6 else 7) {
                 var reading = false
                 var reads = 0
                 lateinit var history: LpDirectionalHistory

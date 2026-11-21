@@ -429,11 +429,12 @@ floating values keep ordinary order. Prune-first advice requires its preferred
 lower prediction to reach the gap. Open-first advice uses the preferred direction's
 larger recent gain, scaled by its current fractional movement; that upper prediction
 must be strictly smaller than the other child's lower prediction. Equal, touching
-or overlapping ranges decline open-first advice. Both intents also require each
-retained outcome's parent gap to be within a factor of two of the current parent
-gap, using the same working cutoff. Unavailable, nonpositive or unrepresentable
-gap ratios keep ordinary order. Parent objectives age with their own outcomes;
-context comparisons and metadata writes spend the containing work allowance.
+or overlapping ranges decline open-first advice. Both intents also require the
+parent gap of every retained numeric sample and outcome to be within a factor of
+two of the current parent gap, using the same working cutoff. Unavailable,
+nonpositive or unrepresentable gap ratios keep ordinary order. Numeric and outcome
+parent objectives age independently with their own samples; context comparisons
+and metadata writes spend the containing work allowance.
 Predictions supply only this ordering, never
 a bound or pruning authority. Numerical gain reliability is checked independently, including
 two stable finite gains in each direction and a positive gain in at least one.
