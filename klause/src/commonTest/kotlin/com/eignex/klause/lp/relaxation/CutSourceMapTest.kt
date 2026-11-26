@@ -114,7 +114,7 @@ class CutSourceMapTest {
             val unknown = CutSource(CutSourceKind.AUXILIARY, 2)
             val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
             val definitions = if (ambiguous) mapOf(first to definition, second to definition)
-                else mapOf(first to definition)
+            else mapOf(first to definition)
             val root = CutSourceMap(Any(), 0L, emptyList(), auxiliaryDefinitions = definitions)
             val expected = if (ambiguous) null else first
             assertEquals(expected, root.auxiliarySource(unknown, definition))
