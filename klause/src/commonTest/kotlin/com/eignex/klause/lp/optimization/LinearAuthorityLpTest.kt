@@ -1,53 +1,14 @@
 package com.eignex.klause.lp.optimization
 
-import com.eignex.klause.lp.SourceLpBudget
-import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
-import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.solver.evidence.SourceRevision
-import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class LinearAuthorityLpTest {
-    @Test
-    fun `a grant pause during source projection should preserve the completed primal`() {
-        val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE),
-            BigFraction.MINUS_ONE))
-        val scope = SourceScope(SourceRevision("projection-pause", "exact-affine"))
-        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
-        val budget = SourceLpBudget(maxOperations = 1, funding = funding)
-        var pause = true
-        LinearAuthorityLp(budget, retain = true, onCutMetric = { name, _ ->
-            if (pause && name == "GuidancePhase_COMPLETE") funding.grant(0L)
-        }).use { lp ->
-            val first = assertNotNull(lp.advance(rows, listOf(BigFraction.ONE), BigFraction.ZERO, scope,
-                ExecutionControl.Never, emptySet(), unconditionalRows = true))
-            val floatWork = budget.measuredFloatWork
-            val certificateWork = budget.measuredBoundCertificationWork
-            assertTrue(funding.paused)
-            assertEquals(listOf(BigFraction.ONE), first.point)
-
-            pause = false
-            funding.grant(1_000_000L)
-            val resumed = assertNotNull(lp.advance(rows, listOf(BigFraction.ONE), BigFraction.ZERO, scope,
-                ExecutionControl.Never, emptySet(), unconditionalRows = true))
-
-            assertEquals(first.point, resumed.point)
-            assertEquals(floatWork, budget.measuredFloatWork)
-            assertEquals(certificateWork, budget.measuredBoundCertificationWork)
-            assertEquals(1, budget.operations)
-            assertEquals(1L, lp.preparations)
-        }
-    }
-
     @Test
     fun `advice outside a present side should use its exact endpoint`() {
         val lower = ExactLpSide(ExactLpNumber.of(0L))

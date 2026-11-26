@@ -489,6 +489,10 @@ withhold a global bound. Output labels it a native nominal-source claim: toleran
 coverage is separate, and publication confers no independent validation or terminal
 status. Reading the retained bound requests no LP work.
 
+A numerical traversal admits its checked point and retains its root bound before
+optional repair guidance and feedback. Cancellation during that observation keeps
+the admitted incumbent and its verified bound without accepting a terminal claim.
+
 Objective-coordinate conversion retains the producer's candidate statistics while
 replacing its objective and proof authority, including candidates published from
 ordinary, instruction and scheduled slices.
