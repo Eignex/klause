@@ -691,6 +691,9 @@ capture, and caller snapshots remain independent copies.
 Adjacent states with the same base region and active rows expose their changed
 bound columns through an identity token. This token retains no predecessor state;
 unrelated states require a full check instead of borrowing the delta.
+Bound-only component refreshes retain unchanged row, right-hand-side and objective
+descriptions after checking their base authority. Fresh columns preserve current
+bound strictness and premises, while scope activity changes rebuild the descriptions.
 Exact trail edits do not require a floating projection. An incompatible projection
 retires the floating owner, while crossed sides are certified directly against the
 exact state and acceptance policy. A later projectable state can prepare a fresh owner.
