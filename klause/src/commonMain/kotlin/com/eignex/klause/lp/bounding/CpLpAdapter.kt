@@ -18,7 +18,6 @@ import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
 import com.eignex.klause.lp.relaxation.columnBounds
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.LpPhaseStats
@@ -387,7 +386,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val state = requireNotNull(core.state)
         val model = requireNotNull(state.ownerWorkingModel())
         val rebound = source?.relaxation(state, SessionDomains(session)) ?: base.withModel(model, remap = remap)
-        val map = rebound.sourceMap?.withCpBounds(model, session)?.withParentRows(cuts.parentRows(state))
+        val map = rebound.sourceMap?.withCpBounds(model, session)
+            ?.withParentRows(cuts.parentRows(state))
         if (map != null) engine.cutPool.remap(map)
         return rebound.withModel(model, map)
     }

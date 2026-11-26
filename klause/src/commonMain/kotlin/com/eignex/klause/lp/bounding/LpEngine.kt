@@ -70,7 +70,6 @@ import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.observeConsumption
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
@@ -1029,8 +1028,8 @@ internal class LpEngine(
     }
 
     internal fun retainedRootCumulativeWork(): Long {
-        val cap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
-            SPARSE_LP_MAX_WORK)
+        val requested = params.lpPlan.rootMaxWork
+        val cap = if (requested > 0L) minOf(requested, SPARSE_LP_MAX_WORK) else SPARSE_LP_MAX_WORK
         var remaining = (cap - minOf(cap, totalSolveOps)).coerceAtLeast(0L)
         lpEffortGovernor.remainingWork()?.let { remaining = minOf(remaining, it) }
         return remaining
