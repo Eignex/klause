@@ -11,6 +11,176 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `depth retention recovers complete own evidence after another depth overwrites it`() {
+        for (boolean in listOf(false, true)) {
+            for (context in listOf("complete", "missing-numeric", "missing-outcome", "unstable", "aged",
+                "numeric-gap", "outcome-gap", "fraction", "cutoff")) {
+                val history = LpDirectionalHistory({}, depthRetention = true)
+                val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+                val offset = if (boolean) 0.0 else 2.0
+                for (level in 0..1) {
+                    for (category in 0..1) {
+                        repeat(2) { sample ->
+                            for (up in listOf(false, true)) {
+                                val missing = level == 0 && sample == 0 && up
+                                val parent = if (level == 0 && sample == 0 && !up &&
+                                    ((category == 0 && context == "numeric-gap") ||
+                                        (category == 1 && context == "outcome-gap"))) -40.0 else 0.0
+                                history.beginNode(level)
+                                history.record(parent)
+                                history.branch(variable, offset + 0.5)
+                                val decision = if (boolean) SearchDecision.Bool(if (up) 0 else 1)
+                                else if (up) SearchDecision.IntAtLeast(0, 3L) else SearchDecision.IntAtMost(0, 2L)
+                                history.commit(decision, level + 1)
+                                history.beginNode(level + 1)
+                                val gain = if (level == 0 && up && sample == 0 && context == "unstable") 9.0
+                                else if (up) 3.0 else 1.0
+                                history.record(if (category == 0 && !(missing && context == "missing-numeric"))
+                                    parent + gain else Double.NaN)
+                                history.finishNode(if (category == 1 && !(missing && context == "missing-outcome"))
+                                    true else null)
+                            }
+                        }
+                    }
+                }
+                if (context == "aged") repeat(257) { history.beginNode(0) }
+                history.beginNode(0)
+                history.record(0.0)
+                val value = offset + if (context == "fraction") 0.0 else 0.5
+                val cutoff = if (context == "cutoff") Double.POSITIVE_INFINITY else 10.0
+
+                val global = history.preferDirection(variable, value, cutoff)
+                val retained = history.depthPreference(variable, value, cutoff) { true }
+
+                assertNull(global, "$boolean/$context")
+                assertEquals(if (context == "complete") false else null, retained, "$boolean/$context")
+            }
+        }
+        var work = 0L
+        val disabled = LpDirectionalHistory({}, charge = { work += it })
+        assertNull(disabled.depthPreference(VarRef.Bool(0), 0.5, 10.0) { true })
+        assertEquals(0L, work)
+    }
+
+    @Test
+    fun `depth retention keeps existing contexts after its lifetime allocation limit`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add, depthRetention = true)
+        for (index in 127 downTo 0) {
+            val variable = if (index and 1 == 1) VarRef.Bool(index / 2) else VarRef.IntVar(index / 2)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(if (variable is VarRef.Bool) SearchDecision.Bool((variable.varId shl 1) or 1)
+            else SearchDecision.IntAtMost(variable.varId, 0L), 1)
+            history.beginNode(1)
+            history.record(1.0)
+            history.finishNode(true)
+        }
+        for (variable in listOf(VarRef.Bool(0), VarRef.IntVar(0), VarRef.Bool(64))) {
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    val decision = if (variable is VarRef.Bool)
+                        SearchDecision.Bool((variable.varId shl 1) or if (up) 0 else 1)
+                    else if (up) SearchDecision.IntAtLeast(variable.varId, 1L)
+                    else SearchDecision.IntAtMost(variable.varId, 0L)
+                    history.commit(decision, 1)
+                    history.beginNode(1)
+                    history.record(if (up) 3.0 else 1.0)
+                    history.finishNode(true)
+                }
+            }
+        }
+        history.restart()
+        history.beginNode(0)
+        history.record(0.0)
+
+        assertEquals(false, history.depthPreference(VarRef.Bool(0), 0.5, 10.0) { true })
+        assertEquals(false, history.depthPreference(VarRef.IntVar(0), 0.5, 10.0) { true })
+        assertNull(history.depthPreference(VarRef.Bool(64), 0.5, 10.0) { true })
+        assertEquals(128, events.count { it == "DEPTH_RETENTION_CONTEXT_RETAINED" })
+        assertEquals(1, events.count { it == "DEPTH_RETENTION_CONTEXT_EXHAUSTED" })
+        history.clear()
+        repeat(2) {
+            for (up in listOf(false, true)) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(VarRef.Bool(0), 0.5)
+                history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                history.beginNode(1)
+                history.record(if (up) 3.0 else 1.0)
+                history.finishNode(true)
+            }
+        }
+        history.beginNode(0)
+        history.record(0.0)
+        assertNull(history.depthPreference(VarRef.Bool(0), 0.5, 10.0) { true })
+        assertEquals(128, events.count { it == "DEPTH_RETENTION_CONTEXT_RETAINED" })
+    }
+
+    @Test
+    fun `depth retention validates allocation publication and lookup after charged invalidation`() {
+        for (action in listOf("numeric-reset", "outcome-reset", "outcome-cancel", "lookup-reset", "lookup-cancel",
+            "allocation-reset", "node-change")) {
+            var armed = false
+            var current = true
+            lateinit var history: LpDirectionalHistory
+            history = LpDirectionalHistory({}, depthRetention = true, charge = { amount ->
+                val target = when {
+                    action.startsWith("lookup") -> 8L
+                    action == "allocation-reset" -> 224L
+                    else -> 12L
+                }
+                if (armed && amount == target) {
+                    armed = false
+                    when {
+                        action.endsWith("cancel") -> current = false
+                        action == "node-change" -> history.beginNode(3)
+                        else -> history.clear()
+                    }
+                }
+            })
+            val variable = VarRef.Bool(0)
+            repeat(2) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 3.0 else 1.0)
+                    history.finishNode(true)
+                }
+            }
+            if (action.startsWith("lookup")) {
+                history.beginNode(0)
+                history.record(0.0)
+                armed = true
+                assertNull(history.depthPreference(variable, 0.5, 10.0) { current })
+            } else {
+                history.beginNode(1)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                history.commit(SearchDecision.Bool(1), 2)
+                history.beginNode(2)
+                armed = true
+                history.record(if (action.startsWith("outcome")) Double.NaN else 1.0)
+                history.finishNode(true) { current }
+            }
+            history.beginNode(0)
+            history.record(0.0)
+
+            val preferred = history.depthPreference(variable, 0.5, 10.0) { true }
+
+            assertFalse(armed, action)
+            assertEquals(if (action.endsWith("reset")) null else false, preferred, action)
+        }
+    }
+
+    @Test
     fun `child advice requires the current depth for every numeric and outcome parent`() {
         for ((cutoff, preferred) in listOf(2.0 to true, 10.0 to false)) {
             for (boolean in listOf(false, true)) {

@@ -29,9 +29,12 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
+    private val depthRetention: Boolean = false,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe, charge = charge)
+    private val history = LpDirectionalHistory(observe, charge = charge, depthRetention = depthRetention)
+    private var depthValues: LpPassiveValueChoice? = null
+    private var depthChecksRemaining = 128
     private var passiveVariable: LpPassiveVariableChoice? = null
     private var passiveValues: LpPassiveValueChoice? = null
     private var passiveCollection: LpPassiveCollection? = null
@@ -81,6 +84,7 @@ internal class LpHints(
             passiveVariable?.clear()
             passiveValues?.clear()
             passiveCollection?.clear()
+            depthValues?.clear()
             passiveState = null
         }
         if (!collect || !cutoff.isFinite() || relaxation.colVarId.size > 8192) return
@@ -173,6 +177,7 @@ internal class LpHints(
         passiveVariable?.clear()
         passiveValues?.clear()
         passiveCollection?.clear()
+        depthValues?.clear()
         val outcome = pruningOutcome
         val relaxation = pruningScope
         pruningOutcome = null
@@ -221,6 +226,7 @@ internal class LpHints(
         passiveVariable?.branch(variable, solveStamp)
         passiveValues?.clear()
         passiveCollection?.clear()
+        depthValues?.clear()
         if (collect && scopeModel != null) {
             history.branch(variable, value(variable))
         }
@@ -230,6 +236,7 @@ internal class LpHints(
         passiveVariable?.commit(decision) { !cancelled() && passivePointCurrent() }
         passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
+        depthValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         if (collect && scopeModel != null) {
             history.commit(decision, depth)
         }
@@ -389,11 +396,58 @@ internal class LpHints(
         passiveVariable?.clear()
         passiveValues?.clear()
         passiveCollection?.clear()
+        depthValues?.clear()
         passivePoint = null
         passiveState = null
     }
 
     fun orderAlternatives(
+        variable: VarRef,
+        alternatives: List<SearchDecision>,
+        cancelled: ExecutionControl,
+    ): List<SearchDecision> {
+        depthValues?.clear()
+        val ordered = orderProductionAlternatives(variable, alternatives, cancelled)
+        if (!depthRetention || ordered.size != 2 || depthChecksRemaining <= 0 || !history.hasDepthHistory ||
+            passiveValues?.hasNomination == true || !cutoff.isFinite() || !passivePointCurrent() || cancelled()
+        ) return ordered
+        val version = nodeStamp
+        val point = passivePoint
+        val state = passiveState
+        val stamp = solveStamp
+        val bound = cutoff
+        fun current(): Boolean = !cancelled() && nodeStamp == version && passivePoint === point &&
+            passiveState === state && solveStamp == stamp && cutoff == bound && passivePointCurrent()
+        depthChecksRemaining--
+        val preference = history.depthPreference(variable, value(variable), bound - scopeConstant.toDouble(), ::current)
+        if (!current()) return ordered
+        observe("PASSIVE_DEPTH_RETENTION_CHECK")
+        if (!current()) return ordered
+        if (depthChecksRemaining == 0) {
+            observe("PASSIVE_DEPTH_RETENTION_EXHAUSTED")
+            if (!current()) return ordered
+        }
+        if (preference == null) {
+            observe("PASSIVE_DEPTH_RETENTION_UNAVAILABLE")
+            return ordered
+        }
+        observe("PASSIVE_DEPTH_RETENTION_AVAILABLE")
+        if (!current()) return ordered
+        if (depthValues == null) {
+            charge(8L)
+            if (!current()) return ordered
+            depthValues = LpPassiveValueChoice(false, { event ->
+                observe(if (event == "PASSIVE_VALUE_CHECK") "PASSIVE_DEPTH_RETENTION_PARTITION_CHECK"
+                else event.replaceFirst("PASSIVE_VALUE", "PASSIVE_DEPTH_RETENTION"))
+            }, charge)
+        }
+        val shadow = checkNotNull(depthValues)
+        shadow.select(variable, value(variable), ordered, preference, stamp, fresh = ::current)
+        if (!current()) shadow.clear()
+        return ordered
+    }
+
+    private fun orderProductionAlternatives(
         variable: VarRef,
         alternatives: List<SearchDecision>,
         cancelled: ExecutionControl,
@@ -515,6 +569,7 @@ internal class LpHints(
             observe("PASSIVE_POINT_RECORDED")
             passiveVariable?.clear()
             passiveCollection?.clear()
+            depthValues?.clear()
             passivePoint = relaxation
             passiveState = null
         }
