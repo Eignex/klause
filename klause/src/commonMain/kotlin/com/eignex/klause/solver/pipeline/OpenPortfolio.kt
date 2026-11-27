@@ -479,6 +479,7 @@ internal class OpenPortfolio(
                             objective,
                             preparedPlan,
                             invocation = { worker.evidenceInvocation },
+                            sharedWitnessProjection = { witnessProjection },
                         )
                     )
                     worker = exactNeighborhoodWorker(

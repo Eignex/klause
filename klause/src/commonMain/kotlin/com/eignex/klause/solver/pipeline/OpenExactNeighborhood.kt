@@ -35,10 +35,15 @@ internal class OpenExactNeighborhood(
     private val objective: LinearObjective? = null,
     preparedSource: PreparedSourcePlan? = null,
     private val invocation: () -> EngineInvocation? = { null },
+    sharedWitnessProjection: (() -> PropagationProblem)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val basePreparation = preparedSource
-    private val witnessProjection = PropagationProblem(model,
-        preparedSource?.factorProjections?.forEngineView(model) ?: model.selectedFactorProjections())
+    private val witnessProjection by lazy {
+        sharedWitnessProjection?.invoke()?.also {
+            require(it.problem === model) { "witness projection belongs to a different source" }
+        } ?: PropagationProblem(model,
+            preparedSource?.factorProjections?.forEngineView(model) ?: model.selectedFactorProjections())
+    }
     private var prepared: PreparedSourcePlan? = null
     private var components: PreparedSearchComponents? = null
     private var encodingPreparationWork = 0L

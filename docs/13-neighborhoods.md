@@ -280,6 +280,8 @@ nonimproving neighborhood before its remaining alternatives are explored.
 A completed candidate must pass the original-source witness check
 before it can update the center or publish an incumbent. Local bounds, refutations
 and exhausted alternatives never leave the heuristic as global claims.
+Open portfolio neighborhoods share the containing invocation's source witness
+projection. The first witness check that needs propagation materializes it.
 
 The mixed repair attempt also retains its termination reason, feasible point and
 conditioned bound independently of the driver's improvement verdict. A feasible
