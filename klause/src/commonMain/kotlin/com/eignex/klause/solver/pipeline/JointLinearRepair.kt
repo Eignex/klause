@@ -407,7 +407,8 @@ internal class JointLinearRepair(
                     hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
                 val initial = if (sharedStart && sourceIntegers == null) {
                     requireNotNull(selection).relaxationNeighborhood(
-                        repairGuidance?.find(source), from, bools, null, budget, stop, startFromRoot = true)
+                        repairGuidance?.find(source), from, bools, null, budget, stop, startFromRoot = true,
+                        onRootFreedomLimit = observation?.let { ::observeRootFreedomLimit })
                 } else null
                 if (checkedStart && hint != null) relaxationAttempted = true
                 if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
@@ -449,6 +450,15 @@ internal class JointLinearRepair(
                     }
             },
         )
+    }
+
+    private fun observeRootFreedomLimit(pinned: Int, free: Int) {
+        if (funding.remainingWork <= 4L || funding.remainingAllocation <= 128L) return
+        budget.observe(preparation = 4L)
+        funding.charge(0L, 128L)
+        observe("jointRepairSharedRootAgreementFreedomLimit")
+        stages["jointRepairSharedRootAgreementPinnedAtLimit"] = pinned.toLong()
+        stages["jointRepairSharedRootAgreementFreeAtLimit"] = free.toLong()
     }
 
     private fun requestIncumbentPreparation() {

@@ -191,7 +191,8 @@ internal class JointRepairNeighborhood private constructor(
 
     fun relaxationNeighborhood(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
         bools: BooleanArray, cutoff: BigFraction?, budget: SourceLpBudget,
-        token: ExecutionControl, startFromRoot: Boolean = false): ExactNeighborhoodCondition? {
+        token: ExecutionControl, startFromRoot: Boolean = false,
+        onRootFreedomLimit: ((pinned: Int, free: Int) -> Unit)? = null): ExactNeighborhoodCondition? {
         if (hint == null || (cutoff == null && !startFromRoot) || centers.size < integers || token()) return null
         val pins = linkedMapOf<Int, BigFraction>()
         var free = 0
@@ -205,7 +206,10 @@ internal class JointRepairNeighborhood private constructor(
             if (!value.isFinite()) return null
             if (relaxed != null && abs(relaxed - value) <= 1e-6) {
                 pins[id] = center
-            } else if (++free > MAX_FREE_INTEGERS && startFromRoot) return null
+            } else if (++free > MAX_FREE_INTEGERS && startFromRoot) {
+                onRootFreedomLimit?.invoke(pins.size, free)
+                return null
+            }
         }
         if (token() || pins.isEmpty() || free == 0) return null
         selectedIntegers += free
