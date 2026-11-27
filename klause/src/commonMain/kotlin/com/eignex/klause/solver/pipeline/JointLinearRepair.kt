@@ -120,6 +120,7 @@ internal class JointLinearRepair(
         aggregateCuts = boundOrdered && params.sourceAggregateCuts)
     private var selection: JointRepairNeighborhood? = null
     private var rootPoint: Map<SourceCoordinate, Double>? = null
+    private var sharedFractionalRoot = false
     private var rootStarted = false
     private var rootPreparationPending = false
     private var query: LinearAuthorityInvocation? = null
@@ -375,9 +376,14 @@ internal class JointLinearRepair(
                 }
                 val checkedStart = pooled != null && completion != null && !bootstrap &&
                     (round == 0L || (bootstrapTried && !relaxationAttempted))
+                val fromSharedRoot = sharedFractionalRoot && !adaptive && pooled == null && limit == null
+                val sharedStart = fromSharedRoot && round == 0L
                 if (round == 0L && completion != null) incumbentTrialPending = pooled != null
                 val width = if (enlargedTrialAfterWitness) checkedTrialWidth + 1 else if (checkedStart) {
                     observe("jointRepairCheckedCenterStarts")
+                    minOf(count, 2)
+                } else if (sharedStart) {
+                    observe("jointRepairSharedRootConnectedStarts")
                     minOf(count, 2)
                 } else if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
                     focusedRemaining--
@@ -388,8 +394,7 @@ internal class JointLinearRepair(
                     selection?.clearRefutation()
                     onIncumbentUse?.invoke()
                 }
-                // A checked center needs no all-pinned rounded-root bootstrap.
-                val proposalRound = if (bootstrap) 0L else if (pooled != null && completion != null)
+                val proposalRound = if (bootstrap) 0L else if (fromSharedRoot || (pooled != null && completion != null))
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
                 val size = if (enlargedTrialPending && width > checkedTrialWidth)
                     minOf(width, checkedTrialWidth + 1) else width
@@ -421,6 +426,7 @@ internal class JointLinearRepair(
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
                                 proposalRound, count, size, when {
                                     bootstrap -> "rounded-paid-root"
+                                    sharedStart -> "borrowed-root"
                                     pooled == null -> "stored"
                                     else -> "checked-pooled"
                                 },
@@ -520,11 +526,15 @@ internal class JointLinearRepair(
         if (funding.remainingWork <= work || funding.remainingAllocation <= bytes) return false
         budget.observe(preparation = work)
         funding.charge(0L, bytes)
+        var fractional = false
         for (id in 0 until integers) {
-            if (cancellation.pollStop() || hint.integer(id) == null) return false
+            if (cancellation.pollStop()) return false
+            val value = hint.integer(id) ?: return false
+            fractional = fractional || value != round(value)
         }
         if (stop() || cancellation() || funding.exhausted) return false
         retainRootPoint(hint.point)
+        sharedFractionalRoot = fractional
         observe("jointRepairSharedRootGuidance")
         return true
     }

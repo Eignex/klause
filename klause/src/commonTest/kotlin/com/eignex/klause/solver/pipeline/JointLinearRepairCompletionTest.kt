@@ -536,6 +536,30 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `borrowed fractional guidance should open a connected first region`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
+            factors = arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val funding = SourceLpFunding(10_000, 10_000).also { it.grant(10_000) }
+        val point = (0..1).associate { SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.5 }
+        val guidance = LinearRepairGuidance()
+        assertTrue(guidance.remember(source, point, SourceLpBudget(funding = funding), ExecutionControl.Never))
+        val observations = mutableListOf<JointRepairObservation>()
+        val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1), boundOrdered = true,
+            repairGuidance = guidance, onObservation = observations::add)
+
+        repair.search(adaptive = false).use { search ->
+            search.advance(ExecutionControl.Never, 5_000)
+
+            val first = observations.first { it.phase == "proposal" }
+            assertEquals(listOf(0, 1), first.freed)
+            assertTrue(first.lower.isEmpty())
+        }
+    }
+
+    @Test
     fun `matching paid root coordinates should remove the joint root query`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))

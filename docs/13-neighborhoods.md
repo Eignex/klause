@@ -249,7 +249,8 @@ and aggregation, a joint owner can borrow the proof worker's paid root point for
 same source context. The proof worker offers its uncut point when the checked
 bound completes and can offer the selected point later. The point must cover every integer coordinate and carries no
 proof authority. Local preparation supplies guidance when no compatible point is
-available. With enabled incumbent completion,
+available. A borrowed fractional point starts a fixed repair with up to two
+connected integer coordinates free, ranked from its fractional seed. With enabled incumbent completion,
 a checked external center supplies initial integer coordinates and the first
 connected neighborhood without a root relaxation. An unavailable center retains
 root guidance. Preparation checks spend the same cumulative LP funding as repair;
