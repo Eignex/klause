@@ -235,6 +235,25 @@ class SparseSourceLpTest {
     }
 
     @Test
+    fun `a declined optional sparse allocation should leave room for a smaller query`() {
+        val funding = SourceLpFunding(100_000L, 2_000L).also { it.grant(100_000L) }
+        val budget = SourceLpBudget(funding = funding)
+        val policy = SparseSourceLpPolicy()
+        var decline: SparseSourceLpDecline? = null
+        fun admit(variables: Int) = budget.admitSparse(ExecutionControl.Never) { token ->
+            SparseSourceLp.prepare(emptyList(), List(variables) { ExactLpColumn(ExactLpBounds()) },
+                List(variables) { BigFraction.ZERO }, BigFraction.ZERO, policy, token, funding = funding)
+                .also { decline = it.decline }
+        }
+
+        assertNull(admit(8))
+        assertEquals(SparseSourceLpDecline.CALLER_ALLOCATION, decline)
+
+        assertNotNull(admit(1)).close()
+        assertFalse(funding.exhausted)
+    }
+
+    @Test
     fun `exhausted sparse budget should skip preparation`() {
         var prepared = false
 

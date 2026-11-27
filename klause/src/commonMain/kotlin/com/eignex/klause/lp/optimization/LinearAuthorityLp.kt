@@ -81,6 +81,7 @@ internal class LinearAuthorityLp(
     private var objectiveCompletion: LinearResidualCompletion? = null
     val preparations: Long get() = session?.preparations ?: 0L
     val reuses: Long get() = session?.reuses ?: 0L
+    val callerAllocationDeclined: Boolean get() = session?.callerAllocationDeclined == true
     fun invalidateGuidance() = session?.invalidateGuidance() ?: Unit
     private val observer = object : LpCertificationObserver {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {

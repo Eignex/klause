@@ -63,6 +63,18 @@ internal class SourceLpBudget(
     val funding: SourceLpFunding? = null,
 ) {
     val context: LpSolveContext get() = solveContext()
+    private var finishingExactQuery = false
+    val paused: Boolean get() = if (finishingExactQuery) funding?.exhausted == true else funding?.paused == true
+
+    fun <T> finishExactQuery(block: () -> T): T {
+        check(!finishingExactQuery)
+        finishingExactQuery = true
+        return try {
+            block()
+        } finally {
+            finishingExactQuery = false
+        }
+    }
 
     var operations: Int = 0
         private set
@@ -238,7 +250,7 @@ internal class SourceLpBudget(
         onDecline: (String) -> Unit = {},
     ): T? {
         val activeCap = maxActiveNanos
-        if (cancellation() || funding?.paused == true) return null
+        if (cancellation() || paused) return null
         if (resumed == null && operations >= maxOperations) {
             operationDenied = true
             return null
@@ -259,6 +271,7 @@ internal class SourceLpBudget(
             cancellation or ExecutionControl.until(start + (activeCap - activeNanos).nanoseconds)
         }
         try {
+            if (funding?.exhausted == true) return null
             if (resumed != null) return block(token).takeUnless { token() || resumed.closed }
             if (sparse != null) {
                 val preparation = sparse(token)
@@ -266,11 +279,11 @@ internal class SourceLpBudget(
                 reservedAllocation += minOf(preparation.metrics.allocation, Long.MAX_VALUE - reservedAllocation)
                 funding?.charge(0, preparation.metrics.allocation)
                 observe(preparation = preparation.metrics.work)
-                if (preparation.prepared == null || token()) return null
+                if (preparation.prepared == null || token() || funding?.exhausted == true) return null
                 return block(token).takeUnless { token() }
             }
             val prepared = prepare?.invoke(token)
-            if (prepare != null && (prepared == null || token())) return null
+            if (prepare != null && (prepared == null || token() || funding?.exhausted == true)) return null
             val admittedVariables = prepared?.variables ?: variables
             val admittedRhs = prepared?.rhs ?: rhs
             val groups = listOf(prepared?.rows ?: rows) + additional
@@ -329,8 +342,8 @@ internal class SourceLpBudget(
                 onDecline("AllocationReservation")
                 return null
             }
-            reservedWork += work
-            reservedAllocation += allocation
+            reservedWork += minOf(work, Long.MAX_VALUE - reservedWork)
+            reservedAllocation += minOf(allocation, Long.MAX_VALUE - reservedAllocation)
             return block(token).takeUnless { token() }
         } finally {
             if (outermost) {

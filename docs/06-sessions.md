@@ -384,8 +384,9 @@ Open linear optimization, numerical MIP traversal and joint repair use caller-fu
 source LP work. Each slice grants work from the same cumulative ledger. Admission
 costs 1024 work units, including declined and resumed attempts;
 source metadata visits, sparse preparation, floating work, exact continuation,
-refinement and certification debit
-their measured work. Atomic phases can overspend, and the next admission pauses.
+refinement and certification debit their measured work. An admitted small exact
+query can finish its bounded certificate checks across a slice boundary.
+Exhausting caller work prevents admission to the next phase.
 At the end of a slice the pending alternative and its owner remain available.
 Standalone optimization advances subsequent slices automatically. The caller may
 set cumulative `source-lp-work-limit` and `source-lp-allocation-limit` ceilings.

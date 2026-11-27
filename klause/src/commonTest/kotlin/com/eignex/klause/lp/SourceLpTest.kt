@@ -94,6 +94,22 @@ class SourceLpTest {
     }
 
     @Test
+    fun `admission spending the caller allowance should skip source input preparation`() {
+        val funding = SourceLpFunding(1024L, 4096L).also { it.grant(1024L) }
+        val budget = SourceLpBudget(funding = funding)
+        var prepared = false
+
+        val result = budget.runPrepared(ExecutionControl.Never, prepare = {
+            prepared = true
+            null
+        }) { true }
+
+        assertNull(result)
+        assertFalse(prepared)
+        assertEquals(1024L, funding.spent)
+    }
+
+    @Test
     fun `cancelled source input preparation should spend an operation without entering the solver`() {
         val budget = SourceLpBudget()
         var cancelled = false

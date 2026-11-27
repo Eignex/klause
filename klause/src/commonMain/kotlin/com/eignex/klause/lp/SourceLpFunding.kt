@@ -14,12 +14,11 @@ internal class SourceLpFunding(
         private set
     var allocated: Long = 0
         private set
-    private var allocationDenied = false
     private var granted = 0L
     val remainingWork: Long get() = (workLimit - spent).coerceAtLeast(0L)
     val remainingAllocation: Long get() = (allocationLimit - allocated).coerceAtLeast(0L)
     val availableWork: Long get() = minOf(remainingWork, (granted - spent).coerceAtLeast(0L))
-    val exhausted: Boolean get() = spent >= workLimit || allocated >= allocationLimit || allocationDenied
+    val exhausted: Boolean get() = spent >= workLimit || allocated >= allocationLimit
     val paused: Boolean get() = exhausted || spent >= granted
 
     fun grant(work: Long) {
@@ -35,15 +34,8 @@ internal class SourceLpFunding(
 
     fun reserveAllocation(bytes: Long): Boolean {
         require(bytes >= 0L)
-        if (bytes > remainingAllocation) {
-            declineAllocation()
-            return false
-        }
+        if (bytes > remainingAllocation) return false
         charge(0L, bytes)
         return true
-    }
-
-    fun declineAllocation() {
-        allocationDenied = true
     }
 }

@@ -19,7 +19,7 @@ internal data class SparseSourceLpLimits(val work: Long, val allocation: Long, v
     }
 }
 
-internal enum class SparseSourceLpDecline { CANCELLED, SHAPE, SCALAR_WIDTH, WORK, ALLOCATION }
+internal enum class SparseSourceLpDecline { CANCELLED, SHAPE, SCALAR_WIDTH, WORK, ALLOCATION, CALLER_ALLOCATION }
 
 internal enum class SparseSourceLpRowPolicy { IDENTITY, UNCONDITIONAL_EQUALITIES }
 
@@ -257,10 +257,9 @@ internal class SparseSourceLp private constructor(
             val bytes = minOf(safety.allocation, funding?.remainingAllocation ?: Long.MAX_VALUE)
             val limits = if (bytes == safety.allocation) safety else safety.copy(allocation = bytes)
             val result = prepare(rows, columns, costs, constant, limits, cancellation, policy.rowPolicy, pointMargin)
-            if (result.decline == SparseSourceLpDecline.ALLOCATION && bytes < safety.allocation) {
-                funding?.declineAllocation()
-            }
-            return result
+            return if (result.decline == SparseSourceLpDecline.ALLOCATION && bytes < safety.allocation) {
+                result.copy(decline = SparseSourceLpDecline.CALLER_ALLOCATION)
+            } else result
         }
     }
 }

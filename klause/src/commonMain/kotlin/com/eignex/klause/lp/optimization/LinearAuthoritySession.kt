@@ -3,6 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpSparseAdmission
 import com.eignex.klause.lp.SparseSourceLp
+import com.eignex.klause.lp.SparseSourceLpDecline
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.SparseSourceLpRowPolicy
 import com.eignex.klause.lp.engine.ExactLpBounds
@@ -55,6 +56,8 @@ internal class LinearAuthoritySession(
         private set
     var reuses: Long = 0L
         private set
+    var callerAllocationDeclined = false
+        private set
 
     fun bind(
         packed: LinearAuthorityModel,
@@ -65,6 +68,7 @@ internal class LinearAuthoritySession(
         allowance: LpFloatAllowance? = null,
         appendRows: Boolean = false,
     ): LpScopedSolver? {
+        callerAllocationDeclined = false
         currentToken = cancellation
         var current = owner
         val profile = allowance ?: effort ?: LpFloatAllowance(2_000_000L, 1024)
@@ -83,7 +87,7 @@ internal class LinearAuthoritySession(
                 if (current != null) {
                     if (appendRows) retireOwner() else close()
                 }
-                if (cancellation() || budget.funding?.paused == true) return null
+                if (cancellation() || budget.paused) return null
                 currentToken = cancellation
                 current = LpScopedSolver(LpExactState(model), token, context = budget.context,
                     iterationLimit = profile.iterations, workLimit = profile.work)
@@ -105,7 +109,7 @@ internal class LinearAuthoritySession(
         }
         val bound = checkNotNull(current)
         effort = profile
-        if (budget.funding?.paused == true) return null
+        if (budget.paused) return null
         if (sides != packed.columns || inactive != packed.inactiveRows || this.authority != authority) {
             var mappingWork = 0L
             var mappingAllocation = 0L
@@ -114,6 +118,7 @@ internal class LinearAuthoritySession(
                     mappingWork += work
                     budget.observe(preparation = work)
                     if (allocation > 0L && budget.funding?.reserveAllocation(allocation) == false) {
+                        callerAllocationDeclined = true
                         false
                     } else {
                         mappingAllocation += allocation
@@ -162,6 +167,7 @@ internal class LinearAuthoritySession(
         observer: LpCertificationObserver,
         consume: (LpRootGuidance, SparseSourceLp, ExecutionControl) -> T?,
     ): T? {
+        callerAllocationDeclined = false
         if (cancellation()) {
             close()
             return null
@@ -189,7 +195,9 @@ internal class LinearAuthoritySession(
             } else close()
             admission = budget.admitSparse(cancellation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns.map { it.copy(bounds = ExactLpBounds()) },
-                    costs, constant, policy, active, funding = budget.funding)
+                    costs, constant, policy, active, funding = budget.funding).also {
+                    callerAllocationDeclined = it.decline == SparseSourceLpDecline.CALLER_ALLOCATION
+                }
             } ?: run {
                 close()
                 return null
