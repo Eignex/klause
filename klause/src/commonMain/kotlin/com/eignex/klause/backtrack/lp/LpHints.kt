@@ -36,6 +36,7 @@ internal class LpHints(
     private val history = LpDirectionalHistory(observe, charge = charge, depthRetention = depthRetention,
         depthCancellation = depthCancellation)
     private var depthValues: LpPassiveValueChoice? = null
+    private var depthEarlyNomination = false
     private var depthChecksRemaining = 128
     private var passiveVariable: LpPassiveVariableChoice? = null
     private var passiveValues: LpPassiveValueChoice? = null
@@ -411,9 +412,12 @@ internal class LpHints(
         cancelled: ExecutionControl,
     ): List<SearchDecision> {
         depthValues?.clear()
-        if (depthRetention) history.clearDepthGuard()
+        if (depthRetention) {
+            depthEarlyNomination = false
+            history.clearDepthLookup()
+        }
         val ordered = orderProductionAlternatives(variable, alternatives, cancelled)
-        if (!depthRetention || !history.depthGuardDeclined || ordered.size != 2 || depthChecksRemaining <= 0 ||
+        if (!depthRetention || !history.depthLookupEligible || ordered.size != 2 || depthChecksRemaining <= 0 ||
             !history.hasDepthHistory || passiveValues?.hasNomination == true || !cutoff.isFinite() ||
             !passivePointCurrent() || cancelled()
         ) return ordered
@@ -424,11 +428,16 @@ internal class LpHints(
         val bound = cutoff
         fun current(): Boolean = !cancelled() && nodeStamp == version && passivePoint === point &&
             passiveState === state && solveStamp == stamp && cutoff == bound && passivePointCurrent()
+        val early = !history.depthGuardDeclined
         depthChecksRemaining--
         val preference = history.depthPreference(variable, value(variable), bound - scopeConstant.toDouble(), ::current)
         if (!current()) return ordered
         observe("PASSIVE_DEPTH_RETENTION_CHECK")
         if (!current()) return ordered
+        if (early) {
+            observe("PASSIVE_DEPTH_RETENTION_EARLY_CHECK")
+            if (!current()) return ordered
+        }
         if (depthChecksRemaining == 0) {
             observe("PASSIVE_DEPTH_RETENTION_EXHAUSTED")
             if (!current()) return ordered
@@ -443,13 +452,16 @@ internal class LpHints(
             charge(8L)
             if (!current()) return ordered
             depthValues = LpPassiveValueChoice(false, { event ->
+                val earlyCommit = depthEarlyNomination && event == "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED"
                 observe(if (event == "PASSIVE_VALUE_CHECK") "PASSIVE_DEPTH_RETENTION_PARTITION_CHECK"
                 else event.replaceFirst("PASSIVE_VALUE", "PASSIVE_DEPTH_RETENTION"))
+                if (earlyCommit) observe("PASSIVE_DEPTH_RETENTION_EARLY_COMMIT_WITHHELD_CHANGED")
             }, charge)
         }
         val shadow = checkNotNull(depthValues)
         shadow.select(variable, value(variable), ordered, preference, stamp, fresh = ::current)
         if (!current()) shadow.clear()
+        if (shadow.hasNomination) depthEarlyNomination = early
         return ordered
     }
 

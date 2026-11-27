@@ -87,6 +87,8 @@ internal class LpDirectionalHistory(
     private var prunedStamp = -1L
     private var observed = false
     private var depthJournal: LpDepthObservationJournal? = null
+    var depthLookupEligible = false
+        private set
     var depthGuardDeclined = false
         private set
 
@@ -112,7 +114,8 @@ internal class LpDirectionalHistory(
 
     val hasDepthHistory: Boolean get() = (depthJournal?.size ?: 0) >= 4
 
-    fun clearDepthGuard() {
+    fun clearDepthLookup() {
+        depthLookupEligible = false
         depthGuardDeclined = false
     }
 
@@ -139,7 +142,7 @@ internal class LpDirectionalHistory(
         charge(gains.size.toLong() + retainedCandidates + if (depthJournal == null) 0L else 1L)
         gains.clear()
         depthJournal?.clear()
-        clearDepthGuard()
+        clearDepthLookup()
         trimParents(0)
         pending = null
         pendingOutcome = null
@@ -396,10 +399,16 @@ internal class LpDirectionalHistory(
 
     fun preferDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {
         val version = generation
+        val node = stamp
         charge(8L)
         if (version != generation) return null
         val history = reliable(variable, value) ?: return null
-        return preferred(history, value, cutoff, version, rememberDepthDecline = depthRetention)
+        val preference = preferred(history, value, cutoff, version, rememberDepthDecline = depthRetention)
+        if (depthRetention && preference == null && version == generation && node == stamp) {
+            charge(1L)
+            if (!depthCancellation() && version == generation && node == stamp) depthLookupEligible = true
+        }
+        return preference
     }
 
     internal fun depthPreference(

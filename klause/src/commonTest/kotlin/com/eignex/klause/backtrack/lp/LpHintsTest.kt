@@ -126,6 +126,51 @@ class LpHintsTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `depth recovery records a changed commitment after an ordinary numeric tie`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2L)
+        val up = SearchDecision.IntAtLeast(0, 3L)
+        val events = ArrayList<String>()
+        val hints = LpHints(1, 0, directionalGains = true, applyAdvice = false, depthRetention = true,
+            observe = events::add)
+        for (level in 0..1) {
+            repeat(2) {
+                for (decision in listOf(down, up)) {
+                    hints.beginNode(level, 1024.0)
+                    hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+                    hints.recordObjective(relaxation, 0.0)
+                    hints.branch(variable)
+                    hints.commit(decision, level + 1)
+                    hints.beginNode(level + 1, 1024.0)
+                    hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+                    val objective = if (level == 1) 2.0 else if (decision == down) 1.0 else 3.0
+                    hints.recordObjective(relaxation, objective)
+                    hints.recordOutcome(true, relaxation)
+                    hints.finishNode(trail.state)
+                }
+            }
+        }
+        hints.beginNode(0, 1024.0)
+        hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
+        hints.recordObjective(relaxation, 0.0)
+        hints.branch(variable)
+        events.clear()
+
+        val order = hints.orderAlternatives(variable, listOf(up, down), ExecutionControl.Never)
+        hints.commit(order.first(), 1)
+
+        assertEquals(listOf(up, down), order)
+        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_EARLY_COMMIT_WITHHELD_CHANGED" })
+        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_COMMIT_WITHHELD_CHANGED" })
+        assertFalse("PASSIVE_VALUE_DEPTH_CONTEXT_DECLINED" in events)
+    }
+
+    @Test
     fun `depth recovery observation limits do not renew on restart or source reset`() {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
