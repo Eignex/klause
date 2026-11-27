@@ -26,58 +26,65 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest : RuntimeInitializedTest() {
     @Test
-    fun `finite search records directional lp outcomes across cooperative slices`() {
-        for (automatic in listOf(false, true)) {
-            val blocks = 2
-            val variables = blocks * 3
-            val factors = ArrayList<Factor>()
-            repeat(blocks) { block ->
-                repeat(3) { edge ->
-                    factors.add(Linear(longArrayOf(1L, 1L),
-                        intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
-                }
-            }
-            val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
-            val params = BacktrackParams(
-                variableSelector = InputOrder,
-                valueSelector = IndomainMin,
-                randomSeed = 3L,
-                maxDecisions = 1000L,
-                lpConfig = if (automatic) LpConfig.AUTO else null,
-                lpPlan = LpPlan(bounding = !automatic, rootBudgetMillis = 0L, rootCutHarvest = false,
-                    boundMaxOpsPerNode = 0L),
-                lpDirectionalGains = true,
-                objectiveBoundSupplier = { 100.0 },
-                componentFactory = {
-                    listOf(object : SearchComponent {
-                        override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
-                    })
-                },
-            )
+    fun `explicit lp records directional outcomes across cooperative slices`() {
+        checkCooperativeDirectionalOutcomes(automatic = false)
+    }
 
-            val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
-            ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
-                var slices = 0
-                while (slices < 128 && !search.isDone &&
-                    ((search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("DOWN") ?: 0L) < 2L ||
-                        (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("UP") ?: 0L) < 2L ||
-                        (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("OUTCOME_OPEN") ?: 0L) < 4L)
-                ) {
-                    slices++
-                    search.runSlice(ExecutionControl.Never, 1000L, 4L) {}
-                }
+    @Test
+    fun `automatic lp records directional outcomes across cooperative slices`() {
+        checkCooperativeDirectionalOutcomes(automatic = true)
+    }
 
-                val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-                val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; " +
-                    "slices=$slices; done=${search.isDone}"
-                assertTrue(slices > 1, diagnostic)
-                assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
-                assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-                assertTrue((observations["OUTCOME_OPEN"] ?: 0L) >= 4L, diagnostic)
-                assertEquals(0L, observations["PASSIVE_VARIABLE_SCORE"] ?: 0L, diagnostic)
-                assertEquals(0L, observations["PASSIVE_VARIABLE_COMMIT_CHANGED"] ?: 0L, diagnostic)
-                assertEquals(0L, observations["CONSUMED"] ?: 0L, diagnostic)
+    private fun checkCooperativeDirectionalOutcomes(automatic: Boolean) {
+        val blocks = 2
+        val variables = blocks * 3
+        val factors = ArrayList<Factor>()
+        repeat(blocks) { block ->
+            repeat(3) { edge ->
+                factors.add(Linear(longArrayOf(1L, 1L),
+                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
             }
+        }
+        val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
+        val params = BacktrackParams(
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
+            randomSeed = 3L,
+            maxDecisions = 1000L,
+            lpConfig = if (automatic) LpConfig.AUTO else null,
+            lpPlan = LpPlan(bounding = !automatic, rootBudgetMillis = 0L, rootCutHarvest = false,
+                boundMaxOpsPerNode = 0L),
+            lpDirectionalGains = true,
+            objectiveBoundSupplier = { 100.0 },
+            componentFactory = {
+                listOf(object : SearchComponent {
+                    override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
+                })
+            },
+        )
+
+        val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
+        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+            var slices = 0
+            while (slices < 128 && !search.isDone &&
+                ((search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("DOWN") ?: 0L) < 2L ||
+                    (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("UP") ?: 0L) < 2L ||
+                    (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("OUTCOME_OPEN") ?: 0L) < 4L)
+            ) {
+                slices++
+                search.runSlice(ExecutionControl.Never, 1000L, 4L) {}
+            }
+
+            val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
+            val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}; " +
+                "slices=$slices; done=${search.isDone}"
+            assertTrue(slices > 1, diagnostic)
+            assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
+            assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
+            assertTrue((observations["OUTCOME_OPEN"] ?: 0L) >= 4L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_VARIABLE_SCORE"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["PASSIVE_VARIABLE_COMMIT_CHANGED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["CONSUMED"] ?: 0L, diagnostic)
         }
     }
 

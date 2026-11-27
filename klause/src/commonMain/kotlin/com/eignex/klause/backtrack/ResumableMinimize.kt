@@ -706,7 +706,7 @@ internal class ResumableMinimize(
             LpHints(problem.numIntVars, problem.numBoolVars,
                 params.lpDirectionalGains && lpEngine.params.lpPlan.bounding,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                applyAdvice = params.lpDirectionalAdvice, depthRetention = true)
+                applyAdvice = params.lpDirectionalAdvice, depthRetention = true, depthCancellation = params.cancellation)
         } else null
         lpEngine.lpHints = lpHints
         yield(Unit)

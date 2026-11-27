@@ -30,9 +30,11 @@ internal class LpHints(
     private val charge: (Long) -> Unit = {},
     private val applyAdvice: Boolean = true,
     private val depthRetention: Boolean = false,
+    depthCancellation: ExecutionControl = ExecutionControl.Never,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe, charge = charge, depthRetention = depthRetention)
+    private val history = LpDirectionalHistory(observe, charge = charge, depthRetention = depthRetention,
+        depthCancellation = depthCancellation)
     private var depthValues: LpPassiveValueChoice? = null
     private var depthChecksRemaining = 128
     private var passiveVariable: LpPassiveVariableChoice? = null
@@ -236,7 +238,9 @@ internal class LpHints(
         passiveVariable?.commit(decision) { !cancelled() && passivePointCurrent() }
         passiveValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
         passiveCollection?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
-        depthValues?.commit(decision, solveStamp) { !cancelled() && passivePointCurrent() }
+        depthValues?.commit(decision, solveStamp) {
+            history.isImmediateChild(depth) && !cancelled() && passivePointCurrent()
+        }
         if (collect && scopeModel != null) {
             history.commit(decision, depth)
         }

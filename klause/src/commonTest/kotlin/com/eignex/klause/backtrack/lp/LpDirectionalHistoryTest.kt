@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -123,12 +124,13 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `depth retention validates allocation publication and lookup after charged invalidation`() {
-        for (action in listOf("numeric-reset", "outcome-reset", "outcome-cancel", "lookup-reset", "lookup-cancel",
-            "allocation-reset", "node-change")) {
+        for (action in listOf("numeric-reset", "numeric-cancel", "outcome-reset", "outcome-cancel",
+            "lookup-reset", "lookup-cancel", "allocation-reset", "node-change")) {
             var armed = false
             var current = true
             lateinit var history: LpDirectionalHistory
-            history = LpDirectionalHistory({}, depthRetention = true, charge = { amount ->
+            val cancellation = ExecutionControl { !current }
+            history = LpDirectionalHistory({}, depthRetention = true, depthCancellation = cancellation, charge = { amount ->
                 val target = when {
                     action.startsWith("lookup") -> 8L
                     action == "allocation-reset" -> 224L

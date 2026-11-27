@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.sqrt
@@ -11,6 +12,7 @@ internal class LpDirectionalHistory(
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
     private val depthRetention: Boolean = false,
+    private val depthCancellation: ExecutionControl = ExecutionControl.Never,
 ) {
     internal class Direction {
         var count = 0
@@ -89,6 +91,8 @@ internal class LpDirectionalHistory(
 
     val hasDepthHistory: Boolean get() = depthRetention && depthValueStamp >= 0L && depthPrunedStamp >= 0L &&
         stamp - depthValueStamp <= maxAge && stamp - depthPrunedStamp <= maxAge
+
+    fun isImmediateChild(level: Int): Boolean = level > 0 && depth == level - 1
 
     fun restart() {
         charge(3L)
@@ -229,7 +233,14 @@ internal class LpDirectionalHistory(
         val index = depthPosition(variable, level, version, node, current) ?: return null
         val present = entries.getOrNull(index)
         if (present != null && compareDepth(present, variable, level) == 0) return present.gains
-        for (slot in depthHistoryCount downTo index + 1) entries[slot] = entries[slot - 1]
+        val count = depthHistoryCount
+        if (index < count) {
+            charge((count - index).toLong())
+            if (!current() || version != generation || node != stamp || depthHistories !== entries ||
+                depthHistoryCount != count
+            ) return null
+            entries.copyInto(entries, index + 1, index, count)
+        }
         val entry = DepthHistory(variable, level)
         entries[index] = entry
         depthHistoryCount++
@@ -239,9 +250,9 @@ internal class LpDirectionalHistory(
     }
 
     private fun recordDepthNumeric(child: Pending, normalized: Double, version: Long, node: Long) {
-        val history = retainDepth(child, version, node) { true } ?: return
+        val history = retainDepth(child, version, node) { !depthCancellation() } ?: return
         charge(12L)
-        if (version != generation || node != stamp) return
+        if (depthCancellation() || version != generation || node != stamp) return
         val direction = if (child.up) history.up else history.down
         direction.previous = direction.latest
         direction.previousStamp = direction.stamp
