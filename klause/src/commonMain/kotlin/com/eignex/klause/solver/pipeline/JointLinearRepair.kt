@@ -10,6 +10,7 @@ import com.eignex.klause.lp.optimization.LinearAuthority
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.withLinearAuthority
+import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -124,6 +125,8 @@ internal class JointLinearRepair(
     private var rootStarted = false
     private var rootPreparationPending = false
     private var query: LinearAuthorityInvocation? = null
+    private var nominalPublicationCapture: ((ExecutionControl) -> SourceProofContext?)? = null
+    private var nominalPublicationTried = false
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
     private val refutedConditions = ArrayDeque<ExactNeighborhoodCondition>()
@@ -640,6 +643,49 @@ internal class JointLinearRepair(
             (0 until model.numIntVars).all { sample.exactIntValue(it) == center.exactIntValue(it) }
     }
 
+    fun enableNominalPublicationRecovery(capture: (ExecutionControl) -> SourceProofContext?) {
+        check(query == null && nominalPublicationCapture == null && !nominalPublicationTried)
+        require(source.scope.revision.semantics == "absolute-tolerance-envelope-v1" &&
+            model.numBoolVars == 0 && model.numIntVars in 1..256 && model.numRealVars > 0 &&
+            model.binaryIntegers && incumbentCompletionCheck != null && objective != null)
+        nominalPublicationCapture = capture
+    }
+
+    private fun recoverNominalPublication(sample: Sample, verification: ExecutionControl): Sample? {
+        val capture = nominalPublicationCapture ?: return null
+        val original = incumbentCompletionCheck ?: return null
+        if (nominalPublicationTried || verification() || funding.exhausted) return null
+        nominalPublicationTried = true
+        observe("jointRepairNominalPublicationAttempts")
+        val work = funding.spent
+        val allocation = funding.allocated
+        val token = object : ExecutionControl(verification) {
+            override fun isCancelled(): Boolean = verification() || funding.exhausted ||
+                funding.spent - work >= NOMINAL_PUBLICATION_MAX_WORK ||
+                funding.allocated - allocation >= NOMINAL_PUBLICATION_MAX_ALLOCATION
+            override val accounting = WorkMeter { units -> budget.observe(preparation = units) }
+        }
+        funding.grant(NOMINAL_PUBLICATION_MAX_WORK)
+        val captureWork = 1L + model.numFactors + source.premiseCount + source.coordinateCount
+        val captureBytes = 256L + 128L * (source.premiseCount + source.coordinateCount)
+        if (captureWork >= funding.availableWork || captureBytes >= funding.remainingAllocation) return null
+        budget.observe(preparation = captureWork)
+        funding.charge(0L, captureBytes)
+        val nominal = capture(token) ?: return null
+        if (token() || nominal.scope.revision == source.scope.revision ||
+            nominal.scope.condition != source.scope.condition ||
+            nominal.scope.objective?.sense != source.scope.objective?.sense ||
+            nominal.coordinates != source.coordinates || nominal.objective != source.objective ||
+            nominal.objectiveConstant != source.objectiveConstant) return null
+        budget.observe(preparation = 1L + sample.numIntVars + sample.numRealVars)
+        funding.charge(0L, 128L + 32L * (sample.numIntVars + sample.numRealVars))
+        val seed = sample.copy(exactReals = null)
+        return LinearIncumbentCompletion(budget, original) { stage, count ->
+            val key = "jointRepairNominalPublication$stage"
+            stages[key] = combine(key, stages[key] ?: 0L, count)
+        }.use { it.complete(nominal, seed, token) }
+    }
+
     private fun advanceAttempt(condition: ExactNeighborhoodCondition,
         cancellation: ExecutionControl): JointRepairAttempt {
         check(!closed)
@@ -722,6 +768,7 @@ internal class JointLinearRepair(
             observe("jointRepairPublicationChecks")
             val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, verification)
             var originalChecked = true
+            var originalRejected = false
             if (checked == SourceEvidenceCheck.Checked && incumbentCompletionCheck != null) {
                 val checking = publicationChecking(verification)
                 observe("jointRepairOriginalPublicationChecks")
@@ -730,8 +777,11 @@ internal class JointLinearRepair(
                 if (checking()) {
                     originalChecked = false
                     observe("jointRepairOriginalPublicationUnavailable")
-                } else observe(if (originalChecked) "jointRepairOriginalPublicationChecked"
-                else "jointRepairOriginalPublicationRejected")
+                } else {
+                    originalRejected = !originalChecked
+                    observe(if (originalChecked) "jointRepairOriginalPublicationChecked"
+                    else "jointRepairOriginalPublicationRejected")
+                }
             }
             observation?.event(proposalSequence, observationQuery, "publication", when {
                 checked != SourceEvidenceCheck.Checked -> "source-unchecked"
@@ -745,23 +795,35 @@ internal class JointLinearRepair(
                 return JointRepairAttempt(ExactNeighborhoodResult.Paused, feasiblePoint = sample,
                     bound = snapshot.bound)
             }
-            val accepted = checked == SourceEvidenceCheck.Checked && originalChecked
-            if (accepted) {
-                compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(sample))
+            val accepted = when {
+                checked != SourceEvidenceCheck.Checked -> null
+                originalChecked -> sample
+                originalRejected -> recoverNominalPublication(sample, verification)?.takeIf { recovered ->
+                    !verification() && !funding.exhausted &&
+                        (condition.cutoff == null || requireNotNull(objective).evaluateExact(recovered) < condition.cutoff)
+                }
+                else -> null
+            }
+            if (accepted != null) {
+                if (accepted !== sample) {
+                    observe("jointRepairNominalPublicationAccepted")
+                    observation?.event(proposalSequence, observationQuery, "publication", "nominal-checked")
+                }
+                compare("discovery", "checked", cutoff = condition.cutoff, candidate = comparisonValue(accepted))
             }
             val liveRelaxation = result == null && condition === relaxationProposal
-            if (accepted && liveRelaxation && !stop() && !exhausted) {
+            if (accepted === sample && liveRelaxation && !stop() && !exhausted) {
                 retainedProposal = condition
                 publishedQueryIncumbent = sample
                 observe("jointRepairRetainedQueryIncumbents")
             } else retire()
-            if (accepted) {
-                anchor = sample
+            if (accepted != null) {
+                anchor = accepted
                 selection?.clearRefutation()
                 refutedConditions.clear()
                 observe("jointRepairCheckedIncumbents")
-                return JointRepairAttempt(ExactNeighborhoodResult.Witness(sample),
-                    feasiblePoint = sample, bound = snapshot.bound)
+                return JointRepairAttempt(ExactNeighborhoodResult.Witness(accepted),
+                    feasiblePoint = accepted, bound = snapshot.bound)
             }
             return JointRepairAttempt(ExactNeighborhoodResult.Undecided, when {
                 params.timeout() -> TerminationReason.Timeout
@@ -1008,6 +1070,8 @@ internal class JointLinearRepair(
 }
 
 private const val QUERY_SLICE_MILLIS = 10L
+private const val NOMINAL_PUBLICATION_MAX_WORK = 20_000_000L
+private const val NOMINAL_PUBLICATION_MAX_ALLOCATION = 64L * 1024 * 1024
 private const val QUERY_SLICE_WORK = 64L
 private const val MAX_REFUTED_CONDITIONS = 4
 private const val MAX_REFUTATION_ENTRIES = 4096

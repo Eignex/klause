@@ -517,6 +517,12 @@ band. Source publication still checks the original decimal source. Bound metadat
 the accepted-set envelope separately from nominal-source bounds; neither establishes
 independent proof validation. Exact source requests retain their original model.
 
+A joint repair with nominal publication recovery may fix an accepted-envelope
+candidate's binary values and complete its real coordinates in a separate nominal
+context. It spends the remaining joint funding and publication lifetime, verifies
+the same original objective and publication check, and applies the receiving
+cutoff before offering the recovered assignment.
+
 Point selection admits at most eight mutually nonparallel additional checked cuts per
 usable point and waits for its completed query before scanning again. A mixed ordinary recipe with
 at least one active checked cut per numerical coordinate keeps its ordinary query

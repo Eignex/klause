@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -14,6 +15,7 @@ import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
+import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -27,6 +29,38 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairResultTest {
+    @Test
+    fun `an accepted envelope point should recover an exact nominal publication`() {
+        val integers = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null)
+        val envelope = Problem(0, intBounds = integers, factors = emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val nominal = Problem(0, intBounds = integers, factors = emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val accepted = assertNotNull(envelope.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val source = accepted.atScope(accepted.scope.copy(
+            revision = SourceRevision("envelope", "absolute-tolerance-envelope-v1")))
+        val pins = mapOf(0 to BigFraction.ONE)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        val expected = BigFraction.ONE / BigFraction.ofLong(4)
+
+        JointLinearRepair(nominal, source, objective, TheoryParams(sourceCuts = false),
+            incumbentCompletionCheck = { sample, value, _ ->
+                sample.exactReals?.single() == expected && value == expected
+            }).use { repair ->
+            repair.enableNominalPublicationRecovery { nominal.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, it) }
+            var attempt = repair.attempt(condition, ExecutionControl.Never)
+            repeat(64) {
+                if (attempt.result == ExactNeighborhoodResult.Paused) attempt = repair.attempt(condition, ExecutionControl.Never)
+            }
+
+            val sample = assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample
+            assertEquals(1L, sample.intValue(0))
+            assertEquals(expected, sample.exactReals?.single())
+        }
+    }
+
     @Test
     fun `an unconsumed improving ray should not report conditioned exhaustion`() {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,

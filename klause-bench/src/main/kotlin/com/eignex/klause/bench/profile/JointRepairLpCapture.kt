@@ -124,6 +124,12 @@ internal object JointRepairLpCapture {
             constructor.newInstance(model, scope, objective, limits, policy, true, { null }, active, null,
                 null, null, true, null, check, null, null, null)
         val owner = openRegion(context, params, checker)
+        if (options["regional-worker-nominal-recovery"] == "true") {
+            val capture: (ExecutionControl) -> SourceProofContext? = { token ->
+                captureContext.invoke(companion, model, objective, token, null, null) as SourceProofContext?
+            }
+            call(owner, "enableNominalPublicationRecovery", capture)
+        }
         if (pins != null) {
             val consultations = options["regional-consultations"]?.toInt() ?: 64
             val regionalCost = replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, consultations,
