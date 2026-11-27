@@ -114,9 +114,10 @@ immutable LP model or column metadata. Scope edits that preserve that model reus
 the completed check. Edits and retraction check every changed
 column; newly appended bounded definitions require evaluation before acceptance.
 Closing the component releases the point, checked state and activity caches.
-An unchanged point rechecks only changed bound columns when the exact state
-identifies its checked predecessor. A skipped state or structural edit requires
-the full column check, and auxiliary values follow their indexed affine definitions.
+An unchanged point rechecks only changed columns between adjacent bound layouts.
+Scope or objective changes that leave bounds intact carry the same layout identity.
+A skipped bound layout or a structural edit requires the full column check, and
+auxiliary values follow their indexed affine definitions.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
 Mixed components can reuse a continuous point after checking the asserted integer

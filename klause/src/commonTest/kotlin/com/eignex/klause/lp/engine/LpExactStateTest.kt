@@ -15,6 +15,35 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
+    fun `point admission should identify changed bounds across empty scopes`() {
+        val source = assertNotNull(LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val root = LpExactState(source)
+        val trail = LpBoundTrail(root)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+        assertTrue(trail.push())
+
+        val checked = mutableListOf<Int>()
+        assertEquals(true, trail.state.checkChangedBounds(root) { checked.add(it) })
+        assertEquals(listOf(1), checked)
+    }
+
+    @Test
+    fun `point admission should identify changed bounds in either direction`() {
+        val source = assertNotNull(LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val root = LpExactState(source)
+        val trail = LpBoundTrail(root)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+
+        val checked = mutableListOf<Int>()
+        assertEquals(true, root.checkChangedBounds(trail.state) { checked.add(it) })
+        assertEquals(listOf(1), checked)
+    }
+
+    @Test
     fun `assertion captures should remain independent across empty scopes and later edits`() {
         val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
             .build(Sense.MINIMIZE).authoritativeModel())
