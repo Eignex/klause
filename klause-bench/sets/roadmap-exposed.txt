@@ -70,6 +70,9 @@ miplib2017/pigeon-20
 miplib2017/qiu
 miplib2017/sorrell8
 miplib3/qiu
+# Related generated development fixtures for independent LP harvest.
+lp-component-split/mps-isolated-cover-conflict
+lp-component-split/mps-isolated-cover-feasible
 # Encodings of the MIPLIB sources above in other formats. The pb-comp-2025 archive also carries
 # bell3a, p0201, pp08aCUTS and sorrell8 under `PB24/`, which no suite selects.
 pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu
