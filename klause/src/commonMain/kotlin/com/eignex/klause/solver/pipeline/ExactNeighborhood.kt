@@ -105,6 +105,7 @@ internal class ExactNeighborhood(
     fun advance(
         cancellation: ExecutionControl,
         allowance: Long,
+        offeredMillis: Long? = null,
         onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
     ): Boolean {
         check(!closed) { "neighborhood owner is closed" }
@@ -112,7 +113,8 @@ internal class ExactNeighborhood(
         val entry = observer?.let { advanceState() }
         fun finish(guard: ExactNeighborhoodAdvanceGuard, done: Boolean = searchAllowanceSpent()): Boolean {
             if (observer != null && entry != null) {
-                observer.recordAdvance(ExactNeighborhoodAdvanceObservation(allowance, entry, advanceState(), guard, done))
+                observer.recordAdvance(ExactNeighborhoodAdvanceObservation(
+                    allowance, offeredMillis, entry, advanceState(), guard, done))
             }
             return done
         }

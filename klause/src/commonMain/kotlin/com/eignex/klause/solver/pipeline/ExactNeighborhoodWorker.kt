@@ -51,7 +51,7 @@ internal fun exactNeighborhoodWorker(
                     result?.let { return it }
                     check(!closed)
                     val done = search.advance(slice(global, sliceMillis),
-                        if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions)
+                        if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions, sliceMillis)
                     if (done || stop(global)()) result = search.solveResult(reason(global))
                     return result
                 }
@@ -87,7 +87,7 @@ internal fun exactNeighborhoodWorker(
                     result?.let { return it }
                     check(!closed)
                     val done = search.advance(slice(global, sliceMillis),
-                        if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions) { sample, value ->
+                        if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions, sliceMillis) { sample, value ->
                         onIncumbent(MinimizeResult.BestFound(sample, requireNotNull(value).toDouble(),
                             TerminationReason.BudgetExhausted, search.stats))
                     }
