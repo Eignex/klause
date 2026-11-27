@@ -28,7 +28,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
-class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeInitializedTest() {
+class JointLinearRepairFractionalTest(
+    private val advisory: Boolean,
+    private val boundOrdered: Boolean,
+) : RuntimeInitializedTest() {
     @Test
     fun `private repair should complete coherent fractional binary guidance`() {
         val half = BigFraction.ofLong(2).reciprocal()
@@ -70,7 +73,7 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
         val records = mutableListOf<JointRepairObservation>()
 
         JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 3, sourceLpOperations = 4),
-            boundOrdered = true, external = { offered }, incumbentProximity = true,
+            boundOrdered = boundOrdered, external = { offered }, incumbentProximity = true,
             incumbentCompletionCheck = { sample, _, token ->
                 verifier.verify(SourceEvidence(source.scope, SourceClaim.Witness(sample),
                     SourceDerivation.SourceWitness), token) == SourceEvidenceCheck.Checked
@@ -107,7 +110,7 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
 
     companion object {
         @JvmStatic
-        @Parameterized.Parameters(name = "advisory={0}")
-        fun cases() = listOf(false, true).map { arrayOf(it) }
+        @Parameterized.Parameters(name = "advisory={0}, boundOrdered={1}")
+        fun cases() = listOf(arrayOf(false, false), arrayOf(true, false), arrayOf(true, true))
     }
 }

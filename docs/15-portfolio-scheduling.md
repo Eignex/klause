@@ -558,8 +558,8 @@ before the solve starts. Other limits and retirement conditions still apply.
 Advisory joint repair retains ordinary root guidance for
 fallback before preparing private neighborhoods. Its first query uses the ordinary
 rounded root; completed advisory queries alternate with ordinary repair queries.
-Paused queries retain their turn. Private joint queries solve the source rows and
-receiving restrictions directly. A default checked center passes private completion
+Paused queries retain their turn. An advisory private joint query solves the source
+rows and receiving restrictions directly. A default checked center passes private completion
 and original-source checks, and its first connected private neighborhood replaces the
 all-pinned cutoff query while retaining ordinary root preparation. Later private
 queries alternate with ordinary repair. Both center kinds first free at most two
