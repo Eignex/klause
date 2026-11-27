@@ -11,8 +11,10 @@ driver owns its schedule instance. A single unbounded run is the default. The
 configurable schedules, in precedence order, are:
 
 - **Mode switching** dives without restarting until a first feasible solution, then
-  alternates a stable stage of sparse Luby restarts that dives on the saved phase with
-  focused stages of frequent adaptive restarts.
+  cycles a stable stage of sparse Luby restarts that dives on the target phase with
+  focused stages of EMA-adaptive and decision-level adaptive restarts on the saved
+  phase. Each stage lasts a Luby multiple of 500 conflicts; the decision-level
+  schedule restarts when recent conflict levels run above their long-run average.
 - **EMA adaptive** and **LBD adaptive** restart when recent learned LBD is worse than
   the long-run average, using moving averages or bounded windows respectively.
 - **Luby** restarts after a Luby multiple of a strictly positive decision base.
@@ -23,11 +25,18 @@ Both adaptive schedules block a restart while the trail is well above its averag
 since the search is then driving deep toward a model. Learned constraints, activities
 and saved phases survive every restart.
 
-When enabled, `PhaseSaving` keeps the saved polarity of each variable, an optional
-target phase (the deepest conflict-free Boolean prefix) and a rephase rotation through
-target, saved, all-true, all-false and random polarities every 1000 conflicts by
-default. A
-mode-switching schedule pins the polarity source to its stage instead.
+Open-theory traversals give the shared engine a `SearchRestartPolicy` directly: no
+restarts by default, or a fixed decision interval set by `shared-restart`. Complete
+pure-real search can instead restart once into conflict-activity order; see
+[linear arithmetic](18-linear-arithmetic.md).
+
+When enabled, `PhaseSaving` keeps the saved value of each variable, an optional
+target phase (the deepest conflict-free Boolean prefix) with a rephase rotation through
+target, solution, saved, all-true, all-false and random polarities every 1000 conflicts
+by default, and an optional solution phase holding the latest incumbent's values. A
+source without a value falls back to the saved phase. A mode-switching schedule pins
+the polarity source to its stage instead: stable stages prefer the solution phase,
+then the target, and focused stages use the saved phase.
 
 Inprocessing runs at safe complete roots in bounded round-robin slices over the
 learned database. Vivification strengthens a clause by asserting the negations of its
@@ -242,9 +251,11 @@ authority.
 
 ### Root primal proposals
 
-On mixed models, the root LP relaxation also proposes incumbents. Nearest rounding,
-directed upward and downward rounding of the retained LP point, a peer worker's
-discrete assignment and a feasibility pump each produce discrete targets. Every
+When the LP plan enables its root probe, the root LP relaxation also proposes
+incumbents. Nearest rounding of the root LP point, directed upward and downward
+rounding (on models without real variables only under a retained-root plan), a peer
+worker's discrete assignment on models with real variables, and a feasibility pump
+each produce discrete targets. Every
 distinct target is pinned through the arm's own propagation, and the leaf checks of
 relations whose selected propagation is inert must accept the pinned point, so it is
 a search leaf. It must then satisfy the caller's assumptions and complete its reals
@@ -266,11 +277,12 @@ search through greedy feasibility repairs when those variables occur only
 positively in hard clauses. The probe runs once before ordinary optimization and is
 skipped behind an existing shared incumbent or within repair fragments.
 
-A private satisfaction repair first finds a feasible assignment, then turns off any
-cost variable whose removal alone keeps every hard clause satisfied. Trials then try
-to turn off the remaining cost variables in descending weight order through a clause
-walk with penalty escalation, restoring the previous feasible assignment on failure.
-Trials run on a projected model reduced by unit propagation and bounded Boolean
+A private satisfaction repair first finds a feasible assignment. Trials then try to
+turn off each cost variable in descending weight order, first through a clause walk
+with penalty escalation that restores the previous feasible assignment on failure,
+then through private repair searches for the variables still on. Each feasible trial
+turns off any cost variable whose removal alone keeps every hard clause satisfied.
+Repairs run on a projected model reduced by unit propagation and bounded Boolean
 elimination, and lift their result back. Private infeasible verdicts contribute no
 outer proof. The search puts a proposal's values first until a decision it led conflicts; the
 proposal does not become an incumbent.

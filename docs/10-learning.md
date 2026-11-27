@@ -152,9 +152,9 @@ an interrupted preflight withholds the unfinished analysis result.
 
 Two analyzers share this construction. The native CP analyzer learns over CP reasons
 and stores into the native clause database. The shared first-UIP analyzer in
-`SearchLearning` learns over component reasons; a shared conflict with usable reasons
-asserts and backjumps, while a sound resolvent that cannot assert keeps chronological
-fallback. Unexplained component publications cannot supply missing antecedents.
+`SearchSession` learns over component reasons and stores into `SearchLearning`; a
+shared conflict with usable reasons asserts and backjumps, while a sound resolvent
+that cannot assert keeps chronological fallback. Unexplained component publications cannot supply missing antecedents.
 
 ## Learned-object authority and lifetime
 
@@ -536,7 +536,7 @@ preset enables capped tiered retention:
 | Mid | Through LBD 6 | Survives reduction; idle clauses demote to local |
 | Local | Above LBD 6 | Aggressively deleted; conflict use promotes to mid |
 
-Tiers persist independently of later LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt)
+Tiers persist independently of later LBD. [LearnedClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/LearnedClauseDb.kt)
 and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 own the native and shared stores.
 

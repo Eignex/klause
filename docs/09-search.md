@@ -57,8 +57,8 @@ condition and learned backjumps below it fall back to chronological traversal.
 Unsupported paused states reseed the task; a sibling query resets the original root.
 A completed source probe needs neither a
 partition nor a peer root. Lost probes and task attempts retain charges.
-It runs through an explicit internal entry point; ordinary portfolio selection
-retains its existing policy.
+Source pipeline admission is described in
+[Boolean task sharing](15-portfolio-scheduling.md#boolean-task-sharing).
 
 `SearchBranchAttemptObserver` observes
 a tightening alternative before assertion, including immediate conflicts. Finite
@@ -650,10 +650,10 @@ then removes unsupported interior values.
 #### Difference systems
 
 The finite difference system is posted after presolve only when its fragment has a
-guarded edge between two unfixed root integer columns; edges to fixed columns act as
-unary bounds. Finite preparation can also append a redundant difference system over
-exact real rows and real table selections, whose vertices are private arithmetic
-coordinates rather than finite real domains. Source guards and table index atoms enter
+guarded edge and an edge between two unfixed root integer columns; edges to fixed
+columns act as unary bounds. Finite preparation can also append a redundant
+difference system over exact real rows and real table selections, whose vertices
+are private arithmetic coordinates rather than finite real domains. Source guards and table index atoms enter
 the graph directly, so a contradictory selection is excluded before all discrete
 columns are fixed. A consistent graph supplies no model; all original factors and
 source checks remain. See
