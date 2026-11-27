@@ -279,6 +279,27 @@ class QfLraSystemTest {
     }
 
     @Test
+    fun `a retained point should preserve its source values when the positive margin shrinks`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0, strict = true)
+        val source = source().withFactors(arrayOf(factor))
+        val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
+        val half = BigFraction.ofLong(2L).reciprocal()
+        val retained = listOf(BigFraction.ZERO, half, BigFraction.ONE)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, strictMargin = true)
+            assertTrue(system.install())
+            assertTrue(system.acceptsPoint(retained, ExecutionControl.Never))
+            assertTrue(lp.atLevel(1))
+            assertTrue(system.assertComparison(comparison, null, premise(0)))
+
+            val result = system.recheckPoint(retained, ExecutionControl.Never)
+
+            assertEquals(listOf(BigFraction.ZERO, half, half), result)
+        }
+    }
+
+    @Test
     fun `batched source sides should keep strict strengthening premises and retract with their scope`() {
         for (upper in listOf(false, true)) {
             LpPropagator(object : LpSearchPolicy {}).use { lp ->

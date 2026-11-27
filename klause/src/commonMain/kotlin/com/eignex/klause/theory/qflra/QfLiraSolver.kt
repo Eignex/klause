@@ -1601,11 +1601,13 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
-        val retained = retainedLpPoint
-        if (retained != null && (model.numIntVars == 0 || model.numRealVars > 0) &&
-            solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
-            system.acceptsPoint(retained, lpStop)
+        val retained = if ((model.numIntVars == 0 || model.numRealVars > 0) &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
         ) {
+            retainedLpPoint?.let { system.recheckPoint(it, lpStop) }
+        } else null
+        if (retained != null) {
+            retainedLpPoint = retained
             candidate = retained.take(model.numRealVars + model.numIntVars)
             dirty = false
             observeCompleteStage("LP_POINT_RECHECK")

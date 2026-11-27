@@ -240,7 +240,26 @@ internal class LiveQfLraSystem(
         point?.getOrNull(it)?.signum()?.let { sign -> sign > 0 } == true
     } ?: (point != null)
 
-    fun acceptsPoint(point: List<BigFraction>, stop: ExecutionControl): Boolean {
+    fun recheckPoint(point: List<BigFraction>, stop: ExecutionControl): List<BigFraction>? {
+        val margin = marginColumn ?: return point.takeIf { acceptsPoint(it, stop) }
+        var marginSideRejected = false
+        if (acceptsPoint(point, stop) { marginSideRejected = true }) return point
+        if (!marginSideRejected || stop()) return null
+        val smaller = MixedPointArithmetic(stop).quotient(point[margin], BigFraction.ofLong(2L)) ?: return null
+        stop.charge(point.size.toLong())
+        if (stop()) return null
+        val adjusted = point.toMutableList().also { it[margin] = smaller }
+        return adjusted.takeIf { acceptsPoint(it, stop) }
+    }
+
+    fun acceptsPoint(point: List<BigFraction>, stop: ExecutionControl): Boolean =
+        acceptsPoint(point, stop, onMarginSideRejected = null)
+
+    private fun acceptsPoint(
+        point: List<BigFraction>,
+        stop: ExecutionControl,
+        onMarginSideRejected: (() -> Unit)?,
+    ): Boolean {
         val state = lp.state ?: return false
         if (point.size != pointColumns || !hasPositiveMargin(point) || state.conflict != null || stop()) return false
         val arithmetic = MixedPointArithmetic(stop)
@@ -257,7 +276,7 @@ internal class LiveQfLraSystem(
             if (accepted) checkedState = state
             return accepted
         }
-        fun holds(column: Int, value: BigFraction): Boolean {
+        fun holds(column: Int, value: BigFraction, term: Map<Int, BigFraction>? = null): Boolean {
             stop.charge(2L)
             if (stop.pollStop()) return false
             val metadata = state.model.column(column)
@@ -267,11 +286,18 @@ internal class LiveQfLraSystem(
             if (bounds.lower?.let { !arithmetic.admitted(it.number.value) } == true ||
                 bounds.upper?.let { !arithmetic.admitted(it.number.value) } == true
             ) return false
-            return bounds.lower?.let { side ->
+            val lowerHolds = bounds.lower?.let { side ->
                 value > side.number.value || (value == side.number.value && !side.strict)
-            } != false && bounds.upper?.let { side ->
+            } != false
+            val holds = lowerHolds && bounds.upper?.let { side ->
                 value < side.number.value || (value == side.number.value && !side.strict)
             } != false
+            if (onMarginSideRejected != null && !holds) {
+                val margin = requireNotNull(marginColumn)
+                val sign = if (column == margin) 1 else term?.get(margin)?.signum() ?: 0
+                if ((!lowerHolds && sign < 0) || (lowerHolds && sign > 0)) onMarginSideRejected()
+            }
+            return holds
         }
 
         // Every auxiliary column is defined by its source affine term; retraction changes only its bounds.
@@ -291,7 +317,7 @@ internal class LiveQfLraSystem(
                 }
                 negative.negated().also { definitionPoint[column] = it }
             }
-            return holds(column, value)
+            return holds(column, value, term)
         }
         val changed = checkedState?.let { previous -> state.checkChangedBounds(previous, ::acceptsColumn) }
         if (changed == false) return false

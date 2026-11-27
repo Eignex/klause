@@ -119,6 +119,9 @@ identifies its checked predecessor. A skipped state or structural edit requires
 the full column check, and auxiliary values follow their indexed affine definitions.
 A failed recheck requests another LP solve; reuse supplies no conflict, and a
 complete point still passes the selected source-row check before publication.
+When the failed side could accept a smaller positive margin, the adapter tries
+halving the retained margin once while keeping all source coordinates fixed. It
+accepts the adjusted point only after checking it against the current exact LP.
 Mixed components can reuse a continuous point after checking the asserted integer
 bounds; source integrality, finite-domain membership and all selected rows remain
 required before publishing a complete witness.
