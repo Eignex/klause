@@ -115,3 +115,16 @@ miplib2017/n6-3
 pb-comp/normalized-PB24/DEC-LIN/nordstrom/CombinatorialBenchmarksPBsolvers/subsetcard/random4reg_opb_shuffle/normalized-subsetcard-eq-random4reg-35.shuf-1
 pb-comp/normalized-PB24/DEC-LIN/nordstrom/CombinatorialBenchmarksPBsolvers/subsetcard/random4reg_opb_shuffle/normalized-subsetcard-eq-random4reg-40.shuf-2
 pb-comp/normalized-PB24/DEC-LIN/nordstrom/CombinatorialBenchmarksPBsolvers/vertex-cover/vc-grids-v1_shuffle/normalized-grid6_13.shuf-2
+miplib2010/neos18
+miplib2017/bmocbd
+miplib2017/bmocbd2
+miplib2017/bmocbd3
+miplib2017/cvrpsimple2i
+miplib2017/neos-498623
+miplib2017/neos18
+miplib2017/neos4
+miplib2017/piperout-d27
+miplib2017/s55
+miplib2017/stoch-vrpvrp-s5v2c8vrp-v2c8i
+miplib2017/supportcase27i
+miplib2017/supportcase43
