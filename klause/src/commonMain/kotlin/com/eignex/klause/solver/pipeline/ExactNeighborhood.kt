@@ -84,7 +84,8 @@ internal class ExactNeighborhood(
     private var stalls = 0L
     private var charged = 0L
     private var closed = false
-    private var booleanCenterPrepared = prepareBooleanCenter == null
+    private var centerPrepared = prepareBooleanCenter == null
+    private var centerCopied = centerPrepared
     private var nextCenterBoolean = 0
     private var nextCenterCoordinate = 0
     private var pending: Pair<Int, ExactNeighborhoodCondition>? = null
@@ -114,21 +115,23 @@ internal class ExactNeighborhood(
         val end = charged + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - charged)
         while (!cancellation() && charged < end && moves < maximumMoves && charged < maximumInstructions &&
             !improvementAllowanceSpent() && nodeBudget?.exhausted() != true && !completionExhausted()) {
-            if (!booleanCenterPrepared) {
-                val before = nativeWork()
-                val prepared = requireNotNull(prepareBooleanCenter)(cancellation)
-                charge(ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong())
-                if (cancellation()) return searchAllowanceSpent()
-                if (!prepared) {
-                    if (centerPreparationPending()) {
+            if (!centerCopied) {
+                if (!centerPrepared) {
+                    val before = nativeWork()
+                    centerPrepared = requireNotNull(prepareBooleanCenter)(cancellation)
+                    charge(ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong())
+                    if (cancellation()) return searchAllowanceSpent()
+                    if (!centerPrepared) {
+                        if (centerPreparationPending()) {
+                            charge(1)
+                            return searchAllowanceSpent()
+                        }
+                        moves++
                         charge(1)
-                        return searchAllowanceSpent()
+                        sink.ls.recordCompletion(refuted = false, undecided = true)
+                        sink.ls.recordWork(moves, 0, stalls)
+                        continue
                     }
-                    moves++
-                    charge(1)
-                    sink.ls.recordCompletion(refuted = false, undecided = true)
-                    sink.ls.recordWork(moves, 0, stalls)
-                    continue
                 }
                 while (nextCenterBoolean < boolCount) {
                     if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
@@ -144,7 +147,7 @@ internal class ExactNeighborhood(
                     rootCoordinateValue.invoke(coordinate)?.let { centers[coordinate] = it }
                     charge(1)
                 }
-                booleanCenterPrepared = true
+                centerCopied = true
                 continue
             }
             val total = centers.size + boolCount

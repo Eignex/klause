@@ -128,19 +128,26 @@ class ExactNeighborhoodTest {
     }
 
     @Test
-    fun `root coordinate copying should resume before proposing a joint repair`() {
+    fun `root coordinate copying should resume after a completed oversized preparation`() {
         val conditions = ArrayList<ExactNeighborhoodCondition>()
+        var nativeWork = 0L
         val search = ExactNeighborhood(0, List(2) { BigFraction.ZERO }, ExactNeighborhoodCompletion { condition, _ ->
             conditions += condition
             ExactNeighborhoodResult.Refuted
-        }, coordinateValues = { emptyList() }, maximumMoves = 1, prepareBooleanCenter = { true },
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, nativeWork = { nativeWork },
+            prepareBooleanCenter = {
+                nativeWork += 10
+                true
+            },
             rootCoordinateValue = { BigFraction.ofLong(it + 3L) })
 
+        assertFalse(search.advance(ExecutionControl.Never, 1))
         assertFalse(search.advance(ExecutionControl.Never, 1))
         assertTrue(conditions.isEmpty())
         assertTrue(search.advance(ExecutionControl.Never, 10))
 
         assertEquals(mapOf(0 to BigFraction.ofLong(3), 1 to BigFraction.ofLong(4)), conditions.single().lower)
+        assertEquals(11L, search.work)
     }
 
     @Test
