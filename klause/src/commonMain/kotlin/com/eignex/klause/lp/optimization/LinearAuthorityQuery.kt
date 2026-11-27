@@ -47,10 +47,12 @@ internal class LinearAuthorityQuery private constructor(
     fun canReuseForCompletion(receiving: SourceProofContext): Boolean =
         source === receiving && unconditionalPremises
 
+    val omittedCompletionRows: Int get() = supplementalRows.last - supplementalRows.first + 1
+
     fun completionRows(): List<ExactRationalInequality> {
         check(unconditionalPremises)
-        if (supplementalRows.isEmpty()) return rows
-        val omitted = supplementalRows.last - supplementalRows.first + 1
+        val omitted = omittedCompletionRows
+        if (omitted == 0) return rows
         return object : AbstractList<ExactRationalInequality>() {
             override val size: Int get() = rows.size - omitted
 

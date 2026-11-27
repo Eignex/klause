@@ -84,7 +84,10 @@ class LinearAuthorityCutsTest {
 
     @Test
     fun `rounded completion should borrow source rows and receiving bounds without active cuts`() {
-        val receiving = scope.copy(condition = SourceCondition(upper = mapOf(y to BigFraction.ONE)))
+        val condition = SourceCondition(upper = mapOf(y to BigFraction.ONE))
+            .integerBound(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val receiving = scope.copy(condition = condition)
         val source = SourceProofContext(receiving, setOf(x, y), mapOf(
             "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                 y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
@@ -94,7 +97,8 @@ class LinearAuthorityCutsTest {
 
         assertEquals(1, query.activeCuts)
         assertTrue(query.canReuseForCompletion(source))
-        assertEquals(listOf(query.rows.first(), query.rows.last()), query.completionRows())
+        assertEquals(listOf(BigFraction.ofLong(3), BigFraction.ZERO, BigFraction.ONE),
+            query.completionRows().map { it.rhs })
     }
 
     @Test

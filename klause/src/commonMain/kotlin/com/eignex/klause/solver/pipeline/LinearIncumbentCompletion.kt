@@ -105,7 +105,9 @@ internal class LinearIncumbentCompletion(
         }
         if (token()) return null
         if (attempt.query == null || attempt.point == null) {
-            val reusable = preparedQuery?.takeIf { ownedSeed && it.canReuseForCompletion(source) }
+            val reusable = preparedQuery?.takeIf {
+                ownedSeed && attempt.query == null && it.canReuseForCompletion(source) && fundCompletionRows(it)
+            }
             val prepared = attempt.query ?: reusable ?: prepare(source, seed, token)
             if (prepared == null) {
                 if (!token()) finish(attempt, null)
@@ -117,6 +119,8 @@ internal class LinearIncumbentCompletion(
                 if (prepared === reusable) {
                     attempt.reusedRows = prepared.completionRows()
                     observe("QueryReused", 1L)
+                    val omitted = prepared.omittedCompletionRows
+                    if (omitted > 0) observe("QuerySupplementalRowsOmitted", omitted.toLong())
                 }
             }
             val point = seedPoint(prepared, seed, token, attempt.takeIf { ownedSeed })
@@ -224,6 +228,16 @@ internal class LinearIncumbentCompletion(
             attempts += it
             observe("Attempts", 1L)
         }
+    }
+
+    private fun fundCompletionRows(query: LinearAuthorityQuery): Boolean {
+        if (query.omittedCompletionRows == 0) return true
+        val funding = budget.funding ?: return true
+        val bytes = 64L
+        if (funding.availableWork <= 1L || funding.remainingAllocation <= bytes) return false
+        budget.observe(preparation = 1L)
+        funding.charge(0L, bytes)
+        return true
     }
 
     private fun checkedExact(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
