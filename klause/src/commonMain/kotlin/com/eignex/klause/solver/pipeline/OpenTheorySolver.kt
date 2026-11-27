@@ -467,9 +467,15 @@ class OpenTheoryEngine internal constructor(
             // for a proposal no traversal would have read.
             val hints = state.candidateHints(plan, model, cancellation)
             val selectedBranching = when (params.openBranching) {
-                OpenBranching.Automatic -> if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
-                    (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true
-                ) OpenBranching.Activity else OpenBranching.SourceOrder
+                OpenBranching.Automatic -> {
+                    val activity = when (plan.theoryPipeline) {
+                        ProblemPipeline.EXACT_LRA -> params.openHintFlips == null
+                        ProblemPipeline.EXACT_LIRA ->
+                            (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true
+                        else -> false
+                    }
+                    if (activity) OpenBranching.Activity else OpenBranching.SourceOrder
+                }
                 else -> params.openBranching
             }
             val branching = when (selectedBranching) {
