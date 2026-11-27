@@ -64,12 +64,12 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `depth history records formation and its preferred revisit once per scope`() {
+    fun `depth histories report the first selected branch or retire without a selection`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add, depthRetention = true)
         val variable = VarRef.Bool(0)
-        repeat(2) {
-            repeat(3) {
+        for (visit in listOf("ready", "stale", "unselected", "aged")) {
+            repeat(2) {
                 for (up in listOf(false, true)) {
                     history.beginNode(0)
                     history.record(0.0)
@@ -80,16 +80,26 @@ class LpDirectionalHistoryTest {
                     history.finishNode(true)
                 }
             }
+            if (visit == "aged") repeat(257) { history.beginNode(0) }
             history.beginNode(0)
             history.record(0.0)
-            repeat(2) {
-                assertEquals(false, history.depthPreference(variable, 0.5, 10.0) { true })
+            if (visit != "unselected") {
+                repeat(2) { history.branch(variable, 0.5) { visit != "stale" } }
+                if (visit == "ready") {
+                    repeat(2) { assertEquals(false, history.depthPreference(variable, 0.5, 10.0) { true }) }
+                }
             }
             history.clear()
         }
 
-        assertEquals(2, events.count { it == "DEPTH_RETENTION_FORMATION_COMPLETE" })
-        assertEquals(2, events.count { it == "DEPTH_RETENTION_FORMATION_REVISITED" })
+        assertEquals(4, events.count { it == "DEPTH_RETENTION_FORMATION_COMPLETE" })
+        assertEquals(3, events.count { it == "DEPTH_RETENTION_FORMATION_SELECTED" })
+        assertEquals(1, events.count { it == "DEPTH_RETENTION_FORMATION_SELECTED_READY" })
+        assertEquals(1, events.count { it == "DEPTH_RETENTION_FORMATION_SELECTED_STALE_POINT" })
+        assertEquals(1, events.count { it == "DEPTH_RETENTION_FORMATION_SELECTED_INCOMPLETE" })
+        assertEquals(1, events.count { it == "DEPTH_RETENTION_FORMATION_REVISITED" })
+        assertEquals(1, events.count { it == "DEPTH_RETENTION_FORMATION_CLEARED_UNSELECTED" })
+        assertEquals(2, events.count { it == "DEPTH_RETENTION_FORMATION_CLEARED_WITHOUT_PREFERENCE" })
     }
 
     @Test

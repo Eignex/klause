@@ -232,7 +232,12 @@ internal class LpHints(
         passiveCollection?.clear()
         depthValues?.clear()
         if (collect && scopeModel != null) {
-            history.branch(variable, value(variable))
+            val point = passivePoint
+            val stamp = solveStamp
+            val current: (() -> Boolean)? = if (depthRetention) {
+                { passivePoint === point && solveStamp == stamp && passivePointCurrent() }
+            } else null
+            history.branch(variable, value(variable), current)
         }
     }
 
