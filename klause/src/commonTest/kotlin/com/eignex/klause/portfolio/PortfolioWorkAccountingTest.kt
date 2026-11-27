@@ -173,6 +173,48 @@ class PortfolioWorkAccountingTest {
         assertEquals(13L, result.stats.portfolio.arms[0].work)
     }
 
+    @Test
+    fun `satisfaction startup should sample charged instructions without a completed move`() {
+        val handle = object : InstructionSlicedSolve {
+            override var chargedInstructions: Long = 0L
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats.EMPTY
+
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+                error("scheduled slice required")
+
+            override fun runInstructionSlice(
+                global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
+            ): SolveResult? {
+                chargedInstructions += sliceInstructions
+                return null
+            }
+        }
+        val solver = object : ResumableSolver<BacktrackParams> by CountingResumableSolver(1) {
+            override fun session() = StatelessSession(this)
+            override fun resumableSolve(params: BacktrackParams): ResumableSolve = handle
+        }
+        val first = PortfolioWorker.of(
+            "neighborhood", 0, solver.session(), BacktrackParams(),
+            withInstructionBudget = { params, _ -> params },
+        ).also { it.family = ArmFamily.LocalSearch }
+        val second = PortfolioWorker.ofSolve("neighborhood", 1) { _, _ -> SolveResult.Unknown(
+            TerminationReason.BudgetExhausted, SolveStats.EMPTY,
+        ) }.also { it.family = ArmFamily.LocalSearch }
+        val labeled = PortfolioWorker.ofSolve("neighborhood#2", 2) { _, _ -> SolveResult.Unknown(
+            TerminationReason.BudgetExhausted, SolveStats.EMPTY,
+        ) }.also { it.family = ArmFamily.LocalSearch }
+
+        val result = Portfolio(
+            listOf(first, second, labeled), fixedBandit(3, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
+        ).also { it.initialHeuristicArms = setOf(0, 1, 2) }
+            .use { it.solve(ExecutionControl { handle.chargedInstructions > 0 }) }
+
+        val sample = result.stats.portfolio.heuristicStarts.single()
+        assertTrue(sample.completed)
+        assertEquals(mapOf("neighborhood" to 7L, "neighborhood#3" to 0L, "neighborhood#2" to 0L), sample.workByArm)
+    }
+
     private fun lsArm(problem: Problem, objective: LinearObjective): PortfolioWorker = PortfolioWorker.of(
         "ls",
         0,

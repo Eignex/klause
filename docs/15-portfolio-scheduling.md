@@ -64,6 +64,9 @@ half). The finite CLI exposes `slice-work`, `slice-max-work` and `slice-growth`
 and reports the effective settings.
 On one lane, pure-real linear satisfaction with neighborhood workers assigns the
 complete worker half the initial probe weight. The other workers share the remainder.
+One neighborhood worker starts at a time until one of them spends the base work
+allowance. This sample prices its exact completion instructions. The scheduler
+can then offer the other neighborhood probes.
 
 Backtrack arms charge decisions, propagation visits and LP work to their scheduler
 at the [slice prices](06-sessions.md#resource-allowances); the solve-wide

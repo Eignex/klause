@@ -110,6 +110,7 @@ private open class OwnedSolve(protected val source: ResumableSolve, release: () 
 
 private class OwnedInstructionSolve(private val instructionSource: InstructionSlicedSolve, release: () -> Unit) :
     OwnedSolve(instructionSource, release), InstructionSlicedSolve {
+    override val chargedInstructions: Long? get() = instructionSource.chargedInstructions
     override val auxiliaryWork: Long get() = instructionSource.auxiliaryWork
 
     override fun runScheduledSlice(

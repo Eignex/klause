@@ -154,6 +154,7 @@ interface ResumableSolve : AutoCloseable {
 }
 
 internal interface InstructionSlicedSolve : ResumableSolve {
+    val chargedInstructions: Long? get() = null
     val auxiliaryWork: Long get() = 0L
 
     fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long): SolveResult?

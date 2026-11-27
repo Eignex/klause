@@ -153,13 +153,17 @@ internal class OpenPortfolio(
                 .bindInvocation(binding, lifetime.includingStop( cancellation),
                 ),
         ) { workers ->
-            val probeWeights = if (lanes == 1 && request?.route == ProblemPipeline.EXACT_LRA) {
-                leadingProbeWeights(workers)
-            } else intArrayOf()
+            val realLinearStartup = lanes == 1 && request?.route == ProblemPipeline.EXACT_LRA
             PortfolioInvocationPolicy(
                 ProblemProfile.of(model, optimizing = false),
                 reservedShares(workers, if (request != null) THEORY_SHARE else 0.0),
-                probeWeights = probeWeights,
+                probeWeights = if (realLinearStartup) leadingProbeWeights(workers) else intArrayOf(),
+                initialHeuristics = if (realLinearStartup) {
+                    workers.indices.filter {
+                        val family = workers[it].family
+                        family == ArmFamily.LocalSearch || family == ArmFamily.Lns
+                    }.toSet()
+                } else emptySet(),
             )
         }
         val result = portfolio.use { it.solve(cancellation) }

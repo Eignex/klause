@@ -318,6 +318,7 @@ class Portfolio(
                 if (openingFailure == null) run.locked { run.firstQuery(arm) }
                 val failure: Throwable?
                 val work: Long
+                var initialProbeWork: Long? = null
                 if (openingFailure != null) {
                     r = null
                     failure = openingFailure
@@ -325,11 +326,13 @@ class Portfolio(
                 } else if (handle != null) {
                     val workBefore = handle.work - if (opening) handle.initialWork else 0L
                     val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
-                    val auxiliaryBefore = (handle as? InstructionSlicedSolve)?.auxiliaryWork ?: 0L
+                    val instructionHandle = handle as? InstructionSlicedSolve
+                    val auxiliaryBefore = instructionHandle?.auxiliaryWork ?: 0L
+                    val probeBefore = if (arm in initialHeuristicArms) instructionHandle?.chargedInstructions else null
                     val outcome = runCatching {
                         val millis = remainingMillis(armToken)
-                        if (worker.acceptsInstructionBudget && handle is InstructionSlicedSolve) {
-                            handle.runScheduledSlice(
+                        if (worker.acceptsInstructionBudget && instructionHandle != null) {
+                            instructionHandle.runScheduledSlice(
                                 run.token, millis, instructionsOf(claim), claim.handleNodes, lsInstructionsPerWork,
                             )
                         } else {
@@ -341,10 +344,14 @@ class Portfolio(
                     work = if (worker.acceptsInstructionBudget) {
                         countedInstructions(
                             claim, handle.stats.ls.moves.sum - instructionsBefore,
-                            ((handle as? InstructionSlicedSolve)?.auxiliaryWork ?: 0L) - auxiliaryBefore,
+                            (instructionHandle?.auxiliaryWork ?: 0L) - auxiliaryBefore,
                         )
                     } else {
                         handle.work - workBefore
+                    }
+                    if (probeBefore != null) {
+                        val charged = requireNotNull(instructionHandle?.chargedInstructions) - probeBefore
+                        initialProbeWork = countedInstructions(claim, charged.coerceAtLeast(0L).toDouble())
                     }
                 } else {
                     require(diagnostics == null || worker.acceptsInstructionBudget) {
@@ -390,6 +397,7 @@ class Portfolio(
                             handle != null -> "slice"
                             else -> "one-shot"
                         },
+                        initialProbeWork = initialProbeWork ?: work,
                     )
                     if (claim.fault != null) {
                         run.quarantine(claim)
@@ -1524,11 +1532,13 @@ class Portfolio(
             failed: Boolean,
             failure: Throwable?,
             phase: String,
+            initialProbeWork: Long = work,
         ) {
             val arm = claim.arm
             val account = ledgerFor(arm)
             if (!heuristicSampled && arm in initialHeuristics) {
-                heuristicSampleWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - heuristicSampleWork[arm])
+                heuristicSampleWork[arm] += minOf(initialProbeWork.coerceAtLeast(0L),
+                    Long.MAX_VALUE - heuristicSampleWork[arm])
                 if (!failed && claim.fault == null && failure !is SearchInitializationCancelled &&
                     heuristicSampleWork[arm] >= baseSliceWork) {
                     heuristicSampled = true
@@ -1687,11 +1697,29 @@ class Portfolio(
                     invocationNanos = epoch.elapsedNow().inWholeNanoseconds,
                     heuristicStarts = if (initialHeuristics.isEmpty()) emptyList() else listOf(
                         HeuristicStartStats(baseSliceWork,
-                            initialHeuristics.associate { workers[it].label to heuristicSampleWork[it] },
+                            initialHeuristicWorkByArm(),
                             heuristicSampled, heuristicSampleCompletion),
                     ),
                 ),
             )
+        }
+
+        private fun initialHeuristicWorkByArm(): Map<String, Long> = buildMap {
+            val originalLabels = initialHeuristics.mapTo(HashSet()) { workers[it].label }
+            val nextSuffix = HashMap<String, Int>()
+            for (arm in initialHeuristics) {
+                val label = workers[arm].label
+                var key = label
+                if (label in this) {
+                    var suffix = nextSuffix[label] ?: 2
+                    do {
+                        key = "$label#$suffix"
+                        suffix++
+                    } while (key in originalLabels || key in this)
+                    nextSuffix[label] = suffix
+                }
+                put(key, heuristicSampleWork[arm])
+            }
         }
 
         fun closeHandle(arm: Int) {

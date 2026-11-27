@@ -43,6 +43,7 @@ internal fun exactNeighborhoodWorker(
                 override val isDone: Boolean get() = result != null
                 override val stats get() = search.stats
                 override val work get() = search.work
+                override val chargedInstructions get() = search.work
                 override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
                     runInstructionSlice(global, sliceMillis, sliceNodes)
                 override fun runInstructionSlice(
