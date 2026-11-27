@@ -4,7 +4,8 @@ import com.eignex.klause.factor.bool.Clause
 
 // The owner must preserve the producer's model and Boolean coordinates across the query boundary.
 internal class RetainedBooleanClause(val literals: IntArray, val lbd: Int) {
-    val key = SharedClause.contentKey(LongArray(literals.size) { literals[it].toLong() })
+    fun matches(other: IntArray, size: Int = other.size): Boolean =
+        literals.size == size && literals.indices.all { literals[it] == other[it] }
 }
 
 internal fun PropagationState.installRetainedRootClauses(clauses: List<RetainedBooleanClause>) {

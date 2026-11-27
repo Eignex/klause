@@ -1591,19 +1591,29 @@ class PropagationSession private constructor(
         val count = learnedClauseCount
         if (count == 0) return emptyList()
         val retained = ArrayList<RetainedBooleanClause>()
+        val scratch = IntArray(4)
+        val native = state.nativeEngine
         for (index in count - 1 downTo (count - maxVisits).coerceAtLeast(0)) {
             if ((count - index) % 16 == 1 && cancellation()) break
             state.work++
             if (!isLearnedClause(index) || learnedClausePermanent(index) ||
-                learnedClauseOrigin(index) != OWN_ORIGIN || learnedClauseLbd(index) > 2 ||
-                learnedClauseLiteralCount(index) !in 1..4
+                learnedClauseOrigin(index) != OWN_ORIGIN || learnedClauseLbd(index) > 2
             ) continue
-            val native = state.nativeEngine
-            val literals = native?.literalsOf(index) ?: learnedClauseAt(index).literals
-            state.work += literals.size
-            if (literals.any { Lit.variable(it) >= problem.numBoolVars }) continue
-            retained.add(RetainedBooleanClause(if (native == null) literals.copyOf() else literals,
-                learnedClauseLbd(index)))
+            val size = learnedClauseLiteralCount(index)
+            if (size !in 1..scratch.size) continue
+            val generalLiterals = if (native == null) learnedClauseAt(index).literals else null
+            state.work += size
+            for (offset in 0 until size) {
+                scratch[offset] = native?.literalOf(index, offset) ?: checkNotNull(generalLiterals)[offset]
+            }
+            if ((0 until size).any { Lit.variable(scratch[it]) >= problem.numBoolVars }) continue
+            scratch.sort(0, size)
+            if (retained.any {
+                    state.work += 1L + minOf(it.literals.size, size)
+                    it.matches(scratch, size)
+                }
+            ) continue
+            retained.add(RetainedBooleanClause(scratch.copyOf(size), learnedClauseLbd(index)))
             if (retained.size == maxClauses) break
         }
         return retained

@@ -817,14 +817,14 @@ every slice.
 
 The Boolean worker can carry a bounded set of short native learned clauses from a
 completed query into the next query's root propagation. The OLL owner keeps the
-same prepared source, appends constraints and allocates fresh Boolean coordinates
-without replacing earlier definitions. Native analysis retains the complements of
-any necessary assumption premises, so releasing a soft pin does not turn a
-conditional clause into a fact. The transfer excludes arithmetic rows, session
-atoms, permanent assertions and queries with external theory components. The
-receiving query owns its watches, reasons and retirement. Cancelling a traversal
-does not publish a new set of clauses, and closing the OLL owner releases its
-retained clauses along with its pins, auxiliary buffers and cursors.
+prepared source and earlier Boolean definitions as it appends constraints and
+allocates coordinates. Learned clauses preserve the complements of necessary
+assumption premises after soft pins are released. Only clauses over those
+Boolean coordinates from completed in-scope traversals participate. The transfer
+folds duplicate clauses and drops a clause when the objective transition installs
+the same core as a hard factor. The receiving query owns its watches, reasons
+and retirement. Closing the OLL owner releases the retained clauses along with
+its pins, auxiliary buffers and cursors.
 
 Published incumbents project away auxiliary selectors, and optimality requires exact
 equality between the original objective and the accumulated bound. Auxiliary clauses

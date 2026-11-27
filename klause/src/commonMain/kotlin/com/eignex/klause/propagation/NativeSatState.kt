@@ -382,6 +382,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun recordConflict(h: Int) {
         state.conflictSeedFactors.add(h)
+        if (h >= baseCount && originOf(h - baseCount) == RETAINED_QUERY_ORIGIN) markUsed(h)
         state.nativeConflictReason = clauseLits(h)
         val levels = IntHashSet()
         val len = clauseLen(h)

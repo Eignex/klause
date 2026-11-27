@@ -22,7 +22,7 @@ internal class PreparingSatisfaction(
     private val projectAssumptionCore: Boolean = false,
     private val containingSlice: ExecutionControl = ExecutionControl.Never,
     retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
-    private val onCompletedQuery: ((PropagationSession) -> Unit)? = null,
+    private val onCompletedQuery: ((PropagationSession, Boolean) -> Unit)? = null,
 ) : ResumableSolve {
     private val lifetime = params.cancellation.lifetimeCancellation()
     private var token = params.cancellation
@@ -45,7 +45,7 @@ internal class PreparingSatisfaction(
     private var retainedStats = SolveStats.EMPTY
     private var retainedWork = 0L
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
-    private val propagationWork: Long get() = session?.work ?: preparation?.work ?: 0L
+    internal val propagationWork: Long get() = session?.work ?: preparation?.work ?: 0L
 
     init {
         sink.search.learning = {

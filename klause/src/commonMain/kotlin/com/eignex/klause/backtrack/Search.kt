@@ -147,7 +147,7 @@ internal class CpSatisfactionTraversal(
     onRelease: ((PropagationSession) -> Unit)? = null,
     onPropagationWork: ((() -> Long) -> Unit)? = null,
     retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
-    private val onCompletedQuery: ((PropagationSession) -> Unit)? = null,
+    private val onCompletedQuery: ((PropagationSession, Boolean) -> Unit)? = null,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -425,7 +425,7 @@ internal class CpSatisfactionTraversal(
         }
         rootOutcome?.let { outcome ->
             rootOutcome = null
-            if (outcome is SearchOutcome.Exhausted && !outcome.indeterminate) onCompletedQuery?.invoke(cp.session)
+            if (outcome is SearchOutcome.Exhausted && !outcome.indeterminate) onCompletedQuery?.invoke(cp.session, true)
             finishQuery()
             return outcome
         }
@@ -434,13 +434,13 @@ internal class CpSatisfactionTraversal(
             is SearchRunEvent.Satisfied -> {
                 val sample = completion.sample(event.model, cp)
                 traversal.brancher.onSolution(sample)
-                onCompletedQuery?.invoke(cp.session)
+                onCompletedQuery?.invoke(cp.session, false)
                 releaseLpResources(lpResources)
                 SearchOutcome.Found(sample)
             }
 
             SearchRunEvent.Exhausted -> {
-                onCompletedQuery?.invoke(cp.session)
+                onCompletedQuery?.invoke(cp.session, true)
                 finishQuery()
                 // Learned decision levels describe traversal, not every premise of the exhausted tree.
                 SearchOutcome.Exhausted(touchedAssumptionLevels = IntArray(

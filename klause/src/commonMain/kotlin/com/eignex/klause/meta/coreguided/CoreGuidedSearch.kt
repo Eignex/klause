@@ -173,7 +173,11 @@ internal class CoreGuidedSearch(
         )
     }
     override val work: Long get() {
-        val live = query?.stats?.search?.propagationWork?.sum?.toLong() ?: 0L
+        val live = when (val handle = query) {
+            is PreparingSatisfaction -> handle.propagationWork
+            is ResumableSatisfaction -> handle.propagationWork
+            else -> 0L
+        }
         val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + live % PROPAGATION_WORK_PER_NODE +
             preparationVisits % PROPAGATION_WORK_PER_NODE) / PROPAGATION_WORK_PER_NODE
         return saturatedAdd(saturatedAdd(completedWork, query?.work ?: 0L),
@@ -413,6 +417,7 @@ internal class CoreGuidedSearch(
         core = selected
         coreLiterals = selected.copyOf()
         factors.add(Clause(coreLiterals))
+        queryLearning?.retireCore(coreLiterals, ::recordPreparation)
         lower += coreWeight
         completedCores++
         largestCore = maxOf(largestCore, selected.size)
@@ -577,8 +582,8 @@ internal class CoreGuidedSearch(
             val solver = BacktrackSolver(baked)
             val retained = queryLearning?.clauses.orEmpty()
             val capture = queryLearning?.let { learning ->
-                { session: PropagationSession ->
-                    learning.complete(session, preparationToken, ::recordPreparation)
+                { session: PropagationSession, refuted: Boolean ->
+                    if (refuted || stratify) learning.complete(session, preparationToken, ::recordPreparation)
                 }
             }
             if (!resumableOpening && params.nativeSat != false && baked.isClausal()) {

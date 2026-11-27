@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
@@ -26,6 +27,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
@@ -42,9 +44,11 @@ import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.BigFraction
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -71,7 +75,9 @@ class CoreGuidedSearchTest {
         assertEquals(1.0, assertIs<MinimizeResult.Optimal>(withLearning).objective)
         assertEquals(1.0, assertIs<MinimizeResult.Optimal>(withoutLearning).objective)
         assertEquals(2L, retained.queryCount)
-        assertTrue(checkNotNull(retained.stats.search.learning["coreQueryLearningConsumed"]) > 0L)
+        assertTrue((retained.stats.search.learning["coreQueryLearningConsumed"] ?: 0L) > 0L,
+            "${retained.stats.search.learning}; nodes=${retained.stats.search.nodes.sum}, " +
+                "controlNodes=${control.stats.search.nodes.sum}")
         assertTrue(retained.stats.search.nodes.sum < control.stats.search.nodes.sum)
     }
 
@@ -114,11 +120,33 @@ class CoreGuidedSearchTest {
         assertTrue(checkNotNull(search.stats.search.learning["coreQueryLearningConsumed"]) > 0L)
     }
 
+    @Test
+    fun `only completed queries publish learned clauses`() {
+        val source = repeatedQueryProblem()
+        val objective = LinearObjective(longArrayOf(0, 0, 0, 1, 2))
+        var cancelled = false
+        val selector = object : VariableSelector by InputOrder {
+            override fun fresh(): VariableSelector = this
+
+            override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                cancelled = session.learnedClauseCount > 0
+                return InputOrder.pick(session, rng)
+            }
+        }
+        val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin, pbLearning = false)
+        val search = CoreGuidedSearch(source, objective, params)
+
+        search.use { it.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1L) {} }
+
+        assertTrue(cancelled)
+        assertEquals(0L, search.stats.search.learning["coreQueryLearningRetained"])
+    }
+
     private fun repeatedQueryProblem(conditional: Boolean = false) =
         Problem(8, 0, emptyArray(), buildList<Factor> {
+            val guard = if (conditional) intArrayOf(Lit.make(0, true), Lit.make(3, true))
+            else intArrayOf(Lit.make(0, true))
             for (signs in 0..3) {
-                val guard = if (conditional) intArrayOf(Lit.make(0, true), Lit.make(3, true))
-                else intArrayOf(Lit.make(0, true))
                 add(Clause(guard + intArrayOf(Lit.make(1, signs and 1 == 0), Lit.make(2, signs and 2 == 0))))
                 add(Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true),
                     Lit.make(5, signs and 1 == 0), Lit.make(6, signs and 2 == 0))))

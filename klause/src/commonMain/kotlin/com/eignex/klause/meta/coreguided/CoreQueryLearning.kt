@@ -17,15 +17,33 @@ internal class CoreQueryLearning(private val limit: Int) {
         val learned = session.retainCompletedBooleanClauses(limit, 8 * limit, cancellation)
         if (learned.isEmpty()) return
 
-        val next = LinkedHashMap<Long, RetainedBooleanClause>()
+        val next = ArrayList<RetainedBooleanClause>(limit)
         for (clause in learned + clauses) {
             charge(1L)
             if (next.size == limit) break
-            if (!next.containsKey(clause.key)) next[clause.key] = clause
+            if (!next.containsClause(clause, charge)) next.add(clause)
         }
-        adopted = saturatedAdd(adopted, next.keys.count { key -> clauses.none { it.key == key } }.toLong())
-        clauses = next.values.toList()
+        adopted = saturatedAdd(adopted, next.count { !clauses.containsClause(it, charge) }.toLong())
+        clauses = next
         peakLiteralBytes = maxOf(peakLiteralBytes, clauses.sumOf { it.literals.size.toLong() * Int.SIZE_BYTES })
+    }
+
+    private fun List<RetainedBooleanClause>.containsClause(
+        candidate: RetainedBooleanClause,
+        charge: (Long) -> Unit,
+    ): Boolean = any {
+        charge(1L + minOf(it.literals.size, candidate.literals.size))
+        it.matches(candidate.literals)
+    }
+
+    fun retireCore(literals: IntArray, charge: (Long) -> Unit) {
+        if (literals.size > 4 || clauses.isEmpty()) return
+        val core = literals.sortedArray()
+        charge(core.size.toLong())
+        clauses = clauses.filterNot {
+            charge(1L + minOf(it.literals.size, core.size))
+            it.matches(core)
+        }
     }
 
     fun statistics(): Map<String, Long> = mapOf(
