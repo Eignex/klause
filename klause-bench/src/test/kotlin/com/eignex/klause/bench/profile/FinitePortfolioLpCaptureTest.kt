@@ -608,6 +608,23 @@ class FinitePortfolioLpCaptureTest {
         val owner: Any get() = throw failure
     }
 
+    @Test
+    fun `a committed root value keeps the offered point identity and split`() {
+        val owner = Any()
+        val point = Any()
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        val split = FinitePortfolioLpCapture.RootPointValueCommit(5, 42L, 40L, false, 1)
+        val offer = RootEvent(owner, 1L, "CONSUMER", "VALUE_OFFERED", point = point, sourceRoot = true)
+
+        window.observe("bt/lp-default", offer, 0L)
+        window.observe("bt/lp-default", offer.copy(sequence = 2L, disposition = "VALUE_COMMITTED",
+            valueCommit = split), 0L)
+
+        val events = window.snapshot().events
+        assertEquals(events[0].point, events[1].point)
+        assertEquals(split, events[1].valueCommit)
+    }
+
     internal data class RootEvent(
         val owner: Any,
         val sequence: Long,
@@ -627,6 +644,7 @@ class FinitePortfolioLpCaptureTest {
         val paused: Boolean? = null,
         val termination: String? = null,
         val admission: FinitePortfolioLpCapture.RootAdmissionRecord? = null,
+        val valueCommit: FinitePortfolioLpCapture.RootPointValueCommit? = null,
     )
 
 

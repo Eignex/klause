@@ -1,11 +1,13 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.catalog.Catalog
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.lab.configureLabPaths
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CommittedCorpusIndexes
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.mps.Mps
@@ -53,11 +55,27 @@ internal object FinitePortfolioLpCapture {
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val file = CorpusFetcher.resolve(reference.source)
-        options["source-archive-sha256"]?.let { expected ->
-            val actual = SolveEvidence.fileHashes(mapOf("source" to file)).getValue("source")
-            require(actual == expected) { "stored source SHA-256 does not match the request" }
-        }
         val bytes = CorpusFiles.open(file).use { readSource(options, it) }
+        options["source-archive-sha256"]?.let { expected ->
+            val source = reference.source as? ProblemSource.External
+            requireNotNull(source) { "archive identity requires an external indexed source" }
+            val index = requireNotNull(CommittedCorpusIndexes.load(source.collection.id))
+            val plain = CorpusFiles.plainPath(source.relPath)
+            val entry = requireNotNull(index.entry(plain + CorpusFiles.SUFFIX) ?: index.entry(plain))
+            require(entry.sha256 == expected) { "committed source index SHA-256 does not match the request" }
+            val actual = SolveEvidence.fileHashes(mapOf("source" to file)).getValue("source")
+            out.resolve("source-identity.json").writeText(buildJsonObject {
+                put("indexedPath", entry.path)
+                put("indexedBytes", entry.bytes)
+                put("indexedSha256", entry.sha256)
+                put("workerFile", file.name)
+                put("workerBytes", file.length())
+                put("workerSha256", actual)
+                put("matchesIndexedBytes", actual == entry.sha256 && file.length() == entry.bytes)
+                put("decodedSha256", options.getValue("sha256"))
+                put("decodedBytes", bytes.size)
+            }.toString())
+        }
         out.resolve("source.mps").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         inspect(options, bytes, out)
@@ -426,7 +444,7 @@ internal object FinitePortfolioLpCapture {
                             put("captureRootPoints", captureRootPoints)
                             if (captureRootPoints) {
                                 put("requestedLpCeiling", options["lp-ceiling"])
-                                put("sourceArchiveSha256", options["source-archive-sha256"])
+                                put("indexedSourceSha256", options["source-archive-sha256"])
                                 put("automaticSparseTreatment", options["automatic-sparse"]?.toBooleanStrict() == true)
                                 put("resolvedPolicyLpCeiling", policy.lpCeiling?.emphasis?.name ?: "AGGRESSIVE")
                                 put("sourceSetupSettings", "DEFAULT_PROBLEM_SETTINGS_NO_SEMANTIC_OVERRIDES")
@@ -792,6 +810,22 @@ internal object FinitePortfolioLpCapture {
         }
     }
 
+    internal data class RootPointValueCommit(
+        val variable: Int,
+        val preferred: Long,
+        val limit: Long,
+        val atMost: Boolean,
+        val level: Int,
+    ) {
+        fun json(): JsonObject = buildJsonObject {
+            put("variable", variable)
+            put("preferred", preferred)
+            put("limit", limit)
+            put("atMost", atMost)
+            put("level", level)
+        }
+    }
+
     internal data class RootPointRecord(
         val worker: String,
         val owner: Int,
@@ -813,6 +847,7 @@ internal object FinitePortfolioLpCapture {
         val termination: String?,
         val elapsedNs: Long,
         val admission: RootAdmissionRecord? = null,
+        val valueCommit: RootPointValueCommit? = null,
     ) {
         fun json(): JsonObject = buildJsonObject {
             put("worker", worker)
@@ -835,6 +870,7 @@ internal object FinitePortfolioLpCapture {
             put("termination", termination)
             put("elapsedNs", elapsedNs)
             admission?.let { put("admission", it.json()) }
+            valueCommit?.let { put("valueCommit", it.json()) }
         }.also { require(it.toString().encodeToByteArray().size <= ROOT_POINT_RECORD_BYTE_LIMIT) }
     }
 
@@ -1077,10 +1113,20 @@ internal object FinitePortfolioLpCapture {
                             !auxiliary && !partial && sourceRoot == null && paused == null && termination == null)
                         RootAdmissionRecord.read(get(event, "Admission"), disposition, automatic, ::call)
                     } else null
+                    val valueCommit = if (stage == "CONSUMER" && disposition == "VALUE_COMMITTED") {
+                        require(automatic && !auxiliary && !partial && sourceRoot == true && point != null)
+                        val commit = get(event, "ValueCommit")
+                        RootPointValueCommit(get(commit, "Variable") as Int, get(commit, "Preferred") as Long,
+                            get(commit, "Limit") as Long, get(commit, "AtMost") as Boolean,
+                            get(commit, "Level") as Int).also {
+                            require(it.variable >= 0 && it.level > 0)
+                            require(if (it.atMost) it.preferred <= it.limit else it.preferred >= it.limit)
+                        }
+                    } else null
                     records.add(RootPointRecord(worker, index, source, objective, pointObjective, model,
                         point, previous, sequence, query, stage, disposition,
                         automatic, auxiliary, partial, sourceRoot, paused, termination,
-                        elapsedNs, admission))
+                        elapsedNs, admission, valueCommit))
                 } catch (failure: Exception) {
                     if (failure is CancellationException) throw failure
                     failures++

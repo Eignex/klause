@@ -457,6 +457,7 @@ internal class LpEngine(
         termination: LpFloatTermination? = null,
         pointObjective: Any? = null,
         admission: LpRootAdmissionObservation? = null,
+        valueCommit: LpRootValueCommit? = null,
     ) {
         if (rootPointRetiring) return
         val observer = rootPointObserver ?: return
@@ -466,7 +467,8 @@ internal class LpEngine(
         }
         val event = LpRootPointObservation(checkNotNull(rootPointOwner), problem, objective,
             ++rootPointSequence, rootPointQuery, stage, disposition, model, point, previousPoint,
-            automaticSparseTrial, auxiliary, partial, sourceRoot, paused, termination, pointObjective, admission)
+            automaticSparseTrial, auxiliary, partial, sourceRoot, paused, termination, pointObjective, admission,
+            valueCommit)
         try {
             observer.onRootPoint(event)
         } catch (failure: Exception) {
