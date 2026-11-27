@@ -12,6 +12,8 @@ import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -222,6 +224,22 @@ class ArithmeticLearningTraceTest {
         assertEquals(2, trace.words)
         assertTrue(trace.truncated)
         assertEquals("words", trace.truncationCause)
+    }
+
+    @Test
+    fun `derive only attachment capture should ignore later wide rows`() {
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val trace = ArithmeticLearningTrace().apply { captureFirstIntegerAttachment = true }
+        val later = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(1) shl 256, bigIntOf(1)), bigIntOf(0), useLo = true))
+        assertTrue(trace.beginIntegerAttachment(state, 0))
+        trace.attachmentStage(state, 0, 0, conflict = false, stage = "clause")
+
+        trace.row("integer.seed-row", later, state)
+
+        assertFalse(trace.truncated)
+        assertEquals(listOf("attachment.begin", "attachment.frontier", "attachment.clause"),
+            trace.events.map { it.kind })
     }
 
     @Test

@@ -84,7 +84,7 @@ internal class ArithmeticLearningTrace(
     }
 
     private fun omitFocusedDetails(): Boolean {
-        if (focusedArithmeticId == null) return false
+        if (focusedArithmeticId == null && !capturedIntegerAttachment) return false
         omittedObservations++
         return true
     }
@@ -285,7 +285,9 @@ internal class ArithmeticLearningTrace(
     }
 
     fun stored(factorId: Int, kind: String) {
-        if (!accepting || omitFocusedDetails()) return
+        val attachmentRow = capturedIntegerAttachment && captureFirstInteger &&
+            focusedArithmeticId == null && kind == "integer"
+        if (!accepting || (!attachmentRow && omitFocusedDetails())) return
         if (storedIds.size == 64) {
             truncationCause = "stored-identities"
             truncated = true
