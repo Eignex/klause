@@ -185,10 +185,11 @@ internal class LinearAuthority(
     }
 
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: ExecutionControl,
-        retainBasePoint: Boolean = false, preserveUncutBound: Boolean = false): LinearAuthorityResult =
+        retainBasePoint: Boolean = false, preserveUncutBound: Boolean = false,
+        onUncutPoint: ((List<SourceCoordinate>, List<BigFraction>) -> Unit)? = null): LinearAuthorityResult =
         if (!preserveUncutBound) advancePointRecipe(source, cancellation, retainBasePoint) else
             boundBaseline.advance(source, cancellation, baseline = {
-                advanceBound(source, cancellation).also {
+                advanceBound(source, cancellation, onUncutPoint).also {
                     if (!it.paused) cutLifecycle.containing("UNCUT_BASELINE") { lp.close() }
                 }
             }, ordinary = { advancePointRecipe(source, cancellation, retainBasePoint) })
@@ -487,11 +488,23 @@ internal class LinearAuthority(
         return cutLifecycle.containing(recipe) { advanceInternal(source, cancellation, cuts, cutMask) }
     }
 
-    private fun advanceBound(source: SourceProofContext, cancellation: ExecutionControl): LinearAuthorityResult {
+    private fun advanceBound(source: SourceProofContext, cancellation: ExecutionControl,
+        onPoint: ((List<SourceCoordinate>, List<BigFraction>) -> Unit)?): LinearAuthorityResult {
         cutLifecycle.families = emptySet()
-        return cutLifecycle.containing("NO_CUT") {
-            advanceInternal(source, cancellation, cuts = false, cutMask = null, boundOnly = true)
+        var captured: Pair<List<SourceCoordinate>, List<BigFraction>>? = null
+        val previous = pointListener
+        if (onPoint != null) pointListener = { prepared, values -> captured = prepared.coordinates to values }
+        val result = try {
+            cutLifecycle.containing("NO_CUT") {
+                advanceInternal(source, cancellation, cuts = false, cutMask = null, boundOnly = true)
+            }
+        } finally {
+            pointListener = previous
         }
+        if (onPoint != null && !result.paused && result.bound != null) {
+            captured?.let { (coordinates, values) -> onPoint(coordinates, values) }
+        }
+        return result
     }
 
     private fun advanceInternal(

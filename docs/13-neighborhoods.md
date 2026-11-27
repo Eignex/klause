@@ -246,7 +246,8 @@ same retained neighborhood driver. A source LP point guides the initial integer
 rounding and orders fractional seed coordinates. Joint root preparation consumes
 point guidance. Proving traversal retains the uncut proof bound. With point selection
 and aggregation, a joint owner can borrow the proof worker's paid root point for the
-same source context. The point must cover every integer coordinate and carries no
+same source context. The proof worker offers its uncut point when the checked
+bound completes and can offer the selected point later. The point must cover every integer coordinate and carries no
 proof authority. Local preparation supplies guidance when no compatible point is
 available. With enabled incumbent completion,
 a checked external center supplies initial integer coordinates and the first

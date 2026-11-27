@@ -78,6 +78,7 @@ internal class LinearAuthorityTraversal(
     composeBooleanBranches: Boolean = false,
     aggregateBranching: Boolean = false,
     private val repairGuidance: LinearRepairGuidance? = null,
+    offerUncutRootGuidance: Boolean = false,
     private val gap: OptimalityGap? = null,
     private val useSourceGap: Boolean = true,
     private val gapTolerance: OptimalityTolerance? = source.semantics?.effective?.optimalityTolerance,
@@ -86,6 +87,14 @@ internal class LinearAuthorityTraversal(
     ((List<SourceEvidence>, SourceLpBudget, ExecutionControl) -> Map<String, Long>)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
+    private val onUncutRootPoint: ((List<SourceCoordinate>, List<BigFraction>) -> Unit)? =
+        repairGuidance?.takeIf { offerUncutRootGuidance }?.let { handoff ->
+            { coordinates, values ->
+                if (handoff.rememberIntegerPoint(source, coordinates, values, budget, cancellation)) {
+                    observe("numericalRepairUncutGuidancePublished")
+                }
+            }
+        }
     private val gapEnabled = gap != null ||
         (useSourceGap && gapTolerance?.isExact == false)
 
@@ -477,7 +486,8 @@ internal class LinearAuthorityTraversal(
                 queriedSource = it
             }
         val queried = if (useGuidance && useCuts && pointCuts)
-            authority.advanceWithPointCuts(branch, cancellation, preserveUncutBound = aggregateCuts)
+            authority.advanceWithPointCuts(branch, cancellation, preserveUncutBound = aggregateCuts,
+                onUncutPoint = onUncutRootPoint.takeIf { current === root })
         else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
         else authority.check(branch, cancellation)
         val strongestBound = strongerLinearBound(current.partialBound, queried.bound)

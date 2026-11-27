@@ -7,6 +7,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -18,6 +19,20 @@ class LinearRepairGuidanceTest {
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val scope = SourceScope(SourceRevision("repair-guidance", "exact"))
     private val source = SourceProofContext(scope, setOf(integer), emptyMap())
+
+    @Test
+    fun `a paid root snapshot should retain only original integer guidance`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val mixed = SourceProofContext(scope, setOf(integer, real), emptyMap())
+        val funding = SourceLpFunding(10_000, 10_000).also { it.grant(10_000) }
+        val guidance = LinearRepairGuidance()
+
+        val retained = guidance.rememberIntegerPoint(mixed, listOf(integer, real),
+            listOf(BigFraction.ONE, BigFraction.ZERO), SourceLpBudget(funding = funding), ExecutionControl.Never)
+
+        assertTrue(retained)
+        assertEquals(mapOf(integer to 1.0), assertNotNull(guidance.find(mixed)).point)
+    }
 
     @Test
     fun `retained guidance should own a snapshot of the producer point`() {
