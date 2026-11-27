@@ -47,8 +47,8 @@ skips clausal satisfaction unless rewrites expose cardinalities with stronger LP
 and propagator-only symmetry does not change that eligibility; explicit
 `+lp-harvest`, nonclausal sources and optimization keep it.
 The scheduled harvest automatically splits eligible root feasibility LPs for
-bounded discrete sources. Assembly, component discovery, solving and any ray
-reconstruction spend the containing allowance. The harvest publishes a refutation
+bounded discrete sources with a constant objective. Assembly, component discovery,
+solving and any ray reconstruction spend the containing allowance. The harvest publishes a refutation
 after checking the reconstructed ray against the parent relaxation and its source
 scope. Later harvest probes use their own LP queries.
 [Wide-integer pre-bake bounds](08-presolve-reductions.md#pre-bake-lp-bounds) use a separate safety gate.

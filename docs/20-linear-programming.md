@@ -35,9 +35,9 @@ Component discovery uses Util's dense disjoint set over structural columns shari
 a row. Blocks retain first-seen column order; columns in no row stay outside child
 layouts and use their bounds directly.
 
-The finite LP harvest can consume this partition for a cold, zero-objective
-feasibility query. Admission looks for a small coupled block that can supply an
-early contradiction. It also excludes small or row-heavy relaxations, a dominant
+The finite LP harvest can consume this partition for a cold feasibility query on
+a constant-objective source. Admission looks for a small coupled block that can
+supply an early contradiction. It also excludes small or row-heavy relaxations, a dominant
 block and splits with limited aggregate tableau savings. The query projects and
 retires one block at a time under a shared allowance. A feasible block supplies
 only its status. A candidate contradiction maps its ray to parent rows and uses

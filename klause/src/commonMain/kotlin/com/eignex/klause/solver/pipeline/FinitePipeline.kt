@@ -190,7 +190,7 @@ object FinitePipeline {
         val objective = prepared.objective ?: request.objective
         val outcome = PresolvePipeline.run(
             prepared,
-            objective,
+            request.objective,
             config,
             request.solutionSetSensitive,
             request.cancellation,

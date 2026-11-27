@@ -178,6 +178,7 @@ object PresolvePipeline {
         } else {
             null
         }
+        val componentFeasibility = config.lpComponents.takeIf { harvestPlan != null && linearObjective.isConstant() }
         val automaticClausalSatisfaction = harvestPlan != null &&
             config.overrides[PresolvePass.LP_HARVEST] != true && linearObjective == null && problem.isClausal()
         val objective = currentObjective ?: LinearObjective()
@@ -362,7 +363,7 @@ object PresolvePipeline {
                         zeroObjectivePricing,
                         randomSeed,
                         numericalLp = numericalLp,
-                        componentFeasibility = config.lpComponents,
+                        componentFeasibility = componentFeasibility,
                     ).also { result ->
                         presolveBudget?.activeInvocation?.let { invocation ->
                             invocation.narrowedColumns = result.report.boundsShaved
@@ -453,6 +454,12 @@ object PresolvePipeline {
 private fun refit(objective: LinearObjective?, problem: Problem): LinearObjective? {
     if (objective == null || objective.boolWeightValues.size >= problem.numBoolVars) return objective
     return objective.copy(boolWeights = objective.boolWeightValues.copyOf(problem.numBoolVars))
+}
+
+private fun LinearObjective?.isConstant(): Boolean {
+    if (this == null) return true
+    return boolWeightValues.all { it == 0L } && intCoefficientValues.all { it == 0L } &&
+        realCoefficientValues.all { it == 0.0 }
 }
 
 /**

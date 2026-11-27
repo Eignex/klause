@@ -241,12 +241,13 @@ class LpHarvestTest {
     @Test
     fun `component harvest should lift a contradiction from one block`() {
         val problem = coverSystem(independentRows = 24).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(problem.numIntVars), constant = 7)
+        val config = PresolveConfig.parse("off,+lp-harvest")
 
-        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
-            componentFeasibility = true)
+        val result = PresolvePipeline.run(problem, objective, config, false)
 
-        assertTrue(result.report.rootInfeasible)
-        assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_REFUTED"))
+        assertTrue(result.stats.infeasible)
+        assertEquals(1L, result.stats.lpStats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_REFUTED"))
     }
 
     @Test
@@ -262,6 +263,26 @@ class LpHarvestTest {
             componentFeasibility = true)
 
         assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("FALLBACK_COMPLETE"))
+    }
+
+    @Test
+    fun `component harvest should decline when presolve makes a source objective constant`() {
+        val cover = coverSystem(independentRows = 24)
+        val n = cover.numIntVars
+        val equality = Linear(intArrayOf(1, -1), intArrayOf(n, n + 1), LinearOp.EQ, 0)
+        val problem = Problem(0, n + 2, Array(n + 2) { IntDomain(0, 10) }, cover.factors + equality)
+        val coefficients = LongArray(n + 2)
+        coefficients[n] = 1
+        coefficients[n + 1] = -1
+        val objective = LinearObjective(intCoefficients = coefficients)
+        val config = PresolveConfig.parse("off,+affine,+lp-harvest")
+        val prepared = PresolvePipeline.prepareSource(problem, config, objective, finiteLane = true)
+
+        val result = PresolvePipeline.run(prepared, objective, config, false)
+
+        assertTrue(assertNotNull(prepared.objective).intCoefficients.all { it == 0L })
+        assertTrue(result.stats.infeasible)
+        assertFalse(result.stats.lpStats.phases.containsKey("PRESOLVE_FEASIBILITY_ROOT"))
     }
 
     @Test
