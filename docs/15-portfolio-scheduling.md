@@ -510,9 +510,10 @@ completion.
 
 `source-incumbent-completion=true` (default false) lets both companions use an
 approximate incumbent's Boolean and finite integer coordinates as advisory pins, with
-approximate real coordinates guiding rational reconstruction without authority. A
-reconstructed point must satisfy every active affine row exactly; otherwise
-connected continuous residuals use the exact recovery path, priced by their source
+approximate real coordinates guiding rational reconstruction without authority.
+One scope construction applies all discrete pins and retains the receiving bounds
+and integer rows. A reconstructed point must satisfy every active affine row exactly.
+When it fails this check, connected continuous residuals use exact recovery, priced by their source
 objective costs where those are nonzero and as feasibility completion otherwise.
 Recovery supplies a checked point and no global bound. Linear sources reconstruct the
 point through the captured presolve mapping, check the original declarations and

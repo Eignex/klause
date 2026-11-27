@@ -13,6 +13,7 @@ import com.eignex.klause.lp.optimization.recoverLinearPrimal
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
@@ -246,30 +247,14 @@ internal class LinearIncumbentCompletion(
     }
 
     private fun prepare(source: SourceProofContext, seed: Sample, token: ExecutionControl): LinearAuthorityQuery? {
-        if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported() ||
-            source.coordinates.count { it.kind == SourceCoordinate.Kind.Boolean } != seed.numBoolVars ||
-            source.coordinates.count { it.kind == SourceCoordinate.Kind.Integer } != seed.numIntVars ||
-            source.coordinates.count { it.kind == SourceCoordinate.Kind.Real } != seed.numRealVars
+        if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
+        val coordinates = source.coordinates
+        if (coordinates.count { it.kind == SourceCoordinate.Kind.Boolean } != seed.numBoolVars ||
+            coordinates.count { it.kind == SourceCoordinate.Kind.Integer } != seed.numIntVars ||
+            coordinates.count { it.kind == SourceCoordinate.Kind.Real } != seed.numRealVars
         ) return null
-        var condition = source.scope.condition
-        for (coordinate in source.coordinates) {
-            if (token()) return null
-            when (coordinate.kind) {
-                SourceCoordinate.Kind.Boolean -> {
-                    val value = seed.boolValue(coordinate.id)
-                    if (condition.bools[coordinate.id]?.let { it != value } == true) return null
-                    condition = condition.pin(coordinate.id, value)
-                }
-                SourceCoordinate.Kind.Integer -> {
-                    val value = BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
-                    if (condition.lower[coordinate]?.let { it > value } == true ||
-                        condition.upper[coordinate]?.let { it < value } == true) return null
-                    condition = condition.bound(coordinate, value, upper = false).bound(coordinate, value, upper = true)
-                }
-                SourceCoordinate.Kind.Real -> Unit
-            }
-        }
-        var allocation = 128L * source.coordinates.size
+        val condition = bindDiscreteSeed(source.scope.condition, coordinates, seed, token) ?: return null
+        var allocation = 128L * coordinates.size
         var entries = 0L
         for (premise in source.premises.values) {
             if (token()) return null
@@ -281,6 +266,34 @@ internal class LinearIncumbentCompletion(
         budget.funding?.charge(0L, allocation)
         if (token()) return null
         return LinearAuthorityQuery.prepare(source.atScope(source.scope.copy(condition = condition)), null, token)
+    }
+
+    private fun bindDiscreteSeed(condition: SourceCondition, coordinates: Set<SourceCoordinate>, seed: Sample,
+        token: ExecutionControl): SourceCondition? {
+        if (seed.numBoolVars == 0 && seed.numIntVars == 0) return condition
+        if (token()) return null
+        val bools = condition.bools.toMutableMap()
+        val lower = condition.lower.toMutableMap()
+        val upper = condition.upper.toMutableMap()
+        for (coordinate in coordinates) {
+            if (token()) return null
+            when (coordinate.kind) {
+                SourceCoordinate.Kind.Boolean -> {
+                    val value = seed.boolValue(coordinate.id)
+                    if (bools[coordinate.id]?.let { it != value } == true) return null
+                    bools[coordinate.id] = value
+                }
+                SourceCoordinate.Kind.Integer -> {
+                    val value = BigFraction.of(seed.exactIntValue(coordinate.id), BIG_ONE)
+                    if (lower[coordinate]?.let { it > value } == true ||
+                        upper[coordinate]?.let { it < value } == true) return null
+                    lower[coordinate] = value
+                    upper[coordinate] = value
+                }
+                SourceCoordinate.Kind.Real -> Unit
+            }
+        }
+        return condition.copy(bools = bools, lower = lower, upper = upper)
     }
 
     private fun recoveryCost(stage: String, count: Long) {
