@@ -1405,8 +1405,7 @@ and `heap-mib`. Contradicting evidence makes a row `invalid`, an arm without
 completed comparable work `incomparable`, a missing arm `incomplete`, and a missing
 receipt, frame, digest, hash or identity `unverifiable`. These rows list their
 reasons and keep their trajectory diagnostic, but contribute no ratio. The lab
-attaches worker receipts to solver records only, so fixed-work rows without one are
-`unverifiable`.
+attaches the accepted worker receipt and execution frame to each fixed-work record.
 
 Valid rows whose limit-point digests agree, or whose arms both reach a verdict with
 equal full digests, are `matched` and report candidate/control wall and CPU ratios
