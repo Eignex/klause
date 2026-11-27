@@ -11,26 +11,28 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
- * LP-owned template retention for one selected source view. Compatible views share a namespace token
- * and one atomic publication slot per source/finite scope; [rowScope] additionally proves that the
- * view's ordered factor identities match the view it was inherited from.
+ * LP-owned template and compact root layout retention. Compatible views share a namespace token
+ * and template publication slots. The [rowScope] also binds the ordered factor identities.
  */
 internal class LpPreparationCache private constructor(
     private val namespace: LpPreparationNamespace,
     private val rowScope: Any,
     private val sourceSlot: AtomicReference<LpPreparationState?>,
     private val finiteSlot: AtomicReference<LpPreparationState?>,
+    private val sparseRootSlot: AtomicReference<LpSparseRootLayout?>,
 ) {
     constructor() : this(
         LpPreparationNamespace(), Any(),
         AtomicReference<LpPreparationState?>(null), AtomicReference<LpPreparationState?>(null),
+        AtomicReference<LpSparseRootLayout?>(null),
     )
 
     /**
      * Shares this namespace and its publication slots with a compatible view under a fresh row layout
      * token, so the next preparation validates that view's actual factor identities.
      */
-    fun inherited(): LpPreparationCache = LpPreparationCache(namespace, Any(), sourceSlot, finiteSlot)
+    fun inherited(): LpPreparationCache = LpPreparationCache(namespace, Any(), sourceSlot, finiteSlot,
+        AtomicReference<LpSparseRootLayout?>(null))
 
     /**
      * Shares everything, including the row layout token, which lets template rebinding skip its
@@ -38,7 +40,24 @@ internal class LpPreparationCache private constructor(
      * are identical to this cache's view may use it.
      */
     fun inheritedForIdenticalFactors(): LpPreparationCache =
-        LpPreparationCache(namespace, rowScope, sourceSlot, finiteSlot)
+        LpPreparationCache(namespace, rowScope, sourceSlot, finiteSlot, sparseRootSlot)
+
+    fun reusableSparseRoot(
+        problem: Problem,
+        objective: LinearObjective,
+        preparationAllowance: Long,
+        queryAllowance: Long,
+    ): LpSparseRootLayout? = sparseRootSlot.load()?.takeIf {
+        it.matches(problem, objective) && it.preparationWork <= preparationAllowance &&
+            it.sourceQueryWork <= queryAllowance
+    }
+
+    fun retainSparseRoot(layout: LpSparseRootLayout) {
+        val previous = sparseRootSlot.load()
+        if (previous?.matches(layout.problem, layout.objective) != true) {
+            sparseRootSlot.compareAndSet(previous, layout)
+        }
+    }
 
     private fun slot(problem: Problem): AtomicReference<LpPreparationState?> =
         if (problem is BakedProblem) finiteSlot else sourceSlot
@@ -116,6 +135,17 @@ internal class LpPreparationCache private constructor(
         }
         return !token() && next != null && cache.compareAndSet(previous, next)
     }
+}
+
+internal class LpSparseRootLayout(
+    val problem: Problem,
+    val objective: LinearObjective,
+    val relaxation: LpRelaxation,
+    val metrics: Map<String, Long>,
+    val preparationWork: Long,
+    val sourceQueryWork: Long,
+) {
+    fun matches(source: Problem, target: LinearObjective): Boolean = source === problem && target === objective
 }
 
 /** Prepares or revalidates this view's LP source templates in its inherited preparation cache. */

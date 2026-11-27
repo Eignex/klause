@@ -43,6 +43,9 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Explicit bounded sparse root trial; emphasis levels leave it disabled. */
     SPARSE_TRIAL("sparse-trial", LpTiming.MEDIUM),
 
+    /** Experimental control for the automatic admission policy. */
+    AUTOMATIC_SPARSE("automatic-sparse", LpTiming.MEDIUM),
+
     /** Cumulative / Disjunctive energetic over-subscription feasibility check. */
     ENERGETIC("energetic", LpTiming.FAST),
 
@@ -200,7 +203,11 @@ class LpConfig(
 
     /** Whether [technique] is permitted: an explicit override wins, else its tier ≤ the emphasis. */
     fun resolved(technique: LpTechnique): Boolean = overrides[technique]
-        ?: (technique != LpTechnique.SPARSE_TRIAL && technique.timing in emphasis.timings)
+        ?: (technique != LpTechnique.SPARSE_TRIAL && technique != LpTechnique.AUTOMATIC_SPARSE &&
+            technique.timing in emphasis.timings)
+
+    internal fun permitsAutomaticSparse(): Boolean = resolved(LpTechnique.AUTOMATIC_SPARSE) &&
+        LpTechnique.SPARSE_TRIAL.timing in emphasis.timings && overrides[LpTechnique.SPARSE_TRIAL] != false
 
     /** This config capped under [ceiling] for a portfolio arm: the lower emphasis, with the ceiling's
      *  per-technique overrides applied on top (so a `--lp aggressive,-cuts` ceiling forces cuts off on
@@ -257,8 +264,9 @@ class LpConfig(
         private fun parseTechniques(spec: String?): LpConfig {
             val s = spec?.trim()?.lowercase().orEmpty()
             if (s.isEmpty()) return AUTO
-            if (s == "all") return LpConfig(LpEmphasis.AGGRESSIVE,
-                LpTechnique.entries.associateWith { it != LpTechnique.SPARSE_TRIAL })
+            if (s == "all") return LpConfig(LpEmphasis.AGGRESSIVE, LpTechnique.entries.associateWith {
+                it != LpTechnique.SPARSE_TRIAL && it != LpTechnique.AUTOMATIC_SPARSE
+            })
             val tokens = s.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             // Emphasis-base form: first token is a level, the rest are +/- deltas.
             LpEmphasis.fromId(tokens.first())?.let { base ->

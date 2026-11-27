@@ -8,6 +8,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SourceSemanticsOwner
+import com.eignex.klause.lp.bounding.LpRootPointObservation
 import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -93,7 +94,20 @@ class SourceExecutionRequest private constructor(
     internal val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     internal val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     internal val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
+    internal val onPortfolioRootPoint: ((String, LpRootPointObservation) -> Unit)? = null,
 ) {
+    internal fun withPortfolioRootPointObserver(
+        observer: (String, LpRootPointObservation) -> Unit,
+    ): SourceExecutionRequest {
+        require(invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
+            "root point observation requires mixed finite source execution"
+        }
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+            presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession, observer)
+    }
+
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
     ): SourceExecutionRequest {
@@ -103,7 +117,8 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession)
+            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession,
+            onPortfolioRootPoint)
     }
 
     internal fun withPortfolioGuidanceObserver(
@@ -115,7 +130,8 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair, onPortfolioSession)
+            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair, onPortfolioSession,
+            onPortfolioRootPoint)
     }
 
     internal fun withPortfolioJointRepairObserver(
@@ -127,7 +143,8 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer, onPortfolioSession)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer, onPortfolioSession,
+            onPortfolioRootPoint)
     }
 
     internal fun withPortfolioSessionObserver(
@@ -139,7 +156,8 @@ class SourceExecutionRequest private constructor(
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, observer)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, observer,
+            onPortfolioRootPoint)
     }
 
     internal fun withValidationCancellation(stop: ExecutionControl): SourceExecutionRequest {
@@ -151,7 +169,8 @@ class SourceExecutionRequest private constructor(
                 it.copy(polynomial = it.polynomial.copy(cancellation = it.polynomial.cancellation or stop))
             },
             transcendental?.let { it.copy(cancellation = it.cancellation or stop) }, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession)
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair, onPortfolioSession,
+            onPortfolioRootPoint)
     }
 
     /**
@@ -509,6 +528,9 @@ private fun executeCapturedSource(
                 ?: throw PipelineConfigException("finite source execution requires its typed finite controls")
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
+            require(request.onPortfolioRootPoint == null || (finite.cores == 1 && !finite.prepareOnly)) {
+                "root point observation requires a single-core finite solve"
+            }
             bindScope?.invoke(
                 finite.cancellation or ExecutionControl { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
@@ -516,7 +538,7 @@ private fun executeCapturedSource(
             val result = FinitePipeline.solve(finite, callbacks.finite, finite.lpSolveContext,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
                 request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair,
-                request.onPortfolioSession)
+                request.onPortfolioSession, request.onPortfolioRootPoint)
             SourceExecutionResult.Finite(invocation, result)
         }
 

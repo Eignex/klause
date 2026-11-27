@@ -1,12 +1,18 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpRootPointDisposition
+import com.eignex.klause.lp.bounding.LpRootPointStage
 import com.eignex.klause.lp.bounding.RootComponentValues
 import com.eignex.klause.lp.bounding.RootPrimalTargets
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.round
 
-internal fun LpEngine.orderRootValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
+internal fun LpEngine.orderRootValues(
+    variable: VarRef,
+    values: Sequence<Long>,
+    onSourcePreference: ((RootPrimalTargets, Long) -> Unit)? = null,
+): Sequence<Long> {
     val targets = rootPrimalTargets
     val components = rootComponentValues
     if (targets == null && components == null) return values
@@ -27,6 +33,11 @@ internal fun LpEngine.orderRootValues(variable: VarRef, values: Sequence<Long>):
             return@sequence
         }
         observeRootValuePreference(currentTargets, currentComponents, saved != null)
+        if (onSourcePreference != null && saved == null && currentTargets != null &&
+            !currentTargets.auxiliary && currentTargets.knownColumns == null
+        ) {
+            onSourcePreference(currentTargets, preferred)
+        }
         yield(preferred)
         for (value in ordinary) if (value != preferred) yield(value)
     }
@@ -69,7 +80,19 @@ private fun LpEngine.observeRootValuePreference(
     }
     if (!saved && targets != null && !targets.valueOrderOffered) {
         targets.valueOrderOffered = true
+        var sourceRootOffer = false
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "VALUE_ORDER_OFFERED", 0L)
+        if (automaticSparseTrial && targets === rootPrimalTargets && !targets.auxiliary &&
+            targets.knownColumns == null
+        ) {
+            sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "SOURCE_ROOT_VALUE_ORDER_OFFERED", 0L)
+            sourceRootOffer = true
+        }
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.CONSUMER, LpRootPointDisposition.VALUE_OFFERED,
+                point = targets.coordinates, auxiliary = targets.auxiliary, partial = targets.knownColumns != null,
+                sourceRoot = sourceRootOffer)
+        }
         if (targets.auxiliary) {
             sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "AUXILIARY_ROOT_VALUE_ORDER_OFFERED", 0L)
         }

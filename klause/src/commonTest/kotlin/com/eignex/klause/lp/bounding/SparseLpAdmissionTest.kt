@@ -22,11 +22,13 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.ResumableLpSolver
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.continueExactLp
@@ -44,10 +46,196 @@ import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `automatic sparse admission leaves resolved cuts on the ordinary plan`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1_000L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val params = LpParams(lpConfig = LpConfig.parse("aggressive,+automatic-sparse"))
+        val sink = SolveStatsSink("sparse-with-cuts")
+
+        LpEngine(problem, objective, params, sink).use { engine ->
+            assertTrue(engine.params.lpPlan.cuts)
+            assertTrue(engine.params.lpPlan.rootCutHarvest)
+        }
+
+        assertTrue(sink.snapshot().lp.sparseTrial.isEmpty())
+    }
+
+    @Test
+    fun `automatic sparse root work checks a funded pause before resuming its cursor`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        var proposals = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    override var currentWork: Long = 0L
+                        private set
+
+                    override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? {
+                        if (cancellation()) return null
+                        proposals++
+                        return DoubleArray(model.m)
+                    }
+
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        currentWork = 1L
+                        pauseAt(1L)
+                        null
+                    }
+                }
+            }
+        }
+        val params = LpParams(lpConfig = LpConfig.parse("default,+automatic-sparse"))
+        LpEngine(problem, objective, params, SolveStatsSink("paid-pause"), LpSolveContext(factory)).use { engine ->
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+
+            engine.lpRoundingProbe(objective, ExecutionControl.Never)
+            assertEquals(0.0, engine.continuedRootLowerBound)
+            assertEquals(1, proposals)
+            engine.lpRoundingProbe(objective, ExecutionControl.Never)
+
+            assertEquals(1, proposals)
+        }
+    }
+
+    @Test
+    fun `a reused sparse root layout has private numerical state and preparation charges`() {
+        val source = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L))
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val params = LpParams(lpConfig = LpConfig.parse("default,+automatic-sparse"))
+        val firstFactory = RecordingLpEngineFactory()
+        val secondFactory = RecordingLpEngineFactory()
+        val secondSink = SolveStatsSink("reused-sparse-root")
+
+        LpEngine(problem, objective, params, SolveStatsSink("first-sparse-root"), LpSolveContext(firstFactory))
+            .use { first ->
+                assertTrue(first.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+                val firstWork = first.totalSolveWork()
+                LpEngine(problem, objective, params, secondSink, LpSolveContext(secondFactory)).use { second ->
+                    val secondBeforeLayout = second.totalSolveWork()
+                    assertTrue(second.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+
+                    val firstState = requireNotNull(first.propagator.state)
+                    val secondState = requireNotNull(second.propagator.state)
+                    assertNotSame(firstState, secondState)
+                    assertNotSame(firstState.model, secondState.model)
+                    assertTrue(firstFactory.calls.any { it.kind == EngineConstruction.PERSISTENT })
+                    assertTrue(secondFactory.calls.any { it.kind == EngineConstruction.PERSISTENT })
+                    assertTrue(second.totalSolveWork() > secondBeforeLayout)
+                    assertEquals(firstWork, first.totalSolveWork())
+                }
+            }
+        assertTrue(requireNotNull(secondSink.snapshot().lp.sparseTrial["ReusedPreparationWork"]) > 0L)
+    }
+
+    @Test
+    fun `automatic sparse preparation shares the paid layout for the same source and objective`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val admissions = ArrayList<SparseLpAdmission>()
+
+        sequence<Unit> {
+            repeat(2) { admissions += prepareSparseLpAdmission(problem, objective, automatic = true) }
+        }.forEach { }
+
+        assertSame(requireNotNull(admissions[0].sourceLayout), admissions[1].sourceLayout)
+        assertEquals(admissions[0].work, admissions[1].metrics["ReusedPreparationWork"])
+        assertEquals(1L, admissions[1].work)
+    }
+
+    @Test
+    fun `automatic sparse reuse can decline a funded source with an unaffordable compact forecast`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val admissions = ArrayList<SparseLpAdmission>()
+
+        sequence<Unit> {
+            val first = prepareSparseLpAdmission(problem, objective, automatic = true)
+            admissions += first
+            admissions += prepareSparseLpAdmission(problem, objective, automatic = true,
+                queryWorkAllowance = first.metrics.getValue("EstimatedProbeTotalWork") - 1L)
+        }.forEach { }
+
+        val (first, declined) = admissions
+        assertEquals(1L, declined.work)
+        assertEquals(first.work, declined.metrics["ReusedPreparationWork"])
+        assertEquals(1L, declined.metrics["DeclineQueryWork"])
+        assertFalse(declined.admitted)
+        assertNull(declined.sourceLayout)
+    }
+
+    @Test
+    fun `automatic sparse reuse preserves a source pass funding decline`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        var declined: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            prepareSparseLpAdmission(problem, objective, automatic = true)
+            declined = prepareSparseLpAdmission(problem, objective, automatic = true, queryWorkAllowance = 0L)
+        }.forEach { }
+
+        val metrics = requireNotNull(declined).metrics
+        assertEquals(1L, metrics["DeclineQueryWork"])
+        assertNull(metrics["ReusedPreparationWork"])
+    }
+
+    @Test
+    fun `automatic sparse preparation keeps layouts for different objectives distinct`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objectives = listOf(LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L)),
+            LinearObjective(intCoefficients = longArrayOf(3L, 2L, 1L)))
+        val admissions = ArrayList<SparseLpAdmission>()
+
+        sequence<Unit> {
+            for (objective in objectives) admissions += prepareSparseLpAdmission(problem, objective, automatic = true)
+        }.forEach { }
+
+        assertNotSame(requireNotNull(admissions[0].sourceLayout), requireNotNull(admissions[1].sourceLayout))
+    }
+
+    @Test
+    fun `unaffordable automatic forecast should stop before inspecting every source row`() {
+        val width = 32
+        val rowCount = CONSTRUCTION_BATCH_SIZE * 3
+        val columns = IntArray(width) { it }
+        val rows = Array(rowCount) { Linear(IntArray(width) { 1 }, columns, LinearOp.GE, 1) }
+        val problem = Problem(0, width, Array(width) { IntDomain(0, 1) }, rows.toList())
+        val optimisticPass = (rowCount.toLong() + width) * rowCount
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, LinearObjective(intCoefficients = LongArray(width)),
+                automatic = true, queryWorkAllowance = optimisticPass + rowCount)
+        }.forEach { }
+
+        val declined = requireNotNull(admission)
+        assertEquals(1L, declined.metrics["DeclineQueryWork"])
+        assertTrue(declined.work in 1L until rowCount.toLong())
+    }
+
     @Test
     fun `disabled source preparation should remain disabled during sparse admission`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
@@ -554,6 +742,23 @@ class SparseLpAdmissionTest {
         assertEquals(1L, estimate.metrics["LargestComponentRows"])
         assertEquals(2L, estimate.metrics["LargestComponentColumns"])
         assertEquals(4L, estimate.metrics["RowIntersectionRisk"])
+    }
+
+    @Test
+    fun `automatic admission accepts the exact grant for an initial factor attempt`() {
+        val model = LpBuilder().apply {
+            repeat(2) { addVar(0L, 10L) }
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 3L)
+        }.build(Sense.MINIMIZE)
+        val explicitForecast = estimateSparseLpAdmission(model)
+        val initialWork = explicitForecast.metrics.getValue("EstimatedProbeTotalWork") -
+            explicitForecast.metrics.getValue("EstimatedFactorAttemptWork")
+
+        val funded = estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = initialWork)
+        val unfunded = estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = initialWork - 1L)
+
+        assertTrue(funded.admitted)
+        assertEquals(1L, unfunded.metrics["DeclineQueryWork"])
     }
 
     @Test

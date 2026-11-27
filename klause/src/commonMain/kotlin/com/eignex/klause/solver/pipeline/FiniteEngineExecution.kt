@@ -15,6 +15,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpRootPointObservation
 import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -109,6 +110,7 @@ internal class FiniteExecutionRequest(
     val onPortfolioGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     val onPortfolioJointRepair: ((String, Long, JointRepairObservation) -> Unit)? = null,
     val onPortfolioSession: ((String, PropagationSession) -> Unit)? = null,
+    val onPortfolioRootPoint: ((String, LpRootPointObservation) -> Unit)? = null,
     /** Source optimality gap over [objective]; see [BacktrackParams.optimalityGap]. */
     val optimalityGap: OptimalityGap? = null,
 )
@@ -662,6 +664,7 @@ private fun executePortfolio(
         onGuidance = request.onPortfolioGuidance,
         onJointRepair = request.onPortfolioJointRepair,
         onSession = request.onPortfolioSession,
+        onRootPoint = request.onPortfolioRootPoint,
         numericalCompanions = request.numericalCompanionParams,
         sourceHints = request.sourceInvocation?.let { invocation ->
             { strategies ->

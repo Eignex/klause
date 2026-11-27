@@ -365,10 +365,12 @@ quantum; resuming a cursor keeps its original lifetime grant and charges each sl
 actual work to the same ledger.
 
 Primal consultations check the preceding paused dual before advancing and completed
-results before rounding. Numerical work, checking and source projection spend the
-same cumulative allowance. Only the identical source-root model and exact state
-qualify; later CP assertions supply no global bound. Search publishes accepted
-bounds to its objective floor and retains them in its terminal bound.
+results before rounding. An automatic worker can check a fresh paused dual at
+the end of its quantum when work and time remain. A checked pause need not be
+checked again before resumption. Numerical work, checking and source projection
+spend the same cumulative allowance. A global bound requires the identical
+source-root model and exact state. Search publishes accepted bounds to its
+objective floor and retains them in its terminal bound.
 With a checked bound and a positive decision allowance, a sliced monolithic finite
 worker can enter discrete search before its root numerical query completes.
 The handoff retires the unfinished cursor and skips further root consultations for
@@ -387,6 +389,26 @@ scratch and factor construction. Each sparse factor attempt reserves entries
 before writing and stops at two million entries or eight million work units;
 declines publish no factors or rank claim. Sparse admission never changes the dense
 exact-continuation caps.
+
+Opt-in automatic admission evaluates source and work guards inside the LP owner
+under the existing root and solve allowances. Resolved cut plans keep the ordinary
+LP path. A scan can decline once its nonzero and fill counts exceed the funded
+pass forecast. The diagnostic observer records completed admission decisions and their evaluated
+guards, including preparation and query allowances at the producer and helper.
+The compact forecast covers the initial factor attempt and full source pass.
+Later attempts draw on the live continuation allowance.
+Automatic workers on the same baked source can reuse one admitted compact layout
+and its forecasts from the preparation cache. The identical source and objective
+and grants covering its preparation and source pass allow a paid lookup. Each
+worker still needs a query grant covering the compact forecast to consume the
+layout. An unfunded compact forecast returns the query decline. Each admitted
+worker installs its own root state and pays for its numerical preparation and queries.
+Root point events identify the original owner, model and point through queries,
+retention and search consultations. A consultation supplies ordering guidance.
+The automatic root path can hand a complete point from the same source
+directly to ordinary search. The first root choice can use its value preference
+without preparing the component order or running another root simplex query.
+Auxiliary and partial points remain eligible for the existing rounding paths.
 
 Completed root points can guide rounding under the same objective identity, within a
 one-MiB guidance cap. Rounding pins through propagation with nearest targets, and
