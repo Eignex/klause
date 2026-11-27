@@ -217,6 +217,7 @@ class ExactLiraSearchComponent private constructor(
     private var outcome: ComponentCheck? = null
     private var unconsumedLpPoint: List<BigFraction>? = null
     private var retainedLpPoint: List<BigFraction>? = null
+    private var partialNumericalCheckDeferred = false
     private var sourceCheckedPoint: List<BigFraction>? = null
     private var sourceCheckedBooleans: IntArray? = null
     private var candidate: List<BigFraction>? = null
@@ -1614,6 +1615,17 @@ class ExactLiraSearchComponent private constructor(
             return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
         }
         if (operationStop()) return ComponentResult.Indeterminate
+        if (completeTraversalObserved && model.numIntVars == 0 && unassignedBooleans > 0 &&
+            retained != null && lp.state?.conflict == null && !partialNumericalCheckDeferred &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        ) {
+            partialNumericalCheckDeferred = true
+            candidate = null
+            dirty = false
+            observeCompleteStage("LP_PARTIAL_QUERY_DEFERRED")
+            return ComponentResult.Consistent
+        }
+        partialNumericalCheckDeferred = false
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         var result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
