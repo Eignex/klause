@@ -304,12 +304,6 @@ class ExactLiraSearchComponent private constructor(
                 }
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
                     primaryLpObserver?.observeSolve(metrics, component)
-                    observeCompleteStage("LP_BASIS_PIVOTS", metrics.pivots.toLong())
-                    observeCompleteStage("LP_BASIS_BUILD_WORK", metrics.basisBuildWork)
-                    observeCompleteStage("LP_BASIS_FACTOR_ENTRIES", metrics.factorEntriesBuilt)
-                    observeCompleteStage("LP_BASIS_BACKEND_REBUILDS", metrics.backendRequestedRefactorizations.toLong())
-                    observeCompleteStage("LP_BASIS_UPDATE_CAP_REBUILDS", metrics.updateLimitRefactorizations.toLong())
-                    observeCompleteStage("LP_BASIS_INITIAL_REBUILDS", metrics.initialRefactorizations.toLong())
                 }
                 override fun observePhase(metrics: LpPhaseMetrics) {
                     primaryLpObserver?.observePhase(metrics)
@@ -1644,10 +1638,12 @@ class ExactLiraSearchComponent private constructor(
         var result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
             lp.solve(sparsePointRecovery = true, claim = LpClaim.FEASIBLE_COMPLETION)
         }
+        observePrimaryLpBasisWork(lp.lastMetrics)
         if (result != null && result.verdict != LpVerdict.INFEASIBLE && system.usesStrictMargin &&
             !system.hasPositiveMargin(result.exactPrimal) && !operationStop()
         ) {
             result = lp.solve(sparsePointRecovery = true, claim = LpClaim.BOUND) ?: result
+            observePrimaryLpBasisWork(lp.lastMetrics)
         }
         if (complete) {
             val key = if (result == null)
@@ -1750,6 +1746,16 @@ class ExactLiraSearchComponent private constructor(
 
     private fun observeCompleteStage(stage: String, count: Long = 1L) {
         if (completeTraversalObserved) smtStats?.observeCompleteSearchStage(stage, count)
+    }
+
+    private fun observePrimaryLpBasisWork(metrics: LpSolveMetrics) {
+        observeCompleteStage("LP_BASIS_PIVOTS", metrics.pivots.toLong())
+        observeCompleteStage("LP_BASIS_BUILD_WORK", metrics.basisBuildWork)
+        observeCompleteStage("LP_BASIS_FACTOR_ENTRIES", metrics.factorEntriesBuilt)
+        observeCompleteStage("LP_BASIS_BACKEND_REBUILDS", metrics.backendRequestedRefactorizations.toLong())
+        observeCompleteStage("LP_BASIS_ROUTINE_REBUILDS", metrics.updateLimitRefactorizations.toLong())
+        observeCompleteStage("LP_BASIS_INITIAL_REBUILDS", metrics.initialRefactorizations.toLong())
+        observeCompleteStage("LP_BASIS_NUMERICAL_RECOVERY", metrics.numericalRecoveryRefactorizations.toLong())
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
