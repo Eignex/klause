@@ -336,6 +336,39 @@ class LpBoundTrailTest {
     }
 
     @Test
+    fun `a single bound batch should report the active strict conflict witnesses`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        val five = ExactLpNumber.of(5L)
+        assertTrue(trail.assertBound(0, false, ExactLpSide(five, strict = true), 1L))
+        val upper = LpBoundAssertion(0, true, ExactLpSide(five), 2L, 0)
+
+        val result = assertIs<LpBoundBatchResult.Conflict>(trail.assertBounds(listOf(upper)))
+
+        assertEquals(1, result.count)
+        assertEquals(1L, result.reason.lower.witness)
+        assertEquals(2L, result.reason.upper.witness)
+        assertTrue(result.reason.lower.side.strict)
+    }
+
+    @Test
+    fun `a single bound batch should check cancellation before staging its first side`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        val before = trail.state
+        assertTrue(before.canProjectWorkingModel())
+        val upper = LpBoundAssertion(0, true, ExactLpSide(ExactLpNumber.of(5L)), 1L, 0)
+        var polls = 0
+        val token = ExecutionControl { ++polls >= 3 }.withBoundedPolling()
+        assertFalse(token.pollStop())
+
+        val result = trail.assertBounds(listOf(upper), token)
+
+        assertEquals(LpBoundBatchResult.Declined(1), result)
+        assertSame(before, trail.state)
+    }
+
+    @Test
     fun `cancelled preparation should leave every ordered assertion unpublished`() {
         val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         val updates = listOf(

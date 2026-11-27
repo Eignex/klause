@@ -695,6 +695,7 @@ index premises. In every case the original source rows decide publication.
 intersects assertions exactly and keeps a source premise for each accepted side.
 Batches publish witnesses only for a committed prefix; crossed bounds cite both
 sides, and pop restores bounds and deactivates scoped rows.
+A single-side batch uses the trail's scalar assertion path.
 Trail edits borrow owned immutable assertion lists for reading. An empty scope
 push shares its predecessor's captured list; changed assertions receive a fresh
 capture, and caller snapshots remain independent copies.

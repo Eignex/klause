@@ -57,10 +57,17 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (token()) return LpBoundBatchResult.Declined(0)
         state.conflict?.let { return LpBoundBatchResult.Conflict(0, it) }
         if (assertions.isEmpty()) return LpBoundBatchResult.Applied(0)
-        if (!state.canProjectWorkingModel(token)) {
-            if (token()) return LpBoundBatchResult.Declined(0)
-            return assertUnprojectedBounds(assertions, token)
+        val projectable = state.canProjectWorkingModel(token)
+        if (!projectable && token()) return LpBoundBatchResult.Declined(0)
+        if (assertions.size == 1) {
+            if (projectable && token()) return LpBoundBatchResult.Declined(1)
+            val assertion = assertions.single()
+            if (assertion.depth != state.depth ||
+                !assertBound(assertion.column, assertion.upper, assertion.side, assertion.witness, token)
+            ) return LpBoundBatchResult.Declined(1)
+            return state.conflict?.let { LpBoundBatchResult.Conflict(1, it) } ?: LpBoundBatchResult.Applied(1)
         }
+        if (!projectable) return assertUnprojectedBounds(assertions, token)
         val before = state.assertionView
         val witnesses = before.mapTo(HashSet()) { it.witness }
         val lower = Array(state.model.numVars) { state.activeSide(it, false) }
