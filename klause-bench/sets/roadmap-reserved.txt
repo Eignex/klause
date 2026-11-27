@@ -32,9 +32,3 @@ klause-generated-4651-v1/thermal-duty
 # #3828 owns these generated source families and their related encodings.
 klause-generated-3828-v1/folio-lines
 klause-generated-3828-v1/district-spectrum
-
-# #3828 owns both early-contradiction families and their related encodings.
-klause-generated-3828-conflict-v1/trade-ledger-primary
-klause-generated-3828-conflict-v1/trade-ledger-guard
-klause-generated-3828-conflict-v1/resin-grades-primary
-klause-generated-3828-conflict-v1/resin-grades-guard

@@ -158,3 +158,9 @@ smtlib-qfrdl/skdmxa/skdmxa-3x3-5
 # MIPLIB source of the pp08a-2000 relaxation
 miplib3/pp08a
 miplib2003/pp08a
+
+# #3828 early-contradiction families
+klause-generated-3828-conflict-v1/trade-ledger-primary
+klause-generated-3828-conflict-v1/trade-ledger-guard
+klause-generated-3828-conflict-v1/resin-grades-primary
+klause-generated-3828-conflict-v1/resin-grades-guard
