@@ -475,8 +475,11 @@ integer endpoints keep the shared premise without reconstructing a native proof.
 Rows share the learned store and integer bounds propagation. A successful row
 assertion also keeps its first-UIP clause in the native store; the two constraints
 can prune different branches, publish their deductions together from the undo
-position before either assertion, and follow their own retention policies. Retained
-row deductions freeze eager historical clause premises, including the signed guard,
+position before either assertion, and follow their own retention policies.
+If the first row fixpoint produces a cascade, the native search keeps its completed
+conflict and can fund the original first-UIP clause for the next fixpoint. Pending
+attachment uses the learned store's ordinary undo and compaction handling.
+Retained row deductions freeze eager historical clause premises, including the signed guard,
 without compactable factor IDs. Arithmetic reuse reconstructs their deduction boundary
 from the bound journal and validates the retained row's raw historical consequence.
 Integer bound event subscriptions wake rows after undo and are remapped or removed on

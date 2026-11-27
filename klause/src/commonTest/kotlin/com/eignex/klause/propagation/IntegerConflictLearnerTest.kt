@@ -524,6 +524,25 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `a row cascade should preserve its original clause for the next fixpoint`() {
+        val native = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray()), pbLearning = false)
+        native.enableIntegerRowLearning()
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(0, 1))
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 0), useLo = true))
+        val fallback = ConflictAnalyzer.AnalysisResult.Learned(intArrayOf(Lit.make(0, true)),
+            backjumpLevel = 0, lbd = 1, decisionLevels = intArrayOf(0))
+        val learned = ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row,
+            backjumpLevel = 1, lbd = 2, decisionLevels = intArrayOf(0, 1), fallbackClause = fallback)
+
+        assertIs<PropagationResult.Unsat>(native.addLearnedIntegerRow(learned))
+        native.popToLevel(0)
+        val next = assertIs<PropagationResult.Implied>(native.pinIntAtMost(0, 0))
+
+        assertEquals(true, next.boolValueOrNull(0))
+    }
+
+    @Test
     fun `prepared optimization should consume a guarded arithmetic consequence`() {
         val program =
             parseFlatZinc("""

@@ -1068,7 +1068,11 @@ class PropagationSession private constructor(
         val capture = state.arithmeticLearningTrace?.beginIntegerAttachment(state, decisionLevel) == true
         if (state.integerRowAdmission) {
             val result = addLearnedIntegerRow(learned.row, learned.lbd, capture)
-            if (result is PropagationResult.Unsat || fixpointCancelled) return result
+            if (result is PropagationResult.Unsat) {
+                if (bakedUnsat == null && !fixpointCancelled) deferCascadeFallback(learned.fallbackClause)
+                return result
+            }
+            if (fixpointCancelled) return result
         } else {
             state.integerRowAdmissionsDeclined++
             state.arithmeticLearningTrace?.record("integer.decline.admission-disabled")
@@ -1076,6 +1080,25 @@ class PropagationSession private constructor(
         val fallback = learned.fallbackClause
         return registerAndPropagate(base = publicationBase, attachmentStage = if (capture) "clause" else null) {
             state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
+        }
+    }
+
+    private fun deferCascadeFallback(fallback: ConflictAnalyzer.AnalysisResult.Learned) {
+        val before = state.work
+        try {
+            val literals = fallback.literals.size.toLong()
+            state.finiteWork.checkNow()
+            ArithmeticLearningBudget(state).spend(work = 1 + 2 * literals, bytes = 128 + 8 * literals)
+            val id = state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
+            state.factorAttribution?.admit(state.factorAt(id))
+            state.deferLearnedAttachment(id)
+            state.integerCascadeFallbacks++
+        } catch (_: ArithmeticLearningDeclined) {
+            // The completed cascade result remains authoritative.
+        } catch (_: FinitePropagationInterrupted) {
+            // The deferred clause is optional once the cascade has been analyzed.
+        } finally {
+            state.integerRowAttachmentWork += state.work - before
         }
     }
 
@@ -1504,6 +1527,7 @@ class PropagationSession private constructor(
             "learningIntegerRetainedSeedUses" to it.integerRowRetainedSeedUses,
             "learningIntegerRetainedEndpointUses" to it.integerRowRetainedEndpointUses,
             "learningIntegerAttachmentWork" to it.integerRowAttachmentWork,
+            "learningIntegerCascadeFallbacks" to it.integerCascadeFallbacks,
             "learningIntegerPropagationWork" to it.integerRowPropagationWork,
             "learningIntegerPostInitialFires" to it.integerRowPostInitialFires,
             "learningIntegerPostInitialUsefulFires" to it.integerRowPostInitialUsefulFires,
