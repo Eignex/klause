@@ -8,7 +8,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 // Small stored columns avoid backend dispatch without widening unbounded scalar work.
-internal const val MAX_SCALAR_COLUMN_ENTRIES: Int = 8
+internal const val MAX_SCALAR_COLUMN_ENTRIES: Int = 64
 
 internal data class BasisSolveWork(
     val first: TriangularSolveWork,
