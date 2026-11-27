@@ -348,9 +348,11 @@ The explicit `+sparse-trial` LP option selects a bounded root trial for compact
 closed unconditional linear sources; emphasis levels leave it disabled. Admission
 bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
-retained layout. Custom emitters decline because they reserve no source size. The
-trial uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
-cuts and expanded hulls stay outside its allowance, and admitted roots enable the
+retained layout. The scan reads compact integer storage directly and includes
+numerator and denominator widths for rational storage. Custom emitters decline
+because they reserve no source size. The trial uses the ordinary bound, fixing and
+conflict consumers under the solve's certification policy. Cuts and expanded hulls
+stay outside its allowance, and admitted roots enable the
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
 and root scopes. The owner advances its floating cursor in adaptive work quanta; a
