@@ -21,7 +21,7 @@ internal class LinearRepairGuidance : AutoCloseable {
 
     private sealed interface State {
         data object Empty : State
-        class Available(val hint: Hint) : State
+        data class Available(val hint: Hint, val finiteCutReady: Boolean? = null) : State
         data object Closed : State
     }
 
@@ -49,6 +49,21 @@ internal class LinearRepairGuidance : AutoCloseable {
 
     fun find(source: SourceProofContext): Hint? =
         (state.load() as? State.Available)?.hint?.takeIf { it.matches(source) }
+
+    fun finiteCutReady(source: SourceProofContext): Boolean? =
+        (state.load() as? State.Available)?.takeIf { it.hint.matches(source) }?.finiteCutReady
+
+    fun settleFiniteCut(
+        source: SourceProofContext, published: Boolean, budget: SourceLpBudget, token: ExecutionControl,
+    ) {
+        val current = state.load() as? State.Available ?: return
+        val funding = budget.funding ?: return
+        if (current.finiteCutReady != null || !current.hint.matches(source) ||
+            token() || funding.availableWork <= 1L || funding.remainingAllocation <= 64L) return
+        budget.observe(preparation = 1L)
+        funding.charge(0L, 64L)
+        if (!token()) state.compareAndSet(current, current.copy(finiteCutReady = published))
+    }
 
     fun rememberIntegerPoint(source: SourceProofContext, coordinates: List<SourceCoordinate>,
         point: List<BigFraction>, budget: SourceLpBudget, token: ExecutionControl): Boolean {

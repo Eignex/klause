@@ -528,7 +528,10 @@ auxiliary objective over the accepted envelope. The auxiliary scope supplies
 guidance only. The regional query retains its source authority and uses the
 stronger of its existing cutoff and the canonical incumbent. The projection
 returns to the instruction guard before regional search starts. The connected
-query and distance trial may request continuation within the worker allowance.
+query and distance trial may request continuation within the worker allowance
+after the paired proof worker publishes a checked finite cut for their shared
+source context. Nominal publication recovery for this route belongs to the
+expanded distance region.
 
 Point selection admits at most eight mutually nonparallel additional checked cuts per
 usable point and waits for its completed query before scanning again. A mixed ordinary recipe with

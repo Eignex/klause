@@ -133,6 +133,7 @@ internal class JointLinearRepair(
     private var distanceTrial: DistanceTrial? = null
     private var distanceBootstrap: ExactNeighborhoodCondition? = null
     private var distanceCutoff: (() -> BigFraction?)? = null
+    private var distancePublicationCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null
     private var distanceTried = false
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
@@ -428,7 +429,10 @@ internal class JointLinearRepair(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
                         if (sharedStart && params.sourceJointDistanceRepair && nominalPublicationCapture != null &&
-                            sourceIntegers == null) distanceBootstrap = condition
+                            sourceIntegers == null) {
+                            if (repairGuidance?.finiteCutReady(source) == true) distanceBootstrap = condition
+                            else observe("jointRepairDistanceAdmissionDeclined")
+                        }
                         if (!distanceTried && distanceBootstrap != null && round > 0L) {
                             val work = 1L + model.numIntVars
                             val bytes = 128L + 16L * model.numIntVars
@@ -438,6 +442,7 @@ internal class JointLinearRepair(
                                 funding.charge(0L, bytes)
                                 distanceTrial = DistanceTrial(condition, from.take(model.numIntVars))
                             } else {
+                                observe("jointRepairDistanceAdmissionDeclined")
                                 distanceTried = true
                                 distanceBootstrap = null
                             }
@@ -700,22 +705,24 @@ internal class JointLinearRepair(
     fun supportsNominalPublicationRecovery(): Boolean =
         source.scope.revision.semantics == "absolute-tolerance-envelope-v1" &&
             model.numBoolVars == 0 && model.numIntVars in 1..256 && model.numRealVars > 0 &&
-            model.binaryIntegers && incumbentCompletionCheck != null && objective != null
+            model.binaryIntegers && objective != null
 
-    fun enableDistanceCutoff(cutoff: () -> BigFraction?) {
+    fun bindDistancePublication(cutoff: () -> BigFraction?, check: (Sample, BigFraction, ExecutionControl) -> Boolean) {
         check(params.sourceJointDistanceRepair && distanceCutoff == null)
         distanceCutoff = cutoff
+        distancePublicationCheck = check
     }
 
     fun enableNominalPublicationRecovery(capture: (ExecutionControl) -> SourceProofContext?) {
         check(query == null && nominalPublicationCapture == null && !nominalPublicationTried)
-        require(supportsNominalPublicationRecovery())
+        require(supportsNominalPublicationRecovery() &&
+            (incumbentCompletionCheck != null || distancePublicationCheck != null))
         nominalPublicationCapture = capture
     }
 
-    private fun recoverNominalPublication(sample: Sample, verification: ExecutionControl): Sample? {
+    private fun recoverNominalPublication(sample: Sample, verification: ExecutionControl,
+        original: (Sample, BigFraction, ExecutionControl) -> Boolean): Sample? {
         val capture = nominalPublicationCapture ?: return null
-        val original = incumbentCompletionCheck ?: return null
         if (nominalPublicationTried || verification() || funding.exhausted) return null
         nominalPublicationTried = true
         observe("jointRepairNominalPublicationRequests")
@@ -836,11 +843,13 @@ internal class JointLinearRepair(
             val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, verification)
             var originalChecked = true
             var originalRejected = false
-            if (checked == SourceEvidenceCheck.Checked && incumbentCompletionCheck != null) {
+            val distancePublication = distanceTrial?.replacement === condition
+            val originalCheck = if (distancePublication) distancePublicationCheck else incumbentCompletionCheck
+            if (checked == SourceEvidenceCheck.Checked && originalCheck != null) {
                 val checking = publicationChecking(verification)
                 observe("jointRepairOriginalPublicationChecks")
                 val value = objective?.evaluateExact(sample)
-                originalChecked = value != null && incumbentCompletionCheck.invoke(sample, value, checking)
+                originalChecked = value != null && originalCheck(sample, value, checking)
                 if (checking()) {
                     originalChecked = false
                     observe("jointRepairOriginalPublicationUnavailable")
@@ -865,10 +874,11 @@ internal class JointLinearRepair(
             val accepted = when {
                 checked != SourceEvidenceCheck.Checked -> null
                 originalChecked -> sample
-                originalRejected -> recoverNominalPublication(sample, verification)?.takeIf { recovered ->
-                    !verification() && !funding.exhausted &&
-                        (condition.cutoff == null || requireNotNull(objective).evaluateExact(recovered) < condition.cutoff)
-                }
+                originalRejected && originalCheck != null && (!params.sourceJointDistanceRepair || distancePublication) ->
+                    recoverNominalPublication(sample, verification, originalCheck)?.takeIf { recovered ->
+                        !verification() && !funding.exhausted &&
+                            (condition.cutoff == null || requireNotNull(objective).evaluateExact(recovered) < condition.cutoff)
+                    }
                 else -> null
             }
             if (accepted != null) {

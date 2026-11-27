@@ -198,7 +198,7 @@ internal class FiniteNumericalCompanions private constructor(
             }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
             sharedCompletions = completionSharing,
             repairGuidance = repairGuidance,
-            incumbentCompletionCheck = incumbentCompletionCheck,
+            incumbentCompletionCheck = incumbentCompletionCheck.takeIf { limits.sourceIncumbentCompletion },
             onObservation = onObservation?.let { report -> { observation -> report(slot.seed, observation) } },
             onComparison = onComparison?.let { report ->
                 { comparison ->
@@ -220,8 +220,8 @@ internal class FiniteNumericalCompanions private constructor(
             }))
         if (limits.sourceJointDistanceRepair && incumbentCompletionCheck != null &&
             repair.supportsNominalPublicationRecovery()) {
+            repair.bindDistancePublication({ incumbents.exchange.current()?.objective }, incumbentCompletionCheck)
             repair.enableNominalPublicationRecovery { captureContext(model, objective, it) }
-            repair.enableDistanceCutoff { incumbents.exchange.current()?.objective }
         }
         return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
@@ -249,13 +249,19 @@ internal class FiniteNumericalCompanions private constructor(
                 }, onIncumbentUse = {
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
-                incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance,
+                incumbentCompletionCheck = incumbentCompletionCheck.takeIf { limits.sourceIncumbentCompletion },
+                repairGuidance = repairGuidance,
                 gap = gap, useSourceGap = false,
                 onRootConditionalCuts = if (params.sourceAggregateCuts && params.sourcePointCuts &&
                     params.sourceCuts && cutBinding != null && cutOrigin >= 0 && cutPool != null) {
                     { cuts, budget, stop ->
-                        FiniteSourceCutClauses(cutBinding, model, context, budget, stop,
+                        val published = FiniteSourceCutClauses(cutBinding, model, context, budget, stop,
                             requireNotNull(cutPool), cutOrigin).publish(cuts)
+                        if (limits.sourceJointDistanceRepair) {
+                            repairGuidance?.settleFiniteCut(context,
+                                (published["SourceCutClausePublished"] ?: 0L) > 0L, budget, stop)
+                        }
+                        published
                     }
                 } else null)
             private var result: MinimizeResult? = null

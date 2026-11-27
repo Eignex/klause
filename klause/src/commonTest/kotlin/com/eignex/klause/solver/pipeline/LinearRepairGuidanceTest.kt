@@ -59,6 +59,19 @@ class LinearRepairGuidanceTest {
     }
 
     @Test
+    fun `a finite cut receipt should admit only its retained source context`() {
+        val funding = SourceLpFunding(1000, 1000).also { it.grant(1000) }
+        val budget = SourceLpBudget(funding = funding)
+        val guidance = LinearRepairGuidance()
+        val foreign = SourceProofContext(scope, setOf(integer), emptyMap())
+        assertTrue(guidance.remember(source, mapOf(integer to 0.5), budget, ExecutionControl.Never))
+
+        guidance.settleFiniteCut(foreign, published = true, budget, ExecutionControl.Never)
+
+        assertNull(guidance.finiteCutReady(source))
+    }
+
+    @Test
     fun `later producer points should leave the retained snapshot unchanged`() {
         val funding = SourceLpFunding(10_000, 10_000).also { it.grant(10_000) }
         val budget = SourceLpBudget(funding = funding)
