@@ -83,7 +83,7 @@ internal class LpExactState internal constructor(
     ) {
         assertions
     } else assertions.toList()
-    private val scopeMarks = scopes.toList()
+    private val scopeMarks: List<Int> = if (scopes === previous?.scopeMarks) scopes else scopes.toList()
     private val changed = changedColumns.toList()
     private val lower: Array<LpBoundAssertion?>
     private val upper: Array<LpBoundAssertion?>
@@ -109,6 +109,7 @@ internal class LpExactState internal constructor(
     val assertions: List<LpBoundAssertion> get() = activeAssertions.toList()
     internal val assertionView: List<LpBoundAssertion> get() = activeAssertions
     val scopes: List<Int> get() = scopeMarks.toList()
+    internal val scopeView: List<Int> get() = scopeMarks
     val changedColumns: List<Int> get() = changed.toList()
     val depth: Int get() = scopeMarks.size
     val model: ExactLpModel
@@ -157,8 +158,14 @@ internal class LpExactState internal constructor(
     init {
         require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision, rowRevision).all { it >= 0L })
         require(rows.size == baseModel.m)
-        require(scopeMarks.all { it in 0..activeAssertions.size })
-        require(scopeMarks.zipWithNext().all { (a, b) -> a <= b })
+        if (scopeMarks !== previous?.scopeMarks) {
+            var last = 0
+            for (mark in scopeMarks) {
+                require(mark >= last)
+                last = mark
+            }
+        }
+        require(scopeMarks.isEmpty() || scopeMarks.last() <= activeAssertions.size)
         require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
         val source = previous?.takeIf { it.baseModel.sharesRegion(baseModel) && it.rows === rows }
         boundPredecessor = source?.scalarIdentity
@@ -247,8 +254,11 @@ internal class LpExactState internal constructor(
 
     // Checks the assertions from [from] on; the ones before it were checked when the state that shares them was built.
     private fun validateAssertions(from: Int) {
+        if (from == activeAssertions.size) return
         val witnesses = LongHashSet()
+        var assertionDepth = 0
         for (index in from until activeAssertions.size) {
+            while (assertionDepth < scopeMarks.size && scopeMarks[assertionDepth] <= index) assertionDepth++
             val assertion = activeAssertions[index]
             require(assertion.column in 0 until baseModel.numVars && assertion.witness >= 0L)
             require(assertion.column < baseModel.n || rows.row(assertion.column - baseModel.n).active)
@@ -256,12 +266,10 @@ internal class LpExactState internal constructor(
                 assertion.column < baseModel.n ||
                     assertion.depth >= (rows.row(assertion.column - baseModel.n).depth ?: 0),
             )
-            require(assertion.depth == scopeMarks.count { it <= index })
+            require(assertion.depth == assertionDepth)
             require(witnesses.add(assertion.witness))
         }
-        if (from > 0 && !witnesses.isEmpty()) {
-            for (index in 0 until from) require(activeAssertions[index].witness !in witnesses)
-        }
+        for (index in 0 until from) require(activeAssertions[index].witness !in witnesses)
     }
 
     private fun sharedPrefix(before: List<LpBoundAssertion>): Int {

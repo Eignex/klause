@@ -25,7 +25,7 @@ internal class LpBoundTrail(initial: LpExactState) {
 
     fun push(token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || state.depth == Int.MAX_VALUE) return false
-        val next = snapshot(scopes = state.scopes + state.assertionView.size)
+        val next = snapshot(scopes = state.scopeView + state.assertionView.size)
         return commit(next, token)
     }
 
@@ -136,7 +136,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (token() || targetDepth !in 0..state.depth) return false
         if (targetDepth == state.depth) return true
         if (state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
-        val retained = state.scopes[targetDepth]
+        val retained = state.scopeView[targetDepth]
         val assertions = state.assertionView.take(retained)
         val beforeRows = state.rows
         val rows = beforeRows.popped(targetDepth)
@@ -152,7 +152,7 @@ internal class LpBoundTrail(initial: LpExactState) {
             // The same rows object when none go, so the popped state can derive from this one.
             rows = rows,
             rowRevision = state.rowRevision + if (changedRows.isEmpty()) 0L else 1L,
-            scopes = state.scopes.take(targetDepth),
+            scopes = state.scopeView.take(targetDepth),
             boundRevision = state.boundRevision + 1L,
             popRevision = state.popRevision + 1L,
             changedColumns = (
@@ -378,7 +378,7 @@ internal class LpBoundTrail(initial: LpExactState) {
             snapshot(
                 baseModel = state.baseModel.compactLayout(remap),
                 assertions = assertions,
-                scopes = state.scopes.map { marks[it] },
+                scopes = state.scopeView.map { marks[it] },
                 rows = state.rows.compact(),
                 matrixRevision = state.matrixRevision + 1L,
                 boundRevision = state.boundRevision + 1L,
@@ -427,7 +427,7 @@ internal class LpBoundTrail(initial: LpExactState) {
     private fun snapshot(
         baseModel: ExactLpModel = state.baseModel,
         assertions: List<LpBoundAssertion> = state.assertionView,
-        scopes: List<Int> = state.scopes,
+        scopes: List<Int> = state.scopeView,
         boundRevision: Long = state.boundRevision,
         objectiveRevision: Long = state.objectiveRevision,
         popRevision: Long = state.popRevision,
