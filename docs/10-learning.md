@@ -500,6 +500,8 @@ notification, preserving its fresh selector, choices and other notifications. It
 identifies the worker and exposes its actual session before branching, including
 replacement sessions. Observation does not select a recipe or grant source authority;
 its work spends the containing invocation allowance.
+Native diagnostic snapshots preserve factor indices, including generated difference
+systems, and record each graph edge with its weight and guard.
 
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction: seed and fallback literals, integer
