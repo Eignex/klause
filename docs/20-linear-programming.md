@@ -428,8 +428,8 @@ and target reset, reseed and engine close release the preferences.
 
 ### Immutable component ownership
 
-The explicit `lp-component-ownership=true` setting lets finite node bounding retain
-one numerical owner per independent row-coupled block. Each child keeps its basis
+A direct finite-worker `LpPlan` with component ownership retains one numerical
+owner per independent row-coupled block. Each child keeps its basis
 and exact result authority; empty structural rows form one logical-only child that
 retains feasibility, strict sides and logical costs. Bound, cost, row activation and
 premise changes invalidate only affected children, and unchanged children reuse
@@ -458,7 +458,7 @@ without a result before projection. Node consumers may prune against the existin
 cutoff, but publish no branching coordinates or directional history from a partial
 aggregate. Returned child coordinates can feed a masked rounding guide.
 
-The same setting dispatches root tableau separation to the owning block. Lifted cuts
+The component plan dispatches root tableau separation to the owning block. Lifted cuts
 keep every row multiplier, bound substitution, integrality premise and source
 address for the ordinary source mapper and cut pool. Rows confined to existing
 blocks replace only those children; cross-block rows, new columns and other
@@ -670,9 +670,7 @@ invocation window and Boolean substitution stay bound to each entry.
 `source-refutation-propagation=true` adds integral unit-prefix deductions: the only
 eligible case is a single missing inclusive bound on a source integer with an
 integral endpoint, and the augmented scope's import check proves the excluded
-sibling. `source-refutation-resolution=true` adds bounded pairwise resolution over
-named integral predicates, checking each resolvent through a source integer-split
-derivation. The index bounds entries, proof storage and support traversal, evicts
+sibling. The index bounds entries, proof storage and support traversal, evicts
 its oldest entry and charges cumulative source funding; reaching its separate
 allocation limit clears it and leaves ordinary traversal running. Unknown or
 cancelled checks close nothing.

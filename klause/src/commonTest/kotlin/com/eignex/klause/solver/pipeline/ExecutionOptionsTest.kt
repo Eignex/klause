@@ -43,6 +43,18 @@ class ExecutionOptionsTest {
         }
     }
 
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `legacy typed component ownership should be rejected before backtracking`() {
+        val options = ExecutionOptions(ExecutionOption.lpComponentOwnership(true))
+
+        val failure = assertFailsWith<PipelineConfigException> {
+            applyFixedBacktrackParams(BacktrackParams(), options.reader(), allowSelectors = true)
+        }
+
+        assertTrue("lp-component-ownership" in failure.message.orEmpty())
+    }
+
     @Test
     fun `parsed and typed luby units should reject non-positive values before recipe construction`() {
         for (base in listOf(0L, -1L, Long.MIN_VALUE)) {

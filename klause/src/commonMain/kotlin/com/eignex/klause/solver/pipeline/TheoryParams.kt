@@ -112,7 +112,7 @@ data class TheoryParams(
     val sourceRefutationReuse: Boolean = false,
     /** Imply integral source bounds from checked refutations at unit prefixes in numerical traversal. */
     val sourceRefutationPropagation: Boolean = false,
-    /** Resolve checked refutations across named integral source predicates within numerical traversal. */
+    /** Compatibility field for older callers. Must be false. */
     val sourceRefutationResolution: Boolean = false,
     /** Complete advisory discrete incumbent coordinates before exact companion admission. */
     val sourceIncumbentCompletion: Boolean = false,
@@ -124,6 +124,7 @@ data class TheoryParams(
     val sourceRefutationCenterStep: Boolean = false,
 ) {
     init {
+        require(!sourceRefutationResolution) { "source-refutation-resolution has been removed" }
         require(!sourceRefutationCenterStep || sourceIncumbentCompletion) {
             "source-refutation-center-step requires source-incumbent-completion"
         }

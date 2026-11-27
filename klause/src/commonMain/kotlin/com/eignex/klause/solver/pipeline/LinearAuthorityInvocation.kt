@@ -51,7 +51,6 @@ internal class LinearAuthorityInvocation(
     private val params: TheoryParams,
     private val external: () -> Sample? = { null },
     private val state: OpenTheorySolveState = OpenTheorySolveState(params),
-    useBranchHistory: Boolean = false,
     borrowedAuthority: LinearAuthority? = null,
     private val boundOrdered: Boolean = false,
     guidance: Boolean = false,
@@ -143,19 +142,18 @@ internal class LinearAuthorityInvocation(
                     sample to it
                 }
             }
-        }, useBranchHistory, borrowedAuthority,
+        }, borrowedAuthority = borrowedAuthority,
         useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
-        useRefutationPropagation = params.sourceRefutationPropagation,
-        useRefutationResolution = params.sourceRefutationResolution, useSupportBranching = supportBranching,
+        propagateRefutations = params.sourceRefutationPropagation, useSupportBranching = supportBranching,
         pointCuts = boundOrdered && params.sourcePointCuts, onNumericalFeedback = onNumericalFeedback,
         aggregateCuts = boundOrdered && params.sourceAggregateCuts, latestFeedback = latestFeedback,
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
         gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
         guideIncumbent = guideIncumbent)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
-        atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
+        atoms = if (params.sourceRefutationPropagation) SearchAtomRegistry(
             context.coordinates.filter {
                 it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
             }.maxOfOrNull { it.id + 1 } ?: 0) else null).also {

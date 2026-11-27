@@ -908,24 +908,16 @@ LP work and certification counters and whole-process measurements retain the cos
 of numerical repair and final completion. The incremental route is the ordinary
 default; explicit false selects the comparison control.
 
-`lp-component-split` supplies existing separable MPS and MiniZinc sources plus
-`mzn-linked-8x24` as a connected control. For immutable node lifecycle controls use
-`param.lp-component-ownership=true|false` with identical source hashes, presolve,
-LP effort and containing work limits. This option also dispatches root tableau
-cuts to their owning blocks. It leaves automatic component admission unchanged;
-record prepared block counts and actual bound edits before interpreting a zero
-reuse or zero-cut result. Component count alone establishes no saved work or
-whole-source improvement.
+`lp-component-split` supplies separable MPS and MiniZinc sources plus
+`mzn-linked-8x24` as a connected control. `param.lp-component-split=true|false`
+controls component splitting for continuous leaf completion.
 `lpPhase_COMPONENT_LIFECYCLE_*` records child `SOLVED` and `REUSED` counts through
 the existing route ledger; numerical work, pivots and factors count actual solves.
 `SOLVED` counts invocations, including attempts that stop without a result.
 `set=lp-component-lifecycle-v1` selects two binary covering MPS sources with direct
 additive objectives. Each block needs two selected columns but has a fractional
-LP optimum, admitting local tableau cuts without an objective-definition row that
-connects the blocks. Compare ownership and `param.lp-root-cuts` independently;
-retain prepared block counts, child reuses, cut consumption and ordinary outcomes.
-Pin `param.bt-arm=lp-aggressive` and `param.arms=1` for lifecycle controls so an
-LP-free portfolio arm cannot finish the source before the component owner runs.
+LP optimum. There is no objective-definition row connecting the blocks. Pin
+`param.bt-arm=lp-aggressive` and `param.arms=1` to isolate an LP worker.
 
 Cut lifecycle controls retain `lpPhase_CUT_ROOT_*` and `lpPhase_CUT_NODE_*` phases
 alongside the ordinary LP totals. Family tags distinguish construction, mapping,
