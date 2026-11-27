@@ -541,7 +541,11 @@ operation, work and allocation ledger. Its rounded-point preparation and active
 recovery cursors survive pauses without another claim or root relaxation. Private
 recovery retains row validation, reconstruction, discrete substitution, component
 preparation and exact row checks at paid entry boundaries under immutable query and
-seed identity. Resumption retains the same cumulative recovery limits. Query
+seed identity. Resumption retains the same cumulative recovery limits. Joint
+repair can reuse the paid row layout of its exact private root when the rows are
+unconditional and there are no active cuts. Recovery substitutes the rounded
+integers into those rows, including all receiving restrictions and the private
+target. Other row layouts prepare the pinned query. Query
 setup interrupted before retaining a complete query ends that trial, retaining its
 cost instead of repeating its reservation on another offer. A retained query owns
 its paid seed-point prefix and resumes at the next coordinate. A declined trial retains the

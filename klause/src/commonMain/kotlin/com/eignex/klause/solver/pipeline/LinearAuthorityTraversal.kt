@@ -491,7 +491,8 @@ internal class LinearAuthorityTraversal(
         }
         if (!current.pending && !context.consumeCheck()) return SearchNodeDisposition.Indeterminate
         val branch = if (queriedNode === current) checkNotNull(queriedSource) else
-            source.atScope(source.scope.copy(condition = current.condition)).also {
+            (if (current === root && proximityOfferWork != null) source
+            else source.atScope(source.scope.copy(condition = current.condition))).also {
                 queriedNode = current
                 queriedSource = it
             }
@@ -517,7 +518,8 @@ internal class LinearAuthorityTraversal(
                 proximityRootCompletionPending = true
                 return SearchNodeDisposition.Pause
             }
-            if (proximityCompletion.advance(result, context, proximityStop, proximityOfferWork))
+            val preparedQuery = if (proximityOfferWork != null) authority.completionQuery(source) else null
+            if (proximityCompletion.advance(result, context, proximityStop, proximityOfferWork, preparedQuery))
                 return SearchNodeDisposition.Pause
             proximityRootCompletionPending = false
             proximityCompletion.takeChecked()?.let { sample ->

@@ -127,7 +127,8 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
         val source = SourceProofContext(scope, columns.toSet(), rows, columns.associateWith { BigFraction.ONE })
         val invocation = LinearAuthorityInvocation(source,
             TheoryParams(maxDecisions = 1, sourceLpOperations = 1, sourceCuts = false), boundOrdered = true,
-            proximityCenter = Sample(booleanArrayOf(), LongArray(3) { 1 }), proximityRounding = true)
+            proximityCenter = Sample(booleanArrayOf(), LongArray(3) { 1 }), proximityRounding = true,
+            boundProximityFloatToOffer = true)
 
         invocation.use {
             assertNull(it.runSlice(ExecutionControl.Never, 100, -1) { _, _ -> })
@@ -143,6 +144,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             assertEquals(1L, it.stats.openTheory.openTheoryDecisions)
             assertEquals(before.openTheory.openTheoryChecks + 1L, it.stats.openTheory.openTheoryChecks)
             assertEquals(1L, it.stats.smt.sourceLp.operations)
+            assertEquals(1L, it.stats.smt.completeSearchStages?.get("numericalProximityCompletionQueryReused"))
             assertEquals(before.smt.completeSearchStages?.get("numericalPrimalGuidanceNativePointPresent"),
                 it.stats.smt.completeSearchStages?.get("numericalPrimalGuidanceNativePointPresent"))
         }

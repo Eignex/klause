@@ -41,6 +41,10 @@ internal class LinearAuthorityQuery private constructor(
         ExactRationalInequality(it.columns, it.coefficients, it.rhs)
     }
 
+    // Recovery fixes the seed integers itself. Guarded rows could change under those pins.
+    fun canReuseForCompletion(receiving: SourceProofContext): Boolean =
+        source === receiving && unconditionalRows && inactive.isEmpty() && activeCuts == 0
+
     fun matches(
         other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null,
         checkUnselectedCuts: Boolean = true,

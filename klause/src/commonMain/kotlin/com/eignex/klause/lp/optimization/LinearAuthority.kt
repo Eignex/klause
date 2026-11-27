@@ -89,6 +89,9 @@ internal class LinearAuthority(
     val reuses: Long get() = lp.reuses
     private var template: LinearAuthorityTemplate? = null
     private var query: LinearAuthorityQuery? = null
+
+    fun completionQuery(source: SourceProofContext): LinearAuthorityQuery? =
+        query?.takeIf { it.canReuseForCompletion(source) }
     var capture: LinearAuthorityCapture? = null
     private var capturedPoint: Map<SourceCoordinate, BigFraction>? = null
     private var capturedQuery: LinearAuthorityQuery? = null

@@ -57,13 +57,13 @@ internal class LinearIncumbentCompletion(
         private set
 
     fun complete(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl,
-        remainingOfferWork: (() -> Long)? = null): Sample? {
+        remainingOfferWork: (() -> Long)? = null, preparedQuery: LinearAuthorityQuery? = null): Sample? {
         preparationInterrupted = false
         val started = TimeSource.Monotonic.markNow()
         var completed: Sample? = null
         var returned = false
         return try {
-            completeSeed(source, seed, cancellation, remainingOfferWork).also {
+            completeSeed(source, seed, cancellation, remainingOfferWork, preparedQuery).also {
                 completed = it
                 returned = true
             }
@@ -81,7 +81,7 @@ internal class LinearIncumbentCompletion(
     }
 
     private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl,
-        remainingOfferWork: (() -> Long)?): Sample? {
+        remainingOfferWork: (() -> Long)?, preparedQuery: LinearAuthorityQuery?): Sample? {
         check(!closed)
         if (cancellation()) return null
         if (seed.exactReals != null) return checkedExact(source, seed, cancellation)
@@ -103,7 +103,8 @@ internal class LinearIncumbentCompletion(
         }
         if (token()) return null
         if (attempt.query == null || attempt.point == null) {
-            val prepared = attempt.query ?: prepare(source, seed, token)
+            val reusable = preparedQuery?.takeIf { ownedSeed && it.canReuseForCompletion(source) }
+            val prepared = attempt.query ?: reusable ?: prepare(source, seed, token)
             if (prepared == null) {
                 if (!token()) finish(attempt, null)
                 return null
@@ -111,6 +112,7 @@ internal class LinearIncumbentCompletion(
             if (ownedSeed && attempt.query == null) {
                 attempt.query = prepared
                 observe("QueryRetained", 1L)
+                if (prepared === reusable) observe("QueryReused", 1L)
             }
             val point = seedPoint(prepared, seed, token, attempt.takeIf { ownedSeed })
             if (point == null) {

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.optimization.LinearAuthorityQuery
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -38,7 +39,7 @@ internal class LinearProximityCompletion(
     fun takeChecked(): Sample? = checked.also { checked = null }
 
     fun advance(result: LinearAuthorityResult, context: SearchContext, stop: ExecutionControl,
-        remainingOfferWork: (() -> Long)? = null): Boolean {
+        remainingOfferWork: (() -> Long)? = null, preparedQuery: LinearAuthorityQuery? = null): Boolean {
         if (finished) return false
         if (stop()) return true
         if (!prepared) {
@@ -51,7 +52,7 @@ internal class LinearProximityCompletion(
             if (!context.consumeCheck() || !claimDecision()) return finish()
             observe("Trials", 1L)
         }
-        checked = completion.complete(source, candidate, stop, remainingOfferWork)
+        checked = completion.complete(source, candidate, stop, remainingOfferWork, preparedQuery)
         if (completion.preparationInterrupted) return finish()
         if (checked != null) {
             observe("Witnesses", 1L)
