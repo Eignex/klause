@@ -10,6 +10,7 @@ import com.eignex.util.numbers.compareTo
 
 internal class IntegerConflictLearner(private val state: PropagationState) {
     private val budget = ArithmeticLearningBudget(state)
+    private val initialWork = state.work
     private val sources = GuardedIntegerSource(state, budget)
     private val normalized = mutableMapOf<Pair<Any, Boolean>, IntegerConflictRow?>()
     private val eagerMarkers = mutableMapOf<Pair<Int, Boolean>, IntArray?>()
@@ -25,6 +26,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
     } catch (_: CheckedLongOverflowException) {
         state.arithmeticLearningTrace?.record("integer.decline.overflow")
         null
+    } finally {
+        state.integerRowDiscoveryWork += state.work - initialWork
     }
 
     private fun decline(cause: String): Nothing? {
@@ -57,6 +60,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         } ?: return decline("seed-normalization")
         state.arithmeticLearningTrace?.row("integer.seed-row", row, state)
         if (row.minimum(state, budget = budget) <= row.bound) return decline("seed-not-conflicting")
+        if (factorId >= state.baseFactorCount) state.integerRowRetainedSeedUses++
         val used = mutableSetOf<Pair<Int, Int>>()
         while (true) {
             budget.spend()
@@ -273,6 +277,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
         }
         if (combination.minimum(state, budget = budget) <= combination.bound) return null
+        if (factorId >= state.baseFactorCount) state.integerRowRetainedEndpointUses++
         state.arithmeticLearningTrace?.record("integer.eliminate", variable.toLong(), factorId.toLong(),
             marker[2].toLong(), if (roundedReason) 1L else 0L)
         return BoundEvent(sourceRow, marker[2], key, combination)

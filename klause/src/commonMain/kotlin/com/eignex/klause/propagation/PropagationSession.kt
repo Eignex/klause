@@ -1035,8 +1035,9 @@ class PropagationSession private constructor(
         state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
     }
 
-    internal fun configureIntegerRowAdmission(enabled: Boolean) {
+    internal fun configureIntegerRowAdmission(enabled: Boolean, reuse: Boolean = true) {
         state.integerRowAdmission = enabled
+        state.integerRowReuse = reuse
     }
 
     /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
@@ -1474,6 +1475,12 @@ class PropagationSession private constructor(
             "learningIntegerSessions" to 1L,
             "learningIntegerDerived" to it.integerRowsDerived,
             "learningIntegerAdmissionDeclined" to it.integerRowAdmissionsDeclined,
+            "learningIntegerDiscoveryWork" to it.integerRowDiscoveryWork,
+            "learningIntegerRetainedSeedUses" to it.integerRowRetainedSeedUses,
+            "learningIntegerRetainedEndpointUses" to it.integerRowRetainedEndpointUses,
+            "learningIntegerPropagationWork" to it.integerRowPropagationWork,
+            "learningIntegerPostInitialFires" to it.integerRowPostInitialFires,
+            "learningIntegerPostInitialUsefulFires" to it.integerRowPostInitialUsefulFires,
         ) else counts
     } ?: retiredLifecycle
 

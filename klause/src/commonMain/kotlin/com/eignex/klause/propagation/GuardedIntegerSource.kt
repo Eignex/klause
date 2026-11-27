@@ -24,7 +24,8 @@ import com.eignex.util.numbers.subExact
 internal fun PropagationState.hasIntegerArithmeticSource(factorId: Int): Boolean =
     factorId in 0 until totalFactorCount && when (factorAt(factorId)) {
         is LinearPropagator, is WideLinearPropagator, is ReifiedLinearPropagator,
-        is WideReifiedLinearPropagator, is LearnedIntegerPropagator, is ElementPropagator -> true
+        is WideReifiedLinearPropagator, is ElementPropagator -> true
+        is LearnedIntegerPropagator -> integerRowReuse
         else -> false
     }
 
@@ -74,6 +75,7 @@ internal class GuardedIntegerSource(
     private fun discover(factorId: Int, trail: Int, forBoundReason: Boolean): IntegerSourceRow? {
         budget.spend()
         if (factorId >= state.baseFactorCount && factorId < state.totalFactorCount) {
+            if (!state.integerRowReuse) return decline("retained-reuse-disabled", factorId)
             val retained = state.factorAt(factorId) as? LearnedIntegerPropagator
                 ?: return decline("not-arithmetic", factorId)
             if (!state.integerGuardTrueAt(retained.row.guard, trail)) return decline("guard-history", factorId)

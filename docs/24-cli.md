@@ -136,6 +136,9 @@ control enables integer-row or pseudo-Boolean learning. See [learning](10-learni
 decision naming while attaching only each mapped row's first-UIP clause. It defaults
 to `true` and does not enable learning. Mandatory arithmetic remains enforced.
 
+`--param integer-row-reuse=false` keeps retained rows and their clausal explanations
+active while excluding those rows as arithmetic sources for later cuts.
+
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
 (1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch
