@@ -146,28 +146,6 @@ internal class LpLayoutRemap(
     fun column(previous: Int): Int = columnMap[previous]
 }
 
-internal fun ExactLpModel.appendScopedRows(
-    columns: List<LpStructuralColumn>,
-    rows: List<LpScopedRow>,
-): ExactLpModel {
-    val newEntries = Array(n + columns.size) { ArrayList<ExactLpEntry>() }
-    for ((index, row) in rows.withIndex()) {
-        for ((column, number) in row.coefficients()) newEntries[column].add(ExactLpEntry(m + index, number))
-    }
-    return ExactLpModel(
-        List(newEntries.size) { column ->
-            if (column < n) entries(column) + newEntries[column] else newEntries[column]
-        },
-        List(m) { rhs(it) } + rows.map { it.rhs },
-        List(n) { column(it) } + columns.map { it.column } + List(m) { column(n + it) } + rows.map { it.logical },
-        List(m) { row(it) } + rows.map { it.metadata },
-        objective.withCosts(
-            List(n) { objective.cost(it) } + columns.map { it.cost } +
-                List(m) { objective.cost(n + it) } + rows.map { it.cost },
-        ),
-    )
-}
-
 internal fun ExactLpModel.appendScopedRow(row: LpScopedRow): ExactLpModel = appendScopedRows(emptyList(), listOf(row))
 
 internal fun ExactLpModel.compactLayout(remap: LpLayoutRemap): ExactLpModel = ExactLpModel(

@@ -199,6 +199,39 @@ internal class ExactLpModel private constructor(
     // Engine kernels read the owned immutable list; caller snapshots go through entries.
     internal fun columnEntries(j: Int): List<ExactLpEntry> = matrix[j]
 
+    fun appendScopedRows(
+        addedColumns: List<LpStructuralColumn>,
+        addedRows: List<LpScopedRow>,
+    ): ExactLpModel {
+        val additions = arrayOfNulls<ArrayList<ExactLpEntry>>(n + addedColumns.size)
+        for ((index, row) in addedRows.withIndex()) {
+            require(row.logical.origin.value.isZero) { "slack origins must be zero" }
+            val rowIndex = m + index
+            for ((column, number) in row.coefficients()) {
+                val entries = additions[column] ?: ArrayList<ExactLpEntry>().also { additions[column] = it }
+                require(entries.lastOrNull()?.row != rowIndex) { "duplicate structural coefficient in appended row" }
+                entries.add(ExactLpEntry(rowIndex, number))
+            }
+        }
+        val appendedMatrix = List(additions.size) { column ->
+            val previous = matrix.getOrNull(column).orEmpty()
+            additions[column]?.let { previous + it } ?: previous
+        }
+        return ExactLpModel(
+            appendedMatrix,
+            rightHandSide + addedRows.map { it.rhs },
+            columns.subList(0, n) + addedColumns.map { it.column } +
+                columns.subList(n, numVars) + addedRows.map { it.logical },
+            rows + addedRows.map { it.metadata },
+            objective.withCosts(
+                List(n) { objective.cost(it) } + addedColumns.map { it.cost } +
+                    List(m) { objective.cost(n + it) } + addedRows.map { it.cost },
+            ),
+            // Existing columns are validated and immutable, and new entries follow them in row order.
+            validateMatrix = false,
+        )
+    }
+
     internal fun reconstructionColumns(): List<List<Pair<Int, BigFraction>>>? = reconstructionMatrix.load()
 
     internal fun retainReconstructionColumns(columns: List<List<Pair<Int, BigFraction>>>) {
