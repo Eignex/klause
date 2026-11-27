@@ -744,7 +744,8 @@ internal class JointLinearRepair(
         verification: ExecutionControl): JointRepairAttempt {
         val original = requireNotNull(distancePublicationCheck)
         val live = distanceCutoff?.invoke()
-        val cutoff = listOfNotNull(condition.cutoff, live).minOrNull()
+        val captured = condition.cutoff
+        val cutoff = if (live == null || (captured != null && captured <= live)) captured else live
         val before = funding.spent
         val allocated = funding.allocated
         val work = 1L + model.numIntVars + model.numRealVars
