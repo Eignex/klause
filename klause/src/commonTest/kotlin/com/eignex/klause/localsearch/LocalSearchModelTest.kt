@@ -69,7 +69,11 @@ class LocalSearchModelTest {
             Cumulative(intArrayOf(0), longArrayOf(1), longArrayOf(1), 1),
         ), openIntHi = booleanArrayOf(true))
         val selection = FactorProjectionProviders.Default.prepare(source)
-        for (model in listOf(LocalSearchModel.open(source, windows), LocalSearchModel.open(source, selection, windows))) {
+        val models = listOf(
+            LocalSearchModel.open(source, windows),
+            LocalSearchModel.open(source, selection, windows),
+        )
+        for (model in models) {
             val state = LocalSearchState(model, Random(3))
             state.assignment.setInt(0, last)
 
@@ -90,7 +94,11 @@ class LocalSearchModelTest {
         val witness = Sample(booleanArrayOf(), longArrayOf(blockerLength, 0))
         assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(source, witness))
 
-        for (model in listOf(LocalSearchModel.open(source, windows), LocalSearchModel.open(source, selection, windows))) {
+        val models = listOf(
+            LocalSearchModel.open(source, windows),
+            LocalSearchModel.open(source, selection, windows),
+        )
+        for (model in models) {
             val result = LocalSearchEngine(model).solve(LocalSearchParams(maxFlips = 8, randomSeed = 3), warm = null)
 
             assertEquals(TerminationReason.BudgetExhausted, assertIs<SolveResult.Unknown>(result).reason)
