@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.RetainedBooleanClause
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
@@ -39,6 +40,8 @@ internal class ResumableSatisfaction(
     private val affineFactorId: Int = -1,
     onPropagationWork: ((() -> Long) -> Unit)? = null,
     private val containingSlice: ExecutionControl = ExecutionControl.Never,
+    retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
+    onCompletedQuery: ((PropagationSession, Boolean) -> Unit)? = null,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: ExecutionControl = params0.cancellation
@@ -81,6 +84,8 @@ internal class ResumableSatisfaction(
         preparedSeed = preparedSeed,
         rebindable = rebindable,
         onPropagationWork = onPropagationWork,
+        retainedRootClauses = retainedRootClauses,
+        onCompletedQuery = onCompletedQuery,
         onRelease = if (affineFactorId < 0) {
             null
         } else {
@@ -103,6 +108,8 @@ internal class ResumableSatisfaction(
     override val stats: SolveStats get() = sink.snapshot()
 
     override val work: Long get() = slice.spent()
+
+    internal val propagationWork: Long get() = traversal.propagationWork()
 
     internal val clauseWork: Long get() = saturatedAdd(
         sink.search.searchWork.coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE,

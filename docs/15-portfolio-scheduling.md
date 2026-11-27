@@ -813,8 +813,18 @@ constraints propagate in the query session. General query sessions keep projecti
 construction, root propagation and assumption seeding across slices. Native clausal
 opening is atomic, so an interrupted opening keeps its charges, model and pins and
 retries with the retained general preparer rather than repeating native construction
-every slice. Closing discards query pins, auxiliary buffers and cursors while keeping
-completed observations.
+every slice.
+
+The Boolean worker can carry a bounded set of short native learned clauses from a
+completed query into the next query's root propagation. The OLL owner keeps the
+prepared source and earlier Boolean definitions as it appends constraints and
+allocates coordinates. Learned clauses preserve the complements of necessary
+assumption premises after soft pins are released. Only clauses over those
+Boolean coordinates from completed in-scope traversals participate. The transfer
+folds duplicate clauses and drops a clause when the objective transition installs
+the same core as a hard factor. The receiving query owns its watches, reasons
+and retirement. Closing the OLL owner releases the retained clauses along with
+its pins, auxiliary buffers and cursors.
 
 Published incumbents project away auxiliary selectors, and optimality requires exact
 equality between the original objective and the accumulated bound. Auxiliary clauses

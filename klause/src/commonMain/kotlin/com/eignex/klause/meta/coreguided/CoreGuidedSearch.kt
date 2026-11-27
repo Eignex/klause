@@ -11,10 +11,12 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.presolve.SeparableObjectiveView
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
@@ -75,6 +77,7 @@ internal class CoreGuidedSearch(
     private val timeSource: TimeSource = TimeSource.Monotonic,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
     continueProductive: Boolean = false,
+    retainQueryLearning: Boolean = true,
 ) : ResumableSearch,
     ReseedGuard {
     private val opened = timeSource.markNow()
@@ -84,6 +87,12 @@ internal class CoreGuidedSearch(
     private val activeMillisLimit: Long? get() = continuation?.maximumMillis ?: maximumMillis
     private var continuationCaller: ExecutionControl = ExecutionControl.Never
     private val lifetime = params.cancellation.lifetimeCancellation()
+    private val retainedClauseLimit = minOf(params.maxLearnedClauses ?: 16, 16)
+    private val queryLearning = if (retainQueryLearning && base.numIntVars == 0 &&
+        !base.hasSymmetryBreaking && params.componentFactory == null && params.lpConfig == null &&
+        params.lpPlan.hasDefaultNumericalSettings() && !params.integerRowLearning &&
+        params.learnedMemoryBytes == null && retainedClauseLimit > 0
+    ) CoreQueryLearning(retainedClauseLimit) else null
     private var factors = ArrayList<Factor>().apply {
         addAll(base.factors)
         (base.rootDeductions as? PropagationResult.Implied)?.forEachBool { id, value ->
@@ -153,12 +162,22 @@ internal class CoreGuidedSearch(
 
     internal val lowerBound: BigFraction get() = BigFraction.of(lower, BIG_ONE)
     override val isDone: Boolean get() = terminal != null
-    override val stats: SolveStats get() = completedStats.mergedWith(query?.stats ?: SolveStats.EMPTY).copy(
-        coreGuided = CoreGuidedStats(completedCores, largestCore, lower, maximumWork, activeMillisLimit,
-            continuation?.grants ?: 0L),
-    )
+    override val stats: SolveStats get() {
+        val current = completedStats.mergedWith(query?.stats ?: SolveStats.EMPTY)
+        return current.copy(
+            search = current.search.copy(learning = current.search.learning +
+                mapOf("coreQueryPreparationWork" to preparationVisits, "coreQueryCount" to queryCount) +
+                (queryLearning?.statistics() ?: emptyMap())),
+            coreGuided = CoreGuidedStats(completedCores, largestCore, lower, maximumWork, activeMillisLimit,
+                continuation?.grants ?: 0L),
+        )
+    }
     override val work: Long get() {
-        val live = query?.stats?.search?.propagationWork?.sum?.toLong() ?: 0L
+        val live = when (val handle = query) {
+            is PreparingSatisfaction -> handle.propagationWork
+            is ResumableSatisfaction -> handle.propagationWork
+            else -> 0L
+        }
         val carried = (completedPropagation % PROPAGATION_WORK_PER_NODE + live % PROPAGATION_WORK_PER_NODE +
             preparationVisits % PROPAGATION_WORK_PER_NODE) / PROPAGATION_WORK_PER_NODE
         return saturatedAdd(saturatedAdd(completedWork, query?.work ?: 0L),
@@ -398,6 +417,7 @@ internal class CoreGuidedSearch(
         core = selected
         coreLiterals = selected.copyOf()
         factors.add(Clause(coreLiterals))
+        queryLearning?.retireCore(coreLiterals, ::recordPreparation)
         lower += coreWeight
         completedCores++
         largestCore = maxOf(largestCore, selected.size)
@@ -560,12 +580,18 @@ internal class CoreGuidedSearch(
             )
             val projected = coreRefinement == CoreRefinementMode.REASONS
             val solver = BacktrackSolver(baked)
+            val retained = queryLearning?.clauses.orEmpty()
+            val capture = queryLearning?.let { learning ->
+                { session: PropagationSession, refuted: Boolean ->
+                    if (refuted || stratify) learning.complete(session, preparationToken, ::recordPreparation)
+                }
+            }
             if (!resumableOpening && params.nativeSat != false && baked.isClausal()) {
                 ResumableSatisfaction(solver, queryParams, ownsWorkDebt = false, projectAssumptionCore = projected,
-                    containingSlice = querySlice)
+                    containingSlice = querySlice, retainedRootClauses = retained, onCompletedQuery = capture)
             } else {
                 PreparingSatisfaction(solver, queryParams.copy(nativeSat = false), projectAssumptionCore = projected,
-                    containingSlice = querySlice)
+                    containingSlice = querySlice, retainedRootClauses = retained, onCompletedQuery = capture)
             }.also { queryCount = saturatedAdd(queryCount, 1L) }
         } catch (failure: SearchInitializationCancelled) {
             settleQuery(failure.stats, failure.work)
@@ -639,6 +665,7 @@ internal class CoreGuidedSearch(
         corePreparation = null
         queryPreparation = null
         transitionPreparation = null
+        queryLearning?.close(::recordPreparation)
         recordPreparation(tails.size.toLong() + weights.size + factors.size + coreLiterals.size + querySofts.size)
         tails = HashMap()
         weights = LinkedHashMap()

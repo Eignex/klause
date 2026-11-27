@@ -382,6 +382,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun recordConflict(h: Int) {
         state.conflictSeedFactors.add(h)
+        if (h >= baseCount && originOf(h - baseCount) == RETAINED_QUERY_ORIGIN) markUsed(h)
         state.nativeConflictReason = clauseLits(h)
         val levels = IntHashSet()
         val len = clauseLen(h)
@@ -912,6 +913,9 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work += 3L
             consumed++
             if (metadata[i, NativeLearnedMetadata.ORIGIN] >= 0) consumedPeerImports++
+            if (metadata[i, NativeLearnedMetadata.ORIGIN] == RETAINED_QUERY_ORIGIN) {
+                state.learned.retainedQueryUses++
+            }
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
             state.factorAttribution?.note(1 shl FactorFamily.Clause.ordinal, FactorAttribution.Metric.Consumed)
         }

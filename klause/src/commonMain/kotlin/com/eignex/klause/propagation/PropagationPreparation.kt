@@ -15,6 +15,7 @@ internal class PropagationPreparation(
     private val historicalTables: Boolean = false,
     private val costAware: Boolean = false,
     private val reasonPreflight: Boolean = false,
+    private val retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
 ) {
     private val projections = PropagationProblem.preparation(problem)
     private var projection: PropagationProblem? = null
@@ -51,6 +52,7 @@ internal class PropagationPreparation(
                 it.historicalTableReasons = historicalTables
                 if (costAware) it.propagationSchedule = PropagationSchedule()
                 it.reasonPreflight = reasonPreflight
+                it.installRetainedRootClauses(retainedRootClauses)
                 states = null
             }
             return null
