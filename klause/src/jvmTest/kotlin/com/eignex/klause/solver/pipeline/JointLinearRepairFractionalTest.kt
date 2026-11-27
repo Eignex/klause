@@ -67,12 +67,13 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
         assertEquals(SourceEvidenceCheck.Checked, verifier.verify(SourceEvidence(source.scope,
             SourceClaim.Witness(improved), SourceDerivation.SourceWitness)))
         assertEquals(BigFraction.ofLong(2), objective.evaluateExact(improved))
+        val records = mutableListOf<JointRepairObservation>()
 
         JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 3, sourceLpOperations = 4),
             external = { offered }, incumbentProximity = true, incumbentCompletionCheck = { sample, _, token ->
                 verifier.verify(SourceEvidence(source.scope, SourceClaim.Witness(sample),
                     SourceDerivation.SourceWitness), token) == SourceEvidenceCheck.Checked
-            }).use { repair ->
+            }, onObservation = records::add).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
                 repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
@@ -88,6 +89,13 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
                 assertTrue(repair.stats.smt.sourceLp.operations <= 4L)
                 assertEquals(SourceEvidenceCheck.Checked, verifier.verify(SourceEvidence(source.scope,
                     SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
+                val stages = assertNotNull(repair.stats.smt.completeSearchStages)
+                val receipt = "jointRepairPrivateQuery1_"
+                val query = assertNotNull(stages[receipt + "Query"])
+                val publication = records.single { it.phase == "publication" && it.query == query }
+                assertEquals("checked", publication.disposition)
+                assertEquals(1L, stages[receipt + "PublicationChecked"])
+                assertTrue((stages[receipt + "OfferAccepted"] ?: 0L) > 0L)
             }
         }
     }

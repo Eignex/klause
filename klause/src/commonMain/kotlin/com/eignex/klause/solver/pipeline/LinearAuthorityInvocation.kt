@@ -101,6 +101,7 @@ internal class LinearAuthorityInvocation(
     private var sliceEnd: ComparableTimeMark? = null
     private var endWork = Long.MAX_VALUE
     private var startWork = 0L
+    private var proximityPause: String? = null
     private var callback: (Sample, BigFraction) -> Unit = { _, _ -> }
     private var incumbent: Sample? = null
     private var value: BigFraction? = null
@@ -248,6 +249,7 @@ internal class LinearAuthorityInvocation(
         sliceEnd = if (millis == Long.MAX_VALUE) null else TimeSource.Monotonic.markNow() + millis.milliseconds
         startWork = this.work
         endWork = if (work < 0) Long.MAX_VALUE else this.work + minOf(work, Long.MAX_VALUE - this.work)
+        proximityPause = null
         callback = onIncumbent
         try {
             if (!context.affineObjectiveAvailable || !context.linearCoordinatesSupported()) {
@@ -331,12 +333,26 @@ internal class LinearAuthorityInvocation(
             }
             throw failure
         } finally {
+            proximityPause?.let { pause ->
+                val key = "numericalProximityPause$pause"
+                externalOffers[key] = (externalOffers[key] ?: 0L) + 1L
+            }
             callback = { _, _ -> }
             currentStop = params.timeout.withAccounting(params.cancellation) or params.cancellation
         }
     }
 
-    private fun paused(): Boolean = work > startWork && (work >= endWork || sliceEnd?.hasPassedNow() == true)
+    private fun paused(): Boolean {
+        val spent = work
+        if (spent <= startWork) return false
+        val pause = when {
+            spent >= endWork -> "Work"
+            sliceEnd?.hasPassedNow() == true -> "Time"
+            else -> return false
+        }
+        if (proximityRounding && proximityPause == null) proximityPause = pause
+        return true
+    }
 
     private fun observeProximity(stage: String, count: Long = 1L) {
         val key = "numericalProximity$stage"
@@ -409,42 +425,44 @@ internal class LinearAuthorityInvocation(
 
     private fun offer(sample: Sample) = offer(sample, external = false)
 
-    private fun observeExternalOffer(external: Boolean, stage: String) {
-        if (external && observeExternalIncumbents) {
-            val key = "numericalExternal$stage"
-            externalOffers[key] = (externalOffers[key] ?: 0L) + 1L
+    private fun observeOffer(external: Boolean, stage: String) {
+        val key = when {
+            external && observeExternalIncumbents -> "numericalExternal$stage"
+            !external && proximityRounding -> "numericalProximityOffer$stage"
+            else -> return
         }
+        externalOffers[key] = (externalOffers[key] ?: 0L) + 1L
     }
 
     private fun offer(sample: Sample, external: Boolean, privatePoint: Boolean = false) {
         val checking = if (external) completion?.checking(stop) ?: stop else stop
         if (checking()) {
-            observeExternalOffer(external, "Stopped")
+            observeOffer(external, "Stopped")
             return
         }
         if (sample.exactReals == null && context.objective.keys.any {
                 it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Real
             }
         ) {
-            observeExternalOffer(external, "MissingExactReals")
+            observeOffer(external, "MissingExactReals")
             return
         }
         val checked = SourceEvidenceVerifier(context.withLinearAuthority()).verify(SourceEvidence(context.scope,
             SourceClaim.Witness(sample), SourceDerivation.SourceWitness), checking)
         if (checked != SourceEvidenceCheck.Checked) {
-            observeExternalOffer(external, if (checked is SourceEvidenceCheck.Rejected) "PointRejected"
+            observeOffer(external, if (checked is SourceEvidenceCheck.Rejected) "PointRejected"
             else "PointUnavailable")
             return
         }
         val exact = context.linearValue(sample, checking)
         if (exact == null) {
-            observeExternalOffer(external, "ObjectiveUnavailable")
+            observeOffer(external, "ObjectiveUnavailable")
             return
         }
         val standing = value
         val minimizes = context.scope.objective?.sense == ObjectiveSense.MINIMIZE
         if (standing != null && if (minimizes) exact >= standing else exact <= standing) {
-            observeExternalOffer(external, "NotImproving")
+            observeOffer(external, "NotImproving")
             return
         }
         incumbent = sample
@@ -452,7 +470,7 @@ internal class LinearAuthorityInvocation(
         proximityIncumbent = sample.takeIf { privatePoint }
         value = exact
         incumbentRevision++
-        observeExternalOffer(external, "Accepted")
+        observeOffer(external, "Accepted")
         callback(sample, exact)
     }
 

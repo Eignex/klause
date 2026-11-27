@@ -701,6 +701,12 @@ Within an existing repair turn, a checked query that makes native progress can
 resume private pauses while the turn has instructions and time left. A pause without
 progress yields; the turn, active lifetime and global funding keep their original limits.
 
+Joint repair statistics retain the first four private queries by query ordinal.
+Each entry records the outer query disposition, residual cursor observations,
+private candidate checks and remaining cumulative LP funding. A checked publication
+entry records the repair owner's check. The accepted improving source stream records
+which private candidates reach the portfolio result.
+
 With explicit incumbent completion, from the availability of a dimension-compatible
 incumbent through root and center preparation and the first proposal, joint repair
 receives continuation after owed complete-worker coverage, within its active cap, until the proposal finishes or the

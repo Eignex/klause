@@ -97,6 +97,8 @@ internal class JointLinearRepair(
     private var proposalSequence = 0L
     private var observedPasses = 0L
     private var observationQuery = 0L
+    private var observedPrivateQueries = 0
+    private var privatePublication: String? = null
     private var observedOperator = 0
     private var observedSchedulingRound = 0L
     private var observedRoots: List<Int> = emptyList()
@@ -189,6 +191,8 @@ internal class JointLinearRepair(
             "jointRepairLpReuses" to authority.reuses,
             "jointRepairFundedWork" to funding.spent,
             "jointRepairFundedAllocation" to funding.allocated,
+            "jointRepairPrivateQueryObservationsDropped" to
+                (observedPrivateQueries - MAX_PRIVATE_QUERY_OBSERVATIONS).coerceAtLeast(0).toLong(),
         )).let { counters -> if (observation == null) counters else counters + observation.observations() }))
 
     private fun observe(stage: String) {
@@ -364,7 +368,28 @@ internal class JointLinearRepair(
         val cuts = authority.cutObservations()
         val current = queryObservations(cuts.keys)
         return (stages.keys + current.keys).associateWith { combine(it, stages[it] ?: 0, current[it] ?: 0) } +
-            cuts.mapKeys { (key, _) -> "jointRepair" + key.removePrefix("numerical") }
+            cuts.mapKeys { (key, _) -> "jointRepair" + key.removePrefix("numerical") } +
+            privateQueryObservation(current, "Live")
+    }
+
+    private fun privateQueryObservation(counters: Map<String, Long>, disposition: String): Map<String, Long> {
+        if (!queryProximity || observedPrivateQueries > MAX_PRIVATE_QUERY_OBSERVATIONS) return emptyMap()
+        val prefix = "jointRepairPrivateQuery${observedPrivateQueries}_"
+        return buildMap {
+            for ((key, value) in counters) {
+                val stage = key.removePrefix("jointRepairProximity")
+                if (stage.startsWith("Completion") || stage.startsWith("Offer") || stage.startsWith("Pause")) {
+                    put(prefix + stage, value)
+                }
+            }
+            put(prefix + "Query", observationQuery)
+            put(prefix + "Pending", if (query?.hasPendingProximityCompletion == true) 1L else 0L)
+            put(prefix + "RemainingWork", funding.remainingWork)
+            put(prefix + "RemainingAllocation", funding.remainingAllocation)
+            put(prefix + "LpOperations", budget.operations.toLong())
+            put(prefix + disposition, 1L)
+            privatePublication?.let { put(prefix + it, 1L) }
+        }
     }
 
     fun search(
@@ -762,7 +787,7 @@ internal class JointLinearRepair(
             (advisoryExternalCenter(queryProximityCutoff) != null ||
                 checkedExternalCenter(queryProximityCutoff) != null)) {
             finishProximity(queryProximityCutoff, finishCenter = true)
-            retire()
+            retire("Superseded")
             observe("jointRepairProximitySuperseded")
             return JointRepairAttempt(ExactNeighborhoodResult.Undecided)
         }
@@ -787,7 +812,7 @@ internal class JointLinearRepair(
                 id < model.numIntVars && captured.upper[id] == value
             }
             pending = captured
-            if (onComparison != null || observation != null) conditionSequence++
+            if (onComparison != null || observation != null || incumbentProximity) conditionSequence++
             observationQuery = conditionSequence
             observation?.event(proposalSequence, observationQuery, "query", "opened")
             compare("query", "opened", cutoff = condition.cutoff)
@@ -806,6 +831,7 @@ internal class JointLinearRepair(
                 IncumbentProximity.prepare(receiving, requireNotNull(seed), requireNotNull(privateCutoff), budget,
                     stop or cancellation)?.also {
                     queryProximity = true
+                    observedPrivateQueries++
                     queryProximityCutoff = privateCutoff
                     queryProximityPass = proximityProposalPass
                     queryProximityClosed = proximityProposalClosed
@@ -866,9 +892,11 @@ internal class JointLinearRepair(
         val bound = snapshot.bound.takeUnless { privateProximity }
         val imported = completion != null && active.incumbentIsImported
         if (imported && snapshot.incumbent != null) observe("jointRepairImportedPointWithheld")
-        val sample = snapshot.incumbent?.takeUnless { imported || it === publishedQueryIncumbent }?.takeIf {
+        val discovered = snapshot.incumbent?.takeUnless { imported || it === publishedQueryIncumbent }
+        val sample = discovered?.takeIf {
             condition.cutoff == null || requireNotNull(objective).evaluateExact(it) < condition.cutoff
         }
+        if (privateProximity && discovered != null && sample == null) privatePublication = "PublicationCutoffMiss"
         if (sample != null) {
             val evidence = SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
             // Full-source point verification has no retained cursor across slice boundaries.
@@ -877,6 +905,7 @@ internal class JointLinearRepair(
             observe("jointRepairPublicationChecks")
             val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, verification)
             var originalChecked = true
+            var originalUnavailable = false
             if (checked == SourceEvidenceCheck.Checked && incumbentCompletionCheck != null) {
                 val checking = publicationChecking(verification)
                 observe("jointRepairOriginalPublicationChecks")
@@ -884,9 +913,17 @@ internal class JointLinearRepair(
                 originalChecked = value != null && incumbentCompletionCheck.invoke(sample, value, checking)
                 if (checking()) {
                     originalChecked = false
+                    originalUnavailable = true
                     observe("jointRepairOriginalPublicationUnavailable")
                 } else observe(if (originalChecked) "jointRepairOriginalPublicationChecked"
                 else "jointRepairOriginalPublicationRejected")
+            }
+            if (privateProximity) privatePublication = when {
+                checked is SourceEvidenceCheck.Rejected -> "PublicationWorkingRejected"
+                checked is SourceEvidenceCheck.Unavailable -> "PublicationWorkingUnavailable"
+                originalUnavailable -> "PublicationOriginalUnavailable"
+                !originalChecked -> "PublicationOriginalRejected"
+                else -> "PublicationChecked"
             }
             observation?.event(proposalSequence, observationQuery, "publication", when {
                 checked != SourceEvidenceCheck.Checked -> "source-unchecked"
@@ -911,7 +948,7 @@ internal class JointLinearRepair(
                 retainedProposal = condition
                 publishedQueryIncumbent = sample
                 observe("jointRepairRetainedQueryIncumbents")
-            } else retire()
+            } else retire(if (accepted) "SourceChecked" else "SourcePublicationDeclined")
             if (accepted) {
                 proximityDiscovery = sample.takeIf { privateProximity }
                 anchor = sample
@@ -947,7 +984,7 @@ internal class JointLinearRepair(
         if (privateProximity) {
             finishProximity(queryProximityCutoff)
             observe("jointRepairProximityCompleted")
-            retire()
+            retire(result.reason.name)
             return JointRepairAttempt(ExactNeighborhoodResult.Undecided, result.reason)
         }
         val refuted = result.terminal?.claim == SourceClaim.Refutation
@@ -1119,9 +1156,10 @@ internal class JointLinearRepair(
         observation?.event(proposalSequence, observationQuery, "center", "advisory-step")
     }
 
-    private fun retire() {
+    private fun retire(disposition: String = "Replaced") {
         val observations = queryObservations(authority.cutObservations().keys)
         for ((key, value) in observations) stages[key] = combine(key, stages[key] ?: 0, value)
+        stages.putAll(privateQueryObservation(observations, disposition))
         val active = query
         query = null
         pending = null
@@ -1137,6 +1175,7 @@ internal class JointLinearRepair(
         queryProximityPass = null
         retainedProposal = null
         publishedQueryIncumbent = null
+        privatePublication = null
         active?.close()
     }
 
@@ -1178,13 +1217,14 @@ internal class JointLinearRepair(
         resources.own(authority)
         completion?.let(resources::own)
         proximityChecking?.takeUnless { it === completion }?.let(resources::own)
-        resources.own(AutoCloseable { retire() })
+        resources.own(AutoCloseable { retire("WorkerClose") })
         resources.close()
     }
 }
 
 private const val QUERY_SLICE_MILLIS = 10L
 private const val QUERY_SLICE_WORK = 64L
+private const val MAX_PRIVATE_QUERY_OBSERVATIONS = 4
 private const val MAX_REFUTED_CONDITIONS = 4
 private const val MAX_REFUTATION_ENTRIES = 4096
 private const val MAX_REFUTATION_SCALAR_BITS = 4096

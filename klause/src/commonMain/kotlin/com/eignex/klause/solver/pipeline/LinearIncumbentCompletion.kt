@@ -148,6 +148,7 @@ internal class LinearIncumbentCompletion(
             }
             return null
         }
+        if (ownedSeed) observe("RecoveryValues", 1L)
         val reals = query.coordinates.indices.filter {
             query.coordinates[it].kind == SourceCoordinate.Kind.Real
         }.map { values[it] }
@@ -157,13 +158,21 @@ internal class LinearIncumbentCompletion(
         val evidence = SourceEvidence(source.scope, SourceClaim.Witness(proposed), SourceDerivation.SourceWitness)
         val authority = source.withLinearAuthority()
         val checked = SourceEvidenceVerifier(authority).verify(evidence, checking)
+        if (ownedSeed) observe(when (checked) {
+            SourceEvidenceCheck.Checked -> "WitnessChecked"
+            is SourceEvidenceCheck.Rejected -> "WitnessRejected"
+            is SourceEvidenceCheck.Unavailable -> "WitnessUnavailable"
+        }, 1L)
         val exact = if (checked == SourceEvidenceCheck.Checked) source.linearValue(proposed, checking) else null
         val objectiveChecked = exact?.let {
             authority.semanticsChecker?.objectiveEquals(proposed, SourceValue.Rational(it), source.scope, checking)
         }
         val accepted = objectiveChecked == SourceEvidenceCheck.Checked &&
             originalCheck?.invoke(proposed, requireNotNull(exact), checking) != false
-        if (checking()) return null
+        if (checking()) {
+            if (ownedSeed) observe("CertificationStopped", 1L)
+            return null
+        }
         if (accepted && originalCheck != null) observe("OriginalChecked", 1L)
         observe(if (accepted) "Checked" else "Rejected", 1L)
         val point = finish(attempt, proposed.takeIf { accepted })

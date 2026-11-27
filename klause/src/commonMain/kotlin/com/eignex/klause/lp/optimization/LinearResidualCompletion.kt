@@ -118,6 +118,7 @@ internal class LinearResidualCompletion(
                     workLimit = profile.work).also { owner = it }
                 val result = floating ?: run {
                     val preparation = current.metrics.preparationWork
+                    val resumed = current.floatPaused
                     try {
                         current.advanceFloat(quantum, profile, token, retainFundingStop = true)?.second
                     } finally {
@@ -125,6 +126,11 @@ internal class LinearResidualCompletion(
                             floatWork = current.lastMetrics.workOps)
                         observe("PrimalRecoverySparseFloatWork", current.lastMetrics.workOps)
                         observe("PrimalRecoverySparsePivots", current.lastMetrics.pivots.toLong())
+                        if (retainPreparation) {
+                            observe(if (resumed) "PrimalRecoverySparseCursorResumed"
+                            else "PrimalRecoverySparseCursorNotPendingAtEntry", 1L)
+                            if (current.floatPaused) observe("PrimalRecoverySparseCursorPendingAtExit", 1L)
+                        }
                     }
                 }
                 if (current.floatFundingStopped) {
