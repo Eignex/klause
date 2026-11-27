@@ -169,6 +169,11 @@ internal class ReconstructionMeter(
     }
 
     fun integer(value: BigInt): BigInt {
+        integerBits(value)
+        return value
+    }
+
+    fun integerBits(value: BigInt): Int {
         step()
         val bits = value.magnitudeBitLength()
         maxBits = maxOf(maxBits, bits)
@@ -177,12 +182,12 @@ internal class ReconstructionMeter(
             admittedUntil -= bits.toLong() / Long.SIZE_BITS
         }
         storage(32L + (bits.toLong() + 7L) / 8L)
-        return value
+        return bits
     }
 
     fun fraction(value: BigFraction): BigFraction {
-        integer(value.num)
-        integer(value.den)
+        integerBits(value.num)
+        integerBits(value.den)
         return value
     }
 
@@ -203,11 +208,14 @@ internal class ReconstructionMeter(
         } else {
             128 - value.dHi.countLeadingZeroBits()
         }
-        val bits = maxOf(numerator, denominator)
+        admitFixedBits(maxOf(numerator, denominator))
+        return value
+    }
+
+    fun admitFixedBits(bits: Int) {
         maxBits = maxOf(maxBits, bits)
         if (bits > limits.maxBits) throw ReconstructionStop(ReconstructionDecline.BITS)
         storage(48L)
-        return value
     }
 
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
