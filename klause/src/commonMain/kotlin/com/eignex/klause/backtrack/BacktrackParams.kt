@@ -494,6 +494,8 @@ data class BacktrackParams(
     val integerRowAdmission: Boolean = true,
     /** Allow retained rows to serve as arithmetic seeds and endpoint reasons. */
     val integerRowReuse: Boolean = true,
+    /** Decline a row whose sole direct tightening exactly duplicates the asserting clause bound. */
+    val integerRowDistinctAssertion: Boolean = false,
 ) : SolverParams {
     init {
         require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)

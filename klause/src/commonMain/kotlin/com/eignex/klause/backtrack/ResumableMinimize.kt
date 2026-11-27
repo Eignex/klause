@@ -667,7 +667,8 @@ internal class ResumableMinimize(
             )).also {
                 if (params.integerRowLearning) it.enableIntegerRowLearning()
                 it.configureArithmeticLearning(params.arithmeticLearningWork, params.arithmeticLearningAllocationBytes)
-                it.configureIntegerRowAdmission(params.integerRowAdmission, params.integerRowReuse)
+                it.configureIntegerRowAdmission(params.integerRowAdmission, params.integerRowReuse,
+                    params.integerRowDistinctAssertion)
                 it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
                     params.costAwarePropagation, params.reasonPreflight)
             },

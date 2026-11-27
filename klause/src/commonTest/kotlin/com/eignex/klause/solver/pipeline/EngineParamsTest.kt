@@ -52,6 +52,20 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `retained row controls should reach fixed and portfolio workers`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        val settings = listOf("integer-row-reuse=false", "integer-row-distinct-assertion=true")
+
+        val workers = listOf(applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true),
+            applyBacktrackParams(base, EngineParams(settings)))
+
+        for (worker in workers) {
+            assertEquals(false, worker.integerRowReuse)
+            assertTrue(worker.integerRowDistinctAssertion)
+        }
+    }
+
+    @Test
     fun `source rate rewards should be an independent opt in`() {
         val ordinary = scenario(cores = 1)
         for ((option, families) in listOf("source-rate" to false, "source-rate-family" to true)) {

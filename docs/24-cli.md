@@ -139,6 +139,9 @@ to `true` and does not enable learning. Mandatory arithmetic remains enforced.
 `--param integer-row-reuse=false` keeps retained rows and their clausal explanations
 active while excluding those rows as arithmetic sources for later cuts.
 
+`--param integer-row-distinct-assertion=true` declines learned rows that only
+duplicate their clause's immediate integer order bound.
+
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
 (1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch

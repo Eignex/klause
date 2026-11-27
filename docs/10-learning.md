@@ -379,6 +379,12 @@ and excludes those rows as arithmetic seeds and endpoint reasons in later analys
 Discovery and row propagation report charged native work, including interrupted
 work. Post-initial firings count separately from the first firing of each row.
 
+`integerRowDistinctAssertion` is opt-in. At mapped publication it declines a row
+whose sole direct raw tightening exactly matches the first-UIP clause's integer
+order assertion. Unsupported shapes or a locally exhausted screen keep ordinary
+attachment. The screen checks the guard and live domain membership before relying
+on the clause and does not change conflict selection or the learned clause.
+
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
 fallback. Interior holes in the remaining terms stay in the actual domains and do

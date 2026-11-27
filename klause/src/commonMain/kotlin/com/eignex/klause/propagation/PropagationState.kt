@@ -368,8 +368,11 @@ class PropagationState private constructor(
     internal var integerRowLearning = false
     internal var integerRowAdmission = true
     internal var integerRowReuse = true
+    internal var integerRowDistinctAssertion = false
     internal var integerRowsDerived = 0L
     internal var integerRowAdmissionsDeclined = 0L
+    internal var integerRowDuplicateAssertions = 0L
+    internal var integerRowAssertionScreenWork = 0L
     internal var integerRowDiscoveryWork = 0L
     internal var integerRowRetainedSeedUses = 0L
     internal var integerRowRetainedEndpointUses = 0L

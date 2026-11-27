@@ -1035,9 +1035,10 @@ class PropagationSession private constructor(
         state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
     }
 
-    internal fun configureIntegerRowAdmission(enabled: Boolean, reuse: Boolean = true) {
+    internal fun configureIntegerRowAdmission(enabled: Boolean, reuse: Boolean = true, distinctAssertion: Boolean = false) {
         state.integerRowAdmission = enabled
         state.integerRowReuse = reuse
+        state.integerRowDistinctAssertion = distinctAssertion
     }
 
     /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
@@ -1054,16 +1055,39 @@ class PropagationSession private constructor(
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
+        val fallback = learned.fallbackClause
         if (state.integerRowAdmission) {
-            val result = addLearnedIntegerRow(learned.row, learned.lbd)
-            if (result is PropagationResult.Unsat || fixpointCancelled) return result
+            val duplicate = state.integerRowDistinctAssertion &&
+                isDuplicateIntegerAssertion(learned.row, fallback.literals)
+            if (state.integerRowDistinctAssertion && fixpointCancelled) return PropagationResult.Implied.EMPTY
+            if (duplicate) {
+                state.integerRowDuplicateAssertions++
+                state.arithmeticLearningTrace?.record("integer.decline.duplicate-clause-assertion")
+            } else {
+                val result = addLearnedIntegerRow(learned.row, learned.lbd)
+                if (result is PropagationResult.Unsat || fixpointCancelled) return result
+            }
         } else {
             state.integerRowAdmissionsDeclined++
             state.arithmeticLearningTrace?.record("integer.decline.admission-disabled")
         }
-        val fallback = learned.fallbackClause
         return registerAndPropagate(base = publicationBase) {
             state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
+        }
+    }
+
+    private fun isDuplicateIntegerAssertion(row: IntegerConflictRow, literals: IntArray): Boolean {
+        state.finiteWork.cancellation = cancellation
+        val workBefore = state.work
+        return try {
+            row.duplicatesUnitAssertion(state, literals, ArithmeticLearningBudget(state))
+        } catch (_: ArithmeticLearningDeclined) {
+            false
+        } catch (_: FinitePropagationInterrupted) {
+            state.runCancelled = true
+            false
+        } finally {
+            state.integerRowAssertionScreenWork += state.work - workBefore
         }
     }
 
@@ -1475,6 +1499,8 @@ class PropagationSession private constructor(
             "learningIntegerSessions" to 1L,
             "learningIntegerDerived" to it.integerRowsDerived,
             "learningIntegerAdmissionDeclined" to it.integerRowAdmissionsDeclined,
+            "learningIntegerDuplicateAssertions" to it.integerRowDuplicateAssertions,
+            "learningIntegerAssertionScreenWork" to it.integerRowAssertionScreenWork,
             "learningIntegerDiscoveryWork" to it.integerRowDiscoveryWork,
             "learningIntegerRetainedSeedUses" to it.integerRowRetainedSeedUses,
             "learningIntegerRetainedEndpointUses" to it.integerRowRetainedEndpointUses,

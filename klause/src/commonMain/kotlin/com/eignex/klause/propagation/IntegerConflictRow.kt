@@ -98,6 +98,58 @@ internal class IntegerConflictRow private constructor(
         return if (next.fitsLong()) next.toLongExact() else null
     }
 
+    fun duplicatesUnitAssertion(state: PropagationState, clause: IntArray, budget: ArithmeticLearningBudget): Boolean {
+        if (!state.integerGuardTrueAt(guard)) return false
+        var unit = Lit.NONE
+        for (literal in clause) {
+            budget.spend()
+            when (state.litTruth(literal)) {
+                false -> Unit
+                true -> return false
+                null -> {
+                    if (unit != Lit.NONE) return false
+                    unit = literal
+                }
+            }
+        }
+        if (unit == Lit.NONE || Lit.variable(unit) < state.problem.numBoolVars) return false
+        val atom = state.atomIdOf(Lit.variable(unit))
+        val kind = state.atoms.kind[atom]
+        if (kind == AtomKind.EQ) return false
+        val positive = Lit.isPositive(unit)
+        val lower = (kind == AtomKind.GE) == positive
+        val variable = state.atoms.intVar[atom]
+        val pivot = variables.binarySearchInt(variable)
+        if (pivot < 0 || (coefficients[pivot] < BIG_ZERO) != lower) return false
+        val threshold = state.atoms.threshold[atom]
+        val unitBound = if (positive) threshold else addExactOrNull(threshold, if (lower) 1L else -1L) ?: return false
+        val activity = minimum(state, budget = budget)
+        if (activity > bound) return false
+        budget.scalar(bound, activity)
+        val slack = bound - activity
+        var matching = false
+        for (index in variables.indices) {
+            budget.spend()
+            val coefficient = coefficients[index]
+            val domain = state.intDomains[variables[index]]
+            val raisesLower = coefficient < BIG_ZERO
+            val base = if (raisesLower) domain.max else domain.min
+            budget.spend(bytes = 48)
+            val baseValue = bigIntOf(base)
+            budget.scalar(coefficient, baseValue)
+            val contribution = coefficient * baseValue
+            budget.scalar(slack, contribution)
+            val residual = slack + contribution
+            budget.scalar(residual, coefficient)
+            val next = endpoint(residual, coefficient)
+            val tightens = if (raisesLower) next > domain.min else next < domain.max
+            if (!tightens) continue
+            if (index != pivot || next.compareTo(unitBound) != 0 || unitBound !in domain) return false
+            matching = true
+        }
+        return matching
+    }
+
     fun assertsAt(state: PropagationState, trail: Int, budget: ArithmeticLearningBudget? = null): Boolean {
         if (!state.integerGuardTrueAt(guard, trail)) return false
         budget?.spend(bytes = variables.size.toLong() * 48)

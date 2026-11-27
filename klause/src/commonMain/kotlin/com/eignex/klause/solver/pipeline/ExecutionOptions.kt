@@ -431,6 +431,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Allow retained integer rows to supply arithmetic reasons and conflict seeds. */
         val integerRowReuse: ExecutionOption<Boolean> = ExecutionOption("integer-row-reuse", ValueKind.BOOLEAN)
 
+        /** Decline optional rows that only duplicate the clause's direct assertion. */
+        val integerRowDistinctAssertion: ExecutionOption<Boolean> =
+            ExecutionOption("integer-row-distinct-assertion", ValueKind.BOOLEAN)
+
         /** Per-conflict work allowance for integer row learning. */
         val arithmeticLearningWork: ExecutionOption<Long> = ExecutionOption("arithmetic-learning-work", ValueKind.LONG)
 
@@ -657,7 +661,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains, lpDirectionalAdvice,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, integerRowAdmission,
-                integerRowReuse, arithmeticLearningWork, arithmeticLearningAllocationBytes,
+                integerRowReuse, integerRowDistinctAssertion, arithmeticLearningWork, arithmeticLearningAllocationBytes,
                 propagationAttribution, historicalTableReasons, costAwarePropagation,
                 reasonPreflight, pbObjectiveCutoff,
                 objectiveGuidedValues, variableSelector, valueSelector, seed, dryRunSolver,
