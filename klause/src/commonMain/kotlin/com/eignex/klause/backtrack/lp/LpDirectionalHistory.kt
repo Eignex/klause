@@ -68,7 +68,6 @@ internal class LpDirectionalHistory(
     }
     internal class Parent(val objective: Double, val variable: VarRef, val value: Double)
     internal class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
-    internal class DepthHistory(val variable: VarRef, val level: Int, val gains: Gains = Gains(variable))
 
     private val gains = HashMap<VarRef, Gains>()
     private var candidates: Array<VarRef?>? = null
@@ -87,11 +86,9 @@ internal class LpDirectionalHistory(
     private var collectionStamp = -1L
     private var prunedStamp = -1L
     private var observed = false
-    private var depthHistories: Array<DepthHistory?>? = null
-    private var depthHistoryCount = 0
-    private var depthHistoryRemaining = 128
-    private var depthValueStamp = -1L
-    private var depthPrunedStamp = -1L
+    private var depthJournal: LpDepthObservationJournal? = null
+    var depthGuardDeclined = false
+        private set
 
     fun beginNode(level: Int) {
         stamp++
@@ -113,8 +110,11 @@ internal class LpDirectionalHistory(
 
     val hasObservations: Boolean get() = observed
 
-    val hasDepthHistory: Boolean get() = depthRetention && depthValueStamp >= 0L && depthPrunedStamp >= 0L &&
-        stamp - depthValueStamp <= maxAge && stamp - depthPrunedStamp <= maxAge
+    val hasDepthHistory: Boolean get() = (depthJournal?.size ?: 0) >= 4
+
+    fun clearDepthGuard() {
+        depthGuardDeclined = false
+    }
 
     fun isImmediateChild(level: Int): Boolean = level > 0 && depth == level - 1
 
@@ -136,12 +136,10 @@ internal class LpDirectionalHistory(
         val retainedCandidates = candidateCount
         candidates = null
         candidateCount = 0
-        charge(gains.size.toLong() + retainedCandidates + depthHistoryCount)
+        charge(gains.size.toLong() + retainedCandidates + (depthJournal?.size ?: 0))
         gains.clear()
-        depthHistories = null
-        depthHistoryCount = 0
-        depthValueStamp = -1L
-        depthPrunedStamp = -1L
+        depthJournal?.clear()
+        clearDepthGuard()
         trimParents(0)
         pending = null
         pendingOutcome = null
@@ -194,121 +192,9 @@ internal class LpDirectionalHistory(
             } else observe("UNSTABLE")
         }
         observe(if (child.up) "UP" else "DOWN")
-        if (depthRetention) recordDepthNumeric(child, normalized, history, version, node)
-    }
-
-    private fun compareDepth(entry: DepthHistory, variable: VarRef, level: Int): Int = when {
-        (entry.variable is VarRef.Bool) != (variable is VarRef.Bool) -> if (entry.variable is VarRef.Bool) -1 else 1
-        entry.variable.varId != variable.varId -> entry.variable.varId.compareTo(variable.varId)
-        else -> entry.level.compareTo(level)
-    }
-
-    private inline fun depthPosition(
-        variable: VarRef,
-        level: Int,
-        version: Long,
-        node: Long,
-        crossinline current: () -> Boolean,
-    ): Int? {
-        val entries = depthHistories ?: return 0
-        val count = depthHistoryCount
-        var low = 0
-        var high = count
-        while (low < high) {
-            charge(4L)
-            if (!current() || version != generation || node != stamp || depthHistories !== entries ||
-                depthHistoryCount != count
-            ) return null
-            val middle = (low + high) ushr 1
-            if (compareDepth(checkNotNull(entries[middle]), variable, level) < 0) low = middle + 1
-            else high = middle
+        if (depthRetention) {
+            recordDepth(child, normalized, null, version, node) { !depthCancellation() }
         }
-        return low
-    }
-
-    private inline fun retainDepth(
-        child: Pending,
-        version: Long,
-        node: Long,
-        numericHistory: Gains?,
-        crossinline current: () -> Boolean,
-    ): Gains? {
-        if (!current() || version != generation || node != stamp) return null
-        if (depthHistories == null && depthHistoryRemaining <= 0) return null
-        charge(8L)
-        if (!current() || version != generation || node != stamp) return null
-        val variable = child.parent.variable
-        val level = child.depth - 1
-        val position = depthPosition(variable, level, version, node, current) ?: return null
-        val retained = depthHistories?.getOrNull(position)
-        if (retained != null && compareDepth(retained, variable, level) == 0) return retained.gains
-        if (numericHistory == null || depthHistoryRemaining <= 0) return null
-        charge(16L)
-        if (!current() || version != generation || node != stamp) return null
-        val opposite = if (child.up) numericHistory.down else numericHistory.up
-        val supported = (opposite.count > 0 && opposite.parentDepth == level && seedAge(opposite.stamp, node)) ||
-            (opposite.count >= RELIABILITY && opposite.previousParentDepth == level &&
-                seedAge(opposite.previousStamp, node))
-        if (!supported) {
-            observe("DEPTH_RETENTION_ADMISSION_NO_OPPOSITE")
-            return null
-        }
-        depthHistoryRemaining--
-        charge(224L + if (depthHistories == null) 128L else 0L)
-        if (!current() || version != generation || node != stamp) return null
-        val entries = depthHistories ?: arrayOfNulls<DepthHistory>(128).also { depthHistories = it }
-        val index = depthPosition(variable, level, version, node, current) ?: return null
-        val present = entries.getOrNull(index)
-        if (present != null && compareDepth(present, variable, level) == 0) return present.gains
-        val count = depthHistoryCount
-        charge(64L + count - index)
-        if (!current() || version != generation || node != stamp || depthHistories !== entries ||
-            depthHistoryCount != count
-        ) return null
-        if (index < count) {
-            entries.copyInto(entries, index + 1, index, count)
-        }
-        val entry = DepthHistory(variable, level)
-        seedDepth(numericHistory.down, entry.gains.down, level, node)
-        seedDepth(numericHistory.up, entry.gains.up, level, node)
-        noteDepthPruning(entry.gains.down)
-        noteDepthPruning(entry.gains.up)
-        entries[index] = entry
-        depthHistoryCount++
-        observe("DEPTH_RETENTION_CONTEXT_RETAINED")
-        if (depthHistoryRemaining == 0) observe("DEPTH_RETENTION_CONTEXT_EXHAUSTED")
-        return if (current() && version == generation && node == stamp) entry.gains else null
-    }
-
-    private fun seedAge(sample: Long, node: Long): Boolean = node - sample in 1L..maxAge
-
-    private fun seedDepth(source: Direction, target: Direction, level: Int, node: Long) {
-        if (source.count >= RELIABILITY && source.previousParentDepth == level && seedAge(source.previousStamp, node)) {
-            target.recordNumeric(source.previous, source.previousStamp, source.previousParent, level)
-        }
-        if (source.count > 0 && source.parentDepth == level && seedAge(source.stamp, node)) {
-            target.recordNumeric(source.latest, source.stamp, source.parent, level)
-        }
-        if (source.outcomeCount >= RELIABILITY && source.outcomePreviousParentDepth == level &&
-            seedAge(source.outcomePreviousStamp, node)
-        ) {
-            target.recordOutcome(source.outcomePrevious, source.outcomePreviousStamp, source.outcomePreviousParent, level)
-        }
-        if (source.outcomeCount > 0 && source.outcomeParentDepth == level && seedAge(source.outcomeStamp, node)) {
-            target.recordOutcome(source.outcomeLatest, source.outcomeStamp, source.outcomeParent, level)
-        }
-    }
-
-    private fun recordDepthNumeric(child: Pending, normalized: Double, ordinary: Gains, version: Long, node: Long) {
-        val history = retainDepth(child, version, node, ordinary) { !depthCancellation() } ?: return
-        charge(12L)
-        if (depthCancellation() || version != generation || node != stamp) return
-        val direction = if (child.up) history.up else history.down
-        direction.recordNumeric(normalized, node, child.parent.objective, child.depth - 1)
-        if (history.down.stable && history.up.stable && (history.down.gain > 0.0 || history.up.gain > 0.0)) {
-            depthValueStamp = maxOf(depthValueStamp, minOf(history.down.previousStamp, history.up.previousStamp))
-        }
-        observe("DEPTH_RETENTION_NUMERIC")
     }
 
     private fun index(history: Gains) {
@@ -328,6 +214,23 @@ internal class LpDirectionalHistory(
         if (generation != version) return
         entries[candidateCount++] = history.variable
         history.indexed = true
+    }
+
+    private inline fun recordDepth(
+        child: Pending,
+        gain: Double,
+        pruned: Boolean?,
+        version: Long,
+        node: Long,
+        crossinline current: () -> Boolean,
+    ) {
+        if (!current() || version != generation || node != stamp) return
+        val journal = depthJournal ?: run {
+            charge(128L)
+            if (!current() || version != generation || node != stamp) return
+            LpDepthObservationJournal(charge, observe, maxAge).also { depthJournal = it }
+        }
+        journal.record(child, node, gain, pruned) { current() && version == generation && node == stamp }
     }
 
     internal inline fun forEachCandidate(crossinline current: () -> Boolean, crossinline visit: (VarRef) -> Unit) {
@@ -488,29 +391,7 @@ internal class LpDirectionalHistory(
             observe("OUTCOME_RATE_READY")
         }
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
-        if (depthRetention) recordDepthOutcome(child, pruned, version, node, current)
-    }
-
-    private inline fun recordDepthOutcome(
-        child: Pending,
-        pruned: Boolean,
-        version: Long,
-        node: Long,
-        crossinline current: () -> Boolean,
-    ) {
-        val history = retainDepth(child, version, node, numericHistory = null, current) ?: return
-        charge(12L)
-        if (!current() || version != generation || node != stamp) return
-        val direction = if (child.up) history.up else history.down
-        direction.recordOutcome(pruned, node, child.parent.objective, child.depth - 1)
-        noteDepthPruning(direction)
-        observe(if (pruned) "DEPTH_RETENTION_OUTCOME_PRUNED" else "DEPTH_RETENTION_OUTCOME_OPEN")
-    }
-
-    private fun noteDepthPruning(direction: Direction) {
-        if (direction.outcomeCount >= RELIABILITY && (direction.outcomeLatest || direction.outcomePrevious)) {
-            depthPrunedStamp = maxOf(depthPrunedStamp, direction.outcomePreviousStamp)
-        }
+        if (depthRetention) recordDepth(child, Double.NaN, pruned, version, node, current)
     }
 
     fun preferDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {
@@ -518,33 +399,45 @@ internal class LpDirectionalHistory(
         charge(8L)
         if (version != generation) return null
         val history = reliable(variable, value) ?: return null
-        return preferred(history, value, cutoff, version)
+        return preferred(history, value, cutoff, version, rememberDepthDecline = depthRetention)
     }
 
-    internal inline fun depthPreference(
+    internal fun depthPreference(
         variable: VarRef,
         value: Double,
         cutoff: Double,
-        crossinline current: () -> Boolean,
+        current: () -> Boolean,
     ): Boolean? {
         if (!hasDepthHistory) return null
         val version = generation
         val node = stamp
         charge(8L)
         if (!current() || version != generation || node != stamp) return null
-        val index = depthPosition(variable, depth, version, node, current) ?: return null
-        val entry = depthHistories?.getOrNull(index)
-        if (entry == null || compareDepth(entry, variable, depth) != 0) {
+        val journal = depthJournal ?: return null
+        val restored = journal.restore(variable, depth, node) {
+            current() && version == generation && node == stamp
+        } ?: return null
+        if (restored.down.count == 0 && restored.up.count == 0 &&
+            restored.down.outcomeCount == 0 && restored.up.outcomeCount == 0
+        ) {
             observe("DEPTH_RETENTION_LOOKUP_NO_CONTEXT")
             return null
         }
-        if (!reliableDepth(entry.gains, variable, value)) {
+        if (!reliableDepth(restored, variable, value)) {
             observe("DEPTH_RETENTION_LOOKUP_NUMERIC_DECLINED")
+            if (restored.down.count < RELIABILITY || restored.up.count < RELIABILITY) {
+                observe("DEPTH_RETENTION_LOOKUP_NUMERIC_SHORT")
+            }
             return null
         }
-        val preference = preferred(entry.gains, value, cutoff, version)
+        val preference = preferred(restored, value, cutoff, version)
         if (!current() || version != generation || node != stamp) return null
-        if (preference == null) observe("DEPTH_RETENTION_LOOKUP_PREFERENCE_DECLINED")
+        if (preference == null) {
+            observe("DEPTH_RETENTION_LOOKUP_PREFERENCE_DECLINED")
+            if (restored.down.outcomeCount < RELIABILITY || restored.up.outcomeCount < RELIABILITY) {
+                observe("DEPTH_RETENTION_LOOKUP_OUTCOME_SHORT")
+            }
+        }
         return preference
     }
 
@@ -557,7 +450,13 @@ internal class LpDirectionalHistory(
         return fraction > DISTANCE_TOL && fraction < 1.0 - DISTANCE_TOL
     }
 
-    private fun preferred(history: Gains, value: Double, cutoff: Double, version: Long): Boolean? {
+    private fun preferred(
+        history: Gains,
+        value: Double,
+        cutoff: Double,
+        version: Long,
+        rememberDepthDecline: Boolean = false,
+    ): Boolean? {
         if (history.down.gain <= 0.0 && history.up.gain <= 0.0) return null
         charge(8L)
         if (version != generation) return null
@@ -624,6 +523,7 @@ internal class LpDirectionalHistory(
             history.down.outcomeParentDepth != depth || history.down.outcomePreviousParentDepth != depth ||
             history.up.outcomeParentDepth != depth || history.up.outcomePreviousParentDepth != depth
         ) {
+            if (rememberDepthDecline) depthGuardDeclined = true
             observe("PASSIVE_VALUE_DEPTH_CONTEXT_DECLINED")
             return null
         }

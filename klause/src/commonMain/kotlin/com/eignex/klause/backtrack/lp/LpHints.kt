@@ -411,9 +411,11 @@ internal class LpHints(
         cancelled: ExecutionControl,
     ): List<SearchDecision> {
         depthValues?.clear()
+        if (depthRetention) history.clearDepthGuard()
         val ordered = orderProductionAlternatives(variable, alternatives, cancelled)
-        if (!depthRetention || ordered.size != 2 || depthChecksRemaining <= 0 || !history.hasDepthHistory ||
-            passiveValues?.hasNomination == true || !cutoff.isFinite() || !passivePointCurrent() || cancelled()
+        if (!depthRetention || !history.depthGuardDeclined || ordered.size != 2 || depthChecksRemaining <= 0 ||
+            !history.hasDepthHistory || passiveValues?.hasNomination == true || !cutoff.isFinite() ||
+            !passivePointCurrent() || cancelled()
         ) return ordered
         val version = nodeStamp
         val point = passivePoint
