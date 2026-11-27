@@ -663,11 +663,20 @@ internal object FinitePortfolioLpCapture {
                 "ADMITTED" -> require(metrics["Admitted"] == 1L && metrics.keys.none { it.startsWith("Decline") })
             }
             metrics["ReusedPreparationWork"]?.let { reused ->
-                require(automatic && disposition == "ADMITTED")
+                require(automatic)
                 val charged = requireNotNull(metrics["PreparationWork"])
                 require(charged in 1L..reused && reused <= requireNotNull(helperPreparationWork))
                 val forecast = requireNotNull(metrics["EstimatedProbeTotalWork"])
-                require(forecast in reused..requireNotNull(helperQueryWork))
+                val query = requireNotNull(helperQueryWork)
+                require(forecast >= reused)
+                val sourcePass = metrics["SourceEstimatedPassTotalWork"]
+                if (sourcePass != null) require(sourcePass in reused..query)
+                if (disposition == "ADMITTED") {
+                    require(forecast <= query)
+                } else {
+                    require(disposition == "ATTEMPTED_DECLINED" && metrics["DeclineQueryWork"] == 1L &&
+                        sourcePass != null && forecast > query)
+                }
             }
             require(eventAutomatic == (disposition == "ADMITTED" && sparseOverride != true))
         }

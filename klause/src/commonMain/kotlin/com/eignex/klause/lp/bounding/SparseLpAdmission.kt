@@ -85,10 +85,15 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     if (objective != null) {
         cache?.reusableSparseRoot(problem, objective, preparationAllowance, queryWorkAllowance)?.let {
             if (cancellation()) return decline("Cancelled")
-            return SparseLpAdmission(it.metrics + mapOf(
+            val metrics = it.metrics + mapOf(
                 "PreparationWork" to 1L, "ReusedPreparationWork" to it.preparationWork,
-                "QueryWorkAllowance" to queryWorkAllowance,
-            ), it.relaxation)
+                "SourceEstimatedPassTotalWork" to it.sourceQueryWork, "QueryWorkAllowance" to queryWorkAllowance,
+            )
+            return if (it.metrics.getValue("EstimatedProbeTotalWork") <= queryWorkAllowance) {
+                SparseLpAdmission(metrics, it.relaxation)
+            } else {
+                SparseLpAdmission(metrics + mapOf("Admitted" to 0L, "DeclineQueryWork" to 1L))
+            }
         }
     }
     val optimisticPassWork = sparsePassWork(rows, columns, 0L, 0L)
@@ -152,7 +157,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     if (cache != null && objective != null) {
         val sourceWork = assemblyWork + sparsePassWork(rows, columns, entries, sourceFillRisk)
         cache.retainSparseRoot(LpSparseRootLayout(problem, objective, relaxation, estimate.metrics, assemblyWork,
-            maxOf(sourceWork, estimate.metrics.getValue("EstimatedProbeTotalWork"))))
+            sourceWork))
     }
     return SparseLpAdmission(estimate.metrics, relaxation)
 }

@@ -1082,7 +1082,8 @@ hash and journals admission,
 query, handoff and consumer events. An optional `source-archive-sha256` binds the
 committed corpus entry and records the worker's stored encoding separately.
 Reuse receipts retain the reader's current preparation charge and the original
-preparation work in separate fields.
+preparation work in separate fields. They distinguish the funded source pass
+from the compact query forecast, which can still decline.
 Guard masks cover evaluated operands only. Missing or interrupted events leave
 the corresponding outcome unknown. The journal associates a committed integer
 split with the full root target that supplied its preferred value when it can

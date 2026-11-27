@@ -147,7 +147,7 @@ class SparseLpAdmissionTest {
     }
 
     @Test
-    fun `automatic sparse reuse requires the current query grant to fund the forecast`() {
+    fun `automatic sparse reuse can decline a funded source with an unaffordable compact forecast`() {
         val source = boundedLpEngineProblem()
         val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
@@ -155,11 +155,34 @@ class SparseLpAdmissionTest {
 
         sequence<Unit> {
             val first = prepareSparseLpAdmission(problem, objective, automatic = true)
+            admissions += first
             admissions += prepareSparseLpAdmission(problem, objective, automatic = true,
                 queryWorkAllowance = first.metrics.getValue("EstimatedProbeTotalWork") - 1L)
         }.forEach { }
 
-        assertEquals(1L, admissions.single().metrics["DeclineQueryWork"])
+        val (first, declined) = admissions
+        assertEquals(1L, declined.work)
+        assertEquals(first.work, declined.metrics["ReusedPreparationWork"])
+        assertEquals(1L, declined.metrics["DeclineQueryWork"])
+        assertFalse(declined.admitted)
+        assertNull(declined.sourceLayout)
+    }
+
+    @Test
+    fun `automatic sparse reuse preserves a source pass funding decline`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        var declined: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            prepareSparseLpAdmission(problem, objective, automatic = true)
+            declined = prepareSparseLpAdmission(problem, objective, automatic = true, queryWorkAllowance = 0L)
+        }.forEach { }
+
+        val metrics = requireNotNull(declined).metrics
+        assertEquals(1L, metrics["DeclineQueryWork"])
+        assertNull(metrics["ReusedPreparationWork"])
     }
 
     @Test

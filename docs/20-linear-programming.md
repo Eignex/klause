@@ -396,10 +396,11 @@ can decline once its nonzero and fill counts exceed the funded pass forecast. Th
 diagnostic observer records completed admission decisions and their evaluated
 guards, including preparation and query allowances at the producer and helper.
 Automatic workers on the same baked source can reuse one admitted compact layout
-from the source preparation cache. Reuse requires the identical source and
-objective and sufficient preparation and query grants for the original forecast.
-The layout carries no mutable numerical owner. Each worker installs its own root
-state and pays for its own numerical preparation and queries.
+and its forecasts from the preparation cache. The identical source and objective
+and grants covering its preparation and source pass allow a paid lookup. Each
+worker still needs a query grant covering the compact forecast to consume the
+layout. An unfunded compact forecast returns the query decline. Each admitted
+worker installs its own root state and pays for its numerical preparation and queries.
 Root point events identify the original owner, model and point through queries,
 retention and search consultations. A consultation supplies ordering guidance.
 The automatic root experiment can hand a complete point from the same source

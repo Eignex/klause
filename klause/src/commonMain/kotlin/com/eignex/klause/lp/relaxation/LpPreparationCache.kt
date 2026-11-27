@@ -48,7 +48,8 @@ internal class LpPreparationCache private constructor(
         preparationAllowance: Long,
         queryAllowance: Long,
     ): LpSparseRootLayout? = sparseRootSlot.load()?.takeIf {
-        it.matches(problem, objective) && it.preparationWork <= preparationAllowance && it.queryWork <= queryAllowance
+        it.matches(problem, objective) && it.preparationWork <= preparationAllowance &&
+            it.sourceQueryWork <= queryAllowance
     }
 
     fun retainSparseRoot(layout: LpSparseRootLayout) {
@@ -142,7 +143,7 @@ internal class LpSparseRootLayout(
     val relaxation: LpRelaxation,
     val metrics: Map<String, Long>,
     val preparationWork: Long,
-    val queryWork: Long,
+    val sourceQueryWork: Long,
 ) {
     fun matches(source: Problem, target: LinearObjective): Boolean = source === problem && target === objective
 }
