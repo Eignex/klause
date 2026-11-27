@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.SOURCE_LP_WORK_QUANTUM
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
@@ -457,7 +458,7 @@ internal class JointLinearRepair(
             }
         }
         if (rootPoint == null) {
-            funding.grant(20_000_000L)
+            funding.grant(SOURCE_LP_WORK_QUANTUM)
             requestIncumbentPreparation()
             if (!rootStarted && completion != null) {
                 preparedCenter = preparedCenter ?: checkedExternalCenter()

@@ -626,9 +626,10 @@ bounds and basis; changed bounds, objective, rows or trail scope discard the cur
 Sparse source preparation transposes emitted support into exact CSC once per
 admission, which neither authorizes ordinary admission nor bounds basis fill;
 `SparseSourceLpPolicy` carries the preparation, floating, consultation and
-certificate allowances, and retained MIP callers fund consultations through
-`SourceLpFunding`, where caller cancellation closes the owner and exhaustion is an
-incomplete result.
+certificate allowances. Retained source callers fund consultations through
+`SourceLpFunding`. Sparse preparation intersects its allocation safeguard with the
+remaining caller allowance before reserving storage. Caller cancellation closes the
+owner and cumulative exhaustion is an incomplete result.
 
 Source primal statistics report each returned guidance consultation's native phase,
 floating termination, native and projected point availability and pause status.

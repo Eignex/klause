@@ -155,6 +155,10 @@ internal class LinearAuthorityTraversal(
     private var pending = 1L
     private var peakPending = 1L
     private var retained = 1L
+    private var retainedCoverageBytes = 0L
+    var coverageAllocationDeclined = false
+        private set
+    val operationDenied: Boolean get() = budget.operationDenied || authority.operationDenied
 
     fun observations(): Map<String, Long> = observations + activeRows?.observations.orEmpty() +
         authority.cutObservations().mapValues { (key, value) ->
@@ -196,14 +200,21 @@ internal class LinearAuthorityTraversal(
             sibling?.let { it.coveredBound ?: it.result?.bound }, incumbent()?.second)
     }
 
-    private fun splitCreated() {
+    private fun reserveSplit(additionalBytes: Long = 0L): Boolean {
+        val condition = current.condition
+        val bytes = additionalBytes + 1024L + 256L *
+            (condition.bools.size.toLong() + condition.lower.size + condition.upper.size +
+                condition.integerRows.sumOf { it.supportSize.toLong() + 1L })
+        if (bytes > MAX_RETAINED_COVERAGE_BYTES - retainedCoverageBytes) {
+            coverageAllocationDeclined = true
+            return false
+        }
+        if (budget.funding?.reserveAllocation(bytes) == false) return false
+        retainedCoverageBytes += bytes
         pending++
         retained += 2
-        val condition = current.condition
-        budget.funding?.charge(0L, 1024L + 256L *
-            (condition.bools.size.toLong() + condition.lower.size + condition.upper.size +
-                condition.integerRows.sumOf { it.supportSize.toLong() + 1L }))
         peakPending = maxOf(peakPending, pending)
+        return true
     }
     var ray: SourceEvidence? = null
         private set
@@ -257,9 +268,11 @@ internal class LinearAuthorityTraversal(
                         current.condition.bools[id] == Lit.isPositive(decision.literal)
                     ) return ComponentResult.Consistent
                 }
-                val split = current.split ?: CoverageSplit.Boolean(id, current.condition).also {
-                    current.split = it
-                    splitCreated()
+                val split = current.split ?: run {
+                    if (!reserveSplit()) return ComponentResult.Indeterminate
+                    CoverageSplit.Boolean(id, current.condition).also {
+                        current.split = it
+                    }
                 }
                 check(split is CoverageSplit.Boolean && split.id == id)
                 if (Lit.isPositive(decision.literal)) split.above else split.below
@@ -329,13 +342,13 @@ internal class LinearAuthorityTraversal(
                 observe("numericalRefutationUnitExplanationDeclines")
                 break
             }
+            if (!reserveSplit()) return ComponentResult.Indeterminate
             val split = CoverageSplit.Integer(exclusion.coordinate, exclusion.threshold, node.condition)
             val rejected = if (exclusion.upper) split.below else split.above
             rejected.result = LinearAuthorityResult(evidence = exclusion.evidence)
             node.split = split
             node.unit = survivor
             node.unitSupport = exclusion.support
-            splitCreated()
             pending--
             observe("numericalClosedLeaves")
             observe("numericalRefutationUnitDeductions")
@@ -402,6 +415,7 @@ internal class LinearAuthorityTraversal(
 
     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
         if (cancellation()) return SearchNodeDisposition.Indeterminate
+        if (budget.funding?.exhausted == true || coverageAllocationDeclined) return SearchNodeDisposition.Indeterminate
         if (gapEnabled) {
             updateGlobalBound()
             if (gapBound() != null && !cancellation()) return SearchNodeDisposition.Pause
@@ -490,13 +504,16 @@ internal class LinearAuthorityTraversal(
         if (result.paused) {
             current.partialBound = result.bound
             current.partialCutFamilies = result.cutBoundFamilies
+            if (current === root) rootBound = result.bound
+            result.incumbent?.let(onIncumbent)
             feedback?.consume(branch, paused = true)?.let { onNumericalFeedback?.invoke(it) }
             current.pending = true
             observe("numericalLpPauses")
             return SearchNodeDisposition.Pause
         }
         current.pending = false
-        current.result = if (result.primalStages.isEmpty()) result else result.copy(primalStages = emptyMap())
+        current.result = LinearAuthorityResult(evidence = result.evidence, bound = result.bound,
+            cutBoundFamilies = result.cutBoundFamilies)
         if (current === root) rootBound = result.bound
         result.incumbent?.let(onIncumbent)
         if (current === root && repairGuidance?.remember(source, result.relaxedPoint, budget, cancellation) == true) {
@@ -569,9 +586,8 @@ internal class LinearAuthorityTraversal(
         if (current.coveredBound != null) return SearchNodeDisposition.Prune
         result.split?.let { (coordinate, threshold) ->
             aggregateBranches?.propose(branch, cancellation)?.let { row ->
-                budget.funding?.charge(0L, 256L + 128L * row.supportSize)
+                if (!reserveSplit(256L + 128L * row.supportSize)) return SearchNodeDisposition.Indeterminate
                 current.split = CoverageSplit.Aggregate(row, current.condition)
-                splitCreated()
                 observe("numericalAggregateSplits")
                 return SearchNodeDisposition.Expand
             }
@@ -584,8 +600,8 @@ internal class LinearAuthorityTraversal(
             if (supportBranching != null && lateFeedback && candidate != result.fractional.firstOrNull()) {
                 observe("numericalSupportLateSelections")
             }
+            if (!reserveSplit()) return SearchNodeDisposition.Indeterminate
             current.split = CoverageSplit.Integer(selected.first, selected.second, current.condition, candidate)
-            splitCreated()
             observe("numericalFractionalSplits")
             return if (propagateRefutations && budget.funding?.paused == true) SearchNodeDisposition.Pause
             else SearchNodeDisposition.Expand
@@ -599,8 +615,8 @@ internal class LinearAuthorityTraversal(
             if (cancellation()) return SearchNodeDisposition.Indeterminate
             if (premise.guards.any { (id, value) -> current.condition.bools[id] != value }) continue
             integerBounds.split(premise.integerPins)?.let { (coordinate, threshold) ->
+                if (!reserveSplit()) return SearchNodeDisposition.Indeterminate
                 current.split = CoverageSplit.Integer(coordinate, threshold, current.condition)
-                splitCreated()
                 observe("numericalIndicatorSplits")
                 return if (propagateRefutations && budget.funding?.paused == true) SearchNodeDisposition.Pause
                 else SearchNodeDisposition.Expand
@@ -733,6 +749,8 @@ internal class LinearAuthorityTraversal(
         }
     }
 }
+
+private const val MAX_RETAINED_COVERAGE_BYTES = 512L * 1024L * 1024L
 
 private data class IntegerAlternative(
     val coordinate: SourceCoordinate, val threshold: BigFraction, val upper: Boolean,

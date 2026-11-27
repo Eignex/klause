@@ -112,10 +112,13 @@ internal class LinearAuthoritySession(
             val suspended = if (sparse == null) packed.inactiveRows else checkNotNull(sparse)
                 .emittedInactiveRows(packed.inactiveRows, token) { work, allocation ->
                     mappingWork += work
-                    mappingAllocation += allocation
                     budget.observe(preparation = work)
-                    budget.funding?.charge(0L, allocation)
-                    budget.funding?.paused != true
+                    if (allocation > 0L && budget.funding?.reserveAllocation(allocation) == false) {
+                        false
+                    } else {
+                        mappingAllocation += allocation
+                        budget.funding?.exhausted != true
+                    }
                 }
             onLifecycle("InactiveRowMappingWork", mappingWork)
             onLifecycle("InactiveRowMappingAllocation", mappingAllocation)
@@ -186,7 +189,7 @@ internal class LinearAuthoritySession(
             } else close()
             admission = budget.admitSparse(cancellation) { active ->
                 SparseSourceLp.prepare(packed.rows, packed.columns.map { it.copy(bounds = ExactLpBounds()) },
-                    costs, constant, policy, active)
+                    costs, constant, policy, active, funding = budget.funding)
             } ?: run {
                 close()
                 return null

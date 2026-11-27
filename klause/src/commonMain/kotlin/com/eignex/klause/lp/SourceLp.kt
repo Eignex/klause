@@ -66,6 +66,8 @@ internal class SourceLpBudget(
 
     var operations: Int = 0
         private set
+    var operationDenied = false
+        private set
     var reservedWork: Long = 0L
         private set
     var reservedAllocation: Long = 0L
@@ -236,7 +238,11 @@ internal class SourceLpBudget(
         onDecline: (String) -> Unit = {},
     ): T? {
         val activeCap = maxActiveNanos
-        if (cancellation() || funding?.paused == true || (resumed == null && operations >= maxOperations)) return null
+        if (cancellation() || funding?.paused == true) return null
+        if (resumed == null && operations >= maxOperations) {
+            operationDenied = true
+            return null
+        }
         if (activeCap != null && activeNanos >= activeCap) return null
         if (resumed == null) {
             operations++
