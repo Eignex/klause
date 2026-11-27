@@ -1,0 +1,15 @@
+{
+  "main": "com.eignex.klause.bench.lab.MpsCliPreparationAdapterKt",
+  "sourceHistory": "snapshot",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-cli:installJvmDist", ":klause-bench:installDist"],
+  "jvmArgs": ["-Xmx512m", "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector"],
+  "runtime": {
+    "java": 25,
+    "tools": [],
+    "environment": {},
+    "requiredTags": ["platform:linux", "arch:x86_64"]
+  },
+  "workspaceInputs": [".git", "klause-bench/lab", "klause-bench/corpus-index", "klause-bench/build/install",
+    "klause-cli/build/install", "klause-mzn-lib"]
+}
