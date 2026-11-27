@@ -391,6 +391,9 @@ guards inside the LP owner under the existing root and solve allowances. A scan
 can decline once its nonzero and fill counts exceed the funded pass forecast. The
 diagnostic observer records completed admission decisions and their evaluated
 guards, including preparation and query allowances at the producer and helper.
+An automatic worker can retire a progressing paused cursor once its checked
+continuation bound reaches the shared floor and closes at least half the gap
+between the initial checked floor and the current verified incumbent.
 Root point events identify the original owner, model and point through queries,
 retention and search consultations. A consultation supplies ordering guidance.
 The automatic root experiment can hand a complete point from the same source

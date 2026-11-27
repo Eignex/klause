@@ -1500,8 +1500,11 @@ internal class ResumableMinimize(
             val lower = lpEngine.measuredRootLowerBound ?: return false
             if (!baseline.isFinite() || ceil(lower) <= ceil(baseline)) return false
             if (defer) {
-                sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "PROGRESS_DEFERRED", 0L)
-                return false
+                if (!checkedRootBoundClosesHalfGap(baseline)) {
+                    sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "PROGRESS_DEFERRED", 0L)
+                    return false
+                }
+                sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "BOUND_GAP_HANDOFF", 0L)
             }
         }
         // A checked global bound survives retirement of its unfinished numerical cursor.
@@ -1509,6 +1512,14 @@ internal class ResumableMinimize(
         lpEngine.handoffRootBoundSearch()
         sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "BOUND_SEARCH_HANDOFF", 0L)
         return true
+    }
+
+    private fun checkedRootBoundClosesHalfGap(baseline: Double): Boolean {
+        val checked = lpEngine.continuedRootLowerBound ?: return false
+        val shared = params.objectiveLowerBoundSupplier?.invoke() ?: return false
+        if (checked > provedRootBound || !(shared >= checked)) return false
+        val pooled = params.pooledIncumbents?.current()?.objective ?: Double.POSITIVE_INFINITY
+        return rootBoundClosesHalfGap(baseline, checked, minOf(bestObj, pooled))
     }
 
     private fun handoffRootTargets(rootToken: ExecutionControl): Boolean {
@@ -2074,3 +2085,7 @@ internal class ResumableMinimize(
         }
     }
 }
+
+internal fun rootBoundClosesHalfGap(baseline: Double, checked: Double, incumbent: Double): Boolean =
+    baseline.isFinite() && incumbent.isFinite() && checked.isFinite() &&
+        baseline < incumbent && checked > baseline && checked >= 0.5 * baseline + 0.5 * incumbent

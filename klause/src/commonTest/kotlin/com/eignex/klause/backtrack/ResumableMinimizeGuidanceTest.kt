@@ -37,11 +37,20 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableMinimizeGuidanceTest {
+    @Test
+    fun `root gap handoff requires a checked gain over half an incumbent gap`() {
+        assertTrue(rootBoundClosesHalfGap(-12.0, -2.0, 8.0))
+        assertFalse(rootBoundClosesHalfGap(-12.0, -3.0, 8.0))
+        assertFalse(rootBoundClosesHalfGap(-12.0, -2.0, Double.POSITIVE_INFINITY))
+        assertFalse(rootBoundClosesHalfGap(8.0, 9.0, 8.0))
+    }
+
     @Test
     fun `component repair revisits earlier pins before passing root coordinates to search`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it % 4 == 0) 2 else 1) },
