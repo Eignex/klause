@@ -20,6 +20,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.FunctionalObjective
 import kotlin.random.Random
 import kotlin.test.Test
@@ -29,6 +30,75 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
+    @Test
+    fun `finite cumulative should grade the same repair across short and wide horizons`() {
+        for (far in listOf(3L, 1L shl 21)) {
+            val factor = Cumulative(intArrayOf(0, 1, 2), longArrayOf(1, 1, 1), longArrayOf(1, 1, 1), 1)
+            val problem = Problem(
+                0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(far, far)), arrayOf<Factor>(factor),
+            ).bake()
+            val state = LocalSearchState(LocalSearchModel.of(problem), Random(3))
+            state.assign(0, 0, far)
+            state.recompute()
+            val move = IntSet(0, 1)
+
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(-1L, predicted)
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `wide cumulative should restore overlap after a shared presence probe`() {
+        val far = 1L shl 21
+        val problem = Problem(
+            1,
+            2,
+            arrayOf(IntDomain(0, far), IntDomain(0, far)),
+            arrayOf<Factor>(
+                Cumulative(
+                    intArrayOf(0, 0, 1), longArrayOf(2, 2, 1), longArrayOf(1, 1, 1), 1,
+                    presents = intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(0, false)),
+                ),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assign(far, 0)
+        state.assignment.setBool(0, true)
+        state.recompute()
+        val move = Move.BoolFlip(0)
+
+        val predicted = state.netDelta(move)
+
+        assertEquals(-2L, predicted)
+        assertEquals(2L, state.cost)
+        state.apply(move)
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `cumulative should grade overlap beyond the last representable start`() {
+        val last = Long.MAX_VALUE
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(last - 1, last), IntDomain(last, last)),
+            arrayOf<Factor>(Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 1)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assign(last, last)
+        state.recompute()
+        val move = IntSet(0, last - 1)
+
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertEquals(-1L, predicted)
+        assertEquals(1L, state.cost)
+    }
+
     @Test
     fun `unequal duration start swaps should repair jointly improving overloads`() {
         for (variableFootprints in listOf(false, true)) {

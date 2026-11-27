@@ -55,8 +55,8 @@ import com.eignex.util.collections.IntIntMap
  * deduction carries an explanation in the style of A. Schutt, T. Feydy, P. J. Stuckey and M. G. Wallace,
  * "Explaining the cumulative propagator", Constraints 16(3), 2011, https://doi.org/10.1007/s10601-010-9103-2.
  *
- * The LS payload is dense: it allocates a usage array over the horizon
- * `max_i(starts(i).max + durations(i)) − min_i(starts(i).min)`.
+ * Local search maintains a dense resource profile for short horizons and sweeps task
+ * start and end events for wider horizons.
  */
 class Cumulative(
     /** Task start-time variable ids. */

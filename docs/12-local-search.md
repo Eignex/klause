@@ -263,6 +263,13 @@ search. Each variable's occurrence index lists each active factor once, so a mov
 updates every invariant reading the coordinate exactly once. Assignments, random
 generators, weights and invariant payloads belong to each live state.
 
+Dense Cumulative profiles hold at most 1,048,576 time slots. Wider horizons and
+task ends outside the signed integer range use a sweep of start and end events
+with storage proportional to task count. The sweep grades proposed and committed
+moves over the full footprint of each task. Timeline-based relocations require the
+dense profile. Search windows bound candidate generation and supply no source
+refutation.
+
 Unmaintained flat Boolean objective folds have a private reader index from leaf
 coordinates to priced terms. A primitive flip evaluates only those terms; compound
 flips combine parity and visit each affected term once. Cost differences retain exact

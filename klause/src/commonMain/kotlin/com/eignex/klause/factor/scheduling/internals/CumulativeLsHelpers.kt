@@ -1,7 +1,5 @@
 package com.eignex.klause.factor.scheduling.internals
 
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.values
 import kotlin.math.max
 import kotlin.math.min
 
@@ -197,20 +195,6 @@ fun applyCumulativeCapacityDelta(ls: CumulativeLsState, newCap: Long) {
     for (u in ls.usage) if (u > newCap) newOv += u - newCap
     ls.cap = newCap
     ls.overage = newOv
-}
-
-/** Smallest value in [domain] that is ≥ [lo], or null if none. */
-internal fun firstInDomainAtLeast(domain: IntDomain, lo: Long): Long? {
-    if (lo > domain.max) return null
-    var pick = Long.MIN_VALUE
-    var found = false
-    domain.values.forEach {
-        if (!found && it >= lo) {
-            pick = it
-            found = true
-        }
-    }
-    return if (!found) null else pick
 }
 
 /** Clamp a Long timeline offset to a valid lower slot index in `[0, size]`. */

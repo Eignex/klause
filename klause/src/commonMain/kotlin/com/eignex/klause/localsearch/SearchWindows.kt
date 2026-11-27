@@ -30,8 +30,8 @@ internal fun searchWindows(domains: Array<IntDomain>): Array<IntDomain> {
     return Array(domains.size) { searchWindow(domains[it]) }
 }
 
-/** Values in the window a scheduling factor's wide column moves over: a resource profile is a timeline as long as
- *  its horizon, so the horizon has to stay short. */
+/** Values in the window a scheduling factor's wide column moves over. Short windows favour early schedules
+ *  and can keep the resource profile dense. */
 private const val SCHEDULE_WINDOW: Long = 1L shl 20
 
 /**
