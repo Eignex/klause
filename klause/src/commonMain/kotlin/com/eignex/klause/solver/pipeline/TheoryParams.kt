@@ -35,7 +35,7 @@ data class TheoryParams(
     val openWorkLimit: Long = Long.MAX_VALUE,
     /** Maximum committed shared decisions, independent of open-theory work accounting. */
     val maxDecisions: Long = Long.MAX_VALUE,
-    /** Positive shared-decision restart cadence within each feasibility traversal, or null for none. */
+    /** Explicit shared-decision restart cadence, or null to use the traversal's default. */
     val sharedRestart: Long? = null,
     /** Retained shared learned-clause cap within each feasibility traversal, or null for no cap. */
     val maxLearnedClauses: Int? = null,
