@@ -51,7 +51,11 @@ internal object FinitePortfolioLpCapture {
         require(bytes.size <= 1_048_576 && sha256(bytes) == options.getValue("sha256"))
         out.resolve("source.mps").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        inspect(options, bytes, out)
+        if (options["distance-pair"] == "true") {
+            val common = options - "distance-pair"
+            inspect(common + ("source-joint-distance-repair" to "false"), bytes, out.resolve("selection-baseline"))
+            inspect(common + ("source-joint-distance-repair" to "true"), bytes, out.resolve("distance-candidate"))
+        } else inspect(options, bytes, out)
     }
 
     internal fun parameters(options: Map<String, String>): List<String> {
@@ -60,6 +64,7 @@ internal object FinitePortfolioLpCapture {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
                 "source-refutation-center-step", "capture-authority", "capture-cut-policy", "capture-joint", "presolve",
+                "source-joint-distance-repair", "distance-pair",
                 "regional-pins", "regional-binary-center", "regional-existing-free", "regional-consultations",
                 "regional-expected-pins-sha256", "regional-explain-rejection", "regional-nominal-after-rejection",
                 "regional-worker-nominal-recovery")
@@ -104,6 +109,14 @@ internal object FinitePortfolioLpCapture {
                 "joint observation does not retain LP snapshots"
             }
         }
+        options["distance-pair"]?.let {
+            require(it.toBooleanStrict() && mode == "portfolio" && options["capture-joint"] == "true" &&
+                options["source-joint-distance-repair"] == null)
+        }
+        val distance = options["source-joint-distance-repair"]?.let {
+            require(mode == "portfolio" && options["capture-joint"] == "true")
+            "source-joint-distance-repair=${it.toBooleanStrict()}"
+        }
         if ("capture-authority" in options || "capture-cut-policy" in options) {
             require(mode == "joint-before")
             require((options["capture-authority"] ?: "nominal") in setOf("nominal", "accepted"))
@@ -138,7 +151,7 @@ internal object FinitePortfolioLpCapture {
         }
         if (preset == "ordinary") {
             require(!handoff) { "ordinary portfolio policy requires handoff=false" }
-            return listOf("portfolio-progress=$progress")
+            return listOfNotNull("portfolio-progress=$progress", distance)
         }
         return listOf("companion-integers=true", "companion-active-ms=4000",
             "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
@@ -205,6 +218,7 @@ internal object FinitePortfolioLpCapture {
         var point: JsonObject? = null
         var producer: String? = null
         var jointRecords = 0
+        var admissions = 0
         var jointObserverNs = 0L
         out.resolve("joint-repair.jsonl").bufferedWriter().use { joint ->
             out.resolve("guidance.jsonl").bufferedWriter().use { guidance ->
@@ -359,7 +373,16 @@ internal object FinitePortfolioLpCapture {
                                 point = if (text.length <= 65_536) {
                                     Reports.json.parseToJsonElement(text) as JsonObject
                                 } else null
-                            }, finite = FiniteSolveCallbacks({}, { producer = it.workerLabel })))
+                            }, finite = FiniteSolveCallbacks({}, { improvement ->
+                                producer = improvement.workerLabel
+                                if (captureJoint && admissions++ < 64) {
+                                    out.resolve("incumbent-admissions.jsonl").appendText(buildJsonObject {
+                                        put("worker", improvement.workerLabel)
+                                        put("elapsedMs", improvement.elapsedMs)
+                                        put("workingObjective", improvement.objective)
+                                    }.toString() + "\n")
+                                }
+                            })))
                         out.resolve("result.json").writeText(buildJsonObject {
                             put("nativeResultKind", result.javaClass.simpleName)
                             put("sourceSemantics", original.semantics.toString())
@@ -367,6 +390,7 @@ internal object FinitePortfolioLpCapture {
                             put("presolve", options["presolve"] ?: "source-default")
                             put("finiteEngine", FiniteEngine.MIXED.id)
                             put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
+                            put("incumbentAdmissionEvents", admissions)
                             put("seed", seed)
                             put("containingTimeoutMs", timeout)
                             put("queryMetadataLimit", 128)

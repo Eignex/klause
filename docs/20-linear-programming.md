@@ -523,6 +523,11 @@ context. The worker can request this once within its remaining funding and
 publication lifetime. Recovery verifies the original objective and publication
 check and applies the receiving cutoff before offering the assignment.
 
+An opt-in distance proposal extends a small binary neighborhood using an
+auxiliary objective over the accepted envelope. The auxiliary scope supplies
+guidance only. The regional query retains its source authority and cutoff.
+The projection and regional continuation spend the existing worker allowance.
+
 Point selection admits at most eight mutually nonparallel additional checked cuts per
 usable point and waits for its completed query before scanning again. A mixed ordinary recipe with
 at least one active checked cut per numerical coordinate keeps its ordinary query

@@ -235,6 +235,7 @@ private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionRead
     sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
         ?: sourceIncumbentCompletion,
     sourceRefutationCenterStep = centerStep ?: sourceRefutationCenterStep,
+    sourceJointDistanceRepair = reader[ExecutionOption.sourceJointDistanceRepair] ?: sourceJointDistanceRepair,
     sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: sourceRefutationReuse,
     sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
         ?: sourceRefutationPropagation,
@@ -289,5 +290,5 @@ private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions 
     "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
     "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
     "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
-    "source-incumbent-completion", "source-refutation-center-step",
+    "source-incumbent-completion", "source-refutation-center-step", "source-joint-distance-repair",
 )

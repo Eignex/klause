@@ -121,6 +121,8 @@ data class TheoryParams(
     val sourceCutBranching: Boolean = false,
     /** Move a pre-incumbent joint repair center using paid conditional refutation advice. */
     val sourceRefutationCenterStep: Boolean = false,
+    /** Try one bounded distance-guided mixed binary neighborhood and nominal completion. */
+    val sourceJointDistanceRepair: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

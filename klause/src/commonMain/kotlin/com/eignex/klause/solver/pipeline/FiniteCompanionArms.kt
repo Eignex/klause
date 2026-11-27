@@ -112,7 +112,8 @@ internal class FiniteCompanionArms private constructor(
                     eligibility.requirements.construction, controls.toleranceAuthority, controls.cutBinding)
             } else null
             val comparison: ((SearchEvent.CompanionComparison) -> Unit)? =
-                if (scenario.reportPortfolioProgress && onEvent != null) { event -> onEvent(JOINT_REPAIR, event) }
+                if ((scenario.reportPortfolioProgress || params?.sourceJointDistanceRepair == true) && onEvent != null)
+                    { event -> onEvent(JOINT_REPAIR, event) }
                 else null
             val observation: ((Long, JointRepairObservation) -> Unit)? = controls.onJointRepair?.let { report ->
                 { seed, observation -> report(JOINT_REPAIR, seed, observation) }

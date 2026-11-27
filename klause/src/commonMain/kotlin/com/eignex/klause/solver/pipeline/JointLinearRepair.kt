@@ -127,6 +127,11 @@ internal class JointLinearRepair(
     private var query: LinearAuthorityInvocation? = null
     private var nominalPublicationCapture: ((ExecutionControl) -> SourceProofContext?)? = null
     private var nominalPublicationTried = false
+    private class DistanceTrial(val base: ExactNeighborhoodCondition, val center: List<BigFraction>) {
+        var replacement: ExactNeighborhoodCondition? = null
+    }
+    private var distanceTrial: DistanceTrial? = null
+    private var distanceTried = false
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
     private val refutedConditions = ArrayDeque<ExactNeighborhoodCondition>()
@@ -324,8 +329,10 @@ internal class JointLinearRepair(
             centerPreparationPending = { rootPreparationPending },
             continuePausedCompletion = {
                 val proposal = checkedProposal
-                val carries = proposal != null && proposal.condition === queryOriginalCondition &&
-                    query?.hasIncumbent == true
+                val distancePending = distanceTrial?.replacement?.let { it === queryOriginalCondition } == true
+                val carries = distancePending || (proposal != null && proposal.condition === queryOriginalCondition &&
+                    query?.hasIncumbent == true)
+                if (distancePending) observe("jointRepairDistanceResumeRequests")
                 if (carries) observe("jointRepairGrantedQueryResumeRequests")
                 carries
             },
@@ -414,6 +421,17 @@ internal class JointLinearRepair(
                 (binary ?: relaxation ?: requireNotNull(selection).propose(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
+                        if (!adaptive && sharedFractionalRoot && !distanceTried &&
+                            nominalPublicationCapture != null && round > 0L && sourceIntegers == null &&
+                            model.numIntVars - condition.lower.size in 1..2) {
+                            val work = 1L + model.numIntVars
+                            val bytes = 128L + 16L * model.numIntVars
+                            if (funding.remainingWork > work && funding.remainingAllocation > bytes) {
+                                budget.observe(preparation = work)
+                                funding.charge(0L, bytes)
+                                distanceTrial = DistanceTrial(condition, from.take(model.numIntVars))
+                            }
+                        }
                         if (bootstrap) {
                             bootstrapPending = false
                             bootstrapTried = true
@@ -597,10 +615,24 @@ internal class JointLinearRepair(
     override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult =
         attempt(condition, cancellation).result
 
-    fun attempt(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): JointRepairAttempt {
+    fun attempt(requested: ExactNeighborhoodCondition, cancellation: ExecutionControl): JointRepairAttempt {
         readyCenterStep = null
+        val trial = distanceTrial?.takeIf { it.base === requested }
+        if (trial != null && !distanceTried && !stop() && !cancellation()) {
+            distanceTried = true
+            observe("jointRepairDistanceProjections")
+            trial.replacement = JointBinaryDistance(source, budget).expand(requested, trial.center, stop or cancellation)
+            val expanded = trial.replacement
+            if (expanded == null) observe("jointRepairDistanceDeclined") else {
+                observe("jointRepairDistanceExpanded")
+                compare("distance", "expanded", cutoff = expanded.cutoff)
+                observation?.event(proposalSequence, observationQuery, "distance", "expanded")
+            }
+        }
+        val condition = trial?.replacement ?: requested
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
+            if (trial != null) distanceTrial = null
             observation?.event(proposalSequence, observationQuery, "result", when (result.result) {
                 is ExactNeighborhoodResult.Witness -> "checked-source-witness"
                 ExactNeighborhoodResult.Refuted -> "regional-refutation"
@@ -643,11 +675,14 @@ internal class JointLinearRepair(
             (0 until model.numIntVars).all { sample.exactIntValue(it) == center.exactIntValue(it) }
     }
 
+    fun supportsNominalPublicationRecovery(): Boolean =
+        source.scope.revision.semantics == "absolute-tolerance-envelope-v1" &&
+            model.numBoolVars == 0 && model.numIntVars in 1..256 && model.numRealVars > 0 &&
+            model.binaryIntegers && incumbentCompletionCheck != null && objective != null
+
     fun enableNominalPublicationRecovery(capture: (ExecutionControl) -> SourceProofContext?) {
         check(query == null && nominalPublicationCapture == null && !nominalPublicationTried)
-        require(source.scope.revision.semantics == "absolute-tolerance-envelope-v1" &&
-            model.numBoolVars == 0 && model.numIntVars in 1..256 && model.numRealVars > 0 &&
-            model.binaryIntegers && incumbentCompletionCheck != null && objective != null)
+        require(supportsNominalPublicationRecovery())
         nominalPublicationCapture = capture
     }
 
@@ -1062,6 +1097,7 @@ internal class JointLinearRepair(
         relaxationProposal = null
         bootstrapHint = null
         guidedProposal = null
+        distanceTrial = null
         readyCenterStep = null
         selection?.clearRefutation()
         refutedConditions.clear()

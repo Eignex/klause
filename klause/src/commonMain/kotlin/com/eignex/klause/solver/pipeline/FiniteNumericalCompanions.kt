@@ -218,6 +218,10 @@ internal class FiniteNumericalCompanions private constructor(
                         comparison.cutoff?.toString(), candidate?.toString(), disposition))
                 }
             }))
+        if (limits.sourceJointDistanceRepair && incumbentCompletionCheck != null &&
+            repair.supportsNominalPublicationRecovery()) {
+            repair.enableNominalPublicationRecovery { captureContext(model, objective, it) }
+        }
         return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },
