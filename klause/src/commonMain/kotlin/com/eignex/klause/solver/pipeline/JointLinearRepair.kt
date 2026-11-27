@@ -130,6 +130,7 @@ internal class JointLinearRepair(
     private class DistanceTrial(val base: ExactNeighborhoodCondition, val center: List<BigFraction>) {
         var replacement: ExactNeighborhoodCondition? = null
         var binaryPose: LongArray? = null
+        var direct: NominalPublication? = null
     }
     private var distanceTrial: DistanceTrial? = null
     private var distanceBootstrap: ExactNeighborhoodCondition? = null
@@ -661,10 +662,9 @@ internal class JointLinearRepair(
             return JointRepairAttempt(ExactNeighborhoodResult.Paused)
         }
         val condition = trial?.replacement ?: requested
-        val direct = trial?.binaryPose
-        val result = if (trial != null && direct != null && !stop() && !cancellation() && !exhausted) {
-            trial.binaryPose = null
-            directDistanceTrial(condition, direct, stop or cancellation)
+        val result = if (trial != null && (trial.binaryPose != null || trial.direct != null) &&
+            !stop() && !cancellation() && !exhausted) {
+            directDistanceTrial(trial, condition, cancellation)
         } else advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
             if (requested === distanceBootstrap && result.result != ExactNeighborhoodResult.Refuted) {
@@ -737,30 +737,42 @@ internal class JointLinearRepair(
         if (nominalPublicationCapture == null) return null
         nominalPublicationTried = true
         observe("jointRepairNominalPublicationRequests")
-        return completeNominal(sample, verification, original, "jointRepairNominalPublication")
+        return NominalPublication(sample, original, "jointRepairNominalPublication").use { it.advance(verification) }
     }
 
-    private fun directDistanceTrial(condition: ExactNeighborhoodCondition, pose: LongArray,
-        verification: ExecutionControl): JointRepairAttempt {
-        val original = requireNotNull(distancePublicationCheck)
+    private fun directDistanceTrial(trial: DistanceTrial, condition: ExactNeighborhoodCondition,
+        cancellation: ExecutionControl): JointRepairAttempt {
+        val projection = trial.binaryPose
+        val direct = trial.direct ?: run {
+            trial.binaryPose = null
+            val work = 1L + model.numIntVars + model.numRealVars
+            val bytes = 128L + 16L * (model.numIntVars + model.numRealVars)
+            if (stop() || cancellation() || funding.remainingWork <= work || funding.remainingAllocation <= bytes) {
+                return JointRepairAttempt(ExactNeighborhoodResult.Paused)
+            }
+            budget.observe(preparation = work)
+            funding.charge(0L, bytes)
+            observe("jointRepairDistanceDirectRequests")
+            val seed = Sample(BooleanArray(0), checkNotNull(projection), DoubleArray(model.numRealVars))
+            NominalPublication(seed, requireNotNull(distancePublicationCheck), "jointRepairDistanceDirect")
+                .also { trial.direct = it }
+        }
+        val completed = direct.advance(stop or cancellation)
+        val paused = !stop() && cancellation() && !direct.exhausted
+        if (!paused) {
+            trial.direct = null
+            direct.close()
+        }
+        stages["jointRepairDistanceDirectWork"] = direct.work
+        stages["jointRepairDistanceDirectAllocation"] = direct.allocation
+        if (paused) {
+            observe("jointRepairDistanceDirectPauses")
+            return JointRepairAttempt(ExactNeighborhoodResult.Paused)
+        }
         val live = distanceCutoff?.invoke()
         val captured = condition.cutoff
         val cutoff = if (live == null || (captured != null && captured <= live)) captured else live
-        val before = funding.spent
-        val allocated = funding.allocated
-        val work = 1L + model.numIntVars + model.numRealVars
-        val bytes = 128L + 16L * (model.numIntVars + model.numRealVars)
-        if (verification() || funding.remainingWork <= work || funding.remainingAllocation <= bytes) {
-            return JointRepairAttempt(ExactNeighborhoodResult.Paused)
-        }
-        budget.observe(preparation = work)
-        funding.charge(0L, bytes)
-        observe("jointRepairDistanceDirectRequests")
-        val seed = Sample(BooleanArray(0), pose, DoubleArray(model.numRealVars))
-        val completed = completeNominal(seed, verification, original, "jointRepairDistanceDirect")
-        stages["jointRepairDistanceDirectWork"] = funding.spent - before
-        stages["jointRepairDistanceDirectAllocation"] = funding.allocated - allocated
-        if (completed == null || verification() || funding.exhausted ||
+        if (completed == null || stop() || funding.exhausted ||
             (cutoff != null && requireNotNull(objective).evaluateExact(completed) >= cutoff)) {
             observe("jointRepairDistanceDirectDeclined")
             return JointRepairAttempt(ExactNeighborhoodResult.Paused)
@@ -775,20 +787,48 @@ internal class JointLinearRepair(
         return JointRepairAttempt(ExactNeighborhoodResult.Witness(completed), feasiblePoint = completed)
     }
 
-    private fun completeNominal(sample: Sample, verification: ExecutionControl,
-        original: (Sample, BigFraction, ExecutionControl) -> Boolean, stagePrefix: String): Sample? {
-        val capture = nominalPublicationCapture ?: return null
-        val work = funding.spent
-        val allocation = funding.allocated
-        val previousGrant = funding.availableWork
-        val token = object : ExecutionControl(verification) {
-            override fun isCancelled(): Boolean = verification() || funding.exhausted ||
-                funding.spent - work >= NOMINAL_PUBLICATION_MAX_WORK ||
-                funding.allocated - allocation >= NOMINAL_PUBLICATION_MAX_ALLOCATION
-            override val accounting = WorkMeter { units -> budget.observe(preparation = units) }
+    private inner class NominalPublication(
+        private val sample: Sample,
+        original: (Sample, BigFraction, ExecutionControl) -> Boolean,
+        stagePrefix: String,
+    ) : AutoCloseable {
+        private val initialWork = funding.spent
+        private val initialAllocation = funding.allocated
+        val work: Long get() = funding.spent - initialWork
+        val allocation: Long get() = funding.allocated - initialAllocation
+        val exhausted: Boolean get() = funding.exhausted || work >= NOMINAL_PUBLICATION_MAX_WORK ||
+            allocation >= NOMINAL_PUBLICATION_MAX_ALLOCATION
+        private var nominal: SourceProofContext? = null
+        private var seed: Sample? = null
+        private val completion = LinearIncumbentCompletion(budget, original) { stage, count ->
+            val key = "$stagePrefix$stage"
+            stages[key] = combine(key, stages[key] ?: 0L, count)
         }
-        funding.grant(NOMINAL_PUBLICATION_MAX_WORK)
-        try {
+
+        fun advance(verification: ExecutionControl): Sample? {
+            if (verification() || exhausted) return null
+            val previousGrant = funding.availableWork
+            val before = funding.spent
+            val token = object : ExecutionControl(verification) {
+                override fun isCancelled(): Boolean = verification() || exhausted
+                override val accounting = WorkMeter { units -> budget.observe(preparation = units) }
+            }
+            funding.grant(NOMINAL_PUBLICATION_MAX_WORK - work)
+            try {
+                val context = nominal ?: captureNominal(token)?.also { nominal = it } ?: return null
+                val fixed = seed ?: sample.copy(exactReals = null).also {
+                    budget.observe(preparation = 1L + sample.numIntVars + sample.numRealVars)
+                    funding.charge(0L, 128L + 32L * (sample.numIntVars + sample.numRealVars))
+                    seed = it
+                }
+                return completion.complete(context, fixed, token)
+            } finally {
+                funding.grant((previousGrant - (funding.spent - before)).coerceAtLeast(0L))
+            }
+        }
+
+        private fun captureNominal(token: ExecutionControl): SourceProofContext? {
+            val capture = nominalPublicationCapture ?: return null
             val captureWork = 1L + model.numFactors + source.premiseCount + source.coordinateCount
             val captureBytes = 256L + 128L * (source.premiseCount + source.coordinateCount)
             if (captureWork >= funding.availableWork || captureBytes >= funding.remainingAllocation) return null
@@ -800,16 +840,10 @@ internal class JointLinearRepair(
                 nominal.scope.objective?.sense != source.scope.objective?.sense ||
                 nominal.coordinates != source.coordinates || nominal.objective != source.objective ||
                 nominal.objectiveConstant != source.objectiveConstant) return null
-            budget.observe(preparation = 1L + sample.numIntVars + sample.numRealVars)
-            funding.charge(0L, 128L + 32L * (sample.numIntVars + sample.numRealVars))
-            val seed = sample.copy(exactReals = null)
-            return LinearIncumbentCompletion(budget, original) { stage, count ->
-                val key = "$stagePrefix$stage"
-                stages[key] = combine(key, stages[key] ?: 0L, count)
-            }.use { it.complete(nominal, seed, token) }
-        } finally {
-            funding.grant((previousGrant - (funding.spent - work)).coerceAtLeast(0L))
+            return nominal
         }
+
+        override fun close() = completion.close()
     }
 
     private fun advanceAttempt(condition: ExactNeighborhoodCondition,
@@ -1186,6 +1220,7 @@ internal class JointLinearRepair(
         relaxationProposal = null
         bootstrapHint = null
         guidedProposal = null
+        val direct = distanceTrial?.direct
         distanceTrial = null
         distanceBootstrap = null
         readyCenterStep = null
@@ -1195,6 +1230,7 @@ internal class JointLinearRepair(
         val resources = SearchInvocationResources()
         resources.own(authority)
         completion?.let(resources::own)
+        direct?.let(resources::own)
         resources.own(AutoCloseable { retire() })
         resources.close()
     }
