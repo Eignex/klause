@@ -38,7 +38,9 @@ layouts and use their bounds directly.
 The finite LP harvest can consume this partition for a cold, zero-objective
 feasibility query. Admission excludes small or row-heavy relaxations, a dominant
 block and splits with limited aggregate tableau savings. The query projects and
-retires one block at a time under a shared allowance. A feasible block supplies
+retires one block at a time under a shared allowance. Each child reserves
+capacity for scaling before solving. Its reported scaling work determines the
+remaining allowance for later children. A feasible block supplies
 only its status. A candidate contradiction maps its ray to parent rows and uses
 the parent's certificate policy and source slack. A declined layout uses the
 ordinary root query. A stopped split supplies no deduction. Later search opens

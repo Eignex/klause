@@ -103,10 +103,9 @@ internal fun LpEngine.splitPresolveFeasibility(
     val iterations = nodePivotBudget().takeIf { it > 0 } ?: defaultSimplexIterations(model.m, model.numVars)
     val size = model.numVars.toLong() + model.m
     var numerical = LpSolveMetrics()
-    var scalingWork = 0L
     var refuted = false
     fun remainingWork(): Long {
-        val spent = saturatedAdd(projection.work, saturatedAdd(scalingWork, numerical.workOps))
+        val spent = saturatedAdd(projection.work, saturatedAdd(numerical.preparationOps, numerical.workOps))
         val available = if (offer > 0L) offer - minOf(offer, spent) else Long.MAX_VALUE
         return minOf(available, callerRemaining())
     }
@@ -124,7 +123,6 @@ internal fun LpEngine.splitPresolveFeasibility(
             val scaling = 2L * LpScalingView.constructionWorkBound(part.model)
             if (scaling >= remaining) return@visit false
             scope.attemptedSplit = true
-            scalingWork = saturatedAdd(scalingWork, scaling)
             newTableauCutSolver(
                 part.model, scope.token, iterationLimit = childIterations,
                 workLimit = if (remaining == Long.MAX_VALUE) 0L else remaining - scaling,
