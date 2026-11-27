@@ -304,9 +304,12 @@ internal fun LpEngine.checkContinuedRootBound(
     // Only the original source-root state supplies a global bound; later CP assertions replace it.
     if (relaxation.model !== model || !ownsRootPrimalModel(model)) return
     val paused = result == null && propagator.floatPaused
+    val attempt = if (paused && automaticSparseTrial) propagator.pausedTrialAttempt else null
+    if (attempt != null && attempt == checkedRootPauseAttempt) return
     val lower = retainedRootLowerBound(model, result, cancellation, pausedProposal = paused)
     val bound = projectCertifiedLowerBound(relaxation, lower)
     if (!bound.isFinite() || cancellation.pollStop()) return
+    if (attempt != null) checkedRootPauseAttempt = attempt
     if (bound <= (continuedRootLowerBound ?: Double.NEGATIVE_INFINITY)) return
     continuedRootLowerBound = bound
     if (automaticSparseTrial && rootPointObservationEnabled) {

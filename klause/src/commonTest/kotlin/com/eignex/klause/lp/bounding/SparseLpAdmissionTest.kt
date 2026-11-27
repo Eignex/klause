@@ -22,11 +22,13 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.ResumableLpSolver
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.continueExactLp
@@ -50,6 +52,52 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `automatic sparse root work checks a funded pause before resuming its cursor`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        var proposals = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    override var currentWork: Long = 0L
+                        private set
+
+                    override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? {
+                        if (cancellation()) return null
+                        proposals++
+                        return DoubleArray(model.m)
+                    }
+
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        currentWork = 1L
+                        pauseAt(1L)
+                        null
+                    }
+                }
+            }
+        }
+        val params = LpParams(lpConfig = LpConfig.parse("default,+automatic-sparse"))
+        LpEngine(problem, objective, params, SolveStatsSink("paid-pause"), LpSolveContext(factory)).use { engine ->
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+
+            engine.lpRoundingProbe(objective, ExecutionControl.Never)
+            assertEquals(0.0, engine.continuedRootLowerBound)
+            assertEquals(1, proposals)
+            engine.lpRoundingProbe(objective, ExecutionControl.Never)
+
+            assertEquals(1, proposals)
+        }
+    }
+
     @Test
     fun `a reused sparse root layout has private numerical state and preparation charges`() {
         val source = boundedLpEngineProblem().withSettings(

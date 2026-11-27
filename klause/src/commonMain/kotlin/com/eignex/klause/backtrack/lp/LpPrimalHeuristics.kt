@@ -800,7 +800,9 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
         val termination = propagator.floatTermination
         val observedBeforeCheck = automaticSparseTrial && result?.optimal == true && observeResult != null
         if (observedBeforeCheck) observeResult?.invoke(result, termination)
-        if (result != null) checkContinuedRootBound(model, result, token)
+        if (result != null || (automaticSparseTrial && propagator.floatPaused)) {
+            checkContinuedRootBound(model, result, token)
+        }
         outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {
             "RETAINED_${termination?.name ?: "OTHER"}"
         }

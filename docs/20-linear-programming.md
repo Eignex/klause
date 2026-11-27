@@ -365,10 +365,12 @@ quantum; resuming a cursor keeps its original lifetime grant and charges each sl
 actual work to the same ledger.
 
 Primal consultations check the preceding paused dual before advancing and completed
-results before rounding. Numerical work, checking and source projection spend the
-same cumulative allowance. Only the identical source-root model and exact state
-qualify; later CP assertions supply no global bound. Search publishes accepted
-bounds to its objective floor and retains them in its terminal bound.
+results before rounding. An automatic worker can check a fresh paused dual at
+the end of its quantum when work and time remain. A checked pause need not be
+checked again before resumption. Numerical work, checking and source projection
+spend the same cumulative allowance. A global bound requires the identical
+source-root model and exact state. Search publishes accepted bounds to its
+objective floor and retains them in its terminal bound.
 With a checked bound and a positive decision allowance, a sliced monolithic finite
 worker can enter discrete search before its root numerical query completes.
 The handoff retires the unfinished cursor and skips further root consultations for

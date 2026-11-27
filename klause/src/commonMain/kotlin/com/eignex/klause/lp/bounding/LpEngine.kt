@@ -1461,6 +1461,7 @@ internal class LpEngine(
     internal var sourceRootBoundLayout: LpRelaxation? = null
         private set
     internal var continuedRootLowerBound: Double? = null
+    internal var checkedRootPauseAttempt: Long? = null
     private var layoutPreparation: Iterator<Unit>? = null
     private var layoutPreparationRelaxer: CpToLpRelaxation? = null
 
