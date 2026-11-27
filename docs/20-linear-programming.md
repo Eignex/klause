@@ -425,11 +425,10 @@ column expressions, global premises and source definitions while owning their ac
 premises and row-parent mappings. A CP bound refresh captures all integer endpoints
 and Boolean pins in private primitive arrays, including variables absent from LP
 columns. Exact endpoint values materialize only for requested premise checks.
-Column bounds and auxiliary exclusions form a fresh owned premise set; fixed-value
-checks can combine its bound directions with the captured CP endpoints. Row-parent
-and premise derivations preserve the capture. A CP refresh replaces it; an LP-only
-bound refresh clears it. Source
-identities and epochs keep their existing scope. Source-map and retained-layout binding
+A CP refresh owns its auxiliary exclusions and can share exact LP bound facts.
+Fixed-value checks can combine LP bound directions with the captured CP endpoints.
+Row-parent and premise derivations preserve the capture. A CP refresh replaces it;
+an LP-only bound refresh clears it. Source identities and epochs keep their scope. Source-map and retained-layout binding
 report structural traversal and exact premise work separately, including cached bound
 refreshes and failed attempts. The host charges them with the existing construction
 and exact-work weights to the pending node and cumulative allowance. Refreshes
@@ -569,6 +568,16 @@ the original row count, and root and node separation keep their round, depth, po
 and work allowances. The [portfolio](15-portfolio-scheduling.md#roles-and-the-mixed-roster)
 decides when the aggressive LP emphasis is seated.
 
+Source maps capture caller collections; derivatives share unchanged private definitions,
+capture changed facts and parent rows, and expose independent collection copies.
+Immutable column bindings retain their exact source expressions. CP bound refreshes
+capture integer endpoints and Boolean pins in private primitive arrays, including
+variables absent from LP columns. Exact endpoint values materialize for requested
+premise checks. LP bounds and auxiliary exclusions remain active facts; fixed-value
+checks combine their directions with the captured CP endpoints. Row-parent and
+premise derivations preserve the capture. A CP refresh replaces it, and an LP-only
+bound refresh clears it.
+
 Cut family identity follows portable proofs and retained rows without contributing
 to proof authority or deduplication. Observations separate construction, mapping
 refusal, admission, selection, tightness, retirement and retraction; a tight or
@@ -698,6 +707,12 @@ certificate allowances, and retained MIP callers fund consultations through
 `SourceLpFunding`, where caller cancellation closes the owner and exhaustion is an
 incomplete result.
 
+Source primal statistics report each returned guidance consultation's native phase,
+floating termination, native and projected point availability and pause status.
+Repeated consultations of a retained result count separately. These observations
+do not count distinct queries, witnesses or certificates; a completed consultation
+can have no primal point. An unavailable termination is not an infeasibility verdict.
+
 Identity row layouts are the default. An explicit unconditional-equality policy
 (equality packing) combines adjacent closed, exactly opposing inequalities into one
 row with a fixed logical column; a cut mask that suspends rows through packing needs
@@ -789,6 +804,9 @@ that leaves the LP scope unchanged keeps its witness map directly.
 Adjacent states with the same base region and active rows expose their changed
 bound columns through an identity token. This token retains no predecessor state;
 unrelated states require a full check instead of borrowing the delta.
+Bound-only component refreshes retain unchanged row, right-hand-side and objective
+descriptions after checking their base authority. Fresh columns preserve current
+bound strictness and premises, while scope activity changes rebuild the descriptions.
 Exact trail edits do not require a floating projection. An incompatible projection
 retires the floating owner, while crossed sides are certified directly against the
 exact state and acceptance policy. A later projectable state can prepare a fresh owner.

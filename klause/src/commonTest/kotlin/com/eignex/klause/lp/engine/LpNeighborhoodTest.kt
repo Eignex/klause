@@ -58,6 +58,24 @@ class LpNeighborhoodTest {
     }
 
     @Test
+    fun `equal numeric bound refreshes preserve strictness and premises`() {
+        val (base, columns) = chain()
+        val trail = LpBoundTrail(assertNotNull(base.authoritativeModel()))
+        val working = assertNotNull(trail.state.ownerWorkingModel())
+        val neighborhood = working.columnNeighborhood(intArrayOf(columns[0]), 16, working.rowIndex())
+        val zero = ExactLpNumber.of(0L)
+        val side = ExactLpSide(zero, strict = true,
+            premises = ExactLpPremises(listOf(ExactLpPremise(7, false, zero)), listOf(5)))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(columns[0], false, side, 9L))
+
+        val refreshed = assertNotNull(neighborhood.rebindExact(trail.state, ExecutionControl.Never))
+
+        val state = assertNotNull(refreshed.model.exactState)
+        assertEquals(side, state.model.column(refreshed.colOf(columns[0])).bounds.lower)
+    }
+
+    @Test
     fun `exact neighborhoods should retain full support when traversal reverses row order`() {
         val (base, x) = chain()
         val state = LpExactState(assertNotNull(base.authoritativeModel()))

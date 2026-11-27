@@ -18,7 +18,9 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpPhaseMetrics
+import com.eignex.klause.lp.engine.LpRootGuidancePhase
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
@@ -46,6 +48,9 @@ internal class LinearAuthorityLpGuidance(
     val workingRows: Int,
     val paused: Boolean,
     val coordinateConflictWeights: List<BigFraction>? = null,
+    val phase: LpRootGuidancePhase? = null,
+    val termination: LpFloatTermination? = null,
+    val nativePointPresent: Boolean? = null,
 )
 
 internal fun ExactLpBounds.projectGuidance(value: Double): BigFraction? {
@@ -236,7 +241,8 @@ internal class LinearAuthorityLp(
                 packed.columns[column].bounds.projectGuidance(raw[column]) ?: return@guideResult null
             }
             LinearAuthorityLpGuidance(LinearAuthorityLpResult(result, weights, conflictWeights), point,
-                workingRows, guide.paused)
+                workingRows, guide.paused, phase = guide.phase, termination = guide.termination,
+                nativePointPresent = raw != null)
         }.also {
             onShape(LinearAuthorityLpShape(rows.size, workingRows, costs.size, it != null,
                 sparse = true, phase = phase))
