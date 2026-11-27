@@ -1737,8 +1737,8 @@ internal class ResumableMinimize(
         }
 
         override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
-            val rooted = if (!sourceValueObserved && variable is VarRef.IntVar && lpEngine.rootPointObservationEnabled &&
-                lpEngine.automaticSparseTrial
+            val rooted = if (!sourceValueObserved && variable is VarRef.IntVar && lpEngine.automaticSparseTrial &&
+                lpEngine.rootPrimalTargets?.let { !it.auxiliary && it.knownColumns == null } == true
             ) {
                 lpEngine.orderRootValues(variable, values) { targets, preferred ->
                     sourcePreference = targets to preferred
@@ -1760,12 +1760,14 @@ internal class ResumableMinimize(
             val (targets, preferred) = sourcePreference ?: return
             sourcePreference = null
             sourceDecision = null
+            sourceValueObserved = true
+            sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "SOURCE_ROOT_VALUE_COMMITTED", 0L)
+            if (!lpEngine.rootPointObservationEnabled) return
             val commit = when (decision) {
                 is SearchDecision.IntAtMost -> LpRootValueCommit(decision.variable, preferred, decision.upper, true, depth)
                 is SearchDecision.IntAtLeast -> LpRootValueCommit(decision.variable, preferred, decision.lower, false, depth)
                 else -> return
             }
-            sourceValueObserved = true
             lpEngine.observeRootPoint(LpRootPointStage.CONSUMER, LpRootPointDisposition.VALUE_COMMITTED,
                 point = targets.coordinates, sourceRoot = true, valueCommit = commit)
         }
