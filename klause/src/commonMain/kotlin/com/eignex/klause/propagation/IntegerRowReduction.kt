@@ -63,10 +63,10 @@ internal fun IntegerConflictRow.reduced(
     val degree = if (promoted) wide else bigIntOf(narrow)
     if (degree <= BIG_ZERO) return null
     budget?.scalar(degree, divisor)
-    val remainder = degree % divisor
+    val remainder = if (divisor == BIG_ONE) BIG_ZERO else degree % divisor
     if (remainder == BIG_ZERO && largestWeight <= degree) return this
     budget?.spend(bytes = variables.size.toLong() * 64)
-    val quotient = ceilDiv(degree, divisor)
+    val quotient = if (divisor == BIG_ONE) degree else ceilDiv(degree, divisor)
     budget?.scalar(remainder, quotient)
     val nextDegree = if (remainder == BIG_ZERO) degree else remainder * quotient
     var nextBound = -nextDegree

@@ -175,7 +175,11 @@ internal class IntegerConflictRow private constructor(
         budget?.scalar(a, b)
         val aMagnitude = a.abs()
         val bMagnitude = b.abs()
-        val divisor = aMagnitude.gcd(bMagnitude)
+        val divisor = when {
+            aMagnitude == BIG_ONE || bMagnitude == BIG_ONE -> BIG_ONE
+            aMagnitude == bMagnitude -> aMagnitude
+            else -> aMagnitude.gcd(bMagnitude)
+        }
         val left = if (bMagnitude == divisor) BIG_ONE else bMagnitude / divisor
         val right = if (aMagnitude == divisor) BIG_ONE else aMagnitude / divisor
         val required = variables.size.toLong() + other.variables.size

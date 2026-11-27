@@ -400,6 +400,7 @@ Opposite-sign nonnegative combinations use arbitrary-precision integer coefficie
 exact activity and gcd normalization with downward rounding of the upper bound.
 Normalized rows retain sorted coordinates; cancellation merges their terms in linear
 time and removes zero coefficients before normalization.
+Unit and equal pivot magnitudes determine the cancellation divisor directly.
 Unit cancellation scales retain immutable coefficient values without identity products.
 Ordered source coordinates use array normalization directly; unordered, repeated or
 zero terms pass through aggregation before normalization.
@@ -413,6 +414,7 @@ they fit, and retry exact arithmetic on overflow without changing raw-target or 
 Saturation expresses the row as a positive cover over integer distances from declared
 box endpoints and caps each weight at its degree. Box degree accumulation uses checked
 words and promotes the partial sum on overflow; wide coefficients remain exact.
+Saturation with a unit divisor uses the degree directly and retains the arithmetic charge.
 If ordinary cancellation loses the conflict, scaled mixed-integer rounding can reduce
 the reason before another combination. These reductions cite only declared domains,
 never live branch bounds.
