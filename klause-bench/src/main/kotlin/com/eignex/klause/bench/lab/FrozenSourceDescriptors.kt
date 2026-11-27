@@ -14,7 +14,7 @@ import java.io.File
 internal object FrozenSourceDescriptors {
     const val MAX_CASES = 8
 
-    val FORMATS = setOf(Format.DIMACS, Format.WCNF, Format.MPS, Format.OPB, Format.MINIZINC)
+    val FORMATS = setOf(Format.DIMACS, Format.WCNF, Format.MPS, Format.OPB, Format.MINIZINC, Format.SMTLIB)
 
     private val SHA256 = Regex("[a-f0-9]{64}")
 
