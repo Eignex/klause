@@ -82,9 +82,13 @@ internal object JointRepairLpCapture {
             .apply { isAccessible = true }
         val context = requireNotNull(captureContext.invoke(companion, model, objective, stop, toleranceAuthority, null))
             as SourceProofContext
-        val checker = Class.forName(PIPELINE + "FiniteIncumbentCompletionKt").methods.single {
+        val nativeChecker = Class.forName(PIPELINE + "FiniteIncumbentCompletionKt").methods.single {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
         }.invoke(null, original, mapping)
+        val rejection = if (options["regional-explain-rejection"] == "true") {
+            RegionalPublicationRejection(original, mapping, source.objective?.sense == ObjectiveSense.MAXIMIZE)
+        } else null
+        val checker = rejection?.observe(nativeChecker) ?: nativeChecker
         val active = stop or ExecutionControl.after(4_000.milliseconds)
         val projection = regionalCenter?.let {
             require(model.numIntVars in 1..256 && (0 until model.numIntVars).all { id ->
@@ -113,6 +117,7 @@ internal object JointRepairLpCapture {
             val consultations = options["regional-consultations"]?.toInt() ?: 64
             replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, consultations,
                 sha256(bytes), out)
+            rejection?.inspect(sha256(bytes), sha256(pins.encodeToByteArray()), stop, out)
             return
         }
         val window = ConditionWindow(limit)
