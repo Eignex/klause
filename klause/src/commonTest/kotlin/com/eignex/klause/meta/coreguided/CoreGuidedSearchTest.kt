@@ -98,6 +98,38 @@ class CoreGuidedSearchTest {
     }
 
     @Test
+    fun `a retained clause resolves an earlier threshold after another extension`() {
+        val factors = buildList<Factor> {
+            add(Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true))))
+            for (signs in 0..3) {
+                for (term in 3..4) {
+                    add(Clause(intArrayOf(Lit.make(0, true), Lit.make(term, true),
+                        Lit.make(1, signs and 1 == 0), Lit.make(2, signs and 2 == 0))))
+                    add(Clause(intArrayOf(Lit.make(5, true), Lit.make(term, true),
+                        Lit.make(6, signs and 1 == 0), Lit.make(7, signs and 2 == 0))))
+                }
+            }
+        }
+        val source = Problem(8, 0, emptyArray(), factors).bake()
+        val objective = LinearObjective(longArrayOf(0, 0, 0, 10, 10, 1))
+        val rootValues = mutableListOf<Boolean?>()
+        val selector = object : VariableSelector by InputOrder {
+            override fun fresh(): VariableSelector = this
+
+            override fun onSessionCreated(session: PropagationSession) {
+                rootValues += session.boolValue(0)
+            }
+        }
+        val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin, pbLearning = false)
+        val search = CoreGuidedSearch(source, objective, params)
+
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(11.0, assertIs<MinimizeResult.Optimal>(result).objective)
+        assertEquals(listOf(null, null, true), rootValues)
+    }
+
+    @Test
     fun `cancellation between queries preserves reusable clauses and caller pins`() {
         val source = repeatedQueryProblem()
         val objective = LinearObjective(longArrayOf(0, 0, 0, 1, 2, 0, 0, 1))
