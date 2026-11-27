@@ -1,9 +1,7 @@
 package com.eignex.klause.lp.bounding
 
-import com.eignex.klause.lp.engine.ComponentLpSolver
-import com.eignex.klause.lp.engine.LpBlockDimensions
 import com.eignex.klause.lp.engine.LpCertifier
-import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpComponentLayout
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpProjectionMeter
@@ -11,8 +9,7 @@ import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.acceptNullable
-import com.eignex.klause.lp.engine.componentLpSolverOrNull
-import com.eignex.klause.lp.engine.componentShare
+import com.eignex.klause.lp.engine.componentLayout
 import com.eignex.klause.lp.engine.floatFarkasRay
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
@@ -51,33 +48,20 @@ internal fun LpEngine.presolveFeasibilityQuery(token: ExecutionControl, split: B
         token.accounting,
     )
     val components = if (split && model.tableauCells() >= MIN_COMPONENT_QUERY_CELLS) {
-        componentFeasibilitySolver(model, token, projection, iterations)
+        solvePresolveComponents(model, token, projection, iterations)
     } else null
     val route = when {
         components != null -> "SPLIT"
         split -> "FALLBACK"
         else -> "UNSPLIT"
     }
-    if (token()) {
-        components?.close()
+    if (components == null && token()) {
         timer.finish("${route}_STOPPED", projection.work)
         return false
     }
-    val solver = components ?: newTableauCutSolver(
-        model, token, iterationLimit = iterations, factory = solveContext.engineFactory, pricing = pricingOptions,
-    )
-    val result = solver.use {
-        val result = try {
-            solver.solve()
-        } finally {
-            observeRootSolve(solver)
-        }
-        val ray = solver.infeasibleRay
-        val infeasible = result == null && ray != null && !token() &&
-            verifyPresolveFeasibilityRay(model, ray, token)
-        PresolveFeasibilityOutcome(infeasible, result?.optimal == true, solver.lastMetrics)
-    }
-    val refuted = result.infeasible && !token()
+    val result = components ?: solvePresolveFeasibility(model, token, iterations)
+    observeRootWork(result.metrics)
+    val refuted = result.ray?.let { !token() && verifyPresolveFeasibilityRay(model, it, token) } == true
     val outcome = when {
         refuted -> "REFUTED"
         result.optimal && !token() -> "COMPLETE"
@@ -89,49 +73,63 @@ internal fun LpEngine.presolveFeasibilityQuery(token: ExecutionControl, split: B
 }
 
 private data class PresolveFeasibilityOutcome(
-    val infeasible: Boolean,
     val optimal: Boolean,
     val metrics: LpSolveMetrics,
+    val ray: DoubleArray?,
 )
 
-private fun LpEngine.componentFeasibilitySolver(
+private fun LpEngine.solvePresolveFeasibility(
+    model: LpModel,
+    token: ExecutionControl,
+    iterations: Int,
+): PresolveFeasibilityOutcome = newTableauCutSolver(
+    model, token, iterationLimit = iterations, factory = solveContext.engineFactory, pricing = pricingOptions,
+).use { solver ->
+    val result = solver.solve()
+    PresolveFeasibilityOutcome(result?.optimal == true, solver.lastMetrics, solver.infeasibleRay.takeIf { result == null })
+}
+
+private fun LpEngine.solvePresolveComponents(
     model: LpModel,
     token: ExecutionControl,
     projection: LpProjectionMeter,
     iterations: Int,
-): ComponentLpSolver? = try {
-    componentLpSolverOrNull(
-        model,
-        token,
-        projection,
-        { part, stop, rowOnlyRows ->
-            newTableauCutSolver(part, stop, factory = solveContext.engineFactory,
-                pricing = pricingOptions.componentShare(part.n, model.n, rowOnlyRows))
-        },
-        { parent, parts, solvers, isolated ->
-            ComponentLpSolver(parent, parts, solvers, isolated).apply {
-                queryAllowance = LpFloatAllowance(work = 0L, iterations = iterations)
+): PresolveFeasibilityOutcome? {
+    var metrics = LpSolveMetrics()
+    var ray: DoubleArray? = null
+    val completed = try {
+        val layout = model.componentLayout(token, projection) ?: return null
+        if (!admitPresolveBlocks(model, layout)) return null
+        projection.reserve(4L * layout.size, 32L * layout.size, matrix = false)
+        val order = (0 until layout.size).sortedBy { layout.rows(it).toLong() + layout.columns(it) }
+        layout.visit(token, projection, order, copyCosts = false) { part ->
+            val remaining = iterations - metrics.pivots
+            if (remaining <= 0) return@visit false
+            val result = solvePresolveFeasibility(part.model, token, remaining)
+            metrics += result.metrics.copy(componentSolves = 1)
+            result.ray?.let { candidate ->
+                projection.reserve(model.m.toLong() + candidate.size, 8L * model.m, matrix = false)
+                val lifted = DoubleArray(model.m)
+                for (row in candidate.indices) lifted[part.rows[row]] = candidate[row]
+                ray = lifted
             }
-        },
-        admit = { blocks -> admitPresolveBlocks(model, blocks, projection) },
-    )
-} catch (_: LpProjectionStop) {
-    null
+            result.optimal
+        }
+    } catch (_: LpProjectionStop) {
+        false
+    }
+    return if (metrics.componentSolves == 0) null else PresolveFeasibilityOutcome(completed, metrics, ray)
 }
 
-private fun admitPresolveBlocks(
-    model: LpModel,
-    blocks: List<LpBlockDimensions>,
-    projection: LpProjectionMeter,
-): Boolean {
-    if (blocks.size > MAX_COMPONENTS || blocks.any { 4L * it.rows > 3L * model.m }) return false
+private fun admitPresolveBlocks(model: LpModel, blocks: LpComponentLayout): Boolean {
+    val indexes = 0 until blocks.size
+    if (blocks.size > MAX_COMPONENTS || indexes.any { 4L * blocks.rows(it) > 3L * model.m }) return false
     val parent = model.tableauCells()
-    val children = blocks.sumOf { it.rows.toLong() * (it.rows.toLong() + it.columns + 1L) }
-    if (children > parent - parent / 4L) return false
-    // Reserve the parent fingerprint, primal, basis and ray scatter before constructing child solvers.
-    val entries = 4L * model.n + 6L * model.m + 2L * blocks.size
-    projection.reserve(entries + model.extent(), 8L * entries, matrix = false)
-    return true
+    val children = indexes.sumOf {
+        val rows = blocks.rows(it).toLong()
+        rows * (rows + blocks.columns(it) + 1L)
+    }
+    return children <= parent - parent / 4L
 }
 
 private fun LpModel.tableauCells(): Long = m.toLong() * (m.toLong() + n + 1L)
