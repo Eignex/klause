@@ -1311,7 +1311,8 @@ class Portfolio(
                 minOf(ordinaryAllowance, diagnostics.workLimit - chargedWork)
             val time = when {
                 initialProofProbeMillis > 0L && initialProbe && !continuingCore &&
-                    workers[arm].family == ArmFamily.Backtrack && workers[arm].permitsSourceProofs ->
+                    !workers[arm].auxiliaryProof && workers[arm].family == ArmFamily.Backtrack &&
+                    workers[arm].permitsSourceProofs ->
                     initialProofProbeMillis.coerceIn(baseSliceMillis, maxSliceMillis)
                 baseAllowance && !continuingCore -> baseSliceMillis
                 else -> slice
