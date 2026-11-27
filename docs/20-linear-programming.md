@@ -505,8 +505,9 @@ The same setting dispatches root tableau separation to the owning block. Lifted 
 keep every row multiplier, bound substitution, integrality premise and source
 address for the ordinary source mapper and cut pool. Row appends share unchanged
 immutable matrix columns. The replacement checks columns by identity or exact
-prefix and checks row identities before retaining an owner. An automatically
-admitted collection rechecks the resulting layout. Rows confined to existing
+prefix and checks row identities before retaining an owner. The planner reads exact
+support from the appended column suffixes. An automatically admitted collection
+rechecks the full resulting layout. Rows confined to existing
 blocks replace those children and any others whose scalar authority changes.
 Replacements validate their own bases using private retained bases as warm hints;
 unchanged children keep their checked evidence. Rows joining existing blocks form a

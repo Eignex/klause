@@ -28,8 +28,7 @@ internal class LpComponentRows(
         if (!compatible()) return null
         val source = state.model
         val working = state.ownerWorkingModel(projection) ?: return null
-        val rows = working.rowIndex(projection)
-        val groups = groups(rows) ?: return null
+        val groups = groups(appendedSupport(source)) ?: return null
         val blocks = groups.count { it.columns > 0 }
         if (blocks < 2) return declined(LpComponentEditDecline.CROSS_BLOCK)
         if (admission != null) {
@@ -38,7 +37,8 @@ internal class LpComponentRows(
                 blocks,
                 source.m.toLong() * (source.n.toLong() + source.m + 1L),
                 groups.sumOf { it.rows.toLong() * (it.columns.toLong() + it.rows + 1L) },
-                128L * (rows.colIdx.size.toLong() + source.n + source.m + groups.size) + 4L * source.m,
+                128L * (checkNotNull(state.projectedMatrixNonzeros).toLong() + source.n + source.m + groups.size) +
+                    4L * source.m,
             )
             if (!admission.accepts(shape)) return declined(LpComponentEditDecline.ADMISSION)
         }
@@ -83,7 +83,24 @@ internal class LpComponentRows(
         return true
     }
 
-    private fun groups(rows: LpRowIndex): List<Group>? {
+    private fun appendedSupport(source: ExactLpModel): Array<IntArrayList> {
+        val count = source.m - model.m
+        projection.reserve(count.toLong(), count * 64L, matrix = true)
+        val support = Array(count) { IntArrayList(initialCapacity = 1) }
+        for (column in 0 until source.n) {
+            projection.reserve(1L, 0L, matrix = true)
+            val entries = source.columnEntries(column)
+            for (k in entries.indices.reversed()) {
+                val entry = entries[k]
+                if (entry.row < model.m) break
+                projection.reserve(1L, 32L, matrix = true)
+                if (!entry.number.value.isZero) support[entry.row - model.m].add(column)
+            }
+        }
+        return support
+    }
+
+    private fun groups(support: Array<IntArrayList>): List<Group>? {
         val source = state.model
         projection.reserve(parts.size * 8L + source.n + source.m, parts.size * 256L + 16L * source.n + 16L * source.m,
             matrix = true)
@@ -91,20 +108,19 @@ internal class LpComponentRows(
         for (index in parts.indices) for (column in parts[index].cols) owner[column] = index
         val partition = IntDisjointSet(parts.size)
         val added = Array(parts.size) { IntArrayList() }
-        for (row in model.m until source.m) {
+        for (index in support.indices) {
             projection.poll()
-            val from = rows.rowPtr[row]
-            val to = rows.rowPtr[row + 1]
-            if (from == to) return declined(LpComponentEditDecline.ROW_ONLY)
-            val first = owner[rows.colIdx[from]]
+            val columns = support[index]
+            if (columns.isEmpty()) return declined(LpComponentEditDecline.ROW_ONLY)
+            val first = owner[columns[0]]
             if (first < 0) return declined(LpComponentEditDecline.CROSS_BLOCK)
-            for (entry in from until to) {
+            for (entry in 0 until columns.size) {
                 projection.reserve(1L, 0L, matrix = true)
-                val other = owner[rows.colIdx[entry]]
+                val other = owner[columns[entry]]
                 if (other < 0) return declined(LpComponentEditDecline.CROSS_BLOCK)
                 partition.union(first, other)
             }
-            added[first].add(row)
+            added[first].add(model.m + index)
         }
         val byRoot = LinkedHashMap<Int, IntArrayList>()
         for (index in parts.indices) byRoot.getOrPut(partition.find(index)) { IntArrayList() }.add(index)

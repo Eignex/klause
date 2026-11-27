@@ -420,6 +420,7 @@ internal class LpExactState internal constructor(
     }
 
     val matrixProjectionStatus: LpMatrixProjectionStatus? get() = projection?.status
+    val projectedMatrixNonzeros: Int? get() = projection?.nonzeros
     val matrixProjectionDeclined: Boolean get() = projectionAttempted && projection == null
     fun projectionLostNonzero(working: LpModel): Boolean? = vectors?.lostNonzero(working)
 
@@ -785,6 +786,7 @@ private class LpMatrixProjection(
     val colPtr: IntArray,
     val rowIdx: IntArray,
     val values: DoubleArray,
+    val nonzeros: Int,
     val status: LpMatrixProjectionStatus,
 ) {
     val csc = Csc(colPtr, rowIdx, LongArray(values.size))
@@ -797,6 +799,7 @@ private class LpMatrixProjection(
             meter.reserve(size, size * 32L + 64L, matrix = true)
             var underflows = 0
             var overflows = 0
+            var zeros = 0
             val pointers = IntArray(model.n + 1)
             for (j in 0 until model.n) {
                 meter.poll()
@@ -818,7 +821,12 @@ private class LpMatrixProjection(
                             if (entry.number.value.signum() < 0) -Double.MAX_VALUE else Double.MAX_VALUE
                         }
 
-                        approximation == 0.0 && !entry.number.value.isZero -> {
+                        approximation == 0.0 && entry.number.value.isZero -> {
+                            zeros++
+                            approximation
+                        }
+
+                        approximation == 0.0 -> {
                             underflows++
                             if (entry.number.value.signum() < 0) -0.0 else 0.0
                         }
@@ -828,7 +836,9 @@ private class LpMatrixProjection(
                 }
             }
             meter.poll()
-            return LpMatrixProjection(pointers, indices, values, LpMatrixProjectionStatus(underflows, overflows))
+            return LpMatrixProjection(
+                pointers, indices, values, values.size - zeros, LpMatrixProjectionStatus(underflows, overflows),
+            )
         }
     }
 }

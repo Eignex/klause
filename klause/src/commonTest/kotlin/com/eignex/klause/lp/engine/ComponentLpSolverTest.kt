@@ -161,6 +161,34 @@ class ComponentLpSolverTest {
     }
 
     @Test
+    fun `stored zeros in appended rows should preserve an independent child`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val zero = ExactLpNumber.of(0L)
+        val slack = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        val minus = ExactLpNumber.of(-1L)
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(trail.state.ownerWorkingModel())))
+        owner.use {
+            assertNotNull(it.solve())
+            assertTrue(trail.append(LpScopedRow(3L, listOf(0 to minus), ExactLpNumber.of(-2L), slack)))
+            assertTrue(trail.append(LpScopedRow(4L, listOf(0 to minus, 1 to zero), ExactLpNumber.of(-3L), slack)))
+
+            assertTrue(it.appendLocalRows(trail.state, ExecutionControl.Never, 0L) { model, token, work ->
+                newPersistentLpSolver(model, cancellation = token, workLimit = work)
+            })
+            val result = assertNotNull(it.solve())
+
+            assertEquals(3, result.blocks)
+            assertEquals(2, it.lastMetrics.componentReuses)
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(it.exactBound()).value)
+        }
+    }
+
+    @Test
     fun `throwing child construction should retain its staging attempt`() {
         val builder = LpBuilder()
         repeat(3) {
