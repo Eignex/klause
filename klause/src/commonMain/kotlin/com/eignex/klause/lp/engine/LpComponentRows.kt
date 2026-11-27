@@ -30,11 +30,12 @@ internal class LpComponentRows(
         val working = state.ownerWorkingModel(projection) ?: return null
         val rows = working.rowIndex(projection)
         val groups = groups(rows) ?: return null
-        if (groups.count { it.columns > 0 } < 2) return declined(LpComponentEditDecline.CROSS_BLOCK)
-        if (groups.any { it.ancestors.size > 1 } && admission != null) {
+        val blocks = groups.count { it.columns > 0 }
+        if (blocks < 2) return declined(LpComponentEditDecline.CROSS_BLOCK)
+        if (admission != null) {
             projection.reserve(groups.size.toLong() + 1L, 64L, matrix = false)
             val shape = LpComponentShape(
-                groups.count { it.columns > 0 },
+                blocks,
                 source.m.toLong() * (source.n.toLong() + source.m + 1L),
                 groups.sumOf { it.rows.toLong() * (it.columns.toLong() + it.rows + 1L) },
                 128L * (rows.colIdx.size.toLong() + source.n + source.m + groups.size) + 4L * source.m,

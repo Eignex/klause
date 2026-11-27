@@ -280,6 +280,25 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `admitted sparse roots retain the monolithic numerical route on separable models`() {
+        val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
+            (0 until 95).filter { it != 47 }.map {
+                Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1)
+            }, settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val queries = mutableListOf<Boolean>()
+        val context = LpSolveContext(onQuery = { queries += it.componentSplit })
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), SolveStatsSink("separable-sparse"), context,
+        ).use { engine ->
+            assertTrue(engine.sparseTrialActive)
+
+            engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
+
+            assertTrue(queries.isNotEmpty() && queries.none { it })
+        }
+    }
+
+    @Test
     fun `sparse root slices share one numerical continuation grant`() {
         val problem = Problem(0, 32, Array(32) { IntDomain(0, 1) },
             List(31) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },

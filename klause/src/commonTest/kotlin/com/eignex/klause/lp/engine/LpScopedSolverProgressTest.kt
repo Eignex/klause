@@ -56,6 +56,50 @@ class LpScopedSolverProgressTest {
     }
 
     @Test
+    fun `an unavailable component preparation preserves a larger ordinary grant`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        for ((ordinaryBudget, inspectAdmitted) in listOf(0L to false, 100_000L to true)) {
+            val admission = object : LpComponentAdmission {
+                override fun inspect(columns: Int, rows: Int, entries: Int): Boolean = inspectAdmitted
+                override fun accepts(shape: LpComponentShape): Boolean = false
+            }
+            LpScopedSolver(LpExactState(source), workLimit = 16L, componentSplit = true,
+                componentAdmission = admission, monolithicPreparationWork = ordinaryBudget).use { owner ->
+
+                val result = assertNotNull(owner.solve())
+
+                assertEquals(BigFraction.ofLong(2L), result.lowerBound)
+            }
+        }
+    }
+
+    @Test
+    fun `a component preflight decline cannot bypass an explicit preparation allowance`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val admission = object : LpComponentAdmission {
+            override fun inspect(columns: Int, rows: Int, entries: Int): Boolean = false
+            override fun accepts(shape: LpComponentShape): Boolean = error("preflight declined")
+        }
+        LpScopedSolver(LpExactState(source), workLimit = 100_000L, componentSplit = true,
+            componentAdmission = admission, monolithicPreparationWork = 0L).use { owner ->
+
+            assertFalse(owner.prepare(ExecutionControl.Never, workAllowance = 20L))
+
+            assertEquals(0L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
     fun `query replay records the admitted numerical owner rather than a declined split request`() {
         val builder = LpBuilder()
         repeat(2) {

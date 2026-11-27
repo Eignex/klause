@@ -107,7 +107,8 @@ internal class CutSourceMap private constructor(
         }
         unique
     }
-    val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> get() = sourceDefinition.auxiliaryDefinitions.toMap()
+    val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition>
+        get() = sourceDefinition.auxiliaryDefinitions.toMap()
     val columns: List<CutColumnSource?> get() = sourceDefinition.columns.toList()
     val columnCount: Int get() = sourceDefinition.columns.size
     val fixed: Map<CutSource, BigFraction> get() = sourceDefinition.fixed.toMap()
@@ -118,12 +119,11 @@ internal class CutSourceMap private constructor(
     }
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
     fun parentFamilies(): Map<Int, CutFamily> = parentSnapshot.mapValues { it.value.family }
-    fun auxiliarySource(source: CutSource, definition: CutAuxiliaryDefinition): CutSource? =
-        if (source.kind != CutSourceKind.AUXILIARY) null else if (sourceDefinition.auxiliaryDefinitions[source] == definition) {
-            source
-        } else {
-            auxiliaryByDefinition[definition]
-        }
+    fun auxiliarySource(source: CutSource, definition: CutAuxiliaryDefinition): CutSource? {
+        if (source.kind != CutSourceKind.AUXILIARY) return null
+        if (sourceDefinition.auxiliaryDefinitions[source] == definition) return source
+        return auxiliaryByDefinition[definition]
+    }
     fun isGlobal(premise: CutPremise): Boolean = implied(premise, sourceDefinition.globals) ||
         (
             premise is CutPremise.Integral && premise.expression.constant.den == BIG_ONE &&
@@ -290,8 +290,10 @@ internal class CutSourceMap private constructor(
             columns: List<CutColumnSource?>,
             globals: Set<CutPremise>,
             auxiliary: Map<CutSource, CutAuxiliaryDefinition>,
-        ): CutSourceMap = CutSourceMap(model, 0L, CutSourceDefinition(columns, globals, emptyMap(), emptySet(), auxiliary),
-            emptySet(), emptyMap(), null, null)
+        ): CutSourceMap = CutSourceMap(
+            model, 0L, CutSourceDefinition(columns, globals, emptyMap(), emptySet(), auxiliary),
+            emptySet(), emptyMap(), null, null,
+        )
     }
 }
 

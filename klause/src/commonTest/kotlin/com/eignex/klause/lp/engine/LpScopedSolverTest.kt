@@ -511,6 +511,28 @@ class LpScopedSolverTest {
     }
 
     @Test
+    fun `a local row that exceeds component storage should use an ordinary owner`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val admission = LpComponentAdmission { shape -> shape.modeledBytes <= 1_200L }
+        LpScopedSolver(LpExactState(source), componentSplit = true, componentAdmission = admission).use { owner ->
+            assertEquals(2, assertNotNull(assertNotNull(owner.solve()).float).blocks)
+            val row = LpScopedRow(2L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))))
+
+            assertTrue(owner.append(row, false))
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(1, assertNotNull(result.float).blocks)
+            assertEquals(BigFraction.ofLong(4L), result.lowerBound)
+        }
+    }
+
+    @Test
     fun `a component conflict should retain its guarded row and active bound premise`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 5L)

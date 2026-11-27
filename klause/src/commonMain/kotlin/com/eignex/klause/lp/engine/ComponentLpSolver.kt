@@ -1043,12 +1043,22 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     val parts = model.componentRestrictions(groups.columns, groups.rows, rowIndex, cancellation, projection)
         ?: return null
     val solvers = ArrayList<LpSolver>(parts.size)
+    var published = false
+    var failure: Throwable? = null
     try {
-        for (part in parts) solvers += engine(part.model, cancellation, rowOnlyRows)
-        return component(model, parts, solvers, isolated.toIntArray())
+        for (part in parts) {
+            if (cancellation()) return null
+            solvers += engine(part.model, cancellation, rowOnlyRows)
+        }
+        if (cancellation()) return null
+        val owner = component(model, parts, solvers, isolated.toIntArray())
+        published = true
+        return owner
     } catch (primary: Throwable) {
-        closeComponentSolvers(solvers, primary)
+        failure = primary
         throw primary
+    } finally {
+        if (!published) closeComponentSolvers(solvers, failure)
     }
 }
 

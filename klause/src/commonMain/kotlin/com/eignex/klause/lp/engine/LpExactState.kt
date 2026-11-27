@@ -34,8 +34,12 @@ internal class LpProjectionMeter(
     }
 
     fun restrictWork(limit: Long) {
+        setWorkLimit(minOf(workLimit, limit))
+    }
+
+    fun setWorkLimit(limit: Long) {
         require(limit >= 0L)
-        workLimit = minOf(workLimit, limit)
+        workLimit = limit
         if (work > workLimit) throw LpProjectionStop()
     }
 

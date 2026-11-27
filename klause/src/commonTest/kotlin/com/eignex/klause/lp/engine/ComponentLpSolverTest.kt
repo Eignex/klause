@@ -15,6 +15,35 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `a stopped component construction should retire its existing children`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+        var stopped = false
+        var constructed = 0
+        var closed = 0
+
+        val owner = componentLpSolverOrNull(model, ExecutionControl { stopped }) { part, _ ->
+            val child = newLpSolver(part, componentSplit = false)
+            constructed++
+            stopped = true
+            object : LpSolver by child {
+                override fun close() {
+                    closed++
+                    child.close()
+                }
+            }
+        }
+
+        assertNull(owner)
+        assertEquals(1, constructed)
+        assertEquals(constructed, closed)
+    }
+
+    @Test
     fun `appended rows should reject any edit to the existing matrix`() {
         for (change in 0..2) {
             val builder = LpBuilder()

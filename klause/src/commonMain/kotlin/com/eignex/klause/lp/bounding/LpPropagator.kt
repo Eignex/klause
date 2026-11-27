@@ -353,33 +353,38 @@ internal class LpPropagator(
         cuts: LpCutEdit,
         sources: LpSourceCompaction? = null,
     ): Boolean = withOwner { current ->
-        if (current.state !== before || cuts.sourceState !== before || !cuts.isCurrent() ||
-            cuts.retired.isNotEmpty() || cuts.rows.isNotEmpty() ||
-            (sources != null && (sources.sourceState !== before || sources.remap !== remap || !sources.isCurrent())) ||
-            cancellation()
-        ) {
-            return@withOwner false
+        withPreparationReport(current) {
+            if (current.state !== before || cuts.sourceState !== before || !cuts.isCurrent() ||
+                cuts.retired.isNotEmpty() || cuts.rows.isNotEmpty() ||
+                (sources != null &&
+                    (sources.sourceState !== before || sources.remap !== remap || !sources.isCurrent())) ||
+                cancellation()
+            ) {
+                return@withOwner false
+            }
+            onEdit(before.model.numVars.toLong())
+            if (!current.compact(remap)) return@withOwner false
+            retainWitnesses()
+            lastMetrics = LpSolveMetrics()
+            sources?.commit()
+            cuts.commit()
+            true
         }
-        onEdit(before.model.numVars.toLong())
-        if (!current.compact(remap)) return@withOwner false
-        retainWitnesses()
-        lastMetrics = LpSolveMetrics()
-        sources?.commit()
-        cuts.commit()
-        true
     } == true
 
     fun editCuts(edit: LpCutEdit): Boolean = withOwner { current ->
-        val before = current.state
-        if (edit.sourceState !== before || !edit.isCurrent() || cancellation()) return@withOwner false
-        if (edit.retired.isNotEmpty() || edit.rows.isNotEmpty()) {
-            onEdit(before.model.numVars.toLong() + edit.rows.size)
-            if (!current.replaceRows(edit.retired, emptyList(), edit.rows, before.depth > 0)) return@withOwner false
-            retainWitnesses()
-            lastMetrics = LpSolveMetrics()
+        withPreparationReport(current) {
+            val before = current.state
+            if (edit.sourceState !== before || !edit.isCurrent() || cancellation()) return@withOwner false
+            if (edit.retired.isNotEmpty() || edit.rows.isNotEmpty()) {
+                onEdit(before.model.numVars.toLong() + edit.rows.size)
+                if (!current.replaceRows(edit.retired, emptyList(), edit.rows, before.depth > 0)) return@withOwner false
+                retainWitnesses()
+                lastMetrics = LpSolveMetrics()
+            }
+            edit.commit()
+            true
         }
-        edit.commit()
-        true
     } == true
 
     fun editSources(

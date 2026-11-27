@@ -979,7 +979,8 @@ internal class LpEngine(
         params.componentReuseWorkHorizon, params.cancellation.deadline() != null)
     private val nodeQueryFunding = LpNodeQueryFunding(params.lpPlan.boundMaxOpsPerNode,
         LpEffortLadder.DEFAULT_WARMUP)
-    private val automaticComponentReuse: Boolean get() = params.lpPlan.componentReuse && componentReuseFunded
+    private val automaticComponentReuse: Boolean
+        get() = params.lpPlan.componentReuse && componentReuseFunded && !sparseTrialActive
     private var componentFundingDeclineObserved = false
 
     // Pivot budget for an LP that is not repaying its cost. See [LpPivotBudget].
@@ -1924,7 +1925,7 @@ internal class LpEngine(
             params = params.copy(lpPlan = plan)
         }
         if (params.lpPlan.bounding && params.lpPlan.componentReuse && !componentReuseFunded &&
-            !params.lpPlan.componentOwnership && !componentFundingDeclineObserved
+            !params.lpPlan.componentOwnership && !sparseTrialActive && !componentFundingDeclineObserved
         ) {
             sink.lp.observeComponentAdmission("FUNDING", 0, 0L)
             componentFundingDeclineObserved = true

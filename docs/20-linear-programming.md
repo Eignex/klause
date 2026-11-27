@@ -461,8 +461,9 @@ tableau-size reduction and modeled child-model storage. A finite shared basis-en
 limit is divided among the admitted children. Construction and declined inspection
 spend the containing LP grant separately from each adaptive numerical query. Owner
 preparation has a bounded atomic grant; search accounts any slice excess as work debt.
-A declined partition keeps the ordinary monolithic preparation limit, and scalar trail
-edits preserve a structural admission decline. Admitted
+A declined partition uses the ordinary monolithic preparation limit and charges
+the inspection to the containing allowance. An admitted sparse trial retains its
+own numerical route. Scalar trail edits preserve a structural admission decline. Admitted
 children retain their numerical state through ordinary node edits. Composed component
 points publish node branching hints only under `lp-component-ownership`, which also
 selects root component guidance, ordering and private rounding. Automatic retention
@@ -502,8 +503,10 @@ aggregate. Returned child coordinates can feed a masked rounding guide.
 
 The same setting dispatches root tableau separation to the owning block. Lifted cuts
 keep every row multiplier, bound substitution, integrality premise and source
-address for the ordinary source mapper and cut pool. Rows confined to existing
-blocks replace those children and any others whose scalar authority changes.
+address for the ordinary source mapper and cut pool. Appending rows to an
+automatically admitted collection rechecks the resulting layout before retaining
+owners. Rows confined to existing blocks replace those children and any others
+whose scalar authority changes.
 Replacements validate their own bases using private retained bases as warm hints;
 unchanged children keep their checked evidence. Rows joining existing blocks form a
 fresh child for each union after admission checks the complete resulting shape.

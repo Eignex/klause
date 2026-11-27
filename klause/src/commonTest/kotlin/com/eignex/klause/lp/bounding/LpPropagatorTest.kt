@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBoundBatchResult
+import com.eignex.klause.lp.engine.LpComponentAdmission
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
@@ -571,6 +572,40 @@ class LpPropagatorTest {
             assertSame(before, lp.state)
             assertTrue(cuts.parentRows(assertNotNull(lp.state)).isEmpty())
             assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `rejected component cut preparation should charge the containing effort once`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+        ))
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        var charged = 0L
+        var initialStorage: Long? = null
+        val admission = LpComponentAdmission { shape ->
+            val baseline = initialStorage ?: shape.modeledBytes.also { initialStorage = it }
+            shape.modeledBytes <= baseline
+        }
+        LpPropagator(object : LpSearchPolicy {},
+            effort = { LpEffortProfile(work = 100_000L, componentSplit = true,
+                componentAdmission = admission, monolithicPreparationWork = 1L) },
+            onPreparation = { charged += it.workOps },
+        ).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            assertTrue(lp.prepare(ExecutionControl.Never, 100_000L))
+            val priorWork = charged
+            val edit = assertNotNull(cuts.prepare(assertNotNull(lp.state), base,
+                listOf(Cut(intArrayOf(base.intColOf[0]), longArrayOf(1L), Relation.GE, 2L, global = true))))
+
+            assertFalse(lp.editCuts(edit))
+
+            assertTrue(charged > priorWork)
+            assertTrue(lp.prepare(ExecutionControl.Never, 100_000L))
+            assertEquals(assertNotNull(lp.metrics).measuredPreparationWork, charged)
         }
     }
 

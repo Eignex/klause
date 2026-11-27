@@ -126,14 +126,15 @@ internal class LpScopedSolver(
         if (closed || token() || state.model.m > maxRetainedRows) return false
         if (solver != null) return true
         if (workAllowance != null && workAllowance <= 0L) return false
-        val available = when {
-            workAllowance == null -> workLimit
-            workLimit <= 0L -> workAllowance
-            else -> minOf(workLimit, workAllowance)
-        }
-        solver = prepared(state, token, workBudget = available)?.first ?: return false
+        val componentBudget = preparationCeiling(workLimit, workAllowance)
+        val ordinaryBudget = preparationCeiling(monolithicPreparationWork ?: workLimit, workAllowance)
+        solver = prepared(state, token, workBudget = componentBudget, ordinaryBudget = ordinaryBudget)?.first
+            ?: return false
         return true
     }
+
+    private fun preparationCeiling(limit: Long, offered: Long? = null): Long =
+        minOf(if (limit == 0L) Long.MAX_VALUE else limit, offered ?: Long.MAX_VALUE)
 
     fun pausedDualProposal(token: ExecutionControl): DoubleArray? {
         requireAvailable()
@@ -689,7 +690,8 @@ internal class LpScopedSolver(
             publish(next)
             return true
         }
-        var replacementWorkLimit = workLimit
+        var replacementWorkLimit = preparationCeiling(workLimit)
+        var ordinaryWorkLimit = preparationCeiling(monolithicPreparationWork ?: workLimit)
         val components = solver as? ComponentLpSolver
         if (append && compaction == null && components != null) {
             preparationAttempts++
@@ -702,10 +704,14 @@ internal class LpScopedSolver(
             solver = null
             closeOwner(components)
             components.lastLocalEditDecline?.let { componentAdmission?.declinedEdit(it) }
-            if (workLimit > 0L) {
-                if (components.lastMetrics.workOps >= workLimit) return false
-                replacementWorkLimit -= components.lastMetrics.workOps
+            val spent = components.lastMetrics.workOps
+            if (replacementWorkLimit != Long.MAX_VALUE) {
+                replacementWorkLimit = (replacementWorkLimit - spent).coerceAtLeast(0L)
             }
+            if (ordinaryWorkLimit != Long.MAX_VALUE) {
+                ordinaryWorkLimit = (ordinaryWorkLimit - spent).coerceAtLeast(0L)
+            }
+            if (replacementWorkLimit == 0L && ordinaryWorkLimit == 0L) return false
         }
         if (append) solver?.let { recordPendingAppendSolve(it) }
         val warm = if (append) {
@@ -727,7 +733,7 @@ internal class LpScopedSolver(
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
         val prepareComponents = componentSplit && solver == null && compaction == null
-        val replacement = prepared(next.state, token, append, warm, replacementWorkLimit,
+        val replacement = prepared(next.state, token, append, warm, replacementWorkLimit, ordinaryWorkLimit,
             allowComponents = prepareComponents) ?: return false
         var published = false
         var failure: Throwable? = null
@@ -883,7 +889,8 @@ internal class LpScopedSolver(
         token: ExecutionControl,
         recordRejectedAppendWork: Boolean = false,
         warm: Basis? = null,
-        workBudget: Long = workLimit,
+        workBudget: Long = preparationCeiling(workLimit),
+        ordinaryBudget: Long = preparationCeiling(monolithicPreparationWork ?: workLimit),
         allowComponents: Boolean = componentSplit,
     ): Pair<RetainedLpSolver, Basis>? {
         preparationAttempts++
@@ -891,7 +898,7 @@ internal class LpScopedSolver(
         var accepted = false
         var failure: Throwable? = null
         val projection = LpProjectionMeter(
-            workLimit = if (workBudget > 0L) workBudget else Long.MAX_VALUE,
+            workLimit = workBudget,
             cancellation = token,
         )
         var constructionBound = 0L
@@ -899,21 +906,27 @@ internal class LpScopedSolver(
         var constructionReported = false
         try {
             if (token() || next.model.m > maxRetainedRows) return null
-            var inspectComponents = allowComponents && warm == null && next.model.n > 0 && next.model.m >= 2 &&
+            var inspectComponents = allowComponents && workBudget > 0L && warm == null &&
+                next.model.n > 0 && next.model.m >= 2 &&
                 declinedComponentMatrix?.sameMatrix(next.model) != true
             if (inspectComponents && componentAdmission != null) {
-                projection.reserve(next.model.n.toLong() + 1L, 0L, matrix = false)
-                val entries = (0 until next.model.n).sumOf { next.model.columnEntries(it).size.toLong() }
-                if (!componentAdmission.inspect(next.model.n, next.model.m,
-                        entries.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
-                ) {
-                    declinedComponentMatrix = next.model
+                val inspectionWork = next.model.n.toLong() + 1L
+                if (inspectionWork > workBudget) {
                     inspectComponents = false
+                } else {
+                    projection.reserve(inspectionWork, 0L, matrix = false)
+                    val entries = (0 until next.model.n).sumOf { next.model.columnEntries(it).size.toLong() }
+                    if (!componentAdmission.inspect(next.model.n, next.model.m,
+                            entries.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                    ) {
+                        declinedComponentMatrix = next.model
+                        inspectComponents = false
+                    }
                 }
             }
-            if (!inspectComponents && monolithicPreparationWork != null && monolithicPreparationWork > 0L) {
-                projection.restrictWork(monolithicPreparationWork)
-            }
+            // Both routes need the same numerical projection and scaling bound.
+            val projectionBudget = if (inspectComponents) maxOf(workBudget, ordinaryBudget) else ordinaryBudget
+            projection.setWorkLimit(projectionBudget)
             val working = next.ownerWorkingModel(projection)?.also {
                 // The numerical owner refreshes its scaled vectors while adopting this state.
                 projection.reserveVectors(next.model)
@@ -922,43 +935,46 @@ internal class LpScopedSolver(
                 projection.reserve(bound, 0L, matrix = true)
                 constructionBound = bound
             } ?: return null
-            if (workBudget > 0L && projection.work >= workBudget) return null
-            candidate = if (inspectComponents) {
-                componentLpSolverOrNull(
-                    working, token, projection,
-                    { part, childToken, rowOnlyRows ->
-                        val remaining = if (workBudget > 0L) workBudget - projection.work else 0L
-                        if (workBudget > 0L && remaining <= 0L) throw LpProjectionStop()
-                        constructionStarted = true
-                        newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                            remaining, trackDegeneracy, context.engineFactory,
-                            componentPricing(part, working.n, rowOnlyRows))
-                    },
-                    ::ComponentLpSolver,
-                    accept = componentAdmission?.let { admission ->
-                        object : LpComponentAdmission {
-                            override val ownerMergeWork: Long get() = admission.ownerMergeWork
+            if (projection.work >= projectionBudget) return null
+            if (inspectComponents && projection.work < workBudget) {
+                projection.restrictWork(workBudget)
+                candidate = try {
+                    componentLpSolverOrNull(
+                        working, token, projection,
+                        { part, childToken, rowOnlyRows ->
+                            val remaining = if (workBudget == Long.MAX_VALUE) 0L else workBudget - projection.work
+                            if (workBudget != Long.MAX_VALUE && remaining <= 0L) throw LpProjectionStop()
+                            constructionStarted = true
+                            newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
+                                remaining, trackDegeneracy, context.engineFactory,
+                                componentPricing(part, working.n, rowOnlyRows))
+                        },
+                        ::ComponentLpSolver,
+                        accept = componentAdmission?.let { admission ->
+                            object : LpComponentAdmission {
+                                override val ownerMergeWork: Long get() = admission.ownerMergeWork
 
-                            override fun inspect(columns: Int, rows: Int, entries: Int): Boolean =
-                                admission.inspect(columns, rows, entries).also {
+                                override fun inspect(columns: Int, rows: Int, entries: Int): Boolean =
+                                    admission.inspect(columns, rows, entries).also {
+                                        if (!it) declinedComponentMatrix = next.model
+                                    }
+
+                                override fun accepts(shape: LpComponentShape): Boolean = admission.accepts(shape).also {
                                     if (!it) declinedComponentMatrix = next.model
                                 }
-
-                            override fun accepts(shape: LpComponentShape): Boolean = admission.accepts(shape).also {
-                                if (!it) declinedComponentMatrix = next.model
                             }
-                        }
-                    },
-                )
-            } else null
-            val selectedBudget = if (candidate == null && monolithicPreparationWork != null &&
-                monolithicPreparationWork > 0L
-            ) {
-                if (workBudget > 0L) minOf(workBudget, monolithicPreparationWork) else monolithicPreparationWork
-            } else workBudget
-            val remainingWork = if (selectedBudget > 0L) selectedBudget - projection.work else 0L
-            if (selectedBudget > 0L && remainingWork <= 0L) return null
+                        },
+                    )
+                } catch (stop: LpProjectionStop) {
+                    if (monolithicPreparationWork == null || token() || token.admission?.exhausted == true) throw stop
+                    null
+                }
+            }
+            val selectedBudget = if (candidate == null) ordinaryBudget else workBudget
+            val remainingWork = if (selectedBudget == Long.MAX_VALUE) 0L else selectedBudget - projection.work
+            if (selectedBudget != Long.MAX_VALUE && remainingWork <= 0L) return null
             if (candidate == null) {
+                if (token() || token.admission?.exhausted == true) return null
                 constructionStarted = true
                 candidate = newPersistentLpSolver(
                     working,
