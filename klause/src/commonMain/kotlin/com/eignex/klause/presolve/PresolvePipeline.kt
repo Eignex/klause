@@ -362,6 +362,7 @@ object PresolvePipeline {
                         zeroObjectivePricing,
                         randomSeed,
                         numericalLp = numericalLp,
+                        componentFeasibility = config.lpComponents,
                     ).also { result ->
                         presolveBudget?.activeInvocation?.let { invocation ->
                             invocation.narrowedColumns = result.report.boundsShaved

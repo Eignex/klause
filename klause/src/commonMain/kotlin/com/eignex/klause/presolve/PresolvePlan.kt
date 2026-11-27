@@ -88,6 +88,8 @@ class PresolveConfig(
     val preserveStructure: Boolean = false,
     /** Maximum factor/entry visits per rewrite impact observation; zero disables it. */
     val structuralImpactLimit: Int = 0,
+    /** Component policy for the root LP feasibility comparison. */
+    val lpComponents: Boolean? = null,
 ) {
     init {
         require(abortFraction.isFinite() && abortFraction in 0.0..1.0)
@@ -115,6 +117,7 @@ class PresolveConfig(
             maxRounds,
             preserveStructure,
             structuralImpactLimit,
+            lpComponents,
         )
 
     /** Return a request-local effort plan, keeping unspecified limits. */
@@ -125,9 +128,10 @@ class PresolveConfig(
         probeTotalBudget: Int? = probeTotalBudgetOverride,
         preserveStructure: Boolean = this.preserveStructure,
         structuralImpactLimit: Int = this.structuralImpactLimit,
+        lpComponents: Boolean? = this.lpComponents,
     ): PresolveConfig = PresolveConfig(
         emphasis, overrides, probeBudgetPerVar, probeTotalBudget, affinePivotOrder, abortFraction, maxRounds,
-        preserveStructure, structuralImpactLimit,
+        preserveStructure, structuralImpactLimit, lpComponents,
     )
 
     /** Whether [pass] runs under [context]. */
