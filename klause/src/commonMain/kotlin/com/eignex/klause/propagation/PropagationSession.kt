@@ -1035,9 +1035,14 @@ class PropagationSession private constructor(
         state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
     }
 
-    internal fun configureIntegerRowAdmission(enabled: Boolean, reuse: Boolean = true) {
+    internal fun configureIntegerRowAdmission(
+        enabled: Boolean,
+        reuse: Boolean = true,
+        attachmentOrder: IntegerRowAttachmentOrder = IntegerRowAttachmentOrder.SEPARATE,
+    ) {
         state.integerRowAdmission = enabled
         state.integerRowReuse = reuse
+        state.integerRowAttachmentOrder = attachmentOrder
     }
 
     /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
@@ -1050,18 +1055,23 @@ class PropagationSession private constructor(
     }
 
     internal fun addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): PropagationResult =
-        registerAndPropagate(base = state.undoTop) {
-            val before = state.work
-            try {
-                state.addLearnedIntegerRow(row, lbd)
-            } finally {
-                state.integerRowAttachmentWork += state.work - before
-            }
+        registerAndPropagate(base = state.undoTop) { registerIntegerRow(row, lbd) }
+
+    private fun registerIntegerRow(row: IntegerConflictRow, lbd: Int): Int {
+        val before = state.work
+        try {
+            return state.addLearnedIntegerRow(row, lbd)
+        } finally {
+            state.integerRowAttachmentWork += state.work - before
         }
+    }
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
         if (state.integerRowAdmission) {
+            if (state.integerRowAttachmentOrder != IntegerRowAttachmentOrder.SEPARATE) {
+                attachIntegerRowPair(learned, publicationBase)?.let { return it }
+            }
             val result = addLearnedIntegerRow(learned.row, learned.lbd)
             if (result is PropagationResult.Unsat || fixpointCancelled) return result
         } else {
@@ -1072,6 +1082,66 @@ class PropagationSession private constructor(
         return registerAndPropagate(base = publicationBase) {
             state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
         }
+    }
+
+    private fun attachIntegerRowPair(
+        learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow,
+        publicationBase: Int,
+    ): PropagationResult? {
+        bakedUnsat?.let { return it }
+        state.finiteWork.cancellation = cancellation
+        val fallback = learned.fallbackClause
+        var row = -1
+        val unit: Int
+        val clause: Int
+        try {
+            unit = unitOrderBound(fallback.literals)
+            if (unit == Lit.NONE) return null
+            row = registerIntegerRow(learned.row, learned.lbd)
+            noteLearnedAttachment(row)
+            clause = state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
+            noteLearnedAttachment(clause)
+        } catch (_: FinitePropagationInterrupted) {
+            state.deferLearnedAttachment(row)
+            state.runCancelled = true
+            return PropagationResult.Implied.EMPTY
+        }
+        val order = if (state.integerRowAttachmentOrder == IntegerRowAttachmentOrder.CLAUSE_FIRST) {
+            intArrayOf(clause, row)
+        } else {
+            intArrayOf(row, clause)
+        }
+        state.integerRowPairedAttachments++
+        val conflict = state.runToFixpoint(allFactors = false, initialFactors = order, cancellation = cancellation)
+        if (conflict != null || state.runCancelled) {
+            // One of the two new factors can still be waiting when the fixpoint stops.
+            state.deferLearnedAttachment(order[0])
+            state.deferLearnedAttachment(order[1])
+        } else {
+            when (state.orderBoundEstablishingFactor(unit)) {
+                clause -> state.integerRowPairedClauseOwners++
+                row -> state.integerRowPairedRowOwners++
+            }
+        }
+        return finishLearnedPropagation(conflict, publicationBase)
+    }
+
+    private fun unitOrderBound(literals: IntArray): Int {
+        var unit = Lit.NONE
+        for (literal in literals) {
+            state.checkFiniteWork()
+            when (state.litTruth(literal)) {
+                true -> return Lit.NONE
+                false -> continue
+                null -> {
+                    if (unit != Lit.NONE) return Lit.NONE
+                    val atom = state.atomIdOf(Lit.variable(literal))
+                    if (atom < 0 || state.atoms.kind[atom] == AtomKind.EQ) return Lit.NONE
+                    unit = literal
+                }
+            }
+        }
+        return unit
     }
 
     internal fun learnedConstraintSatisfied(learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint): Boolean =
@@ -1106,11 +1176,19 @@ class PropagationSession private constructor(
             state.runCancelled = true
             return PropagationResult.Implied.EMPTY
         }
+        noteLearnedAttachment(newFid)
+        val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
+        return finishLearnedPropagation(conflict, base)
+    }
+
+    private fun noteLearnedAttachment(factor: Int) {
         state.factorAttribution?.let {
-            if (state.nativeEngine == null) it.admit(state.factorAt(newFid))
+            if (state.nativeEngine == null) it.admit(state.factorAt(factor))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
         }
-        val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
+    }
+
+    private fun finishLearnedPropagation(conflict: IntArray?, base: Int): PropagationResult {
         if (conflict != null) return revertAndUnsat(conflict)
         // The asserted facts are implied by the decisions up to the current level, so they join the
         // level's baseline: re-snapshot the top mark. Otherwise the next failed pin's revert — which
@@ -1489,6 +1567,9 @@ class PropagationSession private constructor(
             "learningIntegerRetainedSeedUses" to it.integerRowRetainedSeedUses,
             "learningIntegerRetainedEndpointUses" to it.integerRowRetainedEndpointUses,
             "learningIntegerAttachmentWork" to it.integerRowAttachmentWork,
+            "learningIntegerPairedAttachments" to it.integerRowPairedAttachments,
+            "learningIntegerPairedClauseOwners" to it.integerRowPairedClauseOwners,
+            "learningIntegerPairedRowOwners" to it.integerRowPairedRowOwners,
             "learningIntegerPropagationWork" to it.integerRowPropagationWork,
             "learningIntegerPostInitialFires" to it.integerRowPostInitialFires,
             "learningIntegerPostInitialUsefulFires" to it.integerRowPostInitialUsefulFires,

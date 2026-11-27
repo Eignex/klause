@@ -524,6 +524,49 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `attachment order should select the reason for a shared bound`() {
+        for (order in listOf(IntegerRowAttachmentOrder.ROW_FIRST, IntegerRowAttachmentOrder.CLAUSE_FIRST)) {
+            val native = publishOverlappingIntegerBounds(order)
+            val counts = native.learnedLifecycle()
+
+            assertEquals(3L, native.intDomain(0).max)
+            assertEquals(1L, counts["learningIntegerPairedAttachments"])
+            assertEquals(if (order == IntegerRowAttachmentOrder.CLAUSE_FIRST) 1L else 0L,
+                counts["learningIntegerPairedClauseOwners"])
+            assertEquals(if (order == IntegerRowAttachmentOrder.ROW_FIRST) 1L else 0L,
+                counts["learningIntegerPairedRowOwners"])
+        }
+    }
+
+    @Test
+    fun `a row attached behind its clause should tighten a later branch`() {
+        val native = publishOverlappingIntegerBounds(IntegerRowAttachmentOrder.CLAUSE_FIRST)
+
+        val result = assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 3))
+
+        assertEquals(2L, result.intMaxOrNullCompat(0))
+    }
+
+    private fun publishOverlappingIntegerBounds(order: IntegerRowAttachmentOrder): PropagationSession {
+        val variables = intArrayOf(0, 1)
+        val native = PropagationSession(Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1, 1), variables, LinearOp.LE, 14))), pbLearning = false)
+        native.enableIntegerRowLearning()
+        native.configureIntegerRowAdmission(enabled = true, attachmentOrder = order)
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 2))
+        val state = native.explanationState
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
+            longArrayOf(1, 1), variables, LinearOp.LE, 5), useLo = true))
+        val clause = ConflictAnalyzer.AnalysisResult.Learned(
+            intArrayOf(Lit.make(state.atomVarLe(1, 1), true), Lit.make(state.atomVarLe(0, 3), true)),
+            backjumpLevel = 1, lbd = 1, decisionLevels = intArrayOf(1))
+        val learned = ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
+            row, backjumpLevel = 1, lbd = 1, decisionLevels = intArrayOf(1), fallbackClause = clause)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned))
+        return native
+    }
+
+    @Test
     fun `prepared optimization should consume a guarded arithmetic consequence`() {
         val program =
             parseFlatZinc("""

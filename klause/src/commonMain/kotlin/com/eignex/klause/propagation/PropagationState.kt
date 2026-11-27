@@ -368,12 +368,16 @@ class PropagationState private constructor(
     internal var integerRowLearning = false
     internal var integerRowAdmission = true
     internal var integerRowReuse = true
+    internal var integerRowAttachmentOrder = IntegerRowAttachmentOrder.SEPARATE
     internal var integerRowsDerived = 0L
     internal var integerRowAdmissionsDeclined = 0L
     internal var integerRowAnalysisWork = 0L
     internal var integerRowRetainedSeedUses = 0L
     internal var integerRowRetainedEndpointUses = 0L
     internal var integerRowAttachmentWork = 0L
+    internal var integerRowPairedAttachments = 0L
+    internal var integerRowPairedClauseOwners = 0L
+    internal var integerRowPairedRowOwners = 0L
     internal var integerRowPropagationWork = 0L
     internal var integerRowPostInitialFires = 0L
     internal var integerRowPostInitialUsefulFires = 0L

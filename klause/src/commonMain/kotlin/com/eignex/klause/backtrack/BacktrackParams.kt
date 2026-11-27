@@ -22,6 +22,7 @@ import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.IntegerRowAttachmentOrder
 import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
@@ -494,6 +495,8 @@ data class BacktrackParams(
     val integerRowAdmission: Boolean = true,
     /** Allow retained rows to serve as arithmetic seeds and endpoint reasons. */
     val integerRowReuse: Boolean = true,
+    /** Initial scheduling for an integer row and its asserting clause. */
+    val integerRowAttachmentOrder: IntegerRowAttachmentOrder = IntegerRowAttachmentOrder.SEPARATE,
 ) : SolverParams {
     init {
         require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)

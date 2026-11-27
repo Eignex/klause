@@ -60,6 +60,7 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.SourceProgressReward
 import com.eignex.klause.portfolio.SourceRateReward
+import com.eignex.klause.propagation.IntegerRowAttachmentOrder
 
 /** Invalid solver-policy configuration. */
 class PipelineConfigException(message: String) : RuntimeException(message)
@@ -175,6 +176,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
     "pb-learning", "pb-objective-cutoff", "integer-row-learning", "integer-row-admission", "integer-row-reuse",
+    "integer-row-attachment-order",
     "arithmetic-learning-work", "arithmetic-learning-allocation-bytes",
     "propagation-attribution", "historical-table-reasons",
     "objective-guided-values",
@@ -254,6 +256,14 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val integerRowLearning = p[ExecutionOption.integerRowLearning]
     val integerRowAdmission = p[ExecutionOption.integerRowAdmission]
     val integerRowReuse = p[ExecutionOption.integerRowReuse]
+    val integerRowAttachmentOrder = p[ExecutionOption.integerRowAttachmentOrder]?.let {
+        when (it) {
+            "separate" -> IntegerRowAttachmentOrder.SEPARATE
+            "row-first" -> IntegerRowAttachmentOrder.ROW_FIRST
+            "clause-first" -> IntegerRowAttachmentOrder.CLAUSE_FIRST
+            else -> pipelineConfigError("unknown integer row attachment order '$it'")
+        }
+    }
     val arithmeticLearningWork = p[ExecutionOption.arithmeticLearningWork]?.also {
         if (it < 0) pipelineConfigError("arithmetic learning allowances must be non-negative")
     }
@@ -281,7 +291,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         inprocessingWarmupWork, inprocessingProbeInterval,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
-        pbObjectiveCutoff, integerRowLearning, integerRowAdmission, integerRowReuse,
+        pbObjectiveCutoff, integerRowLearning, integerRowAdmission, integerRowReuse, integerRowAttachmentOrder,
         arithmeticLearningWork, arithmeticLearningAllocationBytes,
         propagationAttribution, historicalTableReasons, costAwarePropagation,
         reasonPreflight,
@@ -348,6 +358,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         integerRowLearning?.let { out = out.copy(integerRowLearning = it) }
         integerRowAdmission?.let { out = out.copy(integerRowAdmission = it) }
         integerRowReuse?.let { out = out.copy(integerRowReuse = it) }
+        integerRowAttachmentOrder?.let { out = out.copy(integerRowAttachmentOrder = it) }
         arithmeticLearningWork?.let { out = out.copy(arithmeticLearningWork = it) }
         arithmeticLearningAllocationBytes?.let { out = out.copy(arithmeticLearningAllocationBytes = it) }
         propagationAttribution?.let { out = out.copy(propagationAttribution = it) }

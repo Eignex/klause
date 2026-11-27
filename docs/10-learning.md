@@ -382,6 +382,13 @@ first firing have their own counts. A useful firing changes a propagation count
 or detects a contradiction. Retirement counts cover the learned store's policy.
 Session teardown and mixed-store retirement work have no separate integer-row totals.
 
+`integer-row-attachment-order` controls the initial scheduling when the first-UIP
+clause is unit on an integer order bound. `row-first` and `clause-first` register both
+factors and seed one fixpoint in the requested order. `separate` propagates the row
+before installing the clause and is also used when the unit-bound check fails.
+The paired counters record attachments and the factor that first establishes the
+clause's order bound during a completed attachment fixpoint.
+
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
 fallback. Interior holes in the remaining terms stay in the actual domains and do

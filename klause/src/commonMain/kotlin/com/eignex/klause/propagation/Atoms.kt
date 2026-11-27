@@ -786,6 +786,23 @@ private fun PropagationState.movesBefore(v: Int, k: Long, lower: Boolean): Int {
     return lo
 }
 
+internal fun PropagationState.orderBoundEstablishingFactor(lit: Int): Int {
+    if (!undoLogging || !litTrue(lit)) return -1
+    val atom = atomIdOf(Lit.variable(lit))
+    val variable = atoms.intVar[atom]
+    val threshold = atoms.threshold[atom]
+    val positive = Lit.isPositive(lit)
+    val lower = (atoms.kind[atom] == AtomKind.GE) == positive
+    val bound = if (positive) threshold else if (lower) threshold + 1 else threshold - 1
+    val moves = boundMoves[variable] ?: return -1
+    work += Int.SIZE_BITS - moves.size.countLeadingZeroBits()
+    val next = movesBefore(variable, bound, lower)
+    if (next == 0) return -1
+    if (next == moves.size) return if (lower) intMinReason[variable] else intMaxReason[variable]
+    val trail = moves[next]
+    return if (lower) undo.minReason[trail] else undo.maxReason[trail]
+}
+
 // A move with no reason is a decision. The decided bound itself has none either, but a weaker one follows from
 // it, `[v ≥ bound] → [v ≥ k]` (likewise `≤`), so its reason is the decision's literal; without one it would sit
 // at the decision's level as a second unexplained literal.
