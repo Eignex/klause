@@ -8,6 +8,8 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Runners
+import com.eignex.klause.factor.codec.FactorCodec
+import com.eignex.klause.factor.codec.FactorCodecs
 import com.eignex.klause.factor.codec.MissingFactorCodecException
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.formats.mps.Mps
@@ -44,6 +46,12 @@ import java.util.IdentityHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 internal object PortfolioArithmeticLearningCapture {
+    private val nativeCodec by lazy {
+        val owner = "com.eignex.klause.propagation.difference.DifferenceSystemDiagnosticCodecKt"
+        val difference = Class.forName(owner).getMethod("differenceSystemDiagnosticCodec").invoke(null)
+        ProblemJson(FactorCodecs.builtin + (difference as FactorCodec<*, *>))
+    }
+
     private class Snapshot(val json: String?, val decline: String?)
 
     private fun snapshot(codec: ProblemJson, problem: Problem): Snapshot {
@@ -123,7 +131,7 @@ internal object PortfolioArithmeticLearningCapture {
                         }
                         val started = System.nanoTime()
                         try {
-                            val payload = snapshot(codec, native.problem)
+                            val payload = snapshot(nativeCodec, native.problem)
                             val model = payload.json
                             if (model == null) {
                                 snapshotDeclines += "$worker: ${payload.decline}"
@@ -155,7 +163,7 @@ internal object PortfolioArithmeticLearningCapture {
                 val completed = finite?.outcome as? FiniteSolveOutcome.Completed
                 val label = if (learning) kind else "clause"
                 original?.let { out.resolve("$label-original.json").writeText(it) }
-                val preparedSnapshot = finite?.let { snapshot(codec, it.preparation.problem) }
+                val preparedSnapshot = finite?.let { snapshot(nativeCodec, it.preparation.problem) }
                 preparedSnapshot?.json?.let { out.resolve("$label-prepared.json").writeText(it) }
                 for (session in ordered) {
                     val index = session.ordinal
