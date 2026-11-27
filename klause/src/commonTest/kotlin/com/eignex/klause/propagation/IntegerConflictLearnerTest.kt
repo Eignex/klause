@@ -104,6 +104,25 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `initial only rows should leave later bound changes to other constraints`() {
+        for (initialOnly in listOf(false, true)) {
+            val variables = intArrayOf(0, 1)
+            val native = PropagationSession(Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(1, 1), variables, LinearOp.LE, 14))), pbLearning = false)
+            native.enableIntegerRowLearning()
+            native.configureIntegerRowAdmission(enabled = true, reuse = false, initialOnly = initialOnly)
+            val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
+                longArrayOf(1, 1), variables, LinearOp.LE, 5), useLo = true))
+            assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(row, 1))
+            assertEquals(5L, native.intDomain(0).max)
+
+            assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 3))
+
+            assertEquals(if (initialOnly) 5L else 2L, native.intDomain(0).max)
+        }
+    }
+
+    @Test
     fun `a table endpoint should preserve an available arithmetic assertion`() {
         val native = PropagationSession(Problem(0, 4,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 1)), arrayOf(

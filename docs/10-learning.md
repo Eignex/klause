@@ -379,6 +379,10 @@ and excludes those rows as arithmetic seeds and endpoint reasons in later analys
 Discovery and row propagation report charged native work, including interrupted
 work. Post-initial firings count separately from the first firing of each row.
 
+`integerRowInitialPropagationOnly` bounds each attached row's propagation to
+its attachment fixpoint. Its stored historical reasons and subscriptions remain
+available. Disable arithmetic reuse separately to isolate later propagation.
+
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
 fallback. Interior holes in the remaining terms stay in the actual domains and do

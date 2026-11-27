@@ -494,6 +494,8 @@ data class BacktrackParams(
     val integerRowAdmission: Boolean = true,
     /** Allow retained rows to serve as arithmetic seeds and endpoint reasons. */
     val integerRowReuse: Boolean = true,
+    /** Keep propagation of a newly attached row within its initial fixpoint. */
+    val integerRowInitialPropagationOnly: Boolean = false,
 ) : SolverParams {
     init {
         require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)

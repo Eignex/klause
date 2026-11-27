@@ -16,6 +16,7 @@ import com.eignex.util.numbers.toLongExact
 internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPropagator {
     // Admission owns this propagator, so its cache owner can unlink it without scanning other rows.
     internal var retentionSlot = -1
+    internal var initialPropagationEnded = false
     private var fired = false
     override val boolVars: IntArray =
         if (row.guard == Lit.NONE) emptyIntArray() else intArrayOf(Lit.variable(row.guard))
@@ -43,6 +44,10 @@ internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPr
     }
 
     private fun propagateRow(state: PropagationState): Boolean {
+        if (initialPropagationEnded) {
+            state.integerRowSuppressedFires++
+            return true
+        }
         if (!state.integerGuardTrueAt(row.guard)) return true
         compact?.let {
             return propagateLinearBounds(state, it.coeffs, intVars, LinearOp.LE, it.bound,

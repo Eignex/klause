@@ -1035,9 +1035,10 @@ class PropagationSession private constructor(
         state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
     }
 
-    internal fun configureIntegerRowAdmission(enabled: Boolean, reuse: Boolean = true) {
+    internal fun configureIntegerRowAdmission(enabled: Boolean, reuse: Boolean = true, initialOnly: Boolean = false) {
         state.integerRowAdmission = enabled
         state.integerRowReuse = reuse
+        state.integerRowInitialPropagationOnly = initialOnly
     }
 
     /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
@@ -1049,8 +1050,18 @@ class PropagationSession private constructor(
         }
     }
 
-    internal fun addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): PropagationResult =
-        registerAndPropagate(base = state.undoTop) { state.addLearnedIntegerRow(row, lbd) }
+    internal fun addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): PropagationResult {
+        var attached: LearnedIntegerPropagator? = null
+        try {
+            return registerAndPropagate(base = state.undoTop) {
+                val factor = state.addLearnedIntegerRow(row, lbd)
+                if (state.integerRowInitialPropagationOnly) attached = state.factorAt(factor) as LearnedIntegerPropagator
+                factor
+            }
+        } finally {
+            attached?.initialPropagationEnded = true
+        }
+    }
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
@@ -1479,6 +1490,7 @@ class PropagationSession private constructor(
             "learningIntegerRetainedSeedUses" to it.integerRowRetainedSeedUses,
             "learningIntegerRetainedEndpointUses" to it.integerRowRetainedEndpointUses,
             "learningIntegerPropagationWork" to it.integerRowPropagationWork,
+            "learningIntegerSuppressedFires" to it.integerRowSuppressedFires,
             "learningIntegerPostInitialFires" to it.integerRowPostInitialFires,
             "learningIntegerPostInitialUsefulFires" to it.integerRowPostInitialUsefulFires,
         ) else counts
