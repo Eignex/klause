@@ -115,6 +115,16 @@ class FinitePortfolioLpCaptureTest {
         assertEquals(listOf("portfolio-progress=false"), parameters)
     }
 
+    @Test
+    fun `ordinary portfolio capture should preserve solver controls`() {
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary", "portfolio-progress" to "false")
+
+        val parameters = FinitePortfolioLpCapture.parameters(options + ("capture-joint" to "true"))
+
+        assertEquals(FinitePortfolioLpCapture.parameters(options), parameters)
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `complete coverage should preserve supported handoff selection`(handoff: Boolean) {

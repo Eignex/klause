@@ -102,6 +102,12 @@ fixed repair, complete proof-worker coverage at share 0.5, and quiet logging.
 `source-refutation-center-step=true|false` is accepted in `joint-ordinary` and `joint-handoff` modes
 and forwards the source option to that producer. Omission leaves its default false.
 The existing observation and companion limits apply.
+Use `capture-joint=true captures=0` with the portfolio preset to observe its
+joint repair without changing its algorithm controls. Portfolio capture accepts
+`presolve=off|default` to match an explicit source invocation. Each joint owner
+records up to 128 charged advance observations with the offered instruction
+grant, entry and exit copying cursors, pending condition state and the exit
+guard. Advance observations have a separate cap from detailed proposal records.
 `capture-guidance=true captures=0` records bounded native guide adoption and branch
 observations without retaining LP queries. The preference flag describes configured
 precedence; it does not compare a counterfactual value order. Last-read scalar cutoffs

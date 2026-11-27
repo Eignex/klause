@@ -36,19 +36,25 @@ internal data class JointRepairObservation(
     val integerCount: Int? = null,
     val realCount: Int? = null,
     val booleanCount: Int? = null,
+    val advance: ExactNeighborhoodAdvanceObservation? = null,
 )
 
 internal class JointRepairObservationCapture(
     private val budget: SourceLpBudget,
     private val stop: ExecutionControl,
     private val report: (JointRepairObservation) -> Unit,
-) {
+) : ExactNeighborhoodAdvanceObserver {
     private var records = 0L
     private var entries = 0L
     private var bytes = 0L
     private var dropped = 0L
     private var nanos = 0L
     private var decline: String? = null
+    private var advances = 0L
+    private var droppedAdvances = 0L
+    private var advanceWork = 0L
+    private var advanceBytes = 0L
+    private var advanceNanos = 0L
 
     fun observations(): Map<String, Long> = mapOf(
         "jointRepairObservationRecords" to records,
@@ -56,7 +62,37 @@ internal class JointRepairObservationCapture(
         "jointRepairObservationBytes" to bytes,
         "jointRepairObservationDropped" to dropped,
         "jointRepairObservationNs" to nanos,
+        "jointRepairObservationAdvances" to advances,
+        "jointRepairObservationDroppedAdvances" to droppedAdvances,
+        "jointRepairObservationAdvanceWork" to advanceWork,
+        "jointRepairObservationAdvanceBytes" to advanceBytes,
+        "jointRepairObservationAdvanceReportNs" to advanceNanos,
     ) + (decline?.let { mapOf("jointRepairObservationDeclined$it" to 1L) } ?: emptyMap())
+
+    override fun reserveAdvance(): Boolean {
+        val funding = budget.funding
+        // The driver owns cancellation and the slice grant. Charge the containing ledger only.
+        if (advances >= MAX_ADVANCES || funding == null || funding.remainingWork <= ADVANCE_WORK ||
+            funding.remainingAllocation <= ADVANCE_BYTES) {
+            droppedAdvances++
+            return false
+        }
+        budget.observe(preparation = ADVANCE_WORK)
+        funding.charge(0L, ADVANCE_BYTES)
+        advanceWork += ADVANCE_WORK
+        advanceBytes += ADVANCE_BYTES
+        return true
+    }
+
+    override fun recordAdvance(observation: ExactNeighborhoodAdvanceObservation) {
+        val mark = TimeSource.Monotonic.markNow()
+        try {
+            report(JointRepairObservation(0L, 0L, "advance", observation.guard.name, advance = observation))
+            advances++
+        } finally {
+            advanceNanos += mark.elapsedNow().inWholeNanoseconds
+        }
+    }
 
     private fun pay(work: Long, allocation: Long): Boolean {
         val funding = budget.funding
@@ -181,6 +217,9 @@ internal class JointRepairObservationCapture(
 }
 
 private const val MAX_RECORDS = 64
+private const val MAX_ADVANCES = 128L
+private const val ADVANCE_WORK = 16L
+private const val ADVANCE_BYTES = 512L
 private const val MAX_ENTRIES = 16_384
 private const val MAX_BYTES = 1_048_576L
 private const val MAX_SCALAR_BITS = 4096

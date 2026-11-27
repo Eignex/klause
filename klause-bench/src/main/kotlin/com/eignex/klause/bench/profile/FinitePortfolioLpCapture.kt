@@ -11,6 +11,7 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -58,11 +59,16 @@ internal object FinitePortfolioLpCapture {
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                "source-refutation-center-step")
+                "source-refutation-center-step", "capture-joint", "presolve")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
         val captureJoint = mode == "joint-ordinary" || mode == "joint-handoff"
+        options["presolve"]?.let { require(mode == "portfolio" && it in setOf("off", "default")) }
+        if ("capture-joint" in options) {
+            require(mode == "portfolio")
+            if (options.getValue("capture-joint").toBooleanStrict()) require((options["captures"]?.toInt() ?: 0) == 0)
+        }
         val centerStep = options["source-refutation-center-step"]?.let {
             require(captureJoint) {
                 "source-refutation-center-step requires joint-ordinary capture or joint-handoff capture"
@@ -108,7 +114,8 @@ internal object FinitePortfolioLpCapture {
             return
         }
         val timeout = options["timeout-ms"]?.toLong() ?: 30_000L
-        val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff")
+        val captureJoint = options["capture-mode"] in setOf("joint-ordinary", "joint-handoff") ||
+            options["capture-joint"]?.toBooleanStrict() == true
         val limit = options["captures"]?.toInt() ?: if (captureJoint) 0 else 1
         val captureGuidance = options["capture-guidance"]?.toBooleanStrict() ?: false
         val seed = options.getValue("seed").toLong()
@@ -145,7 +152,8 @@ internal object FinitePortfolioLpCapture {
             }.toString())
             return
         }
-        val policy = SourceExecutionPolicy()
+        val presolve = options["presolve"]?.let(PresolveConfig::parse)
+        val policy = SourceExecutionPolicy(explicitPresolve = presolve != null)
         val window = QueryWindow(captureWorker, limit)
         var retained = 0
         var eventCount = 0
@@ -165,6 +173,7 @@ internal object FinitePortfolioLpCapture {
                         val request = SourceExecutionRequest(invocation, policy, ExecutionOptions.parse(pairs),
                             finiteRequest = { shape ->
                                 policy.finiteRequest(shape, FiniteEngine.MIXED,
+                                    presolveConfig = presolve ?: PresolveConfig.DEFAULT,
                                     cancellation = stop, randomSeed = seed,
                                     onPortfolioEvent = { worker, event ->
                                         if (event.javaClass.simpleName in setOf(
@@ -175,7 +184,8 @@ internal object FinitePortfolioLpCapture {
                                             }.toString()) else eventsDropped++
                                         }
                                     })
-                            }, cores = 1, randomSeed = seed, timeout = stop, cancellation = stop)
+                            }, cores = 1, randomSeed = seed, timeout = stop, cancellation = stop,
+                            presolveConfig = presolve, presolveCancellation = stop)
                         val observer: (String, Double?, Any) -> Unit = { worker, cutoff, query ->
                             val started = System.nanoTime()
                             try {
@@ -313,6 +323,7 @@ internal object FinitePortfolioLpCapture {
                             put("nativeResultKind", result.javaClass.simpleName)
                             put("sourceSemantics", original.semantics.toString())
                             put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
+                            put("presolve", options["presolve"] ?: "source-default")
                             put("finiteEngine", FiniteEngine.MIXED.id)
                             put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
                             put("seed", seed)
@@ -332,7 +343,8 @@ internal object FinitePortfolioLpCapture {
                             put("jointRecords", jointRecords)
                             put("jointObserverNs", jointObserverNs)
                             put("jointCaptureLimits",
-                                "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits")
+                                "64 detailed records and 128 advance records per owner. " +
+                                    "Detailed records cap entries at 16384, modeled bytes at 1048576 and scalars at 4096 bits.")
                             val finite = (result as? SourceExecutionResult.Finite)?.result?.outcome
                                 as? FiniteSolveOutcome.Completed
                             if (captureJoint) {
@@ -390,6 +402,15 @@ internal object FinitePortfolioLpCapture {
                 "IntegerCount", "RealCount", "BooleanCount")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, call(observation, "get$name")?.toString())
             }
+            call(observation, "getAdvance")?.let { advance ->
+                put("advance", buildJsonObject {
+                    put("offeredInstructions", get(advance, "OfferedInstructions") as Long)
+                    put("chargedInstructions", get(advance, "ChargedInstructions") as Long)
+                    put("done", get(advance, "Done") as Boolean)
+                    put("entry", advanceStateMetadata(get(advance, "Entry")))
+                    put("exit", advanceStateMetadata(get(advance, "Exit")))
+                })
+            }
             for (name in listOf("Centers", "Bools", "Lower", "Upper")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, buildJsonObject {
                     (get(observation, name) as Map<*, *>).forEach { (key, value) ->
@@ -413,6 +434,16 @@ internal object FinitePortfolioLpCapture {
             }))
             put("sourceVerdictClaim", false)
         }
+
+    private fun advanceStateMetadata(state: Any): JsonObject = buildJsonObject {
+        put("work", get(state, "Work") as Long)
+        put("phase", get(state, "Phase").toString())
+        put("copiedBooleans", get(state, "CopiedBooleans") as Int)
+        put("copiedCoordinates", get(state, "CopiedCoordinates") as Int)
+        put("moves", get(state, "Moves") as Long)
+        put("pendingOperator", call(state, "getPendingOperator") as Int?)
+        put("pendingCutoff", get(state, "PendingCutoff") as Boolean)
+    }
 
     internal class QueryWindow(private val worker: String, private val captureLimit: Int) {
         private val owners = IdentityHashMap<Any, Int>()

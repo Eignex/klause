@@ -64,6 +64,7 @@ internal class ExactNeighborhood(
     private val reviseRefutedCenter: ((MutableList<BigFraction>, BooleanArray,
         ExactNeighborhoodCondition, ExecutionControl) -> Unit)? = null,
     private val continuePausedCompletion: () -> Boolean = { false },
+    private val advanceObserver: ExactNeighborhoodAdvanceObserver? = null,
 ) : AutoCloseable {
     private val random = Random(seed)
     private var centers = centers.toMutableList()
@@ -80,6 +81,7 @@ internal class ExactNeighborhood(
     private var charged = 0L
     private var closed = false
     private var booleanCenterPrepared = prepareBooleanCenter == null
+    private var rootCenterAvailable = false
     private var nextCenterBoolean = 0
     private var nextCenterCoordinate = 0
     private var pending: Pair<Int, ExactNeighborhoodCondition>? = null
@@ -106,18 +108,27 @@ internal class ExactNeighborhood(
         onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
     ): Boolean {
         check(!closed) { "neighborhood owner is closed" }
+        val observer = advanceObserver?.takeIf { it.reserveAdvance() }
+        val entry = observer?.let { advanceState() }
+        fun finish(guard: ExactNeighborhoodAdvanceGuard, done: Boolean = searchAllowanceSpent()): Boolean {
+            if (observer != null && entry != null) {
+                observer.recordAdvance(ExactNeighborhoodAdvanceObservation(allowance, entry, advanceState(), guard, done))
+            }
+            return done
+        }
         val end = charged + minOf(allowance.coerceAtLeast(0), Long.MAX_VALUE - charged)
-        while (!cancellation() && charged < end && moves < maximumMoves && charged < maximumInstructions &&
-            !improvementAllowanceSpent() && nodeBudget?.exhausted() != true && !completionExhausted()) {
+        while (true) {
+            advanceGuard(cancellation, end)?.let { return finish(it) }
             if (!booleanCenterPrepared) {
                 val before = nativeWork()
                 val prepared = requireNotNull(prepareBooleanCenter)(cancellation)
                 charge(ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong())
-                if (cancellation()) return searchAllowanceSpent()
+                if (prepared) rootCenterAvailable = true
+                if (cancellation()) return finish(ExactNeighborhoodAdvanceGuard.RootCallbackCancelled)
                 if (!prepared) {
                     if (centerPreparationPending()) {
                         charge(1)
-                        return searchAllowanceSpent()
+                        return finish(ExactNeighborhoodAdvanceGuard.RootPending)
                     }
                     moves++
                     charge(1)
@@ -126,15 +137,13 @@ internal class ExactNeighborhood(
                     continue
                 }
                 while (nextCenterBoolean < boolCount) {
-                    if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
-                        nodeBudget?.exhausted() == true || completionExhausted()) return searchAllowanceSpent()
+                    centerCopyGuard(cancellation, end)?.let { return finish(it) }
                     rootBooleanValue(nextCenterBoolean)?.let { bools[nextCenterBoolean] = it }
                     nextCenterBoolean++
                     charge(1)
                 }
                 while (rootCoordinateValue != null && nextCenterCoordinate < centers.size) {
-                    if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
-                        nodeBudget?.exhausted() == true || completionExhausted()) return searchAllowanceSpent()
+                    centerCopyGuard(cancellation, end)?.let { return finish(it) }
                     val coordinate = nextCenterCoordinate++
                     rootCoordinateValue.invoke(coordinate)?.let { centers[coordinate] = it }
                     charge(1)
@@ -167,8 +176,15 @@ internal class ExactNeighborhood(
             val cost = 1 + ceil((nativeWork() - before).coerceAtLeast(0) * 0.8).toLong()
             charge(cost)
             if (result == ExactNeighborhoodResult.Paused) {
-                if (cost > 1L && charged < end && !cancellation() && continuePausedCompletion()) continue
-                return searchAllowanceSpent()
+                val guard = when {
+                    cost <= 1L -> ExactNeighborhoodAdvanceGuard.CompletionPausedWithoutProgress
+                    charged >= end -> ExactNeighborhoodAdvanceGuard.CompletionPausedAtSliceLimit
+                    cancellation() -> ExactNeighborhoodAdvanceGuard.CompletionPausedCancelled
+                    !continuePausedCompletion() -> ExactNeighborhoodAdvanceGuard.CompletionPausedWithoutContinuation
+                    else -> null
+                }
+                if (guard != null) return finish(guard)
+                continue
             }
             pending = null
             if (incumbent != null) improvementMoves++
@@ -183,7 +199,7 @@ internal class ExactNeighborhood(
                 round = 0
                 if (objective == null) {
                     sink.ls.recordWork(moves, 0, stalls)
-                    return true
+                    return finish(ExactNeighborhoodAdvanceGuard.Satisfied, done = true)
                 }
             } else {
                 round++
@@ -193,10 +209,44 @@ internal class ExactNeighborhood(
                 }
             }
             sink.ls.recordWork(moves, 0, stalls)
-            if (total == 0) return true
+            if (total == 0) return finish(ExactNeighborhoodAdvanceGuard.NoCoordinates, done = true)
         }
-        return searchAllowanceSpent()
     }
+
+    private fun advanceGuard(cancellation: ExecutionControl, end: Long): ExactNeighborhoodAdvanceGuard? = when {
+        cancellation() -> ExactNeighborhoodAdvanceGuard.Cancelled
+        charged >= end -> ExactNeighborhoodAdvanceGuard.SliceInstructions
+        moves >= maximumMoves -> ExactNeighborhoodAdvanceGuard.MoveLimit
+        charged >= maximumInstructions -> ExactNeighborhoodAdvanceGuard.InstructionLimit
+        improvementAllowanceSpent() -> ExactNeighborhoodAdvanceGuard.ImprovementLimit
+        nodeBudget?.exhausted() == true -> ExactNeighborhoodAdvanceGuard.NodeLimit
+        completionExhausted() -> ExactNeighborhoodAdvanceGuard.CompletionLimit
+        else -> null
+    }
+
+    private fun centerCopyGuard(cancellation: ExecutionControl, end: Long): ExactNeighborhoodAdvanceGuard? = when {
+        cancellation.pollStop() -> ExactNeighborhoodAdvanceGuard.Cancelled
+        charged >= end -> ExactNeighborhoodAdvanceGuard.SliceInstructions
+        charged >= maximumInstructions -> ExactNeighborhoodAdvanceGuard.InstructionLimit
+        nodeBudget?.exhausted() == true -> ExactNeighborhoodAdvanceGuard.NodeLimit
+        completionExhausted() -> ExactNeighborhoodAdvanceGuard.CompletionLimit
+        else -> null
+    }
+
+    private fun advanceState() = ExactNeighborhoodAdvanceState(
+        work = charged,
+        phase = when {
+            booleanCenterPrepared -> ExactNeighborhoodAdvancePhase.Ready
+            !rootCenterAvailable -> ExactNeighborhoodAdvancePhase.PreparingRoot
+            nextCenterBoolean < boolCount -> ExactNeighborhoodAdvancePhase.CopyingBooleans
+            else -> ExactNeighborhoodAdvancePhase.CopyingCoordinates
+        },
+        copiedBooleans = nextCenterBoolean,
+        copiedCoordinates = nextCenterCoordinate,
+        moves = moves,
+        pendingOperator = pending?.first,
+        pendingCutoff = pending?.second?.cutoff != null,
+    )
 
     private fun searchAllowanceSpent(): Boolean = moves >= maximumMoves || charged >= maximumInstructions ||
         improvementAllowanceSpent() || nodeBudget?.exhausted() == true || completionExhausted()

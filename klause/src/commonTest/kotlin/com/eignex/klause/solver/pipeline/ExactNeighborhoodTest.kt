@@ -128,6 +128,73 @@ class ExactNeighborhoodTest {
     }
 
     @Test
+    fun `oversized root preparation should defer copying until the next grant`() {
+        val conditions = ArrayList<ExactNeighborhoodCondition>()
+        val copied = ArrayList<Int>()
+        var work = 0L
+        val search = ExactNeighborhood(0, List(3) { BigFraction.ZERO }, ExactNeighborhoodCompletion { condition, _ ->
+            conditions += condition
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, nativeWork = { work },
+            prepareBooleanCenter = {
+                if (work == 0L) work += 10
+                true
+            }, rootCoordinateValue = {
+                copied += it
+                BigFraction.ofLong(it + 3L)
+            })
+
+        assertFalse(search.advance(ExecutionControl.Never, 2))
+        assertEquals(8L, search.work)
+        assertTrue(copied.isEmpty())
+        assertFalse(search.advance(ExecutionControl.Never, 2))
+        assertEquals(listOf(0, 1), copied)
+        assertTrue(conditions.isEmpty())
+        assertTrue(search.advance(ExecutionControl.Never, 2))
+
+        assertEquals(listOf(0, 1, 2), copied)
+        val center = mapOf(0 to BigFraction.ofLong(3), 1 to BigFraction.ofLong(4), 2 to BigFraction.ofLong(5))
+        assertEquals(center, conditions.single().lower)
+        assertEquals(center, conditions.single().upper)
+        assertEquals(12L, search.work)
+    }
+
+    @Test
+    fun `advance observations should retain copying progress and a pending condition`() {
+        val advances = mutableListOf<ExactNeighborhoodAdvanceObservation>()
+        var checks = 0
+        val search = ExactNeighborhood(0, List(2) { BigFraction.ZERO }, ExactNeighborhoodCompletion { _, _ ->
+            if (++checks == 1) ExactNeighborhoodResult.Paused else ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, prepareBooleanCenter = { true },
+            rootCoordinateValue = { BigFraction.ONE },
+            advanceObserver = object : ExactNeighborhoodAdvanceObserver {
+                override fun reserveAdvance() = true
+                override fun recordAdvance(observation: ExactNeighborhoodAdvanceObservation) {
+                    advances += observation
+                }
+            })
+
+        search.advance(ExecutionControl.Never, 1)
+        search.advance(ExecutionControl.Never, 5)
+        search.advance(ExecutionControl.Never, 2)
+
+        val (copy, pause, resolve) = advances
+        assertEquals(1L, copy.offeredInstructions)
+        assertEquals(1L, copy.chargedInstructions)
+        assertEquals(ExactNeighborhoodAdvancePhase.PreparingRoot, copy.entry.phase)
+        assertEquals(ExactNeighborhoodAdvancePhase.CopyingCoordinates, copy.exit.phase)
+        assertEquals(1, copy.exit.copiedCoordinates)
+        assertEquals(ExactNeighborhoodAdvanceGuard.SliceInstructions, copy.guard)
+        assertEquals(copy.exit, pause.entry)
+        assertEquals(ExactNeighborhoodAdvanceGuard.CompletionPausedWithoutProgress, pause.guard)
+        assertEquals(2, pause.exit.pendingOperator)
+        assertEquals(pause.exit, resolve.entry)
+        assertEquals(null, resolve.exit.pendingOperator)
+        assertEquals(ExactNeighborhoodAdvanceGuard.MoveLimit, resolve.guard)
+        assertTrue(resolve.done)
+    }
+
+    @Test
     fun `root coordinate copying should resume before proposing a joint repair`() {
         val conditions = ArrayList<ExactNeighborhoodCondition>()
         val search = ExactNeighborhood(0, List(2) { BigFraction.ZERO }, ExactNeighborhoodCompletion { condition, _ ->
