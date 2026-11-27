@@ -525,8 +525,10 @@ check and applies the receiving cutoff before offering the assignment.
 
 An opt-in distance proposal extends a small binary neighborhood using an
 auxiliary objective over the accepted envelope. The auxiliary scope supplies
-guidance only. The regional query retains its source authority and cutoff.
-The projection and regional continuation spend the existing worker allowance.
+guidance only. The regional query retains its source authority and uses the
+stronger of its existing cutoff and the canonical incumbent. The projection
+returns to the instruction guard before regional search starts. The connected
+query and distance trial may request continuation within the worker allowance.
 
 Point selection admits at most eight mutually nonparallel additional checked cuts per
 usable point and waits for its completed query before scanning again. A mixed ordinary recipe with

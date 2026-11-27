@@ -221,10 +221,11 @@ internal class FiniteNumericalCompanions private constructor(
         if (limits.sourceJointDistanceRepair && incumbentCompletionCheck != null &&
             repair.supportsNominalPublicationRecovery()) {
             repair.enableNominalPublicationRecovery { captureContext(model, objective, it) }
+            repair.enableDistanceCutoff { incumbents.exchange.current()?.objective }
         }
         return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
-            pendingIncumbentTrial = { repair.incumbentTrialPending },
+            pendingIncumbentTrial = { repair.productiveTrialPending },
             open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
     }
 

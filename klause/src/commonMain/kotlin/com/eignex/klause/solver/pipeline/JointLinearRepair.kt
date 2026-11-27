@@ -131,6 +131,8 @@ internal class JointLinearRepair(
         var replacement: ExactNeighborhoodCondition? = null
     }
     private var distanceTrial: DistanceTrial? = null
+    private var distanceBootstrap: ExactNeighborhoodCondition? = null
+    private var distanceCutoff: (() -> BigFraction?)? = null
     private var distanceTried = false
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
@@ -147,6 +149,9 @@ internal class JointLinearRepair(
     private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
     var incumbentTrialPending = false
         private set
+    val productiveTrialPending: Boolean
+        get() = incumbentTrialPending || (params.sourceJointDistanceRepair && !stop() && !exhausted &&
+            (distanceTrial != null || (!distanceTried && distanceBootstrap != null)))
     private var closed = false
     private var declined = false
     private var preparationWork = 0L
@@ -329,7 +334,8 @@ internal class JointLinearRepair(
             centerPreparationPending = { rootPreparationPending },
             continuePausedCompletion = {
                 val proposal = checkedProposal
-                val distancePending = distanceTrial?.replacement?.let { it === queryOriginalCondition } == true
+                val distancePending = (distanceBootstrap != null && distanceBootstrap === queryOriginalCondition) ||
+                    distanceTrial?.replacement?.let { queryOriginalCondition == null || it === queryOriginalCondition } == true
                 val carries = distancePending || (proposal != null && proposal.condition === queryOriginalCondition &&
                     query?.hasIncumbent == true)
                 if (distancePending) observe("jointRepairDistanceResumeRequests")
@@ -421,15 +427,19 @@ internal class JointLinearRepair(
                 (binary ?: relaxation ?: requireNotNull(selection).propose(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
-                        if (!adaptive && sharedFractionalRoot && !distanceTried &&
-                            nominalPublicationCapture != null && round > 0L && sourceIntegers == null &&
-                            model.numIntVars - condition.lower.size in 1..2) {
+                        if (sharedStart && params.sourceJointDistanceRepair && nominalPublicationCapture != null &&
+                            sourceIntegers == null) distanceBootstrap = condition
+                        if (!distanceTried && distanceBootstrap != null && round > 0L) {
                             val work = 1L + model.numIntVars
                             val bytes = 128L + 16L * model.numIntVars
-                            if (funding.remainingWork > work && funding.remainingAllocation > bytes) {
+                            if (model.numIntVars - condition.lower.size in 1..2 &&
+                                funding.remainingWork > work && funding.remainingAllocation > bytes) {
                                 budget.observe(preparation = work)
                                 funding.charge(0L, bytes)
                                 distanceTrial = DistanceTrial(condition, from.take(model.numIntVars))
+                            } else {
+                                distanceTried = true
+                                distanceBootstrap = null
                             }
                         }
                         if (bootstrap) {
@@ -621,17 +631,29 @@ internal class JointLinearRepair(
         if (trial != null && !distanceTried && !stop() && !cancellation()) {
             distanceTried = true
             observe("jointRepairDistanceProjections")
-            trial.replacement = JointBinaryDistance(source, budget).expand(requested, trial.center, stop or cancellation)
-            val expanded = trial.replacement
-            if (expanded == null) observe("jointRepairDistanceDeclined") else {
+            val guidance = JointBinaryDistance(source, budget).expand(requested, trial.center, stop or cancellation)
+            val liveCutoff = distanceCutoff?.invoke()
+            val expanded = guidance?.let {
+                if (liveCutoff == null || (it.cutoff != null && it.cutoff <= liveCutoff)) it
+                else it.copy(cutoff = liveCutoff)
+            }
+            trial.replacement = expanded
+            if (expanded == null) {
+                distanceTrial = null
+                observe("jointRepairDistanceDeclined")
+            } else {
                 observe("jointRepairDistanceExpanded")
                 compare("distance", "expanded", cutoff = expanded.cutoff)
                 observation?.event(proposalSequence, observationQuery, "distance", "expanded")
             }
+            return JointRepairAttempt(ExactNeighborhoodResult.Paused)
         }
         val condition = trial?.replacement ?: requested
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
+            if (requested === distanceBootstrap && result.result != ExactNeighborhoodResult.Refuted) {
+                distanceBootstrap = null
+            }
             if (trial != null) distanceTrial = null
             observation?.event(proposalSequence, observationQuery, "result", when (result.result) {
                 is ExactNeighborhoodResult.Witness -> "checked-source-witness"
@@ -679,6 +701,11 @@ internal class JointLinearRepair(
         source.scope.revision.semantics == "absolute-tolerance-envelope-v1" &&
             model.numBoolVars == 0 && model.numIntVars in 1..256 && model.numRealVars > 0 &&
             model.binaryIntegers && incumbentCompletionCheck != null && objective != null
+
+    fun enableDistanceCutoff(cutoff: () -> BigFraction?) {
+        check(params.sourceJointDistanceRepair && distanceCutoff == null)
+        distanceCutoff = cutoff
+    }
 
     fun enableNominalPublicationRecovery(capture: (ExecutionControl) -> SourceProofContext?) {
         check(query == null && nominalPublicationCapture == null && !nominalPublicationTried)
@@ -1098,6 +1125,7 @@ internal class JointLinearRepair(
         bootstrapHint = null
         guidedProposal = null
         distanceTrial = null
+        distanceBootstrap = null
         readyCenterStep = null
         selection?.clearRefutation()
         refutedConditions.clear()
