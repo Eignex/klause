@@ -537,7 +537,7 @@ internal class FloatEvidenceModel(val model: LpModel) {
     inline fun forEachInColumn(column: Int, action: (Int, Double) -> Unit) {
         val exact = model.exactState?.model
         if (exact != null) {
-            for (entry in exact.entries(column)) action(entry.row, entry.number.approximation)
+            for (entry in exact.columnEntries(column)) action(entry.row, entry.number.approximation)
         } else {
             model.forEachInColumnD(column, action)
         }

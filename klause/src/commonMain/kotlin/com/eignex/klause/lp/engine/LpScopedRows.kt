@@ -150,7 +150,7 @@ internal fun ExactLpModel.appendScopedRow(row: LpScopedRow): ExactLpModel = appe
 
 internal fun ExactLpModel.compactLayout(remap: LpLayoutRemap): ExactLpModel = ExactLpModel(
     remap.retainedColumns.map { column ->
-        entries(column).mapNotNull { entry ->
+        columnEntries(column).mapNotNull { entry ->
             val next = remap.row(entry.row)
             if (next < 0) null else ExactLpEntry(next, entry.number)
         }
