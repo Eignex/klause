@@ -174,14 +174,11 @@ internal class LiveQfLraSystem(
                 }
                 put(comparison.ordered, keys)
                 val row = rows[rowIndex]
-                if (marginColumn != null) {
-                    keys.includeStrictSides(comparison)
-                    if (row.activator != LinearRow.ALWAYS) keys.includeStrictSides(form.comparison(false) { false })
-                }
                 if (factor.linearForm !is LinearForm.Disjunction && row.activator == LinearRow.ALWAYS &&
                     (0 until row.size).none { Term.isBool(row.ref(it)) }
                 ) {
                     initialTerms += keys.positive
+                    if (marginColumn != null) keys.includeStrictSides(comparison)
                 }
             }
         }

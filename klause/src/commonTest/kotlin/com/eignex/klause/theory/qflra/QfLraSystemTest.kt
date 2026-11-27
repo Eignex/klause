@@ -882,6 +882,29 @@ class QfLraSystemTest {
     }
 
     @Test
+    fun `a guarded strict margin should constrain a point only while asserted`() {
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0, strict = true)
+        val source = source().withFactors(arrayOf(factor))
+        val comparison = factor.linearRows.single().exactForm(2).comparison(true) { false }
+        val point = listOf(BigFraction.ZERO, BigFraction.ofLong(2L).reciprocal(), BigFraction.ONE)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, strictMargin = true)
+            assertTrue(system.install())
+            assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+            val session = SearchSession(listOf(lp))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+            assertTrue(system.assertComparison(comparison, null, premise(0)))
+            assertFalse(system.acceptsPoint(point, ExecutionControl.Never))
+
+            session.popTo(0)
+            assertTrue(system.acceptsPoint(point, ExecutionControl.Never))
+        }
+    }
+
+    @Test
     fun `a guarded definition should survive retraction while its strict bound retracts`() {
         val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
             doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0, strict = true)
