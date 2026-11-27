@@ -313,6 +313,7 @@ internal class JointLinearRepair(
             maximumMoves = params.maxFlips, maximumInstructions = params.maxInstructions ?: Long.MAX_VALUE,
             maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
             nativeWork = { work }, completionStats = { stats }, onClose = ::close,
+            advanceObserver = observation,
             prepareBooleanCenter = { prepare(it, bootstrap = !adaptive) }, rootCoordinateValue = ::center,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },

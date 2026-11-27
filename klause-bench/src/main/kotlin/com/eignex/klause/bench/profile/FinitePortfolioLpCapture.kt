@@ -354,7 +354,8 @@ internal object FinitePortfolioLpCapture {
                             put("jointRecords", jointRecords)
                             put("jointObserverNs", jointObserverNs)
                             put("jointCaptureLimits",
-                                "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits")
+                                "64 detailed records and 128 advance records per owner. " +
+                                    "Detailed records cap entries at 16384, modeled bytes at 1048576 and scalars at 4096 bits.")
                             val finite = (result as? SourceExecutionResult.Finite)?.result?.outcome
                                 as? FiniteSolveOutcome.Completed
                             if (captureJoint) {
@@ -412,6 +413,15 @@ internal object FinitePortfolioLpCapture {
                 "IntegerCount", "RealCount", "BooleanCount")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, call(observation, "get$name")?.toString())
             }
+            call(observation, "getAdvance")?.let { advance ->
+                put("advance", buildJsonObject {
+                    put("offeredInstructions", get(advance, "OfferedInstructions") as Long)
+                    put("chargedInstructions", get(advance, "ChargedInstructions") as Long)
+                    put("done", get(advance, "Done") as Boolean)
+                    put("entry", advanceStateMetadata(get(advance, "Entry")))
+                    put("exit", advanceStateMetadata(get(advance, "Exit")))
+                })
+            }
             for (name in listOf("Centers", "Bools", "Lower", "Upper")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, buildJsonObject {
                     (get(observation, name) as Map<*, *>).forEach { (key, value) ->
@@ -435,6 +445,16 @@ internal object FinitePortfolioLpCapture {
             }))
             put("sourceVerdictClaim", false)
         }
+
+    private fun advanceStateMetadata(state: Any): JsonObject = buildJsonObject {
+        put("work", get(state, "Work") as Long)
+        put("phase", get(state, "Phase").toString())
+        put("copiedBooleans", get(state, "CopiedBooleans") as Int)
+        put("copiedCoordinates", get(state, "CopiedCoordinates") as Int)
+        put("moves", get(state, "Moves") as Long)
+        put("pendingOperator", call(state, "getPendingOperator") as Int?)
+        put("pendingCutoff", get(state, "PendingCutoff") as Boolean)
+    }
 
     internal class QueryWindow(private val worker: String, private val captureLimit: Int) {
         private val owners = IdentityHashMap<Any, Int>()

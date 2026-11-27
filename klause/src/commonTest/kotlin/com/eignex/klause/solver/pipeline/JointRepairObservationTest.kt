@@ -86,6 +86,27 @@ class JointRepairObservationTest {
     }
 
     @Test
+    fun `advance observations should spend a bounded allowance without polling cancellation`() {
+        val funding = SourceLpFunding(1_000_000, 1_000_000)
+        val records = mutableListOf<JointRepairObservation>()
+        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding),
+            ExecutionControl { error("advance observation polled cancellation") }, records::add)
+        val search = ExactNeighborhood(0, emptyList(), ExactNeighborhoodCompletion { _, _ ->
+            error("a zero grant should not open a query")
+        }, coordinateValues = { emptyList() }, advanceObserver = capture)
+
+        repeat(130) { search.advance(ExecutionControl.Never, 0) }
+
+        assertEquals(128, records.size)
+        assertEquals(2L, capture.observations()["jointRepairObservationDroppedAdvances"])
+        assertEquals(2_048L, funding.spent)
+        assertEquals(65_536L, funding.allocated)
+        assertTrue(funding.paused)
+        assertFalse(funding.exhausted)
+        assertEquals(0L, search.work)
+    }
+
+    @Test
     fun `spent funding should withhold a capture without charging more work`() {
         val funding = SourceLpFunding(0, 1_000_000)
         val records = mutableListOf<JointRepairObservation>()
