@@ -606,12 +606,13 @@ internal class LiveQfLraSystem(
         premise: SearchAtomPremise,
         beforeDefinition: () -> Boolean = { true },
     ): List<LpPremisedBound>? {
-        val original = prepareBound(key, upper, threshold, strict, premise, beforeDefinition) ?: return null
-        val margin = marginColumn ?: return listOf(original)
-        if (!strict) return listOf(original)
-        val interior = prepareBound(key.withMargin(margin, upper), upper, threshold, false, premise, beforeDefinition)
-            ?: return null
-        return listOf(original, interior)
+        val margin = marginColumn
+        val bound = if (strict && margin != null) {
+            prepareBound(key.withMargin(margin, upper), upper, threshold, false, premise, beforeDefinition)
+        } else {
+            prepareBound(key, upper, threshold, strict, premise, beforeDefinition)
+        }
+        return bound?.let { listOf(it) }
     }
 
     private fun definitionColumn(coefficients: Map<Int, BigFraction>, beforeAppend: () -> Boolean): Int? =

@@ -38,9 +38,9 @@ every asserted atom becomes a bound on a single column, and asserting or retract
 an atom only moves a bound.
 
 Pure-real feasibility retains a private margin column `e` in `[0, 1]` and minimizes
-`-e`. Each strict side `t < b` also asserts the closed side `t + e <= b`; the
-original strict bound stays available to explained interval deductions. A finite
-strict system has an interior point exactly when a common positive margin exists.
+`-e`. It represents a strict side `t < b` by the closed side `t + e <= b`, carrying
+the strict side's source premises. A finite strict system has an interior point
+exactly when a common positive margin exists.
 A certified point with positive margin supplies a source candidate. A certified
 lower bound of zero on `-e` refutes strict feasibility and explains the conflict
 with the bound's current source premises. The margin and its affine definitions

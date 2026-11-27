@@ -15,6 +15,7 @@ import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -275,6 +276,23 @@ class QfLraSystemTest {
                 SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(0, false)))))
             assertFalse(system.acceptsPoint(interior, ExecutionControl.Never))
             assertTrue(system.acceptsPoint(boundary, ExecutionControl.Never))
+        }
+    }
+
+    @Test
+    fun `opposing strict and closed sides should certify a zero margin`() {
+        val difference = mapOf(0 to BigFraction.ONE, 1 to BigFraction.MINUS_ONE)
+        val strict = ExactComparison(difference, BigFraction.ZERO, LinearOp.LE, strict = true, hasReals = true)
+        val closed = ExactComparison(difference, BigFraction.ZERO, LinearOp.GE, strict = false, hasReals = true)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp, strictMargin = true)
+            assertTrue(system.install())
+            assertTrue(system.assertComparison(strict, null, premise(0)))
+            assertTrue(system.assertComparison(closed, null, premise(1)))
+
+            val result = lp.solve(claim = LpClaim.BOUND)
+
+            assertEquals(BigFraction.ZERO, result?.lowerBound)
         }
     }
 
