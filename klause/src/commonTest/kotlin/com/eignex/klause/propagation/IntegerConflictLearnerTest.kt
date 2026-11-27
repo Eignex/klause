@@ -145,26 +145,44 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     @Test
     fun `retained arithmetic rows should supply both seeds and reusable endpoint reasons`() {
         for (retainedSeed in listOf(false, true)) {
-            val original = if (retainedSeed)
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0) else
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0)
-            val variables = if (retainedSeed) intArrayOf(0, 1, 2) else intArrayOf(0, 1)
-            val coefficients = if (retainedSeed) longArrayOf(2, 1, -1) else longArrayOf(2, -1)
-            val retained = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
-                coefficients, variables, LinearOp.LE, 0), useLo = true))
-            val native = PropagationSession(Problem(0, 3,
-                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(original)),
-                pbLearning = false).apply { enableIntegerRowLearning() }
-            assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(retained, 3))
-            assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
-
-            val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+            val (native, conflict) = conflictUsingRetainedRow(retainedSeed, reuse = true)
 
             val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
             native.popToLevel(learned.backjumpLevel)
             assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
             assertEquals(1L, native.intDomain(0).max)
         }
+    }
+
+    @Test
+    fun `disabled arithmetic reuse should keep retained row deductions with clause analysis`() {
+        for (retainedSeed in listOf(false, true)) {
+            val (_, conflict) = conflictUsingRetainedRow(retainedSeed, reuse = false)
+
+            assertTrue(assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause).asserting)
+        }
+    }
+
+    private fun conflictUsingRetainedRow(
+        retainedSeed: Boolean,
+        reuse: Boolean,
+    ): Pair<PropagationSession, PropagationResult.Unsat> {
+        val original = if (retainedSeed)
+            Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0) else
+            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0)
+        val variables = if (retainedSeed) intArrayOf(0, 1, 2) else intArrayOf(0, 1)
+        val coefficients = if (retainedSeed) longArrayOf(2, 1, -1) else longArrayOf(2, -1)
+        val retained = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
+            coefficients, variables, LinearOp.LE, 0), useLo = true))
+        val native = PropagationSession(Problem(0, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(original)),
+            pbLearning = false).apply {
+            enableIntegerRowLearning()
+            configureIntegerRowAdmission(enabled = true, reuse = reuse)
+        }
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(retained, 3))
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+        return native to assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
     }
 
     @Test

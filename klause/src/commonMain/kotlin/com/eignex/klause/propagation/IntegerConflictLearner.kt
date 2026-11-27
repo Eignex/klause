@@ -27,7 +27,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         state.arithmeticLearningTrace?.record("integer.decline.overflow")
         null
     } finally {
-        state.integerRowDiscoveryWork += state.work - initialWork
+        state.integerRowAnalysisWork += state.work - initialWork
     }
 
     private fun decline(cause: String): Nothing? {

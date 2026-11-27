@@ -37,6 +37,19 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `the retained row reuse control should reach fixed and portfolio workers`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        val settings = listOf("integer-row-reuse=false")
+
+        val workers = listOf(applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true),
+            applyBacktrackParams(base, EngineParams(settings)))
+
+        for (worker in workers) {
+            assertEquals(false, worker.integerRowReuse)
+        }
+    }
+
+    @Test
     fun `integer learning allowances should reach fixed and portfolio workers`() {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         val settings = listOf("arithmetic-learning-work=0", "arithmetic-learning-allocation-bytes=4096")

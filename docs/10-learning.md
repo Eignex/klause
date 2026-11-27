@@ -374,10 +374,13 @@ counts completed native derivations and
 counter establishes retained admission or consumption. Admission defaults to enabled
 and does not itself enable integer learning.
 
-`integerRowReuse=false` keeps retained rows' propagation, eager clauses and lifetime,
-and excludes those rows as arithmetic seeds and endpoint reasons in later analysis.
-Discovery and row propagation report charged native work, including interrupted
-work. Post-initial firings count separately from the first firing of each row.
+`integerRowReuse=false` keeps retained rows' propagation, historical clausal
+explanations and lifetime, and excludes those rows as arithmetic seeds and endpoint
+reasons in later analysis. Integer analysis, row attachment and row firing report
+their charged native work, including interrupted work. Firings after each row's
+first firing have their own counts. A useful firing changes a propagation count
+or detects a contradiction. Retirement counts describe the learned store's policy;
+they exclude session teardown and have no separate mixed-store work total.
 
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
