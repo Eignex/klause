@@ -142,9 +142,11 @@ internal class IntegerConflictRow private constructor(
             val residual = slack + contribution
             budget.scalar(residual, coefficient)
             val next = endpoint(residual, coefficient)
-            val tightens = if (raisesLower) next > domain.min else next < domain.max
+            if (!next.fitsLong()) continue
+            val value = next.toLongExact()
+            val tightens = if (raisesLower) value > domain.min else value < domain.max
             if (!tightens) continue
-            if (index != pivot || next.compareTo(unitBound) != 0 || unitBound !in domain) return false
+            if (index != pivot || value != unitBound || unitBound !in domain) return false
             matching = true
         }
         return matching
