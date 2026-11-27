@@ -153,9 +153,13 @@ internal class OpenPortfolio(
                 .bindInvocation(binding, lifetime.includingStop( cancellation),
                 ),
         ) { workers ->
+            val probeWeights = if (lanes == 1 && request?.route == ProblemPipeline.EXACT_LRA) {
+                leadingProbeWeights(workers)
+            } else intArrayOf()
             PortfolioInvocationPolicy(
                 ProblemProfile.of(model, optimizing = false),
                 reservedShares(workers, if (request != null) THEORY_SHARE else 0.0),
+                probeWeights = probeWeights,
             )
         }
         val result = portfolio.use { it.solve(cancellation) }
