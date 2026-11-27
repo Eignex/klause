@@ -3,10 +3,23 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class HeuristicBranchingTest {
+
+    @Test
+    fun `the activity switch should request only one restart`() {
+        val branching = ActivityRestartBooleanBranching(numBoolVars = 3, initialDecisions = 2L)
+        assertFalse(branching.shouldRestart(1L))
+        assertTrue(branching.shouldRestart(2L))
+
+        branching.onRestart()
+
+        assertFalse(branching.shouldRestart(3L))
+    }
 
     @Test
     fun `heuristic branching should offer the false polarity before the true one`() {
