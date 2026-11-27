@@ -166,7 +166,8 @@ class FactorPolynomialProjectionTest {
         val execution = assertIs<SourceExecutionResult.Polynomial>(
             SourceSetup.execute(SourceExecutionRequest(invocation, params)))
 
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result.result).reason)
+        val result = assertIs<OpenTheoryResult.Unknown>(execution.result.result)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
         assertTrue(execution.result.stats.workSpent > 0)
     }
 
@@ -203,7 +204,8 @@ class FactorPolynomialProjectionTest {
         val execution = assertIs<SourceExecutionResult.Polynomial>(
             SourceSetup.execute(SourceExecutionRequest(invocation, params)))
 
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result.result).reason)
+        val result = assertIs<OpenTheoryResult.Unknown>(execution.result.result)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
         assertEquals(2L, budget.spent)
     }
 
@@ -221,7 +223,8 @@ class FactorPolynomialProjectionTest {
         val execution = assertIs<SourceExecutionResult.Polynomial>(
             SourceSetup.execute(SourceExecutionRequest(invocation, params)))
 
-        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result.result).reason)
+        val result = assertIs<OpenTheoryResult.Unknown>(execution.result.result)
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
         assertEquals(64L, charged)
         assertEquals(charged, execution.result.stats.workSpent)
     }

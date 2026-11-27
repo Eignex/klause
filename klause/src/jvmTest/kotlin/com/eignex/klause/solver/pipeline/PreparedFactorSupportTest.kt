@@ -98,20 +98,27 @@ class PreparedFactorSupportTest(
     }
 
     @Test
-    fun `open integer polynomial traversal should require every source relation encoded`() {
+    fun `open integer polynomial traversal should require an enforcing owner for every source relation`() {
         val source = source(arrayOf(factor, ContinuousProduct(2, 2, 3)), open = true)
         val selected = FactorProjectionProviders.Default.prepare(source)
         val nativeOnly = setOf("exactRealEquality", "xor", "gaussianXor", "reifiedCardinality", "allDifferentTuples",
             "globalCardinality", "nValue", "sort", "valuePrecede", "lexLess", "inverse",
             "symmetricAllDifferent", "circuit", "cumulative", "diffn", "table", "regular", "mdd", "symmetryHandling")
-        val completeEncoding = name.substringBeforeLast("-") !in nativeOnly
+        val kind = name.substringBeforeLast("-")
+        val completeEncoding = kind !in nativeOnly
         assertEquals(completeEncoding, selected.encoder(0, EncodingTarget.POLYNOMIAL).enforcesSource)
 
         val plan = source.prepareExecutionPlan()
 
-        assertSatisfaction(plan, completeEncoding)
+        val finitePeer = kind in setOf("xor", "gaussianXor", "reifiedCardinality")
+        val traversesFinite = engine in setOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.MIXED)
+        assertSatisfaction(plan, completeEncoding || (finitePeer && traversesFinite))
         assertOwner(plan)
-        if (!completeEncoding) assertNotNull(plan.decline)
+        if (finitePeer) {
+            assertEquals(ComponentResponsibility.FINITE, plan.factorOwner(0).responsibility)
+        } else if (!completeEncoding) {
+            assertNotNull(plan.decline)
+        }
     }
 
     private fun source(factors: Array<Factor>, open: Boolean = false): Problem = Problem(
