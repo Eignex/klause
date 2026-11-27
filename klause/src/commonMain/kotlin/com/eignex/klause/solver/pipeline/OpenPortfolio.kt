@@ -157,7 +157,7 @@ internal class OpenPortfolio(
             PortfolioInvocationPolicy(
                 ProblemProfile.of(model, optimizing = false),
                 reservedShares(workers, if (request != null) THEORY_SHARE else 0.0),
-                probeWeights = if (realLinearProofProbe) leadingProbeWeights(workers, 3) else intArrayOf(),
+                probeWeights = if (realLinearProofProbe) leadingProbeWeights(workers, 9) else intArrayOf(),
                 initialProofProbeMillis = if (realLinearProofProbe) REAL_LINEAR_PROBE_MILLIS else 0L,
             )
         }
