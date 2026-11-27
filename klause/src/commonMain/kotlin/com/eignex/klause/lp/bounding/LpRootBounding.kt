@@ -309,6 +309,10 @@ internal fun LpEngine.checkContinuedRootBound(
     if (!bound.isFinite() || cancellation.pollStop()) return
     if (bound <= (continuedRootLowerBound ?: Double.NEGATIVE_INFINITY)) return
     continuedRootLowerBound = bound
+    if (automaticSparseTrial && rootPointObservationEnabled) {
+        observeRootPoint(LpRootPointStage.BOUND, LpRootPointDisposition.BOUND_CHECKED,
+            model, sourceRoot = true, paused = paused, bound = bound)
+    }
     val outcome = if (paused) "ContinuedPausedBounds" else "ContinuedCompletedBounds"
     sink.lp.sparseTrial = sink.lp.sparseTrial + (outcome to ((sink.lp.sparseTrial[outcome] ?: 0L) + 1L))
     recordRootLowerBound(bound)

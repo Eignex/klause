@@ -849,6 +849,8 @@ internal object FinitePortfolioLpCapture {
         val elapsedNs: Long,
         val admission: RootAdmissionRecord? = null,
         val valueCommit: RootPointValueCommit? = null,
+        val bound: Double? = null,
+        val priorSharedBound: Double? = null,
     ) {
         fun json(): JsonObject = buildJsonObject {
             put("worker", worker)
@@ -872,6 +874,10 @@ internal object FinitePortfolioLpCapture {
             put("elapsedNs", elapsedNs)
             admission?.let { put("admission", it.json()) }
             valueCommit?.let { put("valueCommit", it.json()) }
+            bound?.let {
+                put("bound", it)
+                put("priorSharedBound", priorSharedBound)
+            }
         }.also { require(it.toString().encodeToByteArray().size <= ROOT_POINT_RECORD_BYTE_LIMIT) }
     }
 
@@ -1036,7 +1042,7 @@ internal object FinitePortfolioLpCapture {
                     val disposition = get(event, "Disposition").toString()
                     require(stage.length <= 64 && disposition.length <= 64)
                     require(stage in setOf("ADMISSION", "OWNER", "QUERY_CALL", "COPY", "GUIDANCE", "TARGETS",
-                        "HANDOFF", "CONSUMER", "CLOSE_BEGIN", "CLOSE_END"))
+                        "HANDOFF", "CONSUMER", "BOUND", "CLOSE_BEGIN", "CLOSE_END"))
                     if (owner.worker != worker || owner.closeEnd || sequence != owner.sequence + 1L ||
                         (owner.closeBegin && stage != "CLOSE_END")
                     ) owner.incomplete = true
@@ -1124,10 +1130,19 @@ internal object FinitePortfolioLpCapture {
                             require(if (it.atMost) it.preferred <= it.limit else it.preferred >= it.limit)
                         }
                     } else null
+                    val bound = if (stage == "BOUND") get(event, "Bound") as Double else null
+                    val priorSharedBound = if (stage == "BOUND") call(event, "getPriorSharedBound") as Double? else null
+                    if (bound != null) {
+                        require(bound.isFinite() && automatic && sourceRoot == true && model != null)
+                        require(disposition in setOf("BOUND_CHECKED", "BOUND_APPLIED"))
+                        require(if (disposition == "BOUND_CHECKED") priorSharedBound == null
+                            else paused == null && (priorSharedBound == null ||
+                                priorSharedBound.isFinite() && priorSharedBound < bound))
+                    }
                     records.add(RootPointRecord(worker, index, source, objective, pointObjective, model,
                         point, previous, sequence, query, stage, disposition,
                         automatic, auxiliary, partial, sourceRoot, paused, termination,
-                        elapsedNs, admission, valueCommit))
+                        elapsedNs, admission, valueCommit, bound, priorSharedBound))
                 } catch (failure: Exception) {
                     if (failure is CancellationException) throw failure
                     failures++

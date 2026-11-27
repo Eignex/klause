@@ -1648,9 +1648,19 @@ internal class ResumableMinimize(
         captureRootHandoffFloor(rootBound)
         if (!rootBound.isFinite() || rootBound <= provedRootBound) return
         sink.lp.observeRootBound(0, rootBound)
+        val observedModel = if (lpEngine.automaticSparseTrial && lpEngine.rootPointObservationEnabled)
+            lpEngine.sourceRootBoundLayout?.model else null
+        val before = if (observedModel != null) params.objectiveLowerBoundSupplier?.invoke() else null
         params.objectiveLowerBoundSink?.invoke(rootBound)
         provedRootBound = rootBound
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.ROOT))
+        if (observedModel != null && before != null && before < rootBound &&
+            params.objectiveLowerBoundSupplier?.invoke() == rootBound
+        ) {
+            lpEngine.observeRootPoint(LpRootPointStage.BOUND, LpRootPointDisposition.BOUND_APPLIED,
+                observedModel, sourceRoot = true, bound = rootBound,
+                priorSharedBound = before.takeIf { it.isFinite() })
+        }
     }
 
     /**
@@ -1713,6 +1723,10 @@ internal class ResumableMinimize(
         return false
     }
 
+    private fun preferFullRootValue(session: PropagationSession): Boolean =
+        session.decisionLevel == 0 && lpEngine.automaticSparseTrial && !lpEngine.params.lpPlan.componentOwnership &&
+            lpEngine.rootPrimalTargets?.let { !it.auxiliary && it.knownColumns == null } == true
+
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
         private var sourcePreference: Pair<RootPrimalTargets, Long>? = null
@@ -1738,7 +1752,7 @@ internal class ResumableMinimize(
         }
 
         override fun pick(session: PropagationSession): VarRef? {
-            if (incumbents.current() == null) {
+            if (incumbents.current() == null && !preferFullRootValue(session)) {
                 lpEngine.pickRootComponent(session, params.cancellation)?.let {
                     lpHints?.selected(null)
                     return it
@@ -1822,10 +1836,13 @@ internal class ResumableMinimize(
                 restartRootTargetsPending = false
                 lpEngine.refreshRootPrimalTargets(session, params.cancellation)
             }
-            val deferSimplex = incumbents.current() == null &&
-                lpEngine.prepareRootComponentOrder(session, params.cancellation) != null
+            val noIncumbent = incumbents.current() == null
+            val directRootValue = noIncumbent && preferFullRootValue(session)
+            val deferSimplex = directRootValue || (noIncumbent &&
+                lpEngine.prepareRootComponentOrder(session, params.cancellation) != null)
             if (deferSimplex) {
-                sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "NODE_QUERY_DEFERRED", 0L)
+                val stage = if (directRootValue) "PRIMAL_VALUE_GUIDANCE" else "PRIMAL_COMPONENT_ORDER"
+                sink.lp.observePrimalPhase(stage, "NODE_QUERY_DEFERRED", 0L)
             }
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
                 singleObj?.ascending ?: true, deferSimplex = deferSimplex)

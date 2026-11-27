@@ -625,6 +625,23 @@ class FinitePortfolioLpCaptureTest {
         assertEquals(split, events[1].valueCommit)
     }
 
+    @Test
+    fun `an applied root bound keeps the checked model and preceding shared floor`() {
+        val owner = Any()
+        val model = Any()
+        val window = FinitePortfolioLpCapture.RootPointWindow("any")
+        val checked = RootEvent(owner, 1L, "BOUND", "BOUND_CHECKED", model = model, sourceRoot = true, bound = 33.0)
+
+        window.observe("bt/lp-default", checked, 0L)
+        window.observe("bt/lp-default", checked.copy(sequence = 2L, disposition = "BOUND_APPLIED",
+            priorSharedBound = 12.0), 0L)
+
+        val events = window.snapshot().events
+        assertEquals(events[0].model, events[1].model)
+        assertEquals(events[0].bound, events[1].bound)
+        assertEquals(12.0, events[1].priorSharedBound)
+    }
+
     internal data class RootEvent(
         val owner: Any,
         val sequence: Long,
@@ -645,6 +662,8 @@ class FinitePortfolioLpCaptureTest {
         val termination: String? = null,
         val admission: FinitePortfolioLpCapture.RootAdmissionRecord? = null,
         val valueCommit: FinitePortfolioLpCapture.RootPointValueCommit? = null,
+        val bound: Double? = null,
+        val priorSharedBound: Double? = null,
     )
 
 
