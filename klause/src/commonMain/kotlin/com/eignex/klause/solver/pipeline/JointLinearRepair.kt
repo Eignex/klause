@@ -926,6 +926,7 @@ internal class JointLinearRepair(
                     }
                 }, state = state, borrowedAuthority = authority, borrowedBudget = budget,
                 boundOrdered = boundOrdered, guidance = true, funding = funding,
+                cuts = boundOrdered && params.sourceCuts && !queryProximity,
                 onNumericalFeedback = if (refutationGuidance) { feedback ->
                     guideRefutation(captured, querySource, feedback)
                 } else null,

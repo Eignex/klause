@@ -70,7 +70,8 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
         val records = mutableListOf<JointRepairObservation>()
 
         JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 3, sourceLpOperations = 4),
-            external = { offered }, incumbentProximity = true, incumbentCompletionCheck = { sample, _, token ->
+            boundOrdered = true, external = { offered }, incumbentProximity = true,
+            incumbentCompletionCheck = { sample, _, token ->
                 verifier.verify(SourceEvidence(source.scope, SourceClaim.Witness(sample),
                     SourceDerivation.SourceWitness), token) == SourceEvidenceCheck.Checked
             }, onObservation = records::add).use { repair ->
