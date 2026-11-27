@@ -233,8 +233,10 @@ inclusive and overlap the certifier ledger. A successful check alone is not
 consumption: separate observations count accepted leaf packages and actual bound or
 conflict pruning. Heuristic LP seeding consumes floating coordinates directly and
 requests no certificate.
-Exact point reconstruction checks every bound, skips zero objective products, and
-reuses converted coordinates where the source origin is zero.
+Exact point reconstruction checks every bound. It skips matrix products for zero
+primal coordinates and objective products for zero objective coefficients. It
+reuses converted coordinates where the source origin is zero. The complete input
+is admitted before these shortcuts.
 Reconstruction shares a complete immutable coefficient capture across models with
 the same owned matrix. Each invocation repeats input, scalar, work and allocation
 admission; bounds, premises, right-hand sides and objective values are read from
