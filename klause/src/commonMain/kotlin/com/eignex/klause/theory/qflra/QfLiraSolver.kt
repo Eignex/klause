@@ -304,6 +304,12 @@ class ExactLiraSearchComponent private constructor(
                 }
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
                     primaryLpObserver?.observeSolve(metrics, component)
+                    observeCompleteStage("LP_BASIS_PIVOTS", metrics.pivots.toLong())
+                    observeCompleteStage("LP_BASIS_BUILD_WORK", metrics.basisBuildWork)
+                    observeCompleteStage("LP_BASIS_FACTOR_ENTRIES", metrics.factorEntriesBuilt)
+                    observeCompleteStage("LP_BASIS_BACKEND_REBUILDS", metrics.backendRequestedRefactorizations.toLong())
+                    observeCompleteStage("LP_BASIS_UPDATE_CAP_REBUILDS", metrics.updateLimitRefactorizations.toLong())
+                    observeCompleteStage("LP_BASIS_INITIAL_REBUILDS", metrics.initialRefactorizations.toLong())
                 }
                 override fun observePhase(metrics: LpPhaseMetrics) {
                     primaryLpObserver?.observePhase(metrics)
