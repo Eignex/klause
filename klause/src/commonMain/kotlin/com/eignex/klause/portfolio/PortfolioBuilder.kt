@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.InvariantNetworkPreparation
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchPreparation
+import com.eignex.klause.lp.bounding.LpRootPointObservation
 import com.eignex.klause.lp.engine.LpQueryObservation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -104,6 +105,7 @@ object PortfolioBuilder {
         acceptedIncumbents: IncumbentSource<Sample, Double>? = null,
         onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
         onSession: ((String, PropagationSession) -> Unit)? = null,
+        onRootPoint: ((String, LpRootPointObservation) -> Unit)? = null,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
@@ -171,8 +173,10 @@ object PortfolioBuilder {
                     tuned.withLpQueryObserver(onLpQuery) else tuned
                 val guided = if (onGuidance != null && queried is BacktrackWorkerConfig)
                     queried.withGuidanceObserver(onGuidance) else queried
-                val bounded = if (onSession != null && guided is BacktrackWorkerConfig)
-                    guided.withSessionObserver(onSession) else guided
+                val rooted = if (onRootPoint != null && guided is BacktrackWorkerConfig)
+                    guided.withRootPointObserver(onRootPoint) else guided
+                val bounded = if (onSession != null && rooted is BacktrackWorkerConfig)
+                    rooted.withSessionObserver(onSession) else rooted
                 val privateCoordinates = objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&

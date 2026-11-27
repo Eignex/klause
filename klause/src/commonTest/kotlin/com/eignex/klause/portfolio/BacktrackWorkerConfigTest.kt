@@ -13,6 +13,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.LpRootPointStage
+import com.eignex.klause.lp.bounding.boundedLpEngineProblem
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
@@ -30,6 +32,46 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackWorkerConfigTest {
+    @Test
+    fun `root observation preserves guidance events and improving witnesses`() {
+        val problem = boundedLpEngineProblem().bake()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 1L })
+        val witnesses = mutableListOf<List<Double>>()
+        val guidance = mutableListOf<List<PooledGuidanceKind>>()
+        val rootStages = mutableListOf<LpRootPointStage>()
+        for (root in listOf(false, true)) {
+            val kinds = mutableListOf<PooledGuidanceKind>()
+            val recipe = BacktrackRecipe("observed") { _, _ ->
+                BacktrackParams(randomSeed = 0L,
+                    lpPlan = LpPlan(rootBudgetMillis = 0L, rootCutHarvest = false))
+            }
+            val guided = BacktrackWorkerConfig(recipe).withGuidanceObserver { _, event -> kinds.add(event.kind) }
+            val config = if (root) guided.withRootPointObserver { _, event -> rootStages.add(event.stage) } else guided
+            val worker = config.materialize(problem, index = 0, armId = 0, seed = 0L, lsLambda = 1.0,
+                objective = objective, lsObjective = null, definitionalSweep = null, onEvent = null, pools = null)
+
+            witnesses.add(worker.use {
+                it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never)
+                    .mapNotNull { improvement -> improvement.objectiveValue }.toList()
+            })
+            guidance.add(kinds)
+        }
+
+        assertTrue(witnesses.all { it.isNotEmpty() })
+        assertEquals(2.0, witnesses[0].last())
+        assertEquals(witnesses[0], witnesses[1])
+        assertTrue(guidance.all { kinds ->
+            PooledGuidanceKind.ATTEMPT in kinds && PooledGuidanceKind.COMMIT in kinds &&
+                PooledGuidanceKind.LOCAL in kinds
+        })
+        assertEquals(guidance[0], guidance[1])
+        assertTrue(LpRootPointStage.CLOSE_BEGIN in rootStages)
+        assertTrue(LpRootPointStage.CLOSE_END in rootStages)
+        assertTrue(rootStages.indexOf(LpRootPointStage.CLOSE_BEGIN) <
+            rootStages.indexOf(LpRootPointStage.CLOSE_END))
+    }
+
+
     @Test
     fun `guidance observation should preserve cutoff reads and improving witnesses`() {
         val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(

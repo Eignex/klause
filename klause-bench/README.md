@@ -1071,6 +1071,17 @@ trial or completed lab job alone establishes no useful deduction or source proof
 Keep physical RSS separate from modeled storage reservations. Source checking and
 all preparation, failed work and retirement belong to the containing comparison.
 
+For a bounded lifecycle diagnostic, run `FinitePortfolioLpCapture` with
+`capture-root-points=true capture-worker=any portfolio-policy=ordinary handoff=false
+portfolio-progress=false captures=0 lp-ceiling=default`. The separate
+`automatic-sparse=true` treatment probes automatic admission within the same
+portfolio allocation. Source input is limited to 2 MiB and 6,000 rows and
+columns. The diagnostic checks the decoded source hash and journals admission,
+query, handoff and consumer events. Guard masks cover evaluated operands only.
+Missing or interrupted events leave the corresponding outcome unknown. An
+offer records a search consultation. The benchmark JVM profile and observer
+overhead have a separate cost scope from ordinary CLI solves.
+
 `ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
 `ROOT_LAYOUT_PREPARATION_ROOT` records active cold construction and exact-state
 installation across private worker pauses. Its work and time include completed and
