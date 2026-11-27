@@ -525,7 +525,11 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
 
     @Test
     fun `a row cascade should preserve its original clause for the next fixpoint`() {
-        val native = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray()), pbLearning = false)
+        val native = PropagationSession(Problem(1, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            )), pbLearning = false)
         native.enableIntegerRowLearning()
         assertIs<PropagationResult.Implied>(native.pinIntAtLeast(0, 1))
         val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
