@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.scheduling.internals.firstInDomainAtLeast
+import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
@@ -69,7 +69,7 @@ internal class DisjunctiveInvariant(
                 prevEnd = s + dur
             } else {
                 val cand = max(state.rootDomains[v].min, prevEnd)
-                val s = firstInDomainAtLeast(state.rootDomains[v], cand) ?: return false
+                val s = state.rootDomains[v].ceilingOrNull(cand) ?: return false
                 state.assignment.setInt(v, s)
                 prevEnd = s + dur
             }

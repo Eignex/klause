@@ -1551,8 +1551,9 @@ internal class LocalSearchEngine(
 /**
  * Whether local search can soundly run on [model]. Every invariant scores any domain exactly: linear rows keep their
  * sum in the narrowest exact form, and the others measure violation with saturating arithmetic, which is zero exactly
- * when the factor holds. The exception is [Cumulative], whose resource profile is a timeline as long as the horizon,
- * so a scheduling factor over a wide domain is declined. A model with continuous columns also needs [completes]: its
+ * when the factor holds. Built-in [Cumulative] scoring is admitted when its integer columns have enumerable
+ * 32-bit search domains and uses task events when the horizon is too wide for a dense timeline.
+ * A model with continuous columns also needs [completes]: its
  * rows are scored in floating point, so a candidate is a solution only once a [CandidateCompletion] decides it. A
  * portfolio leaves its local-search arms out otherwise.
  */

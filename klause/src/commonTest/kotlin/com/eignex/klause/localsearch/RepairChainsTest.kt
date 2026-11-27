@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -10,15 +11,50 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RepairChainsTest {
+
+    @Test
+    fun `interrupted cumulative repair chains should restore the committed search state`() {
+        val far = 1L shl 21
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, far) },
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(1, 1L)
+        state.recompute()
+        val assignment = state.assignment.snapshot()
+        val degrees = state.factorDegree.copyOf()
+        val step = state.step
+        val cost = state.cost
+        val first = Move.IntSet(0, 1L)
+
+        val chosen = state.scoringPick(ExecutionControl { state.assignment.intValue(0) == 1L }) {
+            state.buildRepairChain(first, maxDepth = 2, propose = MoveSink())
+            first
+        }
+
+        assertNull(chosen)
+        assertEquals(assignment, state.assignment.snapshot())
+        assertContentEquals(degrees, state.factorDegree)
+        assertEquals(step, state.step)
+        assertEquals(cost, state.cost)
+    }
 
     @Test
     fun `clause repair ranking should include maintained Boolean consequences`() {
