@@ -872,34 +872,49 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     projection: LpProjectionMeter?,
     engine: (LpModel, ExecutionControl, Int) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
-    admit: ((List<LpBlockDimensions>) -> Boolean)? = null,
 ): T? {
-    val n = model.n
-    val m = model.m
+    val layout = model.componentLayout(cancellation, projection) ?: return null
+    val parts = ArrayList<LpNeighborhood>(layout.size)
+    if (!layout.visit(cancellation, projection, action = parts::add)) return null
+    val solvers = ArrayList<LpSolver>(parts.size)
+    try {
+        for (part in parts) solvers += engine(part.model, cancellation, layout.rowOnlyRows)
+        return component(model, parts, solvers, layout.isolated)
+    } catch (primary: Throwable) {
+        closeComponentSolvers(solvers, primary)
+        throw primary
+    }
+}
+
+internal fun LpModel.componentLayout(
+    cancellation: ExecutionControl,
+    projection: LpProjectionMeter?,
+): LpComponentLayout? {
     if (n == 0 || m < 2) return null
-    val rowIndex = model.rowIndex(projection)
-    projection?.reserve(5L * n + 4L * m + 4L * rowIndex.colIdx.size + 1L,
-        16L * n + 12L * m, matrix = true)
-    // Union-find over columns sharing a row.
+    projection?.reserve(2L * m + 1L, 8L * m + 32L, matrix = true)
+    val firstColumn = IntArray(m) { -1 }
+    val rowDegrees = IntArray(m)
+    projection?.reserve(6L * n + 3L * m + 1L, 16L * n + 32L, matrix = true)
     val partition = IntDisjointSet(n)
     val inRow = BooleanArray(n)
-    var rowOnlyRows = 0
-    for (i in 0 until m) {
-        if (cancellation()) return null
-        val from = rowIndex.rowPtr[i]
-        val to = rowIndex.rowPtr[i + 1]
-        if (from == to) {
-            rowOnlyRows++
-            continue
-        }
-        val root = partition.find(rowIndex.colIdx[from])
-        inRow[rowIndex.colIdx[from]] = true
-        for (p in from + 1 until to) {
-            val j = rowIndex.colIdx[p]
+    var entries = 0
+    for (j in 0 until n) {
+        if (j % COMPONENT_SCAN_BATCH == 0 && cancellation()) return null
+        forEachColumnRow(j) { row ->
+            if (++entries == COMPONENT_SCAN_BATCH) {
+                projection?.reserve(4L * entries, 0L, matrix = true)
+                if (cancellation()) return null
+                entries = 0
+            }
             inRow[j] = true
-            partition.union(j, root)
+            rowDegrees[row]++
+            val leader = firstColumn[row]
+            if (leader < 0) firstColumn[row] = j else partition.union(j, leader)
         }
     }
+    projection?.reserve(4L * entries, 0L, matrix = true)
+    if (cancellation()) return null
+    val rowOnlyRows = firstColumn.count { it < 0 }
     // Order components by first-seen root; a model with a single row-coupled block stays monolithic.
     val blockOf = IntArray(n) { -1 }
     var blocks = 0
@@ -916,60 +931,52 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     for (j in 0 until n) if (inRow[j]) blockCols[blockOf[partition.find(j)]].add(j)
     val blockRows = Array(children) { IntArrayList() }
     for (i in 0 until m) {
-        val from = rowIndex.rowPtr[i]
-        val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[partition.find(rowIndex.colIdx[from])]
+        val leader = firstColumn[i]
+        val block = if (leader < 0) blocks else blockOf[partition.find(leader)]
         blockRows[block].add(i)
-    }
-    if (admit != null) {
-        projection?.reserve(children.toLong(), 32L * children, matrix = false)
-        val dimensions = List(children) { LpBlockDimensions(blockCols[it].size, blockRows[it].size) }
-        if (!admit(dimensions)) return null
     }
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
-
-    val parts = model.componentRestrictions(blockCols, blockRows, rowIndex, cancellation, projection) ?: return null
-    val solvers = ArrayList<LpSolver>(parts.size)
-    try {
-        for (part in parts) solvers += engine(part.model, cancellation, rowOnlyRows)
-        return component(model, parts, solvers, isolated.toIntArray())
-    } catch (primary: Throwable) {
-        closeComponentSolvers(solvers, primary)
-        throw primary
-    }
+    return LpComponentLayout(this, blockCols, blockRows, rowDegrees, isolated.toIntArray(), rowOnlyRows)
 }
 
-internal data class LpBlockDimensions(val columns: Int, val rows: Int)
+internal class LpComponentLayout(
+    private val model: LpModel,
+    private val blockCols: Array<IntArrayList>,
+    private val blockRows: Array<IntArrayList>,
+    private val rowDegrees: IntArray,
+    val isolated: IntArray,
+    val rowOnlyRows: Int,
+) {
+    val size: Int get() = blockCols.size
+    fun rows(index: Int): Int = blockRows[index].size
+    fun columns(index: Int): Int = blockCols[index].size
 
-private fun LpModel.componentRestrictions(
-    blockCols: Array<IntArrayList>,
-    blockRows: Array<IntArrayList>,
-    rowIndex: LpRowIndex,
-    cancellation: ExecutionControl,
-    projection: LpProjectionMeter?,
-): List<LpNeighborhood>? {
-    val parts = ArrayList<LpNeighborhood>(blockCols.size)
-    // One scratch buffer for the whole split: a fresh IntArray(m) per component makes the split alone
-    // O(components x m), which on a model with many small components outweighs every restriction it
-    // performs. Polled per component too - without it a long split never observes the deadline, since
-    // the budget is only checked once a solver exists.
-    projection?.reserve(m.toLong(), 4L * m, matrix = true)
-    val rowMapScratch = IntArray(m) { -1 }
-    for (b in blockCols.indices) {
-        if (cancellation()) return null
-        val entries = (0 until blockRows[b].size).sumOf {
-            val row = blockRows[b][it]
-            (rowIndex.rowPtr[row + 1] - rowIndex.rowPtr[row]).toLong()
+    fun visit(
+        cancellation: ExecutionControl,
+        projection: LpProjectionMeter?,
+        order: Iterable<Int> = blockCols.indices,
+        copyCosts: Boolean = true,
+        action: (LpNeighborhood) -> Boolean,
+    ): Boolean {
+        // Reuse one parent row map so restriction allocates only linear scratch across all children.
+        projection?.reserve(model.m.toLong(), 4L * model.m, matrix = true)
+        val rowMapScratch = IntArray(model.m) { -1 }
+        for (index in order) {
+            if (cancellation()) return false
+            val rows = blockRows[index]
+            val entries = if (projection == null) 0L else (0 until rows.size).sumOf { rowDegrees[rows[it]].toLong() }
+            val dimensions = blockCols[index].size.toLong() + rows.size
+            projection?.reserve(8L * entries + dimensions + 1L,
+                128L * (entries + dimensions) + 64L, matrix = true)
+            val part = model.restrictTo(blockCols[index], rows, colMap = null, copyCosts, rowMapScratch)
+            if (cancellation() || !action(part)) return false
         }
-        val dimensions = blockCols[b].size.toLong() + blockRows[b].size
-        projection?.reserve(8L * entries + dimensions + 1L,
-            128L * (entries + dimensions) + 64L, matrix = true)
-        parts.add(
-            restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
-        )
+        return true
     }
-    return parts
 }
+
+private const val COMPONENT_SCAN_BATCH = 256
 
 @Suppress("TooGenericExceptionCaught") // Release every child and preserve the original failure.
 private fun closeComponentSolvers(solvers: List<LpSolver>, primary: Throwable? = null) {
