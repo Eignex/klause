@@ -293,7 +293,8 @@ internal object FinitePortfolioLpCapture {
                             val jointObserver: (String, Long, Any) -> Unit = { worker, workerSeed, observation ->
                                 val started = System.nanoTime()
                                 try {
-                                    val metadata = jointMetadata(worker, workerSeed, sourceHash, observation)
+                                    val metadata =
+                                        jointMetadata(worker, workerSeed, sourceHash, observation, started - executionStarted)
                                     joint.appendLine(metadata.toString())
                                     joint.flush()
                                     jointRecords++
@@ -391,7 +392,9 @@ internal object FinitePortfolioLpCapture {
         }
     }
 
-    internal fun jointMetadata(worker: String, seed: Long, sourceHash: String, observation: Any): JsonObject =
+    internal fun jointMetadata(
+        worker: String, seed: Long, sourceHash: String, observation: Any, elapsedNanos: Long? = null,
+    ): JsonObject =
         buildJsonObject {
             put("worker", worker)
             put("workerSeed", seed)
@@ -405,7 +408,9 @@ internal object FinitePortfolioLpCapture {
             call(observation, "getAdvance")?.let { advance ->
                 put("advance", buildJsonObject {
                     put("offeredInstructions", get(advance, "OfferedInstructions") as Long)
+                    put("offeredMillis", call(advance, "getOfferedMillis") as Long?)
                     put("chargedInstructions", get(advance, "ChargedInstructions") as Long)
+                    put("reportElapsedNanos", elapsedNanos)
                     put("done", get(advance, "Done") as Boolean)
                     put("entry", advanceStateMetadata(get(advance, "Entry")))
                     put("exit", advanceStateMetadata(get(advance, "Exit")))

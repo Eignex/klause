@@ -20,6 +20,7 @@ internal data class ExactNeighborhoodAdvanceState(
 
 internal data class ExactNeighborhoodAdvanceObservation(
     val offeredInstructions: Long,
+    val offeredMillis: Long?,
     val entry: ExactNeighborhoodAdvanceState,
     val exit: ExactNeighborhoodAdvanceState,
     val guard: ExactNeighborhoodAdvanceGuard,
