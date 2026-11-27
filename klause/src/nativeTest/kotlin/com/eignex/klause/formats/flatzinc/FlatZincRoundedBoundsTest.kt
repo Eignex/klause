@@ -3,8 +3,9 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.ExecutionOption
+import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
@@ -37,10 +38,11 @@ internal class FlatZincRoundedBoundsTest {
     internal fun `default tolerance should publish a witness for the rounded product`() {
         val program = parseFlatZinc(ROUNDED_PRODUCT)
 
-        val result = assertIs<SourceExecutionResult.Quadratic>(optimize(program))
-        val witness = assertNotNull(result.result.acceptedIncumbent).incumbent.sample
+        val execution = assertIs<SourceExecutionResult.Quadratic>(optimize(program)).result
+        val witness = assertNotNull(execution.acceptedIncumbent).incumbent.sample
         val output = writeFlatZincSolution(program, witness)
 
+        assertIs<QuadraticOptimizationResult.WithIncumbent>(execution.result)
         assertTrue("W = 200;" in output.lineSequence(), output)
     }
 
@@ -54,7 +56,11 @@ internal class FlatZincRoundedBoundsTest {
             ),
         )
         return SourceSetup.execute(
-            SourceExecutionRequest(invocation, polynomial = PolynomialTheoryParams(maximumWork = 10_000_000L)),
+            SourceExecutionRequest(
+                invocation,
+                ExecutionOptions(ExecutionOption.nraWorkLimit(10_000_000L)),
+                randomSeed = 17L,
+            ),
         )
     }
 
