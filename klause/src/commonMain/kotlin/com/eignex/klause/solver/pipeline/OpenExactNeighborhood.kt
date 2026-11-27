@@ -97,7 +97,7 @@ internal class OpenExactNeighborhood(
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt, theorySolveStop = stop, openHintFlips = params.openHintFlips)
         if (params.openLinearIncremental && model.numRealVars > 0 && model.numIntVars == 0) {
-            (opened.theory as? ExactLiraSearchComponent)?.useIncrementalSourceAssertions()
+            (opened.theory as? ExactLiraSearchComponent)?.useRetainedSourcePointRechecks()
         }
         return opened
     }

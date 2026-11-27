@@ -232,6 +232,8 @@ a private retained theory search and retracts them after every verdict, so sibli
 conditions inherit nothing. Native work shares one allowance across repairs.
 Retained real-only neighborhood searches schedule source assertions from changed Boolean inputs and
 popped assertions using the [linear component's row index](18-linear-arithmetic.md#solving-and-composition).
+Each retained point must pass the selected source comparisons before it can postpone
+pending LP assertions.
 `open-linear-incremental=false` selects full row scans.
 
 The quadratic adapter uses the same contract with exact algebraic objective ordering,

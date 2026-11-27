@@ -219,6 +219,7 @@ class ExactLiraSearchComponent private constructor(
     private var retainedLpPoint: List<BigFraction>? = null
     private var sourceCheckedPoint: List<BigFraction>? = null
     private var sourceCheckedBooleans: IntArray? = null
+    private var recheckRetainedSourcePoints = false
     private var candidate: List<BigFraction>? = null
         set(value) {
             field = value
@@ -370,6 +371,7 @@ class ExactLiraSearchComponent private constructor(
     internal fun observeCompleteTraversal() {
         check(context == null && !completeTraversalObserved)
         completeTraversalObserved = true
+        recheckRetainedSourcePoints = true
         smtStats?.observeCompleteSearchBooleans(bools.size, unassignedBooleans)
         observeCompleteStage("OPENING")
     }
@@ -473,6 +475,12 @@ class ExactLiraSearchComponent private constructor(
     internal fun useIncrementalSourceAssertions() {
         check(context == null || context?.decisionLevel == 0)
         incrementalSourceRows = true
+    }
+
+    internal fun useRetainedSourcePointRechecks() {
+        check(context == null)
+        useIncrementalSourceAssertions()
+        recheckRetainedSourcePoints = true
     }
 
     internal val partialLinearPropagationStats: PartialLinearPropagationStats
@@ -1583,12 +1591,13 @@ class ExactLiraSearchComponent private constructor(
         ) {
             return ComponentResult.Consistent
         }
-        if (completeTraversalObserved && acceptsRetainedSourcePoint()) {
+        if (recheckRetainedSourcePoints && acceptsRetainedSourcePoint()) {
             if (!context.consumeCheck()) return ComponentResult.Indeterminate
             candidate = checkNotNull(retainedLpPoint).take(model.numRealVars)
             dirty = false
             observeCompleteStage("LP_SOURCE_POINT_RECHECK")
-            if (unassignedBooleans > 0) capturePointHints(checkNotNull(candidate), context)
+            val partial = if (completeTraversalObserved) unassignedBooleans > 0 else bools.any { it == UNASSIGNED }
+            if (partial) capturePointHints(checkNotNull(candidate), context)
             else captureCompleteWitness(candidate)
             return if (operationStop()) ComponentResult.Indeterminate else ComponentResult.Consistent
         }

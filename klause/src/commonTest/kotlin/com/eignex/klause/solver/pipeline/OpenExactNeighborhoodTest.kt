@@ -227,7 +227,7 @@ class OpenExactNeighborhoodTest {
     }
 
     @Test
-    fun `a strict guarded row should retract before an opposite neighborhood pin`() {
+    fun `retained point reuse should reject an incompatible strict guard`() {
         val model = Problem(
             1, 0, emptyArray(),
             arrayOf(
@@ -243,11 +243,11 @@ class OpenExactNeighborhoodTest {
         val fixed = mapOf(0 to BigFraction.ZERO)
 
         OpenExactNeighborhood(model, TheoryParams()).use { adapter ->
-            val refused = adapter.check(
-                ExactNeighborhoodCondition(mapOf(0 to true), fixed, fixed), ExecutionControl.Never,
-            )
             val accepted = adapter.check(
                 ExactNeighborhoodCondition(mapOf(0 to false), fixed, fixed), ExecutionControl.Never,
+            )
+            val refused = adapter.check(
+                ExactNeighborhoodCondition(mapOf(0 to true), fixed, fixed), ExecutionControl.Never,
             )
 
             assertIs<ExactNeighborhoodResult.Refuted>(refused)
