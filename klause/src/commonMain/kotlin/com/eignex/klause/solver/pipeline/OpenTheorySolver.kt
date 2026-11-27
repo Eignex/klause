@@ -368,6 +368,7 @@ class OpenTheoryEngine internal constructor(
         params: TheoryParams,
         state: OpenTheorySolveState,
         nodePolicy: SearchNodePolicy,
+        deferPartialNumericalChecks: Boolean = false,
     ): OpenTheoryStart {
         val work = state.work
         val cancellation = params.timeout.withAccounting(params.cancellation).includingStop( params.cancellation)
@@ -439,6 +440,9 @@ class OpenTheoryEngine internal constructor(
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()
                 if (params.openLinearIncremental) it.useIncrementalLinearPropagation()
+                if (deferPartialNumericalChecks && plan.theoryPipeline == ProblemPipeline.EXACT_LRA) {
+                    it.deferAlternatePartialNumericalChecks()
+                }
             }
             planned.session.bindOpenTheoryWork(work)
             when (planned.session.initialize()) {

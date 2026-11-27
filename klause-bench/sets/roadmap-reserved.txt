@@ -24,3 +24,7 @@ klause-generated-4657-v1/assignment-1
 klause-generated-4657-v1/assignment-2
 klause-generated-4657-v1/production-1
 klause-generated-4657-v1/production-2
+
+# #4651 owns these generated source families and their related encodings.
+klause-generated-4651-v1/asset-lots
+klause-generated-4651-v1/thermal-duty
