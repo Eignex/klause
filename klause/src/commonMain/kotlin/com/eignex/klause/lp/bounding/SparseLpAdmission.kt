@@ -64,6 +64,15 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to maxOf(inspected, assemblyWork), "Automatic" to if (automatic) 1L else 0L,
         "SourceInspectedFillRisk" to sourceFillRisk))
+    fun unaffordableSourcePass(): SparseLpAdmission? {
+        if (!automatic) return null
+        val pass = sparsePassWork(rows, columns, entries, sourceFillRisk)
+        val total = 32L * (entries + rows + columns) + pass
+        if (total <= queryWorkAllowance) return null
+        return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
+            "SourceEstimatedPassWork" to pass, "SourceEstimatedPassTotalWork" to total,
+            "QueryWorkAllowance" to queryWorkAllowance))
+    }
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
         return decline("Shape")
@@ -93,19 +102,16 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         if (entries > MAX_ENTRIES || 32L * (entries + columns + rows) > preparationAllowance) {
             return decline("PreparationWork")
         }
-        if ((index + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        if ((index + 1) % CONSTRUCTION_BATCH_SIZE == 0) {
+            // Additional rows only increase the forecast for this fixed layout shape.
+            unaffordableSourcePass()?.let { return it }
+            yield(Unit)
+        }
     }
     val reservation = sparseLpStorage(rows, columns, entries)
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
-    val assemblyCost = 32L * (entries + rows + columns)
-    val sourcePassWork = sparsePassWork(rows, columns, entries, sourceFillRisk)
-    if (automatic && assemblyCost + sourcePassWork > queryWorkAllowance) {
-        return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
-            "SourceEstimatedPassWork" to sourcePassWork,
-            "SourceEstimatedPassTotalWork" to assemblyCost + sourcePassWork,
-            "QueryWorkAllowance" to queryWorkAllowance))
-    }
-    assemblyWork = assemblyCost
+    unaffordableSourcePass()?.let { return it }
+    assemblyWork = 32L * (entries + rows + columns)
     val relaxation = try {
         val relaxer = CpToLpRelaxation(problem, objective, deferred = true,
             reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
