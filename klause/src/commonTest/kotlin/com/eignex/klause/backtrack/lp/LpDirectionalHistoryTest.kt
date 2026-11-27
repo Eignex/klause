@@ -148,7 +148,7 @@ class LpDirectionalHistoryTest {
                 val target = when {
                     action.startsWith("lookup") -> 8L
                     action == "scan-reset" -> 32L
-                    else -> 16L
+                    else -> 24L
                 }
                 if (armed && amount == target) {
                     armed = false

@@ -139,7 +139,8 @@ internal class LpDirectionalHistory(
         val retainedCandidates = candidateCount
         candidates = null
         candidateCount = 0
-        charge(gains.size.toLong() + retainedCandidates + if (depthJournal == null) 0L else 1L)
+        charge(gains.size.toLong() + retainedCandidates +
+            if (depthJournal == null) 0L else LpDepthObservationJournal.CLEAR_WORK)
         gains.clear()
         depthJournal?.clear()
         clearDepthLookup()
@@ -448,6 +449,14 @@ internal class LpDirectionalHistory(
             }
         }
         return preference
+    }
+
+    fun hasCompleteDepthEvidence(variable: VarRef, current: () -> Boolean): Boolean {
+        val journal = depthJournal ?: return false
+        val version = generation
+        val node = stamp
+        charge(8L)
+        return current() && version == generation && node == stamp && journal.mayHavePairs(variable, depth)
     }
 
     private fun reliableDepth(history: Gains, variable: VarRef, value: Double): Boolean {

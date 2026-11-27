@@ -127,6 +127,15 @@ class LpHintsTest : RuntimeInitializedTest() {
 
     @Test
     fun `depth recovery records a changed commitment after an ordinary numeric tie`() {
+        checkRecoveryWhenOrdinaryDeclines(unstable = false)
+    }
+
+    @Test
+    fun `retained pairs recover withheld advice when ordinary numeric gains are unstable`() {
+        checkRecoveryWhenOrdinaryDeclines(unstable = true)
+    }
+
+    private fun checkRecoveryWhenOrdinaryDeclines(unstable: Boolean) {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -139,7 +148,7 @@ class LpHintsTest : RuntimeInitializedTest() {
         val hints = LpHints(1, 0, directionalGains = true, applyAdvice = false, depthRetention = true,
             observe = events::add)
         for (level in 0..1) {
-            repeat(2) {
+            repeat(2) { sample ->
                 for (decision in listOf(down, up)) {
                     hints.beginNode(level, 1024.0)
                     hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
@@ -148,7 +157,11 @@ class LpHintsTest : RuntimeInitializedTest() {
                     hints.commit(decision, level + 1)
                     hints.beginNode(level + 1, 1024.0)
                     hints.record(relaxation, doubleArrayOf(2.5), DoubleArray(0))
-                    val objective = if (level == 1) 2.0 else if (decision == down) 1.0 else 3.0
+                    val objective = when {
+                        level == 0 -> if (decision == down) 1.0 else 3.0
+                        unstable && decision == down && sample == 1 -> 64.0
+                        else -> 2.0
+                    }
                     hints.recordObjective(relaxation, objective)
                     hints.recordOutcome(true, relaxation)
                     hints.finishNode(trail.state)
@@ -165,7 +178,8 @@ class LpHintsTest : RuntimeInitializedTest() {
         hints.commit(order.first(), 1)
 
         assertEquals(listOf(up, down), order)
-        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_EARLY_COMMIT_WITHHELD_CHANGED" })
+        val origin = if (unstable) "INDEX_ONLY" else "EARLY"
+        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_${origin}_COMMIT_WITHHELD_CHANGED" })
         assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_COMMIT_WITHHELD_CHANGED" })
         assertFalse("PASSIVE_VALUE_DEPTH_CONTEXT_DECLINED" in events)
     }

@@ -17,6 +17,7 @@ internal class LpDepthObservationJournal(
 
     private val capacity = capacity(maxAge)
     private val blocks = arrayOfNulls<Block>(blockCount(capacity))
+    private val evidence = LongArray(BUCKETS)
     private var next = 0
     var size = 0
         private set
@@ -24,6 +25,13 @@ internal class LpDepthObservationJournal(
     fun clear() {
         size = 0
         next = 0
+        evidence.fill(0L)
+    }
+
+    fun mayHavePairs(variable: VarRef, level: Int): Boolean {
+        val packed = evidence[bucket(key(variable), level)]
+        return field(packed, 0) >= 2L && field(packed, 1) >= 2L &&
+            field(packed, 2) >= 2L && field(packed, 3) >= 2L
     }
 
     fun record(
@@ -33,6 +41,7 @@ internal class LpDepthObservationJournal(
         pruned: Boolean?,
         current: () -> Boolean,
     ) {
+        if (pruned == null && !gain.isFinite()) return
         val count = size
         val write = next
         charge(8L)
@@ -50,11 +59,15 @@ internal class LpDepthObservationJournal(
                 retained.parents[slot] != child.parent.objective ||
                 retained.flags[slot].toInt() and OUTCOMES.inv() != flag)
         ) return
-        charge(16L + if (retained == null) BLOCK_BYTES else 0L)
+        charge(24L + if (retained == null) BLOCK_BYTES else 0L)
         if (!current() || count != size || write != next) return
         val evicts = append && count == capacity
         val block = retained ?: Block().also { blocks[page] = it }
         val evictsInAge = evicts && node - block.nodes[slot] <= maxAge
+        if (evicts) {
+            val oldFlag = block.flags[slot].toInt()
+            adjust(block.variables[slot], oldFlag, block.gains[slot].isFinite(), oldFlag and OUTCOMES != 0, add = false)
+        }
         if (append) {
             block.variables[slot] = key
             block.nodes[slot] = node
@@ -65,8 +78,12 @@ internal class LpDepthObservationJournal(
             size = minOf(capacity, count + 1)
         }
         if (pruned == null) {
+            if (!block.gains[slot].isFinite()) adjust(key, flag, numeric = true, outcome = false, add = true)
             block.gains[slot] = gain
         } else {
+            if (block.flags[slot].toInt() and OUTCOMES == 0) {
+                adjust(key, flag, numeric = false, outcome = true, add = true)
+            }
             block.flags[slot] = (flag or if (pruned) PRUNED else OPEN).toShort()
         }
         if (retained == null) observe("DEPTH_RETENTION_JOURNAL_BLOCK_ALLOCATED")
@@ -77,6 +94,15 @@ internal class LpDepthObservationJournal(
             true -> "DEPTH_RETENTION_OUTCOME_PRUNED"
             false -> "DEPTH_RETENTION_OUTCOME_OPEN"
         })
+    }
+
+    private fun adjust(key: Int, flag: Int, numeric: Boolean, outcome: Boolean, add: Boolean) {
+        val index = bucket(key, flag ushr LEVEL_SHIFT)
+        val direction = if (flag and UP == 0) 0 else 1
+        val numericCount = if (numeric) 1L shl (direction * FIELD_BITS) else 0L
+        val outcomeCount = if (outcome) 1L shl ((direction + 2) * FIELD_BITS) else 0L
+        val delta = numericCount or outcomeCount
+        evidence[index] += if (add) delta else -delta
     }
 
     fun restore(
@@ -126,13 +152,24 @@ internal class LpDepthObservationJournal(
         private const val PRUNED = 4
         private const val OUTCOMES = OPEN or PRUNED
         private const val LEVEL_SHIFT = 3
+        private const val BUCKETS = 128
+        private const val FIELD_BITS = 9
+        private const val FIELD_MASK = (1L shl FIELD_BITS) - 1L
+        const val CLEAR_WORK = BUCKETS + 1L
 
-        fun indexWork(maxAge: Long): Long = blockCount(capacity(maxAge)).toLong()
+        fun indexWork(maxAge: Long): Long = blockCount(capacity(maxAge)).toLong() + BUCKETS * 8L
 
         private fun capacity(maxAge: Long): Int = maxAge.coerceIn(0L, MAX_AGE).toInt() + 1
 
         private fun blockCount(capacity: Int): Int = (capacity + BLOCK_SIZE - 1) / BLOCK_SIZE
 
         private fun key(variable: VarRef): Int = if (variable is VarRef.Bool) variable.varId.inv() else variable.varId
+
+        private fun field(value: Long, index: Int): Long = value ushr (index * FIELD_BITS) and FIELD_MASK
+
+        private fun bucket(key: Int, level: Int): Int {
+            val mixed = (key * -1640531527) xor (level * 40503)
+            return (mixed xor (mixed ushr 16)) and (BUCKETS - 1)
+        }
     }
 }
