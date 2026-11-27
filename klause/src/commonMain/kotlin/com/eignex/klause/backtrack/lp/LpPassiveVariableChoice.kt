@@ -58,7 +58,7 @@ internal class LpPassiveVariableChoice(
         if (!branched) clear()
     }
 
-    fun commit(decision: SearchDecision, fresh: () -> Boolean) {
+    internal inline fun commit(decision: SearchDecision, crossinline fresh: () -> Boolean) {
         val current = nomination ?: return
         observe("PASSIVE_VARIABLE_COMMIT_CHECK")
         charge(4L)

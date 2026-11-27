@@ -449,6 +449,7 @@ Initial scope capture reports no invalidation. The additional reason observation
 charges the existing LP work allowance.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
+Passive commitment checks inline the freshness callback at the matching decision.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
 histories and 128 ancestor splits are retained. Ancestor records use depth-indexed
 slots allocated on the first usable split; allocation is charged once and trimming
