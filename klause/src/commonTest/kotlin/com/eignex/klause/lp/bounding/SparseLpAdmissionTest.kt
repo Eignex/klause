@@ -729,6 +729,23 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `automatic admission accepts the exact grant for an initial factor attempt`() {
+        val model = LpBuilder().apply {
+            repeat(2) { addVar(0L, 10L) }
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 3L)
+        }.build(Sense.MINIMIZE)
+        val explicitForecast = estimateSparseLpAdmission(model)
+        val initialWork = explicitForecast.metrics.getValue("EstimatedProbeTotalWork") -
+            explicitForecast.metrics.getValue("EstimatedFactorAttemptWork")
+
+        val funded = estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = initialWork)
+        val unfunded = estimateSparseLpAdmission(model, automatic = true, queryWorkAllowance = initialWork - 1L)
+
+        assertTrue(funded.admitted)
+        assertEquals(1L, unfunded.metrics["DeclineQueryWork"])
+    }
+
+    @Test
     fun `ordinary root bounding consumes a sparse trial certificate beyond the size proxy`() {
         val problem = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },

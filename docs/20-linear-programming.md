@@ -395,6 +395,8 @@ guards inside the LP owner under the existing root and solve allowances. A scan
 can decline once its nonzero and fill counts exceed the funded pass forecast. The
 diagnostic observer records completed admission decisions and their evaluated
 guards, including preparation and query allowances at the producer and helper.
+The compact forecast covers the initial factor attempt and full source pass.
+Later attempts draw on the live continuation allowance.
 Automatic workers on the same baked source can reuse one admitted compact layout
 and its forecasts from the preparation cache. The identical source and objective
 and grants covering its preparation and source pass allow a paid lookup. Each

@@ -274,10 +274,11 @@ internal fun estimateSparseLpAdmission(
     val storage = sparseLpStorage(model.m.toLong(), model.n.toLong(), entries)
     val queryWork = sparseQueryWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
     // Sparse updates cannot connect these emitted blocks; ordering and recovery still use one owner.
-    // Two predicted attempts do not bound repair or subsequent pivots under cooperative funding.
     val factorAttemptForecast = componentRowCubes + model.m.toLong() * model.m
     val factorAttemptWork = minOf(factorAttemptForecast, SPARSE_LP_MAX_FACTOR_WORK)
-    val probeWork = 2L * factorAttemptWork +
+    // One funded attempt can supply a checked automatic root bound. Continuations pay their own work.
+    val factorAttempts = if (automatic) 1L else 2L
+    val probeWork = factorAttempts * factorAttemptWork +
         sparsePassWork(model.m.toLong(), model.n.toLong(), entries, fillRisk)
     val decline = when {
         scalarBits > 128 -> "ScalarWidth"
