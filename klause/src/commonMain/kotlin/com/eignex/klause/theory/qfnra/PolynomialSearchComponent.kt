@@ -30,9 +30,9 @@ internal class PolynomialSearchComponent(
 ) : SearchComponent, PreparingSearchComponent, FiniteFactorEnforcer {
     private val integerColumns = integerColumns.toMap()
     val witnessKey = SearchModelKey(QfNraAssignment::class)
+    private val bounds = PolynomialSearchBounds(service.boolCount, invocation, this.integerColumns)
     private var signature: PolynomialSignature? = null
     private var outcome: QfNraResult? = null
-    private var boundSignature: PolynomialSignature? = null
 
     private var attached = false
     private var finiteEnforcement: FiniteFactorEnforcer? = null
@@ -63,13 +63,13 @@ internal class PolynomialSearchComponent(
             yield(ComponentResult.Indeterminate)
             return@sequence
         }
-        val tightening = tighten(context, authorized = true)
+        val tightening = bounds.tighten(context, authorized = true)
         if (tightening != ComponentResult.Consistent) {
             yield(tightening)
             return@sequence
         }
-        val current = signatureOf(context)
-        val pending = invocation.prepareCheck(conditionOf(current), ExecutionControl { context.cancelled() })
+        val current = bounds.signature(context)
+        val pending = invocation.prepareCheck(bounds.condition(current), ExecutionControl { context.cancelled() })
         var result: QfNraResult? = null
         while (result == null) {
             result = pending.next()
@@ -84,7 +84,7 @@ internal class PolynomialSearchComponent(
     }.iterator()
 
     override fun propagate(context: SearchContext): ComponentResult {
-        val tightening = tighten(context)
+        val tightening = bounds.tighten(context)
         if (tightening != ComponentResult.Consistent) return tightening
         return when (evaluate(context)) {
             is QfNraResult.Satisfiable -> ComponentResult.Consistent
@@ -116,18 +116,40 @@ internal class PolynomialSearchComponent(
 
     private fun evaluate(context: SearchContext): QfNraResult? {
         if (context.cancelled()) return null
-        val current = signatureOf(context)
+        val current = bounds.signature(context)
         if (signature == current) return outcome
         if (!context.consumeCheck()) return null
-        val result = invocation.check(conditionOf(current), ExecutionControl { context.cancelled() })
+        val result = invocation.check(bounds.condition(current), ExecutionControl { context.cancelled() })
         retain(current, result)
         return result
     }
 
-    private fun tighten(context: SearchContext, authorized: Boolean = false): ComponentResult {
-        if (integerColumns.isEmpty()) return ComponentResult.Consistent
+    private fun retain(current: PolynomialSignature, result: QfNraResult) {
+        signature = current.takeUnless { result is QfNraResult.Unknown }
+        outcome = result.takeUnless { it is QfNraResult.Unknown }
+    }
+
+    private fun invalidate() {
+        signature = null
+        outcome = null
+        bounds.invalidate()
+    }
+}
+
+internal class PolynomialSearchBounds(
+    private val boolCount: Int,
+    private val invocation: PolynomialTheoryInvocation,
+    private val integerColumns: Map<Int, Int>,
+    private val fixed: Map<Int, BigFraction> = emptyMap(),
+    private val checkFeasibility: Boolean = false,
+) {
+    private val columns = integerColumns.values.toSet()
+    private var boundSignature: PolynomialSignature? = null
+
+    fun tighten(context: SearchContext, authorized: Boolean = false, workAllowance: Long? = null): ComponentResult {
+        if (columns.isEmpty() && !checkFeasibility) return ComponentResult.Consistent
         if (context.cancelled()) return ComponentResult.Indeterminate
-        val current = signatureOf(context)
+        val current = signature(context)
         if (current == boundSignature) return ComponentResult.Consistent
         if (!authorized && !context.consumeCheck()) return ComponentResult.Indeterminate
         val premises = ArrayList<SearchAtomPremise>()
@@ -139,8 +161,8 @@ internal class PolynomialSearchComponent(
             if (column in current.upper) premises += context.intUpperBoundPremise(source)
         }
         val premise = SearchAtomPremise.All(premises)
-        val bounds = invocation.bounds(conditionOf(current), integerColumns.values.toSet(),
-            ExecutionControl { context.cancelled() })
+        val bounds = invocation.bounds(condition(current), columns,
+            ExecutionControl { context.cancelled() }, workAllowance)
         if (bounds.stopped) return ComponentResult.Indeterminate
         if (bounds.infeasible) return ComponentResult.Conflict(context.explainAtoms(premise))
         for ((source, column) in integerColumns) {
@@ -165,30 +187,26 @@ internal class PolynomialSearchComponent(
         return ComponentResult.Consistent
     }
 
-    private fun signatureOf(context: SearchContext): PolynomialSignature = PolynomialSignature(
-        (0 until service.boolCount).mapNotNull { id -> context.boolValue(id)?.let { id to it } }.toMap(),
+    fun signature(context: SearchContext): PolynomialSignature = PolynomialSignature(
+        (0 until boolCount).mapNotNull { id -> context.boolValue(id)?.let { id to it } }.toMap(),
         integerColumns.mapNotNull { (source, column) -> context.intLowerBound(source)?.let { column to it } }.toMap(),
         integerColumns.mapNotNull { (source, column) -> context.intUpperBound(source)?.let { column to it } }.toMap(),
     )
 
-    private fun conditionOf(current: PolynomialSignature): PolynomialCondition = PolynomialCondition(
-        current.bools, current.lower.mapValues { BigFraction.ofLong(it.value) },
-        current.upper.mapValues { BigFraction.ofLong(it.value) },
-    )
-
-    private fun retain(current: PolynomialSignature, result: QfNraResult) {
-        signature = current.takeUnless { result is QfNraResult.Unknown }
-        outcome = result.takeUnless { it is QfNraResult.Unknown }
+    fun condition(current: PolynomialSignature): PolynomialCondition {
+        fun numeric(bounds: Map<Int, Long>): Map<Int, BigFraction> {
+            val converted = bounds.mapValues { BigFraction.ofLong(it.value) }
+            return if (fixed.isEmpty()) converted else fixed + converted
+        }
+        return PolynomialCondition(current.bools, numeric(current.lower), numeric(current.upper))
     }
 
-    private fun invalidate() {
-        signature = null
-        outcome = null
+    fun invalidate() {
         boundSignature = null
     }
 }
 
-private data class PolynomialSignature(
+internal data class PolynomialSignature(
     val bools: Map<Int, Boolean>,
     val lower: Map<Int, Long>,
     val upper: Map<Int, Long>,

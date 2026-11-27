@@ -94,6 +94,13 @@ fun OpenTheoryPipeline.minimize(
     onAccepted: ((QuadraticIncumbentPublication) -> Unit)?,
 ): QuadraticOptimizationExecution {
     require(cores > 0)
+    val factorProjection = (request.preparedPlan.execution as? PreparedExecution.NonlinearInteger)?.projection
+    if (factorProjection?.finiteOwnership != null) {
+        return QuadraticOptimizationExecution(
+            QuadraticOptimizationResult.Unknown(null, TerminationReason.Unsupported, sense, SolveStats.EMPTY),
+            PolynomialTheoryStats(), numericalWork = 0L, nativeWork = 0L,
+        ).withSourceSemantics(request.preparedPlan.sourceSemantics)
+    }
     val publication = QuadraticPublicationObserver(onAccepted)
     return publication.execute {
         val native = QuadraticNativeScope(params.polynomial, concurrent = cores > 1 && engine != FiniteEngine.FIXED)
