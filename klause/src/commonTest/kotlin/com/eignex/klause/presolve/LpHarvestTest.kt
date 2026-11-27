@@ -199,17 +199,21 @@ class LpHarvestTest {
         assertSameFeasibleSet(problem, harvested, hi = 5)
     }
 
-    private fun coverSystem(): Problem = Problem(
-        0,
-        3,
-        arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
-        arrayOf<Factor>(
+    private fun coverSystem(independentRows: Int = 0): Problem {
+        val otherColumns = if (independentRows == 0) 0 else 2 * (independentRows + 1)
+        val unrelated = Array<Factor>(2 * independentRows) { row ->
+            val column = 3 + row + row / independentRows
+            Linear(intArrayOf(1, 1), intArrayOf(column, column + 1), LinearOp.GE, 3)
+        }
+        val cover = arrayOf<Factor>(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
             Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
             Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
-        ),
-    )
+        )
+        val domains = Array(3 + otherColumns) { IntDomain(0, 10) }
+        return Problem(0, domains.size, domains, unrelated + cover)
+    }
 
     @Test
     fun `numerical harvest should keep typed integer rows exact`() {
@@ -232,6 +236,30 @@ class LpHarvestTest {
         val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true), numericalLp = true)
 
         assertFalse(result.report.rootInfeasible)
+    }
+
+    @Test
+    fun `component harvest should lift a contradiction from one block`() {
+        val problem = coverSystem(independentRows = 24).bake()
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
+            componentFeasibility = true)
+
+        assertTrue(result.report.rootInfeasible)
+        assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_REFUTED"))
+    }
+
+    @Test
+    fun `component harvest should honor parent source slack`() {
+        val problem = coverSystem(independentRows = 24).withSourceSemantics(SourceSemantics(
+            SourceFormat.MPS, feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
+        ).resolve()).bake()
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
+            numericalLp = true, componentFeasibility = true)
+
+        assertSame(problem, result.problem)
+        assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_INCONCLUSIVE"))
     }
 
     @Test
