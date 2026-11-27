@@ -45,12 +45,12 @@ internal class LpDepthObservationJournal(
         gain: Double,
         pruned: Boolean?,
         current: () -> Boolean,
-    ): Boolean {
-        if (pruned == null && !gain.isFinite()) return false
+    ) {
+        if (pruned == null && !gain.isFinite()) return
         val count = size
         val write = next
         charge(8L)
-        if (!current() || count != size || write != next) return false
+        if (!current() || count != size || write != next) return
         val last = if (write == 0) capacity - 1 else write - 1
         val previous = blocks[last / BLOCK_SIZE]
         val append = count == 0 || previous?.nodes?.get(last % BLOCK_SIZE) != node
@@ -63,11 +63,11 @@ internal class LpDepthObservationJournal(
         if (!append && (retained == null || retained.variables[slot] != key ||
                 retained.parents[slot] != child.parent.objective ||
                 retained.flags[slot].toInt() and OUTCOMES.inv() != flag)
-        ) return false
+        ) return
         val evicts = append && count == capacity
         val positionWork = if (evicts) 12L else if (append) 6L else 0L
         charge(24L + positionWork + if (retained == null) BLOCK_BYTES else 0L)
-        if (!current() || count != size || write != next) return false
+        if (!current() || count != size || write != next) return
         val block = retained ?: Block().also { blocks[page] = it }
         val evictsInAge = evicts && node - block.nodes[slot] <= maxAge
         if (evicts) {
@@ -103,7 +103,6 @@ internal class LpDepthObservationJournal(
             true -> "DEPTH_RETENTION_OUTCOME_PRUNED"
             false -> "DEPTH_RETENTION_OUTCOME_OPEN"
         })
-        return true
     }
 
     private fun updatePosition(key: Int, flag: Int, position: Int, add: Boolean) {
@@ -125,7 +124,6 @@ internal class LpDepthObservationJournal(
         variable: VarRef,
         level: Int,
         node: Long,
-        includeCurrent: Boolean = false,
         current: () -> Boolean,
     ): LpDirectionalHistory.Gains? {
         val count = size
@@ -135,7 +133,6 @@ internal class LpDepthObservationJournal(
         if (!current() || count != size || write != next) return null
         val history = LpDirectionalHistory.Gains(variable)
         val key = key(variable)
-        val minimumAge = if (includeCurrent) 0L else 1L
         val bucketStart = bucket(key, level) * wordsPerBucket
         fun replay(start: Int, end: Int): Boolean {
             var offset = start
@@ -156,7 +153,7 @@ internal class LpDepthObservationJournal(
                     val flag = block.flags[slot].toInt()
                     val sample = block.nodes[slot]
                     if (block.variables[slot] != key || flag ushr LEVEL_SHIFT != level ||
-                        node - sample !in minimumAge..maxAge
+                        node - sample !in 1L..maxAge
                     ) continue
                     val direction = if (flag and UP != 0) history.up else history.down
                     val parent = block.parents[slot]
