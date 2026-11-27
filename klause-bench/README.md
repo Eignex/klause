@@ -163,7 +163,9 @@ JVM CI exercises the pinned Gradle and SDK release assets with
 requires Linux, `gh`, `sha256sum` and the JDK archive tool. It checks the Gradle asset against the wrapper
 version and SHA-256, verifies every SDK artifact, and extracts only verified bytes into a private
 temporary directory removed after Gradle exits, with daemon reuse disabled for that distribution.
-It keeps the caller's Gradle dependency cache.
+It keeps the caller's Gradle dependency cache. The JVM coverage step opts into one refreshed Gradle
+retry when the `buildSrc` plugin classpath reports missing Kotlin POMs before any task starts and
+each reported Plugin Portal POM responds with HTTP 200.
 Lab workers use their JDK transport and do not invoke this shell entry point.
 
 Gradle stages the checksum-pinned Lab Bench SDK `0.1.1` through the public GitHub release-asset API using the JDK.

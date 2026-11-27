@@ -4,6 +4,11 @@ set -euo pipefail
 scripts=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 project=$(cd -- "$scripts/../.." && pwd)
 properties="$project/gradle/wrapper/gradle-wrapper.properties"
+retry_buildsrc_metadata=false
+if [[ ${1:-} == --retry-buildsrc-metadata ]]; then
+    retry_buildsrc_metadata=true
+    shift
+fi
 if ! grep -Fxq 'distributionUrl=https\://services.gradle.org/distributions/gradle-9.7.1-bin.zip' "$properties"; then
     printf 'The bootstrap Gradle asset must match the wrapper distribution.\n' >&2
     exit 1
@@ -33,4 +38,9 @@ fi
 
 bash "$scripts/stage-lab-sdk.sh" "$stage/sdk"
 export ORG_GRADLE_PROJECT_labBenchRepository="file://$stage/sdk"
-bash "$stage/gradle-9.7.1/bin/gradle" "$@" --no-daemon
+gradle=(bash "$stage/gradle-9.7.1/bin/gradle" "$@" --no-daemon)
+if "$retry_buildsrc_metadata"; then
+    bash "$scripts/run-gradle-with-metadata-recovery.sh" "${gradle[@]}"
+else
+    "${gradle[@]}"
+fi
