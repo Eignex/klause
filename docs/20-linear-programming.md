@@ -274,8 +274,9 @@ form.
 
 ## Consumers, explanations and cuts
 
-Polynomial adapters use `LinearEnvelopes` and `CertifiedEnvelopeLp` to assemble
-exact square and bilinear relaxations outside the engine. An owner retains its
+Polynomial adapters use the envelope rows of `LinearEnvelopes.kt` and
+`CertifiedEnvelopeLp` to assemble exact square and bilinear relaxations outside the
+engine. An owner retains its
 matrix for coordinate objectives and tangent additions inside one immutable query
 scope. A forward and reverse pass of exact row certificates tightens its bounds
 before numerical solving. Row

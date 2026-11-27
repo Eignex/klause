@@ -339,9 +339,9 @@ to platform snapshots. Concrete versions belong to the build.
 
 Unchecked reductions may reassociate or fuse arithmetic according to the selected
 implementation, so Klause does not use vendor `iamax` to choose pivots. Exact proof
-checks, work and cancellation budgets remain solver responsibilities. The `GerWindow`
-route always uses portable panel kernels, with Klause's overflow, underflow and
-finite checks around each call.
+checks, work and cancellation budgets remain solver responsibilities. The dense
+panel's rank-one `ger` update on a borrowed matrix view always uses portable
+kernels, with Klause's overflow, underflow and finite checks around each call.
 
 ### Runtime support
 
