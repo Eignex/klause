@@ -59,14 +59,21 @@ internal object FinitePortfolioLpCapture {
         require(options.keys.containsAll(required) && (options.keys - required).all {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                "source-refutation-center-step", "capture-authority", "capture-cut-policy", "capture-joint", "presolve")
+                "source-refutation-center-step", "capture-authority", "capture-cut-policy", "capture-joint", "presolve",
+                "regional-pins")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
         val captureJoint = mode == "joint-ordinary" || mode == "joint-handoff"
+        val regional = options["regional-pins"]
+        if (regional != null) {
+            require(mode == "joint-before" && options["capture-authority"] == "accepted" &&
+                options["capture-cut-policy"] == "selected" && options["presolve"] == "off")
+            require(regional.length in 1..32768)
+        }
         options["presolve"]?.let {
-            require(mode == "portfolio" && it in setOf("off", "default")) {
-                "presolve requires portfolio capture and off or default"
+            require((mode == "portfolio" || regional != null) && it in setOf("off", "default")) {
+                "presolve requires a portfolio or regional capture"
             }
         }
         options["capture-joint"]?.let {

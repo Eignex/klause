@@ -5,9 +5,11 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -20,6 +22,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -46,14 +49,18 @@ internal object JointRepairLpCapture {
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
             maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop))
-        val executionPolicy = SourceExecutionPolicy()
+        val regionalPins = options["regional-pins"]
+        val presolve = options["presolve"]?.let(PresolveConfig::parse)
+        val executionPolicy = SourceExecutionPolicy(explicitPresolve = presolve != null)
         val prepared = SourceSetup.execute(SourceExecutionRequest(invocation, executionPolicy,
             ExecutionOptions.parse(FinitePortfolioLpCapture.parameters(options)),
             finiteRequest = { shape ->
                 executionPolicy.finiteRequest(shape, FiniteEngine.MIXED,
+                    presolveConfig = presolve ?: PresolveConfig.DEFAULT,
                     cancellation = stop, randomSeed = seed, prepareOnly = true)
             },
-            randomSeed = seed, timeout = stop, cancellation = stop))
+            randomSeed = seed, timeout = stop, cancellation = stop,
+            presolveConfig = presolve, presolveCancellation = stop))
         val preparation = (prepared as? SourceExecutionResult.Finite)?.result?.preparation
             ?: error("joint capture requires finite preparation")
         val model = preparation.problem
@@ -72,7 +79,8 @@ internal object JointRepairLpCapture {
         } else null
         val captureContext = companion.javaClass.declaredMethods.single { it.name == "captureContext" }
             .apply { isAccessible = true }
-        val context = requireNotNull(captureContext.invoke(companion, model, objective, stop, toleranceAuthority))
+        val context = requireNotNull(captureContext.invoke(companion, model, objective, stop, toleranceAuthority, null))
+            as SourceProofContext
         val checker = Class.forName(PIPELINE + "FiniteIncumbentCompletionKt").methods.single {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
         }.invoke(null, original, mapping)
@@ -80,12 +88,16 @@ internal object JointRepairLpCapture {
         val cutPolicy = options["capture-cut-policy"] ?: "ordinary"
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
             sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
-            sourceIncumbentCompletion = true,
+            sourceIncumbentCompletion = regionalPins == null,
             sourcePointCuts = cutPolicy == "selected", sourceAggregateCuts = cutPolicy == "selected")
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
         val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
             .newInstance(model, context, objective, params, policy, true, { null }, active, null,
                 null, null, true, null, checker, null, null, null)
+        if (regionalPins != null) {
+            replayRegion(owner as AutoCloseable, regionalPins, model.numIntVars, context, active, sha256(bytes), out)
+            return
+        }
         val window = ConditionWindow(limit)
         val authority = requireNotNull(field(owner, "authority"))
         val budget = requireNotNull(field(owner, "budget"))
@@ -229,6 +241,52 @@ internal object JointRepairLpCapture {
             (owner as AutoCloseable).close()
         }
         if (options["inspect-rays"] == "true") JointRayInspection.inspect(out, stop)
+    }
+
+    private fun replayRegion(
+        owner: AutoCloseable, specification: String, integers: Int, context: SourceProofContext, stop: ExecutionControl,
+        sourceHash: String, out: File,
+    ) {
+        val entries = specification.split(',')
+        val pins = entries.associate { entry ->
+            val id = entry.substringBefore('=').toInt()
+            require(id in 0 until integers)
+            id to BigFraction.ofLong(entry.substringAfter('=').toLong())
+        }
+        require(pins.size == entries.size)
+        val condition = Class.forName(PIPELINE + "ExactNeighborhoodCondition")
+            .constructors.single { it.parameterCount == 4 }
+            .newInstance(emptyMap<Int, Boolean>(), pins, pins, null)
+        var attempts = 0
+        var disposition = "Paused"
+        var reason: String? = null
+        val started = System.nanoTime()
+        owner.use {
+            while (attempts < 64 && disposition == "Paused" && !stop()) {
+                val attempt = requireNotNull(call(owner, "attempt", condition, stop))
+                disposition = requireNotNull(call(attempt, "getResult")).javaClass.simpleName
+                reason = call(attempt, "getReason")?.toString()
+                attempts++
+            }
+        }
+        val stats = requireNotNull(call(owner, "getStats")) as SolveStats
+        out.resolve("regional-replay.json").writeText(buildJsonObject {
+            put("sourceSha256", sourceHash)
+            put("pinsSha256", sha256(specification.encodeToByteArray()))
+            put("rootScope", NumericalFrontierSnapshot.scope(context.scope))
+            put("integerCount", integers)
+            put("pinCount", pins.size)
+            put("attempts", attempts)
+            put("attemptAndRetirementNs", System.nanoTime() - started)
+            put("disposition", disposition)
+            put("reason", reason)
+            put("chargedWork", call(owner, "getWork") as Long)
+            put("cancelled", stop())
+            put("stageCounters", buildJsonObject {
+                stats.smt.completeSearchStages.orEmpty().forEach { (name, value) -> put(name, value) }
+            })
+            put("sourceVerdictClaim", false)
+        }.toString())
     }
 
     private fun captureRay(session: Any, id: Int, scope: SourceScope, state: JsonObject, out: File): String? {
