@@ -299,6 +299,7 @@ internal class JointLinearRepair(
             maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null,
             nativeWork = { work }, completionStats = { stats }, onClose = ::close,
             prepareBooleanCenter = { prepare(it, bootstrap = !adaptive) }, rootCoordinateValue = ::center,
+            rootCoordinateCount = model.numIntVars,
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
             continuePausedCompletion = {
@@ -499,8 +500,7 @@ internal class JointLinearRepair(
         return true
     }
 
-    private fun center(index: Int): BigFraction? {
-        if (index >= model.numIntVars) return null
+    private fun center(index: Int): BigFraction {
         val prepared = preparedCenter?.let { BigFraction.of(it.sample.exactIntValue(index), BIG_ONE) }
         if (!bootstrapPending && prepared != null) return prepared
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, index)
@@ -533,7 +533,7 @@ internal class JointLinearRepair(
         val integers = LongArray(model.numIntVars)
         for (id in integers.indices) {
             if (stop()) return false
-            val value = center(id) ?: return false
+            val value = center(id)
             if (value.den != BIG_ONE || !value.num.fitsLong()) return false
             integers[id] = value.num.toLongExact()
         }
