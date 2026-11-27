@@ -308,6 +308,9 @@ internal class Frac128Ops : FracOps<Frac128> {
         if (latched) return Frac128.ZERO
         if (b.isZero) return a
         if (a.isZero) return if (negateB) negated(b) else b
+        if (a.dHi == 0L && a.dLo == 1L && b.dHi == 0L && b.dLo == 1L) {
+            return combineIntegers(a, b, subtract = negateB)
+        }
         // n = na·db ± nb·da over d = da·db, then normalize.
         val da = U128(a.dHi.toULong(), a.dLo.toULong())
         val db = U128(b.dHi.toULong(), b.dLo.toULong())
@@ -345,6 +348,23 @@ internal class Frac128Ops : FracOps<Frac128> {
             mag = p2
         }
         return normalized(negOut, mag, d) ?: latch()
+    }
+
+    private fun combineIntegers(a: Frac128, b: Frac128, subtract: Boolean): Frac128 {
+        val low: Long
+        val high: Long
+        if (subtract) {
+            low = a.nLo - b.nLo
+            val borrow = if (a.nLo.toULong() < b.nLo.toULong()) 1L else 0L
+            high = a.nHi - b.nHi - borrow
+        } else {
+            low = a.nLo + b.nLo
+            val carry = if (low.toULong() < a.nLo.toULong()) 1L else 0L
+            high = a.nHi + b.nHi + carry
+        }
+        val oppositeSigns = (a.nHi xor b.nHi) < 0L
+        if (oppositeSigns == subtract && (a.nHi xor high) < 0L) return latch()
+        return if (high == 0L && low == 0L) zero else Frac128(high, low, 0L, 1L)
     }
 
     override fun times(a: Frac128, b: Frac128): Frac128 {

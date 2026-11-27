@@ -8,6 +8,35 @@ import kotlin.test.assertTrue
 class Frac128Test {
 
     @Test
+    fun `integer addition and subtraction should carry across numerator words`() {
+        val below = Frac128(0L, -1L, 0L, 1L)
+        val above = Frac128(1L, 0L, 0L, 1L)
+        for (add in listOf(false, true)) {
+            val ops = Frac128Ops()
+            val expected = if (add) above else below
+
+            val result = if (add) ops.plus(below, ops.one) else ops.minus(above, ops.one)
+
+            assertFalse(ops.overflowed())
+            assertEquals(listOf(expected.nHi, expected.nLo, 0L, 1L),
+                listOf(result.nHi, result.nLo, result.dHi, result.dLo))
+        }
+    }
+
+    @Test
+    fun `integer addition and subtraction should latch past the signed boundary`() {
+        val maximum = Frac128(Long.MAX_VALUE, -1L, 0L, 1L)
+        val minimum = Frac128(Long.MIN_VALUE, 0L, 0L, 1L)
+        for (add in listOf(false, true)) {
+            val ops = Frac128Ops()
+
+            if (add) ops.plus(maximum, ops.one) else ops.minus(minimum, ops.one)
+
+            assertTrue(ops.overflowed())
+        }
+    }
+
+    @Test
     fun `equal wide denominators should combine without an overflowing denominator product`() {
         val ops = Frac128Ops()
         val first = Frac128(0L, 1L, 1L shl 36, 0L)
