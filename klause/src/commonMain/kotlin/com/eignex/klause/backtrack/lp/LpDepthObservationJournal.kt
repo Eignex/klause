@@ -18,14 +18,19 @@ internal class LpDepthObservationJournal(
     private val capacity = capacity(maxAge)
     private val blocks = arrayOfNulls<Block>(blockCount(capacity))
     private val evidence = LongArray(BUCKETS)
+    private val wordsPerBucket = wordCount(capacity)
+    private val positions = LongArray(BUCKETS * wordsPerBucket)
     private var next = 0
     var size = 0
         private set
+
+    val clearWork: Long get() = evidence.size + positions.size + 1L
 
     fun clear() {
         size = 0
         next = 0
         evidence.fill(0L)
+        positions.fill(0L)
     }
 
     fun mayHavePairs(variable: VarRef, level: Int): Boolean {
@@ -59,16 +64,20 @@ internal class LpDepthObservationJournal(
                 retained.parents[slot] != child.parent.objective ||
                 retained.flags[slot].toInt() and OUTCOMES.inv() != flag)
         ) return false
-        charge(24L + if (retained == null) BLOCK_BYTES else 0L)
-        if (!current() || count != size || write != next) return false
         val evicts = append && count == capacity
+        val positionWork = if (evicts) 12L else if (append) 6L else 0L
+        charge(24L + positionWork + if (retained == null) BLOCK_BYTES else 0L)
+        if (!current() || count != size || write != next) return false
         val block = retained ?: Block().also { blocks[page] = it }
         val evictsInAge = evicts && node - block.nodes[slot] <= maxAge
         if (evicts) {
             val oldFlag = block.flags[slot].toInt()
-            adjust(block.variables[slot], oldFlag, block.gains[slot].isFinite(), oldFlag and OUTCOMES != 0, add = false)
+            val oldKey = block.variables[slot]
+            adjust(oldKey, oldFlag, block.gains[slot].isFinite(), oldFlag and OUTCOMES != 0, add = false)
+            updatePosition(oldKey, oldFlag, index, add = false)
         }
         if (append) {
+            updatePosition(key, flag, index, add = true)
             block.variables[slot] = key
             block.nodes[slot] = node
             block.parents[slot] = child.parent.objective
@@ -97,6 +106,12 @@ internal class LpDepthObservationJournal(
         return true
     }
 
+    private fun updatePosition(key: Int, flag: Int, position: Int, add: Boolean) {
+        val index = bucket(key, flag ushr LEVEL_SHIFT) * wordsPerBucket + position / WORD_BITS
+        val bit = 1L shl (position % WORD_BITS)
+        positions[index] = if (add) positions[index] or bit else positions[index] and bit.inv()
+    }
+
     private fun adjust(key: Int, flag: Int, numeric: Boolean, outcome: Boolean, add: Boolean) {
         val index = bucket(key, flag ushr LEVEL_SHIFT)
         val direction = if (flag and UP == 0) 0 else 1
@@ -121,30 +136,42 @@ internal class LpDepthObservationJournal(
         val history = LpDirectionalHistory.Gains(variable)
         val key = key(variable)
         val minimumAge = if (includeCurrent) 0L else 1L
-        for (offset in 0 until count step BLOCK_SIZE) {
-            val end = minOf(count, offset + BLOCK_SIZE)
-            charge((end - offset) * 8L)
-            if (!current() || count != size || write != next) return null
-            for (index in offset until end) {
-                val position = (first + index) % capacity
-                val block = checkNotNull(blocks[position / BLOCK_SIZE])
-                val slot = position % BLOCK_SIZE
-                val flag = block.flags[slot].toInt()
-                val sample = block.nodes[slot]
-                if (block.variables[slot] != key || flag ushr LEVEL_SHIFT != level ||
-                    node - sample !in minimumAge..maxAge
-                ) {
-                    continue
+        val bucketStart = bucket(key, level) * wordsPerBucket
+        fun replay(start: Int, end: Int): Boolean {
+            var offset = start
+            while (offset < end) {
+                val word = offset / WORD_BITS
+                val base = word * WORD_BITS
+                val stop = minOf(end, base + WORD_BITS)
+                val lowMask = -1L shl (offset - base)
+                val highMask = -1L ushr (WORD_BITS - (stop - base))
+                var candidates = positions[bucketStart + word] and lowMask and highMask
+                charge(8L + candidates.countOneBits() * 8L)
+                if (!current() || count != size || write != next) return false
+                while (candidates != 0L) {
+                    val position = base + candidates.countTrailingZeroBits()
+                    candidates = candidates and (candidates - 1L)
+                    val block = checkNotNull(blocks[position / BLOCK_SIZE])
+                    val slot = position % BLOCK_SIZE
+                    val flag = block.flags[slot].toInt()
+                    val sample = block.nodes[slot]
+                    if (block.variables[slot] != key || flag ushr LEVEL_SHIFT != level ||
+                        node - sample !in minimumAge..maxAge
+                    ) continue
+                    val direction = if (flag and UP != 0) history.up else history.down
+                    val parent = block.parents[slot]
+                    val gain = block.gains[slot]
+                    if (gain.isFinite()) direction.recordNumeric(gain, sample, parent, level)
+                    if (flag and OUTCOMES != 0) {
+                        direction.recordOutcome(flag and PRUNED != 0, sample, parent, level)
+                    }
                 }
-                val direction = if (flag and UP != 0) history.up else history.down
-                val parent = block.parents[slot]
-                val gain = block.gains[slot]
-                if (gain.isFinite()) direction.recordNumeric(gain, sample, parent, level)
-                if (flag and OUTCOMES != 0) {
-                    direction.recordOutcome(flag and PRUNED != 0, sample, parent, level)
-                }
+                offset = stop
             }
+            return true
         }
+        val end = first + count
+        if (!replay(first, minOf(end, capacity)) || (end > capacity && !replay(0, end - capacity))) return null
         return history
     }
 
@@ -158,15 +185,20 @@ internal class LpDepthObservationJournal(
         private const val OUTCOMES = OPEN or PRUNED
         private const val LEVEL_SHIFT = 3
         private const val BUCKETS = 128
+        private const val WORD_BITS = 64
         private const val FIELD_BITS = 9
         private const val FIELD_MASK = (1L shl FIELD_BITS) - 1L
-        const val CLEAR_WORK = BUCKETS + 1L
 
-        fun indexWork(maxAge: Long): Long = blockCount(capacity(maxAge)).toLong() + BUCKETS * 8L
+        fun indexWork(maxAge: Long): Long {
+            val capacity = capacity(maxAge)
+            return blockCount(capacity) + BUCKETS * (1L + wordCount(capacity)) * 8L
+        }
 
         private fun capacity(maxAge: Long): Int = maxAge.coerceIn(0L, MAX_AGE).toInt() + 1
 
         private fun blockCount(capacity: Int): Int = (capacity + BLOCK_SIZE - 1) / BLOCK_SIZE
+
+        private fun wordCount(capacity: Int): Int = (capacity + WORD_BITS - 1) / WORD_BITS
 
         private fun key(variable: VarRef): Int = if (variable is VarRef.Bool) variable.varId.inv() else variable.varId
 

@@ -144,7 +144,7 @@ internal class LpDirectionalHistory(
         candidates = null
         candidateCount = 0
         charge(gains.size.toLong() + retainedCandidates + (formed?.size ?: 0) +
-            if (depthJournal == null) 0L else LpDepthObservationJournal.CLEAR_WORK)
+            (depthJournal?.clearWork ?: 0L))
         gains.clear()
         depthJournal?.clear()
         depthFormations = null

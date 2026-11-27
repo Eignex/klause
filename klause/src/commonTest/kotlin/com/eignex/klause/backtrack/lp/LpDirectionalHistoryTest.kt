@@ -186,8 +186,8 @@ class LpDirectionalHistoryTest {
             history = LpDirectionalHistory({}, depthRetention = true, depthCancellation = cancellation, charge = { amount ->
                 val target = when {
                     action.startsWith("lookup") -> 8L
-                    action == "scan-reset" -> 32L
-                    else -> 24L
+                    action == "scan-reset" -> 40L
+                    else -> 30L
                 }
                 if (armed && amount == target) {
                     armed = false

@@ -9,6 +9,30 @@ import kotlin.test.assertTrue
 
 class LpDepthObservationJournalTest {
     @Test
+    fun `depth replay keeps the latest matching observations across the ring boundary`() {
+        val journal = LpDepthObservationJournal({}, {}, maxAge = 64L)
+        val target = VarRef.IntVar(0)
+        val unrelated = VarRef.IntVar(755)
+        val depth = 0
+        val sampleNodes = setOf(62L, 64L, 66L, 68L)
+        for (node in 1L..70L) {
+            val matches = node in sampleNodes
+            val up = node == 64L || node == 68L
+            val parent = LpDirectionalHistory.Parent(2.0, if (matches || node == 69L) target else unrelated, 0.5)
+            val child = LpDirectionalHistory.Pending(parent, up, 0.5, if (node == 69L) depth + 2 else depth + 1)
+            journal.record(child, node, node.toDouble(), null) { true }
+            journal.record(child, node, Double.NaN, node <= 64L) { true }
+        }
+
+        val restored = assertNotNull(journal.restore(target, depth, 70L) { true })
+
+        assertEquals(62L to 66L, restored.down.previousStamp to restored.down.stamp)
+        assertEquals(64L to 68L, restored.up.previousStamp to restored.up.stamp)
+        assertEquals(62L to 66L, restored.down.outcomePreviousStamp to restored.down.outcomeStamp)
+        assertEquals(64L to 68L, restored.up.outcomePreviousStamp to restored.up.outcomeStamp)
+    }
+
+    @Test
     fun `full depth window keeps the oldest distinct in age observations`() {
         val events = ArrayList<String>()
         val journal = LpDepthObservationJournal({}, events::add, maxAge = 256L)
