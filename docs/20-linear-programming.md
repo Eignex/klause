@@ -716,7 +716,8 @@ objective edits invalidate dependent proofs.
 and [CpLpAdapter](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/CpLpAdapter.kt)
 hold bound trails, active-row identity and verification caches.
 
-Rows have stable identities. Deactivation removes slack bounds, strictness and
+Rows have stable identities. The deepest retractable row scope lets a bound-only pop
+reuse the row layout directly. Deactivation removes slack bounds, strictness and
 integrality, and is rejected while surviving assertions need the row; global
 source-valid cuts can survive pop. Appends and compaction prepare a fresh
 fixed-dimension owner with warm headings and publish it before retiring the donor;
