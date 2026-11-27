@@ -659,6 +659,7 @@ internal class JointLinearRepair(
         observe("jointRepairNominalPublicationAttempts")
         val work = funding.spent
         val allocation = funding.allocated
+        val previousGrant = funding.availableWork
         val token = object : ExecutionControl(verification) {
             override fun isCancelled(): Boolean = verification() || funding.exhausted ||
                 funding.spent - work >= NOMINAL_PUBLICATION_MAX_WORK ||
@@ -666,24 +667,28 @@ internal class JointLinearRepair(
             override val accounting = WorkMeter { units -> budget.observe(preparation = units) }
         }
         funding.grant(NOMINAL_PUBLICATION_MAX_WORK)
-        val captureWork = 1L + model.numFactors + source.premiseCount + source.coordinateCount
-        val captureBytes = 256L + 128L * (source.premiseCount + source.coordinateCount)
-        if (captureWork >= funding.availableWork || captureBytes >= funding.remainingAllocation) return null
-        budget.observe(preparation = captureWork)
-        funding.charge(0L, captureBytes)
-        val nominal = capture(token) ?: return null
-        if (token() || nominal.scope.revision == source.scope.revision ||
-            nominal.scope.condition != source.scope.condition ||
-            nominal.scope.objective?.sense != source.scope.objective?.sense ||
-            nominal.coordinates != source.coordinates || nominal.objective != source.objective ||
-            nominal.objectiveConstant != source.objectiveConstant) return null
-        budget.observe(preparation = 1L + sample.numIntVars + sample.numRealVars)
-        funding.charge(0L, 128L + 32L * (sample.numIntVars + sample.numRealVars))
-        val seed = sample.copy(exactReals = null)
-        return LinearIncumbentCompletion(budget, original) { stage, count ->
-            val key = "jointRepairNominalPublication$stage"
-            stages[key] = combine(key, stages[key] ?: 0L, count)
-        }.use { it.complete(nominal, seed, token) }
+        try {
+            val captureWork = 1L + model.numFactors + source.premiseCount + source.coordinateCount
+            val captureBytes = 256L + 128L * (source.premiseCount + source.coordinateCount)
+            if (captureWork >= funding.availableWork || captureBytes >= funding.remainingAllocation) return null
+            budget.observe(preparation = captureWork)
+            funding.charge(0L, captureBytes)
+            val nominal = capture(token) ?: return null
+            if (token() || nominal.scope.revision == source.scope.revision ||
+                nominal.scope.condition != source.scope.condition ||
+                nominal.scope.objective?.sense != source.scope.objective?.sense ||
+                nominal.coordinates != source.coordinates || nominal.objective != source.objective ||
+                nominal.objectiveConstant != source.objectiveConstant) return null
+            budget.observe(preparation = 1L + sample.numIntVars + sample.numRealVars)
+            funding.charge(0L, 128L + 32L * (sample.numIntVars + sample.numRealVars))
+            val seed = sample.copy(exactReals = null)
+            return LinearIncumbentCompletion(budget, original) { stage, count ->
+                val key = "jointRepairNominalPublication$stage"
+                stages[key] = combine(key, stages[key] ?: 0L, count)
+            }.use { it.complete(nominal, seed, token) }
+        } finally {
+            funding.grant((previousGrant - (funding.spent - work)).coerceAtLeast(0L))
+        }
     }
 
     private fun advanceAttempt(condition: ExactNeighborhoodCondition,
