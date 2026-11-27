@@ -181,7 +181,11 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val sourceRefutationPropagation: ExecutionOption<Boolean> =
             ExecutionOption("source-refutation-propagation", ValueKind.BOOLEAN)
 
-        /** Checked resolution over named numerical source-bound predicates. */
+        /** Binary compatibility for callers compiled against the retired numerical resolution setting. */
+        @Deprecated(
+            "The execution setting source-refutation-resolution has been removed.",
+            level = DeprecationLevel.ERROR,
+        )
         val sourceRefutationResolution: ExecutionOption<Boolean> =
             ExecutionOption("source-refutation-resolution", ValueKind.BOOLEAN)
 
@@ -391,7 +395,11 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `lp-component-split` execution setting. */
         val lpComponentSplit: ExecutionOption<Boolean> = ExecutionOption("lp-component-split", ValueKind.BOOLEAN)
 
-        /** The `lp-component-ownership` execution setting. */
+        /** Binary compatibility for callers compiled against the retired finite search setting. */
+        @Deprecated(
+            "The finite execution setting lp-component-ownership has been removed.",
+            level = DeprecationLevel.ERROR,
+        )
         val lpComponentOwnership: ExecutionOption<Boolean> =
             ExecutionOption("lp-component-ownership", ValueKind.BOOLEAN)
 
@@ -638,7 +646,6 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 sourceRefutationCenterStep,
                 sourceRefutationReuse,
                 sourceRefutationPropagation,
-                sourceRefutationResolution,
                 nraWorkLimit, nraDenseCoefficients, nraMatrixCells, niaCandidates, niaMoves,
                 niaCellRefinement, niaCellReuse, niaCellSteering, niaIntegerRoots, niaResidues,
                 maxFlips, maxInstructions, alnsIterations, sharedRestart, openBranching,
@@ -654,7 +661,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingProbeInterval,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
-                lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
+                lpKnapsackLagrangian, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains, lpDirectionalAdvice,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning, integerRowAdmission,
                 integerRowReuse, arithmeticLearningWork, arithmeticLearningAllocationBytes,

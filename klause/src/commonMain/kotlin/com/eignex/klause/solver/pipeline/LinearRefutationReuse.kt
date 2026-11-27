@@ -15,7 +15,6 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
-import com.eignex.klause.solver.search.resolveSearchClauses
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -28,7 +27,6 @@ internal class LinearRefutationReuse(
     private val maximumEntries: Int = 256,
     private val maximumBytes: Long = 1_048_576L,
     maximumAllocation: Long = 67_108_864L,
-    private val resolve: Boolean = false,
 ) {
     class UnitExclusion(
         val id: Long,
@@ -36,14 +34,9 @@ internal class LinearRefutationReuse(
         val threshold: BigFraction,
         val upper: Boolean,
         val evidence: SourceEvidence,
-        val support: SourceCondition,
-        val resolved: Boolean,
-        val unfixedPivot: Boolean,
     )
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
-    private data class Predicate(val coordinate: SourceCoordinate, val value: BigFraction, val upper: Boolean)
-    private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long,
-        val clause: IntArray?, val nodes: Int, val depth: Int) {
+    private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long) {
         var consumed = false
         var asserted = false
     }
@@ -56,10 +49,6 @@ internal class LinearRefutationReuse(
     private val entries = linkedMapOf<Long, Entry>()
     private val indexed = hashMapOf<Side, MutableSet<Long>>()
     private val unconditional = linkedSetOf<Long>()
-    private val names = hashMapOf<Predicate, Int>()
-    private val predicates = hashMapOf<Int, Predicate>()
-    private val scopes = hashMapOf<SourceCondition, Long>()
-    private var nameBytes = 0L
     private var nextId = 0L
     private var retainedBytes = 0L
     private var peakBytes = 0L
@@ -84,7 +73,6 @@ internal class LinearRefutationReuse(
         lifecycle.snapshot() + mapOf(
             "numericalRefutationReuseRetained" to entries.size.toLong(),
             "numericalRefutationReuseBytes" to retainedBytes,
-            "numericalRefutationReuseNameBytes" to nameBytes,
             "numericalRefutationReusePeakBytes" to peakBytes,
             "numericalRefutationReuseAllocation" to allocated,
             "numericalRefutationReuseWork" to work,
@@ -94,29 +82,6 @@ internal class LinearRefutationReuse(
 
     private fun observe(name: String) {
         counts[name] = (counts[name] ?: 0L) + 1L
-    }
-
-    fun name(coordinate: SourceCoordinate, threshold: BigFraction, positive: Int) {
-        if (!resolve) return
-        val below = Predicate(coordinate, threshold, true)
-        if (below in names) return
-        val aboveValue = threshold + BigFraction.ONE
-        val bits = threshold.num.magnitudeBitLength().toLong() + threshold.den.magnitudeBitLength() +
-            aboveValue.num.magnitudeBitLength() + aboveValue.den.magnitudeBitLength()
-        val bytes = 512L + (bits + 7L) / 8L
-        if (bytes > maximumBytes / 4L - nameBytes) {
-            observe("ResolutionNameStops")
-            return
-        }
-        if (!spend(2L, bytes)) return
-        val above = Predicate(coordinate, aboveValue, false)
-        names[below] = positive
-        names[above] = positive xor 1
-        predicates[positive] = below
-        predicates[positive xor 1] = above
-        nameBytes += bytes
-        while (retainedBytes > maximumBytes - nameBytes) evict()
-        peakBytes = maxOf(peakBytes, retainedBytes + nameBytes)
     }
 
     private fun charge(units: Long, bytes: Long = 0L) {
@@ -264,13 +229,11 @@ internal class LinearRefutationReuse(
                 return
             }
         }
-        val entry = store(retained, captured.bytes, captured.nodes, 0) ?: return
-        if (resolve && entry.clause != null) resolve(entry)
+        store(retained, captured.bytes)
     }
 
-    private fun store(evidence: SourceEvidence, proofBytes: Long, nodes: Int, depth: Int): Entry? {
+    private fun store(evidence: SourceEvidence, proofBytes: Long) {
         val retainedCondition = evidence.scope.condition
-        if (resolve && retainedCondition in scopes) return null
         val lowers = retainedCondition.lower
         val uppers = retainedCondition.upper
         val sides = lowers.keys.map { Side(it, false) } + uppers.keys.map { Side(it, true) }
@@ -278,117 +241,17 @@ internal class LinearRefutationReuse(
             (lowers.values + uppers.values).sumOf {
                 64L + (it.num.magnitudeBitLength().toLong() + it.den.magnitudeBitLength() + 7L) / 8L
             }
-        if (bytes > maximumBytes - nameBytes || !spend(1L + sides.size, bytes)) return null
-        val clause = if (resolve) clause(retainedCondition) else null
-        if (retired || cancellation() || budget.funding?.paused == true) return null
-        while (entries.size >= maximumEntries || bytes > maximumBytes - nameBytes - retainedBytes) evict()
+        if (bytes > maximumBytes || !spend(1L + sides.size, bytes)) return
+        if (retired || cancellation() || budget.funding?.paused == true) return
+        while (entries.size >= maximumEntries || bytes > maximumBytes - retainedBytes) evict()
         val anchor = sides.minWithOrNull(compareBy({ it.coordinate.kind.ordinal }, { it.coordinate.id }, { it.upper }))
         val id = nextId++
-        val entry = Entry(evidence, anchor, bytes, (sides.size + retainedCondition.bools.size).toLong(),
-            clause, nodes, depth)
-        entries[id] = entry
-        if (resolve) scopes[retainedCondition] = id
+        entries[id] = Entry(evidence, anchor, bytes, (sides.size + retainedCondition.bools.size).toLong())
         if (anchor == null) unconditional += id else indexed.getOrPut(anchor) { linkedSetOf() }.add(id)
         retainedBytes += bytes
-        peakBytes = maxOf(peakBytes, retainedBytes + nameBytes)
+        peakBytes = maxOf(peakBytes, retainedBytes)
         lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Admitted)
         observe("RetainedProofs")
-        return entry
-    }
-
-    private fun clause(condition: SourceCondition): IntArray? {
-        val opening = source.scope.condition
-        val size = condition.bools.size + condition.lower.size + condition.upper.size
-        if (size > 4096 || !spend(1L + size, 128L * size)) return null
-        val literals = ArrayList<Int>()
-        val openingBools = opening.bools
-        for ((id, value) in condition.bools) {
-            if (openingBools[id] != value) {
-                literals += (id shl 1) or if (value) 1 else 0
-            }
-        }
-        for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
-            for ((coordinate, value) in bounds) {
-                val required = SourceCondition().bound(coordinate, value, upper)
-                if (opening.implies(required)) continue
-                val name = names[Predicate(coordinate, value, upper)]
-                if (name == null) {
-                    observe("ResolutionNameDeclines")
-                    return null
-                }
-                literals += name xor 1
-            }
-        }
-        return literals.toIntArray()
-    }
-
-    private fun condition(clause: IntArray): SourceCondition {
-        val opening = source.scope.condition
-        val bools = opening.bools.toMutableMap()
-        val lower = opening.lower.toMutableMap()
-        val upper = opening.upper.toMutableMap()
-        for (literal in clause) {
-            val bound = predicates[literal xor 1]
-            if (bound == null) bools[literal ushr 1] = literal and 1 != 0 else {
-                val bounds = if (bound.upper) upper else lower
-                val previous = bounds[bound.coordinate]
-                if (previous == null || if (bound.upper) bound.value < previous else bound.value > previous) {
-                    bounds[bound.coordinate] = bound.value
-                }
-            }
-        }
-        return SourceCondition(bools, lower, upper)
-    }
-
-    private fun resolve(added: Entry) {
-        val clause = added.clause ?: return
-        if (!spend(entries.size.toLong(), entries.size * 8L)) return
-        val candidates = entries.values.toList()
-        for (entry in candidates) {
-            val other = entry.clause ?: continue
-            if (entry === added || entry.depth >= 32 || added.nodes + entry.nodes + 3 > 4096) continue
-            for (pivot in clause) {
-                if (!spend(1L + other.size)) return
-                val bound = predicates[pivot xor 1] ?: continue
-                if (pivot xor 1 !in other) continue
-                observe("ResolutionCandidates")
-                if (!spend(clause.size.toLong() + other.size,
-                        256L * (clause.size + other.size + added.restrictions + entry.restrictions))) return
-                val resolved = resolveSearchClauses(clause, other, pivot) ?: continue
-                val required = condition(resolved)
-                if (required in scopes) continue
-                val threshold = if (bound.upper) bound.value else bound.value - BigFraction.ONE
-                val first = SourceDerivation.Import(added.evidence)
-                val second = SourceDerivation.Import(entry.evidence)
-                val proof = SourceDerivation.IntegerSplit(bound.coordinate, threshold,
-                    if (bound.upper) first else second, if (bound.upper) second else first)
-                lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Constructed)
-                val evidence = SourceEvidence(source.scope.copy(condition = required), SourceClaim.Refutation, proof)
-                when (verify(evidence)) {
-                    SourceEvidenceCheck.Checked -> {
-                        if (store(evidence, added.bytes + entry.bytes + 256L,
-                                added.nodes + entry.nodes + 3, maxOf(added.depth, entry.depth) + 1) != null) {
-                            observe("ResolutionProofs")
-                        }
-                    }
-                    is SourceEvidenceCheck.Rejected -> observe("ResolutionRejected")
-                    is SourceEvidenceCheck.Unavailable -> {
-                        observe("Unavailable")
-                        if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return
-                    }
-                }
-            }
-        }
-    }
-
-    private fun unfixedPivot(entry: Entry, condition: SourceCondition): Boolean? {
-        if (entry.depth == 0) return false
-        if (!spend(2L + 2L * entry.restrictions, 192L + 96L * entry.restrictions)) return null
-        val split = entry.evidence.derivation as? SourceDerivation.IntegerSplit ?: return false
-        val lower = condition.lower[split.coordinate]
-        val upper = condition.upper[split.coordinate]
-        return (upper == null || upper > split.threshold) &&
-            (lower == null || lower < split.threshold + BigFraction.ONE)
     }
 
     fun find(condition: SourceCondition, consume: Boolean = false): SourceEvidence? {
@@ -412,15 +275,12 @@ internal class LinearRefutationReuse(
             if (!condition.implies(entry.evidence.scope.condition)) continue
             val imported = SourceEvidence(source.scope.copy(condition = condition), SourceClaim.Refutation,
                 SourceDerivation.Import(entry.evidence))
-            val unfixed = unfixedPivot(entry, condition) ?: return null
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     asserted(entry)
                     if (consume) consumed(id)
                     observe("Hits")
-                    if (entry.depth > 0) observe("ResolutionHits")
-                    if (unfixed) observe("ResolutionUnfixedHits")
                     return imported
                 }
                 is SourceEvidenceCheck.Rejected -> observe("Rejected")
@@ -462,15 +322,12 @@ internal class LinearRefutationReuse(
             val scoped = condition.bound(coordinate, value, isUpper)
             val imported = SourceEvidence(source.scope.copy(condition = scoped), SourceClaim.Refutation,
                 SourceDerivation.Import(entry.evidence))
-            val unfixed = unfixedPivot(entry, scoped) ?: return null
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
                     if (retired || cancellation() || budget.funding?.paused == true) return null
                     observe("UnitChecks")
-                    if (entry.depth > 0) observe("ResolutionUnits")
                     asserted(entry)
-                    return UnitExclusion(id, coordinate, threshold, isUpper, imported, required,
-                        entry.depth > 0, unfixed)
+                    return UnitExclusion(id, coordinate, threshold, isUpper, imported)
                 }
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
                 is SourceEvidenceCheck.Unavailable -> {
@@ -500,7 +357,6 @@ internal class LinearRefutationReuse(
         val id = first.key
         val entry = first.value
         entries.remove(id)
-        if (resolve) scopes.remove(entry.evidence.scope.condition)
         val bucket = entry.anchor?.let { indexed.getValue(it) } ?: unconditional
         bucket.remove(id)
         if (bucket.isEmpty() && entry.anchor != null) indexed.remove(entry.anchor)
@@ -512,8 +368,5 @@ internal class LinearRefutationReuse(
 
     fun clear() {
         while (entries.isNotEmpty()) evict()
-        names.clear()
-        predicates.clear()
-        nameBytes = 0L
     }
 }

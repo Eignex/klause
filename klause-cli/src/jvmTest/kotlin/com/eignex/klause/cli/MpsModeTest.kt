@@ -22,7 +22,7 @@ class MpsModeTest {
         val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
                 "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts,preparation=disabled",
-                "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
+                "--param", "bt-arm=lp-aggressive",
                 "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath)))
         }
 
@@ -42,7 +42,7 @@ class MpsModeTest {
         val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
                 "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts",
-                "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
+                "--param", "bt-arm=lp-aggressive",
                 "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath)))
         }
 
@@ -65,22 +65,20 @@ class MpsModeTest {
     }
 
     @Test
-    fun `prepared separable MPS search should consume compatible child results`() {
+    fun `retired component ownership should be rejected by the MPS CLI`() {
         val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
-        val text = captureStdout {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact", "--presolve", "off",
-                "--lp", "aggressive,-cuts", "--param", "lp-component-ownership=true",
-                "--param", "bt-arm=lp-aggressive", "--param", "arms=1", "-r", "3",
-                "--param", "max-decisions=1000", source.absolutePath)))
-        }
+        for (enabled in listOf(false, true)) {
+            var code = -1
+            val error = captureStderr {
+                code = runCli(arrayOf("-e", "cp", "-p", "1", "--param",
+                    "lp-component-ownership=$enabled", source.absolutePath))
+            }
 
-        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
-        assertTrue("o 4" in text.lines(), text)
-        val reuses = Regex("lpPhase_COMPONENT_LIFECYCLE_[A-Z]+_REUSED=(\\d+)").findAll(text)
-            .sumOf { it.groupValues[1].toLong() }
-        assertTrue(reuses > 0L, text)
+            assertEquals(2, code, error)
+            assertTrue("lp-component-ownership" in error, error)
+        }
     }
 
     @Test

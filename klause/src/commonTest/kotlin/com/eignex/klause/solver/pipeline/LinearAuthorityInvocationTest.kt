@@ -447,7 +447,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
         ), mapOf(real to BigFraction.ONE))
         val params = TheoryParams(sourceCuts = false)
 
-        for ((recordFeedback, resolution) in listOf(false to false, true to false, true to true)) {
+        for (recordFeedback in listOf(false, true)) {
             var baselineFeedback = 0
             var reusedFeedback = 0
             val baselineObserver: (SourceNumericalFeedbackResult) -> Unit = { baselineFeedback++ }
@@ -456,7 +456,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             val baseline = LinearAuthorityInvocation(source, params, boundOrdered = true,
                 onNumericalFeedback = baselineObserver.takeIf { recordFeedback }).use { it.run { _, _ -> } }
             val reused = LinearAuthorityInvocation(source, params.copy(sourceRefutationReuse = true,
-                sourceRefutationPropagation = recordFeedback, sourceRefutationResolution = resolution),
+                sourceRefutationPropagation = recordFeedback),
                 boundOrdered = true, onNumericalFeedback = reusedObserver.takeIf { recordFeedback }).use {
                 if (!recordFeedback) it.run { _, _ -> } else {
                     var result: LinearInvocationResult? = null
@@ -896,9 +896,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     @Test
     fun `bound frontier should preserve complete sibling proofs across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        for ((sense, resolution) in ObjectiveSense.entries.flatMap { sense ->
-            listOf(false, true).map { sense to it }
-        }) {
+        for (sense in ObjectiveSense.entries) {
             val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
             val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
                 setOf(integer, other), mapOf(
@@ -908,8 +906,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
                         BigFraction.MINUS_ONE)),
                 ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true,
-                sourceRefutationResolution = resolution),
+            LinearAuthorityInvocation(source, TheoryParams(sourceRefutationPropagation = true),
                 boundOrdered = true).use { invocation ->
                 var result: LinearInvocationResult? = null
                 repeat(32) {
@@ -943,31 +940,6 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             assertNotNull(snapshot.incumbent)
             assertNull(snapshot.bound)
             assertNull(snapshot.terminal)
-        }
-    }
-
-    @Test
-    fun `directional history should preserve exhaustive fractional sibling proofs`() {
-        val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        for (sense in ObjectiveSense.entries) {
-            val direction = if (sense == ObjectiveSense.MINIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
-            val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", sense)),
-                setOf(integer, other), mapOf(
-                    "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ofLong(-2) * direction),
-                        BigFraction.MINUS_ONE)),
-                    "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ofLong(-2) * direction),
-                        BigFraction.MINUS_ONE)),
-                ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
-
-            val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(), useBranchHistory = true).use {
-                it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
-            })
-
-            val terminal = assertNotNull(result.terminal)
-            val claim = assertIs<SourceClaim.Optimal>(terminal.claim)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2) * direction), claim.value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
     }
 
