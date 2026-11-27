@@ -393,6 +393,9 @@ diagnostic observer records completed admission decisions and their evaluated
 guards, including preparation and query allowances at the producer and helper.
 Root point events identify the original owner, model and point through queries,
 retention and search consultations. A consultation supplies ordering guidance.
+The automatic root experiment can hand a complete point from the same source
+directly to ordinary search. Auxiliary and partial points remain eligible for
+the existing rounding paths.
 
 Completed root points can guide rounding under the same objective identity, within a
 one-MiB guidance cap. Rounding pins through propagation with nearest targets, and

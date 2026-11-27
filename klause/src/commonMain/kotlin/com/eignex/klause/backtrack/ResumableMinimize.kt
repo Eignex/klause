@@ -1550,6 +1550,17 @@ internal class ResumableMinimize(
             }
             return false
         }
+        val directAutomaticHandoff = lpEngine.automaticSparseTrial && !plan.componentOwnership
+        if (directAutomaticHandoff &&
+            (guide.auxiliaryPoint || guide.knownColumns != null || guide.sourceProblem !== problem)
+        ) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.OWNER,
+                    guide.relaxation.model, guide.primal, auxiliary = guide.auxiliaryPoint,
+                    partial = guide.knownColumns != null)
+            }
+            return false
+        }
         if (rootToken()) {
             if (lpEngine.rootPointObservationEnabled) {
                 lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.CANCELLED,
@@ -1561,7 +1572,7 @@ internal class ResumableMinimize(
             !lpEngine.retainRootPrimalTargets(rootToken)
         )
             return false
-        if (lpEngine.prepareRootComponentTrial(objective, rootToken)) {
+        if (!directAutomaticHandoff && lpEngine.prepareRootComponentTrial(objective, rootToken)) {
             if (lpEngine.rootPointObservationEnabled) {
                 lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.COMPONENT_TRIAL,
                     guide.relaxation.model, guide.primal)
