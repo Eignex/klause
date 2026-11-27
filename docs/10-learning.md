@@ -379,8 +379,8 @@ explanations and lifetime, and excludes those rows as arithmetic seeds and endpo
 reasons in later analysis. Integer analysis, row attachment and row firing report
 their charged native work, including interrupted work. Firings after each row's
 first firing have their own counts. A useful firing changes a propagation count
-or detects a contradiction. Retirement counts describe the learned store's policy;
-they exclude session teardown and have no separate mixed-store work total.
+or detects a contradiction. Retirement counts cover the learned store's policy.
+Session teardown and mixed-store retirement work have no separate integer-row totals.
 
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
