@@ -26,6 +26,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.magnitudeBitLength
+import kotlin.math.abs
 
 internal const val SPARSE_LP_MAX_WORK = 150_000_000L
 internal const val SPARSE_LP_MAX_ALLOCATION = 2L * 1024L * 1024L * 1024L
@@ -152,33 +153,46 @@ internal fun estimateSparseLpAdmission(
     }
     var entries = 0L
     var scalarBits = 1
+    val integralStorage = !model.hasContinuous
     fun number(value: BigFraction) {
         scalarBits = maxOf(scalarBits, value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
     }
+    fun entry(row: Int, column: Int) {
+        entries++
+        rowDegree[row]++
+        union(row, model.m + column)
+    }
     for (column in 0 until model.n) {
         if (cancellation()) return decline("Cancelled")
-        model.forEachRationalColumn(column) { row, value ->
-            number(value)
-            if (!value.isZero) {
-                entries++
-                rowDegree[row]++
-                union(row, model.m + column)
+        if (integralStorage) {
+            model.forEachInColumn(column) { row, value ->
+                scalarBits = maxOf(scalarBits, signedMagnitudeBits(value))
+                if (value != 0L) entry(row, column)
+            }
+        } else {
+            model.forEachRationalColumn(column) { row, value ->
+                number(value)
+                if (!value.isZero) entry(row, column)
             }
         }
         if (entries > MAX_ENTRIES) return decline("Entries")
     }
-    for (row in 0 until model.m) number(model.exactRhs(row))
-    for (column in 0 until model.numVars) {
-        number(model.exactCost(column))
-        if (column < model.n) number(model.exactShift(column))
-        val bounds = model.exactBounds(column)
-        bounds.lower?.let { number(it.number.value) }
-        bounds.upper?.let { number(it.number.value) }
-    }
-    number(model.exactConstant())
-    model.exactState?.model?.objective?.let {
-        number(it.scale.value)
-        number(it.externalConstant.value)
+    if (integralStorage) {
+        scalarBits = maxOf(scalarBits, integralVectorBits(model))
+    } else {
+        for (row in 0 until model.m) number(model.exactRhs(row))
+        for (column in 0 until model.numVars) {
+            number(model.exactCost(column))
+            if (column < model.n) number(model.exactShift(column))
+            val bounds = model.exactBounds(column)
+            bounds.lower?.let { number(it.number.value) }
+            bounds.upper?.let { number(it.number.value) }
+        }
+        number(model.exactConstant())
+        model.exactState?.model?.objective?.let {
+            number(it.scale.value)
+            number(it.externalConstant.value)
+        }
     }
     val componentRows = IntArray(parent.size)
     val componentColumns = IntArray(parent.size)
@@ -221,3 +235,20 @@ internal fun estimateSparseLpAdmission(
         decline?.let { put("Decline$it", 1L) }
     })
 }
+
+private fun integralVectorBits(model: LpModel): Int {
+    var bits = signedMagnitudeBits(model.objConstant)
+    for (row in 0 until model.m) bits = maxOf(bits, signedMagnitudeBits(model.rhs[row]))
+    for (column in 0 until model.numVars) {
+        bits = maxOf(bits, signedMagnitudeBits(model.cost[column]))
+        if (column < model.n) bits = maxOf(bits, signedMagnitudeBits(model.loShift[column]))
+        // Normalized lower sides are zero. Probe upper sides are absent from the exact box.
+        if (model.hasUpper[column] && (column >= model.n || !model.probeClampedHi[column])) {
+            bits = maxOf(bits, signedMagnitudeBits(model.upper[column]))
+        }
+    }
+    return bits
+}
+
+private fun signedMagnitudeBits(value: Long): Int =
+    if (value == Long.MIN_VALUE) Long.SIZE_BITS else Long.SIZE_BITS - abs(value).countLeadingZeroBits()

@@ -364,9 +364,11 @@ The explicit `+sparse-trial` LP option selects a bounded root trial for compact
 closed unconditional linear sources; emphasis levels leave it disabled. Admission
 bounds source assembly, then inspects emitted nonzeros, component dimensions, exact
 scalar width and row-intersection fill risk on the same source-root boxes as the
-retained layout. Custom emitters decline because they reserve no source size. The
-trial uses the ordinary bound, fixing and conflict consumers under the solve's certification policy;
-cuts and expanded hulls stay outside its allowance, and admitted roots enable the
+retained layout. The scan reads compact integer storage directly and includes
+numerator and denominator widths for rational storage. Custom emitters decline
+because they reserve no source size. The trial uses the ordinary bound, fixing and
+conflict consumers under the solve's certification policy. Cuts and expanded hulls
+stay outside its allowance, and admitted roots enable the
 ordinary root primal consumers. The initial root bound and later root propagation
 share one scoped numerical owner, and handoff requires matching source identities
 and root scopes. The owner advances its floating cursor in adaptive work quanta; a
@@ -503,12 +505,11 @@ aggregate. Returned child coordinates can feed a masked rounding guide.
 
 The same setting dispatches root tableau separation to the owning block. Lifted cuts
 keep every row multiplier, bound substitution, integrality premise and source
-address for the ordinary source mapper and cut pool. Row appends share unchanged
-immutable matrix columns. The replacement checks columns by identity or exact
-prefix and checks row identities before retaining an owner. The planner reads exact
-support from the appended column suffixes. An automatically admitted collection
-rechecks the full resulting layout. Rows confined to existing
-blocks replace those children and any others whose scalar authority changes.
+address for the ordinary source mapper and cut pool. The replacement checks
+columns by identity or exact prefix and checks row identities before retaining an
+owner. The planner reads exact support from the appended column suffixes. An
+automatically admitted collection rechecks the full resulting layout. Rows confined
+to existing blocks replace those children and any others whose scalar authority changes.
 Replacements validate their own bases using private retained bases as warm hints;
 unchanged children keep their checked evidence. Rows joining existing blocks form a
 fresh child for each union after admission checks the complete resulting shape.
@@ -806,6 +807,7 @@ push shares its predecessor's captured list; changed assertions receive a fresh
 capture, and caller snapshots remain independent copies.
 Witness cleanup reads that capture with primitive IDs after a pop; a rollback
 that leaves the LP scope unchanged keeps its witness map directly.
+Row appends share unchanged immutable matrix columns and validate the added entries.
 Adjacent states with the same base region and active rows expose their changed
 bound columns through an identity token. This token retains no predecessor state;
 unrelated states require a full check instead of borrowing the delta.
