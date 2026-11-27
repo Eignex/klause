@@ -25,6 +25,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.ConflictActivatedBooleanBranching
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchSelection
@@ -51,6 +52,8 @@ import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.parseBigInt
 import kotlin.time.TimeSource
+
+private const val REAL_LINEAR_ACTIVITY_CONFLICTS = 16
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -465,15 +468,17 @@ class OpenTheoryEngine internal constructor(
             // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
             // for a proposal no traversal would have read.
             val hints = state.candidateHints(plan, model, cancellation)
-            val selectedBranching = when (params.openBranching) {
-                OpenBranching.Automatic -> if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
-                    (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true
-                ) OpenBranching.Activity else OpenBranching.SourceOrder
-                else -> params.openBranching
-            }
-            val branching = when (selectedBranching) {
+            val branching = when (params.openBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
-                OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
+                OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
+                OpenBranching.Automatic -> when {
+                    plan.theoryPipeline == ProblemPipeline.EXACT_LRA && params.openHintFlips == null ->
+                        ConflictActivatedBooleanBranching(model.numBoolVars, REAL_LINEAR_ACTIVITY_CONFLICTS)
+                    plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
+                        (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true ->
+                        HeuristicBooleanBranching(Vsids(), model.numBoolVars)
+                    else -> BooleanBranching.SourceOrder(model.numBoolVars)
+                }
             }
             val run = planned.session.openRun(
                 model.numBoolVars,

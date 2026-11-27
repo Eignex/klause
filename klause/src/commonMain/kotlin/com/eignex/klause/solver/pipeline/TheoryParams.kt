@@ -14,7 +14,7 @@ enum class OpenBranching(
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
 
-    /** Activity for a complete mixed default point owner; source order for other openings. */
+    /** Select branching from the opening and the complete traversal's conflict evidence. */
     Automatic("auto"),
     ;
 
@@ -67,9 +67,10 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner,
-     * and source order for other openings, including private queries and explicit hint allowances.
-     * The theory decides the arithmetic residual at a leaf.
+     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner.
+     * A complete pure-real worker without an explicit hint allowance starts in source order and switches
+     * after enough learned conflicts. Other openings use source order. The theory decides the arithmetic
+     * residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
     /**

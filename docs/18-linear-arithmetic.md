@@ -102,6 +102,11 @@ A check proceeds in four steps:
 4. **Complete.** Once every Boolean is assigned, the exact candidate point is
    checked against every selected source row before it becomes a witness.
 
+Automatic complete pure-real traversal starts with source-order Boolean decisions.
+Without an explicit hint allowance it gathers learned conflict activities while it
+does so, then uses those activities to choose variables after sixteen learned
+conflicts. Switching keeps the same search trail and its exact arithmetic authority.
+
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 The invocation can retain a certified point as a guess across edits and retraction.

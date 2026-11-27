@@ -31,6 +31,18 @@ class HeuristicBranchingTest {
     }
 
     @Test
+    fun `conflict activation should use activity gathered during source order`() {
+        val session = SearchSession(emptyList())
+        val branching = ConflictActivatedBooleanBranching(numBoolVars = 4, remainingConflicts = 3)
+        repeat(2) { branching.onLearnedConflict(asserting(intArrayOf(3 shl 1))) }
+        assertEquals(listOf(0, 0), branching.splitVariables(session))
+
+        branching.onLearnedConflict(asserting(intArrayOf(2 shl 1)))
+
+        assertEquals(listOf(3, 3), branching.splitVariables(session))
+    }
+
+    @Test
     fun `heuristic branching should split the failed decision variable when no clause was learned`() {
         val session = SearchSession(emptyList())
         val branching = HeuristicBooleanBranching(Vsids(), numBoolVars = 4)
@@ -81,7 +93,7 @@ class HeuristicBranchingTest {
         assertEquals(true, session.boolValue(0))
     }
 
-    private fun HeuristicBooleanBranching.splitVariables(context: SearchContext): List<Int>? =
+    private fun BooleanBranching.splitVariables(context: SearchContext): List<Int>? =
         alternatives(context)?.map { (it as SearchDecision.Bool).literal ushr 1 }
 
     private fun asserting(literals: IntArray): SearchLearnedConflict = object : SearchLearnedConflict {

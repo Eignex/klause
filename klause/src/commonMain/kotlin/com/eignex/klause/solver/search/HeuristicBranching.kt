@@ -80,6 +80,30 @@ class HeuristicBooleanBranching(
         (pendingConflict as? SearchDecision.Bool)?.let { VarRef.Bool(it.literal ushr 1) }
 }
 
+internal class ConflictActivatedBooleanBranching(
+    private val numBoolVars: Int,
+    private var remainingConflicts: Int,
+) : BooleanBranching, SearchRunObserver, SearchUnassignListener {
+    private val sourceOrder = BooleanBranching.SourceOrder(numBoolVars)
+    private val vsids = Vsids()
+    private val activity = HeuristicBooleanBranching(vsids, numBoolVars)
+
+    override fun alternatives(context: SearchContext): List<SearchDecision>? =
+        if (remainingConflicts > 0) sourceOrder.alternatives(context) else activity.alternatives(context)
+
+    override fun onConflict(decision: SearchDecision?) = activity.onConflict(decision)
+
+    override fun onLearnedConflict(conflict: SearchLearnedConflict) {
+        vsids.prepareBooleans(numBoolVars)
+        activity.onLearnedConflict(conflict)
+        if (remainingConflicts > 0) remainingConflicts--
+    }
+
+    override fun onRestart(decisions: Long) = activity.onRestart(decisions)
+
+    override fun onUnassign(variable: Int) = activity.onUnassign(variable)
+}
+
 /**
  * [BranchingState] over a shared session.
  *

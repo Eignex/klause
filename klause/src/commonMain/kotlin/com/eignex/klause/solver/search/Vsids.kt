@@ -55,6 +55,8 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         numIntCached = numInt
     }
 
+    internal fun prepareBooleans(numBool: Int) = ensureSized(numBool, 0)
+
     override val tracksUnassign: Boolean get() = true
 
     override fun pick(state: BranchingState, rng: Random): VarRef? {
