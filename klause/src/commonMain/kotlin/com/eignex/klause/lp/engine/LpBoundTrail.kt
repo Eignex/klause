@@ -138,14 +138,15 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
         val retained = state.scopes[targetDepth]
         val assertions = state.assertionView.take(retained)
-        val rows = state.rows.popped(targetDepth)
-        val changedRows = (0 until rows.size).filter { rows.row(it) != state.rows.row(it) }
-        if (changedRows.isNotEmpty() && state.rowRevision == Long.MAX_VALUE) return false
-        val removed = state.rows.entries().indices.filter {
-            val row = state.rows.row(it)
-            row.active && row.depth != null && row.depth > targetDepth
-        }.toSet()
-        if (!canDeactivate(removed, assertions)) return false
+        val beforeRows = state.rows
+        val rows = beforeRows.popped(targetDepth)
+        val changedRows = if (rows === beforeRows) emptyList() else
+            (0 until rows.size).filter { rows.row(it) != beforeRows.row(it) }
+        if (changedRows.isNotEmpty()) {
+            if (state.rowRevision == Long.MAX_VALUE) return false
+            val removed = changedRows.filterTo(HashSet()) { beforeRows.row(it).active && !rows.row(it).active }
+            if (!canDeactivate(removed, assertions)) return false
+        }
         val next = snapshot(
             assertions = assertions,
             // The same rows object when none go, so the popped state can derive from this one.
@@ -177,8 +178,10 @@ internal class LpBoundTrail(initial: LpExactState) {
 
     fun resetRoot(token: ExecutionControl = ExecutionControl.Never): Boolean {
         if (token() || state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
-        val rows = state.rows.popped(0)
-        val changedRows = (0 until rows.size).filter { rows.row(it) != state.rows.row(it) }
+        val beforeRows = state.rows
+        val rows = beforeRows.popped(0)
+        val changedRows = if (rows === beforeRows) emptyList() else
+            (0 until rows.size).filter { rows.row(it) != beforeRows.row(it) }
         if (changedRows.isNotEmpty() && state.rowRevision == Long.MAX_VALUE) return false
         if (!canDeactivate(changedRows.filterTo(HashSet()) { !rows.row(it).active }, emptyList())) return false
         return commit(
