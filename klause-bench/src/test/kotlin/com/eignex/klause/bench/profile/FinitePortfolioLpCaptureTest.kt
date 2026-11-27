@@ -217,8 +217,9 @@ class FinitePortfolioLpCaptureTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["valid-detached", "valid-helper", "valid-signed-policy", "schema", "metric", "mask",
-        "disposition", "funding", "helper-preparation-over", "helper-query-over", "metric-allowance", "fraction"])
+    @ValueSource(strings = ["valid-detached", "valid-helper", "valid-signed-policy", "valid-reuse", "schema",
+        "metric", "mask", "disposition", "funding", "helper-preparation-over", "helper-query-over",
+        "metric-allowance", "unfunded-reuse", "fraction"])
     fun `admission payload validation preserves detached scalars and visible failures`(variant: String) {
         val metrics = linkedMapOf("DeclineProjection" to 1L, "Automatic" to 1L)
         val original = FinitePortfolioLpCapture.RootAdmissionRecord(
@@ -260,8 +261,12 @@ class FinitePortfolioLpCaptureTest {
         val helper = original.copy(disposition = "ADMITTED", projectionAllowed = true,
             helperPreparationWork = 1000L, helperQueryWork = 1000L,
             metrics = mapOf("Automatic" to 1L, "Admitted" to 1L, "QueryWorkAllowance" to 1000L))
+        val reused = helper.copy(metrics = helper.metrics + mapOf("PreparationWork" to 1L,
+            "ReusedPreparationWork" to 900L, "EstimatedProbeTotalWork" to 975L))
         val payload = when (variant) {
             "valid-helper" -> helper
+            "valid-reuse" -> reused
+            "unfunded-reuse" -> reused.copy(helperPreparationWork = 899L)
             "valid-signed-policy" -> original.copy(baseCellCap = -1L, ceilingCellCap = -1L,
                 withinCeiling = false, resolvedBounding = false, resolvedProbe = false,
                 resolvedBoundMaxDepth = -1, resolvedRootMaxWork = -1L, resolvedRootBudgetMillis = -1L,
@@ -284,7 +289,7 @@ class FinitePortfolioLpCaptureTest {
         metrics["Automatic"] = 0L
         val snapshot = window.snapshot()
 
-        if (variant in setOf("valid-detached", "valid-helper", "valid-signed-policy")) {
+        if (variant in setOf("valid-detached", "valid-helper", "valid-signed-policy", "valid-reuse")) {
             assertEquals(0L, snapshot.failures)
             if (variant == "valid-signed-policy") {
                 val json = snapshot.events.single().json().getValue("admission").jsonObject
@@ -298,6 +303,11 @@ class FinitePortfolioLpCaptureTest {
             assertEquals(1L, snapshot.events.single().admission?.metrics?.get("Automatic"))
             assertEquals(1L, snapshot.events.single().json().getValue("admission").jsonObject
                 .getValue("metrics").jsonObject.getValue("Automatic").jsonPrimitive.long)
+            if (variant == "valid-reuse") {
+                val retained = requireNotNull(snapshot.events.single().admission).metrics
+                assertEquals(1L, retained["PreparationWork"])
+                assertEquals(900L, retained["ReusedPreparationWork"])
+            }
         } else {
             assertEquals(1L, snapshot.failures)
             assertEquals(1L, snapshot.admissionFailures)

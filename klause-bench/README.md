@@ -1081,6 +1081,8 @@ source input to 2 MiB and 6,000 rows and columns. It checks the decoded source
 hash and journals admission,
 query, handoff and consumer events. An optional `source-archive-sha256` binds the
 committed corpus entry and records the worker's stored encoding separately.
+Reuse receipts retain the reader's current preparation charge and the original
+preparation work in separate fields.
 Guard masks cover evaluated operands only. Missing or interrupted events leave
 the corresponding outcome unknown. The journal associates a committed integer
 split with the full root target that supplied its preferred value when it can

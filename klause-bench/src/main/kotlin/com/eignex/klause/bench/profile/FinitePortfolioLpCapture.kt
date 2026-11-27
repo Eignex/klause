@@ -662,6 +662,13 @@ internal object FinitePortfolioLpCapture {
                     metrics.filterKeys { it.startsWith("Decline") }.values.toList() == listOf(1L))
                 "ADMITTED" -> require(metrics["Admitted"] == 1L && metrics.keys.none { it.startsWith("Decline") })
             }
+            metrics["ReusedPreparationWork"]?.let { reused ->
+                require(automatic && disposition == "ADMITTED")
+                val charged = requireNotNull(metrics["PreparationWork"])
+                require(charged in 1L..reused && reused <= requireNotNull(helperPreparationWork))
+                val forecast = requireNotNull(metrics["EstimatedProbeTotalWork"])
+                require(forecast in reused..requireNotNull(helperQueryWork))
+            }
             require(eventAutomatic == (disposition == "ADMITTED" && sparseOverride != true))
         }
 
@@ -726,6 +733,7 @@ internal object FinitePortfolioLpCapture {
                 "ReservedBytes",
                 "CheckingReservedBytes",
                 "PreparationWork",
+                "ReusedPreparationWork",
                 "WorkLimit",
                 "StorageLimit",
                 "Admitted",
