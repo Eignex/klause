@@ -912,6 +912,9 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work += 3L
             consumed++
             if (metadata[i, NativeLearnedMetadata.ORIGIN] >= 0) consumedPeerImports++
+            if (metadata[i, NativeLearnedMetadata.ORIGIN] == RETAINED_QUERY_ORIGIN) {
+                state.learned.retainedQueryUses++
+            }
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
             state.factorAttribution?.note(1 shl FactorFamily.Clause.ordinal, FactorAttribution.Metric.Consumed)
         }

@@ -561,7 +561,10 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
     if (learned.store[index, GeneralLearnedRows.STAGES] and bit != 0) return
     learned.store[index, GeneralLearnedRows.STAGES] = learned.store[index, GeneralLearnedRows.STAGES] or bit
     learned.lifecycle.note(learnedKind(index), stage)
-    if (stage == LearnedStage.Consumed) factorAttribution?.consumed(learned.store[index])
+    if (stage == LearnedStage.Consumed) {
+        if (learnedClauseOrigin(index) == RETAINED_QUERY_ORIGIN) learned.retainedQueryUses++
+        factorAttribution?.consumed(learned.store[index])
+    }
 }
 
 internal fun PropagationState.referencedLearned(count: Int): BooleanArray {

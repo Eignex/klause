@@ -68,6 +68,7 @@ class PropagationSession private constructor(
     costAware: Boolean = false,
     reasonPreflight: Boolean = false,
     onPropagationWork: ((() -> Long) -> Unit)? = null,
+    retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -90,10 +91,12 @@ class PropagationSession private constructor(
         costAware: Boolean = false,
         reasonPreflight: Boolean = false,
         onPropagationWork: ((() -> Long) -> Unit)? = null,
+        retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
     ) : this(
         projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
         cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables,
         costAware = costAware, reasonPreflight = reasonPreflight, onPropagationWork = onPropagationWork,
+        retainedRootClauses = retainedRootClauses,
     )
 
     internal fun checkSelectedProjection(
@@ -460,7 +463,10 @@ class PropagationSession private constructor(
         onPropagationWork?.invoke { work }
         val conflict = if (preparedState == null) {
             if (!state.seeded) state.conflictLevels ?: emptyIntArray()
-            else state.runToFixpoint(allFactors = true, cancellation = cancellation)
+            else {
+                state.installRetainedRootClauses(retainedRootClauses)
+                state.runToFixpoint(allFactors = true, cancellation = cancellation)
+            }
         } else {
             check(
                 state.rootFixpointStarted && !state.runCancelled &&
@@ -1492,7 +1498,9 @@ class PropagationSession private constructor(
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
         val counts = it.learned.lifecycle.snapshot() +
             (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
-            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
+            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap()) +
+            if (it.learned.retainedQueryUses == 0L) emptyMap()
+            else mapOf("coreQueryLearningConsumed" to it.learned.retainedQueryUses)
         if (it.integerRowLearning) counts + mapOf(
             "learningIntegerSessions" to 1L,
             "learningIntegerDerived" to it.integerRowsDerived,
@@ -1573,6 +1581,33 @@ class PropagationSession private constructor(
      *  clauses aren't in the general database), else through [learnedClauseAt]. */
     internal fun learnedClauseLiterals(learnedIndex: Int): IntArray =
         state.nativeEngine?.literalsOf(learnedIndex) ?: learnedClauseAt(learnedIndex).literals
+
+    internal fun retainCompletedBooleanClauses(
+        maxClauses: Int,
+        maxVisits: Int,
+        cancellation: ExecutionControl,
+    ): List<RetainedBooleanClause> {
+        if (scopedLearnedAssertion || !seededRestrictions.isEmpty || fixpointCancelled) return emptyList()
+        val count = learnedClauseCount
+        if (count == 0) return emptyList()
+        val retained = ArrayList<RetainedBooleanClause>()
+        for (index in count - 1 downTo (count - maxVisits).coerceAtLeast(0)) {
+            if ((count - index) % 16 == 1 && cancellation()) break
+            state.work++
+            if (!isLearnedClause(index) || learnedClausePermanent(index) ||
+                learnedClauseOrigin(index) != OWN_ORIGIN || learnedClauseLbd(index) > 2 ||
+                learnedClauseLiteralCount(index) !in 1..4
+            ) continue
+            val native = state.nativeEngine
+            val literals = native?.literalsOf(index) ?: learnedClauseAt(index).literals
+            state.work += literals.size
+            if (literals.any { Lit.variable(it) >= problem.numBoolVars }) continue
+            retained.add(RetainedBooleanClause(if (native == null) literals.copyOf() else literals,
+                learnedClauseLbd(index)))
+            if (retained.size == maxClauses) break
+        }
+        return retained
+    }
 
     /** True iff [learnedIndex] names an active clause. Clause-only passes skip other constraint
      * kinds and retired slots. */

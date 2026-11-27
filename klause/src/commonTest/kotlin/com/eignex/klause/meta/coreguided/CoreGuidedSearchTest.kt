@@ -58,6 +58,75 @@ import kotlin.time.TestTimeSource
 
 class CoreGuidedSearchTest {
     @Test
+    fun `the next objective query consumes an incidental clause after extension`() {
+        val source = repeatedQueryProblem()
+        val objective = LinearObjective(longArrayOf(0, 0, 0, 1, 2))
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, pbLearning = false)
+        val retained = CoreGuidedSearch(source, objective, params)
+        val control = CoreGuidedSearch(source, objective, params, retainQueryLearning = false)
+
+        val withLearning = retained.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
+        val withoutLearning = control.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
+
+        assertEquals(1.0, assertIs<MinimizeResult.Optimal>(withLearning).objective)
+        assertEquals(1.0, assertIs<MinimizeResult.Optimal>(withoutLearning).objective)
+        assertEquals(2L, retained.queryCount)
+        assertTrue(checkNotNull(retained.stats.search.learning["coreQueryLearningConsumed"]) > 0L)
+        assertTrue(retained.stats.search.nodes.sum < control.stats.search.nodes.sum)
+    }
+
+    @Test
+    fun `retained clauses keep the premise of a released objective pin`() {
+        val source = repeatedQueryProblem(conditional = true)
+        val objective = LinearObjective(longArrayOf(0, 0, 0, 1, 2))
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, pbLearning = false)
+        val search = CoreGuidedSearch(source, objective, params)
+
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
+
+        val optimum = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(1.0, optimum.objective)
+        assertFalse(optimum.sample.boolValue(0))
+        assertTrue(optimum.sample.boolValue(3))
+        assertTrue(checkNotNull(search.stats.search.learning["coreQueryLearningRetained"]) > 0L)
+    }
+
+    @Test
+    fun `cancellation between queries preserves reusable clauses and caller pins`() {
+        val source = repeatedQueryProblem()
+        val objective = LinearObjective(longArrayOf(0, 0, 0, 1, 2, 0, 0, 1))
+        var stopped = false
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, pbLearning = false,
+            assumptions = Assumptions(bools = mapOf(7 to false)), objectiveLowerBoundSink = { stopped = true })
+        val search = CoreGuidedSearch(source, objective, params)
+        val cancellation = ExecutionControl { stopped }
+
+        val paused = search.runSlice(cancellation, Long.MAX_VALUE, -1L) {}
+        val beforeResume = search.work
+        stopped = false
+        val result = search.use { it.runSlice(cancellation, Long.MAX_VALUE, -1L) {} }
+
+        assertNull(paused)
+        val optimum = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(1.0, optimum.objective)
+        assertFalse(optimum.sample.boolValue(7))
+        assertTrue(search.work >= beforeResume)
+        assertTrue(checkNotNull(search.stats.search.learning["coreQueryLearningConsumed"]) > 0L)
+    }
+
+    private fun repeatedQueryProblem(conditional: Boolean = false) =
+        Problem(8, 0, emptyArray(), buildList<Factor> {
+            for (signs in 0..3) {
+                val guard = if (conditional) intArrayOf(Lit.make(0, true), Lit.make(3, true))
+                else intArrayOf(Lit.make(0, true))
+                add(Clause(guard + intArrayOf(Lit.make(1, signs and 1 == 0), Lit.make(2, signs and 2 == 0))))
+                add(Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true),
+                    Lit.make(5, signs and 1 == 0), Lit.make(6, signs and 2 == 0))))
+            }
+            if (conditional) add(Clause(intArrayOf(Lit.make(3, false), Lit.make(0, false))))
+        }).bake()
+
+    @Test
     fun `cancelled bound publication should defer continuation funding until resume`() {
         val source = Problem(3, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),

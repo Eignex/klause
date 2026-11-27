@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.LeafColumns
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.RetainedBooleanClause
 import com.eignex.klause.propagation.VarKind
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.projectSeedCore
@@ -145,6 +146,8 @@ internal class CpSatisfactionTraversal(
     private val rebindable: Boolean = false,
     onRelease: ((PropagationSession) -> Unit)? = null,
     onPropagationWork: ((() -> Long) -> Unit)? = null,
+    retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
+    private val onCompletedQuery: ((PropagationSession) -> Unit)? = null,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -161,6 +164,7 @@ internal class CpSatisfactionTraversal(
             reasonPreflight = params.reasonPreflight,
             cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
             onPropagationWork = onPropagationWork,
+            retainedRootClauses = retainedRootClauses,
         )).also {
             if (params.integerRowLearning) it.enableIntegerRowLearning()
             it.configureArithmeticLearning(params.arithmeticLearningWork, params.arithmeticLearningAllocationBytes)
@@ -421,6 +425,7 @@ internal class CpSatisfactionTraversal(
         }
         rootOutcome?.let { outcome ->
             rootOutcome = null
+            if (outcome is SearchOutcome.Exhausted && !outcome.indeterminate) onCompletedQuery?.invoke(cp.session)
             finishQuery()
             return outcome
         }
@@ -429,11 +434,13 @@ internal class CpSatisfactionTraversal(
             is SearchRunEvent.Satisfied -> {
                 val sample = completion.sample(event.model, cp)
                 traversal.brancher.onSolution(sample)
+                onCompletedQuery?.invoke(cp.session)
                 releaseLpResources(lpResources)
                 SearchOutcome.Found(sample)
             }
 
             SearchRunEvent.Exhausted -> {
+                onCompletedQuery?.invoke(cp.session)
                 finishQuery()
                 // Learned decision levels describe traversal, not every premise of the exhausted tree.
                 SearchOutcome.Exhausted(touchedAssumptionLevels = IntArray(

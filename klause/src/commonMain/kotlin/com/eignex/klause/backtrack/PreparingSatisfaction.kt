@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.propagation.PropagationPreparation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.RetainedBooleanClause
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.lifetimeCancellation
@@ -20,6 +21,8 @@ internal class PreparingSatisfaction(
     private val params: BacktrackParams,
     private val projectAssumptionCore: Boolean = false,
     private val containingSlice: ExecutionControl = ExecutionControl.Never,
+    retainedRootClauses: List<RetainedBooleanClause> = emptyList(),
+    private val onCompletedQuery: ((PropagationSession) -> Unit)? = null,
 ) : ResumableSolve {
     private val lifetime = params.cancellation.lifetimeCancellation()
     private var token = params.cancellation
@@ -32,6 +35,7 @@ internal class PreparingSatisfaction(
         historicalTables = params.historicalTableReasons,
         costAware = params.costAwarePropagation,
         reasonPreflight = params.reasonPreflight,
+        retainedRootClauses = retainedRootClauses,
     )
     private var session: PropagationSession? = null
     private var seeding: Iterator<PropagationResult?>? = null
@@ -93,6 +97,7 @@ internal class PreparingSatisfaction(
                 ownsWorkDebt = false, projectAssumptionCore = projectAssumptionCore,
                 preparedSession = live, preparedSeed = seed,
                 containingSlice = containingSlice,
+                onCompletedQuery = onCompletedQuery,
             )
             query = handle
             preparation = null

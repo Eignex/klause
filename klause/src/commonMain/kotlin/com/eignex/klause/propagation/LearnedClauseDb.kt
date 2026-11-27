@@ -58,6 +58,7 @@ internal class LearnedClauseDb(
 
     /** Uses of imported clauses, by origin. */
     val importUses = OriginCounts()
+    var retainedQueryUses = 0L
 
     /** Number of learned clauses. */
     val size: Int get() = initializedStore?.size ?: 0
