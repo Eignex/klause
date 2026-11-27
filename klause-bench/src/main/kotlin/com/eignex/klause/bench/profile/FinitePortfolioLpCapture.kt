@@ -55,6 +55,10 @@ internal object FinitePortfolioLpCapture {
             val common = options - "distance-pair"
             inspect(common + ("source-joint-distance-repair" to "false"), bytes, out.resolve("selection-baseline"))
             inspect(common + ("source-joint-distance-repair" to "true"), bytes, out.resolve("distance-candidate"))
+        } else if (options["distance-direct-pair"] == "true") {
+            val common = options - "distance-direct-pair" + ("source-joint-distance-repair" to "true")
+            inspect(common + ("source-joint-distance-direct" to "false"), bytes, out.resolve("distance-region"))
+            inspect(common + ("source-joint-distance-direct" to "true"), bytes, out.resolve("distance-direct"))
         } else inspect(options, bytes, out)
     }
 
@@ -64,7 +68,7 @@ internal object FinitePortfolioLpCapture {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
                 "source-refutation-center-step", "capture-authority", "capture-cut-policy", "capture-joint", "presolve",
-                "source-joint-distance-repair", "distance-pair",
+                "source-joint-distance-repair", "distance-pair", "source-joint-distance-direct", "distance-direct-pair",
                 "regional-pins", "regional-binary-center", "regional-existing-free", "regional-consultations",
                 "regional-expected-pins-sha256", "regional-explain-rejection", "regional-nominal-after-rejection",
                 "regional-worker-nominal-recovery")
@@ -111,11 +115,20 @@ internal object FinitePortfolioLpCapture {
         }
         options["distance-pair"]?.let {
             require(it.toBooleanStrict() && mode == "portfolio" && options["capture-joint"] == "true" &&
-                options["source-joint-distance-repair"] == null)
+                options["source-joint-distance-repair"] == null && options["distance-direct-pair"] == null)
+        }
+        options["distance-direct-pair"]?.let {
+            require(it.toBooleanStrict() && mode == "portfolio" && options["capture-joint"] == "true" &&
+                options["source-joint-distance-repair"] == null && options["source-joint-distance-direct"] == null)
         }
         val distance = options["source-joint-distance-repair"]?.let {
             require(mode == "portfolio" && options["capture-joint"] == "true")
             "source-joint-distance-repair=${it.toBooleanStrict()}"
+        }
+        val direct = options["source-joint-distance-direct"]?.let {
+            require(mode == "portfolio" && options["capture-joint"] == "true" &&
+                options["source-joint-distance-repair"] == "true")
+            "source-joint-distance-direct=${it.toBooleanStrict()}"
         }
         if ("capture-authority" in options || "capture-cut-policy" in options) {
             require(mode == "joint-before")
@@ -151,7 +164,7 @@ internal object FinitePortfolioLpCapture {
         }
         if (preset == "ordinary") {
             require(!handoff) { "ordinary portfolio policy requires handoff=false" }
-            return listOfNotNull("portfolio-progress=$progress", distance)
+            return listOfNotNull("portfolio-progress=$progress", distance, direct)
         }
         return listOf("companion-integers=true", "companion-active-ms=4000",
             "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",

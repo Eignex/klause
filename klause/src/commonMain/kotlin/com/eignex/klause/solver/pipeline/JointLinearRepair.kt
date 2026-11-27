@@ -129,6 +129,7 @@ internal class JointLinearRepair(
     private var nominalPublicationTried = false
     private class DistanceTrial(val base: ExactNeighborhoodCondition, val center: List<BigFraction>) {
         var replacement: ExactNeighborhoodCondition? = null
+        var binaryPose: LongArray? = null
     }
     private var distanceTrial: DistanceTrial? = null
     private var distanceBootstrap: ExactNeighborhoodCondition? = null
@@ -640,13 +641,15 @@ internal class JointLinearRepair(
         if (trial != null && !distanceTried && !stop() && !cancellation()) {
             distanceTried = true
             observe("jointRepairDistanceProjections")
-            val guidance = JointBinaryDistance(source, budget).expand(requested, trial.center, stop or cancellation)
+            val guidance = JointBinaryDistance(source, budget).expand(requested, trial.center, stop or cancellation,
+                params.sourceJointDistanceDirect)
             val liveCutoff = distanceCutoff?.invoke()
-            val expanded = guidance?.let {
+            val expanded = guidance?.condition?.let {
                 if (liveCutoff == null || (it.cutoff != null && it.cutoff <= liveCutoff)) it
                 else it.copy(cutoff = liveCutoff)
             }
             trial.replacement = expanded
+            trial.binaryPose = guidance?.binaryPose
             if (expanded == null) {
                 distanceTrial = null
                 observe("jointRepairDistanceDeclined")
@@ -658,7 +661,11 @@ internal class JointLinearRepair(
             return JointRepairAttempt(ExactNeighborhoodResult.Paused)
         }
         val condition = trial?.replacement ?: requested
-        val result = advanceAttempt(condition, cancellation)
+        val direct = trial?.binaryPose
+        val result = if (trial != null && direct != null && !stop() && !cancellation() && !exhausted) {
+            trial.binaryPose = null
+            directDistanceTrial(condition, direct, stop or cancellation)
+        } else advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
             if (requested === distanceBootstrap && result.result != ExactNeighborhoodResult.Refuted) {
                 distanceBootstrap = null
@@ -726,10 +733,50 @@ internal class JointLinearRepair(
 
     private fun recoverNominalPublication(sample: Sample, verification: ExecutionControl,
         original: (Sample, BigFraction, ExecutionControl) -> Boolean): Sample? {
-        val capture = nominalPublicationCapture ?: return null
         if (nominalPublicationTried || verification() || funding.exhausted) return null
+        if (nominalPublicationCapture == null) return null
         nominalPublicationTried = true
         observe("jointRepairNominalPublicationRequests")
+        return completeNominal(sample, verification, original, "jointRepairNominalPublication")
+    }
+
+    private fun directDistanceTrial(condition: ExactNeighborhoodCondition, pose: LongArray,
+        verification: ExecutionControl): JointRepairAttempt {
+        val original = requireNotNull(distancePublicationCheck)
+        val live = distanceCutoff?.invoke()
+        val cutoff = listOfNotNull(condition.cutoff, live).minOrNull()
+        val before = funding.spent
+        val allocated = funding.allocated
+        val work = 1L + model.numIntVars + model.numRealVars
+        val bytes = 128L + 16L * (model.numIntVars + model.numRealVars)
+        if (verification() || funding.remainingWork <= work || funding.remainingAllocation <= bytes) {
+            return JointRepairAttempt(ExactNeighborhoodResult.Paused)
+        }
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        observe("jointRepairDistanceDirectRequests")
+        val seed = Sample(BooleanArray(0), pose, DoubleArray(model.numRealVars))
+        val completed = completeNominal(seed, verification, original, "jointRepairDistanceDirect")
+        stages["jointRepairDistanceDirectWork"] = funding.spent - before
+        stages["jointRepairDistanceDirectAllocation"] = funding.allocated - allocated
+        if (completed == null || verification() || funding.exhausted ||
+            (cutoff != null && requireNotNull(objective).evaluateExact(completed) >= cutoff)) {
+            observe("jointRepairDistanceDirectDeclined")
+            return JointRepairAttempt(ExactNeighborhoodResult.Paused)
+        }
+        anchor = completed
+        selection?.clearRefutation()
+        refutedConditions.clear()
+        observe("jointRepairCheckedIncumbents")
+        observe("jointRepairDistanceDirectAccepted")
+        compare("distance-direct", "checked", cutoff = cutoff, candidate = comparisonValue(completed))
+        observation?.event(proposalSequence, observationQuery, "publication", "distance-direct-checked")
+        return JointRepairAttempt(ExactNeighborhoodResult.Witness(completed), feasiblePoint = completed)
+    }
+
+    private fun completeNominal(sample: Sample, verification: ExecutionControl,
+        original: (Sample, BigFraction, ExecutionControl) -> Boolean, stagePrefix: String): Sample? {
+        val capture = nominalPublicationCapture ?: return null
         val work = funding.spent
         val allocation = funding.allocated
         val previousGrant = funding.availableWork
@@ -756,7 +803,7 @@ internal class JointLinearRepair(
             funding.charge(0L, 128L + 32L * (sample.numIntVars + sample.numRealVars))
             val seed = sample.copy(exactReals = null)
             return LinearIncumbentCompletion(budget, original) { stage, count ->
-                val key = "jointRepairNominalPublication$stage"
+                val key = "$stagePrefix$stage"
                 stages[key] = combine(key, stages[key] ?: 0L, count)
             }.use { it.complete(nominal, seed, token) }
         } finally {

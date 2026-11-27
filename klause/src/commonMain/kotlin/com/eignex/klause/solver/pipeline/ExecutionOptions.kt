@@ -177,6 +177,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val sourceJointDistanceRepair: ExecutionOption<Boolean> =
             ExecutionOption("source-joint-distance-repair", ValueKind.BOOLEAN)
 
+        /** Opt-in direct completion of a paid distance projection. */
+        val sourceJointDistanceDirect: ExecutionOption<Boolean> =
+            ExecutionOption("source-joint-distance-direct", ValueKind.BOOLEAN)
+
         /** Invocation-local checked numerical refutation reuse control. */
         val sourceRefutationReuse: ExecutionOption<Boolean> =
             ExecutionOption("source-refutation-reuse", ValueKind.BOOLEAN)
@@ -636,7 +640,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,
                 sourcePointCuts, sourceCutBranching, sourceAggregateCuts, sourceIncumbentCompletion,
-                sourceRefutationCenterStep, sourceJointDistanceRepair,
+                sourceRefutationCenterStep, sourceJointDistanceRepair, sourceJointDistanceDirect,
                 sourceRefutationReuse,
                 sourceRefutationPropagation,
                 sourceRefutationResolution,

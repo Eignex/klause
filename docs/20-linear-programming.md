@@ -533,6 +533,11 @@ distance projection requires a checked finite cut published for their shared
 source context. Nominal publication recovery for this route belongs to the
 expanded distance region.
 
+An optional direct trial rounds every projected movement away from the binary
+center. It completes the resulting fixed binary pose in the nominal context
+and checks the original publication and live cutoff. A declined direct trial
+leaves the expanded regional query available under the remaining allowance.
+
 Point selection admits at most eight mutually nonparallel additional checked cuts per
 usable point and waits for its completed query before scanning again. A mixed ordinary recipe with
 at least one active checked cut per numerical coordinate keeps its ordinary query

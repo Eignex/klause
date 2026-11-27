@@ -16,9 +16,11 @@ internal class JointBinaryDistance(
     private val source: SourceProofContext,
     private val budget: SourceLpBudget,
 ) {
+    data class Projection(val condition: ExactNeighborhoodCondition, val binaryPose: LongArray?)
+
     fun expand(
-        condition: ExactNeighborhoodCondition, center: List<BigFraction>, stop: ExecutionControl,
-    ): ExactNeighborhoodCondition? {
+        condition: ExactNeighborhoodCondition, center: List<BigFraction>, stop: ExecutionControl, direct: Boolean,
+    ): Projection? {
         val funding = budget.funding ?: return null
         if (stop() || condition.bools.isNotEmpty() || condition.lower != condition.upper ||
             center.size !in 1..256 || condition.lower.size !in (center.size - MAX_FREED + 1)..center.size) return null
@@ -53,14 +55,23 @@ internal class JointBinaryDistance(
             } ?: return null
             if (token() || funding.paused) return null
             val pins = condition.lower.toMutableMap()
+            val poseBytes = 64L + Long.SIZE_BYTES * center.size.toLong()
+            val pose = if (direct && funding.availableWork > center.size &&
+                funding.remainingAllocation > poseBytes && MAX_ALLOCATION - (funding.allocated - allocated) > poseBytes) {
+                budget.observe(preparation = center.size.toLong())
+                funding.charge(0L, poseBytes)
+                LongArray(center.size)
+            } else null
             for ((id, target) in center.withIndex()) {
                 if (token()) return null
                 val value = point[SourceCoordinate(SourceCoordinate.Kind.Integer, id)] ?: return null
                 if (!value.isFinite() || value !in -MOVEMENT..(1 + MOVEMENT)) return null
-                if (abs(value - target.toDouble()) > MOVEMENT) pins.remove(id)
+                val moved = abs(value - target.toDouble()) > MOVEMENT
+                if (moved) pins.remove(id)
+                if (pose != null) pose[id] = if ((target == BigFraction.ONE) != moved) 1L else 0L
             }
             if (pins.size == condition.lower.size || center.size - pins.size > MAX_FREED) return null
-            return condition.copy(lower = pins, upper = pins)
+            return Projection(condition.copy(lower = pins, upper = pins), pose)
         } finally {
             funding.grant((previousGrant - (funding.spent - before)).coerceAtLeast(0L))
         }

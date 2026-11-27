@@ -123,6 +123,8 @@ data class TheoryParams(
     val sourceRefutationCenterStep: Boolean = false,
     /** Try one bounded distance-guided mixed binary neighborhood and nominal completion. */
     val sourceJointDistanceRepair: Boolean = false,
+    /** Try one original nominal completion of the paid projected binary pose before regional branching. */
+    val sourceJointDistanceDirect: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
