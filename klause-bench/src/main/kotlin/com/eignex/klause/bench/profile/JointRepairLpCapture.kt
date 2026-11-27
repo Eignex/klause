@@ -50,6 +50,7 @@ internal object JointRepairLpCapture {
             ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
             maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop))
         val regionalPins = options["regional-pins"]
+        val regionalCenter = options["regional-binary-center"]
         val presolve = options["presolve"]?.let(PresolveConfig::parse)
         val executionPolicy = SourceExecutionPolicy(explicitPresolve = presolve != null)
         val prepared = SourceSetup.execute(SourceExecutionRequest(invocation, executionPolicy,
@@ -85,17 +86,27 @@ internal object JointRepairLpCapture {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
         }.invoke(null, original, mapping)
         val active = stop or ExecutionControl.after(4_000.milliseconds)
+        val projection = regionalCenter?.let {
+            require(model.numIntVars in 1..256 && (0 until model.numIntVars).all { id ->
+                val bounds = model.intBounds
+                bounds.hasLower(id) && bounds.hasUpper(id) && bounds.lower(id) == 0L && bounds.upper(id) == 1L
+            })
+            BinaryDistanceRegion.project(context, it, options.getValue("regional-existing-free"),
+                active, sha256(bytes), out).also { result -> if (result.pins == null) return }
+        }
+        val pins = projection?.pins ?: regionalPins
         val cutPolicy = options["capture-cut-policy"] ?: "ordinary"
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
-            sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
-            sourceIncumbentCompletion = regionalPins == null,
+            sourceLpWorkLimit = 500_000_000L - (projection?.work ?: 0L),
+            sourceLpAllocationLimit = 256L * 1024 * 1024 - (projection?.allocation ?: 0L),
+            sourceIncumbentCompletion = pins == null,
             sourcePointCuts = cutPolicy == "selected", sourceAggregateCuts = cutPolicy == "selected")
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
         val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
             .newInstance(model, context, objective, params, policy, true, { null }, active, null,
                 null, null, true, null, checker, null, null, null)
-        if (regionalPins != null) {
-            replayRegion(owner as AutoCloseable, regionalPins, model.numIntVars, context, active, sha256(bytes), out)
+        if (pins != null) {
+            replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, sha256(bytes), out)
             return
         }
         val window = ConditionWindow(limit)
