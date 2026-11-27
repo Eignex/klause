@@ -103,6 +103,9 @@ or certificate authority.
 Certification checks numerical proposals against the exact active model. Different
 claims need different evidence packages; where certification is required, a floating
 optimum or failed check cannot prune or prove a result.
+Compact integer imports determine logical integrality from stored nonzero continuous
+support and reuse small exact coefficients within one import. Rational imports also
+check coefficient and unshifted row-origin integrality.
 [LpSolve](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt)
 owns these checks.
 

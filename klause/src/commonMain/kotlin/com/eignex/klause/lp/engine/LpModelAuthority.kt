@@ -2,6 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.util.numbers.BIG_ONE
 
+private const val COMPACT_SCALAR_RADIUS = 8
+
 // Stored normalized Long/IEEE data is authoritative; probe sides are absent, origins stay finite.
 internal fun LpModel.authoritativeModel(): ExactLpModel? = authoritativeModel(null)
 
@@ -11,22 +13,19 @@ internal fun LpModel.authoritativeModel(
     exactState?.let { return it.model }
     if (!finiteExactInput()) return null
     val dv = doubleView
-    val integralRows = BooleanArray(m) { true }
-    val rowOrigins = MutableList(m) { exactRhs(it) }
-    for (column in 0 until n) {
-        forEachRationalColumn(column) { row, value ->
-            if (!value.isZero) {
-                if (colContinuous[column] || value.den != BIG_ONE) integralRows[row] = false
-                rowOrigins[row] += value * exactShift(column)
-            }
-        }
-    }
-    for (row in 0 until m) integralRows[row] = integralRows[row] && (rowOrigins[row].den == BIG_ONE)
+    val integralRows = logicalIntegrality()
+    val compactScalars = if (dv == null) arrayOfNulls<ExactLpNumber>(2 * COMPACT_SCALAR_RADIUS + 1) else null
     return ExactLpModel(
         List(n) { column ->
             buildList {
-                if (dv == null) {
-                    forEachInColumn(column) { row, value -> add(ExactLpEntry(row, ExactLpNumber.of(value))) }
+                if (compactScalars != null) {
+                    forEachInColumn(column) { row, value ->
+                        val number = if (value in -COMPACT_SCALAR_RADIUS.toLong()..COMPACT_SCALAR_RADIUS.toLong()) {
+                            val index = value.toInt() + COMPACT_SCALAR_RADIUS
+                            compactScalars[index] ?: ExactLpNumber.of(value).also { compactScalars[index] = it }
+                        } else ExactLpNumber.of(value)
+                        add(ExactLpEntry(row, number))
+                    }
                 } else {
                     forEachInColumnD(column) { row, value -> add(ExactLpEntry(row, ExactLpNumber.ofIeee(value))) }
                 }
@@ -68,6 +67,29 @@ internal fun LpModel.authoritativeModel(
             sense = sense,
         ),
     )
+}
+
+private fun LpModel.logicalIntegrality(): BooleanArray {
+    val integral = BooleanArray(m) { true }
+    if (doubleView == null) {
+        // Integral RHS and shifts preserve integrality unless a continuous column contributes.
+        for (column in 0 until n) {
+            if (!colContinuous[column]) continue
+            forEachInColumn(column) { row, value -> if (value != 0L) integral[row] = false }
+        }
+        return integral
+    }
+    val rowOrigins = MutableList(m) { exactRhs(it) }
+    for (column in 0 until n) {
+        forEachRationalColumn(column) { row, value ->
+            if (!value.isZero) {
+                if (colContinuous[column] || value.den != BIG_ONE) integral[row] = false
+                rowOrigins[row] += value * exactShift(column)
+            }
+        }
+    }
+    for (row in 0 until m) integral[row] = integral[row] && rowOrigins[row].den == BIG_ONE
+    return integral
 }
 
 private fun LpModel.authoritativeBounds(column: Int): ExactLpBounds = ExactLpBounds(
