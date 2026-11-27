@@ -178,7 +178,8 @@ internal object FinitePortfolioLpCapture {
         val captureRoute = options["capture-route"] ?: "any"
         require(captureWorker in setOf("bt/lp-default", "any"))
         require(captureRoute in setOf("any", "SESSION", "SCOPED_FLOAT", "SCOPED_CONTINUATION"))
-        require(timeout in 1L..30_000L && limit in 0..4)
+        val timeoutLimit = if (captureRootPoints) 60_000L else 30_000L
+        require(timeout in 1L..timeoutLimit && limit in 0..4)
         validateSource(options, bytes)
         out.mkdirs()
         out.resolve("source.mps").writeBytes(bytes)

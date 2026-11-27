@@ -387,7 +387,8 @@ declines publish no factors or rank claim. Sparse admission never changes the de
 exact-continuation caps.
 
 The automatic admission experiment evaluates its additional source and work
-guards inside the LP owner under the existing root and solve allowances. The
+guards inside the LP owner under the existing root and solve allowances. A scan
+can decline once its nonzero and fill counts exceed the funded pass forecast. The
 diagnostic observer records completed admission decisions and their evaluated
 guards, including preparation and query allowances at the producer and helper.
 Root point events identify the original owner, model and point through queries,

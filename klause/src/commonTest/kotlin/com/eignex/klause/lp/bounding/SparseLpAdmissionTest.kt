@@ -49,6 +49,26 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `unaffordable automatic forecast should stop before inspecting every source row`() {
+        val width = 32
+        val rowCount = CONSTRUCTION_BATCH_SIZE * 3
+        val columns = IntArray(width) { it }
+        val rows = Array(rowCount) { Linear(IntArray(width) { 1 }, columns, LinearOp.GE, 1) }
+        val problem = Problem(0, width, Array(width) { IntDomain(0, 1) }, rows.toList())
+        val optimisticPass = (rowCount.toLong() + width) * rowCount
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, LinearObjective(intCoefficients = LongArray(width)),
+                automatic = true, queryWorkAllowance = optimisticPass + rowCount)
+        }.forEach { }
+
+        val declined = requireNotNull(admission)
+        assertEquals(1L, declined.metrics["DeclineQueryWork"])
+        assertTrue(declined.work in 1L until rowCount.toLong())
+    }
+
+    @Test
     fun `disabled source preparation should remain disabled during sparse admission`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
