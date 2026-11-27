@@ -2,6 +2,8 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpRootPointDisposition
+import com.eignex.klause.lp.bounding.LpRootPointStage
 import com.eignex.klause.lp.bounding.RootComponentOrder
 import com.eignex.klause.lp.bounding.RootPrimalTargets
 import com.eignex.klause.lp.engine.LpProjectionMeter
@@ -62,7 +64,19 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
     if (rootPrimalTargets !== targets || cancellation()) return null
     if (!order.offered) {
         order.offered = true
+        var sourceRootOffer = false
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "COMPONENT_PICK_OFFERED", 0L)
+        if (automaticSparseTrial && !targets.auxiliary && targets.knownColumns == null &&
+            targets.intColumns.getOrNull(variable)?.let { targets.coordinates.getOrNull(it)?.isFinite() } == true
+        ) {
+            sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "SOURCE_ROOT_COMPONENT_PICK_OFFERED", 0L)
+            sourceRootOffer = true
+        }
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.CONSUMER, LpRootPointDisposition.COMPONENT_OFFERED,
+                point = targets.coordinates, auxiliary = targets.auxiliary, partial = targets.knownColumns != null,
+                sourceRoot = sourceRootOffer)
+        }
     }
     return VarRef.IntVar(variable)
 }

@@ -13,7 +13,11 @@ import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpRootPointDisposition
+import com.eignex.klause.lp.bounding.LpRootPointObserver
+import com.eignex.klause.lp.bounding.LpRootPointStage
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
+import com.eignex.klause.lp.bounding.linearLowerBound
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
@@ -98,6 +102,7 @@ import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.BigFraction
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.ceil
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -184,6 +189,8 @@ internal class ResumableMinimize(
 
     // The root LP relaxation's proved objective bound; it raises the bound an optimality-gap terminal reports.
     private var provedRootBound = Double.NEGATIVE_INFINITY
+    private var rootBoundHandoffBaseline: Double? = null
+    private var rootBoundHandoffFloorCaptured = false
 
     // Whether a prune relied on an optimality-gap cutoff below the incumbent's own, and the least such cutoff: every
     // point the search left unseen, and every fact it derived from such a prune, holds only below that cutoff.
@@ -699,6 +706,7 @@ internal class ResumableMinimize(
         lpEngine = resources.own(
             LpEngine(
                 problem, objective, params.lpParams(), sink, slackContext(), deferred = true,
+                rootPointObserver = params.branchObserver as? LpRootPointObserver,
                 nodeWorkAllowance = {
                     if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()
@@ -967,6 +975,8 @@ internal class ResumableMinimize(
         inprocessing?.reset()
         learnedMemory.reset()
         firstRun = true
+        rootBoundHandoffBaseline = null
+        rootBoundHandoffFloorCaptured = false
         rootRoundingPending = false
         rootLayoutPending = false
         restartRootTargetsPending = false
@@ -1458,9 +1468,16 @@ internal class ResumableMinimize(
             }
         }
         val initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null
-        val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial, accept = ::accept)
+        var pointHandedOff = false
+        val rounded = lpEngine.lpRoundingProbe(objective, rootToken, initial = initial,
+            handoffRootPoint = {
+                pointHandedOff = lpEngine.automaticSparseTrial && !lpEngine.params.lpPlan.componentOwnership &&
+                    handoffRootTargets(rootToken)
+                pointHandedOff
+            }, accept = ::accept)
         lpEngine.continuedRootLowerBound?.let(::publishRootLpBound)
-        if (handoffSparseRootBound()) return installed
+        if (pointHandedOff) return installed
+        if (handoffSparseRootBound(afterQuery = true)) return installed
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
         lpEngine.rootRoundingWarmStart = null
@@ -1468,12 +1485,23 @@ internal class ResumableMinimize(
         return installed
     }
 
-    private fun handoffSparseRootBound(): Boolean {
+    private fun handoffSparseRootBound(afterQuery: Boolean = false): Boolean {
         val plan = lpEngine.params.lpPlan
         if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 || plan.componentOwnership ||
             plan.lbTreeSearch || !lpEngine.sparseTrialActive || !lpEngine.rootRoundingQueryPaused ||
             lpEngine.measuredRootLowerBound == null
         ) return false
+        if (lpEngine.automaticSparseTrial) {
+            val defer = lpEngine.deferAutomaticRootHandoff(afterQuery)
+            if (!rootBoundHandoffFloorCaptured) return false
+            val baseline = rootBoundHandoffBaseline ?: return false
+            val lower = lpEngine.measuredRootLowerBound ?: return false
+            if (!baseline.isFinite() || ceil(lower) <= ceil(baseline)) return false
+            if (defer) {
+                sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", "PROGRESS_DEFERRED", 0L)
+                return false
+            }
+        }
         // A checked global bound survives retirement of its unfinished numerical cursor.
         rootRoundingPending = false
         lpEngine.handoffRootBoundSearch()
@@ -1483,25 +1511,77 @@ internal class ResumableMinimize(
 
     private fun handoffRootTargets(rootToken: ExecutionControl): Boolean {
         val plan = lpEngine.params.lpPlan
-        if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 ||
-            !plan.branching || plan.lbTreeSearch || !lpEngine.retainedRootEnabled
-        )
+        val declined = when {
+            !pausable -> LpRootPointDisposition.NOT_PAUSABLE
+            decisionLimit <= 0L -> LpRootPointDisposition.NO_DECISIONS
+            problem.numRealVars != 0 -> LpRootPointDisposition.REAL_VARIABLES
+            !plan.branching -> LpRootPointDisposition.BRANCH_DISABLED
+            plan.lbTreeSearch -> LpRootPointDisposition.TREE_SEARCH
+            !lpEngine.retainedRootEnabled -> LpRootPointDisposition.NOT_RETAINED
+            else -> null
+        }
+        if (declined != null) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, declined)
+            }
             return false
-        val pending = lpEngine.rootRoundingWarmStart ?: return false
+        }
+        val pending = lpEngine.rootRoundingWarmStart ?: run {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.NO_GUIDANCE)
+            }
+            return false
+        }
         if (pending.primal == null) {
             lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
         }
-        val guide = lpEngine.rootRoundingWarmStart ?: return false
-        if (guide.primal == null || rootToken()) return false
+        val guide = lpEngine.rootRoundingWarmStart ?: run {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.NO_GUIDANCE)
+            }
+            return false
+        }
+        if (guide.primal == null) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.NO_POINT,
+                    guide.relaxation.model)
+            }
+            return false
+        }
+        if (rootToken()) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.CANCELLED,
+                    guide.relaxation.model, guide.primal)
+            }
+            return false
+        }
         if (lpEngine.rootPrimalTargets?.coordinates !== guide.primal &&
             !lpEngine.retainRootPrimalTargets(rootToken)
         )
             return false
-        if (lpEngine.prepareRootComponentTrial(objective, rootToken) || rootToken()) return false
+        if (lpEngine.prepareRootComponentTrial(objective, rootToken)) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.COMPONENT_TRIAL,
+                    guide.relaxation.model, guide.primal)
+            }
+            return false
+        }
+        if (rootToken()) {
+            if (lpEngine.rootPointObservationEnabled) {
+                lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.CANCELLED,
+                    guide.relaxation.model, guide.primal)
+            }
+            return false
+        }
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
         lpEngine.rootRoundingWarmStart = null
         sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "SEARCH_HANDOFF", 0L)
+        if (lpEngine.rootPointObservationEnabled) {
+            lpEngine.observeRootPoint(LpRootPointStage.HANDOFF, LpRootPointDisposition.HANDED_OFF,
+                guide.relaxation.model, guide.primal, auxiliary = guide.auxiliaryPoint,
+                partial = guide.knownColumns != null)
+        }
         return true
     }
 
@@ -1527,9 +1607,15 @@ internal class ResumableMinimize(
      * `LpPlan.rootBudgetFraction`.
      */
     private fun initRootLp(token: ExecutionControl): Boolean {
+        if (lpEngine.automaticSparseTrial && rootBoundHandoffBaseline == null) {
+            val domain = lpEngine.linearLowerBound(objective, session).takeUnless { it == Long.MIN_VALUE }?.toDouble()
+            val shared = params.objectiveLowerBoundSupplier?.invoke()?.takeIf { it.isFinite() }
+            rootBoundHandoffBaseline = listOfNotNull(domain, shared).maxOrNull() ?: Double.NaN
+        }
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
             preparationCancellation = rootLpPreparationBudget())
+        captureRootHandoffFloor(rootBound)
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
@@ -1539,7 +1625,14 @@ internal class ResumableMinimize(
         return true
     }
 
+    private fun captureRootHandoffFloor(rootBound: Double) {
+        if (!lpEngine.automaticSparseTrial || rootBoundHandoffFloorCaptured || !rootBound.isFinite()) return
+        rootBoundHandoffBaseline = maxOf(rootBound, rootBoundHandoffBaseline?.takeIf { it.isFinite() } ?: rootBound)
+        rootBoundHandoffFloorCaptured = true
+    }
+
     private fun publishRootLpBound(rootBound: Double) {
+        captureRootHandoffFloor(rootBound)
         if (!rootBound.isFinite() || rootBound <= provedRootBound) return
         sink.lp.observeRootBound(0, rootBound)
         params.objectiveLowerBoundSink?.invoke(rootBound)

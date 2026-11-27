@@ -10,6 +10,8 @@ import com.eignex.klause.backtrack.PooledGuidanceObserver
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpRootPointObservation
+import com.eignex.klause.lp.bounding.LpRootPointObserver
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.lp.engine.LpQueryObservation
@@ -28,6 +30,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.OptimalityGap
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SharingChannel
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 
@@ -48,35 +51,40 @@ internal class BacktrackWorkerConfig(
     private val onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     private val numericalLp: Boolean = false,
     private val optimalityGap: OptimalityGap? = null,
+    private val onRootPoint: ((String, LpRootPointObservation) -> Unit)? = null,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, onLpQuery, onGuidance, numericalLp,
-            optimalityGap)
+            optimalityGap, onRootPoint)
 
     fun withNumericalLp(): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance, true,
-            optimalityGap)
+            optimalityGap, onRootPoint)
 
     fun withOptimalityGap(gap: OptimalityGap): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance,
-            numericalLp, gap)
+            numericalLp, gap, onRootPoint)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement,
-            onLpQuery, onGuidance, numericalLp, optimalityGap)
+            onLpQuery, onGuidance, numericalLp, optimalityGap, onRootPoint)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance, numericalLp,
-            optimalityGap)
+            optimalityGap, onRootPoint)
 
     fun withLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer, onGuidance,
-            numericalLp, optimalityGap)
+            numericalLp, optimalityGap, onRootPoint)
 
     fun withGuidanceObserver(observer: (String, PooledGuidanceObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer,
-            numericalLp, optimalityGap)
+            numericalLp, optimalityGap, onRootPoint)
+
+    fun withRootPointObserver(observer: (String, LpRootPointObservation) -> Unit): BacktrackWorkerConfig =
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance,
+            numericalLp, optimalityGap, observer)
 
     fun withSessionObserver(observer: (String, PropagationSession) -> Unit): BacktrackWorkerConfig {
         fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {
@@ -90,7 +98,7 @@ internal class BacktrackWorkerConfig(
             recipe.build(seed, events).let { it.copy(variableSelector = observing(it.variableSelector)) }
         }
         return BacktrackWorkerConfig(observed, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery,
-            onGuidance, numericalLp, optimalityGap)
+            onGuidance, numericalLp, optimalityGap, onRootPoint)
     }
 
     override val label: String get() = recipe.label
@@ -147,6 +155,24 @@ internal class BacktrackWorkerConfig(
                     previous?.onCommit(decision, decisionLevel)
                 }
             })
+        }
+        onRootPoint?.let { observe ->
+            val previous = params.branchObserver
+            val observer: SearchBranchAttemptObserver = if (previous is PooledGuidanceObserver) {
+                object : PooledGuidanceObserver by previous, LpRootPointObserver {
+                    override fun onRootPoint(event: LpRootPointObservation) = observe(workerLabel, event)
+                }
+            } else if (previous != null) {
+                object : SearchBranchAttemptObserver by previous, LpRootPointObserver {
+                    override fun onRootPoint(event: LpRootPointObservation) = observe(workerLabel, event)
+                }
+            } else {
+                object : SearchBranchAttemptObserver, LpRootPointObserver {
+                    override fun onAttempt(decision: SearchDecision, context: SearchContext) = Unit
+                    override fun onRootPoint(event: LpRootPointObservation) = observe(workerLabel, event)
+                }
+            }
+            params = params.copy(branchObserver = observer)
         }
         if (recipe.label == BacktrackArm.CoreGuided.label) {
             val coreParams = params
