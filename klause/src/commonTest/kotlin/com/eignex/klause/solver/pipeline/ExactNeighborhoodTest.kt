@@ -144,6 +144,23 @@ class ExactNeighborhoodTest {
     }
 
     @Test
+    fun `root copying should spend instructions only on guided coordinates`() {
+        val conditions = ArrayList<ExactNeighborhoodCondition>()
+        val search = ExactNeighborhood(0, List(4) { BigFraction.ZERO }, ExactNeighborhoodCompletion { condition, _ ->
+            conditions += condition
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, prepareBooleanCenter = { true },
+            rootCoordinateValue = { BigFraction.ONE }, rootCoordinateCount = 2)
+
+        val done = search.advance(ExecutionControl.Never, 3)
+
+        assertTrue(done)
+        assertEquals(mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE, 2 to BigFraction.ZERO, 3 to BigFraction.ZERO),
+            conditions.single().lower)
+        assertEquals(3L, search.work)
+    }
+
+    @Test
     fun `root Boolean copying should resume without checking a partial center`() {
         val visited = ArrayList<Int>()
         val conditions = ArrayList<ExactNeighborhoodCondition>()
