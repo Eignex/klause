@@ -403,7 +403,8 @@ internal class LinearAuthority(
             point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
         val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
-        val proposed = withAdditionalCuts(directed, funded, point, maximumCandidates = 64) ?: return null
+        val proposed = withAdditionalCuts(directed, funded, point, maximumCandidates = 64,
+            preferIntegerProjection = denseRootBaseline === family) ?: return null
         if (funded()) return null
         if (sameCurrentCuts(family, prepared, proposed, funded, 65_536L - work)) return family to prepared
         if (funded()) return null
@@ -663,6 +664,7 @@ internal class LinearAuthority(
         prepared: LinearAuthorityTemplate, cancellation: ExecutionControl,
         point: Map<SourceCoordinate, Double>? = null,
         maximumCandidates: Int = Int.MAX_VALUE,
+        preferIntegerProjection: Boolean = false,
     ): LinearAuthorityTemplate? {
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty() &&
@@ -691,7 +693,8 @@ internal class LinearAuthority(
                 limits = limits.copy(rows = if (seeded) 16 else limits.rows,
                     work = minOf(if (seeded) 65_536L else limits.work,
                         limits.work - generatedWork), allocation = minOf(if (seeded) 1_048_576L else limits.allocation,
-                        limits.allocation - generatedAllocation)), point = if (seeded) point else null)
+                        limits.allocation - generatedAllocation)), point = if (seeded) point else null,
+                preferIntegerProjection = seeded && preferIntegerProjection)
         }
         val generated = if (generateAggregates) {
             val seeded = if (point == null) emptyList() else generate(minOf(8, 64 - additionalCuts.size), true)

@@ -53,6 +53,7 @@ internal object LinearAuthorityAggregateCuts {
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
         limits: LinearAuthorityAggregateLimits = sourcePairLimits,
         point: Map<SourceCoordinate, Double>? = null,
+        preferIntegerProjection: Boolean = false,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
         val meter = AggregateMeter(limits, cancellation, observe)
@@ -151,6 +152,28 @@ internal object LinearAuthorityAggregateCuts {
                 PairExtension(incidence, selectedBounds, bounds, point, pointProjections, meter, attemptLimits,
                     derivedStop, observe, checkNotNull(integerBounds))
             }
+            fun prepareIntegerProjections(): Boolean {
+                if (point == null || limits.rows <= 4) return false
+                eligibilityKnown = false
+                val before = candidates.size
+                val projectionWork = if (preferIntegerProjection) minOf(meter.remainingWork / 2L, 32_768L)
+                else minOf(meter.remainingWork / 3L, 16_384L)
+                val projectionLimits = attemptLimits.copy(rows = minOf(16, limits.rows), work = projectionWork,
+                    allocation = minOf(meter.remainingAllocation / 3L, 262_144L))
+                observe("AggregateIntegerProjectionWorkGrant", projectionWork)
+                val projectionMeter = AggregateMeter(projectionLimits, derivedStop, charge)
+                try {
+                    projectionMeter.reserve(1L, 320L)
+                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, projectionMeter,
+                        projectionLimits, derivedStop, charge, checkNotNull(integerBounds)).integerProjections(
+                        rows, candidates, maximumCandidates)
+                } catch (stop: AggregateStop) {
+                    charge("AggregateIntegerProjection" + stop.reason, 1L)
+                }
+                return candidates.size > before
+            }
+            // Give the finite root proof offer a share before ordinary integer candidates use the seeded allowance.
+            val earlyProjection = preferIntegerProjection && prepareIntegerProjections()
             if (!integerRows.isNullOrEmpty() && point != null) {
                 eligibilityKnown = false
                 meter.reserve(1L, 128L)
@@ -166,23 +189,7 @@ internal object LinearAuthorityAggregateCuts {
                     charge("AggregateInteger" + stop.reason, 1L)
                 }
             }
-            val beforeProjection = candidates.size
-            if (point != null && limits.rows > 4) {
-                eligibilityKnown = false
-                val projectionLimits = attemptLimits.copy(rows = minOf(16, limits.rows),
-                    work = minOf(meter.remainingWork / 3L, 16_384L),
-                    allocation = minOf(meter.remainingAllocation / 3L, 262_144L))
-                val projectionMeter = AggregateMeter(projectionLimits, derivedStop, charge)
-                try {
-                    projectionMeter.reserve(1L, 320L)
-                    PairExtension(incidence, selectedBounds, bounds, point, pointProjections, projectionMeter,
-                        projectionLimits, derivedStop, charge, checkNotNull(integerBounds)).integerProjections(
-                        rows, candidates, maximumCandidates)
-                } catch (stop: AggregateStop) {
-                    charge("AggregateIntegerProjection" + stop.reason, 1L)
-                }
-            }
-            val projectedInteger = candidates.size > beforeProjection
+            val projectedInteger = if (preferIntegerProjection) earlyProjection else prepareIntegerProjections()
             meter.reserve(candidates.size.toLong())
             var separationRetained = candidates.any { !it.conditionalCandidate }
             for (row in rows) {
