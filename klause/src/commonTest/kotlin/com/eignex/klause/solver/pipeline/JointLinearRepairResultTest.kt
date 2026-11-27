@@ -56,10 +56,13 @@ class JointLinearRepairResultTest {
         var paused = false
         var checks = 0
         var captures = 0
+        var directValue: BigFraction? = null
 
         JointLinearRepair(model, source, objective,
             TheoryParams(sourceCuts = false, sourceJointDistanceRepair = true, sourceJointDistanceDirect = true,
-                maxFlips = 2), repairGuidance = guidance).use { repair ->
+                maxFlips = 2), repairGuidance = guidance, onComparison = {
+                if (it.phase == "distance-direct") directValue = it.candidateValue
+            }).use { repair ->
             repair.bindDistancePublication({ null }) { _, _, _ ->
                 if (++checks == 1) paused = true
                 true
@@ -69,12 +72,13 @@ class JointLinearRepairResultTest {
                 val slice = ExecutionControl { paused }
                 repeat(64) {
                     search.advance(slice, 5_000)
-                    if (paused) paused = false
+                    paused = false
                 }
 
                 val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
-                assertEquals(BigFraction.ofLong(13) * BigFraction.ofLong(4).reciprocal(),
-                    objective.evaluateExact(result.sample))
+                val expected = BigFraction.ofLong(13) * BigFraction.ofLong(4).reciprocal()
+                assertEquals(expected, objective.evaluateExact(result.sample))
+                assertEquals(expected, directValue)
                 assertEquals(2, checks)
                 assertEquals(1, captures)
             }
