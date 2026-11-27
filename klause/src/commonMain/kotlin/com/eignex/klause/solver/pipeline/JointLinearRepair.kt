@@ -833,7 +833,7 @@ internal class JointLinearRepair(
             }
             val querySource = if (condition === proximityProposal && seed != null) {
                 IncumbentProximity.prepare(receiving, requireNotNull(seed), requireNotNull(privateCutoff), budget,
-                    stop or cancellation)?.also {
+                    stop or cancellation, relativeImprovement = false)?.also {
                     queryProximity = true
                     observedPrivateQueries++
                     privateQueryId = PrivateQueryId(proposalSequence, observationQuery)
@@ -991,7 +991,9 @@ internal class JointLinearRepair(
         if (privateProximity) {
             finishProximity(queryProximityCutoff)
             observe("jointRepairProximityCompleted")
-            retire(result.reason.name)
+            val terminal = result.terminal
+            val refuted = terminal?.claim == SourceClaim.Refutation && terminal.scope == queryRefutationScope
+            retire(if (refuted) "CheckedRefutation" else result.reason.name)
             return JointRepairAttempt(ExactNeighborhoodResult.Undecided, result.reason)
         }
         val refuted = result.terminal?.claim == SourceClaim.Refutation

@@ -133,6 +133,28 @@ class IncumbentProximityTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `the minimum target should admit a small improvement within receiving pins`() {
+        val fixed = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val free = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val condition = SourceCondition(lower = mapOf(fixed to BigFraction.ONE),
+            upper = mapOf(fixed to BigFraction.ONE))
+        val source = SourceProofContext(SourceScope(SourceRevision("small-improvement", "exact"), condition,
+            SourceObjective("cost", ObjectiveSense.MINIMIZE)), setOf(fixed, free), emptyMap(),
+            mapOf(fixed to BigFraction.ofLong(1_000L), free to BigFraction.ONE))
+        val center = Sample(booleanArrayOf(), longArrayOf(1L, 1L))
+        val improved = Sample(booleanArrayOf(), longArrayOf(1L, 0L))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val budget = SourceLpBudget(funding = funding)
+
+        val query = assertNotNull(IncumbentProximity.prepare(source, center, BigFraction.ofLong(1_001L), budget,
+            ExecutionControl.Never, relativeImprovement = false))
+
+        assertEquals(condition, query.scope.condition)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(query.withLinearAuthority()).verify(
+            SourceEvidence(query.scope, SourceClaim.Witness(improved), SourceDerivation.SourceWitness)))
+    }
+
+    @Test
     fun `relative improvement should be independent of objective translation`() {
         val column = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         for (constant in listOf(0L, 1_000_000L)) {

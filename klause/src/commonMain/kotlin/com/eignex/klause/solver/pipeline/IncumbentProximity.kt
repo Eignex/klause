@@ -77,7 +77,8 @@ internal object IncumbentProximity {
         }
 
     fun prepare(source: SourceProofContext, center: Sample, cutoff: BigFraction,
-        budget: SourceLpBudget, cancellation: ExecutionControl): SourceProofContext? {
+        budget: SourceLpBudget, cancellation: ExecutionControl,
+        relativeImprovement: Boolean = true): SourceProofContext? {
         val funding = budget.funding ?: return null
         if (cancellation() || center.numBoolVars != 0 || center.numIntVars !in 1..4096 ||
             !source.affineObjectiveAvailable || source.scope.objective == null) return null
@@ -135,12 +136,13 @@ internal object IncumbentProximity {
         val gap = source.semantics?.effective?.optimalityTolerance?.gapAllowance(cutoff)
         val originalConstant = if (maximize) source.objectiveConstant.negated() else source.objectiveConstant
         val variableValue = cutoff - originalConstant
-        val magnitude = if (variableValue.signum() < 0) variableValue.negated() else variableValue
-        var improvement = requireNotNull(scale) * BigFraction.of(BIG_ONE, bigIntOf(1000))
-        val relative = magnitude * BigFraction.of(BIG_ONE, bigIntOf(100))
-        if (relative > improvement) improvement = relative
-        if (gap != null && gap > improvement) improvement = gap
-        val target = cutoff - improvement - originalConstant
+        val coefficientFloor = requireNotNull(scale) * BigFraction.of(BIG_ONE, bigIntOf(1000))
+        val minimum = maxOf(coefficientFloor, gap ?: BigFraction.ZERO)
+        val improvement = if (relativeImprovement) {
+            val magnitude = if (variableValue.signum() < 0) variableValue.negated() else variableValue
+            maxOf(minimum, magnitude * BigFraction.of(BIG_ONE, bigIntOf(100)))
+        } else minimum
+        val target = variableValue - improvement
         if (target.num.magnitudeBitLength() + target.den.magnitudeBitLength() > 4096 || cancellation()) return null
         val premises = source.premises.toMutableMap()
         val key = "incumbent-proximity-target"

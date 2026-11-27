@@ -523,6 +523,9 @@ and a floating objective evaluated as a rational aspiration. It supplies no feas
 incumbent, parent cutoff or bound. A private query retains the original objective,
 all receiving conditions and source rows, adds the aspiration target and change
 radius, and leaves continuous coordinates free. Its first query is an LP relaxation.
+The target improvement is at least the declared gap and one thousandth of the
+smallest nonzero objective coefficient. The numerical traversal also requires
+one percent of the magnitude of the variable part of the center objective.
 The numerical owner alternates private consultations with its retained ordinary
 frontier inside the same turn offers, using at most half the remaining offered time
 and work for each private consultation. The private search visits the center's side
