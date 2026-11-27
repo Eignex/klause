@@ -30,8 +30,8 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.adjacentIntegerAbove
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.solver.objective.OptimalityGap
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.objective.closesDeclaredGap
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchAtomPremise

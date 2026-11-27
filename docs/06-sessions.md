@@ -392,7 +392,8 @@ Standalone optimization advances subsequent slices automatically. The caller may
 set cumulative `source-lp-work-limit` and `source-lp-allocation-limit` ceilings.
 Both default to unlimited and resuming preserves all charges. Cumulative exhaustion
 ends the worker with any checked incumbent and bound it already holds. Sparse
-preparation and retained branch coverage apply separate [allocation safeguards](18-linear-arithmetic.md#state-and-resources).
+preparation and retained branch coverage apply separate
+[allocation safeguards](18-linear-arithmetic.md#state-and-resources).
 Opt-in checked refutation reuse charges
 support indexing, source reconstruction, proof replay, storage and eviction to
 these same ceilings. Reuse admits at most 64 MiB of cumulative modeled allocation
