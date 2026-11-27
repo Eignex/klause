@@ -121,11 +121,11 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
     }
 
     private fun publishWithDistinctAssertion(otherMax: Long, positive: Boolean): PropagationSession {
+        val variables = intArrayOf(0, 1)
         val native = PropagationSession(Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, otherMax)),
-            emptyArray()), pbLearning = false)
+            arrayOf(Linear(intArrayOf(1, 1), variables, LinearOp.LE, 14))), pbLearning = false)
         native.enableIntegerRowLearning()
         native.configureIntegerRowAdmission(enabled = true, distinctAssertion = true)
-        val variables = intArrayOf(0, 1)
         val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
             longArrayOf(1L, 1L), variables, LinearOp.LE, 5), useLo = true))
         val state = native.explanationState
