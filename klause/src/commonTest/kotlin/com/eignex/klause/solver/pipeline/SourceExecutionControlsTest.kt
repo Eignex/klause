@@ -99,14 +99,14 @@ class SourceExecutionControlsTest {
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
         ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
         for ((supplied, options, expected) in listOf(
-            Triple(false, emptyList<String>(), listOf(true, false, false, false)),
-            Triple(true, emptyList<String>(), listOf(true, false, false, false)),
+            Triple(false, emptyList<String>(), listOf(true, false, false, false, false)),
+            Triple(true, emptyList<String>(), listOf(true, false, false, false, false)),
             Triple(false, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true",
-                "source-cut-branching=true"),
-                listOf(false, true, true, true)),
+                "source-cut-branching=true", "source-dense-root-cut-trial=true"),
+                listOf(false, true, true, true, true)),
             Triple(true, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true",
-                "source-cut-branching=true"),
-                listOf(false, true, true, true)),
+                "source-cut-branching=true", "source-dense-root-cut-trial=true"),
+                listOf(false, true, true, true, true)),
         )) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
                 ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
@@ -124,7 +124,8 @@ class SourceExecutionControlsTest {
 
             assertTrue(invocation.requestsFiniteNumericalCompanions)
             assertEquals(expected, listOf(request.theory.sourceCuts, request.theory.sourcePointCuts,
-                request.theory.sourceAggregateCuts, request.theory.sourceCutBranching))
+                request.theory.sourceAggregateCuts, request.theory.sourceCutBranching,
+                request.theory.sourceDenseRootCutTrial))
             assertFalse(scenario.explicitArms)
             assertFalse(scenario.companionIntegers)
             assertEquals(4_000L, scenario.companionActiveMillis)

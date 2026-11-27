@@ -290,7 +290,7 @@ private fun FiniteSolveRequest.withSourceControls(
 
 private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions = without(
     "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
-    "source-cuts", "source-point-cuts", "source-cut-branching", "source-aggregate-cuts",
+    "source-cuts", "source-point-cuts", "source-dense-root-cut-trial", "source-cut-branching", "source-aggregate-cuts",
     "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
     "source-incumbent-completion", "source-refutation-center-step", "source-joint-distance-repair",
     "source-joint-distance-direct",
