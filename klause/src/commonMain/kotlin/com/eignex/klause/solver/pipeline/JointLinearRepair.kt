@@ -92,10 +92,7 @@ internal class JointLinearRepair(
     private val state = OpenTheorySolveState(params)
     private val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
-        onWork = { delta ->
-            state.smt.observeSourceLp(delta)
-            measuringPrivateQuery?.let { it.firstLpWork = it.firstLpWork.mergedWith(delta) }
-        }, funding = funding)
+        onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
     private val centerProgress = if (params.sourceRefutationCenterStep)
         JointRepairCenter(model, budget, stop) { selection?.eligibleInteger(it) == true } else null
@@ -109,7 +106,6 @@ internal class JointLinearRepair(
     private var observationQuery = 0L
     private var observedPrivateQueries = 0
     private var privateQueryReceipt: PrivateQueryReceipt? = null
-    private var measuringPrivateQuery: PrivateQueryReceipt? = null
     private var privatePublication: String? = null
     private var observedOperator = 0
     private var observedSchedulingRound = 0L
@@ -424,24 +420,36 @@ internal class JointLinearRepair(
 
     private fun binaryPins(condition: SourceCondition): BinaryPins? {
         val width = model.numIntVars
-        val count = condition.lower.size
-        if (width !in 1..Long.SIZE_BITS || condition.bools.isNotEmpty() || condition.integerRows.isNotEmpty() ||
-            count != condition.upper.size || count > width) return null
-        val work = 1L + count
-        if (funding.availableWork <= work || funding.remainingAllocation <= 64L) return null
+        val count = condition.coordinateRestrictionCount
+        if (width !in 1..Long.SIZE_BITS || condition.hasIntegerRows || count > 2L * width) return null
+        val work = 1L + 4L * width
+        val allocation = 64L + 32L * width
+        if (funding.availableWork <= work || funding.remainingAllocation <= allocation) return null
         budget.observe(preparation = work)
-        funding.charge(0L, 64L)
+        funding.charge(0L, allocation)
         var fixed = 0L
         var ones = 0L
-        for ((coordinate, value) in condition.lower) {
-            if (coordinate.kind != SourceCoordinate.Kind.Integer || coordinate.id !in 0 until width ||
-                condition.upper[coordinate] != value || (!value.isZero && value != BigFraction.ONE)) return null
-            val bit = 1L shl coordinate.id
+        for (id in 0 until width) {
+            val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, id)
+            val lower = condition.boundValue(coordinate, upper = false)
+            val upper = condition.boundValue(coordinate, upper = true)
+            if (lower == null && upper == null) continue
+            if (lower == null || lower != upper || (!lower.isZero && lower != BigFraction.ONE)) return null
+            val bit = 1L shl id
             fixed = fixed or bit
-            if (!value.isZero) ones = ones or bit
+            if (!lower.isZero) ones = ones or bit
         }
-        return BinaryPins(width, fixed, ones)
+        return if (2L * fixed.countOneBits() == count) BinaryPins(width, fixed, ones) else null
     }
+
+    private fun lpPhaseWork(before: SourceLpWorkStats? = null): SourceLpWorkStats = SourceLpWorkStats(
+        preparationWork = budget.measuredPreparationWork - (before?.preparationWork ?: 0L),
+        floatWork = budget.measuredFloatWork - (before?.floatWork ?: 0L),
+        continuationWork = budget.measuredContinuationWork - (before?.continuationWork ?: 0L),
+        refinementWork = budget.measuredRefinementWork - (before?.refinementWork ?: 0L),
+        boundCertificationWork = budget.measuredBoundCertificationWork - (before?.boundCertificationWork ?: 0L),
+        conflictCertificationWork = budget.measuredConflictCertificationWork - (before?.conflictCertificationWork ?: 0L),
+    )
 
     fun search(
         adaptive: Boolean, seed: Long = params.randomSeed, sourceInputPass: Boolean = sourceIntegers != null,
@@ -939,16 +947,14 @@ internal class JointLinearRepair(
         val before = active.work
         val delivered = if (queryProximity) ExecutionControl { active.hasIncumbent } else ExecutionControl.Never
         val receipt = privateQueryReceipt
-        val first = receipt?.takeIf { it.consultations == 0L }
-        measuringPrivateQuery = first
-        val result = try {
-            active.runSlice(delivered, millis, QUERY_SLICE_WORK) { _, _ -> }
-        } finally {
-            measuringPrivateQuery = null
-        }
+        val lpBefore = receipt?.takeIf { it.consultations == 0L }?.let { lpPhaseWork() }
+        val result = active.runSlice(delivered, millis, QUERY_SLICE_WORK) { _, _ -> }
         if (receipt != null) {
             receipt.consultations++
-            if (first != null) first.firstSearchWork = active.work - before
+            if (lpBefore != null) {
+                receipt.firstSearchWork = active.work - before
+                receipt.firstLpWork = lpPhaseWork(lpBefore)
+            }
         }
         if (queryProximity) {
             observe("jointRepairProximityConsultations")
