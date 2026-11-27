@@ -29,6 +29,7 @@ import com.eignex.util.numbers.saturatedMul
 
 private const val MIN_COMPONENT_QUERY_CELLS = 4096L
 private const val MAX_COMPONENTS = 64
+private const val MAX_EARLY_PROOF_DIMENSION = 16L
 private const val MAX_ROWS_PER_COLUMN = 4L
 private const val MAX_COMPONENT_PREPARATION_WORK = 1_048_576L
 private const val MAX_COMPONENT_PREPARATION_BYTES = 32L * 1024 * 1024
@@ -168,6 +169,12 @@ internal fun LpEngine.splitPresolveFeasibility(
 private fun admitPresolveBlocks(model: LpModel, blocks: LpComponentLayout): Boolean {
     val indexes = 0 until blocks.size
     if (blocks.size > MAX_COMPONENTS || indexes.any { 4L * blocks.rows(it) > 3L * model.m }) return false
+    val hasSmallBlock = indexes.any {
+        val rows = blocks.rows(it)
+        val columns = blocks.columns(it)
+        rows >= 2 && columns >= 2 && rows.toLong() + columns <= MAX_EARLY_PROOF_DIMENSION
+    }
+    if (!hasSmallBlock) return false
     val parent = model.tableauCells()
     val children = indexes.sumOf {
         val rows = blocks.rows(it).toLong()
