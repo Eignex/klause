@@ -23,6 +23,7 @@ import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ActivityRestartBooleanBranching
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
@@ -51,6 +52,8 @@ import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.parseBigInt
 import kotlin.time.TimeSource
+
+private const val REAL_LINEAR_RESTART_DECISIONS = 768L
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -458,9 +461,13 @@ class OpenTheoryEngine internal constructor(
                     ),
                 )
             }
+            val activityRestart = if (params.openBranching == OpenBranching.Automatic &&
+                plan.theoryPipeline == ProblemPipeline.EXACT_LRA &&
+                params.openHintFlips == null && params.sharedRestart == null
+            ) ActivityRestartBooleanBranching(model.numBoolVars, REAL_LINEAR_RESTART_DECISIONS) else null
             val solveParams = SearchSolveParams(
                 maxDecisions = state.remainingDecisions(),
-                restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
+                restart = activityRestart ?: params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
             )
             // Drawn here rather than beside the plan, so a root that propagation already refuted never pays
             // for a proposal no traversal would have read.
@@ -471,7 +478,7 @@ class OpenTheoryEngine internal constructor(
                 ) OpenBranching.Activity else OpenBranching.SourceOrder
                 else -> params.openBranching
             }
-            val branching = when (selectedBranching) {
+            val branching = activityRestart ?: when (selectedBranching) {
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
                 OpenBranching.SourceOrder, OpenBranching.Automatic -> BooleanBranching.SourceOrder(model.numBoolVars)
             }
