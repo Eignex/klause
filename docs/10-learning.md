@@ -374,6 +374,11 @@ counts completed native derivations and
 counter establishes retained admission or consumption. Admission defaults to enabled
 and does not itself enable integer learning.
 
+`integerRowReuse=false` keeps retained rows' propagation, eager clauses and lifetime,
+and excludes those rows as arithmetic seeds and endpoint reasons in later analysis.
+Discovery and row propagation report charged native work, including interrupted
+work. Post-initial firings count separately from the first firing of each row.
+
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint keeps clause
 fallback. Interior holes in the remaining terms stay in the actual domains and do
