@@ -41,6 +41,7 @@ internal data class LinearAuthorityResult(
     val cutBoundFamilies: Set<CutFamily> = emptySet(),
     val cutConflictFamilies: Set<CutFamily> = emptySet(),
     val cutTerminalBoundFamilies: Set<CutFamily> = emptySet(),
+    val callerAllocationDeclined: Boolean = false,
 )
 
 internal class LinearAuthority(
@@ -272,7 +273,9 @@ internal class LinearAuthority(
             return pending.base.copy(primalStages = if (pending.reported) emptyMap() else pending.base.primalStages)
         }
         val result = advance(source, cancellation, cuts = true, cutMask = pending.mask)
-        if (!result.paused || budget.funding?.exhausted == true || cancellation()) pointRound = null
+        if (!result.paused || result.callerAllocationDeclined || budget.funding?.exhausted == true || cancellation()) {
+            pointRound = null
+        }
         val previousStages = if (pending.reported) emptyMap() else pending.base.primalStages
         pending.reported = true
         val stages = (previousStages.keys + result.primalStages.keys).associateWith { key ->
@@ -285,7 +288,8 @@ internal class LinearAuthority(
             pending.base.cutBoundFamilies
         } else result.cutBoundFamilies
         fun fallback() = pending.base.copy(bound = strongest, cutBoundFamilies = boundFamilies, primalStages = stages)
-        if (result.paused && (budget.funding?.exhausted == true || cancellation())) return fallback()
+        if (result.callerAllocationDeclined ||
+            (result.paused && (budget.funding?.exhausted == true || cancellation()))) return fallback()
         val completed = !result.paused && budget.funding?.paused != true && !cancellation()
         if (completed) {
             policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
@@ -399,15 +403,12 @@ internal class LinearAuthority(
             lp.close()
             return LinearAuthorityResult()
         }
-        if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
-        val result = checkSource(source, cancellation)
+        val result = checkExact(source, cancellation)
         if (cancellation()) {
             lp.close()
             return LinearAuthorityResult()
         }
-        return result.copy(relaxedPoint = relaxedPoint,
-            paused = result.paused || (result.evidence == null && result.split == null &&
-                result.incumbent == null && budget.funding?.paused == true))
+        return result.copy(relaxedPoint = relaxedPoint)
     }
 
     fun advance(
@@ -503,18 +504,20 @@ internal class LinearAuthority(
         if (budget.funding != null) {
             val condition = source.scope.condition
             budget.funding.charge(0L, condition.integerRows.sumOf { 128L + 64L * it.supportSize })
-            var work = source.coordinateCount.toLong() + condition.bools.size + condition.lower.size +
-                condition.upper.size + condition.integerRows.sumOf { it.supportSize.toLong() + 1L }
+            val remaining = budget.funding.remainingWork
+            var work = source.coordinateCount.toLong() + condition.coordinateRestrictionCount +
+                condition.integerRowStorageEntries
             try {
-                val complete = source.allPremises { _, premise ->
+                val complete = !budget.funding.exhausted && work < remaining && source.allPremises { _, premise ->
                     if (cancellation()) return@allPremises false
                     work += 1L + premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
-                    true
+                    work < remaining
                 }
                 if (!complete) return null
             } finally {
                 budget.observe(preparation = work)
             }
+            if (budget.funding.exhausted) return null
         }
         val replay = replayCuts
         val prepared = if (retainLp || cuts) {
@@ -590,6 +593,14 @@ internal class LinearAuthority(
         budget.funding?.charge(0L, allocation)
     }
 
+    private fun checkExact(
+        source: SourceProofContext, cancellation: ExecutionControl, cuts: Boolean = false, cutMask: Set<Int>? = null,
+    ): LinearAuthorityResult {
+        if (budget.paused) return LinearAuthorityResult(paused = true)
+        // The small exact route can need several checks to certify one leaf, including a strict endpoint.
+        return budget.finishExactQuery { checkSource(source, cancellation, cuts = cuts, cutMask = cutMask) }
+    }
+
     private fun checkSource(
         source: SourceProofContext, cancellation: ExecutionControl, guidance: Boolean = false, cuts: Boolean = false,
         cutMask: Set<Int>? = null,
@@ -658,7 +669,8 @@ internal class LinearAuthority(
         val closureRows = prepared.closureRows
         val guide = if (guidance) lp.advance(closureRows, costs, constant, source.scope, cancellation, inactive,
             prepared.unconditionalRows)
-            ?: return LinearAuthorityResult(paused = budget.funding?.paused == true) else null
+            ?: return LinearAuthorityResult(paused = budget.funding?.paused == true,
+                callerAllocationDeclined = lp.callerAllocationDeclined) else null
         guide?.let {
             observePrimal("PrimalGuidancePhase${it.phase?.name ?: "Unavailable"}")
             observePrimal("PrimalGuidanceTermination${it.termination?.name ?: "Unavailable"}")
@@ -679,7 +691,7 @@ internal class LinearAuthority(
         }
         val solved = guide?.result ?: lp.solve(closureRows, costs, constant, cancellation, inactive,
             claim = LpClaim.ATTAINED_OPTIMUM)
-            ?: return LinearAuthorityResult(paused = budget.funding?.paused == true)
+            ?: return LinearAuthorityResult(paused = budget.paused)
         pointListener?.let { listener ->
             val point = guide?.point ?: solved.result.exactPrimal?.take(coordinates.size)
             if (point != null && point.size == coordinates.size) listener(prepared, point)
@@ -702,7 +714,7 @@ internal class LinearAuthority(
                 cutConflictFamilies = conflictFamilies)
             return if (guide != null && budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
                 observePrimal("ConflictExactFallback")
-                checkSource(source, cancellation, cuts = cuts, cutMask = cutMask)
+                checkExact(source, cancellation, cuts, cutMask)
             } else LinearAuthorityResult()
         }
         guide?.point?.let { point ->
@@ -804,7 +816,7 @@ internal class LinearAuthority(
                 split = fractions.first().floorSplit(), fractional = fractions)
             if (budget.admitsDimensions(costs.size, guide.workingRows.toLong())) {
                 observePrimal("PrimalExactFallback")
-                val exact = checkSource(source, cancellation, cuts = cuts, cutMask = cutMask)
+                val exact = checkExact(source, cancellation, cuts, cutMask)
                 return exact.retainingBound(bound, boundFamilies).copy(incumbent = exact.incumbent ?: candidate)
             }
             if (candidate == null) observePrimal("PrimalExactDimension")

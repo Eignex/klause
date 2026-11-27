@@ -146,6 +146,56 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `an ordinary strict leaf should finish its certificate across a grant boundary`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO,
+                strict = true)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceLpWorkLimit = 100_000L)
+        val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+        var admissions = 0L
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            admissions += it.operations
+            if (admissions == 2L && it.operations > 0L) funding.grant(0L)
+        })
+
+        val result = LinearAuthority(budget, retainLp = true).use { authority ->
+            LinearAuthorityInvocation(source, params, borrowedAuthority = authority).use { it.run { _, _ -> } }
+        }
+
+        val terminal = assertNotNull(result.terminal)
+        assertEquals(SourceValue.Rational(BigFraction.ZERO), assertIs<SourceClaim.Limit>(terminal.claim).value)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+        assertTrue(admissions > 2L)
+        assertFalse(funding.exhausted)
+    }
+
+    @Test
+    fun `cancelling a paused sparse query should spend no further funding`() {
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val params = TheoryParams(sourceLpWorkLimit = 100_000L, sourceCuts = false)
+        val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            if (it.operations > 0L) funding.grant(0L)
+        })
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            LinearAuthorityInvocation(source, params, borrowedAuthority = authority, boundOrdered = true).use {
+                assertNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
+                val spent = funding.spent
+
+                val result = it.runSlice(ExecutionControl { true }, Long.MAX_VALUE, -1) { _, _ -> }
+
+                assertEquals(TerminationReason.Cancelled, assertNotNull(result).reason)
+                assertNull(result.terminal)
+                assertEquals(spent, funding.spent)
+            }
+        }
+    }
+
+    @Test
     fun `a checked root incumbent should survive a stop in numerical observation`() {
         val source = SourceProofContext(scope, setOf(integer), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),

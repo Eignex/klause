@@ -345,8 +345,10 @@ exact completion; a caller stop remains terminal.
 Numerical or representational declines leave exact completion responsible for the
 remaining scope. A bounded exact witness probe precedes LP construction; unresolved
 regions enter envelope pruning before cylindrical projection. The caller's matrix
-ceiling admits envelope rows, refinement and retained spatial windows. Declining
-an optional envelope allocation leaves exact completion available.
+ceiling admits envelope rows, refinement and retained spatial windows. Envelope
+consultations debit the enclosing arithmetic ledger across queries, including
+when called through a transcendental relaxation. An optional envelope decline
+leaves exact completion available under the remaining caller allowance.
 
 #### Quadratic strategy execution
 

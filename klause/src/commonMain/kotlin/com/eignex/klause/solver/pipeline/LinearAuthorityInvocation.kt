@@ -242,7 +242,10 @@ internal class LinearAuthorityInvocation(
             component.ray?.let { return finish(it, TerminationReason.SearchExhausted) }
             if (component.gapBound() != null) return finish(null, TerminationReason.SearchExhausted, gapClosed = true)
             return when (event) {
-                SearchRunEvent.Paused -> if (stop() || funding.exhausted) finish(null, incompleteReason()) else null
+                SearchRunEvent.Paused -> {
+                    if (stop() || funding.exhausted || component.allocationStop != null) finish(null, incompleteReason())
+                    else null
+                }
                 SearchRunEvent.Exhausted -> {
                     val terminal = component.completed()
                     finish(terminal, if (terminal == null) incompleteReason() else TerminationReason.SearchExhausted)
@@ -269,8 +272,7 @@ internal class LinearAuthorityInvocation(
     private fun incompleteReason(): TerminationReason = when {
         funding.exhausted || component.operationDenied || session.workExhausted() ||
             session.checkBudgetExhausted() || session.decisionBudgetExhausted() -> TerminationReason.BudgetExhausted
-        component.coverageAllocationDeclined -> TerminationReason.RepresentationDeclined
-        else -> TerminationReason.Unsupported
+        else -> component.allocationStop ?: TerminationReason.Unsupported
     }
 
     private fun paused(): Boolean = work > startWork && (work >= endWork || sliceEnd?.hasPassedNow() == true)

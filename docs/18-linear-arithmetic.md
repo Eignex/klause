@@ -300,6 +300,8 @@ and any remaining caller allocation ceiling. The traversal reserves modeled stor
 for both children and their condition maps before opening a branch. Its retained
 coverage has a 512 MiB safety envelope independent of cumulative allocation for
 temporary LP preparation and proof work.
+An allocation refusal in optional guidance or candidate completion leaves the
+caller ledger available to admit other queries.
 
 Immutable row addresses, forms and Boolean dependencies can be shared by fresh
 components over one canonical fragment. `prepareExactLiraSource` returns an opaque
