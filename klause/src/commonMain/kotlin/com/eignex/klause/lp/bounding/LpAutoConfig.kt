@@ -424,10 +424,10 @@ object LpAutoConfig {
             sparseGuard(trace, true, 7, !base.lbTreeSearch) &&
             sparseGuard(trace, true, 8, !coneRequested) &&
             sparseGuard(trace, true, 9, cells > baseCap) &&
-            sparseGuard(trace, true, 10, !base.cuts) &&
-            sparseGuard(trace, true, 11, !base.booleanRlt) &&
-            sparseGuard(trace, true, 12, !base.impliedBoundCuts) &&
-            sparseGuard(trace, true, 13, !base.flowCoverCuts) &&
+            sparseGuard(trace, true, 10, !plan.cuts) &&
+            sparseGuard(trace, true, 11, !plan.booleanRlt) &&
+            sparseGuard(trace, true, 12, !plan.impliedBoundCuts) &&
+            sparseGuard(trace, true, 13, !plan.flowCoverCuts) &&
             sparseGuard(trace, true, 14, config.overrides.none { (technique, enabled) ->
                 enabled && technique.timing == LpTiming.EXHAUSTIVE
             })

@@ -99,9 +99,9 @@ class SourceExecutionRequest private constructor(
     internal fun withPortfolioRootPointObserver(
         observer: (String, LpRootPointObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(invocation.request.engine == FiniteEngine.MIXED &&
+        require(cores == 1 && invocation.request.engine == FiniteEngine.MIXED &&
             SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
-            "root point observation requires mixed finite source execution"
+            "root point observation requires single-core mixed finite source execution"
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,

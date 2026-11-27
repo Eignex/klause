@@ -125,7 +125,7 @@ internal fun LpEngine.lpRoundingProbe(
             problem.numRealVars == 0 && it.objective === objective &&
                 it.relaxation === relaxation && it.primal === primal
         }
-        if (retained?.primal == null && resumed == null && guidance != null &&
+        if (automaticSparseTrial && retained?.primal == null && resumed == null && guidance != null &&
             guidance.knownColumns == null && !guidance.auxiliaryPoint &&
             guidance.sourceProblem === problem && ownsRootPrimalModel(relaxation.model) &&
             !cancellation()

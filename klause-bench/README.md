@@ -1076,7 +1076,7 @@ For a bounded lifecycle diagnostic, run `FinitePortfolioLpCapture` with
 `capture-root-points=true capture-worker=any portfolio-policy=ordinary handoff=false
 portfolio-progress=false captures=0 lp-ceiling=default`. The separate
 `automatic-sparse=true` treatment probes automatic admission within the same
-portfolio allocation. Root lifecycle capture allows up to 60,000 ms and limits
+portfolio allocation. Single-core root lifecycle capture allows up to 60,000 ms and limits
 source input to 2 MiB and 6,000 rows and columns. It checks the decoded source
 hash and journals admission,
 query, handoff and consumer events. An optional `source-archive-sha256` binds the

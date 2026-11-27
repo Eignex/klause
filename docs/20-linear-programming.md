@@ -390,10 +390,10 @@ before writing and stops at two million entries or eight million work units;
 declines publish no factors or rank claim. Sparse admission never changes the dense
 exact-continuation caps.
 
-The automatic admission experiment evaluates its additional source and work
-guards inside the LP owner under the existing root and solve allowances. A scan
-can decline once its nonzero and fill counts exceed the funded pass forecast. The
-diagnostic observer records completed admission decisions and their evaluated
+Opt-in automatic admission evaluates source and work guards inside the LP owner
+under the existing root and solve allowances. Resolved cut plans keep the ordinary
+LP path. A scan can decline once its nonzero and fill counts exceed the funded
+pass forecast. The diagnostic observer records completed admission decisions and their evaluated
 guards, including preparation and query allowances at the producer and helper.
 The compact forecast covers the initial factor attempt and full source pass.
 Later attempts draw on the live continuation allowance.
@@ -405,7 +405,7 @@ layout. An unfunded compact forecast returns the query decline. Each admitted
 worker installs its own root state and pays for its numerical preparation and queries.
 Root point events identify the original owner, model and point through queries,
 retention and search consultations. A consultation supplies ordering guidance.
-The automatic root experiment can hand a complete point from the same source
+The automatic root path can hand a complete point from the same source
 directly to ordinary search. The first root choice can use its value preference
 without preparing the component order or running another root simplex query.
 Auxiliary and partial points remain eligible for the existing rounding paths.

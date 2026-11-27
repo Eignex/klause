@@ -53,6 +53,22 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `automatic sparse admission leaves resolved cuts on the ordinary plan`() {
+        val problem = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1_000L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val params = LpParams(lpConfig = LpConfig.parse("aggressive,+automatic-sparse"))
+        val sink = SolveStatsSink("sparse-with-cuts")
+
+        LpEngine(problem, objective, params, sink).use { engine ->
+            assertTrue(engine.params.lpPlan.cuts)
+            assertTrue(engine.params.lpPlan.rootCutHarvest)
+        }
+
+        assertTrue(sink.snapshot().lp.sparseTrial.isEmpty())
+    }
+
+    @Test
     fun `automatic sparse root work checks a funded pause before resuming its cursor`() {
         val problem = boundedLpEngineProblem().withSettings(
             ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L)).bake()
