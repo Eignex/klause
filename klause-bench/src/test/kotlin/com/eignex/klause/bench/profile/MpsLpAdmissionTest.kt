@@ -36,6 +36,18 @@ import kotlin.test.assertTrue
 
 class MpsLpAdmissionTest {
     @ParameterizedTest
+    @ValueSource(ints = [Int.MIN_VALUE, 0, 121, Int.MAX_VALUE])
+    fun `preparation deadlines reject values outside the bounded diagnostic range`(seconds: Int) {
+        assertFailsWith<IllegalArgumentException> { MpsLpAdmission.PreparationLimits(seconds, 1L) }
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = [Long.MIN_VALUE, 0L, 6_600_000_001L, Long.MAX_VALUE])
+    fun `preparation work rejects values outside the bounded diagnostic range`(work: Long) {
+        assertFailsWith<IllegalArgumentException> { MpsLpAdmission.PreparationLimits(20, work) }
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = [Int.MIN_VALUE, 0, 65, Int.MAX_VALUE])
     fun `input limits reject values outside the bounded diagnostic range`(mebibytes: Int) {
         assertFailsWith<IllegalArgumentException> { MpsLpAdmission.inputByteLimit(mebibytes) }
