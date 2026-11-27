@@ -458,6 +458,7 @@ class OpenTheoryEngine internal constructor(
                     ),
                 )
             }
+            (planned.theory as? ExactLiraSearchComponent)?.observeCompleteRootShape()
             val solveParams = SearchSolveParams(
                 maxDecisions = state.remainingDecisions(),
                 restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,

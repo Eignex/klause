@@ -374,6 +374,15 @@ class ExactLiraSearchComponent private constructor(
         observeCompleteStage("OPENING")
     }
 
+    internal fun observeCompleteRootShape() {
+        observeCompleteStage("SOURCE_REAL_COLUMNS", model.numRealVars.toLong())
+        observeCompleteStage("SOURCE_ROWS", preparedRows.size.toLong())
+        observeCompleteStage("SOURCE_ARITHMETIC_BOOLEANS", arithmeticVariables.size.toLong())
+        observeCompleteStage("ROOT_UNASSIGNED_BOOLEANS", unassignedBooleans.toLong())
+        val openArithmetic = arithmeticVariables.count { bools[it] == UNASSIGNED }
+        observeCompleteStage("ROOT_UNASSIGNED_ARITHMETIC_BOOLEANS", openArithmetic.toLong())
+    }
+
     internal fun partialPointHints(
         stop: ExecutionControl,
         defaultOpening: Boolean = false,
