@@ -14,6 +14,7 @@ import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.componentLayout
+import com.eignex.klause.lp.engine.defaultSimplexIterations
 import com.eignex.klause.lp.engine.floatFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
@@ -22,6 +23,7 @@ import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.saturatedAdd
 import com.eignex.util.numbers.saturatedMul
 
@@ -90,47 +92,69 @@ internal fun LpEngine.splitPresolveFeasibility(
     if (!scope.split || model.m > MAX_ROWS_PER_COLUMN * model.n ||
         model.tableauCells() < MIN_COMPONENT_QUERY_CELLS || model.rowStrict.any { it }
     ) return null
+    val offer = nodeWorkBudget()
     val projection = LpProjectionMeter(
-        MAX_COMPONENT_PREPARATION_WORK,
+        if (offer > 0L) minOf(offer, MAX_COMPONENT_PREPARATION_WORK) else MAX_COMPONENT_PREPARATION_WORK,
         MAX_COMPONENT_PREPARATION_BYTES,
         scope.token,
         WorkMeter(scope::charge),
     )
-    val offer = nodeWorkBudget()
+    val iterations = nodePivotBudget().takeIf { it > 0 } ?: defaultSimplexIterations(model.m, model.numVars)
+    val size = model.numVars.toLong() + model.m
     var numerical = LpSolveMetrics()
+    var scalingWork = 0L
     var refuted = false
+    fun remainingWork(): Long = offer - minOf(offer, saturatedAdd(
+        projection.work, saturatedAdd(scalingWork, numerical.workOps),
+    ))
     try {
         val layout = model.componentLayout(scope.token, projection) ?: return null
         if (!admitPresolveBlocks(model, layout)) return null
         projection.reserve(4L * layout.size, 32L * layout.size, matrix = false)
         val order = (0 until layout.size).sortedBy { layout.rows(it).toLong() + layout.columns(it) }
         scope.complete = layout.visit(scope.token, projection, order, copyCosts = false) { part ->
-            val remaining = offer - numerical.workOps
-            if (offer > 0L && remaining <= 0L) return@visit false
+            val remaining = remainingWork()
+            val childSize = part.model.numVars.toLong() + part.model.m
+            val childIterations = (childSize * iterations / size).toInt()
+            if (childIterations == 0) return@visit false
             // Scaling is prepared before the numerical solver has a chance to poll.
-            val scaling = LpScalingView.constructionWorkBound(part.model)
+            val scaling = 2L * LpScalingView.constructionWorkBound(part.model)
             if ((offer > 0L && scaling >= remaining) ||
                 (scope.token.admission?.quotaRemaining?.let { scaling >= it } == true)
             ) return@visit false
             scope.attemptedSplit = true
+            scalingWork = saturatedAdd(scalingWork, scaling)
             newTableauCutSolver(
-                part.model, scope.token, workLimit = if (offer == 0L) 0L else remaining,
+                part.model, scope.token, iterationLimit = childIterations,
+                workLimit = if (offer == 0L) 0L else remaining - scaling,
                 factory = solveContext.engineFactory, pricing = pricingOptions,
             ).use { solver ->
+                val fallbacks = solver.scalingMetrics.fallbacks
                 val point = solver.solve()
-                val metrics = solver.lastMetrics.copy(componentSolves = 1)
+                val measured = solver.lastMetrics
+                val scalingAfter = solver.scalingMetrics
+                val retryWork = scalingAfter.work.takeIf { scalingAfter.fallbacks > fallbacks } ?: 0L
+                val metrics = measured.copy(
+                    preparationOps = saturatedAdd(measured.preparationOps, retryWork),
+                    componentSolves = 1,
+                )
                 numerical += metrics
                 scope.solved(metrics)
                 solver.infeasibleRay?.takeIf { !scope.token() }?.let { candidate ->
-                    projection.reserve(model.m.toLong() + candidate.size, 8L * model.m, matrix = false)
-                    val lifted = DoubleArray(model.m)
-                    for (row in candidate.indices) lifted[part.rows[row]] = candidate[row]
-                    refuted = verifyPresolveFeasibilityRay(model, lifted, scope)
+                    val liftWork = model.m.toLong() + candidate.size
+                    if (offer == 0L || liftWork < remainingWork()) {
+                        projection.reserve(liftWork, 8L * model.m, matrix = false)
+                        val lifted = DoubleArray(model.m)
+                        for (row in candidate.indices) lifted[part.rows[row]] = candidate[row]
+                        refuted = verifyPresolveFeasibilityRay(model, lifted, scope)
+                    }
                 }
                 point?.optimal == true && !scope.token()
             }
         }
     } catch (_: LpProjectionStop) {
+        scope.complete = false
+    } catch (_: CheckedLongOverflowException) {
         scope.complete = false
     }
     if (!scope.attemptedSplit) return null

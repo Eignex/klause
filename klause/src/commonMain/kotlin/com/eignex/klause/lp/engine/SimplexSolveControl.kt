@@ -13,7 +13,7 @@ internal class SimplexSolveControl(
     private val workLimit: Long,
     token: ExecutionControl,
 ) {
-    private val defaultIterations = 50 * (m + numVars) + 200
+    private val defaultIterations = defaultSimplexIterations(m, numVars)
     val work = LpWork()
     var floatAllowance: LpFloatAllowance? = null
     var retainFundingStop = false
@@ -77,6 +77,9 @@ internal class SimplexSolveControl(
 
     fun iterationsRemain(progress: SolveProgress): Boolean = retainFundingStop || progress.iterations < maxIterations
 }
+
+internal fun defaultSimplexIterations(rows: Int, variables: Int): Int =
+    (50L * (rows.toLong() + variables) + 200L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
 // Recovery may replace factors or headings, but it remains part of one logical solve. Keeping these
 // counters in one carrier prevents a restart from buying a fresh termination or anti-cycling budget.

@@ -243,7 +243,7 @@ internal fun lpHarvestReporting(
             sink.snapshot().lp,
         )
     }
-    if (!plan.variableShaving && !plan.objectiveShaving) {
+    if (cancellation() || (!plan.variableShaving && !plan.objectiveShaving)) {
         return LpHarvestResult(
             problem,
             LpHarvestReport(),
