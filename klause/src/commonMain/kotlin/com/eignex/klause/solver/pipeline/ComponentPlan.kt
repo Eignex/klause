@@ -145,8 +145,16 @@ class ComponentPlan internal constructor(
     }
 
     /** Build the compact finite problem owned by the CP component. */
-    fun cpProjection(spec: Problem, cpDomains: Map<Int, IntDomain>): CpProblemProjection {
+    fun cpProjection(spec: Problem, cpDomains: Map<Int, IntDomain>): CpProblemProjection =
+        requireNotNull(cpProjection(spec, cpDomains, ExecutionControl.Never))
+
+    internal fun cpProjection(
+        spec: Problem,
+        cpDomains: Map<Int, IntDomain>,
+        cancellation: ExecutionControl,
+    ): CpProblemProjection? {
         requireBelongsTo(spec)
+        if (cancellation()) return null
         val sourceToCp = IntArray(intOwners.size) { -1 }
         val cpToSource = cpIntVars
         for (local in cpToSource.indices) sourceToCp[cpToSource[local]] = local
@@ -157,6 +165,7 @@ class ComponentPlan internal constructor(
         val mapping = VarRemap(boolMap, sourceToCp)
         val factorIds = factorOwners.indices.filter { factorOwners[it] == FactorOwner.CP }
         val factors = factorIds.map { factor ->
+            if (cancellation()) return null
             val sourceFactor = spec.factors[factor]
             require(sourceFactor.intVars.all { sourceToCp[it] >= 0 }) {
                 "CP factor $factor mentions a theory-owned integer column"
@@ -164,7 +173,7 @@ class ComponentPlan internal constructor(
             sourceFactor.remap(mapping)
         }
             .toTypedArray()
-        return CpProblemProjection(
+        val projection = CpProblemProjection(
             BakedProblem(
                 settings = spec.settings,
                 semantics = spec.semantics,
@@ -179,12 +188,14 @@ class ComponentPlan internal constructor(
                 numRealVars = 0,
                 realLower = doubleArrayOf(),
                 realUpper = doubleArrayOf(),
+                cancellation = cancellation,
                 projectionProviders = factorProjections.providers,
                 projectionSelection = { view -> factorProjections.projected(view, factorIds.toIntArray(), mapping) },
             ),
             sourceToCp,
             cpToSource,
         )
+        return projection.takeUnless { cancellation() }
     }
 
     /**

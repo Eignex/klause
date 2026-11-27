@@ -1,9 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -16,12 +22,17 @@ import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
+import com.eignex.klause.propagation.PropagationProjection
+import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
@@ -33,6 +44,8 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -45,6 +58,215 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FactorPolynomialProjectionTest {
+    @Test
+    fun `open integer squares should complete with native finite distinct counts`() {
+        val count = NValue(4, intArrayOf(1, 2, 3))
+        val source = Problem(
+            0, 5, arrayOf(IntDomain(0, 0), IntDomain(1, 2), IntDomain(1, 1), IntDomain(1, 1), IntDomain(2, 2)),
+            arrayOf(
+                Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.EQ, 0),
+                ContinuousProduct(0, 0, 1),
+                Linear(longArrayOf(-1), intArrayOf(1), doubleArrayOf(1.0), intArrayOf(1), LinearOp.GE, 0),
+                count,
+            ),
+            openIntLo = booleanArrayOf(true, false, false, false, false),
+            openIntHi = booleanArrayOf(true, false, false, false, false),
+            numRealVars = 2,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+
+        val execution =
+            assertIs<SourceExecutionResult.Polynomial>(SourceSetup.execute(SourceExecutionRequest(invocation)))
+
+        val point = assertIs<OpenTheoryResult.Sat>(execution.result.result).assignment
+        val plan = assertNotNull(invocation.preparedPlan)
+        assertEquals(ComponentResponsibility.FINITE, plan.factorOwner(3).responsibility)
+        assertSame(count, assertNotNull(plan.model).factors[3])
+        assertNull(plan.finiteIntegerCoordinate(0))
+        val integer = BigFraction.of(parseBigInt(point.intValue(0)), BIG_ONE)
+        assertEquals(integer, point.algebraicRealValue(0)?.rational)
+        val square = assertNotNull(point.algebraicRealValue(1)?.rational)
+        assertEquals(integer * integer, square)
+        assertEquals(listOf("2", "1", "1", "2"), (1..4).map(point::intValue))
+        assertTrue(square >= BigFraction.ofLong(2))
+    }
+
+    @Test
+    fun `guarded arithmetic should condition the same finite choices as the native count`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(guardedSquare()), ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+        ))
+
+        for ((guard, value) in listOf(true to "1", false to "2")) {
+            val assumptions = Assumptions.None.withBool(0, guard)
+            val params = NonlinearIntegerTheoryParams(
+                polynomial = PolynomialTheoryParams(strategy = PolynomialStrategyParams(assumptions = assumptions)),
+            )
+            val execution = assertIs<SourceExecutionResult.Polynomial>(
+                SourceSetup.execute(SourceExecutionRequest(invocation, params)))
+
+            val assignment = assertIs<OpenTheoryResult.Sat>(execution.result.result).assignment
+            assertEquals(guard, assignment.boolValue(0))
+            assertEquals(value, assignment.intValue(1))
+        }
+    }
+
+    @Test
+    fun `a conflicting guard should preserve the other finite branch`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(guardedSquare()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val params = NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(
+                backtrack = BacktrackParams(valueSelector = IndomainMax),
+                assumptions = Assumptions.None.withInt(1, 2L),
+            ),
+        ))
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(
+            SourceSetup.execute(SourceExecutionRequest(invocation, params)))
+
+        val result = assertIs<OpenTheoryResult.Sat>(execution.result.result)
+        assertEquals(false, result.assignment.boolValue(0))
+        assertTrue(result.stats.search.fails.sum > 0)
+    }
+
+    private fun guardedSquare(): Problem = Problem(
+        1, 5, arrayOf(IntDomain(0, 0), IntDomain(1, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(2, 2)),
+        arrayOf(
+            Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.EQ, 0),
+            ContinuousProduct(0, 0, 1),
+            ReifiedRealLinear(0, intArrayOf(1), doubleArrayOf(-1.0), intArrayOf(1), doubleArrayOf(1.0),
+                LinearOp.GE, 0.0),
+            NValue(4, intArrayOf(1, 2, 3)),
+        ),
+        openIntLo = booleanArrayOf(true, false, false, false, false),
+        openIntHi = booleanArrayOf(true, false, false, false, false),
+        numRealVars = 2,
+        realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, 1.0),
+        realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, 1.0),
+    )
+
+    @Test
+    fun `finite exhaustion should preserve an undecided open integer completion`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(coupledCube()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val assumptions = Assumptions.None.withInt(1, 2L)
+        val params = NonlinearIntegerTheoryParams(
+            maximumCandidates = 2,
+            polynomial = PolynomialTheoryParams(strategy = PolynomialStrategyParams(assumptions = assumptions)),
+        )
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(
+            SourceSetup.execute(SourceExecutionRequest(invocation, params)))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result.result).reason)
+        assertTrue(execution.result.stats.workSpent > 0)
+    }
+
+    @Test
+    fun `a later finite leaf should still accept an integral relaxation witness`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(coupledCube()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val params = NonlinearIntegerTheoryParams(
+            maximumCandidates = 2,
+            polynomial = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+                backtrack = BacktrackParams(valueSelector = IndomainMax),
+            )),
+        )
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(
+            SourceSetup.execute(SourceExecutionRequest(invocation, params)))
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(execution.result.result).assignment
+        assertEquals("1", assignment.intValue(1))
+        assertEquals("1", assignment.intValue(0))
+    }
+
+    @Test
+    fun `finite decisions and open tuples should share the caller node allowance`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(coupledCube()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        val budget = NodeBudget(2L)
+        val params = NonlinearIntegerTheoryParams(nodeBudget = budget, polynomial = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(backtrack = BacktrackParams(valueSelector = IndomainMax)),
+        ))
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(
+            SourceSetup.execute(SourceExecutionRequest(invocation, params)))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result.result).reason)
+        assertEquals(2L, budget.spent)
+    }
+
+    @Test
+    fun `finite composition should charge the containing arithmetic allowance once`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(coupledCube()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
+        var charged = 0L
+        val params = NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(
+            maximumWork = 64L,
+            cancellation = ExecutionControl(accounting = WorkMeter { charged += it }),
+        ))
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(
+            SourceSetup.execute(SourceExecutionRequest(invocation, params)))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result.result).reason)
+        assertEquals(64L, charged)
+        assertEquals(charged, execution.result.stats.workSpent)
+    }
+
+    @Test
+    fun `a cancelled traversal should avoid opening the finite peer`() {
+        var opened = 0
+        val providers = FactorProjectionProviders(propagation = PropagationProjectionProvider { factor ->
+            val native = BuiltInPropagationProjectionProvider.select(factor)
+            if (factor !is NValue || native == null) native else PropagationProjection(
+                native.capability, native.assignmentCheck, native.inertReason,
+            ) { local ->
+                opened++
+                native.create(local, null)
+            }
+        })
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(coupledCube()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, providers = providers,
+        ))
+        val before = opened
+        val params = NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(
+            strategy = PolynomialStrategyParams(backtrack = BacktrackParams(cancellation = ExecutionControl { true })),
+        ))
+
+        val execution = assertIs<SourceExecutionResult.Polynomial>(
+            SourceSetup.execute(SourceExecutionRequest(invocation, params)))
+
+        assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(execution.result.result).reason)
+        assertEquals(before, opened)
+    }
+
+    private fun coupledCube(): Problem = Problem(
+        0, 5, arrayOf(IntDomain(0, 0), IntDomain(1, 2), IntDomain(1, 1), IntDomain(2, 2), IntDomain(2, 2)),
+        arrayOf(
+            Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0), LinearOp.EQ, 0),
+            Power(Power.Coordinate.Real(SourceRealId(0)), 3, Power.Coordinate.Real(SourceRealId(1))),
+            Linear(longArrayOf(-1), intArrayOf(1), doubleArrayOf(1.0), intArrayOf(1), LinearOp.EQ, 0),
+            NValue(4, intArrayOf(1, 2, 3)),
+        ),
+        openIntLo = booleanArrayOf(true, false, false, false, false),
+        openIntHi = booleanArrayOf(true, false, false, false, false),
+        numRealVars = 2,
+        realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+        realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
+    )
+
     @Test
     fun `integer products should enforce their complete relation in open polynomial projection`() {
         val source = Problem(0, 3, arrayOf(IntDomain(2, 2), IntDomain(3, 3), IntDomain(0, 0)),

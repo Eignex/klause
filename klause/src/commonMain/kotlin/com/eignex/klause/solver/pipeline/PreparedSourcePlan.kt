@@ -305,7 +305,8 @@ class PreparedSourcePlan private constructor(
 
             is PreparedExecution.Transcendental -> sourceId.takeIf { selected.completion != null }
 
-            is PreparedExecution.NonlinearInteger -> null
+            is PreparedExecution.NonlinearInteger -> selected.projection?.finiteOwnership?.cpIntVars
+                ?.indexOf(sourceId)?.takeIf { it >= 0 }
         }
     }
 
