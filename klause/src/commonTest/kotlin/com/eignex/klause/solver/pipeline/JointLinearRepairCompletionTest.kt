@@ -536,14 +536,14 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
-    fun `borrowed fractional guidance should open a connected first region`() {
-        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
-            factors = arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+    fun `borrowed fractional guidance should leave rounding disagreements free`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4) { 2 }, null, null),
+            factors = arrayOf(Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             ExecutionControl.Never))
         val funding = SourceLpFunding(10_000, 10_000).also { it.grant(10_000) }
-        val point = (0..1).associate { SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.5 }
+        val point = (0..3).associate { SourceCoordinate(SourceCoordinate.Kind.Integer, it) to if (it == 1) 1.0 else 0.5 }
         val guidance = LinearRepairGuidance()
         assertTrue(guidance.remember(source, point, SourceLpBudget(funding = funding), ExecutionControl.Never))
         val observations = mutableListOf<JointRepairObservation>()
@@ -554,8 +554,8 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
             search.advance(ExecutionControl.Never, 5_000)
 
             val first = observations.first { it.phase == "proposal" }
-            assertEquals(listOf(0, 1), first.freed)
-            assertTrue(first.lower.isEmpty())
+            assertEquals(listOf(0, 2, 3), first.freed)
+            assertEquals(mapOf(1 to BigFraction.ONE), first.lower)
         }
     }
 

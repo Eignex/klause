@@ -405,10 +405,15 @@ internal class JointLinearRepair(
                         pooled.bools, limit, budget, stop) else null
                 val relaxation = if (checkedStart && binary == null) requireNotNull(selection).relaxationNeighborhood(
                     hint, from, requireNotNull(pooled).bools, limit, budget, stop) else null
+                val initial = if (sharedStart && sourceIntegers == null) {
+                    requireNotNull(selection).relaxationNeighborhood(
+                        repairGuidance?.find(source), from, bools, null, budget, stop, startFromRoot = true)
+                } else null
                 if (checkedStart && hint != null) relaxationAttempted = true
                 if (relaxation != null) observe("jointRepairRelaxationNeighborhoods")
                 if (binary != null) observe("jointRepairBinarySupportNeighborhoods")
-                (binary ?: relaxation ?: requireNotNull(selection).propose(
+                if (initial != null) observe("jointRepairSharedRootAgreementStarts")
+                (initial ?: binary ?: relaxation ?: requireNotNull(selection).propose(
                     from, pooled?.bools ?: bools, size, proposalRound, radius, limit))
                     .also { condition ->
                         if (bootstrap) {
@@ -424,8 +429,9 @@ internal class JointLinearRepair(
                             proposalSequence++
                             observationQuery = 0L
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
-                                proposalRound, count, size, when {
+                                proposalRound, count, initial?.let { model.numIntVars - it.lower.size } ?: size, when {
                                     bootstrap -> "rounded-paid-root"
+                                    initial != null -> "borrowed-root-agreements"
                                     sharedStart -> "borrowed-root"
                                     pooled == null -> "stored"
                                     else -> "checked-pooled"
