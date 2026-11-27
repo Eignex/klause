@@ -390,7 +390,10 @@ before writing and stops at two million entries or eight million work units;
 declines publish no factors or rank claim. Sparse admission never changes the dense
 exact-continuation caps.
 
-Opt-in automatic admission evaluates source and work guards inside the LP owner
+Opt-in automatic admission (`+automatic-sparse`) applies only to pure-integer
+optimization over closed declarations whose dense tableau exceeds the ordinary cell
+cap, without component ownership, the best-bound tree or the objective cone. It
+evaluates source and work guards inside the LP owner
 under the existing root and solve allowances. Resolved cut plans keep the ordinary
 LP path. A scan can decline once its nonzero and fill counts exceed the funded
 pass forecast. The diagnostic observer records completed admission decisions and their evaluated
