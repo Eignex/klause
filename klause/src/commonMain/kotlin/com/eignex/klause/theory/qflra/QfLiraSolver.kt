@@ -467,6 +467,11 @@ class ExactLiraSearchComponent private constructor(
     internal fun useIncrementalSourceRows() {
         usePartialLinearPropagation()
         reusePartialLinearDeclines()
+        useIncrementalSourceAssertions()
+    }
+
+    internal fun useIncrementalSourceAssertions() {
+        check(context == null || context?.decisionLevel == 0)
         incrementalSourceRows = true
     }
 

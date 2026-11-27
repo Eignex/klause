@@ -632,8 +632,9 @@ private fun openWitnessVerifier(
         verifyOpenWitness(model, sample, cancellation, projection())
     }
     val authoritative = if (checked is Verification.Indeterminate && preparedSource != null && !cancellation()) {
-        OpenExactNeighborhood(model, TheoryParams(cancellation = cancellation, nodeBudget = pointNodeBudget),
-            objective, preparedSource).use {
+        val verificationParams = TheoryParams(cancellation = cancellation, nodeBudget = pointNodeBudget,
+            openLinearIncremental = false)
+        OpenExactNeighborhood(model, verificationParams, objective, preparedSource).use {
             it.checkPoint(sample, cancellation)
         }
     } else checked

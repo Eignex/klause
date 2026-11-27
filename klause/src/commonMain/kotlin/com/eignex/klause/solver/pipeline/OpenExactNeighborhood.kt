@@ -21,6 +21,7 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.EncodedTheoryFactor
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
@@ -92,9 +93,13 @@ internal class OpenExactNeighborhood(
     private fun open(stop: ExecutionControl, state: OpenTheorySolveState): PlannedSearch? {
         val source = prepare(stop) ?: return null
         if (!source.prepareSource(stop)) return null
-        return source.open(maxChecks = params.maxLeaves, cancellation = stop,
+        val opened = source.open(maxChecks = params.maxLeaves, cancellation = stop,
             learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
             smtStats = state.smt, theorySolveStop = stop, openHintFlips = params.openHintFlips)
+        if (params.openLinearIncremental && model.numRealVars > 0 && model.numIntVars == 0) {
+            (opened.theory as? ExactLiraSearchComponent)?.useIncrementalSourceAssertions()
+        }
+        return opened
     }
 
     fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl, action: () -> T): T =

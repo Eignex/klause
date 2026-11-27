@@ -230,6 +230,9 @@ domain or establishing infeasibility.
 The linear adapter asserts exact rational bounds and strict objective cutoffs into
 a private retained theory search and retracts them after every verdict, so sibling
 conditions inherit nothing. Native work shares one allowance across repairs.
+Retained real-only neighborhood searches schedule source assertions from changed Boolean inputs and
+popped assertions using the [linear component's row index](18-linear-arithmetic.md#solving-and-composition).
+`open-linear-incremental=false` selects full row scans.
 
 The quadratic adapter uses the same contract with exact algebraic objective ordering,
 repairing finite assignments and continuous windows together

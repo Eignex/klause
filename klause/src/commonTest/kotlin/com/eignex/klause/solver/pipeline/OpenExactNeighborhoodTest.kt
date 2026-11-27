@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -223,6 +224,37 @@ class OpenExactNeighborhoodTest {
         assertIs<ExactNeighborhoodResult.Refuted>(refused)
         assertEquals(third, assertIs<ExactNeighborhoodResult.Witness>(accepted).sample.exactReals?.single())
         adapter.close()
+    }
+
+    @Test
+    fun `a strict guarded row should retract before an opposite neighborhood pin`() {
+        val model = Problem(
+            1, 0, emptyArray(),
+            arrayOf(
+                ReifiedRealLinear(
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0, strict = true,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val fixed = mapOf(0 to BigFraction.ZERO)
+
+        OpenExactNeighborhood(model, TheoryParams()).use { adapter ->
+            val refused = adapter.check(
+                ExactNeighborhoodCondition(mapOf(0 to true), fixed, fixed), ExecutionControl.Never,
+            )
+            val accepted = adapter.check(
+                ExactNeighborhoodCondition(mapOf(0 to false), fixed, fixed), ExecutionControl.Never,
+            )
+
+            assertIs<ExactNeighborhoodResult.Refuted>(refused)
+            val point = assertIs<ExactNeighborhoodResult.Witness>(accepted).sample
+            assertFalse(point.boolValue(0))
+            assertEquals(BigFraction.ZERO, point.exactReals?.single())
+        }
     }
 
     @Test
