@@ -92,9 +92,13 @@ internal object JointRepairLpCapture {
                 bounds.hasLower(id) && bounds.hasUpper(id) && bounds.lower(id) == 0L && bounds.upper(id) == 1L
             })
             BinaryDistanceRegion.project(context, it, options.getValue("regional-existing-free"),
-                active, sha256(bytes), out).also { result -> if (result.pins == null) return }
+                active, sha256(bytes), out)
         }
         val pins = projection?.pins ?: regionalPins
+        options["regional-expected-pins-sha256"]?.let {
+            require(pins != null && sha256(pins.encodeToByteArray()) == it)
+        }
+        if (projection != null && pins == null) return
         val cutPolicy = options["capture-cut-policy"] ?: "ordinary"
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
             sourceLpWorkLimit = 500_000_000L - (projection?.work ?: 0L),
@@ -106,7 +110,9 @@ internal object JointRepairLpCapture {
             .newInstance(model, context, objective, params, policy, true, { null }, active, null,
                 null, null, true, null, checker, null, null, null)
         if (pins != null) {
-            replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, sha256(bytes), out)
+            val consultations = options["regional-consultations"]?.toInt() ?: 64
+            replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, consultations,
+                sha256(bytes), out)
             return
         }
         val window = ConditionWindow(limit)
@@ -256,7 +262,7 @@ internal object JointRepairLpCapture {
 
     private fun replayRegion(
         owner: AutoCloseable, specification: String, integers: Int, context: SourceProofContext, stop: ExecutionControl,
-        sourceHash: String, out: File,
+        consultations: Int, sourceHash: String, out: File,
     ) {
         val entries = specification.split(',')
         val pins = entries.associate { entry ->
@@ -273,7 +279,7 @@ internal object JointRepairLpCapture {
         var reason: String? = null
         val started = System.nanoTime()
         owner.use {
-            while (attempts < 64 && disposition == "Paused" && !stop()) {
+            while (attempts < consultations && disposition == "Paused" && !stop()) {
                 val attempt = requireNotNull(call(owner, "attempt", condition, stop))
                 disposition = requireNotNull(call(attempt, "getResult")).javaClass.simpleName
                 reason = call(attempt, "getReason")?.toString()
@@ -288,6 +294,7 @@ internal object JointRepairLpCapture {
             put("integerCount", integers)
             put("pinCount", pins.size)
             put("attempts", attempts)
+            put("consultationLimit", consultations)
             put("attemptAndRetirementNs", System.nanoTime() - started)
             put("disposition", disposition)
             put("reason", reason)

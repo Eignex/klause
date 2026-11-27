@@ -60,7 +60,8 @@ internal object FinitePortfolioLpCapture {
             it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
                 "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
                 "source-refutation-center-step", "capture-authority", "capture-cut-policy", "capture-joint", "presolve",
-                "regional-pins", "regional-binary-center", "regional-existing-free")
+                "regional-pins", "regional-binary-center", "regional-existing-free", "regional-consultations",
+                "regional-expected-pins-sha256")
         })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary", "joint-handoff"))
@@ -70,6 +71,10 @@ internal object FinitePortfolioLpCapture {
         val regional = regionPins != null || regionCenter != null
         require(regionPins == null || regionCenter == null)
         require((regionCenter != null) == options.containsKey("regional-existing-free"))
+        options["regional-consultations"]?.let { require(regional && it.toInt() in 64..256) }
+        options["regional-expected-pins-sha256"]?.let {
+            require(regional && Regex("[a-f0-9]{64}").matches(it))
+        }
         if (regional) {
             require(mode == "joint-before" && options["capture-authority"] == "accepted" &&
                 options["capture-cut-policy"] == "selected" && options["presolve"] == "off")
