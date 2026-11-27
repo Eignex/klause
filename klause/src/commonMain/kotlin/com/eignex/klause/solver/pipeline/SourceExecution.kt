@@ -99,9 +99,9 @@ class SourceExecutionRequest private constructor(
     internal fun withPortfolioRootPointObserver(
         observer: (String, LpRootPointObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(cores == 1 && invocation.request.engine == FiniteEngine.MIXED &&
+        require(invocation.request.engine == FiniteEngine.MIXED &&
             SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
-            "root point observation requires single-core mixed finite source execution"
+            "root point observation requires mixed finite source execution"
         }
         return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
@@ -528,6 +528,9 @@ private fun executeCapturedSource(
                 ?: throw PipelineConfigException("finite source execution requires its typed finite controls")
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
+            require(request.onPortfolioRootPoint == null || (finite.cores == 1 && !finite.prepareOnly)) {
+                "root point observation requires a single-core finite solve"
+            }
             bindScope?.invoke(
                 finite.cancellation or ExecutionControl { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
