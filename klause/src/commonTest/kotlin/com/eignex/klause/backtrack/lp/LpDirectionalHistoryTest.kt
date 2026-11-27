@@ -66,7 +66,7 @@ class LpDirectionalHistoryTest {
     @Test
     fun `recent depth observations replace the oldest slots without reallocating on scope reset`() {
         val events = ArrayList<String>()
-        val history = LpDirectionalHistory(events::add, maxAge = 512L, depthRetention = true)
+        val history = LpDirectionalHistory(events::add, depthRetention = true)
         fun observe(variable: VarRef.Bool, up: Boolean) {
             history.beginNode(0)
             history.record(0.0)
@@ -83,7 +83,7 @@ class LpDirectionalHistoryTest {
             observe(old, false)
             observe(old, true)
         }
-        repeat(124) { observe(VarRef.Bool(2), false) }
+        repeat(253) { observe(VarRef.Bool(2), false) }
         repeat(2) {
             observe(recent, false)
             observe(recent, true)
@@ -95,7 +95,7 @@ class LpDirectionalHistoryTest {
         assertNull(history.depthPreference(old, 0.5, 10.0) { true })
         assertEquals(false, history.depthPreference(recent, 0.5, 10.0) { true })
         assertEquals(4, events.count { it == "DEPTH_RETENTION_JOURNAL_EVICTED" })
-        assertEquals(4, events.count { it == "DEPTH_RETENTION_JOURNAL_EVICTED_IN_AGE" })
+        assertFalse("DEPTH_RETENTION_JOURNAL_EVICTED_IN_AGE" in events)
 
         history.clear()
         repeat(2) {
@@ -106,7 +106,7 @@ class LpDirectionalHistoryTest {
         history.record(0.0)
 
         assertEquals(false, history.depthPreference(recent, 0.5, 10.0) { true })
-        assertEquals(128, events.count { it == "DEPTH_RETENTION_SLOT_ALLOCATED" })
+        assertEquals(17, events.count { it == "DEPTH_RETENTION_JOURNAL_BLOCK_ALLOCATED" })
     }
 
     @Test
@@ -148,7 +148,7 @@ class LpDirectionalHistoryTest {
                 val target = when {
                     action.startsWith("lookup") -> 8L
                     action == "scan-reset" -> 32L
-                    else -> 64L
+                    else -> 16L
                 }
                 if (armed && amount == target) {
                     armed = false

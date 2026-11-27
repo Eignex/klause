@@ -7,27 +7,21 @@ internal class LpDepthObservationJournal(
     private val observe: (String) -> Unit,
     private val maxAge: Long,
 ) {
-    private class Observation {
-        var variable: VarRef? = null
-        var level = 0
-        var node = 0L
-        var parent = 0.0
-        var up = false
-        var gain = Double.NaN
-        var pruned: Boolean? = null
-
-        fun matches(child: LpDirectionalHistory.Pending): Boolean =
-            variable == child.parent.variable && level == child.depth - 1 && parent == child.parent.objective &&
-                up == child.up
+    private class Block {
+        val variables = IntArray(BLOCK_SIZE)
+        val nodes = LongArray(BLOCK_SIZE)
+        val parents = DoubleArray(BLOCK_SIZE)
+        val gains = DoubleArray(BLOCK_SIZE)
+        val flags = ShortArray(BLOCK_SIZE)
     }
 
-    private val entries = arrayOfNulls<Observation>(CAPACITY)
+    private val capacity = capacity(maxAge)
+    private val blocks = arrayOfNulls<Block>(blockCount(capacity))
     private var next = 0
     var size = 0
         private set
 
     fun clear() {
-        for (index in 0 until size) entries[index]?.variable = null
         size = 0
         next = 0
     }
@@ -39,34 +33,43 @@ internal class LpDepthObservationJournal(
         pruned: Boolean?,
         current: () -> Boolean,
     ) {
-        charge(8L)
-        if (!current()) return
         val count = size
         val write = next
-        val last = (write - 1) and MASK
-        val latest = entries[last]
-        val append = count == 0 || latest?.node != node
-        if (!append && latest?.matches(child) != true) return
-        val index = if (append) write else last
-        val retained = entries[index]
-        charge(if (retained == null) 64L else 16L)
+        charge(8L)
         if (!current() || count != size || write != next) return
-        val evicts = append && count == CAPACITY
-        val evictsInAge = evicts && retained != null && node - retained.node <= maxAge
-        val observation = retained ?: Observation().also { entries[index] = it }
+        val last = if (write == 0) capacity - 1 else write - 1
+        val previous = blocks[last / BLOCK_SIZE]
+        val append = count == 0 || previous?.nodes?.get(last % BLOCK_SIZE) != node
+        val index = if (append) write else last
+        val page = index / BLOCK_SIZE
+        val slot = index % BLOCK_SIZE
+        val key = key(child.parent.variable)
+        val flag = ((child.depth - 1) shl LEVEL_SHIFT) or if (child.up) UP else 0
+        val retained = blocks[page]
+        if (!append && (retained == null || retained.variables[slot] != key ||
+                retained.parents[slot] != child.parent.objective ||
+                retained.flags[slot].toInt() and OUTCOMES.inv() != flag)
+        ) return
+        charge(16L + if (retained == null) BLOCK_BYTES else 0L)
+        if (!current() || count != size || write != next) return
+        val evicts = append && count == capacity
+        val block = retained ?: Block().also { blocks[page] = it }
+        val evictsInAge = evicts && node - block.nodes[slot] <= maxAge
         if (append) {
-            observation.variable = child.parent.variable
-            observation.level = child.depth - 1
-            observation.node = node
-            observation.parent = child.parent.objective
-            observation.up = child.up
-            observation.gain = Double.NaN
-            observation.pruned = null
-            next = (write + 1) and MASK
-            size = minOf(CAPACITY, count + 1)
+            block.variables[slot] = key
+            block.nodes[slot] = node
+            block.parents[slot] = child.parent.objective
+            block.gains[slot] = Double.NaN
+            block.flags[slot] = flag.toShort()
+            next = if (write + 1 == capacity) 0 else write + 1
+            size = minOf(capacity, count + 1)
         }
-        if (pruned == null) observation.gain = gain else observation.pruned = pruned
-        if (retained == null) observe("DEPTH_RETENTION_SLOT_ALLOCATED")
+        if (pruned == null) {
+            block.gains[slot] = gain
+        } else {
+            block.flags[slot] = (flag or if (pruned) PRUNED else OPEN).toShort()
+        }
+        if (retained == null) observe("DEPTH_RETENTION_JOURNAL_BLOCK_ALLOCATED")
         if (evicts) observe("DEPTH_RETENTION_JOURNAL_EVICTED")
         if (evictsInAge) observe("DEPTH_RETENTION_JOURNAL_EVICTED_IN_AGE")
         observe(when (pruned) {
@@ -84,29 +87,52 @@ internal class LpDepthObservationJournal(
     ): LpDirectionalHistory.Gains? {
         val count = size
         val write = next
-        val first = (write - count) and MASK
+        val first = (write - count + capacity) % capacity
         charge(64L)
         if (!current() || count != size || write != next) return null
         val history = LpDirectionalHistory.Gains(variable)
-        for (offset in 0 until count step BLOCK) {
-            val end = minOf(count, offset + BLOCK)
+        val key = key(variable)
+        for (offset in 0 until count step BLOCK_SIZE) {
+            val end = minOf(count, offset + BLOCK_SIZE)
             charge((end - offset) * 8L)
             if (!current() || count != size || write != next) return null
             for (index in offset until end) {
-                val entry = checkNotNull(entries[(first + index) and MASK])
-                if (entry.variable != variable || entry.level != level || node - entry.node !in 1L..maxAge) continue
-                val direction = if (entry.up) history.up else history.down
-                if (entry.gain.isFinite()) direction.recordNumeric(entry.gain, entry.node, entry.parent, level)
-                val pruned = entry.pruned
-                if (pruned != null) direction.recordOutcome(pruned, entry.node, entry.parent, level)
+                val position = (first + index) % capacity
+                val block = checkNotNull(blocks[position / BLOCK_SIZE])
+                val slot = position % BLOCK_SIZE
+                val flag = block.flags[slot].toInt()
+                val sample = block.nodes[slot]
+                if (block.variables[slot] != key || flag ushr LEVEL_SHIFT != level || node - sample !in 1L..maxAge) {
+                    continue
+                }
+                val direction = if (flag and UP != 0) history.up else history.down
+                val parent = block.parents[slot]
+                val gain = block.gains[slot]
+                if (gain.isFinite()) direction.recordNumeric(gain, sample, parent, level)
+                if (flag and OUTCOMES != 0) {
+                    direction.recordOutcome(flag and PRUNED != 0, sample, parent, level)
+                }
             }
         }
         return history
     }
 
-    private companion object {
-        const val CAPACITY = 128
-        const val MASK = CAPACITY - 1
-        const val BLOCK = 16
+    internal companion object {
+        private const val BLOCK_SIZE = 16
+        private const val BLOCK_BYTES = BLOCK_SIZE * 30L
+        private const val MAX_AGE = 256L
+        private const val UP = 1
+        private const val OPEN = 2
+        private const val PRUNED = 4
+        private const val OUTCOMES = OPEN or PRUNED
+        private const val LEVEL_SHIFT = 3
+
+        fun indexWork(maxAge: Long): Long = blockCount(capacity(maxAge)).toLong()
+
+        private fun capacity(maxAge: Long): Int = maxAge.coerceIn(0L, MAX_AGE).toInt() + 1
+
+        private fun blockCount(capacity: Int): Int = (capacity + BLOCK_SIZE - 1) / BLOCK_SIZE
+
+        private fun key(variable: VarRef): Int = if (variable is VarRef.Bool) variable.varId.inv() else variable.varId
     }
 }

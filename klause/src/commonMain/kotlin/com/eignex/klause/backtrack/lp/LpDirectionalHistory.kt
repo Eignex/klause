@@ -136,7 +136,7 @@ internal class LpDirectionalHistory(
         val retainedCandidates = candidateCount
         candidates = null
         candidateCount = 0
-        charge(gains.size.toLong() + retainedCandidates + (depthJournal?.size ?: 0))
+        charge(gains.size.toLong() + retainedCandidates + if (depthJournal == null) 0L else 1L)
         gains.clear()
         depthJournal?.clear()
         clearDepthGuard()
@@ -226,7 +226,7 @@ internal class LpDirectionalHistory(
     ) {
         if (!current() || version != generation || node != stamp) return
         val journal = depthJournal ?: run {
-            charge(128L)
+            charge(LpDepthObservationJournal.indexWork(maxAge))
             if (!current() || version != generation || node != stamp) return
             LpDepthObservationJournal(charge, observe, maxAge).also { depthJournal = it }
         }
