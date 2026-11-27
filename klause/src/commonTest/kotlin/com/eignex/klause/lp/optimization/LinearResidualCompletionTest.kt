@@ -5,9 +5,11 @@ import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpLimits
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +19,45 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LinearResidualCompletionTest {
+    @Test
+    fun `private priced residual should complete across short paid offers`() {
+        val variables = 12
+        val rows = List(variables - 1) { column ->
+            ExactRationalInequality(intArrayOf(column, column + 1), List(2) { BigFraction.MINUS_ONE },
+                BigFraction.MINUS_ONE)
+        }
+        val costs = List(variables) { BigFraction.ONE }
+        var floating = false
+        var spent = 0L
+        val context = LpSolveContext(onQuery = { floating = true })
+        val budget = SourceLpBudget(maxOperations = 1, solveContext = { context })
+        val stop = object : ExecutionControl() {
+            override val accounting = WorkMeter { if (floating) spent += it }
+            override fun isCancelled() = spent >= 128L
+        }
+        val observations = mutableMapOf<String, Long>()
+        val observe: (String, Long) -> Unit = { stage, units ->
+            observations[stage] = (observations[stage] ?: 0L) + units
+            if (stage == "PrimalRecoverySparseFloatWork") {
+                spent += units
+                floating = false
+            }
+        }
+
+        val point = LinearResidualCompletion(budget, SparseSourceLpPolicy(quantum = 128L),
+            retainPreparation = true, remainingOfferWork = { (128L - spent).coerceAtLeast(0L) }).use { completion ->
+            (1..32).firstNotNullOfOrNull {
+                spent = 0L
+                completion.complete(rows, variables, stop, observe, costs, small = { null })
+            }
+        }
+
+        assertTrue(assertNotNull(point, observations.toString()).satisfiesSourceRows(rows))
+        assertEquals(1, budget.operations)
+        assertEquals(1L, observations["PrimalRecoverySparseCursorNotPendingAtEntry"])
+        assertTrue((observations["PrimalRecoverySparseCursorResumed"] ?: 0L) > 0L)
+    }
+
     @Test
     fun `closing a private prepared residual should withhold its point across later offers`() {
         val budget = SourceLpBudget(maxOperations = 1)

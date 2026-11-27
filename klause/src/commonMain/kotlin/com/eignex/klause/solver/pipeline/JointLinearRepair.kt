@@ -874,6 +874,7 @@ internal class JointLinearRepair(
                 feedbackRequest = if (refutationGuidance) LinearAuthorityFeedbackRequest(refutation = true) else null,
                 useSourceGap = false, guideIncumbent = seed != null && !queryProximity,
                 proximityCenter = seed.takeIf { queryProximity }, proximityRounding = queryProximity,
+                boundProximityFloatToOffer = queryProximity,
                 observeExternalIncumbents = observeExternalIncumbents)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
             queryFreedIntegers = freed

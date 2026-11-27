@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.pollStop
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.saturatedAdd
@@ -20,6 +21,7 @@ internal class LpScopedSolver(
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
+    private val deferFloatWorkAccounting: Boolean = false,
 ) : AutoCloseable {
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
@@ -34,10 +36,15 @@ internal class LpScopedSolver(
     }
     private var pendingFloat: PendingFloat? = null
     private var floatInvocation: ExecutionControl = ExecutionControl.Never
+    private var advancingFloat = false
+    // The simplex caches its accounting sink when it adopts the solve token.
+    private val floatWorkMeter = if (deferFloatWorkAccounting) {
+        WorkMeter { units -> if (!advancingFloat) floatInvocation.charge(units) }
+    } else null
     private val floatInvocationToken = object : ExecutionControl() {
         override fun isCancelled(): Boolean = floatInvocation()
         override fun deadline() = floatInvocation.deadline()
-        override val accounting get() = floatInvocation.accounting
+        override val accounting get() = floatWorkMeter ?: floatInvocation.accounting
         override val admission get() = admissionFrom(floatInvocation)
         override val workScheduled: Boolean get() = floatInvocation.workScheduled()
     }
@@ -428,6 +435,7 @@ internal class LpScopedSolver(
         allowance: LpFloatAllowance,
         token: ExecutionControl = cancellation,
         retainFundingStop: Boolean = false,
+        remainingOfferWork: (() -> Long)? = null,
     ): Pair<LpSolver, FloatLpResult?>? {
         requireAvailable()
         require(quantum > 0L && allowance.work > 0L)
@@ -450,13 +458,14 @@ internal class LpScopedSolver(
         }
         val current = requireNotNull(solver)
         if (current !is ResumableLpSolver) {
-            return solveFloat(token = token, allowance = allowance.copy(work = minOf(quantum, allowance.work)))
+            val grant = minOf(quantum, allowance.work, remainingOfferWork?.invoke() ?: quantum)
+            return if (grant > 0L) solveFloat(token = token, allowance = allowance.copy(work = grant)) else null
         }
         var pending = pendingFloat
         if (retainFundingStop && pending != null && pending.allowance != allowance) {
             if (!current.promoteSolve(allowance)) {
                 discardFloatProgress()
-                return advanceFloat(quantum, allowance, token, retainFundingStop)
+                return advanceFloat(quantum, allowance, token, retainFundingStop, remainingOfferWork)
             }
             pending.allowance = allowance
         }
@@ -466,13 +475,22 @@ internal class LpScopedSolver(
                 closeOwner(current)
                 return null
             }
+        }
+        val grant = minOf(quantum, remainingOfferWork?.invoke() ?: quantum)
+        if (grant <= 0L) return null
+        if (pending == null) {
             observeFloatQuery(current, current === previous, allowance, token,
-                LpQueryRoute.SCOPED_CONTINUATION, quantum, retainFundingStop)
+                LpQueryRoute.SCOPED_CONTINUATION, grant, retainFundingStop)
             pending = PendingFloat(current.openSolve(allowance, retainFundingStop), allowance)
             pendingFloat = pending
         }
         try {
-            val step = pending.cursor.advance(quantum)
+            val step = try {
+                advancingFloat = true
+                pending.cursor.advance(grant)
+            } finally {
+                advancingFloat = false
+            }
             val actual = current.lastMetrics
             lastMetrics = actual - pending.reported
             pending.reported = actual

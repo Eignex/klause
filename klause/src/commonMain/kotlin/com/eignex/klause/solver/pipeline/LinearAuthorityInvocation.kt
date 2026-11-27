@@ -82,6 +82,7 @@ internal class LinearAuthorityInvocation(
     private val recordProgress: Boolean = true,
     private val proximityCenter: Sample? = null,
     private val proximityRounding: Boolean = false,
+    boundProximityFloatToOffer: Boolean = false,
 ) : AutoCloseable {
     init {
         require(borrowedAuthority?.funding == null || borrowedAuthority.funding === funding) {
@@ -182,7 +183,8 @@ internal class LinearAuthorityInvocation(
                 !stop() && state.remainingDecisions() > 0 &&
                     state.work.theoryDecision() && state.decisionBudget.consume()
             }
-        } else null)
+        } else null,
+        proximityOfferWork = if (boundProximityFloatToOffer) ::remainingProximityOfferWork else null)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {
@@ -352,6 +354,12 @@ internal class LinearAuthorityInvocation(
         }
         if (proximityRounding && proximityPause == null) proximityPause = pause
         return true
+    }
+
+    private fun remainingProximityOfferWork(): Long {
+        val nodes = (endWork - work).coerceAtLeast(0L)
+        if (nodes >= Long.MAX_VALUE / LP_WORK_PER_NODE) return Long.MAX_VALUE
+        return (nodes * LP_WORK_PER_NODE - funding.spent % LP_WORK_PER_NODE).coerceAtLeast(0L)
     }
 
     private fun observeProximity(stage: String, count: Long = 1L) {

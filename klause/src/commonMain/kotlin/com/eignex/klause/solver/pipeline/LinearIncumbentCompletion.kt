@@ -56,13 +56,14 @@ internal class LinearIncumbentCompletion(
     var preparationInterrupted: Boolean = false
         private set
 
-    fun complete(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
+    fun complete(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl,
+        remainingOfferWork: (() -> Long)? = null): Sample? {
         preparationInterrupted = false
         val started = TimeSource.Monotonic.markNow()
         var completed: Sample? = null
         var returned = false
         return try {
-            completeSeed(source, seed, cancellation).also {
+            completeSeed(source, seed, cancellation, remainingOfferWork).also {
                 completed = it
                 returned = true
             }
@@ -79,7 +80,8 @@ internal class LinearIncumbentCompletion(
         }
     }
 
-    private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
+    private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl,
+        remainingOfferWork: (() -> Long)?): Sample? {
         check(!closed)
         if (cancellation()) return null
         if (seed.exactReals != null) return checkedExact(source, seed, cancellation)
@@ -132,7 +134,7 @@ internal class LinearIncumbentCompletion(
                 val costs = List(columns.size) { query.costs[columns[it]] }
                 val objective = costs.takeIf { it.any { cost -> !cost.isZero } }
                 val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy(),
-                    retainPreparation = ownedSeed)
+                    retainPreparation = ownedSeed, remainingOfferWork = remainingOfferWork)
                     .also { attempt.residual = it }
                 residual.complete(rows, columns.size, active, ::recoveryCost, costs = objective) {
                     if (objective != null) null else LinearAuthorityLp(budget).use { completion ->

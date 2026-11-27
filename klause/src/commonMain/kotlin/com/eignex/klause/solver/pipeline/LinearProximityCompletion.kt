@@ -37,7 +37,8 @@ internal class LinearProximityCompletion(
 
     fun takeChecked(): Sample? = checked.also { checked = null }
 
-    fun advance(result: LinearAuthorityResult, context: SearchContext, stop: ExecutionControl): Boolean {
+    fun advance(result: LinearAuthorityResult, context: SearchContext, stop: ExecutionControl,
+        remainingOfferWork: (() -> Long)? = null): Boolean {
         if (finished) return false
         if (stop()) return true
         if (!prepared) {
@@ -50,7 +51,7 @@ internal class LinearProximityCompletion(
             if (!context.consumeCheck() || !claimDecision()) return finish()
             observe("Trials", 1L)
         }
-        checked = completion.complete(source, candidate, stop)
+        checked = completion.complete(source, candidate, stop, remainingOfferWork)
         if (completion.preparationInterrupted) return finish()
         if (checked != null) {
             observe("Witnesses", 1L)

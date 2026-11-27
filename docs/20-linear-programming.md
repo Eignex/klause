@@ -779,6 +779,10 @@ numerical recovery keeps its own completion policy.
 Private residual completion can retain a fully prepared sparse admission when an
 offer stops before the solve begins. Its owner resumes under the same cumulative
 budget, including the consumed admission; this grants no additional operation.
+An admitted private joint-repair floating cursor charges its measured work after each advance
+under the remaining offer's work quantum. The kernel's cursor accounting does not
+also charge that work to the query's preparation meter. Preparation, hard
+cancellation, time limits and exact certificate checks keep their existing controls.
 
 `solver.pipeline.SourceNumericalFeedback` delivers completed queries to decision
 consumers. Latest-query consumers own one bounded slot; prefix consumers and

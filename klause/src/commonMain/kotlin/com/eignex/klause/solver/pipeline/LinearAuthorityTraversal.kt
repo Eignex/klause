@@ -84,6 +84,7 @@ internal class LinearAuthorityTraversal(
     private val guideIncumbent: Boolean = false,
     private val proximityCenter: Sample? = null,
     claimProximityDecision: (() -> Boolean)? = null,
+    private val proximityOfferWork: (() -> Long)? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val gapEnabled = gap != null ||
@@ -516,7 +517,8 @@ internal class LinearAuthorityTraversal(
                 proximityRootCompletionPending = true
                 return SearchNodeDisposition.Pause
             }
-            if (proximityCompletion.advance(result, context, proximityStop)) return SearchNodeDisposition.Pause
+            if (proximityCompletion.advance(result, context, proximityStop, proximityOfferWork))
+                return SearchNodeDisposition.Pause
             proximityRootCompletionPending = false
             proximityCompletion.takeChecked()?.let { sample ->
                 onIncumbent(sample)

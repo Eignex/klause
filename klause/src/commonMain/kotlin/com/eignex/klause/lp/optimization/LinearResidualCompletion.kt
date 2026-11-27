@@ -26,7 +26,11 @@ internal class LinearResidualCompletion(
     private val policy: SparseSourceLpPolicy,
     private val lifetimeLimit: LpFloatAllowance? = null,
     private val retainPreparation: Boolean = false,
+    remainingOfferWork: (() -> Long)? = null,
 ) : AutoCloseable {
+    private val remainingFloatWork = remainingOfferWork?.let { remaining ->
+        { minOf(remaining(), budget.funding?.availableWork ?: Long.MAX_VALUE) }
+    }
     private var rows: List<ExactRationalInequality>? = null
     private var columns = 0
     private var objective: List<BigFraction>? = null
@@ -114,13 +118,14 @@ internal class LinearResidualCompletion(
                 val quantum = minOf(policy.quantum, funding?.availableWork ?: policy.quantum)
                 if (quantum <= 0L) return@resumeSparse null
                 val current = owner ?: LpScopedSolver(LpExactState(prepared.model), token,
-                    context = budget.context, iterationLimit = profile.iterations,
-                    workLimit = profile.work).also { owner = it }
+                    context = budget.context, iterationLimit = profile.iterations, workLimit = profile.work,
+                    deferFloatWorkAccounting = remainingFloatWork != null).also { owner = it }
                 val result = floating ?: run {
                     val preparation = current.metrics.preparationWork
                     val resumed = current.floatPaused
                     try {
-                        current.advanceFloat(quantum, profile, token, retainFundingStop = true)?.second
+                        current.advanceFloat(quantum, profile, token, retainFundingStop = true,
+                            remainingOfferWork = remainingFloatWork)?.second
                     } finally {
                         budget.observe(preparation = current.metrics.preparationWork - preparation,
                             floatWork = current.lastMetrics.workOps)
