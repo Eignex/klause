@@ -10,6 +10,7 @@ import com.eignex.klause.backtrack.PooledGuidanceObserver
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpRootPointObservation
 import com.eignex.klause.lp.bounding.LpRootPointObserver
 import com.eignex.klause.lp.bounding.LpTechnique
@@ -85,6 +86,12 @@ internal class BacktrackWorkerConfig(
     fun withRootPointObserver(observer: (String, LpRootPointObservation) -> Unit): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance,
             numericalLp, optimalityGap, observer)
+
+    fun withoutAutomaticSparseTrial(): BacktrackWorkerConfig {
+        val ceiling = LpConfig(LpEmphasis.AGGRESSIVE, mapOf(LpTechnique.AUTOMATIC_SPARSE to false))
+        return BacktrackWorkerConfig(recipe.capLp(ceiling), zeroObjectivePricing, toleranceCheck, coreRefinement,
+            onLpQuery, onGuidance, numericalLp, optimalityGap, onRootPoint)
+    }
 
     fun withSessionObserver(observer: (String, PropagationSession) -> Unit): BacktrackWorkerConfig {
         fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {

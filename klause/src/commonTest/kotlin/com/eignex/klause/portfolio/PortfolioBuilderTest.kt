@@ -22,6 +22,7 @@ import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.VariableSelection
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.LpRootPointStage
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
@@ -607,6 +608,31 @@ class PortfolioBuilderTest {
         } finally {
             workers.forEach { it.close() }
         }
+    }
+
+    @Test
+    fun `only the first curated default LP slot may attempt automatic sparse admission`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(lpCeiling = LpConfig.parse("default,+automatic-sparse"))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val permissions = mutableListOf<Pair<String, Boolean?>>()
+        val factories = PortfolioBuilder.factories(continuous, scenario, objective, null, null, null,
+            ProblemProfile.of(continuous, true), numericalCompletion = false, onRootPoint = { worker, event ->
+                if (event.stage == LpRootPointStage.ADMISSION && event.admission?.sparsePermitted != null) {
+                    permissions.add(worker to event.admission.sparsePermitted)
+                }
+            })
+
+        repeat(2 * factories.size) { index ->
+            val factory = factories[index % factories.size]
+            if (factory.family == ArmFamily.Backtrack) {
+                factory.materialize(index, 0L, null).use { worker ->
+                    worker.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).firstOrNull()
+                }
+            }
+        }
+
+        assertEquals(listOf(true, false), permissions.filter { it.first == "bt/lp-default" }.map { it.second })
+        assertEquals(listOf("bt/lp-default"), permissions.filter { it.second == true }.map { it.first })
     }
 
     @Test

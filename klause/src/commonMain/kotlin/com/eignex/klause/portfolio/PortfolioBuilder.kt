@@ -140,6 +140,10 @@ object PortfolioBuilder {
             clausePeers = (0 until count).count { configs[it % configs.size] is BacktrackWorkerConfig } > 1,
             acceptedIncumbents = acceptedIncumbents,
         )
+        val curatedSparseTrial = scenario.btPool == null && scenario.lpCeiling.permitsAutomaticSparse()
+        val sparseOwner = if (curatedSparseTrial) configs.indexOfFirst {
+            it is BacktrackWorkerConfig && it.label == BacktrackArm.LpDefault.label
+        } else -1
         return configs.mapIndexed { armId, config ->
             val family = when (config) {
                 is BacktrackWorkerConfig, is CoreGuidedWorkerConfig -> ArmFamily.Backtrack
@@ -147,10 +151,15 @@ object PortfolioBuilder {
                 is AlnsWorkerConfig -> ArmFamily.Lns
             }
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
-                val observed = if (config is AlnsWorkerConfig) config.withSharingMemory(
-                    scenario.sharingMemory, scenario.sharingMemoryWork,
-                    scenario.sharingMemoryScratch, scenario.sharingMemoryBytes,
-                ) else config
+                val observed = when {
+                    config is AlnsWorkerConfig -> config.withSharingMemory(
+                        scenario.sharingMemory, scenario.sharingMemoryWork,
+                        scenario.sharingMemoryScratch, scenario.sharingMemoryBytes,
+                    )
+                    config is BacktrackWorkerConfig && curatedSparseTrial &&
+                        (armId != sparseOwner || index != armId) -> config.withoutAutomaticSparseTrial()
+                    else -> config
+                }
                 val admitted = when {
                     config is CoreGuidedWorkerConfig && deferCore ->
                         scenario.diagnosticWorkLimit?.let { config.withWorkLimit(it) } ?: config.withActiveTimeLimit()

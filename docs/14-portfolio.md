@@ -45,6 +45,11 @@ the slots. `bt-arm=X` selects the backtrack recipe; `arms=1` with the `cp` engin
 selects one worker. An explicit pool with one recipe can therefore have several
 private replicas with separate seed offsets.
 
+In a curated finite portfolio, the automatic sparse root trial is eligible in
+the first default LP slot. Replicas and the other workers use their own ordinary
+root plans. This limits repeated numerical preparation on a shared source while
+keeping the per-slot seed, grants and schedule.
+
 `objective-guidance=canonical|functional|geometric` selects local-search objective
 guidance inside an explicitly selected recipe pool (`arm`, a named `strategy`, or LS
 axis edits); it cannot construct an automatic pool. A comma-separated list expands
