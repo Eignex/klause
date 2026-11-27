@@ -28,6 +28,7 @@ class LinearResidualCompletionTest {
         }
         val costs = List(variables) { BigFraction.ONE }
         var floating = false
+        var pendingCursor = false
         var spent = 0L
         val context = LpSolveContext(onQuery = { floating = true })
         val budget = SourceLpBudget(maxOperations = 1, solveContext = { context })
@@ -42,17 +43,22 @@ class LinearResidualCompletionTest {
                 spent += units
                 floating = false
             }
+            if (stage == "PrimalRecoverySparseCursorPendingAtExit") pendingCursor = true
         }
 
         val point = LinearResidualCompletion(budget, SparseSourceLpPolicy(quantum = 128L),
             retainPreparation = true, remainingOfferWork = { (128L - spent).coerceAtLeast(0L) }).use { completion ->
             (1..32).firstNotNullOfOrNull {
                 spent = 0L
+                floating = pendingCursor
+                pendingCursor = false
                 completion.complete(rows, variables, stop, observe, costs, small = { null })
             }
         }
 
-        assertTrue(assertNotNull(point, observations.toString()).satisfiesSourceRows(rows))
+        val checked = assertNotNull(point, observations.toString())
+        assertTrue(checked.satisfiesSourceRows(rows))
+        assertEquals(BigFraction.ofLong(6L), checked.fold(BigFraction.ZERO) { sum, value -> sum + value })
         assertEquals(1, budget.operations)
         assertEquals(1L, observations["PrimalRecoverySparseCursorNotPendingAtEntry"])
         assertTrue((observations["PrimalRecoverySparseCursorResumed"] ?: 0L) > 0L)

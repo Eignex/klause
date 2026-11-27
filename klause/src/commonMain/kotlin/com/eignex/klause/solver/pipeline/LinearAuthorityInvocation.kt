@@ -358,7 +358,7 @@ internal class LinearAuthorityInvocation(
 
     private fun remainingProximityOfferWork(): Long {
         val nodes = (endWork - work).coerceAtLeast(0L)
-        if (nodes >= Long.MAX_VALUE / LP_WORK_PER_NODE) return Long.MAX_VALUE
+        if (nodes > Long.MAX_VALUE / LP_WORK_PER_NODE) return Long.MAX_VALUE
         return (nodes * LP_WORK_PER_NODE - funding.spent % LP_WORK_PER_NODE).coerceAtLeast(0L)
     }
 

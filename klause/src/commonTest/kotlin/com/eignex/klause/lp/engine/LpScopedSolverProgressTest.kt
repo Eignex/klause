@@ -8,9 +8,49 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpScopedSolverProgressTest {
+    @Test
+    fun `failed floating advances should retain deferred work`() {
+        val failure = IllegalStateException("advance failed")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
+                    iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    override var currentWork = 0L
+                        private set
+                    override val lastMetrics: LpSolveMetrics
+                        get() = if (currentWork > 0L) LpSolveMetrics(workOps = currentWork) else delegate.lastMetrics
+
+                    override fun openSolve(allowance: LpFloatAllowance?, retainFundingStop: Boolean) =
+                        LpSolveCursor<FloatLpResult?> {
+                            currentWork = 19L
+                            throw failure
+                        }
+                }
+            }
+        }
+        LpScopedSolver(LpExactState(scopedLowerBoundModel()), context = LpSolveContext(factory),
+            deferFloatWorkAccounting = true).use { owner ->
+            val thrown = assertFailsWith<IllegalStateException> {
+                owner.advanceFloat(100L, LpFloatAllowance(100_000L, 100), retainFundingStop = true)
+            }
+            assertSame(failure, thrown)
+            assertEquals(19L, owner.lastMetrics.workOps)
+        }
+    }
+
     @Test
     fun `floating query capture should retain adopted bounds and numerical limits`() {
         var observed: LpQueryObservation? = null

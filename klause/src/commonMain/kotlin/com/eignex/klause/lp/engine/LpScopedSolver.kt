@@ -458,7 +458,7 @@ internal class LpScopedSolver(
         }
         val current = requireNotNull(solver)
         if (current !is ResumableLpSolver) {
-            val grant = minOf(quantum, allowance.work, remainingOfferWork?.invoke() ?: quantum)
+            val grant = floatGrant(minOf(quantum, allowance.work), remainingOfferWork, token)
             return if (grant > 0L) solveFloat(token = token, allowance = allowance.copy(work = grant)) else null
         }
         var pending = pendingFloat
@@ -476,7 +476,7 @@ internal class LpScopedSolver(
                 return null
             }
         }
-        val grant = minOf(quantum, remainingOfferWork?.invoke() ?: quantum)
+        val grant = floatGrant(quantum, remainingOfferWork, token)
         if (grant <= 0L) return null
         if (pending == null) {
             observeFloatQuery(current, current === previous, allowance, token,
@@ -488,12 +488,19 @@ internal class LpScopedSolver(
             val step = try {
                 advancingFloat = true
                 pending.cursor.advance(grant)
+            } catch (primary: Throwable) {
+                if (floatWorkMeter != null) {
+                    try {
+                        recordFloatStep(current, pending)
+                    } catch (accountingFailure: Throwable) {
+                        if (accountingFailure !== primary) primary.addSuppressed(accountingFailure)
+                    }
+                }
+                throw primary
             } finally {
                 advancingFloat = false
             }
-            val actual = current.lastMetrics
-            lastMetrics = actual - pending.reported
-            pending.reported = actual
+            recordFloatStep(current, pending)
             if (step is LpSolveStep.Paused) {
                 lastFloatTermination = current.lastTermination
                 if (token() || cancellation()) discardFloatProgress()
@@ -516,6 +523,18 @@ internal class LpScopedSolver(
             }
             throw primary
         }
+    }
+
+    private fun floatGrant(quantum: Long, remainingOfferWork: (() -> Long)?, token: ExecutionControl): Long {
+        val grant = minOf(quantum, remainingOfferWork?.invoke() ?: quantum)
+        check(grant > 0L || token()) { "A zero floating work grant requires a stopped offer" }
+        return grant
+    }
+
+    private fun recordFloatStep(current: RetainedLpSolver, pending: PendingFloat) {
+        val actual = current.lastMetrics
+        lastMetrics = actual - pending.reported
+        pending.reported = actual
     }
 
     private fun observeFloatQuery(
