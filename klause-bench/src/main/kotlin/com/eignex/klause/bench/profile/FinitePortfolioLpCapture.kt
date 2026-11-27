@@ -1169,7 +1169,9 @@ internal object FinitePortfolioLpCapture {
                             require(priorSharedBound == null)
                         } else {
                             require(paused == null)
-                            require(priorSharedBound == null || (priorSharedBound.isFinite() && priorSharedBound < bound))
+                            require(
+                                priorSharedBound == null || (priorSharedBound.isFinite() && priorSharedBound < bound),
+                            )
                         }
                     }
                     records.add(RootPointRecord(worker, index, source, objective, pointObjective, model,
