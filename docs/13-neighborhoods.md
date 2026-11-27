@@ -243,8 +243,12 @@ windows carry no proof authority.
 
 Finite numerical companions of a linear source use `JointLinearRepair` with the
 same retained neighborhood driver. A source LP point guides the initial integer
-rounding and orders fractional seed coordinates. Joint root preparation requests
-point guidance without retaining an uncut proof bound. With enabled incumbent completion,
+rounding and orders fractional seed coordinates. Joint root preparation consumes
+point guidance. Proving traversal retains the uncut proof bound. With point selection
+and aggregation, a joint owner can borrow the proof worker's paid root point for the
+same source context. The point must cover every integer coordinate and carries no
+proof authority. Local preparation supplies guidance when no compatible point is
+available. With enabled incumbent completion,
 a checked external center supplies initial integer coordinates and the first
 connected neighborhood without a root relaxation. An unavailable center retains
 root guidance. Preparation checks spend the same cumulative LP funding as repair;

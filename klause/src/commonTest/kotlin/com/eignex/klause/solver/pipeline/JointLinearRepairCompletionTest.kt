@@ -536,6 +536,29 @@ class JointLinearRepairCompletionTest : RuntimeInitializedTest() {
     }
 
     @Test
+    fun `matching paid root coordinates should remove the joint root query`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val funding = SourceLpFunding(10_000, 10_000).also { it.grant(10_000) }
+        val guidance = LinearRepairGuidance()
+        assertTrue(guidance.remember(source, mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to 1.0),
+            SourceLpBudget(funding = funding), ExecutionControl.Never))
+        val repair = JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true,
+            repairGuidance = guidance)
+
+        repair.search(adaptive = false).use { search ->
+            search.advance(ExecutionControl.Never, 1)
+
+            val stages = assertNotNull(repair.stats.smt.completeSearchStages)
+            assertEquals(1L, stages["jointRepairSharedRootGuidance"])
+            assertEquals(0L, stages["jointRepairRootQueries"] ?: 0L)
+        }
+    }
+
+    @Test
     fun `root guidance should spend no work on an uncut proof baseline`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
             factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1)))

@@ -27,6 +27,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
@@ -472,6 +473,7 @@ internal class JointLinearRepair(
             }
         }
         if (rootPoint == null) {
+            if (!rootStarted && completion == null && borrowRootPoint(cancellation)) return true
             funding.grant(20_000_000L)
             requestIncumbentPreparation()
             if (!rootStarted && completion != null) {
@@ -504,15 +506,36 @@ internal class JointLinearRepair(
                 return false
             }
             if (stop()) return false
-            val guidance = result.advisoryPoint ?: result.relaxedPoint
-            rootPoint = guidance
-            requireNotNull(selection).guide(guidance)
-            stages["jointRepairGuidedIntegers"] = guidance.keys.count {
-                it.kind == SourceCoordinate.Kind.Integer
-            }.toLong()
-            if (guidance.isEmpty()) observe("jointRepairRootGuidanceUnavailable")
+            retainRootPoint(result.advisoryPoint ?: result.relaxedPoint)
         }
         return true
+    }
+
+    private fun borrowRootPoint(cancellation: ExecutionControl): Boolean {
+        val hint = repairGuidance?.find(source) ?: return false
+        val integers = model.numIntVars
+        if (integers == 0 || integers > hint.point.size) return false
+        val work = 1L + 32L * integers + hint.point.size
+        val bytes = 64L + 16L * integers
+        if (funding.remainingWork <= work || funding.remainingAllocation <= bytes) return false
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        for (id in 0 until integers) {
+            if (cancellation.pollStop() || hint.integer(id) == null) return false
+        }
+        if (stop() || cancellation() || funding.exhausted) return false
+        retainRootPoint(hint.point)
+        observe("jointRepairSharedRootGuidance")
+        return true
+    }
+
+    private fun retainRootPoint(guidance: Map<SourceCoordinate, Double>) {
+        rootPoint = guidance
+        requireNotNull(selection).guide(guidance)
+        stages["jointRepairGuidedIntegers"] = guidance.keys.count {
+            it.kind == SourceCoordinate.Kind.Integer
+        }.toLong()
+        if (guidance.isEmpty()) observe("jointRepairRootGuidanceUnavailable")
     }
 
     private fun center(index: Int): BigFraction? {

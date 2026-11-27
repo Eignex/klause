@@ -106,7 +106,8 @@ internal class FiniteNumericalCompanions private constructor(
         private set
     private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
         LinearIncumbentSharing() else null
-    private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
+    private val repairGuidance = if (completionSharing != null ||
+        (params.sourceCuts && params.sourcePointCuts && params.sourceAggregateCuts)) LinearRepairGuidance() else null
     private var cutPool: SharedClausePool? = null
     private var cutOrigin = -1
 

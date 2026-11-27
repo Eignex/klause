@@ -4,22 +4,30 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.ExecutionControl
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
+@OptIn(ExperimentalAtomicApi::class)
 internal class LinearRepairGuidance : AutoCloseable {
     class Hint internal constructor(
         private val source: SourceProofContext,
-        private val point: Map<SourceCoordinate, Double>,
+        internal val point: Map<SourceCoordinate, Double>,
     ) {
         fun matches(context: SourceProofContext): Boolean = source === context
         fun integer(id: Int): Double? = point[SourceCoordinate(SourceCoordinate.Kind.Integer, id)]
     }
 
-    private var hint: Hint? = null
-    private var closed = false
+    private sealed interface State {
+        data object Empty : State
+        class Available(val hint: Hint) : State
+        data object Closed : State
+    }
+
+    private val state = AtomicReference<State>(State.Empty)
 
     fun remember(source: SourceProofContext, point: Map<SourceCoordinate, Double>,
         budget: SourceLpBudget, token: ExecutionControl): Boolean {
-        if (closed || hint != null || point.isEmpty() || point.size > MAX_COLUMNS ||
+        if (state.load() != State.Empty || point.isEmpty() || point.size > MAX_COLUMNS ||
             source.coordinateCount > MAX_COLUMNS || token()) return false
         val funding = budget.funding ?: return false
         val work = 1L + 2L * point.size + source.coordinateCount
@@ -34,15 +42,14 @@ internal class LinearRepairGuidance : AutoCloseable {
             copy[coordinate] = value
         }
         if (token()) return false
-        hint = Hint(source, copy)
-        return true
+        return state.compareAndSet(State.Empty, State.Available(Hint(source, copy)))
     }
 
-    fun find(source: SourceProofContext): Hint? = hint?.takeIf { !closed && it.matches(source) }
+    fun find(source: SourceProofContext): Hint? =
+        (state.load() as? State.Available)?.hint?.takeIf { it.matches(source) }
 
     override fun close() {
-        closed = true
-        hint = null
+        state.store(State.Closed)
     }
 
     companion object {

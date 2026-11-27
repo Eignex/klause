@@ -88,6 +88,22 @@ class LinearRepairGuidanceTest {
     }
 
     @Test
+    fun `retirement during capture should refuse late guidance publication`() {
+        val funding = SourceLpFunding(10_000, 10_000).also { it.grant(10_000) }
+        val budget = SourceLpBudget(funding = funding)
+        val guidance = LinearRepairGuidance()
+        val token = ExecutionControl {
+            guidance.close()
+            false
+        }
+
+        val retained = guidance.remember(source, mapOf(integer to 0.5), budget, token)
+
+        assertFalse(retained)
+        assertNull(guidance.find(source))
+    }
+
+    @Test
     fun `closing guidance should release the point and refuse later publication`() {
         val funding = SourceLpFunding(1000, 1000).also { it.grant(1000) }
         val budget = SourceLpBudget(funding = funding)
