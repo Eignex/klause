@@ -21,7 +21,6 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
-import com.eignex.util.numbers.div
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -44,7 +43,7 @@ class JointLinearRepairResultTest {
             revision = SourceRevision("envelope", "absolute-tolerance-envelope-v1")))
         val pins = mapOf(0 to BigFraction.ONE)
         val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
-        val expected = BigFraction.ONE / BigFraction.ofLong(4)
+        val expected = BigFraction.ofLong(4).reciprocal()
 
         JointLinearRepair(nominal, source, objective, TheoryParams(sourceCuts = false),
             incumbentCompletionCheck = { sample, value, _ ->

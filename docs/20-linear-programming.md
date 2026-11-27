@@ -519,9 +519,9 @@ independent proof validation. Exact source requests retain their original model.
 
 A joint repair with nominal publication recovery may fix an accepted-envelope
 candidate's binary values and complete its real coordinates in a separate nominal
-context. It spends the remaining joint funding and publication lifetime, verifies
-the same original objective and publication check, and applies the receiving
-cutoff before offering the recovered assignment.
+context. The worker can request this once within its remaining funding and
+publication lifetime. Recovery verifies the original objective and publication
+check and applies the receiving cutoff before offering the assignment.
 
 Point selection admits at most eight mutually nonparallel additional checked cuts per
 usable point and waits for its completed query before scanning again. A mixed ordinary recipe with

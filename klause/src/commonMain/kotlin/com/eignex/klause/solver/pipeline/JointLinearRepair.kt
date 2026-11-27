@@ -656,7 +656,7 @@ internal class JointLinearRepair(
         val original = incumbentCompletionCheck ?: return null
         if (nominalPublicationTried || verification() || funding.exhausted) return null
         nominalPublicationTried = true
-        observe("jointRepairNominalPublicationAttempts")
+        observe("jointRepairNominalPublicationRequests")
         val work = funding.spent
         val allocation = funding.allocated
         val previousGrant = funding.availableWork
