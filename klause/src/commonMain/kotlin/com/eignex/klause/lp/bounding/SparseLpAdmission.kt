@@ -18,6 +18,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
+import com.eignex.klause.lp.relaxation.LpSparseRootLayout
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -79,6 +80,17 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         return decline("Shape")
     }
     if (cancellation()) return decline("Cancelled")
+    val cache = if (automatic && sourcePreparation == LpSourcePreparation.ADMITTED && objective != null)
+        (problem as? BakedProblem)?.factorProjections?.lpPreparation else null
+    if (objective != null) {
+        cache?.reusableSparseRoot(problem, objective, preparationAllowance, queryWorkAllowance)?.let {
+            if (cancellation()) return decline("Cancelled")
+            return SparseLpAdmission(it.metrics + mapOf(
+                "PreparationWork" to 1L, "ReusedPreparationWork" to it.preparationWork,
+                "QueryWorkAllowance" to queryWorkAllowance,
+            ), it.relaxation)
+        }
+    }
     val optimisticPassWork = sparsePassWork(rows, columns, 0L, 0L)
     if (automatic && optimisticPassWork > queryWorkAllowance) {
         return SparseLpAdmission(decline("QueryWork").metrics + mapOf(
@@ -136,7 +148,13 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         !model.hasContinuous && relaxation.colVarId.all { it >= 0 } &&
         model.extent() * LpNodeOverhead.BUILD <= assemblyWork
     if (cancellation()) return decline("Cancelled")
-    return if (reusable) SparseLpAdmission(estimate.metrics, relaxation) else estimate
+    if (!reusable) return estimate
+    if (cache != null && objective != null) {
+        val sourceWork = assemblyWork + sparsePassWork(rows, columns, entries, sourceFillRisk)
+        cache.retainSparseRoot(LpSparseRootLayout(problem, objective, relaxation, estimate.metrics, assemblyWork,
+            maxOf(sourceWork, estimate.metrics.getValue("EstimatedProbeTotalWork"))))
+    }
+    return SparseLpAdmission(estimate.metrics, relaxation)
 }
 
 // Reserve capped factor storage, CSC, exact authority, temporary maps, transforms and scratch.

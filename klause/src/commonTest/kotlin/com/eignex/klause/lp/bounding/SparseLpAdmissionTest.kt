@@ -44,10 +44,59 @@ import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `automatic sparse preparation shares the paid layout for the same source and objective`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val admissions = ArrayList<SparseLpAdmission>()
+
+        sequence<Unit> {
+            repeat(2) { admissions += prepareSparseLpAdmission(problem, objective, automatic = true) }
+        }.forEach { }
+
+        assertSame(requireNotNull(admissions[0].sourceLayout), admissions[1].sourceLayout)
+        assertEquals(admissions[0].work, admissions[1].metrics["ReusedPreparationWork"])
+        assertEquals(1L, admissions[1].work)
+    }
+
+    @Test
+    fun `automatic sparse reuse requires the current query grant to fund the forecast`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val admissions = ArrayList<SparseLpAdmission>()
+
+        sequence<Unit> {
+            val first = prepareSparseLpAdmission(problem, objective, automatic = true)
+            admissions += prepareSparseLpAdmission(problem, objective, automatic = true,
+                queryWorkAllowance = first.metrics.getValue("EstimatedProbeTotalWork") - 1L)
+        }.forEach { }
+
+        assertEquals(1L, admissions.single().metrics["DeclineQueryWork"])
+    }
+
+    @Test
+    fun `automatic sparse preparation keeps layouts for different objectives distinct`() {
+        val source = boundedLpEngineProblem()
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objectives = listOf(LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L)),
+            LinearObjective(intCoefficients = longArrayOf(3L, 2L, 1L)))
+        val admissions = ArrayList<SparseLpAdmission>()
+
+        sequence<Unit> {
+            for (objective in objectives) admissions += prepareSparseLpAdmission(problem, objective, automatic = true)
+        }.forEach { }
+
+        assertNotSame(requireNotNull(admissions[0].sourceLayout), requireNotNull(admissions[1].sourceLayout))
+    }
+
     @Test
     fun `unaffordable automatic forecast should stop before inspecting every source row`() {
         val width = 32

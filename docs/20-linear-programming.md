@@ -393,6 +393,11 @@ guards inside the LP owner under the existing root and solve allowances. A scan
 can decline once its nonzero and fill counts exceed the funded pass forecast. The
 diagnostic observer records completed admission decisions and their evaluated
 guards, including preparation and query allowances at the producer and helper.
+Automatic workers on the same baked source can reuse one admitted compact layout
+from the source preparation cache. Reuse requires the identical source and
+objective and sufficient preparation and query grants for the original forecast.
+The layout carries no mutable numerical owner. Each worker installs its own root
+state and pays for its own numerical preparation and queries.
 Root point events identify the original owner, model and point through queries,
 retention and search consultations. A consultation supplies ordering guidance.
 The automatic root experiment can hand a complete point from the same source
