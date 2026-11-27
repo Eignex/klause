@@ -11,6 +11,7 @@ import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.linearCoordinatesSupported
 import com.eignex.klause.lp.optimization.recoverLinearPrimal
 import com.eignex.klause.lp.optimization.withLinearAuthority
+import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -37,6 +38,7 @@ internal class LinearIncumbentCompletion(
 ) : AutoCloseable {
     private class Attempt(val key: LinearIncumbentSharing.Key, ownedSeed: Boolean) {
         var query: LinearAuthorityQuery? = null
+        var reusedRows: List<ExactRationalInequality>? = null
         var point: List<BigFraction>? = null
         var pointPreparation: ArrayList<BigFraction>? = null
         val progress = LinearPrimalRecoveryProgress(retainPreparation = ownedSeed)
@@ -112,7 +114,10 @@ internal class LinearIncumbentCompletion(
             if (ownedSeed && attempt.query == null) {
                 attempt.query = prepared
                 observe("QueryRetained", 1L)
-                if (prepared === reusable) observe("QueryReused", 1L)
+                if (prepared === reusable) {
+                    attempt.reusedRows = prepared.completionRows()
+                    observe("QueryReused", 1L)
+                }
             }
             val point = seedPoint(prepared, seed, token, attempt.takeIf { ownedSeed })
             if (point == null) {
@@ -124,8 +129,9 @@ internal class LinearIncumbentCompletion(
             attempt.pointPreparation = null
         }
         val query = requireNotNull(attempt.query)
-        val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), query.rows,
-            query.inactive, token, complete = recovery@{ rows, columns, active ->
+        val reusedRows = attempt.reusedRows
+        val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), reusedRows ?: query.rows,
+            if (reusedRows == null) query.inactive else emptySet(), token, complete = recovery@{ rows, columns, active ->
                 val allocation = 32L * columns.size
                 if (active() || budget.funding?.remainingAllocation?.let { allocation > it } == true) {
                     return@recovery null
@@ -384,6 +390,7 @@ internal class LinearIncumbentCompletion(
         attempt.checked = point
         attempt.finished = true
         attempt.query = null
+        attempt.reusedRows = null
         attempt.point = null
         attempt.pointPreparation = null
         attempt.progress.completed.clear()

@@ -35,6 +35,8 @@ internal class LinearAuthorityQuery private constructor(
     val installedCuts: Set<Int>,
     val cutFamilies: Map<Int, CutFamily>,
     val retainMaskedCuts: Boolean,
+    private val unconditionalPremises: Boolean,
+    private val supplementalRows: IntRange,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -43,7 +45,19 @@ internal class LinearAuthorityQuery private constructor(
 
     // Recovery fixes the seed integers itself. Guarded rows could change under those pins.
     fun canReuseForCompletion(receiving: SourceProofContext): Boolean =
-        source === receiving && unconditionalRows && inactive.isEmpty() && activeCuts == 0
+        source === receiving && unconditionalPremises
+
+    fun completionRows(): List<ExactRationalInequality> {
+        check(unconditionalPremises)
+        if (supplementalRows.isEmpty()) return rows
+        val omitted = supplementalRows.last - supplementalRows.first + 1
+        return object : AbstractList<ExactRationalInequality>() {
+            override val size: Int get() = rows.size - omitted
+
+            override fun get(index: Int): ExactRationalInequality =
+                rows[if (index < supplementalRows.first) index else index + omitted]
+        }
+    }
 
     fun matches(
         other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null,
@@ -89,6 +103,7 @@ internal class LinearAuthorityQuery private constructor(
                     cited += premise.inequality to SourceDerivation.Premise(id)
                 }
             }
+            val premiseEnd = cited.size
             var activeCuts = 0
             var activeMixedCuts = 0
             var cutVerificationWork = 0L
@@ -134,6 +149,7 @@ internal class LinearAuthorityQuery private constructor(
                 val claim = evidence.claim as SourceClaim.Consequence
                 cited += claim.inequality to SourceDerivation.Import(evidence)
             }
+            val supplementalRows = premiseEnd until cited.size
             val condition = source.scope.condition
             for (row in condition.integerRows) {
                 if (cancellation()) return null
@@ -157,7 +173,7 @@ internal class LinearAuthorityQuery private constructor(
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
                 cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
                 accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
-                cutFamilies.toMap(), retainMaskedCuts)
+                cutFamilies.toMap(), retainMaskedCuts, unconditional, supplementalRows)
         }
     }
 }
