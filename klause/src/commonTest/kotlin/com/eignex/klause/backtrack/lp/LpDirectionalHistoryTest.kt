@@ -69,14 +69,19 @@ class LpDirectionalHistoryTest {
         val history = LpDirectionalHistory(events::add, depthRetention = true)
         for (index in 127 downTo 0) {
             val variable = if (index and 1 == 1) VarRef.Bool(index / 2) else VarRef.IntVar(index / 2)
-            history.beginNode(0)
-            history.record(0.0)
-            history.branch(variable, 0.5)
-            history.commit(if (variable is VarRef.Bool) SearchDecision.Bool((variable.varId shl 1) or 1)
-            else SearchDecision.IntAtMost(variable.varId, 0L), 1)
-            history.beginNode(1)
-            history.record(1.0)
-            history.finishNode(true)
+            for (up in listOf(false, true)) {
+                history.beginNode(0)
+                history.record(0.0)
+                history.branch(variable, 0.5)
+                val decision = if (variable is VarRef.Bool) {
+                    SearchDecision.Bool((variable.varId shl 1) or if (up) 0 else 1)
+                } else if (up) SearchDecision.IntAtLeast(variable.varId, 1L)
+                else SearchDecision.IntAtMost(variable.varId, 0L)
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.record(if (up) 3.0 else 1.0)
+                history.finishNode(true)
+            }
         }
         for (variable in listOf(VarRef.Bool(0), VarRef.IntVar(0), VarRef.Bool(64))) {
             repeat(2) {
@@ -123,6 +128,60 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
+    fun `depth retention allocates only after fresh opposite numeric support at the same depth`() {
+        for ((level, age, admits) in listOf(Triple(0, 0, true), Triple(1, 0, false), Triple(0, 257, false))) {
+            val events = ArrayList<String>()
+            val history = LpDirectionalHistory(events::add, depthRetention = true)
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(SearchDecision.Bool(1), 1)
+            history.beginNode(1)
+            history.record(1.0)
+            history.finishNode(true)
+            assertFalse("DEPTH_RETENTION_CONTEXT_RETAINED" in events)
+            repeat(age) { history.beginNode(0) }
+            history.beginNode(level)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(SearchDecision.Bool(0), level + 1)
+            history.beginNode(level + 1)
+
+            history.record(3.0)
+
+            assertEquals(admits, "DEPTH_RETENTION_CONTEXT_RETAINED" in events, "$level/$age")
+        }
+    }
+
+    @Test
+    fun `late depth admission uses earlier outcomes and needs distinct directional gains`() {
+        val history = LpDirectionalHistory({}, depthRetention = true)
+        val variable = VarRef.Bool(0)
+        fun child(up: Boolean, objective: Double, outcome: Boolean?) {
+            history.beginNode(0)
+            history.record(0.0)
+            history.branch(variable, 0.5)
+            history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+            history.beginNode(1)
+            history.record(objective)
+            history.finishNode(outcome)
+        }
+        repeat(2) { child(up = false, objective = 1.0, outcome = true) }
+        child(up = true, objective = 3.0, outcome = true)
+        child(up = true, objective = Double.NaN, outcome = true)
+        history.beginNode(0)
+        history.record(0.0)
+
+        assertNull(history.depthPreference(variable, 0.5, 10.0) { true })
+        child(up = true, objective = 3.0, outcome = null)
+        history.beginNode(0)
+        history.record(0.0)
+
+        assertEquals(false, history.depthPreference(variable, 0.5, 10.0) { true })
+    }
+
+    @Test
     fun `depth retention validates allocation publication and lookup after charged invalidation`() {
         for (action in listOf("numeric-reset", "numeric-cancel", "outcome-reset", "outcome-cancel",
             "lookup-reset", "lookup-cancel", "allocation-reset", "node-change")) {
@@ -163,11 +222,21 @@ class LpDirectionalHistoryTest {
                 armed = true
                 assertNull(history.depthPreference(variable, 0.5, 10.0) { current })
             } else {
-                history.beginNode(1)
+                val level = if (action == "allocation-reset") 1 else 0
+                if (level == 1) {
+                    history.beginNode(level)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(0), level + 1)
+                    history.beginNode(level + 1)
+                    history.record(3.0)
+                    history.finishNode(true)
+                }
+                history.beginNode(level)
                 history.record(0.0)
                 history.branch(variable, 0.5)
-                history.commit(SearchDecision.Bool(1), 2)
-                history.beginNode(2)
+                history.commit(SearchDecision.Bool(1), level + 1)
+                history.beginNode(level + 1)
                 armed = true
                 history.record(if (action.startsWith("outcome")) Double.NaN else 1.0)
                 history.finishNode(true) { current }
