@@ -51,6 +51,35 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
     )
 
     @Test
+    fun `a checked root incumbent should survive a stop in numerical observation`() {
+        val source = SourceProofContext(scope, setOf(integer), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(integer to BigFraction.ONE))
+        for (timeout in listOf(false, true)) {
+            var observations = 0
+            val stop = ExecutionControl { observations > 0 }
+            val params = TheoryParams(sourceCuts = false,
+                timeout = if (timeout) stop else ExecutionControl.Never,
+                cancellation = if (timeout) ExecutionControl.Never else stop)
+
+            val result = LinearAuthorityInvocation(source, params, boundOrdered = true,
+                onNumericalFeedback = {
+                    observations++
+                }).use { it.run { _, _ -> } }
+
+            val sample = assertNotNull(result.incumbent)
+            assertEquals(1, observations)
+            assertEquals(if (timeout) TerminationReason.Timeout else TerminationReason.Cancelled, result.reason)
+            assertEquals(1L, sample.intValue(0))
+            assertEquals(BigFraction.ONE, result.value)
+            assertNull(result.terminal)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+        }
+    }
+
+    @Test
     fun `a private numerical pause should retain completion eligibility at the final admission`() {
         val source = SourceProofContext(scope, setOf(integer, real), mapOf(
             "sum" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE,

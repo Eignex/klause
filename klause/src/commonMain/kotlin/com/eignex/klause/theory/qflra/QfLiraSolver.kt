@@ -1358,11 +1358,13 @@ class ExactLiraSearchComponent private constructor(
         } else
             null
         val refreshRoot = rootFixings != null && rootFixings != assertedRootFixings
-        val selected = sourceRowsToAssert(refreshRoot) ?: return false
+        val selected = if (incrementalSourceRows) sourceRowsToAssert(refreshRoot) ?: return false else null
+        val rowCount = selected?.size ?: preparedRows.size
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         val comparisons = ArrayList<PremisedSmtComparison>()
-        val indices = ArrayList<Int>()
-        for (index in selected) {
+        val indices = IntArrayList()
+        for (position in 0 until rowCount) {
+            val index = selected?.get(position) ?: position
             if (incrementalSourceRows) operationAccounting?.charge(1)
             if (lpStop.poll()) return false
             sourceRowVisits++
@@ -1387,7 +1389,7 @@ class ExactLiraSearchComponent private constructor(
                 disequalities += Triple(address, comparison, premise)
             } else {
                 comparisons += PremisedSmtComparison(comparison, premise)
-                indices += index
+                indices.add(index)
             }
         }
         if (!system.assertComparisons(comparisons, lpStop) { index ->
@@ -1410,7 +1412,7 @@ class ExactLiraSearchComponent private constructor(
             is LpBoundBatchResult.Applied -> Unit
         }
         if (!assertDisequalities(disequalities)) return false
-        if (incrementalSourceRows) pendingSourceRows.removeAll(selected.toSet())
+        if (incrementalSourceRows) pendingSourceRows.clear()
         // Fixings discovered by this pass must trigger substitution in a later pass.
         if (rootFixings != null) assertedRootFixings = rootFixings
         nodesByLevel.put(context.decisionLevel, node)
@@ -1434,8 +1436,7 @@ class ExactLiraSearchComponent private constructor(
         return fixed
     }
 
-    private fun sourceRowsToAssert(refreshRoot: Boolean): Iterable<Int>? {
-        if (!incrementalSourceRows) return preparedRows.indices
+    private fun sourceRowsToAssert(refreshRoot: Boolean): IntArray? {
         if (sourceRowsByBoolean == null) {
             val dependencies = LinkedHashMap<Int, MutableList<Int>>()
             val recurring = ArrayList<Int>()
@@ -1469,7 +1470,7 @@ class ExactLiraSearchComponent private constructor(
         val count = if (refreshRoot) preparedRows.size else pendingSourceRows.size
         operationAccounting?.charge(count.toLong() * (1L + Int.SIZE_BITS - count.countLeadingZeroBits()))
         if (lpStop.poll()) return null
-        return if (refreshRoot) preparedRows.indices.toList() else pendingSourceRows.sorted()
+        return if (refreshRoot) IntArray(preparedRows.size) { it } else pendingSourceRows.toIntArray().apply { sort() }
     }
 
     private fun assertDisequalities(

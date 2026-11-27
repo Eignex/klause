@@ -467,6 +467,16 @@ the original row count, and root and node separation keep their round, depth, po
 and work allowances. The [portfolio](15-portfolio-scheduling.md#roles-and-the-mixed-roster)
 decides when the aggressive LP emphasis is seated.
 
+Source maps capture caller collections; derivatives share unchanged private definitions,
+capture changed facts and parent rows, and expose independent collection copies.
+Immutable column bindings retain their exact source expressions. CP bound refreshes
+capture integer endpoints and Boolean pins in private primitive arrays, including
+variables absent from LP columns. Exact endpoint values materialize for requested
+premise checks. LP bounds and auxiliary exclusions remain active facts; fixed-value
+checks combine their directions with the captured CP endpoints. Row-parent and
+premise derivations preserve the capture. A CP refresh replaces it, and an LP-only
+bound refresh clears it.
+
 Cut family identity follows portable proofs and retained rows without contributing
 to proof authority or deduplication. Observations separate construction, mapping
 refusal, admission, selection, tightness, retirement and retraction; a tight or
@@ -693,6 +703,9 @@ capture, and caller snapshots remain independent copies.
 Adjacent states with the same base region and active rows expose their changed
 bound columns through an identity token. This token retains no predecessor state;
 unrelated states require a full check instead of borrowing the delta.
+Bound-only component refreshes retain unchanged row, right-hand-side and objective
+descriptions after checking their base authority. Fresh columns preserve current
+bound strictness and premises, while scope activity changes rebuild the descriptions.
 Exact trail edits do not require a floating projection. An incompatible projection
 retires the floating owner, while crossed sides are certified directly against the
 exact state and acceptance policy. A later projectable state can prepare a fresh owner.

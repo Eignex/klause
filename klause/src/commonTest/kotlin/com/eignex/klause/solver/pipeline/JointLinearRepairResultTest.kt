@@ -295,6 +295,32 @@ class JointLinearRepairResultTest {
     }
 
     @Test
+    fun `a paused root should finish within its admitted LP operation`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val params = TheoryParams(sourceCuts = false, sourceLpOperations = 1, maxFlips = 1)
+
+        JointLinearRepair(model, source, objective, params, SparseSourceLpPolicy(quantum = 1L)).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                assertFalse(search.advance(ExecutionControl.Never, 1))
+                var done = false
+                repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
+
+                assertTrue(done)
+                val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                assertEquals(1L, stages["jointRepairGuidedIntegers"])
+                assertTrue((stages["jointRepairRootConsultations"] ?: 0L) > 1L)
+                assertEquals(1L, repair.stats.smt.sourceLp.operations)
+            }
+        }
+    }
+
+    @Test
     fun `paused guidance should keep its check allowance through incumbent publication`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(

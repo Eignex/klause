@@ -176,7 +176,7 @@ internal class JointLinearRepair(
     private var declined = false
     private var preparationWork = 0L
     val exhausted: Boolean get() = declined || funding.exhausted ||
-        (budget.operations >= params.sourceLpOperations &&
+        (!rootPreparationPending && budget.operations >= params.sourceLpOperations &&
             !(queryProximity && query?.hasPendingProximityCompletion == true)) ||
         (!rootPreparationPending && pending == null && (!state.work.hasAllowance() ||
             state.work.acceptedChecks >= params.maxLeaves))

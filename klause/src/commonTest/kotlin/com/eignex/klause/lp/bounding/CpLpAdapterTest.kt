@@ -27,7 +27,6 @@ import com.eignex.klause.lp.engine.TableauCutProvenance
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.relaxation.LpExplanation
-import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective

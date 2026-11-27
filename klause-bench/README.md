@@ -654,11 +654,12 @@ without lowering a second model in the harness. Comments, strings and quoted sym
 do not declare objectives. In-process consumers parse the model and exact objective
 on first access; CLI parsing and lowering spend the source invocation's allowance.
 `lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
-single-model `BenchCase` templates for DIMACS, WCNF, MPS or OPB. Each template retains its
+single-model `BenchCase` templates for DIMACS, WCNF, MPS, OPB or SMT-LIB. Each template retains its
 packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning
 expands ordinary engine/seed/repeat controls from at most eight templates into at
 most 128 cases without catalog discovery; execution
-verifies both identities and retains failed results. Request source validation with
+verifies both identities and retains failed results. Use cache or temporary staging
+for automatic SMT-LIB model requests. Request source validation with
 `bench.sourceValidation`, and retain full-cost same-machine paired rows for staging
 qualification. The diagnostic prehash uses 8 KiB reads; ordinary identity hashing
 uses 64 KiB reads. Both read the full plain source before the invocation timer, but
