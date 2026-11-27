@@ -39,31 +39,43 @@ private class FixedReconstructionVerifier(
     }
 
     private fun from(value: BigFraction): Frac128 {
-        meter.fraction(value)
-        val numeratorBits = value.num.magnitudeBitLength()
-        val denominatorBits = value.den.magnitudeBitLength()
+        val numeratorBits = meter.integerBits(value.num)
+        val denominatorBits = meter.integerBits(value.den)
         if (numeratorBits > 127 || denominatorBits > 127) throw ReconstructionOverflow()
+        if (ops.overflowed()) throw ReconstructionOverflow()
+        meter.admitFixedBits(maxOf(numeratorBits, denominatorBits))
+        if (denominatorBits == 1 && numeratorBits <= 1) {
+            return when (value.signum()) {
+                -1 -> Frac128.MINUS_ONE
+                1 -> Frac128.ONE
+                else -> Frac128.ZERO
+            }
+        }
         if (numeratorBits <= 63 && denominatorBits <= 63) {
             val numerator = value.num.toLong()
-            return checked(Frac128(if (numerator < 0L) -1L else 0L, numerator, 0L, value.den.toLong()))
+            return Frac128(if (numerator < 0L) -1L else 0L, numerator, 0L, value.den.toLong())
         }
         val magnitude = value.num.abs()
         val low = magnitude.toLong()
         val high = (magnitude shr 64).toLong()
         val negative = value.signum() < 0
-        return checked(
-            Frac128(
-                if (negative) high.inv() + if (low == 0L) 1L else 0L else high,
-                if (negative) -low else low,
-                (value.den shr 64).toLongExact(),
-                value.den.toLong(),
-            ),
+        return Frac128(
+            if (negative) high.inv() + if (low == 0L) 1L else 0L else high,
+            if (negative) -low else low,
+            (value.den shr 64).toLongExact(),
+            value.den.toLong(),
         )
     }
 
     private fun big(value: Frac128): BigFraction {
         val signedLong = (value.nHi == 0L && value.nLo >= 0L) || (value.nHi == -1L && value.nLo < 0L)
-        val fraction = if (signedLong && value.dHi == 0L && value.dLo > 0L) {
+        val fraction = if (signedLong && value.dHi == 0L && value.dLo == 1L) {
+            when (value.nLo) {
+                -1L -> BigFraction.MINUS_ONE
+                1L -> BigFraction.ONE
+                else -> BigFraction.ofLong(value.nLo)
+            }
+        } else if (signedLong && value.dHi == 0L && value.dLo > 0L) {
             BigFraction.of(bigIntOf(value.nLo), bigIntOf(value.dLo))
         } else {
             BigFraction.of(
