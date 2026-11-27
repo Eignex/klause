@@ -31,13 +31,14 @@ internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPr
         if (!initial) state.integerRowPostInitialFires++
         val workBefore = state.work
         val propagationsBefore = state.propagations
+        var consistent = true
         try {
-            val consistent = propagateRow(state)
+            consistent = propagateRow(state)
+            return consistent
+        } finally {
             if (!initial && (!consistent || state.propagations != propagationsBefore)) {
                 state.integerRowPostInitialUsefulFires++
             }
-            return consistent
-        } finally {
             state.integerRowPropagationWork += state.work - workBefore
         }
     }
