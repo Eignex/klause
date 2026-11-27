@@ -919,6 +919,11 @@ internal class JointLinearRepair(
             val separateCuts = boundOrdered && params.sourceCuts
             val advisorySourceRowsOnly = separateCuts && queryProximity && proximityAdvisory != null
             privateQueryReceipt?.advisorySourceRowsOnly = advisorySourceRowsOnly
+            val cuts = separateCuts && !advisorySourceRowsOnly
+            if (queryProximity) {
+                observation?.privateQuery(proposalSequence, observationQuery, source.scope, querySource.scope,
+                    privateCutoff, cuts)
+            }
             query = LinearAuthorityInvocation(querySource,
                 params.copy(sourceIncumbentCompletion = false, sourceRefutationCenterStep = false),
                 external = {
@@ -931,7 +936,7 @@ internal class JointLinearRepair(
                     }
                 }, state = state, borrowedAuthority = authority, borrowedBudget = budget,
                 boundOrdered = boundOrdered, guidance = true, funding = funding,
-                cuts = separateCuts && !advisorySourceRowsOnly,
+                cuts = cuts,
                 onNumericalFeedback = if (refutationGuidance) { feedback ->
                     guideRefutation(captured, querySource, feedback)
                 } else null,

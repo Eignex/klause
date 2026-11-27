@@ -1,11 +1,16 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -14,9 +19,36 @@ import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointRepairObservationTest {
+    @Test
+    fun `conditioned query should retain the actual scope beyond narrow masks`() {
+        val records = mutableListOf<JointRepairObservation>()
+        val capture = JointRepairObservationCapture(
+            SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)), ExecutionControl.Never, records::add)
+        val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, 99)
+        val row = SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ONE)
+        val original = SourceScope(SourceRevision("original", "native"),
+            objective = SourceObjective("original-objective", ObjectiveSense.MINIMIZE))
+        val receiving = original.copy(revision = SourceRevision("private", "native"),
+            objective = SourceObjective("private-objective", ObjectiveSense.MINIMIZE),
+            condition = SourceCondition(lower = mapOf(coordinate to BigFraction.ONE)).integerBound(row))
+
+        capture.privateQuery(4, 7, original, receiving, BigFraction.ofLong(3), false)
+
+        val record = records.single()
+        val scoped = assertNotNull(record.privateQuery)
+        assertEquals(4L, record.proposal)
+        assertEquals(7L, record.query)
+        assertEquals(BigFraction.ofLong(3), record.cutoff)
+        assertEquals(original, scoped.working.scope)
+        assertEquals(receiving, scoped.receiving.scope)
+        assertEquals(setOf(row), scoped.receiving.integerRows)
+        assertFalse(scoped.cuts)
+    }
+
     @Test
     fun `proposal capture should retain exact pins and actual free coordinates`() {
         val funding = SourceLpFunding(1_000_000, 1_000_000)

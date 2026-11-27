@@ -11,6 +11,9 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -27,6 +30,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -407,6 +411,8 @@ internal object FinitePortfolioLpCapture {
                     JsonArray((get(observation, name) as List<*>).map { JsonPrimitive(it as Int) }))
             }
             put("realCentersAuthority", "approximate-guidance")
+            observation.javaClass.methods.singleOrNull { it.name == "getPrivateQuery" }?.invoke(observation)
+                ?.let { put("privateQuery", privateQueryMetadata(it)) }
             call(observation, "getSelection")?.let { selection ->
                 put("selection", buildJsonObject {
                     for (name in listOf("Pass", "RootIndex", "RootCoordinate", "Expanded", "Visits", "Closed",
@@ -429,6 +435,53 @@ internal object FinitePortfolioLpCapture {
             }))
             put("sourceVerdictClaim", false)
         }
+
+    internal fun privateQueryMetadata(query: Any): JsonObject = buildJsonObject {
+        val working = get(query, "Working")
+        val receiving = get(query, "Receiving")
+        val workingScope = get(working, "Scope") as SourceScope
+        val receivingScope = get(receiving, "Scope") as SourceScope
+        put("working", scopeMetadata(working, workingScope))
+        put("receiving", scopeMetadata(receiving, receivingScope))
+        put("cuts", get(query, "Cuts") as Boolean)
+        val prefix = workingScope.objective?.identity?.let { "$it/proximity/" }
+        if (prefix != null) {
+            receivingScope.objective?.identity?.takeIf { it.startsWith(prefix) }?.let {
+                put("proximityObjective", it.removePrefix(prefix))
+            }
+        }
+    }
+
+    private fun scopeMetadata(observed: Any, scope: SourceScope): JsonObject = buildJsonObject {
+        put("revision", scope.revision.identity)
+        put("semantics", scope.revision.semantics)
+        put("objective", scope.objective?.identity)
+        put("sense", scope.objective?.sense?.name)
+        put("bools", buildJsonObject {
+            scope.condition.bools.toSortedMap().forEach { (id, value) -> put(id.toString(), value) }
+        })
+        put("lower", coordinateMetadata(scope.condition.lower))
+        put("upper", coordinateMetadata(scope.condition.upper))
+        val rows = (get(observed, "IntegerRows") as Set<*>).map {
+            val row = it as SourceInequality
+            val encoded = buildJsonObject {
+                put("coefficients", coordinateMetadata(row.coefficients))
+                put("rhs", row.rhs.toString())
+                put("strict", row.strict)
+            }
+            encoded.toString() to encoded
+        }
+        put("integerRows", JsonArray(rows.sortedBy { it.first }.map { it.second }))
+    }
+
+    private fun coordinateMetadata(values: Map<SourceCoordinate, BigFraction>): JsonArray = JsonArray(
+        values.entries.sortedWith(compareBy({ it.key.kind.ordinal }, { it.key.id })).map { (coordinate, value) ->
+            buildJsonObject {
+                put("kind", coordinate.kind.name)
+                put("id", coordinate.id)
+                put("value", value.toString())
+            }
+        })
 
     internal class QueryWindow(private val worker: String, private val captureLimit: Int) {
         private val owners = IdentityHashMap<Any, Int>()

@@ -47,6 +47,7 @@ class SourceCondition(
 ) {
     private var capturedIntegerRows: Set<SourceInequality> = emptySet()
     internal val integerRows: Set<SourceInequality> get() = capturedIntegerRows.toSet()
+    internal val integerRowCount: Int get() = capturedIntegerRows.size
     internal val hasIntegerRows: Boolean get() = capturedIntegerRows.isNotEmpty()
     private val capturedBools = bools.toMap()
     private val capturedLower = lower.toMap()

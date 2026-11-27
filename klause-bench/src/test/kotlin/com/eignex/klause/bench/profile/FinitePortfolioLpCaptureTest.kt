@@ -1,5 +1,17 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceCoordinate
+import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourceObjective
+import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.util.numbers.BigFraction
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
@@ -11,6 +23,37 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FinitePortfolioLpCaptureTest {
+    @Test
+    fun `private scope metadata should retain exact ordered restrictions and portable objective`() {
+        val low = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val high = SourceCoordinate(SourceCoordinate.Kind.Integer, 99)
+        val base = SourceScope(SourceRevision("run-id", "native"),
+            objective = SourceObjective("run-id/objective", ObjectiveSense.MINIMIZE))
+        val receiving = base.copy(
+            objective = SourceObjective("run-id/objective/proximity/010/2/1/3", ObjectiveSense.MINIMIZE),
+            condition = SourceCondition(lower = linkedMapOf(high to BigFraction.ONE, low to BigFraction.ZERO)))
+        val row = SourceInequality(linkedMapOf(high to BigFraction.ONE, low to BigFraction.ONE), BigFraction.ONE)
+        val namespace = "com.eignex.klause.solver.pipeline"
+        val scopeType = Class.forName("$namespace.JointRepairObservedScope")
+        val scope = scopeType.getConstructor(SourceScope::class.java, Set::class.java)
+        val query = Class.forName("$namespace.JointRepairObservedPrivateQuery")
+            .getConstructor(scopeType, scopeType, Boolean::class.java)
+            .newInstance(scope.newInstance(base, emptySet<SourceInequality>()),
+                scope.newInstance(receiving, setOf(row)), false)
+
+        val encoded = FinitePortfolioLpCapture.privateQueryMetadata(query)
+
+        val effective = encoded.getValue("receiving").jsonObject
+        assertEquals("run-id/objective", encoded.getValue("working").jsonObject.getValue("objective")
+            .jsonPrimitive.content)
+        assertEquals("010/2/1/3", encoded.getValue("proximityObjective").jsonPrimitive.content)
+        assertEquals(listOf(2, 99), effective.getValue("lower").jsonArray.map {
+            it.jsonObject.getValue("id").jsonPrimitive.int
+        })
+        assertEquals(listOf(2, 99), effective.getValue("integerRows").jsonArray.single()
+            .jsonObject.getValue("coefficients").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.int })
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["bt/satOptimized", "bt/conflictDriven"])
     fun `unselected callbacks should preserve selected metadata and owner capacity`(worker: String) {

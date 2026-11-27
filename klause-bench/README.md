@@ -111,6 +111,11 @@ completion or change admission, scheduling, companion limits or cutoff accountin
 Observation costs remain in the containing execution and the existing producer grant.
 The joint journal records actual private integer pass centers, root and phase before
 ordinary fallback, including bounded support and the edge at a structural decline.
+The conditioned-query record carries the actual cutoff, cut policy, base working
+and receiving objective identities, and exact restrictions in working coordinate
+order. It also records the proximity center, radius and target as an objective
+suffix free of run-local IDs. Match the record by worker, proposal and query.
+Verify the working coordinate frame before comparing LP work across solves.
 Prepared row ordinals follow non-singleton source-premise rows; columns put integers
 before reals. Real-center values are approximate guidance with an explicit completeness
 flag, so they do not establish a witness or exact mixed-row slack. Selection metadata

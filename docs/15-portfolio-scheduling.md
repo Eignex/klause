@@ -753,7 +753,10 @@ retirement, checked completions, publication checks and the actual width of open
 queries; these counts grant no publication or proof authority.
 An opt-in proposal journal distinguishes ordinary, checked private and advisory
 centers. Private selection records bind an integer pass, aspiration, root coordinate
-and pair or expansion phase before ordinary fallback. Structural declines retain
+and pair or expansion phase before ordinary fallback. A conditioned query record
+binds its proposal and query to the base working and receiving scopes, exact
+cutoff and cut policy. Both scopes retain their objective identities and restrictions.
+Structural declines retain
 bounded partial support, the prepared row and boundary coordinate, and charged visits.
 Integer coordinates come from that pass; available finite real coordinates are
 approximate guidance with an explicit completeness flag. Prepared row ordinals refer

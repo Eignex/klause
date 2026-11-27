@@ -4,7 +4,9 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
+import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceRevision
+import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
@@ -28,6 +30,14 @@ internal data class JointRepairObservedSelection(
     val peer: Int?,
     val sourceRevision: String,
     val sourceSemantics: String,
+)
+
+internal data class JointRepairObservedScope(val scope: SourceScope, val integerRows: Set<SourceInequality>)
+
+internal data class JointRepairObservedPrivateQuery(
+    val working: JointRepairObservedScope,
+    val receiving: JointRepairObservedScope,
+    val cuts: Boolean,
 )
 
 internal data class JointRepairObservation(
@@ -55,6 +65,7 @@ internal data class JointRepairObservation(
     val selection: JointRepairObservedSelection? = null,
     val realCenters: Map<Int, Double> = emptyMap(),
     val realCentersComplete: Boolean? = null,
+    val privateQuery: JointRepairObservedPrivateQuery? = null,
 )
 
 internal class JointRepairObservationCapture(
@@ -246,6 +257,39 @@ internal class JointRepairObservationCapture(
 
     fun event(proposal: Long, query: Long, phase: String, disposition: String) = capture {
         JointRepairObservation(proposal, query, phase, disposition)
+    }
+
+    fun privateQuery(proposal: Long, query: Long, working: SourceScope, receiving: SourceScope,
+        cutoff: BigFraction?, cuts: Boolean) = capture {
+        val workingScope = scoped(working) ?: return@capture null
+        val receivingScope = scoped(receiving) ?: return@capture null
+        if (!scalar(cutoff)) return@capture null
+        JointRepairObservation(proposal, query, "query", "conditioned", cutoff = cutoff,
+            privateQuery = JointRepairObservedPrivateQuery(workingScope, receivingScope, cuts))
+    }
+
+    private fun scoped(scope: SourceScope): JointRepairObservedScope? {
+        val condition = scope.condition
+        val restrictions = condition.coordinateRestrictionCount + condition.integerRowCount
+        if (restrictions > MAX_ENTRIES - entries) {
+            decline = "Entries"
+            return null
+        }
+        val text = scope.revision.identity.length.toLong() + scope.revision.semantics.length +
+            (scope.objective?.identity?.length ?: 0)
+        if (!pay(1L + text + 16L * restrictions, 2L * text + 64L * restrictions)) return null
+        repeat(condition.bools.size) {
+            if (!entry()) return null
+        }
+        for (bounds in listOf(condition.lower, condition.upper)) {
+            for (value in bounds.values) if (!entry() || !scalar(value)) return null
+        }
+        val rows = condition.integerRows
+        for (row in rows) {
+            if (!entry() || !scalar(row.rhs) || !pay(16L * row.supportSize, 64L * row.supportSize) ||
+                !row.forEachCoefficient { _, value -> entry() && scalar(value) }) return null
+        }
+        return JointRepairObservedScope(scope, rows)
     }
 }
 
