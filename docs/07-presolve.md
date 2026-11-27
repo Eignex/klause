@@ -51,6 +51,9 @@ bounded discrete sources with a constant objective. Assembly, component discover
 solving and any ray reconstruction spend the containing allowance. The harvest publishes a refutation
 after checking the reconstructed ray against the parent relaxation and its source
 scope. Later harvest probes use their own LP queries.
+When the schedule includes both the harvest and construction-time integer probing,
+a proof-only component query may refute the base bake within a separate slice of
+the same presolve allowance before probing starts.
 [Wide-integer pre-bake bounds](08-presolve-reductions.md#pre-bake-lp-bounds) use a separate safety gate.
 
 The finite invocation carries its source-template policy through pre-bake LP checks,

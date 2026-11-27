@@ -5,6 +5,7 @@ import com.eignex.klause.lp.bounding.LP_HARVEST_MAX_RELAXATION_COST
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.admitsPresolveFeasibility
 import com.eignex.klause.lp.bounding.impliedEqualities
 import com.eignex.klause.lp.bounding.redundantConstraints
 import com.eignex.klause.lp.bounding.rootInfeasible
@@ -215,7 +216,11 @@ internal fun lpHarvestReporting(
     randomSeed: Long? = null,
     numericalLp: Boolean = false,
     componentFeasibility: Boolean?,
+    splitOnly: Boolean = false,
 ): LpHarvestResult {
+    if (splitOnly && (cancellation() || !problem.admitsPresolveFeasibility())) {
+        return LpHarvestResult(problem, LpHarvestReport())
+    }
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
     // that `LpParams` hands it — every `LpSolver` entry point defaults to `ExecutionControl.Never`.
@@ -233,17 +238,22 @@ internal fun lpHarvestReporting(
         LpSolveContext.finite(numericalLp).readingSourceSlack(problem),
         eagerSourcePreparation = true,
     )
-    if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
+    if (engine.lpRelaxer == null) {
+        if (splitOnly) engine.close()
+        return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
+    }
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
-    if (engine.rootInfeasible(cancellation, componentFeasibility)) {
+    val refuted = if (splitOnly) engine.use { it.rootInfeasible(cancellation, componentFeasibility, true) }
+    else engine.rootInfeasible(cancellation, componentFeasibility)
+    if (refuted) {
         return LpHarvestResult(
             RootBaker.provenInfeasible(problem, bakeConfig),
             LpHarvestReport(rootInfeasible = true),
             sink.snapshot().lp,
         )
     }
-    if (cancellation() || (!plan.variableShaving && !plan.objectiveShaving)) {
+    if (splitOnly || cancellation() || (!plan.variableShaving && !plan.objectiveShaving)) {
         return LpHarvestResult(
             problem,
             LpHarvestReport(),

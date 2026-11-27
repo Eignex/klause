@@ -46,6 +46,7 @@ internal class LpPresolveFeasibility(
     val split: Boolean,
     val token: ExecutionControl,
     observer: LpCertificationObserver,
+    val splitOnly: Boolean,
 ) {
     private val timer = LpPhaseTimer(observer, LpSolvePhase.PRESOLVE_FEASIBILITY)
     private var extraWork = 0L
@@ -73,6 +74,7 @@ internal class LpPresolveFeasibility(
     fun finish(refuted: Boolean) {
         val route = when {
             attemptedSplit -> "SPLIT"
+            splitOnly -> "DECLINED"
             split -> "FALLBACK"
             else -> "UNSPLIT"
         }
@@ -115,8 +117,10 @@ internal fun LpEngine.splitPresolveFeasibility(
         val layout = model.componentLayout(scope.token, projection) ?: return null
         if (!admitPresolveBlocks(model, layout)) return null
         projection.reserve(4L * layout.size, 32L * layout.size, matrix = false)
-        val order = (0 until layout.size).sortedBy { layout.rows(it).toLong() + layout.columns(it) }
-        scope.complete = layout.visit(scope.token, projection, order, copyCosts = false) { part ->
+        val indexes = 0 until layout.size
+        val candidates = if (scope.splitOnly) indexes.filter(layout::isSmallProofBlock) else indexes
+        val order = candidates.sortedBy { layout.rows(it).toLong() + layout.columns(it) }
+        val complete = layout.visit(scope.token, projection, order, copyCosts = false) { part ->
             val remaining = remainingWork()
             val childSize = part.model.numVars.toLong() + part.model.m
             val childIterations = (childSize * iterations / size).toInt()
@@ -155,6 +159,7 @@ internal fun LpEngine.splitPresolveFeasibility(
                 point?.optimal == true && !scope.token()
             }
         }
+        scope.complete = complete && !scope.splitOnly
     } catch (_: LpProjectionStop) {
         scope.complete = false
     } catch (_: CheckedLongOverflowException) {
@@ -169,18 +174,19 @@ internal fun LpEngine.splitPresolveFeasibility(
 private fun admitPresolveBlocks(model: LpModel, blocks: LpComponentLayout): Boolean {
     val indexes = 0 until blocks.size
     if (blocks.size > MAX_COMPONENTS || indexes.any { 4L * blocks.rows(it) > 3L * model.m }) return false
-    val hasSmallBlock = indexes.any {
-        val rows = blocks.rows(it)
-        val columns = blocks.columns(it)
-        rows >= 2 && columns >= 2 && rows.toLong() + columns <= MAX_EARLY_PROOF_DIMENSION
-    }
-    if (!hasSmallBlock) return false
+    if (indexes.none(blocks::isSmallProofBlock)) return false
     val parent = model.tableauCells()
     val children = indexes.sumOf {
         val rows = blocks.rows(it).toLong()
         rows * (rows + blocks.columns(it) + 1L)
     }
     return children <= parent - parent / 4L
+}
+
+private fun LpComponentLayout.isSmallProofBlock(index: Int): Boolean {
+    val rows = rows(index)
+    val columns = columns(index)
+    return rows >= 2 && columns >= 2 && rows.toLong() + columns <= MAX_EARLY_PROOF_DIMENSION
 }
 
 private fun LpModel.tableauCells(): Long = m.toLong() * (m.toLong() + n + 1L)

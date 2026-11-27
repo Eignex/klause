@@ -266,6 +266,17 @@ class LpHarvestTest {
     }
 
     @Test
+    fun `component harvest should refute before construction integer probing`() {
+        val problem = coverSystem(independentRows = 24)
+        val config = PresolveConfig.parse("off,+probe-int-bounds,+lp-harvest")
+
+        val result = PresolvePipeline.run(problem, null, config, false, presolveBudget = PresolveBudget(64_000_000L))
+
+        assertTrue(result.stats.infeasible)
+        assertEquals(1L, result.stats.lpStats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_REFUTED"))
+    }
+
+    @Test
     fun `component harvest should decline when presolve makes a source objective constant`() {
         val cover = coverSystem(independentRows = 24)
         val n = cover.numIntVars

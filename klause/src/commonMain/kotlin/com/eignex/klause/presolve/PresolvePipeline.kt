@@ -26,6 +26,7 @@ import kotlin.time.TimeSource
 /** Round cap for the presolve↔LP-harvest fixpoint: a spin guard, never the real stop. The loop
  *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
 private const val MAX_PRESOLVE_HARVEST_ROUNDS = 4
+private const val MAX_PRE_PROBING_LP_WORK = 4_000_000L
 
 /**
  * The outcome of [PresolvePipeline.run]: the transformed [problem], a [reconstruct] that lifts a solution
@@ -255,13 +256,25 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
+        var earlyHarvest: LpHarvestResult? = null
         val (baked, seeded) = presolveBudget.observePreparation(
             PresolvePreparationStage.ROOT_BAKE, PresolveLane.FINITE, prebaked, cancellation,
             output = { it.second },
         ) { token, observation ->
             val selected = projections?.forEngineView(prebaked)
             val root = if (selected == null) prebaked.bake(token) else prebaked.bake(selected, token)
-            val explicit = RootBaker.reseed(root, bakeConfig)
+            if (harvestPlan != null && componentFeasibility == true && presolveBudget != null &&
+                (bakeConfig.probeIntBounds || bakeConfig.probeIntHoles) && root.baked !is PropagationResult.Unsat
+            ) {
+                val allowance = minOf(MAX_PRE_PROBING_LP_WORK, presolveBudget.remaining() / 16L)
+                earlyHarvest = lpHarvestReporting(
+                    root, currentObjective ?: LinearObjective(), harvestPlan.copy(sourcePreparation = sourcePreparation),
+                    bakeConfig, presolveBudget.slice(allowance) or token, zeroObjectivePricing, randomSeed,
+                    numericalLp = numericalLp, componentFeasibility = true, splitOnly = true,
+                )
+            }
+            val early = earlyHarvest?.takeIf { it.report.rootInfeasible }
+            val explicit = early?.problem ?: RootBaker.reseed(root, bakeConfig)
             val boundedProbing = config.emphasis == PresolveEmphasis.DEFAULT && currentObjective == null &&
                 config.overrides[PresolvePass.PROBE_INT_HOLES] == null &&
                 config.overrides[PresolvePass.PROBE_INT_BOUNDS] == null
@@ -329,10 +342,11 @@ object PresolvePipeline {
             mappings.add(SourceMapping(packed, it.problem, TransformationGuarantees.IDENTITY, it.rebuild))
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
         }
-        var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
+        var harvest = earlyHarvest?.report ?: LpHarvestReport() // The LP harvest's contribution over all rounds.
         var harvestStats = prepared.stats.lpStats
             .mergedWith(rootInfeasible.stats)
             .mergedWith(rootBounds.stats)
+            .mergedWith(earlyHarvest?.stats ?: LpStats())
         var infeasible = current.baked is PropagationResult.Unsat
         var round = 0
         while (!infeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {

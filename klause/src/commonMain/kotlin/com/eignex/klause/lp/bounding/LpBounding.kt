@@ -458,10 +458,11 @@ internal fun LpEngine.sparseSafePrune(
             spread.rowRatio,
         )
     }
+    val presolve = presolveFeasibility
     if (!numericalDeductions && model.rowStrict.any { it }) {
+        if (presolve?.splitOnly == true) return LpNodeOutcome(false, null)
         strictSourcePrune(relaxation, session, bound, sink, cancellation, learn)?.let { return it }
     }
-    val presolve = presolveFeasibility
     if (presolve != null && satisfactionOnly && cutPool.size == 0) {
         splitPresolveFeasibility(model, presolve)?.let { refuted ->
             if (refuted) {
@@ -473,6 +474,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         if (cancellation()) return LpNodeOutcome(false, null)
     }
+    if (presolve?.splitOnly == true) return LpNodeOutcome(false, null)
     val attempted = solveNode(model, warm, cancellation)
     if (attempted == null) {
         presolve?.solved(propagator.lastMetrics)
