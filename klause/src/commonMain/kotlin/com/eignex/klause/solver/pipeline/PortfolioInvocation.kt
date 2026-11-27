@@ -58,6 +58,7 @@ internal class PortfolioInvocationPolicy(
     initialHeuristics: Set<Int> = emptySet(),
     heuristicTargets: Set<Int>? = null,
     val onProgress: ((PortfolioEvent) -> Unit)? = null,
+    val initialProofProbeMillis: Long = 0L,
 ) {
     private val minimumShares = shares.copyOf()
     private val improvingProbes = probes.toSet()
@@ -137,6 +138,7 @@ internal class PortfolioInvocation(
             it.reserveBeforeIncumbentOnly = selected.reserveBeforeIncumbentOnly
             it.incumbentProbeArms = selected.probes
             it.initialProbeWeights = selected.probeWeights
+            it.initialProofProbeMillis = selected.initialProofProbeMillis
             it.initialProbeRanks = selected.probeRanks
             it.initialHeuristicArms = selected.initialHeuristics
             it.initialHeuristicTargets = selected.heuristicTargets
