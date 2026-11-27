@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpComponentLayout
 import com.eignex.klause.lp.engine.LpModel
@@ -15,31 +16,55 @@ import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.saturatedMul
 
 private const val MIN_COMPONENT_QUERY_CELLS = 4096L
 private const val MAX_COMPONENTS = 64
+private const val MAX_ROWS_PER_COLUMN = 4L
 private const val MAX_COMPONENT_PREPARATION_WORK = 1_048_576L
 private const val MAX_COMPONENT_PREPARATION_BYTES = 32L * 1024 * 1024
 
-internal fun LpEngine.presolveFeasibilityQuery(token: ExecutionControl, split: Boolean): Boolean {
+internal fun Problem.admitsPresolveFeasibility(): Boolean {
+    if (numRealVars != 0 || intBounds.hasOpenSides) return false
+    val columns = numIntVars.toLong() + numBoolVars
+    val rows = numFactors.toLong()
+    return rows <= MAX_ROWS_PER_COLUMN * columns &&
+        saturatedMul(rows, columns + rows + 1L) >= MIN_COMPONENT_QUERY_CELLS
+}
+
+internal fun LpEngine.presolveFeasibilityQuery(token: ExecutionControl, split: Boolean): Boolean? {
+    val relaxer = lpRelaxer ?: return null
     val observer = rootCertificationObserver()
     val timer = LpPhaseTimer(observer, LpSolvePhase.PRESOLVE_FEASIBILITY)
     val session = PropagationSession(problem, token)
-    val model = try {
-        if (session.isUnsatAtRoot || token()) null else
-            primalRelaxer(LinearObjective()).build(session, cancellation = token).model
+    if (session.isUnsatAtRoot || token()) {
+        timer.finish("UNAVAILABLE")
+        return false
+    }
+    val activeModel = try {
+        relaxer.build(session, cancellation = token).model
     } catch (_: CheckedLongOverflowException) {
         null
     } catch (_: LpAssemblyCancelled) {
         null
     }
-    if (model == null || model.n == 0 || token()) {
-        timer.finish("UNAVAILABLE")
+    if (token()) {
+        timer.finish("STOPPED")
         return false
     }
+    if (activeModel == null || activeModel.n == 0 || activeModel.exactState != null) {
+        timer.finish("UNAVAILABLE")
+        return null
+    }
+    val objectiveWork = activeModel.numVars.toLong()
+    token.charge(objectiveWork)
+    if (token()) {
+        timer.finish("STOPPED", objectiveWork)
+        return false
+    }
+    val model = activeModel.withRowObjective(intArrayOf(), longArrayOf())
     val iterations = (50L * (model.m.toLong() + model.numVars) + 200).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     val projection = LpProjectionMeter(
         MAX_COMPONENT_PREPARATION_WORK,
@@ -47,7 +72,9 @@ internal fun LpEngine.presolveFeasibilityQuery(token: ExecutionControl, split: B
         token,
         token.accounting,
     )
-    val components = if (split && model.tableauCells() >= MIN_COMPONENT_QUERY_CELLS) {
+    val components = if (split && model.m <= MAX_ROWS_PER_COLUMN * model.n &&
+        model.tableauCells() >= MIN_COMPONENT_QUERY_CELLS
+    ) {
         solvePresolveComponents(model, token, projection, iterations)
     } else null
     val route = when {
@@ -56,21 +83,31 @@ internal fun LpEngine.presolveFeasibilityQuery(token: ExecutionControl, split: B
         else -> "UNSPLIT"
     }
     if (components == null && token()) {
-        timer.finish("${route}_STOPPED", projection.work)
+        timer.finish("${route}_STOPPED", projection.work + objectiveWork)
         return false
     }
-    val result = components ?: solvePresolveFeasibility(model, token, iterations)
-    observeRootWork(result.metrics)
-    val refuted = result.ray?.let { !token() && verifyPresolveFeasibilityRay(model, it, token) } == true
+    var result = components ?: solvePresolveFeasibility(model, token, iterations)
+    var metrics = result.metrics
+    var refuted = refutesPresolveFeasibility(model, result.ray, token)
+    val remaining = iterations - metrics.pivots
+    if (components != null && !result.optimal && !refuted && remaining > 0 && !token()) {
+        result = solvePresolveFeasibility(model, token, remaining)
+        metrics += result.metrics
+        refuted = refutesPresolveFeasibility(model, result.ray, token)
+    }
+    observeRootWork(metrics)
     val outcome = when {
         refuted -> "REFUTED"
         result.optimal && !token() -> "COMPLETE"
         else -> "INCONCLUSIVE"
     }
-    val metrics = result.metrics
-    timer.finish("${route}_$outcome", projection.work + metrics.workOps, metrics.pivots, metrics.componentSolves)
+    timer.finish("${route}_$outcome", projection.work + metrics.workOps + objectiveWork,
+        metrics.pivots, metrics.componentSolves)
     return refuted
 }
+
+private fun LpEngine.refutesPresolveFeasibility(model: LpModel, ray: DoubleArray?, token: ExecutionControl): Boolean =
+    ray != null && !token() && verifyPresolveFeasibilityRay(model, ray, token)
 
 private data class PresolveFeasibilityOutcome(
     val optimal: Boolean,

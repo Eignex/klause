@@ -122,7 +122,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val presolveStructuralImpact: ExecutionOption<Int> =
             ExecutionOption("presolve-structural-impact", ValueKind.INT)
 
-        /** Enable component decomposition in the presolve LP feasibility comparison. */
+        /** Solve independent blocks in eligible presolve LP feasibility queries. */
         val presolveLpComponents: ExecutionOption<Boolean> =
             ExecutionOption("presolve-lp-components", ValueKind.BOOLEAN)
 

@@ -242,8 +242,7 @@ class LpHarvestTest {
     fun `component harvest should lift a contradiction from one block`() {
         val problem = coverSystem(independentRows = 24).bake()
 
-        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
-            componentFeasibility = true)
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true))
 
         assertTrue(result.report.rootInfeasible)
         assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_REFUTED"))
@@ -255,8 +254,7 @@ class LpHarvestTest {
             SourceFormat.MPS, feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
         ).resolve()).bake()
 
-        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
-            numericalLp = true, componentFeasibility = true)
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true), numericalLp = true)
 
         assertSame(problem, result.problem)
         assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_INCONCLUSIVE"))

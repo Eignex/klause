@@ -917,6 +917,12 @@ whole-source improvement.
 `lpPhase_COMPONENT_LIFECYCLE_*` records child `SOLVED` and `REUSED` counts through
 the existing route ledger; numerical work, pivots and factors count actual solves.
 `SOLVED` counts invocations, including attempts that stop without a result.
+`presolve=default,+lp-harvest` schedules the root feasibility harvest.
+`param.presolve-lp-components=false` uses its monolithic query on the same
+eligible source view. `lpPhase_PRESOLVE_FEASIBILITY_ROOT` time includes assembly,
+partitioning, solving, ray reconstruction, checking and retirement. Its step
+count records actual child solves. Compare source outcomes and complete invocation
+costs separately from this query.
 `set=lp-component-lifecycle-v1` selects two binary covering MPS sources with direct
 additive objectives. Each block needs two selected columns but has a fractional
 LP optimum, admitting local tableau cuts without an objective-definition row that
