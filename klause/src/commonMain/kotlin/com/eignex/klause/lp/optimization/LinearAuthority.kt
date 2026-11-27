@@ -145,7 +145,8 @@ internal class LinearAuthority(
             !prepared.matches(source, cuts = true, cutMask = prepared.cutMask,
                 checkUnselectedCuts = prepared.checkUnselectedCuts, retainMaskedCuts = prepared.retainMaskedCuts) ||
             cancellation() || budget.funding?.paused == true) return emptyList()
-        val rows = template?.cuts?.rows ?: return emptyList()
+        val family = template ?: return emptyList()
+        val rows = family.cuts?.rows ?: return emptyList()
         cutCost(1L + rows.size, 256L)
         val result = ArrayList<SourceEvidence>(2)
         var selected = 0
@@ -155,6 +156,30 @@ internal class LinearAuthority(
             if (++selected > 2) break
             if (id !in prepared.checkedCuts) continue
             result += SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
+        }
+        if (result.isEmpty() && denseRootBaseline != null && denseRootBaseline !== family) {
+            for (id in family.ordinaryCuts until rows.size) {
+                cutCost(1L, 0L)
+                if (cancellation() || budget.funding?.paused == true) break
+                if (id !in prepared.cutFamilies) continue
+                val cut = rows[id]
+                pointPolicy?.observe("DenseFiniteSelectedScanned")
+                if (cut.mixed) {
+                    pointPolicy?.observe("DenseFiniteSelectedMixed")
+                    continue
+                }
+                val width = cut.inequality.supportSize
+                if (width !in 1..8) {
+                    pointPolicy?.observe("DenseFiniteSelectedWidthDeclined")
+                    continue
+                }
+                cutCost(width.toLong(), 128L)
+                if (cancellation() || budget.funding?.paused == true) break
+                if (cut.inequality.coefficients.keys.any { it.kind != SourceCoordinate.Kind.Integer }) continue
+                pointPolicy?.observe("DenseFiniteSelectedOffered")
+                result += SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
+                if (result.size == 2) break
+            }
         }
         return result
     }
