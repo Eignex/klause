@@ -492,6 +492,8 @@ data class BacktrackParams(
     val lpDirectionalAdvice: Boolean = true,
     /** Admit derived integer rows; disabling keeps derivation and integer decision naming enabled. */
     val integerRowAdmission: Boolean = true,
+    /** Compare child advice recovered from bounded same-depth LP evidence. */
+    val lpDepthRecovery: Boolean = false,
 ) : SolverParams {
     init {
         require(arithmeticLearningWork >= 0L && arithmeticLearningAllocationBytes >= 0L)

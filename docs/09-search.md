@@ -504,6 +504,12 @@ reliable child-order proposals while retaining directional observation, collecti
 nomination, comparison and commitment work; the corresponding backtrack setting is
 `BacktrackParams.lpDirectionalAdvice`.
 
+The experimental `lp-depth-recovery=true` setting uses bounded depth-context
+history to recover a preference for an exhaustive adjacent split. With directional
+gains enabled, this mode retains collection and withholds ordinary reliable
+proposals. The directional advice setting controls whether fresh recovered
+preferences can reorder the split.
+
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Read-only column maps shared by bound views compare by identity;
 replacement arrays are checked element by element. Scope capture borrows those arrays,

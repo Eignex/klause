@@ -135,7 +135,12 @@ class LpHintsTest : RuntimeInitializedTest() {
         checkRecoveryWhenOrdinaryDeclines(unstable = true)
     }
 
-    private fun checkRecoveryWhenOrdinaryDeclines(unstable: Boolean) {
+    @Test
+    fun `applied depth recovery reorders the matching exhaustive split`() {
+        checkRecoveryWhenOrdinaryDeclines(unstable = true, applyDepth = true)
+    }
+
+    private fun checkRecoveryWhenOrdinaryDeclines(unstable: Boolean, applyDepth: Boolean = false) {
         val builder = LpBuilder()
         builder.addVar(0, 10, cost = 1L)
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -146,7 +151,7 @@ class LpHintsTest : RuntimeInitializedTest() {
         val up = SearchDecision.IntAtLeast(0, 3L)
         val events = ArrayList<String>()
         val hints = LpHints(1, 0, directionalGains = true, applyAdvice = false, depthRetention = true,
-            observe = events::add)
+            observe = events::add, applyDepthAdvice = applyDepth)
         for (level in 0..1) {
             repeat(2) { sample ->
                 for (decision in listOf(down, up)) {
@@ -177,10 +182,11 @@ class LpHintsTest : RuntimeInitializedTest() {
         val order = hints.orderAlternatives(variable, listOf(up, down), ExecutionControl.Never)
         hints.commit(order.first(), 1)
 
-        assertEquals(listOf(up, down), order)
+        assertEquals(if (applyDepth) listOf(down, up) else listOf(up, down), order)
         val origin = if (unstable) "INDEX_ONLY" else "EARLY"
-        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_${origin}_COMMIT_WITHHELD_CHANGED" })
-        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_COMMIT_WITHHELD_CHANGED" })
+        val commitment = if (applyDepth) "COMMIT_CHANGED" else "COMMIT_WITHHELD_CHANGED"
+        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_${origin}_$commitment" })
+        assertEquals(1, events.count { it == "PASSIVE_DEPTH_RETENTION_$commitment" })
         assertFalse("PASSIVE_VALUE_DEPTH_CONTEXT_DECLINED" in events)
     }
 

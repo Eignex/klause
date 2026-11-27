@@ -173,7 +173,8 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "inprocessing-warmup-work", "inprocessing-probe-interval",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
-    "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
+    "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-depth-recovery",
+    "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
     "pb-learning", "pb-objective-cutoff", "integer-row-learning", "integer-row-admission",
     "arithmetic-learning-work", "arithmetic-learning-allocation-bytes",
     "propagation-attribution", "historical-table-reasons",
@@ -247,6 +248,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val lpBranching = p[ExecutionOption.lpBranching]
     val lpDirectionalGains = p[ExecutionOption.lpDirectionalGains]
     val lpDirectionalAdvice = p[ExecutionOption.lpDirectionalAdvice]
+    val lpDepthRecovery = p[ExecutionOption.lpDepthRecovery]
     val lpVariableShaving = p[ExecutionOption.lpVariableShaving]
     val lpPruneHulls = p[ExecutionOption.lpPruneHulls]
     val lpRootCuts = p[ExecutionOption.lpRootCuts]
@@ -284,7 +286,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         arithmeticLearningWork, arithmeticLearningAllocationBytes,
         propagationAttribution, historicalTableReasons, costAwarePropagation,
         reasonPreflight,
-        objectiveGuidedValues, lpDirectionalGains, lpDirectionalAdvice,
+        objectiveGuidedValues, lpDirectionalGains, lpDirectionalAdvice, lpDepthRecovery,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -340,6 +342,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
         lpDirectionalGains?.let { out = out.copy(lpDirectionalGains = it) }
         lpDirectionalAdvice?.let { out = out.copy(lpDirectionalAdvice = it) }
+        lpDepthRecovery?.let { out = out.copy(lpDepthRecovery = it) }
         lpVariableShaving?.let { out = out.copy(lpPlan = out.lpPlan.copy(variableShaving = it)) }
         lpPruneHulls?.let { out = out.copy(lpPlan = out.lpPlan.copy(pruneHulls = it)) }
         lpRootCuts?.let { out = out.copy(lpPlan = out.lpPlan.copy(rootCutHarvest = it)) }

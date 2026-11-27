@@ -31,6 +31,7 @@ internal class LpHints(
     private val applyAdvice: Boolean = true,
     private val depthRetention: Boolean = false,
     depthCancellation: ExecutionControl = ExecutionControl.Never,
+    private val applyDepthAdvice: Boolean = false,
 ) : LpHintSink {
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge, depthRetention = depthRetention,
@@ -464,24 +465,32 @@ internal class LpHints(
         if (depthValues == null) {
             charge(8L)
             if (!current()) return ordered
-            depthValues = LpPassiveValueChoice(false, { event ->
+            depthValues = LpPassiveValueChoice(applyDepthAdvice, { event ->
                 val attribution = depthNominationOrigin
                 observe(if (event == "PASSIVE_VALUE_CHECK") "PASSIVE_DEPTH_RETENTION_PARTITION_CHECK"
                 else event.replaceFirst("PASSIVE_VALUE", "PASSIVE_DEPTH_RETENTION"))
-                if (event == "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED") {
+                val change = when (event) {
+                    "PASSIVE_VALUE_COMMIT_WITHHELD_CHANGED" -> "COMMIT_WITHHELD_CHANGED"
+                    "PASSIVE_VALUE_COMMIT_CHANGED" -> "COMMIT_CHANGED"
+                    else -> null
+                }
+                if (change != null) {
                     when (attribution) {
-                        DepthOrigin.EARLIER -> observe("PASSIVE_DEPTH_RETENTION_EARLY_COMMIT_WITHHELD_CHANGED")
-                        DepthOrigin.INDEX_ONLY -> observe("PASSIVE_DEPTH_RETENTION_INDEX_ONLY_COMMIT_WITHHELD_CHANGED")
+                        DepthOrigin.EARLIER -> observe("PASSIVE_DEPTH_RETENTION_EARLY_$change")
+                        DepthOrigin.INDEX_ONLY -> observe("PASSIVE_DEPTH_RETENTION_INDEX_ONLY_$change")
                         else -> Unit
                     }
                 }
             }, charge)
         }
         val shadow = checkNotNull(depthValues)
-        shadow.select(variable, value(variable), ordered, preference, stamp, fresh = ::current)
-        if (!current()) shadow.clear()
+        val recovered = shadow.select(variable, value(variable), ordered, preference, stamp, fresh = ::current)
+        if (!current()) {
+            shadow.clear()
+            return ordered
+        }
         if (shadow.hasNomination) depthNominationOrigin = origin
-        return ordered
+        return recovered
     }
 
     private fun orderProductionAlternatives(
