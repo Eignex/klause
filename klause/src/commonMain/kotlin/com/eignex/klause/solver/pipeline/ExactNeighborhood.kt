@@ -57,6 +57,7 @@ internal class ExactNeighborhood(
     private val prepareBooleanCenter: ((ExecutionControl) -> Boolean)? = null,
     private val rootBooleanValue: (Int) -> Boolean? = { null },
     private val rootCoordinateValue: ((Int) -> BigFraction?)? = null,
+    private val rootCoordinateCount: Int = centers.size,
     private val proposal: ExactNeighborhoodProposal? = null,
     private val completionExhausted: () -> Boolean = { false },
     private val centerPreparationPending: () -> Boolean = { false },
@@ -65,6 +66,10 @@ internal class ExactNeighborhood(
         ExactNeighborhoodCondition, ExecutionControl) -> Unit)? = null,
     private val continuePausedCompletion: () -> Boolean = { false },
 ) : AutoCloseable {
+    init {
+        require(rootCoordinateCount in 0..centers.size)
+    }
+
     private val random = Random(seed)
     private var centers = centers.toMutableList()
     private var bools = BooleanArray(boolCount)
@@ -132,7 +137,7 @@ internal class ExactNeighborhood(
                     nextCenterBoolean++
                     charge(1)
                 }
-                while (rootCoordinateValue != null && nextCenterCoordinate < centers.size) {
+                while (rootCoordinateValue != null && nextCenterCoordinate < rootCoordinateCount) {
                     if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
                         nodeBudget?.exhausted() == true || completionExhausted()) return searchAllowanceSpent()
                     val coordinate = nextCenterCoordinate++

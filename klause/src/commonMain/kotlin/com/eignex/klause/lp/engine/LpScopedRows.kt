@@ -10,6 +10,9 @@ internal data class LpRowIdentity(
 internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
     private val identities = entries.toList()
     private val indices by lazy { identities.withIndex().associate { it.value.id to it.index } }
+    private val deepestRetraction = identities.maxOfOrNull { row ->
+        if (row.active) row.depth ?: 0 else row.suspendedAt ?: 0
+    } ?: 0
     private var weightedStorage: LpLayoutStorage? = null
     private var layoutWeight: LpLayoutWeight? = null
     val size: Int get() = identities.size
@@ -75,6 +78,7 @@ internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
     )
 
     fun popped(targetDepth: Int): LpScopedRows {
+        if (targetDepth >= deepestRetraction) return this
         val next = identities.map { row ->
             when {
                 row.depth != null && row.depth > targetDepth -> row.copy(active = false, suspendedAt = null)
