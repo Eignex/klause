@@ -104,8 +104,8 @@ A check proceeds in four steps:
 
 Automatic complete pure-real traversal starts with source-order Boolean decisions.
 Without an explicit restart schedule or hint allowance, a traversal that reaches
-768 decisions can restart once and use conflict-activity order. The restart keeps
-learned clauses and spends the same solve-wide allowances.
+768 decisions can restart once and use conflict-activity order. The restart
+repropagates retained learned clauses and spends the same solve-wide allowances.
 
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
