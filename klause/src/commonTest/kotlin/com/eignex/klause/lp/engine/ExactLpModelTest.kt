@@ -50,4 +50,17 @@ class ExactLpModelTest {
             }
         }
     }
+
+    @Test
+    fun `an appended row should reject duplicate structural coefficients`() {
+        val builder = LpBuilder()
+        val variable = builder.addVar(0L, 10L)
+        val base = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val one = ExactLpNumber.of(1L)
+        val appended = LpScopedRow(
+            0L, listOf(variable to one, variable to one), one, ExactLpColumn(ExactLpBounds()),
+        )
+
+        assertFailsWith<IllegalArgumentException> { base.appendScopedRow(appended) }
+    }
 }

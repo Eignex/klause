@@ -257,7 +257,7 @@ internal class LpBoundTrail(initial: LpExactState) {
             return false
         }
         val nnz = (0 until state.model.n).sumOf { state.model.columnEntries(it).size.toLong() } +
-            rows.sumOf { it.coefficients().size.toLong() }
+            rows.sumOf { it.coefficientCount.toLong() }
         if (nnz + newM > Int.MAX_VALUE || token()) return false
         val identities = state.rows.append(rows.map { it.id }, if (scoped) state.depth else null, permanentRows)
         val assertions = if (columns.isEmpty()) {

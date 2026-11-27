@@ -65,6 +65,10 @@ internal class LpComponentRows(
         for (column in 0 until model.n) {
             val values = source.columnEntries(column)
             val prefix = previous.model.columnEntries(column)
+            if (values === prefix) {
+                projection.reserve(1L, 0L, matrix = true)
+                continue
+            }
             projection.reserve(minOf(values.size.toLong(), prefix.size.toLong() + 1L) + 1L, 0L, matrix = true)
             if (values.size < prefix.size || prefix.indices.any { values[it] != prefix[it] } ||
                 (values.size > prefix.size && values[prefix.size].row < model.m)
