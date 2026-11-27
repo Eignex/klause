@@ -12,6 +12,8 @@ import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -225,6 +227,22 @@ class ArithmeticLearningTraceTest {
     }
 
     @Test
+    fun `derive only attachment capture should ignore later wide rows`() {
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val trace = ArithmeticLearningTrace().apply { captureFirstIntegerAttachment = true }
+        val later = requireNotNull(IntegerConflictRow.source(intArrayOf(0, 1),
+            arrayOf(bigIntOf(1) shl 256, bigIntOf(1)), bigIntOf(0), useLo = true))
+        assertTrue(trace.beginIntegerAttachment(state, 0))
+        trace.attachmentStage(state, 0, 0, conflict = false, stage = "clause")
+
+        trace.row("integer.seed-row", later, state)
+
+        assertFalse(trace.truncated)
+        assertEquals(listOf("attachment.begin", "attachment.frontier", "attachment.clause"),
+            trace.events.map { it.kind })
+    }
+
+    @Test
     fun `empty events should consume the event allowance`() {
         val trace = ArithmeticLearningTrace(maxEvents = 2, maxWords = 3)
         val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
@@ -253,13 +271,16 @@ class ArithmeticLearningTraceTest {
     @Test
     fun `bounded capture should preserve conflict fallback and later row deduction`() {
         val work = mutableListOf<Long>()
-        for (capture in 0..2) {
+        for (capture in 0..3) {
             val native = PropagationSession(Problem(0, 3,
                 arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
                     Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                     Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
                 )), pbLearning = false).apply { enableIntegerRowLearning() }
-            val trace = ArithmeticLearningTrace().apply { captureFirstInteger = capture == 2 }
+            val trace = ArithmeticLearningTrace().apply {
+                captureFirstInteger = capture >= 2
+                captureFirstIntegerAttachment = capture == 3
+            }
             if (capture != 0) native.explanationState.arithmeticLearningTrace = trace
             val cp = CpSearchComponent(native)
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
@@ -284,6 +305,16 @@ class ArithmeticLearningTraceTest {
                 assertTrue(trace.events.any { it.kind == "analysis.mapped-target" })
                 assertTrue(trace.events.any { it.kind == "consumer.upper" && it.data[3] == 2L })
                 assertFalse(trace.truncated)
+            }
+            if (capture == 3) {
+                val kinds = trace.events.map { it.kind }
+                assertTrue(kinds.indexOf("attachment.begin") < kinds.indexOf("attachment.row"))
+                val end = kinds.indexOf("attachment.clause")
+                assertTrue(end > kinds.indexOf("attachment.row"))
+                assertTrue(trace.events.any {
+                    it.kind == "attachment.row.upper" && it.data[0] == 0L && it.data[2] == 1L
+                })
+                assertTrue(trace.events.drop(end + 1).any { it.kind == "consumer.upper" && it.data[3] == 2L })
             }
         }
         assertEquals(1, work.distinct().size)

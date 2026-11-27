@@ -502,6 +502,11 @@ replacement sessions. Observation does not select a recipe or grant source autho
 its work spends the containing invocation allowance.
 Native diagnostic snapshots preserve factor indices, including generated difference
 systems, and record each graph edge with its weight and guard.
+The first integer attachment observation records the visible domain intervals and
+Boolean pins at publication, then records net integer bounds and their final reasons
+after each native fixpoint. The capture labels interrupted and conflicting stages
+before retraction. Coordinate and journal caps and interior holes can omit payloads.
+The visible frontier is an observation of selected native state.
 
 An optional native-session `ArithmeticLearningTrace` records bounded arithmetic
 analysis events before conflict retraction: seed and fallback literals, integer

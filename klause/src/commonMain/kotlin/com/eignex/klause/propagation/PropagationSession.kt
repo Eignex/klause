@@ -1049,8 +1049,12 @@ class PropagationSession private constructor(
         }
     }
 
-    internal fun addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): PropagationResult =
-        registerAndPropagate(base = state.undoTop) {
+    internal fun addLearnedIntegerRow(
+        row: IntegerConflictRow,
+        lbd: Int,
+        captureAttachment: Boolean = false,
+    ): PropagationResult =
+        registerAndPropagate(base = state.undoTop, attachmentStage = if (captureAttachment) "row" else null) {
             val before = state.work
             try {
                 state.addLearnedIntegerRow(row, lbd)
@@ -1061,15 +1065,16 @@ class PropagationSession private constructor(
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
+        val capture = state.arithmeticLearningTrace?.beginIntegerAttachment(state, decisionLevel) == true
         if (state.integerRowAdmission) {
-            val result = addLearnedIntegerRow(learned.row, learned.lbd)
+            val result = addLearnedIntegerRow(learned.row, learned.lbd, capture)
             if (result is PropagationResult.Unsat || fixpointCancelled) return result
         } else {
             state.integerRowAdmissionsDeclined++
             state.arithmeticLearningTrace?.record("integer.decline.admission-disabled")
         }
         val fallback = learned.fallbackClause
-        return registerAndPropagate(base = publicationBase) {
+        return registerAndPropagate(base = publicationBase, attachmentStage = if (capture) "clause" else null) {
             state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
         }
     }
@@ -1097,7 +1102,11 @@ class PropagationSession private constructor(
 
     /** Shared body of [addLearnedClause] / [addLearnedPb]: register the constraint via [register], fire it
      *  once, and either surface the cascaded conflict or re-baseline the level with the asserted facts. */
-    private inline fun registerAndPropagate(base: Int, register: () -> Int): PropagationResult {
+    private inline fun registerAndPropagate(
+        base: Int,
+        attachmentStage: String? = null,
+        register: () -> Int,
+    ): PropagationResult {
         bakedUnsat?.let { return it }
         state.finiteWork.cancellation = cancellation
         val newFid = try {
@@ -1110,7 +1119,13 @@ class PropagationSession private constructor(
             if (state.nativeEngine == null) it.admit(state.factorAt(newFid))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
         }
+        val propagationBase = if (attachmentStage != null) state.undoTop else 0
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
+        if (attachmentStage != null) {
+            state.arithmeticLearningTrace?.attachmentStage(
+                state, propagationBase, newFid, conflict != null, attachmentStage,
+            )
+        }
         if (conflict != null) return revertAndUnsat(conflict)
         // The asserted facts are implied by the decisions up to the current level, so they join the
         // level's baseline: re-snapshot the top mark. Otherwise the next failed pin's revert — which

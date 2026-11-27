@@ -94,9 +94,12 @@ internal object PortfolioArithmeticLearningCapture {
         val seed = (options["seed"] ?: "1").toLong()
         val kind = options["learning"] ?: "integer"
         val traceMode = options["trace"] ?: "first-integer"
+        val attachment = traceMode == "first-integer-attachment"
         val cpu = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { records ->
             for (learning in listOf(false, true)) {
+                val typed = learning || attachment
+                val admit = learning || !attachment
                 val opened = System.nanoTime()
                 val cpuBefore = cpu?.processCpuTime
                 val stop = ExecutionControl.after(timeout.milliseconds)
@@ -124,8 +127,9 @@ internal object PortfolioArithmeticLearningCapture {
                 var omitted = 0
                 var attachmentNs = 0L
                 val snapshotDeclines = ArrayList<String>()
-                val pairs = listOf("integer-row-learning=${learning && kind != "pb"}",
-                    "pb-learning=${learning && kind != "integer"}", "portfolio-progress=false")
+                val pairs = listOf("integer-row-learning=${typed && kind != "pb"}",
+                    "pb-learning=${typed && kind != "integer"}", "portfolio-progress=false") +
+                    if (attachment) listOf("integer-row-admission=$admit") else emptyList()
                 val policy = if (options["lp"] == "off") {
                     SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioLpCeiling = LpConfig.OFF)
                 } else SourceExecutionPolicy()
@@ -154,8 +158,10 @@ internal object PortfolioArithmeticLearningCapture {
                                 return@observer
                             }
                             val capture = PreparedArithmeticLearningProfile.Capture(native, 1024, 65536,
-                                captureFirstInteger = learning && kind != "pb" && traceMode == "first-integer",
-                                captureFirstPb = learning && kind != "integer" && traceMode == "first-pb")
+                                captureFirstInteger = typed && kind != "pb" &&
+                                    (traceMode == "first-integer" || attachment),
+                                captureFirstPb = typed && kind != "integer" && traceMode == "first-pb",
+                                captureFirstIntegerAttachment = attachment)
                             capture.record("ordinary.session-created", sessions.size.toLong(),
                                 native.decisionLevel.toLong(), native.learnedClauseCount.toLong())
                             val entry = Observed(worker, ordered.size, native.decisionLevel,
@@ -176,7 +182,11 @@ internal object PortfolioArithmeticLearningCapture {
                 val cpuAfter = cpu?.processCpuTime
                 val finite = (result as? SourceExecutionResult.Finite)?.result
                 val completed = finite?.outcome as? FiniteSolveOutcome.Completed
-                val label = if (learning) kind else "clause"
+                val label = when {
+                    attachment -> if (admit) "retained" else "derive"
+                    learning -> kind
+                    else -> "clause"
+                }
                 original?.let { out.resolve("$label-original.json").writeText(it) }
                 val preparedSnapshot = finite?.let { snapshot(it.preparation.problem, native = true) }
                 preparedSnapshot?.json?.let { out.resolve("$label-prepared.json").writeText(it) }
@@ -194,8 +204,9 @@ internal object PortfolioArithmeticLearningCapture {
                         put("session", index)
                         put("levelAtAttachment", session.levelAtAttachment)
                         put("learnedAtAttachment", session.learnedAtAttachment)
-                        put("integerRowLearning", learning && kind != "pb")
-                        put("pbLearning", learning && kind != "integer")
+                        put("integerRowLearning", typed && kind != "pb")
+                        put("pbLearning", typed && kind != "integer")
+                        if (attachment) put("integerRowAdmission", admit)
                         put("original", original)
                         put("originalExportDecline", originalSnapshot.decline)
                         put("prepared", session.model)

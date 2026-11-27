@@ -6,6 +6,8 @@ import com.eignex.util.numbers.toLongExact
 
 private const val DECLINE_CENSUS_KINDS = 64
 private const val DECLINE_CENSUS_NAME_LENGTH = 96
+private const val ATTACHMENT_COORDINATE_LIMIT = 1024
+private const val ATTACHMENT_JOURNAL_LIMIT = 4096
 
 internal class ArithmeticLearningTrace(
     private val maxEvents: Int = 128,
@@ -24,6 +26,8 @@ internal class ArithmeticLearningTrace(
         private set
     var captureFirstInteger = false
     var captureFirstPb = false
+    var captureFirstIntegerAttachment = false
+    private var capturedIntegerAttachment = false
     val payloadTermLimit: Int get() = if (captureFirstPb) minOf(1024, maxWords / 6) else 64
     var collectDeclines = false
     private val declineNames = ArrayList<String>()
@@ -63,7 +67,9 @@ internal class ArithmeticLearningTrace(
     }
 
     fun beginConflict(factorId: Int, level: Int, trail: Int) {
-        if ((captureFirstInteger || captureFirstPb) && focusedArithmeticId == null && events.isNotEmpty()) {
+        if ((captureFirstInteger || captureFirstPb || captureFirstIntegerAttachment) &&
+            !capturedIntegerAttachment && focusedArithmeticId == null && events.isNotEmpty()
+        ) {
             discardedWindows++
             discardedEvents += events.size
             discardedWords += words
@@ -78,7 +84,7 @@ internal class ArithmeticLearningTrace(
     }
 
     private fun omitFocusedDetails(): Boolean {
-        if (focusedArithmeticId == null) return false
+        if (focusedArithmeticId == null && !capturedIntegerAttachment) return false
         omittedObservations++
         return true
     }
@@ -105,9 +111,11 @@ internal class ArithmeticLearningTrace(
     fun record(kind: String, vararg data: Long) {
         countDecline(kind)
         if (!accepting) return
-        if (focusedArithmeticId != null) {
+        if (focusedArithmeticId != null || capturedIntegerAttachment) {
             if ((kind == "traversal.pick" || kind == "traversal.attempt") && pendingPick) pendingPick = false
-            else if (!kind.startsWith("consumer.") && kind != "store.remap" &&
+            else if (!kind.startsWith("consumer.") && !kind.startsWith("attachment.") &&
+                !(kind == "integer.stored" && capturedIntegerAttachment && focusedArithmeticId == null) &&
+                kind != "store.remap" &&
                 kind != "traversal.finished" && kind != "traversal.retirement-checked"
             ) {
                 omittedObservations++
@@ -121,6 +129,66 @@ internal class ArithmeticLearningTrace(
         }
         events.add(Event(kind, data.copyOf()))
         words += data.size
+    }
+
+    fun beginIntegerAttachment(state: PropagationState, level: Int): Boolean {
+        if (!captureFirstIntegerAttachment || capturedIntegerAttachment) return false
+        capturedIntegerAttachment = true
+        record("attachment.begin", level.toLong(), state.undoTop.toLong(), state.totalFactorCount.toLong())
+        val ints = state.problem.numIntVars
+        val bools = state.problem.numBoolVars
+        if (ints.toLong() + bools > ATTACHMENT_COORDINATE_LIMIT ||
+            state.intDomains.any { it.holeCount != 0L }
+        ) {
+            omitAttachment("attachment.frontier", ints)
+            return true
+        }
+        record("attachment.frontier", *LongArray(2 + ints * 2 + bools) { index ->
+            when {
+                index == 0 -> ints.toLong()
+                index == 1 -> bools.toLong()
+                index < 2 + ints * 2 -> state.intDomains[(index - 2) / 2].let {
+                    if (index % 2 == 0) it.min else it.max
+                }
+                else -> when (state.boolValues[index - 2 - ints * 2]) {
+                    true -> 1L
+                    false -> 0L
+                    null -> -1L
+                }
+            }
+        })
+        return true
+    }
+
+    fun attachmentStage(state: PropagationState, base: Int, factor: Int, conflict: Boolean, stage: String) {
+        val top = state.undoTop
+        val status = if (conflict) 1L else if (state.runCancelled) 2L else 0L
+        record("attachment.$stage", base.toLong(), top.toLong(), factor.toLong(), status)
+        if (!accepting) return
+        if (top - base > ATTACHMENT_JOURNAL_LIMIT) {
+            omitAttachment("attachment.$stage.bounds", top - base)
+            return
+        }
+        val seen = HashSet<Int>()
+        for (index in base until top) {
+            if (state.undoIsBoolAt(index)) continue
+            val prior = state.undo.domain[index] ?: continue
+            val v = state.undoVarAt(index)
+            if (!seen.add(v)) continue
+            val after = state.intDomains[v]
+            if (prior.min != after.min) {
+                record("attachment.$stage.lower", v.toLong(), prior.min, after.min, state.intMinReason[v].toLong())
+            }
+            if (prior.max != after.max) {
+                record("attachment.$stage.upper", v.toLong(), prior.max, after.max, state.intMaxReason[v].toLong())
+            }
+            if (!accepting) return
+        }
+    }
+
+    private fun omitAttachment(kind: String, size: Int) {
+        omittedPayloads++
+        record("$kind.omitted", size.toLong())
     }
 
     fun clause(kind: String, literals: IntArray, state: PropagationState) {
@@ -217,7 +285,9 @@ internal class ArithmeticLearningTrace(
     }
 
     fun stored(factorId: Int, kind: String) {
-        if (!accepting || omitFocusedDetails()) return
+        val attachmentRow = capturedIntegerAttachment && captureFirstInteger &&
+            focusedArithmeticId == null && kind == "integer"
+        if (!accepting || (!attachmentRow && omitFocusedDetails())) return
         if (storedIds.size == 64) {
             truncationCause = "stored-identities"
             truncated = true

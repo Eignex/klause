@@ -1247,6 +1247,9 @@ attribution=false|true`.
 `route=catalog seed=N` instead runs the ordinary single-core automatic CP catalog
 through source setup and execution. This mode rejects `nodes` and attribution;
 the ordinary elapsed schedule and recipe settings supply their own controls.
+Catalog `trace=first-integer-attachment` compares integer derivation with admission
+disabled and enabled under the same typed settings. It records the first publication
+frontier, separate row and clause fixpoint boundaries, and their net bound changes.
 `route=single` is the default fixed-seed backtrack traversal below and rejects `seed`.
 Catalog capture records at most four native sessions in creation order, with worker
 labels, initial levels and learned counts, canonical source and actual worker models,
