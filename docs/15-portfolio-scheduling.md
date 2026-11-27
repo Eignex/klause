@@ -716,6 +716,9 @@ Each entry records the outer query disposition, residual cursor observations,
 private candidate checks and remaining cumulative LP funding. A checked publication
 entry records the repair owner's check. The accepted improving source stream records
 which private candidates reach the portfolio result.
+The receipt includes the first consultation's LP phase charges. When the receiving
+condition contains only fixed binary coordinates and the integer frame fits in
+64 bits, the receipt also records the fixed and one-valued coordinate masks.
 
 With explicit incumbent completion, from the availability of a dimension-compatible
 incumbent through root and center preparation and the first proposal, joint repair

@@ -97,6 +97,9 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
                 assertEquals(publication.proposal, stages[receipt + "Proposal"])
                 assertEquals(1L, stages[receipt + "PublicationChecked"])
                 assertTrue((stages[receipt + "OfferAccepted"] ?: 0L) > 0L)
+                assertEquals(2L, stages[receipt + "PinWidth"])
+                assertEquals(0L, stages[receipt + "FixedIntegerMask"])
+                assertTrue((stages[receipt + "FirstSearchWork"] ?: 0L) > 0L)
             }
         }
     }

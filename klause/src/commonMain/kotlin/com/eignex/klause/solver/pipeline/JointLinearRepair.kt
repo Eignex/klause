@@ -23,6 +23,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.util.ExecutionControl
@@ -75,7 +76,12 @@ internal class JointLinearRepair(
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
     private class CheckedProposal(val condition: ExactNeighborhoodCondition, val sample: Sample)
-    private class PrivateQueryId(val proposal: Long, val query: Long)
+    private class BinaryPins(val width: Int, val fixed: Long, val ones: Long)
+    private class PrivateQueryReceipt(val proposal: Long, val query: Long, val pins: BinaryPins?) {
+        var consultations = 0L
+        var firstSearchWork = 0L
+        var firstLpWork = SourceLpWorkStats()
+    }
     private class ProximityPass(val value: BigFraction, val coordinates: List<BigFraction>, val observationId: Long,
         var next: Int = 0) {
         var pair: ExactNeighborhoodCondition? = null
@@ -86,7 +92,10 @@ internal class JointLinearRepair(
     private val state = OpenTheorySolveState(params)
     private val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
-        onWork = state.smt::observeSourceLp, funding = funding)
+        onWork = { delta ->
+            state.smt.observeSourceLp(delta)
+            measuringPrivateQuery?.let { it.firstLpWork = it.firstLpWork.mergedWith(delta) }
+        }, funding = funding)
     private val stages = linkedMapOf<String, Long>()
     private val centerProgress = if (params.sourceRefutationCenterStep)
         JointRepairCenter(model, budget, stop) { selection?.eligibleInteger(it) == true } else null
@@ -99,7 +108,8 @@ internal class JointLinearRepair(
     private var observedPasses = 0L
     private var observationQuery = 0L
     private var observedPrivateQueries = 0
-    private var privateQueryId: PrivateQueryId? = null
+    private var privateQueryReceipt: PrivateQueryReceipt? = null
+    private var measuringPrivateQuery: PrivateQueryReceipt? = null
     private var privatePublication: String? = null
     private var observedOperator = 0
     private var observedSchedulingRound = 0L
@@ -375,8 +385,7 @@ internal class JointLinearRepair(
     }
 
     private fun privateQueryObservation(counters: Map<String, Long>, disposition: String): Map<String, Long> {
-        val id = privateQueryId ?: return emptyMap()
-        if (observedPrivateQueries > MAX_PRIVATE_QUERY_OBSERVATIONS) return emptyMap()
+        val receipt = privateQueryReceipt ?: return emptyMap()
         val prefix = "jointRepairPrivateQuery${observedPrivateQueries}_"
         return buildMap {
             for ((key, value) in counters) {
@@ -385,8 +394,25 @@ internal class JointLinearRepair(
                     put(prefix + stage, value)
                 }
             }
-            put(prefix + "Proposal", id.proposal)
-            put(prefix + "Query", id.query)
+            put(prefix + "Proposal", receipt.proposal)
+            put(prefix + "Query", receipt.query)
+            put(prefix + "Consultations", receipt.consultations)
+            receipt.pins?.let { pins ->
+                put(prefix + "PinWidth", pins.width.toLong())
+                put(prefix + "PinCount", pins.fixed.countOneBits().toLong())
+                put(prefix + "FixedIntegerMask", pins.fixed)
+                put(prefix + "OneIntegerMask", pins.ones)
+            }
+            if (receipt.consultations > 0L) {
+                val work = receipt.firstLpWork
+                put(prefix + "FirstSearchWork", receipt.firstSearchWork)
+                put(prefix + "FirstLpPreparationWork", work.preparationWork)
+                put(prefix + "FirstLpFloatWork", work.floatWork)
+                put(prefix + "FirstLpContinuationWork", work.continuationWork)
+                put(prefix + "FirstLpRefinementWork", work.refinementWork)
+                put(prefix + "FirstLpBoundCertificationWork", work.boundCertificationWork)
+                put(prefix + "FirstLpConflictCertificationWork", work.conflictCertificationWork)
+            }
             put(prefix + "Pending", if (query?.hasPendingProximityCompletion == true) 1L else 0L)
             put(prefix + "RemainingWork", funding.remainingWork)
             put(prefix + "RemainingAllocation", funding.remainingAllocation)
@@ -394,6 +420,27 @@ internal class JointLinearRepair(
             put(prefix + disposition, 1L)
             privatePublication?.let { put(prefix + it, 1L) }
         }
+    }
+
+    private fun binaryPins(condition: SourceCondition): BinaryPins? {
+        val width = model.numIntVars
+        val count = condition.lower.size
+        if (width !in 1..Long.SIZE_BITS || condition.bools.isNotEmpty() || condition.integerRows.isNotEmpty() ||
+            count != condition.upper.size || count > width) return null
+        val work = 1L + count
+        if (funding.availableWork <= work || funding.remainingAllocation <= 64L) return null
+        budget.observe(preparation = work)
+        funding.charge(0L, 64L)
+        var fixed = 0L
+        var ones = 0L
+        for ((coordinate, value) in condition.lower) {
+            if (coordinate.kind != SourceCoordinate.Kind.Integer || coordinate.id !in 0 until width ||
+                condition.upper[coordinate] != value || (!value.isZero && value != BigFraction.ONE)) return null
+            val bit = 1L shl coordinate.id
+            fixed = fixed or bit
+            if (!value.isZero) ones = ones or bit
+        }
+        return BinaryPins(width, fixed, ones)
     }
 
     fun search(
@@ -836,7 +883,10 @@ internal class JointLinearRepair(
                     stop or cancellation, relativeImprovement = false)?.also {
                     queryProximity = true
                     observedPrivateQueries++
-                    privateQueryId = PrivateQueryId(proposalSequence, observationQuery)
+                    if (observedPrivateQueries <= MAX_PRIVATE_QUERY_OBSERVATIONS) {
+                        privateQueryReceipt = PrivateQueryReceipt(proposalSequence, observationQuery,
+                            binaryPins(it.scope.condition))
+                    }
                     queryProximityCutoff = privateCutoff
                     queryProximityPass = proximityProposalPass
                     queryProximityClosed = proximityProposalClosed
@@ -888,7 +938,18 @@ internal class JointLinearRepair(
             ?.coerceIn(1, QUERY_SLICE_MILLIS) ?: QUERY_SLICE_MILLIS
         val before = active.work
         val delivered = if (queryProximity) ExecutionControl { active.hasIncumbent } else ExecutionControl.Never
-        val result = active.runSlice(delivered, millis, QUERY_SLICE_WORK) { _, _ -> }
+        val receipt = privateQueryReceipt
+        val first = receipt?.takeIf { it.consultations == 0L }
+        measuringPrivateQuery = first
+        val result = try {
+            active.runSlice(delivered, millis, QUERY_SLICE_WORK) { _, _ -> }
+        } finally {
+            measuringPrivateQuery = null
+        }
+        if (receipt != null) {
+            receipt.consultations++
+            if (first != null) first.firstSearchWork = active.work - before
+        }
         if (queryProximity) {
             observe("jointRepairProximityConsultations")
             stages["jointRepairProximityWork"] = (stages["jointRepairProximityWork"] ?: 0L) + active.work - before
@@ -1184,7 +1245,7 @@ internal class JointLinearRepair(
         queryProximityPass = null
         retainedProposal = null
         publishedQueryIncumbent = null
-        privateQueryId = null
+        privateQueryReceipt = null
         privatePublication = null
         active?.close()
     }
