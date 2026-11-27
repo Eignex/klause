@@ -9,6 +9,7 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.shr
