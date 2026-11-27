@@ -174,7 +174,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-directional-advice", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
-    "pb-learning", "pb-objective-cutoff", "integer-row-learning", "integer-row-admission",
+    "pb-learning", "pb-objective-cutoff", "integer-row-learning", "integer-row-admission", "integer-row-reuse",
     "arithmetic-learning-work", "arithmetic-learning-allocation-bytes",
     "propagation-attribution", "historical-table-reasons",
     "objective-guided-values",
@@ -253,6 +253,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val pbLearning = p[ExecutionOption.pbLearning]
     val integerRowLearning = p[ExecutionOption.integerRowLearning]
     val integerRowAdmission = p[ExecutionOption.integerRowAdmission]
+    val integerRowReuse = p[ExecutionOption.integerRowReuse]
     val arithmeticLearningWork = p[ExecutionOption.arithmeticLearningWork]?.also {
         if (it < 0) pipelineConfigError("arithmetic learning allowances must be non-negative")
     }
@@ -280,7 +281,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         inprocessingWarmupWork, inprocessingProbeInterval,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
-        pbObjectiveCutoff, integerRowLearning, integerRowAdmission,
+        pbObjectiveCutoff, integerRowLearning, integerRowAdmission, integerRowReuse,
         arithmeticLearningWork, arithmeticLearningAllocationBytes,
         propagationAttribution, historicalTableReasons, costAwarePropagation,
         reasonPreflight,
@@ -346,6 +347,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         pbLearning?.let { out = out.copy(pbLearning = it) }
         integerRowLearning?.let { out = out.copy(integerRowLearning = it) }
         integerRowAdmission?.let { out = out.copy(integerRowAdmission = it) }
+        integerRowReuse?.let { out = out.copy(integerRowReuse = it) }
         arithmeticLearningWork?.let { out = out.copy(arithmeticLearningWork = it) }
         arithmeticLearningAllocationBytes?.let { out = out.copy(arithmeticLearningAllocationBytes = it) }
         propagationAttribution?.let { out = out.copy(propagationAttribution = it) }
