@@ -278,6 +278,9 @@ and optimality; a checked witness remains available without a terminal claim.
 
 CLI reporting derives the verdict from the accepted claim or gap completion;
 budget exhaustion and termination reasons remain separate diagnostic metadata.
+Unfinished search retains the checked incumbent and bound. A caller ceiling can
+stop a worker with `BudgetExhausted`; a coverage allocation refusal returns
+`RepresentationDeclined`. A cooperative slice pause leaves the traversal live.
 
 A declared positive optimality gap can complete the traversal once a checked source
 incumbent and a checked global bound satisfy it in original objective units.
@@ -290,6 +293,13 @@ gap in working objective units separately from their original source semantics.
 Exact feasibility keeps exact termination.
 
 ### State and resources
+
+Source LP slices use the cumulative [invocation ledger](06-sessions.md#native-arithmetic-allowances).
+Sparse preparation reserves modeled allocation within its per-query safety envelope
+and any remaining caller allocation ceiling. The traversal reserves modeled storage
+for both children and their condition maps before opening a branch. Its retained
+coverage has a 512 MiB safety envelope independent of cumulative allocation for
+temporary LP preparation and proof work.
 
 Immutable row addresses, forms and Boolean dependencies can be shared by fresh
 components over one canonical fragment. `prepareExactLiraSource` returns an opaque

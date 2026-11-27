@@ -96,10 +96,10 @@ data class TheoryParams(
     val maxFlips: Long = Long.MAX_VALUE,
     /** Solve-wide heuristic instruction cap, including completion work. */
     val maxInstructions: Long? = null,
-    /** Cumulative source LP preparation, numerical and certification work, including admission overhead. */
-    val sourceLpWorkLimit: Long = 1_000_000_000L,
-    /** Cumulative source preparation, proof replay and modeled retained coverage allocation in bytes. */
-    val sourceLpAllocationLimit: Long = 512L * 1024L * 1024L,
+    /** Caller ceiling on cumulative source LP work, or [Long.MAX_VALUE] for no ceiling. */
+    val sourceLpWorkLimit: Long = Long.MAX_VALUE,
+    /** Caller ceiling on cumulative modeled source LP allocation in bytes, or [Long.MAX_VALUE] for no ceiling. */
+    val sourceLpAllocationLimit: Long = Long.MAX_VALUE,
     /** Optional source LP operation ceiling, independent of cumulative numerical work. */
     val sourceLpOperations: Int = Int.MAX_VALUE,
     /** Enable checked source-row separation for numerical frontier traversal. */
