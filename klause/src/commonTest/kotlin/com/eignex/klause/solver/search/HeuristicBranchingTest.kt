@@ -3,22 +3,35 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class HeuristicBranchingTest {
 
     @Test
-    fun `the activity switch should request only one restart`() {
-        val branching = ActivityRestartBooleanBranching(numBoolVars = 3, initialDecisions = 2L)
-        assertFalse(branching.shouldRestart(1L))
-        assertTrue(branching.shouldRestart(2L))
+    fun `the first restart should switch Boolean order within the same decision budget`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val branching = ActivityRestartBooleanBranching(numBoolVars = 4, initialDecisions = 2L)
+        val variables = mutableListOf<Int>()
+        val restarts = mutableListOf<Long>()
+        val observer = object : SearchRunObserver by branching {
+            override fun onRestart(decisions: Long) {
+                restarts += decisions
+            }
 
-        branching.onRestart()
+            override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                variables += (decision as SearchDecision.Bool).literal ushr 1
+            }
+        }
+        val run = session.openRun(4, SearchSolveParams(maxDecisions = 4L, restart = branching),
+            booleanBranching = branching, observer = observer)
 
-        assertFalse(branching.shouldRestart(3L))
+        val result = run.next()
+
+        assertEquals(listOf(2L), restarts)
+        assertEquals(listOf(0, 1, 0, 3), variables)
+        assertIs<SearchRunEvent.Indeterminate.Budget>(result)
     }
 
     @Test
