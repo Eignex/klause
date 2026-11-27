@@ -14,7 +14,7 @@ enum class OpenBranching(
     /** Conflict-activity order over the shared session. */
     Activity("activity"),
 
-    /** Activity for a complete mixed default point owner; source order for other openings. */
+    /** Select branching from the complete traversal and its opening. */
     Automatic("auto"),
     ;
 
@@ -35,7 +35,7 @@ data class TheoryParams(
     val openWorkLimit: Long = Long.MAX_VALUE,
     /** Maximum committed shared decisions, independent of open-theory work accounting. */
     val maxDecisions: Long = Long.MAX_VALUE,
-    /** Positive shared-decision restart cadence within each feasibility traversal, or null for none. */
+    /** Explicit shared-decision restart cadence, or null to use the traversal's default. */
     val sharedRestart: Long? = null,
     /** Retained shared learned-clause cap within each feasibility traversal, or null for no cap. */
     val maxLearnedClauses: Int? = null,
@@ -67,9 +67,10 @@ data class TheoryParams(
     /**
      * Boolean branching for each feasibility traversal.
      *
-     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner,
-     * and source order for other openings, including private queries and explicit hint allowances.
-     * The theory decides the arithmetic residual at a leaf.
+     * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner.
+     * A complete pure-real worker in the default single-lane feasibility portfolio can switch from source order
+     * to activity at a single restart. Other automatic openings use source order. The theory decides the
+     * arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
     /**
