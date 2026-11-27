@@ -1063,18 +1063,20 @@ internal class RevisedSimplex(
     }
 
     private fun duals(): DoubleArray {
-        // Zero objective (the gated feasibility filter): the duals solve `Bᵀy = 0`, so the whole
-        // BTRAN — a full pass over the factors, once per iteration — is a zero vector.
-        if (allZeroCost) {
+        var zero = true
+        for (i in 0 until m) {
+            val coefficient = cost(basicVar[i])
+            dualRhs[i] = coefficient
+            if (coefficient != 0.0) zero = false
+        }
+        // Only basic costs enter Bᵀy, including when a nonbasic variable carries the objective.
+        if (zero) {
             dualValues.fill(0.0)
             return dualValues
         }
-        for (i in 0 until m) dualRhs[i] = cost(basicVar[i])
         return btranDense(dualRhs, dualValues, dualVec)
     }
 
-    /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
-    private val allZeroCost: Boolean get() = (0 until numVars).all { cost(it) == 0.0 }
     private fun resetGamma() = pricingState.resetReference()
 
     /**
