@@ -79,7 +79,7 @@ class QfLiraSolverDifferenceTest {
             component.observeWith(stats)
             component.observeCompleteTraversal()
             component.useIncrementalSourceRows()
-            component.deferAlternatePartialNumericalChecks()
+            component.allowPartialNumericalDeferrals()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))

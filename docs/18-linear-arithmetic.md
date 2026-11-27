@@ -92,8 +92,8 @@ A check proceeds in four steps:
    out until search selects a disjunct.
 2. **Check.** The LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
-   The default single-lane real feasibility portfolio can postpone one partial
-   numerical query between solve attempts after a retained point fails rechecking.
+   The default single-lane real feasibility portfolio can postpone up to three partial
+   numerical queries between solve attempts after a retained point fails rechecking.
    Direct bound conflicts remain eligible, and assigning the last Boolean requires
    an exact check even when its assignment changes no arithmetic row.
    Partial states retain a 128-row exact-continuation allowance. Boolean-complete

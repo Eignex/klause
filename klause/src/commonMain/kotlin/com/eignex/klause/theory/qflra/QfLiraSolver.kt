@@ -218,7 +218,7 @@ class ExactLiraSearchComponent private constructor(
     private var unconsumedLpPoint: List<BigFraction>? = null
     private var retainedLpPoint: List<BigFraction>? = null
     private var deferPartialNumericalChecks = false
-    private var partialNumericalCheckDeferred = false
+    private var deferredNumericalQueries = 0
     private var sourceCheckedPoint: List<BigFraction>? = null
     private var sourceCheckedBooleans: IntArray? = null
     private var candidate: List<BigFraction>? = null
@@ -376,7 +376,7 @@ class ExactLiraSearchComponent private constructor(
         observeCompleteStage("OPENING")
     }
 
-    internal fun deferAlternatePartialNumericalChecks() {
+    internal fun allowPartialNumericalDeferrals() {
         check(context == null && completeTraversalObserved && model.numIntVars == 0)
         deferPartialNumericalChecks = true
     }
@@ -1622,17 +1622,17 @@ class ExactLiraSearchComponent private constructor(
         }
         if (operationStop()) return ComponentResult.Indeterminate
         if (deferPartialNumericalChecks && unassignedBooleans > 0 && retained != null &&
-            lp.state?.let { it.conflict == null } == true && !partialNumericalCheckDeferred &&
+            lp.state?.let { it.conflict == null } == true && deferredNumericalQueries < MAX_DEFERRED_NUMERICAL_QUERIES &&
             solveContext.certificationPolicy === ProductionLpCertificationPolicy
         ) {
-            partialNumericalCheckDeferred = true
+            deferredNumericalQueries++
             candidate = null
             // Delivering the last Boolean marks even an unrelated arithmetic state dirty.
             dirty = false
             observeCompleteStage("LP_PARTIAL_QUERY_DEFERRED")
             return ComponentResult.Consistent
         }
-        partialNumericalCheckDeferred = false
+        deferredNumericalQueries = 0
         val complete = completeTraversalObserved && unassignedBooleans == 0
         if (complete) smtStats?.observeCompleteSearchLinearCheck()
         var result = measurePartialLinearPhase({ partialLinearNumericalNs += it }) {
@@ -2066,6 +2066,7 @@ class ExactLiraSearchComponent private constructor(
 private const val UNASSIGNED = -1
 private const val DECLINED_HINT = -2
 private const val MAX_POINT_HINT_ENTRIES = 65_536
+private const val MAX_DEFERRED_NUMERICAL_QUERIES = 3
 private const val MAX_POINT_HINT_BITS = 4096
 private const val FALSE = 0
 internal const val LIRA_TRUE = 1

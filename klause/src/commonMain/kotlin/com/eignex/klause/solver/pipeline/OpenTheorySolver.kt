@@ -441,7 +441,7 @@ class OpenTheoryEngine internal constructor(
                 it.useMixedPointCompletion()
                 if (params.openLinearIncremental) it.useIncrementalLinearPropagation()
                 if (deferPartialNumericalChecks && plan.theoryPipeline == ProblemPipeline.EXACT_LRA) {
-                    it.deferAlternatePartialNumericalChecks()
+                    it.allowPartialNumericalDeferrals()
                 }
             }
             planned.session.bindOpenTheoryWork(work)
