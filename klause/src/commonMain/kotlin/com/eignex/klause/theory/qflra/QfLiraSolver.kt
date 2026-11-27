@@ -1592,7 +1592,9 @@ class ExactLiraSearchComponent private constructor(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
-        if (partialLinearPropagation && bools.any { it == UNASSIGNED }) {
+        if (partialLinearPropagation && (!completeTraversalObserved || model.numIntVars != 0) &&
+            bools.any { it == UNASSIGNED }
+        ) {
             val propagated = derivePartialLinearImplications(context, applyLocally = true)
             if (operationStop()) return ComponentResult.Indeterminate
             if (propagated.deductions.isNotEmpty()) {
