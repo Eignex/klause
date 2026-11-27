@@ -5,6 +5,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.ContiguousDomain
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpNodeOverhead
+import com.eignex.klause.lp.bounding.LpRootPointDisposition
+import com.eignex.klause.lp.bounding.LpRootPointStage
 import com.eignex.klause.lp.bounding.LpRounding
 import com.eignex.klause.lp.bounding.RootComponentRounding
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
@@ -42,6 +44,7 @@ internal fun LpEngine.lpRoundingProbe(
     objective: LinearObjective,
     cancellation: ExecutionControl,
     initial: Sample? = null,
+    handoffRootPoint: () -> Boolean = { false },
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
     requireOpen()
@@ -63,8 +66,8 @@ internal fun LpEngine.lpRoundingProbe(
         retainRootPartialPrimalGuidance(pending.relaxation, cancellation)
     }
     val retained = rootRoundingWarmStart
-    val resumed = retained?.pinning
-    val session = resumed ?: PropagationSession(problem, cancellation)
+    var resumed = retained?.pinning
+    var session = resumed ?: PropagationSession(problem, cancellation)
     var previousWork = if (resumed == null) 0L else session.work
     var keepPinning = resumed != null
     try {
@@ -100,13 +103,16 @@ internal fun LpEngine.lpRoundingProbe(
                     if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
                         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis,
                             sourceProblem = sourceProblem)
+                        if (automaticSparseTrial && iterate.optimal && ownsRootPrimalModel(relaxation.model)) {
+                            retainRootPrimalGuidance(relaxation, iterate, cancellation)
+                        }
                     }
                 }
             } catch (_: CheckedLongOverflowException) {
                 return null
             } ?: return null
             if (ownsRootPrimalModel(relaxation.model)) {
-                retainRootPrimalGuidance(relaxation, result, cancellation)
+                if (!automaticSparseTrial) retainRootPrimalGuidance(relaxation, result, cancellation)
             } else retainRoundingPrimalGuidance(relaxation, result, objective, sourceProblem)
             rootRoundingWarmStart?.takeIf {
                 it.objective === objective && it.relaxation === relaxation && it.knownColumns == null
@@ -118,6 +124,30 @@ internal fun LpEngine.lpRoundingProbe(
         val guidance = rootRoundingWarmStart?.takeIf {
             problem.numRealVars == 0 && it.objective === objective &&
                 it.relaxation === relaxation && it.primal === primal
+        }
+        if (retained?.primal == null && resumed == null && guidance != null &&
+            guidance.knownColumns == null && !guidance.auxiliaryPoint &&
+            guidance.sourceProblem === problem && ownsRootPrimalModel(relaxation.model) &&
+            !cancellation()
+        ) {
+            if (handoffRootPoint()) {
+                outcome = "SEARCH_HANDOFF"
+                return null
+            }
+            val prepared = guidance.pinning?.takeIf { rootRoundingWarmStart === guidance }
+            if (prepared != null && prepared !== session) {
+                val unused = session
+                val unusedPreviousWork = previousWork
+                session = prepared
+                previousWork = prepared.work
+                resumed = prepared
+                keepPinning = true
+                try {
+                    unused.releaseRetainedState()
+                } finally {
+                    primalPropagationWork += unused.work - unusedPreviousWork
+                }
+            }
         }
         guidance?.pinning = session
         if (resumed != null) {
@@ -701,14 +731,21 @@ private fun LpEngine.solvePrimalRelaxation(
     observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)? = null,
 ): FloatLpResult? {
     requireOpen()
-    if (cancellation()) return null
+    if (cancellation()) {
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.QUERY_CALL, LpRootPointDisposition.CANCELLED, model)
+        }
+        return null
+    }
     if (ownsRootPrimalModel(model)) return solveRetainedPrimalRelaxation(model, cancellation, observeResult)
     val started = TimeSource.Monotonic.markNow()
     val simplex = newTableauCutSolver(model, cancellation,
         workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
     var outcome = "FAILED"
     try {
+        beginRootPointQuery(model)
         val result = if (primal) simplex.solvePrimal(warm) else simplex.solve(warm)
+        endRootPointQuery(model, result)
         outcome = if (result?.optimal == true) "OPTIMAL" else {
             val reason = simplex.lastTermination?.name ?: "OTHER"
             if (result == null) "NO_POINT_$reason" else "NON_OPTIMAL_$reason"
@@ -737,26 +774,37 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RETAINED_DECLINED"
     val remaining = minOf(rootPrimalWorkBudget(), retainedRootRemainingWork())
-    if (remaining <= 0L) return null
+    if (remaining <= 0L) {
+        if (rootPointObservationEnabled) {
+            observeRootPoint(LpRootPointStage.QUERY_CALL, LpRootPointDisposition.ROOT_WORK, model)
+        }
+        return null
+    }
     val token = cancellation or ExecutionControl { retainedRootRemainingWork() <= 0L }
     var observed = false
     try {
         checkContinuedRootBound(model, null, token)
+        beginRootPointQuery(model)
         val attempt = propagator.solveFloat(token = token, queryAllowance = {
             minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)
         })
+        if (rootPointObservationEnabled) {
+            endRootPointQuery(model, attempt?.second, propagator.floatPaused, propagator.floatTermination)
+        }
         if (attempt == null) observeSparsePausedProgress()
         val result = attempt?.second
         if (sparseTrialActive) {
             observed = true
             observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
         }
-        if (result != null) checkContinuedRootBound(model, result, token)
         val termination = propagator.floatTermination
+        val observedBeforeCheck = automaticSparseTrial && result?.optimal == true && observeResult != null
+        if (observedBeforeCheck) observeResult?.invoke(result, termination)
+        if (result != null) checkContinuedRootBound(model, result, token)
         outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {
             "RETAINED_${termination?.name ?: "OTHER"}"
         }
-        observeResult?.invoke(result, termination)
+        if (!observedBeforeCheck) observeResult?.invoke(result, termination)
         if (result?.optimal != true && (propagator.floatPaused || termination == LpFloatTermination.WORK ||
                 termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED)
         ) {

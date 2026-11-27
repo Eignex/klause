@@ -386,6 +386,13 @@ before writing and stops at two million entries or eight million work units;
 declines publish no factors or rank claim. Sparse admission never changes the dense
 exact-continuation caps.
 
+The automatic admission experiment evaluates its additional source and work
+guards inside the LP owner under the existing root and solve allowances. The
+diagnostic observer records completed admission decisions and their evaluated
+guards, including preparation and query allowances at the producer and helper.
+Root point events identify the original owner, model and point through queries,
+retention and search consultations. A consultation supplies ordering guidance.
+
 Completed root points can guide rounding under the same objective identity, within a
 one-MiB guidance cap. Rounding pins through propagation with nearest targets, and
 retained-root plans also try upward and downward targets; an interrupted pin restores
