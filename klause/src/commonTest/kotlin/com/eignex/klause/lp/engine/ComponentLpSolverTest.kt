@@ -171,11 +171,14 @@ class ComponentLpSolverTest {
         val zero = ExactLpNumber.of(0L)
         val slack = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
         val minus = ExactLpNumber.of(-1L)
+        val added = listOf(
+            LpScopedRow(3L, listOf(0 to minus), ExactLpNumber.of(-2L), slack),
+            LpScopedRow(4L, listOf(0 to minus, 1 to zero), ExactLpNumber.of(-3L), slack),
+        )
         val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(trail.state.ownerWorkingModel())))
         owner.use {
             assertNotNull(it.solve())
-            assertTrue(trail.append(LpScopedRow(3L, listOf(0 to minus), ExactLpNumber.of(-2L), slack)))
-            assertTrue(trail.append(LpScopedRow(4L, listOf(0 to minus, 1 to zero), ExactLpNumber.of(-3L), slack)))
+            assertTrue(trail.append(emptyList(), added, scoped = false))
 
             assertTrue(it.appendLocalRows(trail.state, ExecutionControl.Never, 0L) { model, token, work ->
                 newPersistentLpSolver(model, cancellation = token, workLimit = work)
