@@ -138,7 +138,7 @@ internal class ArithmeticLearningTrace(
         val ints = state.problem.numIntVars
         val bools = state.problem.numBoolVars
         if (ints.toLong() + bools > ATTACHMENT_COORDINATE_LIMIT ||
-            state.intDomains.any { it.holeCount != 0 }
+            state.intDomains.any { it.holeCount != 0L }
         ) {
             omitAttachment("attachment.frontier", ints)
             return true
