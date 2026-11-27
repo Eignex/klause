@@ -64,6 +64,35 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
+    fun `depth history records formation and its preferred revisit once per scope`() {
+        val events = ArrayList<String>()
+        val history = LpDirectionalHistory(events::add, depthRetention = true)
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            repeat(3) {
+                for (up in listOf(false, true)) {
+                    history.beginNode(0)
+                    history.record(0.0)
+                    history.branch(variable, 0.5)
+                    history.commit(SearchDecision.Bool(if (up) 0 else 1), 1)
+                    history.beginNode(1)
+                    history.record(if (up) 3.0 else 1.0)
+                    history.finishNode(true)
+                }
+            }
+            history.beginNode(0)
+            history.record(0.0)
+            repeat(2) {
+                assertEquals(false, history.depthPreference(variable, 0.5, 10.0) { true })
+            }
+            history.clear()
+        }
+
+        assertEquals(2, events.count { it == "DEPTH_RETENTION_FORMATION_COMPLETE" })
+        assertEquals(2, events.count { it == "DEPTH_RETENTION_FORMATION_REVISITED" })
+    }
+
+    @Test
     fun `recent depth observations replace the oldest slots without reallocating on scope reset`() {
         val events = ArrayList<String>()
         val history = LpDirectionalHistory(events::add, depthRetention = true)

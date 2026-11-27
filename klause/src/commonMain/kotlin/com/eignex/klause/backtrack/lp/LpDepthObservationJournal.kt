@@ -40,12 +40,12 @@ internal class LpDepthObservationJournal(
         gain: Double,
         pruned: Boolean?,
         current: () -> Boolean,
-    ) {
-        if (pruned == null && !gain.isFinite()) return
+    ): Boolean {
+        if (pruned == null && !gain.isFinite()) return false
         val count = size
         val write = next
         charge(8L)
-        if (!current() || count != size || write != next) return
+        if (!current() || count != size || write != next) return false
         val last = if (write == 0) capacity - 1 else write - 1
         val previous = blocks[last / BLOCK_SIZE]
         val append = count == 0 || previous?.nodes?.get(last % BLOCK_SIZE) != node
@@ -58,9 +58,9 @@ internal class LpDepthObservationJournal(
         if (!append && (retained == null || retained.variables[slot] != key ||
                 retained.parents[slot] != child.parent.objective ||
                 retained.flags[slot].toInt() and OUTCOMES.inv() != flag)
-        ) return
+        ) return false
         charge(24L + if (retained == null) BLOCK_BYTES else 0L)
-        if (!current() || count != size || write != next) return
+        if (!current() || count != size || write != next) return false
         val evicts = append && count == capacity
         val block = retained ?: Block().also { blocks[page] = it }
         val evictsInAge = evicts && node - block.nodes[slot] <= maxAge
@@ -94,6 +94,7 @@ internal class LpDepthObservationJournal(
             true -> "DEPTH_RETENTION_OUTCOME_PRUNED"
             false -> "DEPTH_RETENTION_OUTCOME_OPEN"
         })
+        return true
     }
 
     private fun adjust(key: Int, flag: Int, numeric: Boolean, outcome: Boolean, add: Boolean) {
@@ -109,6 +110,7 @@ internal class LpDepthObservationJournal(
         variable: VarRef,
         level: Int,
         node: Long,
+        includeCurrent: Boolean = false,
         current: () -> Boolean,
     ): LpDirectionalHistory.Gains? {
         val count = size
@@ -118,6 +120,7 @@ internal class LpDepthObservationJournal(
         if (!current() || count != size || write != next) return null
         val history = LpDirectionalHistory.Gains(variable)
         val key = key(variable)
+        val minimumAge = if (includeCurrent) 0L else 1L
         for (offset in 0 until count step BLOCK_SIZE) {
             val end = minOf(count, offset + BLOCK_SIZE)
             charge((end - offset) * 8L)
@@ -128,7 +131,9 @@ internal class LpDepthObservationJournal(
                 val slot = position % BLOCK_SIZE
                 val flag = block.flags[slot].toInt()
                 val sample = block.nodes[slot]
-                if (block.variables[slot] != key || flag ushr LEVEL_SHIFT != level || node - sample !in 1L..maxAge) {
+                if (block.variables[slot] != key || flag ushr LEVEL_SHIFT != level ||
+                    node - sample !in minimumAge..maxAge
+                ) {
                     continue
                 }
                 val direction = if (flag and UP != 0) history.up else history.down

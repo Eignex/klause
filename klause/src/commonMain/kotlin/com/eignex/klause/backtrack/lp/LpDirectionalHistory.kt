@@ -87,6 +87,8 @@ internal class LpDirectionalHistory(
     private var prunedStamp = -1L
     private var observed = false
     private var depthJournal: LpDepthObservationJournal? = null
+    private var depthFormations: HashMap<Long, Boolean>? = null
+    private var depthFormationRemaining = 64
     var depthLookupEligible = false
         private set
     var depthGuardDeclined = false
@@ -139,10 +141,11 @@ internal class LpDirectionalHistory(
         val retainedCandidates = candidateCount
         candidates = null
         candidateCount = 0
-        charge(gains.size.toLong() + retainedCandidates +
+        charge(gains.size.toLong() + retainedCandidates + (depthFormations?.size ?: 0) +
             if (depthJournal == null) 0L else LpDepthObservationJournal.CLEAR_WORK)
         gains.clear()
         depthJournal?.clear()
+        depthFormations = null
         clearDepthLookup()
         trimParents(0)
         pending = null
@@ -220,13 +223,13 @@ internal class LpDirectionalHistory(
         history.indexed = true
     }
 
-    private inline fun recordDepth(
+    private fun recordDepth(
         child: Pending,
         gain: Double,
         pruned: Boolean?,
         version: Long,
         node: Long,
-        crossinline current: () -> Boolean,
+        current: () -> Boolean,
     ) {
         if (!current() || version != generation || node != stamp) return
         val journal = depthJournal ?: run {
@@ -234,8 +237,52 @@ internal class LpDirectionalHistory(
             if (!current() || version != generation || node != stamp) return
             LpDepthObservationJournal(charge, observe, maxAge).also { depthJournal = it }
         }
-        journal.record(child, node, gain, pruned) { current() && version == generation && node == stamp }
+        fun live(): Boolean = current() && version == generation && node == stamp
+        val recorded = journal.record(child, node, gain, pruned, ::live)
+        if (recorded && pruned != null) observeDepthFormation(journal, child, node, ::live)
     }
+
+    private fun observeDepthFormation(
+        journal: LpDepthObservationJournal,
+        child: Pending,
+        node: Long,
+        current: () -> Boolean,
+    ) {
+        if (depthFormationRemaining == 0) return
+        charge(8L)
+        if (!current()) return
+        val variable = child.parent.variable
+        val level = child.depth - 1
+        val key = depthContextKey(variable, level)
+        if (depthFormations?.containsKey(key) == true || !journal.mayHavePairs(variable, level)) return
+        depthFormationRemaining--
+        val history = journal.restore(variable, level, node, includeCurrent = true, current) ?: return
+        observe("DEPTH_RETENTION_FORMATION_CHECK")
+        if (!current()) return
+        if (depthFormationRemaining == 0) {
+            observe("DEPTH_RETENTION_FORMATION_EXHAUSTED")
+            if (!current()) return
+        }
+        val decline = when {
+            history.down.count < RELIABILITY || history.up.count < RELIABILITY -> "NUMERIC_SHORT"
+            !history.down.stable || !history.up.stable || (history.down.gain <= 0.0 && history.up.gain <= 0.0) ->
+                "NUMERIC_UNRELIABLE"
+            history.down.outcomeCount < RELIABILITY || history.up.outcomeCount < RELIABILITY -> "OUTCOME_SHORT"
+            else -> null
+        }
+        if (decline != null) {
+            observe("DEPTH_RETENTION_FORMATION_$decline")
+            return
+        }
+        charge(if (depthFormations == null) 64L else 16L)
+        if (!current()) return
+        val formed = depthFormations ?: HashMap<Long, Boolean>().also { depthFormations = it }
+        formed[key] = false
+        observe("DEPTH_RETENTION_FORMATION_COMPLETE")
+    }
+
+    private fun depthContextKey(variable: VarRef, level: Int): Long =
+        (variable.varId.toLong() shl 8) or (level.toLong() shl 1) or if (variable is VarRef.Bool) 1L else 0L
 
     internal inline fun forEachCandidate(crossinline current: () -> Boolean, crossinline visit: (VarRef) -> Unit) {
         val entries = candidates ?: return
@@ -395,7 +442,7 @@ internal class LpDirectionalHistory(
             observe("OUTCOME_RATE_READY")
         }
         observe(if (pruned) "OUTCOME_PRUNED" else "OUTCOME_OPEN")
-        if (depthRetention) recordDepth(child, Double.NaN, pruned, version, node, current)
+        if (depthRetention) recordDepth(child, Double.NaN, pruned, version, node) { current() }
     }
 
     fun preferDirection(variable: VarRef, value: Double, cutoff: Double): Boolean? {
@@ -446,6 +493,19 @@ internal class LpDirectionalHistory(
             observe("DEPTH_RETENTION_LOOKUP_PREFERENCE_DECLINED")
             if (restored.down.outcomeCount < RELIABILITY || restored.up.outcomeCount < RELIABILITY) {
                 observe("DEPTH_RETENTION_LOOKUP_OUTCOME_SHORT")
+            }
+        }
+        if (preference != null) {
+            val formed = depthFormations
+            if (formed != null) {
+                charge(4L)
+                if (!current() || version != generation || node != stamp) return null
+                val key = depthContextKey(variable, depth)
+                if (formed[key] == false) {
+                    formed[key] = true
+                    observe("DEPTH_RETENTION_FORMATION_REVISITED")
+                    if (!current() || version != generation || node != stamp) return null
+                }
             }
         }
         return preference
