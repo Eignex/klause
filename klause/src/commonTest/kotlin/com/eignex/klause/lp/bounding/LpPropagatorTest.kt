@@ -591,8 +591,10 @@ class LpPropagatorTest {
             shape.modeledBytes <= baseline
         }
         LpPropagator(object : LpSearchPolicy {},
-            effort = { LpEffortProfile(work = 100_000L, componentSplit = true,
-                componentAdmission = admission, monolithicPreparationWork = 1L) },
+            effort = {
+                LpEffortProfile(work = 100_000L, componentSplit = true,
+                    componentAdmission = admission, monolithicPreparationWork = 1L)
+            },
             onPreparation = { charged += it.workOps },
         ).use { lp ->
             assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))

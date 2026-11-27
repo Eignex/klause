@@ -965,8 +965,8 @@ internal class LpScopedSolver(
                             }
                         },
                     )
-                } catch (stop: LpProjectionStop) {
-                    if (monolithicPreparationWork == null || token() || token.admission?.exhausted == true) throw stop
+                } catch (_: LpProjectionStop) {
+                    if (monolithicPreparationWork == null || token() || token.admission?.exhausted == true) return null
                     null
                 }
             }
