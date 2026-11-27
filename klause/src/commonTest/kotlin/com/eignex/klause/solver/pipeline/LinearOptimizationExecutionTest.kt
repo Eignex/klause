@@ -56,6 +56,18 @@ class LinearOptimizationExecutionTest {
     }
 
     @Test
+    fun `standalone linear execution should return a result when caller work is exhausted`() {
+        val context = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
+
+        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(sourceLpWorkLimit = 1L))
+
+        assertEquals(TerminationReason.BudgetExhausted, result.reason)
+        assertNull(result.terminal)
+    }
+
+    @Test
     fun `cancelling a scoped portfolio should keep its checked incumbent and conditional root bound`() {
         val model = Problem(
             0,

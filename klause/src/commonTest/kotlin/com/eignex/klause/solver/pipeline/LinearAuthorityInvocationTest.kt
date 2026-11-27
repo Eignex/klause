@@ -52,14 +52,16 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
 
     @Test
     fun `ordinary linear optimization should cross the former cumulative defaults`() {
-        val source = SourceProofContext(scope, setOf(real), mapOf(
+        val source = SourceProofContext(scope, setOf(bool, real), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "guarded" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+                mapOf(0 to true)),
         ), mapOf(real to BigFraction.ONE))
         val params = TheoryParams()
         val formerWork = 1_000_000_000L
         val formerAllocation = 512L * 1024L * 1024L
 
-        for ((work, allocation) in listOf(formerWork to 0L, 0L to formerAllocation)) {
+        for ((work, allocation) in listOf((formerWork - 1L) to 0L, 0L to (formerAllocation - 512L))) {
             val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
             funding.charge(work, allocation)
 
@@ -68,7 +70,7 @@ class LinearAuthorityInvocationTest : RuntimeInitializedTest() {
             assertEquals(TerminationReason.SearchExhausted, result.reason)
             assertEquals(SourceValue.Rational(BigFraction.ONE),
                 assertIs<SourceClaim.Optimal>(result.terminal?.claim).value)
-            assertTrue(funding.spent > work)
+            assertTrue(funding.spent > formerWork || funding.allocated > formerAllocation)
         }
     }
 
