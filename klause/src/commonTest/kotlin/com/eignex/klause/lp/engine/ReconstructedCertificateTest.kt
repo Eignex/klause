@@ -385,6 +385,29 @@ class ReconstructedCertificateTest {
     }
 
     @Test
+    fun `zero primal products should avoid restarting fixed point verification`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val wide = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 128, BIG_ONE))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, wide)), listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            listOf(ExactLpRow()),
+            ExactLpObjective(List(3) { zero }),
+        )
+
+        val result = reconstructCertificate(
+            assertNotNull(LpExactState(source).toWorkingModel()),
+            doubleArrayOf(0.0, 1.0),
+            claim = LpClaim.FEASIBLE_COMPLETION,
+        )
+
+        assertEquals(listOf(BigFraction.ZERO, BigFraction.ONE), result.witness?.primal)
+        assertEquals(0, result.metrics.verificationRestarts)
+    }
+
+    @Test
     fun `strict equality should be a bound but never a feasible point`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(

@@ -89,7 +89,10 @@ private class FixedReconstructionVerifier(
         val x = primal.map { from(it) }.toMutableList()
         val slack = a.rhs.map { from(it) }.toMutableList()
         for (j in 0 until a.n) {
-            for ((row, coefficient) in a.matrix[j]) slack[row] = minus(slack[row], times(from(coefficient), x[j]))
+            val value = x[j]
+            val entries = a.matrix[j]
+            if (value.isZero) meter.step(entries.size.toLong())
+            else for ((row, coefficient) in entries) slack[row] = minus(slack[row], times(from(coefficient), value))
         }
         x.addAll(slack)
         var value = from(a.constant)
@@ -205,7 +208,10 @@ private class BigReconstructionVerifier(
         val x = primal.map { from(it) }.toMutableList()
         val slack = a.rhs.map { from(it) }.toMutableList()
         for (j in 0 until a.n) {
-            for ((row, coefficient) in a.matrix[j]) slack[row] = minus(slack[row], times(from(coefficient), x[j]))
+            val value = x[j]
+            val entries = a.matrix[j]
+            if (value.isZero) meter.step(entries.size.toLong())
+            else for ((row, coefficient) in entries) slack[row] = minus(slack[row], times(from(coefficient), value))
         }
         x.addAll(slack)
         var value = from(a.constant)
