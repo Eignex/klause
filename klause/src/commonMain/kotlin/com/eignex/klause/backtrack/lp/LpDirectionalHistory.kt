@@ -603,6 +603,30 @@ internal class LpDirectionalHistory(
         val history = gains[variable] ?: return null
         expire(history.down)
         expire(history.up)
+        return preferUnderObservedDirection(history, value, "PASSIVE_COLLECTION_ZERO_GAIN")
+    }
+
+    fun hasDepthCollectionEvidence(variable: VarRef): Boolean {
+        if ((depthJournal?.size ?: 0) < RELIABILITY) return false
+        val history = gains[variable] ?: return false
+        return (history.down.stable && history.down.gain > 0.0 && stamp - history.down.previousStamp <= maxAge) ||
+            (history.up.stable && history.up.gain > 0.0 && stamp - history.up.previousStamp <= maxAge)
+    }
+
+    fun preferUnderObservedDirectionAtDepth(variable: VarRef, value: Double, current: () -> Boolean): Boolean? {
+        if (!value.isFinite() || (variable is VarRef.Bool && value !in 0.0..1.0)) return null
+        val journal = depthJournal ?: return null
+        val version = generation
+        val node = stamp
+        charge(8L)
+        if (!current() || version != generation || node != stamp) return null
+        val restored = journal.restore(variable, depth, node) {
+            current() && version == generation && node == stamp
+        } ?: return null
+        return preferUnderObservedDirection(restored, value, "PASSIVE_COLLECTION_DEPTH_ZERO_GAIN")
+    }
+
+    private fun preferUnderObservedDirection(history: Gains, value: Double, zeroGainOutcome: String): Boolean? {
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
         if (history.down.count >= RELIABILITY && history.up.count >= RELIABILITY) return null
@@ -610,7 +634,7 @@ internal class LpDirectionalHistory(
         val sampledDirection = if (history.up.count < history.down.count) history.down else history.up
         if (!sampledDirection.stable) return null
         if (sampledDirection.gain <= 0.0) {
-            observe("PASSIVE_COLLECTION_ZERO_GAIN")
+            observe(zeroGainOutcome)
             return null
         }
         return history.up.count < history.down.count

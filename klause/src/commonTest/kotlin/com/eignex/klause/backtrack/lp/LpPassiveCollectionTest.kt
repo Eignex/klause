@@ -41,6 +41,39 @@ class LpPassiveCollectionTest {
     }
 
     @Test
+    fun `depth scoped collection visits a missing direction despite complete mixed depth history`() {
+        val history = LpDirectionalHistory({}, depthRetention = true)
+        val variable = VarRef.IntVar(0)
+        val down = SearchDecision.IntAtMost(0, 2)
+        val up = SearchDecision.IntAtLeast(0, 3)
+        for ((level, decision) in listOf(0 to down, 1 to up)) {
+            repeat(2) {
+                history.beginNode(level)
+                history.record(10.0)
+                history.branch(variable, 2.25)
+                history.commit(decision, level + 1)
+                history.beginNode(level + 1)
+                history.record(11.0)
+            }
+        }
+        history.beginNode(0)
+        history.record(10.0)
+        val original = listOf(down, up)
+        val events = ArrayList<String>()
+        val collection = LpPassiveCollection(events::add, {})
+
+        val ordinary = collection.select(variable, 2.25, original, history, 1) { true }
+        val scoped = collection.select(variable, 2.25, original, history, 1, depthScoped = true) { true }
+        collection.commit(scoped.first(), 1) { true }
+        collection.commit(scoped.first(), 1) { true }
+
+        assertEquals(original, ordinary)
+        assertEquals(listOf(up, down), scoped)
+        assertEquals(1, events.count { it == "PASSIVE_COLLECTION_COMMIT_CHANGED" })
+        assertEquals(1, events.count { it == "PASSIVE_COLLECTION_DEPTH_COMMIT_CHANGED" })
+    }
+
+    @Test
     fun `unavailable history points and splits retain ordinary order`() {
         for (condition in listOf("missing", "one-sample", "equal", "reliable", "integral", "foreign", "cancelled")) {
             val history = LpDirectionalHistory({})

@@ -12,9 +12,11 @@ internal class LpPassiveCollection(
 ) {
     private var remainingChecks = maxChecks
     private var remainingSelections = maxSelections
+    private var remainingDepthChecks = 32
     private var nomination: SearchDecision? = null
     private var nominationStamp = -1
     private var changed = false
+    private var depthChanged = false
 
     init {
         require(maxChecks in 0..128 && maxSelections in 0..32)
@@ -26,6 +28,7 @@ internal class LpPassiveCollection(
     fun clear() {
         nomination = null
         changed = false
+        depthChanged = false
     }
 
     internal inline fun select(
@@ -34,6 +37,7 @@ internal class LpPassiveCollection(
         alternatives: List<SearchDecision>,
         history: LpDirectionalHistory,
         stamp: Int,
+        depthScoped: Boolean = false,
         crossinline fresh: () -> Boolean,
     ): List<SearchDecision> {
         clear()
@@ -42,7 +46,19 @@ internal class LpPassiveCollection(
         charge(16L)
         observe("PASSIVE_COLLECTION_CHECK")
         if (!fresh()) return alternatives.also { observe("PASSIVE_COLLECTION_STALE") }
-        val preferUp = history.preferUnderObservedDirection(variable, point)
+        val ordinary = history.preferUnderObservedDirection(variable, point)
+        var scoped: Boolean? = null
+        if (depthScoped && alternatives.size == 2 && remainingDepthChecks > 0) {
+            charge(4L)
+            if (!fresh()) return alternatives.also { observe("PASSIVE_COLLECTION_STALE") }
+            if (history.hasDepthCollectionEvidence(variable)) {
+                remainingDepthChecks--
+                observe("PASSIVE_COLLECTION_DEPTH_CHECK")
+                scoped = history.preferUnderObservedDirectionAtDepth(variable, point) { fresh() }
+                if (!fresh()) return alternatives.also { observe("PASSIVE_COLLECTION_STALE") }
+            }
+        }
+        val preferUp = (scoped ?: ordinary)
             ?: return alternatives.also { observe("PASSIVE_COLLECTION_NO_PROPOSAL") }
         val down: SearchDecision
         val up: SearchDecision
@@ -68,6 +84,7 @@ internal class LpPassiveCollection(
         nomination = proposal
         nominationStamp = stamp
         changed = differs
+        depthChanged = differs && scoped != null && scoped != ordinary
         return if (differs) alternatives.reversed() else alternatives
     }
 
@@ -77,9 +94,11 @@ internal class LpPassiveCollection(
         observe("PASSIVE_COLLECTION_COMMIT_CHECK")
         val accepted = expected == decision && nominationStamp == stamp && fresh()
         val wasChanged = changed
+        val changedByDepth = depthChanged
         clear()
         if (!accepted) return
         observe("PASSIVE_COLLECTION_COMMITTED")
         if (wasChanged) observe("PASSIVE_COLLECTION_COMMIT_CHANGED")
+        if (changedByDepth) observe("PASSIVE_COLLECTION_DEPTH_COMMIT_CHANGED")
     }
 }

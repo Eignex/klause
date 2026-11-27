@@ -501,7 +501,8 @@ internal class LpHints(
             if (values.hasNomination) return advised
         }
         if (!collectReady || !current()) return alternatives
-        return collection.select(variable, pointValue, alternatives, history, stamp, ::current)
+        return collection.select(variable, pointValue, alternatives, history, stamp,
+            depthScoped = depthRetention, fresh = ::current)
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
