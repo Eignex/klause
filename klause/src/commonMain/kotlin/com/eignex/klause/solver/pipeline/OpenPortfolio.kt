@@ -585,7 +585,7 @@ internal class OpenPortfolio(
 
         // The theory's least share of a satisfaction run, the rest to local search: only the theory can refute.
         const val THEORY_SHARE: Double = 0.75
-        const val REAL_LINEAR_PROBE_MILLIS: Long = 3_250L
+        const val REAL_LINEAR_PROBE_MILLIS: Long = 4_750L
 
         // Wall-clock ceiling on the seed LP, a small slice beside any portfolio budget.
         val SEED_BUDGET: Duration = 500.milliseconds
