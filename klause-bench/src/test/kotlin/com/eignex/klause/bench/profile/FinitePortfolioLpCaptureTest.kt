@@ -317,7 +317,8 @@ class FinitePortfolioLpCaptureTest {
         } else {
             assertEquals(1L, snapshot.failures)
             assertEquals(1L, snapshot.admissionFailures)
-            assertEquals(if (variant in setOf("schema", "metric", "fraction")) 1L else 0L, snapshot.admissionUnsupported)
+            val unsupported = if (variant in setOf("schema", "metric", "fraction")) 1L else 0L
+            assertEquals(unsupported, snapshot.admissionUnsupported)
             assertEquals("UNKNOWN", snapshot.owners.single().coverage)
             assertTrue(snapshot.events.isEmpty())
         }
@@ -508,11 +509,13 @@ class FinitePortfolioLpCaptureTest {
         val window = FinitePortfolioLpCapture.RootPointWindow("any",
             FinitePortfolioLpCapture.RootPointLimits(ownerEvents = 8, events = 16))
         val owners = List(4) { Any() }
-        val threads = owners.map { owner -> Thread {
-            repeat(8) { index ->
-                window.observe("bt/lp-default", RootEvent(owner, index + 1L), index.toLong())
+        val threads = owners.map { owner ->
+            Thread {
+                repeat(8) { index ->
+                    window.observe("bt/lp-default", RootEvent(owner, index + 1L), index.toLong())
+                }
             }
-        } }
+        }
 
         threads.forEach { it.start() }
         threads.forEach { it.join() }
@@ -681,7 +684,6 @@ class FinitePortfolioLpCaptureTest {
         val bound: Double? = null,
         val priorSharedBound: Double? = null,
     )
-
 
     @ParameterizedTest
     @ValueSource(strings = ["bt/satOptimized", "bt/conflictDriven"])
