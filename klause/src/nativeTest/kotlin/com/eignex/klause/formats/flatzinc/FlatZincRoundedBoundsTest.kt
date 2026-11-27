@@ -4,17 +4,19 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-internal class FlatZincSourceStateTest {
+internal class FlatZincRoundedBoundsTest {
     @Test
     @Suppress("FunctionNaming")
     internal fun `exact optimization should refute a rounded image outside its declared bound`() {
@@ -51,7 +53,9 @@ internal class FlatZincSourceStateTest {
                 objective = assertNotNull(program.linearObjective()),
             ),
         )
-        return SourceSetup.execute(SourceExecutionRequest(invocation))
+        return SourceSetup.execute(
+            SourceExecutionRequest(invocation, polynomial = PolynomialTheoryParams(maximumWork = 10_000_000L)),
+        )
     }
 
     private companion object {
