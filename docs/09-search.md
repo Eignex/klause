@@ -657,7 +657,7 @@ are private arithmetic coordinates rather than finite real domains. Source guard
 the graph directly, so a contradictory selection is excluded before all discrete
 columns are fixed. A consistent graph supplies no model; all original factors and
 source checks remain. See
-[real graph admission](17-theories.md#real-graph-admission-and-checks).
+[finite real propagation](17-theories.md#finite-real-propagation).
 
 ### Selected propagation projections
 
