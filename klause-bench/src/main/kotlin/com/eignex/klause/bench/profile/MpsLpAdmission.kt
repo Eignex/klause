@@ -47,12 +47,18 @@ import kotlin.time.Duration.Companion.seconds
 internal object MpsLpAdmission {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 1..3 && args[0].startsWith("batch64="))
+        require(args.size in 1..5 && args[0].startsWith("batch64="))
         val options = args.drop(1).associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.size == args.size - 1 && options.keys.all { it in setOf("queries", "input-mib") })
+        require(options.size == args.size - 1 && options.keys.all {
+            it in setOf("queries", "input-mib", "preparation-seconds", "preparation-work")
+        })
         val queries = options["queries"]
         require(queries == null || queries in setOf("true", "checkpoint"))
         val inputBytes = inputByteLimit(options["input-mib"]?.toInt() ?: 16)
+        val limits = PreparationLimits(
+            options["preparation-seconds"]?.toInt() ?: 20,
+            options["preparation-work"]?.toLong() ?: 1_650_000_000L,
+        )
         val requests = Json.decodeFromString<List<List<String>>>(
             Base64.getDecoder().decode(args[0].substringAfter('=')).decodeToString(),
         )
@@ -60,7 +66,7 @@ internal object MpsLpAdmission {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         requests.forEachIndexed { index, request ->
-            inspect(request, out.resolve("$index").apply { mkdirs() }, queries, inputBytes)
+            inspect(request, out.resolve("$index").apply { mkdirs() }, queries, inputBytes, limits)
         }
     }
 
@@ -69,7 +75,15 @@ internal object MpsLpAdmission {
         return mebibytes * 1024 * 1024
     }
 
-    private fun inspect(request: List<String>, out: File, queries: String?, inputBytes: Int) {
+    internal data class PreparationLimits(val seconds: Int, val work: Long) {
+        init {
+            require(seconds in 1..120)
+            require(work in 1L..6_600_000_000L)
+        }
+    }
+
+    private fun inspect(request: List<String>, out: File, queries: String?, inputBytes: Int,
+        limits: PreparationLimits) {
         val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys == setOf("suite", "problem", "sha256"))
         val source = Catalog.uncapped(options.getValue("suite")).problems
@@ -78,7 +92,7 @@ internal object MpsLpAdmission {
         require(bytes.size <= inputBytes && sha256(bytes) == options.getValue("sha256"))
         out.resolve("source.mps").writeBytes(bytes)
         val parsed = Mps.parse(bytes.decodeToString())
-        val stop = ExecutionControl.after(20.seconds)
+        val stop = ExecutionControl.after(limits.seconds.seconds)
         val original = requireNotNull(parsed.toLinearSourceProblem(cancellation = stop))
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
@@ -89,7 +103,7 @@ internal object MpsLpAdmission {
         }
         val canonical = requireNotNull(plan.model)
         val sourceObjective = preparedObjective(plan)
-        val budget = PresolveBudget(1_650_000_000L)
+        val budget = PresolveBudget(limits.work)
         val preparation = FinitePipeline.prepare(FinitePipelineRequest(
             canonical, FiniteEngine.BACKTRACK, sourceObjective,
             cancellation = stop, solveCancellation = stop, presolveBudget = budget,
@@ -107,7 +121,7 @@ internal object MpsLpAdmission {
             put("searchExecuted", false)
             put("sourceVerdictClaim", false)
             put("inputByteLimit", inputBytes)
-            put("preparationDeadlineSeconds", 20)
+            put("preparationDeadlineSeconds", limits.seconds)
             put("preparationDeadlineScope", "source-lowering-through-shape")
             put("preparationWorkScope", "finite-pipeline")
             status.forEach { (key, value) -> put(key, value) }
@@ -247,7 +261,7 @@ internal object MpsLpAdmission {
         }
     }
 
-    private fun admission(problem: Problem, config: LpConfig): JsonObject {
+    internal fun admission(problem: Problem, config: LpConfig): JsonObject {
         val method = LpAutoConfig.javaClass.methods.single { it.name.startsWith("admission$") }
         val observed = method.invoke(LpAutoConfig, problem, config, LpPlan())
         return buildJsonObject {
