@@ -6,11 +6,14 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -29,6 +32,55 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairResultTest {
+    @Test
+    fun `a projected pose should resume its original source check after a slice pause`() {
+        val integers = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null)
+        val model = Problem(0, intBounds = integers, factors = arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            Linear(intArrayOf(2), intArrayOf(2), LinearOp.GE, 1),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.25), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1),
+            realCoefficients = doubleArrayOf(1.0))
+        val nominal = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
+        val source = nominal.atScope(nominal.scope.copy(
+            revision = SourceRevision("envelope", "absolute-tolerance-envelope-v1")))
+        val guidance = LinearRepairGuidance()
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val budget = SourceLpBudget(funding = funding)
+        assertTrue(guidance.remember(source, (0..2).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.5
+        }, budget, ExecutionControl.Never))
+        guidance.settleFiniteCut(source, published = true, budget, ExecutionControl.Never)
+        var paused = false
+        var checks = 0
+        var captures = 0
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceCuts = false, sourceJointDistanceRepair = true, sourceJointDistanceDirect = true,
+                maxFlips = 2), repairGuidance = guidance).use { repair ->
+            repair.bindDistancePublication({ null }) { _, _, _ ->
+                if (++checks == 1) paused = true
+                true
+            }
+            repair.enableNominalPublicationRecovery { captures++; nominal }
+            repair.search(adaptive = false).use { search ->
+                val slice = ExecutionControl { paused }
+                repeat(64) {
+                    search.advance(slice, 5_000)
+                    if (paused) paused = false
+                }
+
+                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(BigFraction.ofLong(13) * BigFraction.ofLong(4).reciprocal(),
+                    objective.evaluateExact(result.sample))
+                assertEquals(2, checks)
+                assertEquals(1, captures)
+            }
+        }
+    }
+
     @Test
     fun `an accepted envelope point should recover an exact nominal publication`() {
         val integers = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null)
