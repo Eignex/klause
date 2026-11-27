@@ -523,8 +523,8 @@ settles it. `% klause-float-rounding: x = undetermined` marks a coordinate whose
 narrowing ran out of allowance, printed as its interval's rounded midpoint, and
 `overflow` one past binary64, printed as the largest finite value of its sign. The
 fraction or root description retains source authority.
-A completion accepted within tolerance carries binary64 coordinates only, so its
-block has decimal assignments and no exact comments.
+A completion that carries only binary64 coordinates emits decimal assignments.
+A polynomial witness can also carry exact coordinates for the tolerance-widened formula.
 Float component comments identify source real coordinates. With `-s`, a source
 declaring float variables reports `floatApproximation=false`. Accepted source
 satisfaction and completed optimization use the standard terminal marker;
