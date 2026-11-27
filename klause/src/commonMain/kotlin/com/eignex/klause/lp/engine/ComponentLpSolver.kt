@@ -872,6 +872,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     projection: LpProjectionMeter?,
     engine: (LpModel, ExecutionControl, Int) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
+    admit: ((List<LpBlockDimensions>) -> Boolean)? = null,
 ): T? {
     val n = model.n
     val m = model.m
@@ -919,6 +920,11 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[partition.find(rowIndex.colIdx[from])]
         blockRows[block].add(i)
     }
+    if (admit != null) {
+        projection?.reserve(children.toLong(), 32L * children, matrix = false)
+        val dimensions = List(children) { LpBlockDimensions(blockCols[it].size, blockRows[it].size) }
+        if (!admit(dimensions)) return null
+    }
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
 
@@ -932,6 +938,8 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         throw primary
     }
 }
+
+internal data class LpBlockDimensions(val columns: Int, val rows: Int)
 
 private fun LpModel.componentRestrictions(
     blockCols: Array<IntArrayList>,

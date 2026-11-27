@@ -122,6 +122,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val presolveStructuralImpact: ExecutionOption<Int> =
             ExecutionOption("presolve-structural-impact", ValueKind.INT)
 
+        /** Enable component decomposition in the presolve LP feasibility comparison. */
+        val presolveLpComponents: ExecutionOption<Boolean> =
+            ExecutionOption("presolve-lp-components", ValueKind.BOOLEAN)
+
         /** Minimum relative gain that keeps a presolve round active. */
         val presolveAbortFraction: ExecutionOption<Double> = ExecutionOption(
             "presolve-abort-fraction",
@@ -630,7 +634,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
 
         internal val byId by lazy {
             listOf(
-                dryRunPresolve, affinePivotOrder, presolvePreserveStructure, presolveStructuralImpact,
+                dryRunPresolve, affinePivotOrder, presolvePreserveStructure, presolveStructuralImpact, presolveLpComponents,
                 presolveAbortFraction, presolveMaxRounds,
                 presolveProbePerVar, presolveProbeTotal,
                 nodeLimit, openWorkLimit, sourceLpWorkLimit, sourceLpAllocationLimit, sourceLpOperations, sourceCuts,

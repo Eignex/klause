@@ -302,8 +302,11 @@ private fun LpEngine.widestFirst(n: Int, minimumSpan: Long): List<Int> {
  *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
  *  oracle [shaveVariableBounds] leans on). A true result proves the whole problem has no solution. Bake
  *  propagation already reports its own infeasibility, so a root already Unsat is left to that path. */
-internal fun LpEngine.rootInfeasible(token: ExecutionControl): Boolean {
+internal fun LpEngine.rootInfeasible(token: ExecutionControl, componentFeasibility: Boolean? = null): Boolean {
     if (lpRelaxer == null || token()) return false
+    if (componentFeasibility != null && problem.numRealVars == 0) {
+        return presolveFeasibilityQuery(token, componentFeasibility)
+    }
     val s = PropagationSession(problem)
     if (s.isUnsatAtRoot) return false
     return pruneNode(s, Double.POSITIVE_INFINITY, -1, true)

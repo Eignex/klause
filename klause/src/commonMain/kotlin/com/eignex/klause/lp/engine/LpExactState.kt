@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.LongHashSet
@@ -16,6 +17,7 @@ internal class LpProjectionMeter(
     private val workLimit: Long = Long.MAX_VALUE,
     private val allocationLimit: Long = Long.MAX_VALUE,
     private val cancellation: ExecutionControl = ExecutionControl.Never,
+    private val accounting: WorkMeter? = null,
 ) {
     var matrixWork: Long = 0L
         private set
@@ -45,6 +47,7 @@ internal class LpProjectionMeter(
         }
         if (matrix) matrixWork += work else vectorWork += work
         allocation += bytes
+        accounting?.charge(work)
     }
 }
 

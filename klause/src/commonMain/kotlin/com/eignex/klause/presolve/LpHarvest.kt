@@ -200,6 +200,7 @@ fun lpHarvestReporting(
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
     numericalLp: Boolean = false,
+    componentFeasibility: Boolean? = null,
 ): LpHarvestResult {
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`
@@ -221,7 +222,7 @@ fun lpHarvestReporting(
     if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
-    if (engine.rootInfeasible(cancellation)) {
+    if (engine.rootInfeasible(cancellation, componentFeasibility)) {
         return LpHarvestResult(
             RootBaker.provenInfeasible(problem, bakeConfig),
             LpHarvestReport(rootInfeasible = true),
