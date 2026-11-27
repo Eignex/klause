@@ -250,6 +250,21 @@ class LpHarvestTest {
     }
 
     @Test
+    fun `component harvest should decline a layout of only large blocks`() {
+        val blockSize = 32
+        val problem = Problem(0, 2 * blockSize, Array(2 * blockSize) { IntDomain(0, 10) },
+            Array<Factor>(2 * blockSize) { column ->
+                val next = column / blockSize * blockSize + (column + 1) % blockSize
+                Linear(intArrayOf(1, 1), intArrayOf(column, next), LinearOp.GE, 3)
+            }).bake()
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
+            componentFeasibility = true)
+
+        assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("FALLBACK_COMPLETE"))
+    }
+
+    @Test
     fun `component harvest should honor parent source slack`() {
         val problem = coverSystem(independentRows = 24).withSourceSemantics(SourceSemantics(
             SourceFormat.MPS, feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
