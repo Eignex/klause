@@ -619,24 +619,34 @@ internal object FinitePortfolioLpCapture {
             require(emphasis == null || emphasis in setOf("OFF", "CONSERVATIVE", "DEFAULT", "AGGRESSIVE"))
             require(listOf(estimatedRows, estimatedColumns, estimatedCells, producerQueryWork,
                 producerPreparationWork, helperQueryWork, helperPreparationWork).all { it == null || it >= 0L })
-            if (listOf(resolvedRootBudgetFraction, resolvedLpWorkBudgetFraction).any {
-                it != null && !it.isFinite()
-            }) throw UnsupportedAdmissionPayload()
+            val fractions = listOf(resolvedRootBudgetFraction, resolvedLpWorkBudgetFraction)
+            if (fractions.any { it != null && !it.isFinite() }) throw UnsupportedAdmissionPayload()
             require(metrics.values.all { it >= 0L })
+            val configuration = listOf(
+                emphasis, sparsePermitted, automaticEligible, estimatedRows, estimatedColumns, estimatedCells,
+                baseCellCap, ceilingCellCap, boundingPermitted, withinCeiling, structurallyApplicable,
+                projectionAllowed, producerQueryWork, producerPreparationWork, resolvedBounding, resolvedProbe,
+                resolvedBranching, resolvedComponentOwnership, resolvedLbTreeSearch, resolvedRootMaxWork,
+                resolvedBoundMaxDepth, resolvedRootBudgetMillis, resolvedRootBudgetFraction,
+                resolvedLpWorkBudgetFraction,
+            )
             if (disposition == "NOT_CONFIGURED") {
-                require(listOf(emphasis, sparseOverride, sparsePermitted, automaticEligible, estimatedRows, estimatedColumns, estimatedCells, baseCellCap, ceilingCellCap, boundingPermitted, withinCeiling, structurallyApplicable, projectionAllowed, producerQueryWork, producerPreparationWork, helperQueryWork, helperPreparationWork, resolvedBounding, resolvedProbe, resolvedBranching, resolvedComponentOwnership, resolvedLbTreeSearch, resolvedRootMaxWork, resolvedBoundMaxDepth, resolvedRootBudgetMillis, resolvedRootBudgetFraction, resolvedLpWorkBudgetFraction).all { it == null })
+                require(configuration.all { it == null })
+                require(sparseOverride == null && helperQueryWork == null && helperPreparationWork == null)
                 require(automaticEvaluated == 0L && automaticPassed == 0L &&
                     outerEvaluated == 0L && outerPassed == 0L && metrics.isEmpty() && !eventAutomatic)
                 return
             }
-            require(listOf(emphasis, sparsePermitted, automaticEligible, estimatedRows, estimatedColumns, estimatedCells, baseCellCap, ceilingCellCap, boundingPermitted, withinCeiling, structurallyApplicable, projectionAllowed, producerQueryWork, producerPreparationWork, resolvedBounding, resolvedProbe, resolvedBranching, resolvedComponentOwnership, resolvedLbTreeSearch, resolvedRootMaxWork, resolvedBoundMaxDepth, resolvedRootBudgetMillis, resolvedRootBudgetFraction, resolvedLpWorkBudgetFraction).all { it != null })
+            require(configuration.all { it != null })
             val automatic = completedGuard(automaticEvaluated, automaticPassed, 15)
             val considered = completedGuard(outerEvaluated, outerPassed, 6)
             require(automaticEligible == automatic)
             require((automaticPassed and 1L != 0L) == (sparseOverride != true))
             if (automaticEvaluated and 2L != 0L) require((automaticPassed and 2L != 0L) == sparsePermitted)
             if (outerEvaluated and 2L != 0L) require((outerPassed and 2L != 0L) == sparsePermitted)
-            if (outerEvaluated and 8L != 0L) require((outerPassed and 8L != 0L) == (sparseOverride == true || automatic))
+            if (outerEvaluated and 8L != 0L) {
+                require((outerPassed and 8L != 0L) == (sparseOverride == true || automatic))
+            }
             if (outerEvaluated and 16L != 0L) require((outerPassed and 16L != 0L) == structurallyApplicable)
             if (outerEvaluated and 32L != 0L) require((outerPassed and 32L != 0L) == boundingPermitted)
             val helperReturned = disposition == "ATTEMPTED_DECLINED" || disposition == "ADMITTED"
@@ -981,7 +991,9 @@ internal object FinitePortfolioLpCapture {
 
     internal class RootPointWindow(private val selectedWorker: String,
         private val limits: RootPointLimits = RootPointLimits()) {
-        init { require(selectedWorker.length <= 128) }
+        init {
+            require(selectedWorker.length <= 128)
+        }
 
         private class WeakIds(private val limit: Int) {
             private val values = ArrayList<WeakReference<Any>>()
@@ -1034,6 +1046,7 @@ internal object FinitePortfolioLpCapture {
         private var admissionUnsupported = 0L
         private var observerNs = 0L
 
+        @Suppress("TooGenericExceptionCaught") // A malformed diagnostic event must leave the solver running.
         fun observe(worker: String, event: Any, elapsedNs: Long) {
             val started = System.nanoTime()
             synchronized(lock) {
@@ -1152,19 +1165,26 @@ internal object FinitePortfolioLpCapture {
                     if (bound != null) {
                         require(bound.isFinite() && automatic && sourceRoot == true && model != null)
                         require(disposition in setOf("BOUND_CHECKED", "BOUND_APPLIED"))
-                        require(if (disposition == "BOUND_CHECKED") priorSharedBound == null
-                            else paused == null && (priorSharedBound == null ||
-                                priorSharedBound.isFinite() && priorSharedBound < bound))
+                        if (disposition == "BOUND_CHECKED") {
+                            require(priorSharedBound == null)
+                        } else {
+                            require(paused == null)
+                            require(priorSharedBound == null || (priorSharedBound.isFinite() && priorSharedBound < bound))
+                        }
                     }
                     records.add(RootPointRecord(worker, index, source, objective, pointObjective, model,
                         point, previous, sequence, query, stage, disposition,
                         automatic, auxiliary, partial, sourceRoot, paused, termination,
                         elapsedNs, admission, valueCommit, bound, priorSharedBound))
-                } catch (failure: Exception) {
-                    if (failure is CancellationException) throw failure
+                } catch (failure: CancellationException) {
+                    throw failure
+                } catch (_: UnsupportedAdmissionPayload) {
                     failures++
                     if (admissionEvent) admissionFailures++
-                    if (failure is UnsupportedAdmissionPayload) admissionUnsupported++
+                    admissionUnsupported++
+                } catch (_: Exception) {
+                    failures++
+                    if (admissionEvent) admissionFailures++
                 } finally {
                     observerNs += System.nanoTime() - started
                 }

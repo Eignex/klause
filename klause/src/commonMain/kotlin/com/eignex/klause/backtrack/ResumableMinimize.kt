@@ -1789,8 +1789,10 @@ internal class ResumableMinimize(
             sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "SOURCE_ROOT_VALUE_COMMITTED", 0L)
             if (!lpEngine.rootPointObservationEnabled) return
             val commit = when (decision) {
-                is SearchDecision.IntAtMost -> LpRootValueCommit(decision.variable, preferred, decision.upper, true, depth)
-                is SearchDecision.IntAtLeast -> LpRootValueCommit(decision.variable, preferred, decision.lower, false, depth)
+                is SearchDecision.IntAtMost ->
+                    LpRootValueCommit(decision.variable, preferred, decision.upper, true, depth)
+                is SearchDecision.IntAtLeast ->
+                    LpRootValueCommit(decision.variable, preferred, decision.lower, false, depth)
                 else -> return
             }
             lpEngine.observeRootPoint(LpRootPointStage.CONSUMER, LpRootPointDisposition.VALUE_COMMITTED,

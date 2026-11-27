@@ -92,10 +92,14 @@ class LpRootPointObservationTest {
             val sink = SolveStatsSink("admission-conservation")
             val params = LpParams(lpConfig = LpConfig.parse("default,+automatic-sparse"),
                 lpPlan = LpPlan(rootMaxWork = 100L),
-                cancellation = ExecutionControl { polls.add("cancel"); false })
+                cancellation = ExecutionControl {
+                    polls.add("cancel")
+                    false
+                })
 
             LpEngine(problem, objective, params, sink, nodeWorkAllowance = {
-                polls.add("allowance"); 1_000_000L
+                polls.add("allowance")
+                1_000_000L
             }, rootPointObserver = observer).use { engine ->
                 plans.add(engine.params.lpPlan)
                 metrics.add(sink.lp.snapshot().sparseTrial)
@@ -235,16 +239,21 @@ class LpRootPointObservationTest {
                 val observer = if (observed) LpRootPointObserver { events.add(it) } else null
                 LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true,
                     componentOwnership = true)), SolveStatsSink("copy-observation"),
-                    nodeWorkAllowance = { allowanceReads++; 1_000_000L }, rootPointObserver = observer).use { engine ->
+                    nodeWorkAllowance = {
+                        allowanceReads++
+                        1_000_000L
+                    }, rootPointObserver = observer).use { engine ->
                     allowanceReads = 0
                     engine.retainRootPrimalGuidance(relaxation, result, ExecutionControl { ++polls >= stopOn })
                     work.add(allowanceReads to engine.totalSolveWork())
 
                     assertEquals(minOf(stopOn, 2), polls)
                     assertEquals(stopOn == 3, engine.rootRoundingWarmStart?.primal != null)
-                    if (observed) assertEquals(if (stopOn == 3) LpRootPointDisposition.RETAINED
-                        else LpRootPointDisposition.CANCELLED,
-                        events.last { it.stage == LpRootPointStage.COPY }.disposition)
+                    if (observed) {
+                        val expected = if (stopOn == 3) LpRootPointDisposition.RETAINED
+                        else LpRootPointDisposition.CANCELLED
+                        assertEquals(expected, events.last { it.stage == LpRootPointStage.COPY }.disposition)
+                    }
                 }
             }
             assertEquals(work[0], work[1])
@@ -261,7 +270,8 @@ class LpRootPointObservationTest {
             rootPointObserver = LpRootPointObserver { events.add(it) }).use { engine ->
             engine.retainRootPrimalGuidance(relaxation, null, ExecutionControl { error("unexpected poll") })
 
-            assertEquals(LpRootPointDisposition.PROBE_DISABLED, events.single { it.stage == LpRootPointStage.COPY }.disposition)
+            assertEquals(LpRootPointDisposition.PROBE_DISABLED,
+                events.single { it.stage == LpRootPointStage.COPY }.disposition)
         }
     }
 
@@ -352,12 +362,15 @@ class LpRootPointObservationTest {
                 engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
                 assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
 
-                val returned = events.last { it.stage == LpRootPointStage.QUERY_CALL &&
-                    it.disposition == LpRootPointDisposition.OPTIMAL }
-                val copied = events.last { it.stage == LpRootPointStage.COPY &&
-                    it.disposition == LpRootPointDisposition.RETAINED }
-                val targets = events.last { it.stage == LpRootPointStage.TARGETS &&
-                    it.disposition == LpRootPointDisposition.RETAINED }
+                val returned = events.last {
+                    it.stage == LpRootPointStage.QUERY_CALL && it.disposition == LpRootPointDisposition.OPTIMAL
+                }
+                val copied = events.last {
+                    it.stage == LpRootPointStage.COPY && it.disposition == LpRootPointDisposition.RETAINED
+                }
+                val targets = events.last {
+                    it.stage == LpRootPointStage.TARGETS && it.disposition == LpRootPointDisposition.RETAINED
+                }
                 assertSame(returned.owner, copied.owner)
                 assertSame(returned.point, copied.previousPoint)
                 assertNotSame(returned.point, copied.point)

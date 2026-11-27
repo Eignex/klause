@@ -444,6 +444,7 @@ internal class LpEngine(
         }, model, result?.primal, paused = paused, termination = termination)
     }
 
+    @Suppress("TooGenericExceptionCaught") // Observer failures must not interrupt the solve.
     internal fun observeRootPoint(
         stage: LpRootPointStage,
         disposition: LpRootPointDisposition,
@@ -473,8 +474,9 @@ internal class LpEngine(
             valueCommit, bound, priorSharedBound)
         try {
             observer.onRootPoint(event)
-        } catch (failure: Exception) {
-            if (failure is CancellationException) throw failure
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
             disableRootPointObservation()
         }
     }

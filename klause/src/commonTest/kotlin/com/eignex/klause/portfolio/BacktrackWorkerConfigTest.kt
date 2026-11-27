@@ -71,7 +71,6 @@ class BacktrackWorkerConfigTest {
             rootStages.indexOf(LpRootPointStage.CLOSE_END))
     }
 
-
     @Test
     fun `guidance observation should preserve cutoff reads and improving witnesses`() {
         val problem = Problem(8, 0, emptyArray(), arrayOf<Factor>(
