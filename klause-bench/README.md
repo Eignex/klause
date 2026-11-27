@@ -911,13 +911,10 @@ default; explicit false selects the comparison control.
 `lp-component-split` supplies separable MPS and MiniZinc sources plus
 `mzn-linked-8x24` as a connected control. `param.lp-component-split=true|false`
 controls component splitting for continuous leaf completion.
-`lpPhase_COMPONENT_LIFECYCLE_*` records child `SOLVED` and `REUSED` counts through
-the existing route ledger; numerical work, pivots and factors count actual solves.
-`SOLVED` counts invocations, including attempts that stop without a result.
-`set=lp-component-lifecycle-v1` selects two binary covering MPS sources with direct
-additive objectives. Each block needs two selected columns but has a fractional
-LP optimum. There is no objective-definition row connecting the blocks. Pin
-`param.bt-arm=lp-aggressive` and `param.arms=1` to isolate an LP worker.
+`set=lp-component-lifecycle-v1` selects two binary covering MPS sources for
+ordinary LP comparisons on independent blocks. Each block needs two selected
+columns but has a fractional LP optimum. Pin `param.bt-arm=lp-aggressive` and
+`param.arms=1` to isolate an LP worker.
 
 Cut lifecycle controls retain `lpPhase_CUT_ROOT_*` and `lpPhase_CUT_NODE_*` phases
 alongside the ordinary LP totals. Family tags distinguish construction, mapping,
