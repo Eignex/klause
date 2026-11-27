@@ -22,11 +22,14 @@ import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
@@ -97,6 +100,34 @@ class CumulativeInvariantTest {
 
         assertEquals(-1L, predicted)
         assertEquals(1L, state.cost)
+    }
+
+    @Test
+    fun `wide cumulative scoring should stop inside a candidate and preserve its committed grade`() {
+        val far = 1L shl 21
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, far) },
+            arrayOf<Factor>(Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 1)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assign(0, 0)
+        state.recompute()
+        val move = IntSet(0, far)
+        var polls = 0
+        var scored = false
+
+        val chosen = state.scoringPick(ExecutionControl { ++polls > 1 }) {
+            state.factors[0].deltaIfIntSet(state, 0, move.varId, move.newValue)
+            scored = true
+            move
+        }
+
+        assertNull(chosen)
+        assertFalse(scored)
+        assertEquals(1L, state.cost)
+        assertEquals(-1L, state.netDelta(move))
     }
 
     @Test

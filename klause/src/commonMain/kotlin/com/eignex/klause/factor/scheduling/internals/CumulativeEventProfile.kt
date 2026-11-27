@@ -26,14 +26,18 @@ internal class CumulativeEventProfile {
     }
 
     // Exact event coordinates and loads keep zero overage meaningful even when a task ends beyond Long.MAX_VALUE.
-    fun overage(capacity: Long, commitPeak: Boolean): Int {
-        events.sortBy { it.time }
+    fun overage(capacity: Long, commitPeak: Boolean, checkWork: (() -> Unit)?): Int {
+        events.sortWith { first, second ->
+            checkWork?.invoke()
+            first.time.compareTo(second.time)
+        }
         val cap = bigIntOf(capacity.coerceAtLeast(0L))
         var overage = if (capacity < 0L) BIG_ZERO - bigIntOf(capacity) else BIG_ZERO
         var highest = cap
         var peakTime: Long? = null
         var usage = BIG_ZERO
         for (i in events.indices) {
+            checkWork?.invoke()
             val event = events[i]
             usage += event.loadChange
             val nextTime = events.getOrNull(i + 1)?.time ?: break

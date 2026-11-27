@@ -119,8 +119,10 @@ internal class CumulativeInvariant(
         intValue: (Int) -> Long = { state.assignment.intValue(it) },
         flippedBool: Int = -1,
     ): Int {
+        val checkWork = if (commitPeak) null else state::checkScoringWork
         profile.clear()
         for (i in 0 until n) {
+            checkWork?.invoke()
             val present = OptionalPresence.isPresentInAssignment(presents, i, state)
             val flipsPresence = presents.isNotEmpty() && Lit.variable(presents[i]) == flippedBool
             if (present == flipsPresence) continue
@@ -128,7 +130,7 @@ internal class CumulativeInvariant(
             val demand = if (resourceVars.isEmpty()) resources[i] else intValue(resourceVars[i])
             profile.addTask(intValue(starts[i]), duration, demand)
         }
-        return profile.overage(if (capacityVar < 0) capacity else intValue(capacityVar), commitPeak)
+        return profile.overage(if (capacityVar < 0) capacity else intValue(capacityVar), commitPeak, checkWork)
     }
 
     private fun refreshEventOverage(state: LocalSearchState, factorId: Int, profile: CumulativeEventProfile): Int {
@@ -510,6 +512,7 @@ internal class CumulativeInvariant(
             val iCur = state.assignment.intValue(iV)
             val iDom = state.rootDomains[iV]
             for (j in 0 until n) {
+                if (maxTrials != Int.MAX_VALUE) state.checkScoringWork()
                 if (swapsAdded >= CUMULATIVE_MAX_SWAPS) break
                 if (j == i) continue
                 val dj0 = curDur(state, j)
