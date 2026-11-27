@@ -25,7 +25,7 @@ enum class OpenBranching(
     }
 }
 
-private const val DEFAULT_HINT_MIN_SPLITS = 128L
+internal const val DEFAULT_HINT_MIN_SPLITS = 128L
 
 /** Cooperative limits shared by complete open-model theories. */
 data class TheoryParams(

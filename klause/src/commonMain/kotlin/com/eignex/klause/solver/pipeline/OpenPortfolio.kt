@@ -370,7 +370,13 @@ internal class OpenPortfolio(
         params: TheoryParams,
         invocation: () -> EngineInvocation?,
     ): ResumableSolve = object : ResumableSolve {
-        private val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), params)
+        private val search = ResumableOpenTheory(
+            OpenTheoryPipeline.engineFor(request), params,
+            deferPartialNumericalChecks = lanes == 1 && request.route == ProblemPipeline.EXACT_LRA &&
+                params.openLinearIncremental && params.openBranching == OpenBranching.Automatic &&
+                params.openHintFlips == null && params.openHintMinSplits == DEFAULT_HINT_MIN_SPLITS &&
+                params.sharedRestart == null,
+        )
         override val isDone: Boolean get() = search.isDone
         override val stats: SolveStats get() = search.stats
         override val work: Long get() = search.work

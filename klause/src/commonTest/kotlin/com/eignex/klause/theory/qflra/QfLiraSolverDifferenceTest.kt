@@ -16,6 +16,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -47,8 +48,11 @@ class QfLiraSolverDifferenceTest {
                     LinearOp.LE, 1.0),
             ))
         ExactLiraSearchComponent(model).use { component ->
+            val stats = SmtStatsSink()
+            component.observeWith(stats)
             component.observeCompleteTraversal()
             component.useIncrementalSourceRows()
+            component.deferAlternatePartialNumericalChecks()
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
             assertIs<ComponentResult.Consistent>(session.initialize())
             for (truth in listOf(true, false, true)) {
@@ -62,6 +66,7 @@ class QfLiraSolverDifferenceTest {
                 val point = assertNotNull(session.model().valueOf(component.realAssignmentKey)).reals.single()
                 assertTrue(if (truth) point <= BigFraction.ZERO else point > BigFraction.ONE)
             }
+            assertTrue((stats.snapshot().completeSearchStages?.get("LP_PARTIAL_QUERY_DEFERRED") ?: 0L) > 0L)
         }
     }
 
