@@ -93,8 +93,9 @@ internal fun LpEngine.splitPresolveFeasibility(
         model.tableauCells() < MIN_COMPONENT_QUERY_CELLS || model.rowStrict.any { it }
     ) return null
     val offer = nodeWorkBudget()
+    fun callerRemaining(): Long = scope.token.admission?.quotaRemaining ?: Long.MAX_VALUE
     val projection = LpProjectionMeter(
-        if (offer > 0L) minOf(offer, MAX_COMPONENT_PREPARATION_WORK) else MAX_COMPONENT_PREPARATION_WORK,
+        minOf(offer.takeIf { it > 0L } ?: Long.MAX_VALUE, MAX_COMPONENT_PREPARATION_WORK, callerRemaining()),
         MAX_COMPONENT_PREPARATION_BYTES,
         scope.token,
         WorkMeter(scope::charge),
@@ -104,9 +105,11 @@ internal fun LpEngine.splitPresolveFeasibility(
     var numerical = LpSolveMetrics()
     var scalingWork = 0L
     var refuted = false
-    fun remainingWork(): Long = offer - minOf(offer, saturatedAdd(
-        projection.work, saturatedAdd(scalingWork, numerical.workOps),
-    ))
+    fun remainingWork(): Long {
+        val spent = saturatedAdd(projection.work, saturatedAdd(scalingWork, numerical.workOps))
+        val available = if (offer > 0L) offer - minOf(offer, spent) else Long.MAX_VALUE
+        return minOf(available, callerRemaining())
+    }
     try {
         val layout = model.componentLayout(scope.token, projection) ?: return null
         if (!admitPresolveBlocks(model, layout)) return null
@@ -119,14 +122,12 @@ internal fun LpEngine.splitPresolveFeasibility(
             if (childIterations == 0) return@visit false
             // Scaling is prepared before the numerical solver has a chance to poll.
             val scaling = 2L * LpScalingView.constructionWorkBound(part.model)
-            if ((offer > 0L && scaling >= remaining) ||
-                (scope.token.admission?.quotaRemaining?.let { scaling >= it } == true)
-            ) return@visit false
+            if (scaling >= remaining) return@visit false
             scope.attemptedSplit = true
             scalingWork = saturatedAdd(scalingWork, scaling)
             newTableauCutSolver(
                 part.model, scope.token, iterationLimit = childIterations,
-                workLimit = if (offer == 0L) 0L else remaining - scaling,
+                workLimit = if (remaining == Long.MAX_VALUE) 0L else remaining - scaling,
                 factory = solveContext.engineFactory, pricing = pricingOptions,
             ).use { solver ->
                 val fallbacks = solver.scalingMetrics.fallbacks
@@ -142,13 +143,14 @@ internal fun LpEngine.splitPresolveFeasibility(
                 scope.solved(metrics)
                 solver.infeasibleRay?.takeIf { !scope.token() }?.let { candidate ->
                     val liftWork = model.m.toLong() + candidate.size
-                    if (offer == 0L || liftWork < remainingWork()) {
+                    if (liftWork < remainingWork()) {
                         projection.reserve(liftWork, 8L * model.m, matrix = false)
                         val lifted = DoubleArray(model.m)
                         for (row in candidate.indices) lifted[part.rows[row]] = candidate[row]
                         refuted = verifyPresolveFeasibilityRay(model, lifted, scope)
                     }
                 }
+                projection.capAdditionalWork(remainingWork())
                 point?.optimal == true && !scope.token()
             }
         }
