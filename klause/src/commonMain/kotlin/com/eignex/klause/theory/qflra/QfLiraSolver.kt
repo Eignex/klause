@@ -19,6 +19,7 @@ import com.eignex.klause.lp.bounding.LpPremisedBound
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.closeSourceLpOwners
+import com.eignex.klause.lp.engine.DEFAULT_REFACTOR_UPDATE_LIMIT
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
@@ -287,6 +288,9 @@ class ExactLiraSearchComponent private constructor(
             },
             effort = {
                 LpEffortProfile(
+                    refactorUpdates = if (completeTraversalObserved && model.numIntVars == 0) {
+                        2 * DEFAULT_REFACTOR_UPDATE_LIMIT
+                    } else DEFAULT_REFACTOR_UPDATE_LIMIT,
                     continuation = ExactContinuationLimits(
                         maxRows = if (completeTraversalObserved && unassignedBooleans == 0) Int.MAX_VALUE else 128,
                     ),
