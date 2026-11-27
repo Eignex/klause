@@ -75,6 +75,7 @@ internal class JointLinearRepair(
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
     private class CheckedProposal(val condition: ExactNeighborhoodCondition, val sample: Sample)
+    private class PrivateQueryId(val proposal: Long, val query: Long)
     private class ProximityPass(val value: BigFraction, val coordinates: List<BigFraction>, val observationId: Long,
         var next: Int = 0) {
         var pair: ExactNeighborhoodCondition? = null
@@ -98,6 +99,7 @@ internal class JointLinearRepair(
     private var observedPasses = 0L
     private var observationQuery = 0L
     private var observedPrivateQueries = 0
+    private var privateQueryId: PrivateQueryId? = null
     private var privatePublication: String? = null
     private var observedOperator = 0
     private var observedSchedulingRound = 0L
@@ -373,7 +375,8 @@ internal class JointLinearRepair(
     }
 
     private fun privateQueryObservation(counters: Map<String, Long>, disposition: String): Map<String, Long> {
-        if (!queryProximity || observedPrivateQueries > MAX_PRIVATE_QUERY_OBSERVATIONS) return emptyMap()
+        val id = privateQueryId ?: return emptyMap()
+        if (observedPrivateQueries > MAX_PRIVATE_QUERY_OBSERVATIONS) return emptyMap()
         val prefix = "jointRepairPrivateQuery${observedPrivateQueries}_"
         return buildMap {
             for ((key, value) in counters) {
@@ -382,7 +385,8 @@ internal class JointLinearRepair(
                     put(prefix + stage, value)
                 }
             }
-            put(prefix + "Query", observationQuery)
+            put(prefix + "Proposal", id.proposal)
+            put(prefix + "Query", id.query)
             put(prefix + "Pending", if (query?.hasPendingProximityCompletion == true) 1L else 0L)
             put(prefix + "RemainingWork", funding.remainingWork)
             put(prefix + "RemainingAllocation", funding.remainingAllocation)
@@ -579,8 +583,8 @@ internal class JointLinearRepair(
                         checkedProposal = (privateChecked ?: pooled)?.takeIf {
                             (completion != null || privateChecked != null) && !bootstrap
                         }?.let { CheckedProposal(condition, it) }
+                        if (incumbentProximity || observation != null) proposalSequence++
                         if (observation != null) {
-                            proposalSequence++
                             observationQuery = 0L
                             observation.proposal(proposalSequence, observedOperator, observedSchedulingRound,
                                 proposalRound, count, size, when {
@@ -832,6 +836,7 @@ internal class JointLinearRepair(
                     stop or cancellation)?.also {
                     queryProximity = true
                     observedPrivateQueries++
+                    privateQueryId = PrivateQueryId(proposalSequence, observationQuery)
                     queryProximityCutoff = privateCutoff
                     queryProximityPass = proximityProposalPass
                     queryProximityClosed = proximityProposalClosed
@@ -923,6 +928,7 @@ internal class JointLinearRepair(
                 checked is SourceEvidenceCheck.Unavailable -> "PublicationWorkingUnavailable"
                 originalUnavailable -> "PublicationOriginalUnavailable"
                 !originalChecked -> "PublicationOriginalRejected"
+                incumbentCompletionCheck == null -> "PublicationWorkingCheckedOnly"
                 else -> "PublicationChecked"
             }
             observation?.event(proposalSequence, observationQuery, "publication", when {
@@ -1175,6 +1181,7 @@ internal class JointLinearRepair(
         queryProximityPass = null
         retainedProposal = null
         publishedQueryIncumbent = null
+        privateQueryId = null
         privatePublication = null
         active?.close()
     }

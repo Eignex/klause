@@ -94,6 +94,7 @@ class JointLinearRepairFractionalTest(private val advisory: Boolean) : RuntimeIn
                 val query = assertNotNull(stages[receipt + "Query"])
                 val publication = records.single { it.phase == "publication" && it.query == query }
                 assertEquals("checked", publication.disposition)
+                assertEquals(publication.proposal, stages[receipt + "Proposal"])
                 assertEquals(1L, stages[receipt + "PublicationChecked"])
                 assertTrue((stages[receipt + "OfferAccepted"] ?: 0L) > 0L)
             }
