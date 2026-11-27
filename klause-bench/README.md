@@ -1078,9 +1078,12 @@ portfolio-progress=false captures=0 lp-ceiling=default`. The separate
 `automatic-sparse=true` treatment probes automatic admission within the same
 portfolio allocation. Source input is limited to 2 MiB and 6,000 rows and
 columns. The diagnostic checks the decoded source hash and journals admission,
-query, handoff and consumer events. Guard masks cover evaluated operands only.
-Missing or interrupted events leave the corresponding outcome unknown. An
-offer records a search consultation. The benchmark JVM profile and observer
+query, handoff and consumer events. An optional `source-archive-sha256` binds the
+committed corpus entry and records the worker's stored encoding separately.
+Guard masks cover evaluated operands only. Missing or interrupted events leave
+the corresponding outcome unknown. The journal associates a committed integer
+split with the full root target that supplied its preferred value when it can
+trace the split through ordinary search. The benchmark JVM profile and observer
 overhead have a separate cost scope from ordinary CLI solves.
 
 `ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.

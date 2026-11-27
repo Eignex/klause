@@ -16,6 +16,8 @@ import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpRootPointDisposition
 import com.eignex.klause.lp.bounding.LpRootPointObserver
 import com.eignex.klause.lp.bounding.LpRootPointStage
+import com.eignex.klause.lp.bounding.LpRootValueCommit
+import com.eignex.klause.lp.bounding.RootPrimalTargets
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.linearLowerBound
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
@@ -1702,11 +1704,18 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
+        private var sourcePreference: Pair<RootPrimalTargets, Long>? = null
+        private var sourceDecision: SearchDecision? = null
+        private var sourceValueObserved = false
+
         override fun onBranch(variable: VarRef) {
+            sourcePreference = null
+            sourceDecision = null
             lpHints?.branch(variable)
         }
 
         override fun onCommit(decision: SearchDecision, depth: Int) {
+            if (decision === sourceDecision) observeRootValueCommit(decision, depth)
             lpHints?.commit(decision, depth, params.cancellation)
         }
 
@@ -1728,12 +1737,38 @@ internal class ResumableMinimize(
         }
 
         override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
-            val rooted = lpEngine.orderRootValues(variable, values)
+            val rooted = if (!sourceValueObserved && variable is VarRef.IntVar && lpEngine.rootPointObservationEnabled &&
+                lpEngine.automaticSparseTrial
+            ) {
+                lpEngine.orderRootValues(variable, values) { targets, preferred ->
+                    sourcePreference = targets to preferred
+                }
+            } else lpEngine.orderRootValues(variable, values)
             return lpHints?.order(variable, rooted) ?: rooted
         }
 
-        override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
-            lpHints?.orderAlternatives(variable, alternatives, params.cancellation) ?: alternatives
+        override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> {
+            val ordered = lpHints?.orderAlternatives(variable, alternatives, params.cancellation) ?: alternatives
+            if (sourcePreference != null) {
+                val first = ordered.firstOrNull()
+                if (first === alternatives.firstOrNull()) sourceDecision = first
+            }
+            return ordered
+        }
+
+        private fun observeRootValueCommit(decision: SearchDecision, depth: Int) {
+            val (targets, preferred) = sourcePreference ?: return
+            sourcePreference = null
+            sourceDecision = null
+            val commit = when (decision) {
+                is SearchDecision.IntAtMost -> LpRootValueCommit(decision.variable, preferred, decision.upper, true, depth)
+                is SearchDecision.IntAtLeast -> LpRootValueCommit(decision.variable, preferred, decision.lower, false, depth)
+                else -> return
+            }
+            sourceValueObserved = true
+            lpEngine.observeRootPoint(LpRootPointStage.CONSUMER, LpRootPointDisposition.VALUE_COMMITTED,
+                point = targets.coordinates, sourceRoot = true, valueCommit = commit)
+        }
     }
 
     /** Refutes LP-dominated partial assignments through the shared frame stack. */

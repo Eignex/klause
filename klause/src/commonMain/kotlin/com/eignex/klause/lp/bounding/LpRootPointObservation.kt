@@ -14,7 +14,7 @@ internal enum class LpRootPointDisposition {
     ENTERED, OPTIMAL, NON_OPTIMAL, NO_RESULT, RETAINED, REPLACED, CLEARED,
     PROBE_DISABLED, CANCELLED, STORAGE, LP_WORK, ROOT_WORK, BRANCH_DISABLED, REAL_VARIABLES,
     OBJECTIVE, SHAPE, MASK, OWNER, NO_GUIDANCE, NO_POINT, NOT_PAUSABLE, NO_DECISIONS,
-    TREE_SEARCH, NOT_RETAINED, COMPONENT_TRIAL, HANDED_OFF, VALUE_OFFERED, COMPONENT_OFFERED,
+    TREE_SEARCH, NOT_RETAINED, COMPONENT_TRIAL, HANDED_OFF, VALUE_OFFERED, COMPONENT_OFFERED, VALUE_COMMITTED,
     NOT_CONFIGURED, NOT_CONSIDERED, PROJECTION_SKIPPED, ATTEMPTED_DECLINED, ADMITTED, BEGIN, END,
 }
 
@@ -40,6 +40,15 @@ internal class LpRootPointObservation(
     val termination: LpFloatTermination?,
     val pointObjective: Any?,
     val admission: LpRootAdmissionObservation? = null,
+    val valueCommit: LpRootValueCommit? = null,
+)
+
+internal class LpRootValueCommit(
+    val variable: Int,
+    val preferred: Long,
+    val limit: Long,
+    val atMost: Boolean,
+    val level: Int,
 )
 
 internal enum class LpRootAdmissionDisposition {
