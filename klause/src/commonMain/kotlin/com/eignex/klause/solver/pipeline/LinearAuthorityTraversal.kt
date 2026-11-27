@@ -85,6 +85,7 @@ internal class LinearAuthorityTraversal(
     private val guideIncumbent: Boolean = false,
     private val onRootConditionalCuts:
     ((List<SourceEvidence>, SourceLpBudget, ExecutionControl) -> Map<String, Long>)? = null,
+    private val denseRootCutTrial: Boolean = false,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
     private val onUncutRootPoint: ((List<SourceCoordinate>, List<BigFraction>) -> Unit)? =
@@ -487,7 +488,9 @@ internal class LinearAuthorityTraversal(
             }
         val queried = if (useGuidance && useCuts && pointCuts)
             authority.advanceWithPointCuts(branch, cancellation, preserveUncutBound = aggregateCuts,
-                onUncutPoint = onUncutRootPoint.takeIf { current === root })
+                onUncutPoint = onUncutRootPoint.takeIf { current === root },
+                allowDenseRootTrial = denseRootCutTrial && current === root && onRootConditionalCuts != null &&
+                    ownsAuthority)
         else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
         else authority.check(branch, cancellation)
         val strongestBound = strongerLinearBound(current.partialBound, queried.bound)

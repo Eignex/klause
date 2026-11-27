@@ -154,7 +154,8 @@ internal class LinearAuthorityInvocation(
         feedbackRequest = feedbackRequest, aggregateBranching = aggregateBranching, repairGuidance = repairGuidance,
         offerUncutRootGuidance = !params.sourceIncumbentCompletion && params.sourcePointCuts && params.sourceAggregateCuts,
         gap = gap, useSourceGap = useSourceGap, gapTolerance = gapTolerance,
-        guideIncumbent = guideIncumbent, onRootConditionalCuts = onRootConditionalCuts)
+        guideIncumbent = guideIncumbent, onRootConditionalCuts = onRootConditionalCuts,
+        denseRootCutTrial = params.sourceDenseRootCutTrial)
     private val session = SearchComponentSet(listOf(component)).session(params.maxLeaves, stop,
         atoms = if (params.sourceRefutationPropagation || params.sourceRefutationResolution) SearchAtomRegistry(
             context.coordinates.filter {

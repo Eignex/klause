@@ -230,6 +230,7 @@ private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionRead
     sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: sourceLpOperations,
     sourceCuts = reader[ExecutionOption.sourceCuts] ?: sourceCuts,
     sourcePointCuts = point ?: sourcePointCuts,
+    sourceDenseRootCutTrial = reader[ExecutionOption.sourceDenseRootCutTrial] ?: sourceDenseRootCutTrial,
     sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: sourceCutBranching,
     sourceAggregateCuts = aggregate ?: sourceAggregateCuts,
     sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]

@@ -125,6 +125,8 @@ data class TheoryParams(
     val sourceJointDistanceRepair: Boolean = false,
     /** Try one original nominal completion of the paid projected binary pose before regional branching. */
     val sourceJointDistanceDirect: Boolean = false,
+    /** Allow one point-selection trial on a dense ordinary root in the finite proof worker. */
+    val sourceDenseRootCutTrial: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)

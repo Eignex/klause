@@ -98,6 +98,7 @@ internal class LinearAuthority(
     private var pointPolicy: LinearAuthorityPointCuts? = null
     private var pointFamily: LinearAuthorityTemplate? = null
     private var pointFallback: LinearAuthorityTemplate? = null
+    private var denseRootBaseline: LinearAuthorityTemplate? = null
     private var directedFamily: LinearAuthorityTemplate? = null
     private var pointMask: Set<Int>? = null
     private var deferAggregatePreparation = false
@@ -176,6 +177,7 @@ internal class LinearAuthority(
         pointPolicy?.releaseCandidates()
         pointFamily = null
         pointFallback = null
+        denseRootBaseline = null
         directedFamily = null
         pointMask = null
         deferAggregatePreparation = false
@@ -186,16 +188,30 @@ internal class LinearAuthority(
 
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: ExecutionControl,
         retainBasePoint: Boolean = false, preserveUncutBound: Boolean = false,
-        onUncutPoint: ((List<SourceCoordinate>, List<BigFraction>) -> Unit)? = null): LinearAuthorityResult =
-        if (!preserveUncutBound) advancePointRecipe(source, cancellation, retainBasePoint) else
-            boundBaseline.advance(source, cancellation, baseline = {
-                advanceBound(source, cancellation, onUncutPoint).also {
-                    if (!it.paused) cutLifecycle.containing("UNCUT_BASELINE") { lp.close() }
-                }
-            }, ordinary = { advancePointRecipe(source, cancellation, retainBasePoint) })
+        onUncutPoint: ((List<SourceCoordinate>, List<BigFraction>) -> Unit)? = null,
+        allowDenseRootTrial: Boolean = false): LinearAuthorityResult {
+        // The proof worker can read the selected root query before the ordinary family is restored.
+        if (!allowDenseRootTrial) denseRootBaseline?.let { ordinary ->
+            template = ordinary
+            query = null
+            pointFamily = ordinary
+            pointFallback = ordinary
+            denseRootBaseline = null
+            directedFamily = null
+            pointMask = null
+            pointRound = null
+            pointPolicy?.releaseCandidates()
+        }
+        if (!preserveUncutBound) return advancePointRecipe(source, cancellation, retainBasePoint, allowDenseRootTrial)
+        return boundBaseline.advance(source, cancellation, baseline = {
+            advanceBound(source, cancellation, onUncutPoint).also {
+                if (!it.paused) cutLifecycle.containing("UNCUT_BASELINE") { lp.close() }
+            }
+        }, ordinary = { advancePointRecipe(source, cancellation, retainBasePoint, allowDenseRootTrial) })
+    }
 
     private fun advancePointRecipe(source: SourceProofContext, cancellation: ExecutionControl,
-        retainBasePoint: Boolean = false): LinearAuthorityResult {
+        retainBasePoint: Boolean, allowDenseRootTrial: Boolean): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe,
             maximumBatchCuts = 8)
             .also { pointPolicy = it }
@@ -257,11 +273,15 @@ internal class LinearAuthority(
                 policy.observe("AdmissionActiveCutsSum", prepared.activeCuts.toLong())
                 policy.observe("AdmissionCoordinatesSum", prepared.coordinates.size.toLong())
                 if (prepared.activeCuts >= prepared.coordinates.size) {
-                    pointFallback = family
-                    policy.observe("DeclinedCutCount")
-                    return base
-                }
-                policy.observe("AdmittedCutCount")
+                    if (!allowDenseRootTrial || denseRootBaseline != null ||
+                        source.scope.condition != SourceCondition()) {
+                        pointFallback = family
+                        policy.observe("DeclinedCutCount")
+                        return base
+                    }
+                    denseRootBaseline = baselineFamily
+                    policy.observe("DenseRootTrial")
+                } else policy.observe("AdmittedCutCount")
             }
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
