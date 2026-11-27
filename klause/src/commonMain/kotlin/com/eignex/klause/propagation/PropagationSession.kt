@@ -1035,8 +1035,9 @@ class PropagationSession private constructor(
         state.arithmeticLearningLimits = ArithmeticLearningLimits(workLimit, allocationBytes)
     }
 
-    internal fun configureIntegerRowAdmission(enabled: Boolean) {
+    internal fun configureIntegerRowAdmission(enabled: Boolean, reuse: Boolean = true) {
         state.integerRowAdmission = enabled
+        state.integerRowReuse = reuse
     }
 
     /** Enable exact mandatory integer-row learning for subsequent finite conflicts. */
@@ -1049,7 +1050,14 @@ class PropagationSession private constructor(
     }
 
     internal fun addLearnedIntegerRow(row: IntegerConflictRow, lbd: Int): PropagationResult =
-        registerAndPropagate(base = state.undoTop) { state.addLearnedIntegerRow(row, lbd) }
+        registerAndPropagate(base = state.undoTop) {
+            val before = state.work
+            try {
+                state.addLearnedIntegerRow(row, lbd)
+            } finally {
+                state.integerRowAttachmentWork += state.work - before
+            }
+        }
 
     internal fun addLearnedIntegerRow(learned: ConflictAnalyzer.AnalysisResult.LearnedIntegerRow): PropagationResult {
         val publicationBase = state.undoTop
@@ -1474,6 +1482,16 @@ class PropagationSession private constructor(
             "learningIntegerSessions" to 1L,
             "learningIntegerDerived" to it.integerRowsDerived,
             "learningIntegerAdmissionDeclined" to it.integerRowAdmissionsDeclined,
+            "learningIntegerAdmitted" to counts.getOrElse("learningIntegerAdmitted") { 0L },
+            "learningIntegerConsumed" to counts.getOrElse("learningIntegerConsumed") { 0L },
+            "learningIntegerRetired" to counts.getOrElse("learningIntegerRetired") { 0L },
+            "learningIntegerAnalysisWork" to it.integerRowAnalysisWork,
+            "learningIntegerRetainedSeedUses" to it.integerRowRetainedSeedUses,
+            "learningIntegerRetainedEndpointUses" to it.integerRowRetainedEndpointUses,
+            "learningIntegerAttachmentWork" to it.integerRowAttachmentWork,
+            "learningIntegerPropagationWork" to it.integerRowPropagationWork,
+            "learningIntegerPostInitialFires" to it.integerRowPostInitialFires,
+            "learningIntegerPostInitialUsefulFires" to it.integerRowPostInitialUsefulFires,
         ) else counts
     } ?: retiredLifecycle
 
