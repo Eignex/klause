@@ -4,10 +4,12 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toLinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -73,10 +75,7 @@ internal object JointRepairLpCapture {
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
             sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
             sourceIncumbentCompletion = true)
-        val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
-        val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
-            .newInstance(model, context, objective, params, policy, true, { null }, active, null,
-                null, null, true, null, checker, null, null, null)
+        val owner = openOwner(model, context as SourceProofContext, objective, params, active, checker)
         val window = ConditionWindow(limit)
         val authority = requireNotNull(field(owner, "authority"))
         val budget = requireNotNull(field(owner, "budget"))
@@ -215,7 +214,7 @@ internal object JointRepairLpCapture {
             }.toString())
         } finally {
             (search as AutoCloseable).close()
-            (owner as AutoCloseable).close()
+            owner.close()
         }
         if (options["inspect-rays"] == "true") JointRayInspection.inspect(out, stop)
     }
@@ -298,6 +297,16 @@ internal object JointRepairLpCapture {
             if (index + 1 == observerComponent) observe else call(context, "component${index + 1}")
         }
         return requireNotNull(copy.invoke(context, *arguments))
+    }
+
+    internal fun openOwner(
+        model: Problem, context: SourceProofContext, objective: LinearObjective,
+        params: TheoryParams, active: ExecutionControl, checker: Any?,
+    ): AutoCloseable {
+        val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
+        return Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 19 }
+            .newInstance(model, context, objective, params, policy, true, { null }, active, null,
+                null, null, null, true, null, checker, null, null, false, null) as AutoCloseable
     }
 
     private fun field(owner: Any, name: String): Any? =
