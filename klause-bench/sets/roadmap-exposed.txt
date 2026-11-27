@@ -128,3 +128,33 @@ miplib2017/s55
 miplib2017/stoch-vrpvrp-s5v2c8vrp-v2c8i
 miplib2017/supportcase27i
 miplib2017/supportcase43
+
+# SMT-LIB linear arithmetic
+smtlib-qflira/LCTES/cruise-control
+smtlib-qflira/LCTES/cruise-control.nosummaries
+smtlib-qflira/LCTES/fly-by-wire.locals
+smtlib-qflira/LCTES/smtopt
+smtlib-qflira/LCTES/tdf.locals
+smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_overflow1.i_3_8_2.bpl_7
+smtlib-qflra/DTP-Scheduling/constraints-temporal-machine-shop-2-3-A40
+smtlib-qflra/DTP-Scheduling/constraints-temporal-machine-shop-2-3-A60
+smtlib-qflra/LassoRanker/CooperatingT2/broydn.c.i.broydn.pl.t2.fixed.t2.c_Iteration8_Loop_7-phaseTemplate
+smtlib-qflra/latendresse/ecoliFBAyicesTest-500
+smtlib-qflra/miplib/pp08a-2000
+smtlib-qflra/sc/sc-22.induction3.cvc
+smtlib-qflra/tta_startup/simple_startup_6nodes.synchro.induct
+smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/cooking13
+smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/cooking14
+smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/cooking15
+smtlib-qfrdl/check/bignum_rdl1
+smtlib-qfrdl/check/bignum_rdl2
+smtlib-qfrdl/sal/fischer9-mutex-2
+smtlib-qfrdl/sal/fischer9-mutex-3
+smtlib-qfrdl/sal/fischer9-mutex-4
+smtlib-qfrdl/scheduling/orb06_1000
+smtlib-qfrdl/scheduling/orb07_330
+smtlib-qfrdl/scheduling/orb08_830
+smtlib-qfrdl/skdmxa/skdmxa-3x3-5
+# MIPLIB source of the pp08a-2000 relaxation
+miplib3/pp08a
+miplib2003/pp08a
