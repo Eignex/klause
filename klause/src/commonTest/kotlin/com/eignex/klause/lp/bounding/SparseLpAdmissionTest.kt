@@ -501,6 +501,24 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `compact estimates measure the full signed objective magnitude`() {
+        val model = LpBuilder().apply { addVar(0L, 1L, cost = Long.MIN_VALUE) }.build(Sense.MINIMIZE)
+
+        val estimate = estimateSparseLpAdmission(model)
+
+        assertEquals(64L, estimate.metrics["ScalarBits"])
+    }
+
+    @Test
+    fun `compact estimates exclude an artificial upper side`() {
+        val model = LpBuilder().apply { addFreeVar(0L, null, cost = 7L) }.build(Sense.MINIMIZE)
+
+        val estimate = estimateSparseLpAdmission(model)
+
+        assertEquals(3L, estimate.metrics["ScalarBits"])
+    }
+
+    @Test
     fun `wide exact scalars decline numerical admission`() {
         for (originOnly in listOf(false, true)) {
             val model = LpBuilder().apply {
