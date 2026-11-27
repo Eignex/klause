@@ -202,19 +202,19 @@ fun lpHarvestReporting(
     numericalLp: Boolean = false,
 ): LpHarvestResult = lpHarvestReporting(
     problem, objective, plan, bakeConfig, cancellation, zeroObjectivePricing, randomSeed, numericalLp,
-    componentFeasibility = true,
+    componentFeasibility = null,
 )
 
 internal fun lpHarvestReporting(
     problem: BakedProblem,
     objective: LinearObjective,
     plan: LpPlan,
-    bakeConfig: BakeConfig,
-    cancellation: ExecutionControl,
-    zeroObjectivePricing: LpZeroObjectivePricing,
-    randomSeed: Long?,
-    numericalLp: Boolean,
-    componentFeasibility: Boolean,
+    bakeConfig: BakeConfig = BakeConfig.NONE,
+    cancellation: ExecutionControl = ExecutionControl.Never,
+    zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+    randomSeed: Long? = null,
+    numericalLp: Boolean = false,
+    componentFeasibility: Boolean?,
 ): LpHarvestResult {
     // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
     // large relaxation runs far past the presolve budget, and the engine polls only the `cancellation`

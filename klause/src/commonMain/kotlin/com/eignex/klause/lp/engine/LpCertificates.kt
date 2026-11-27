@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -132,10 +133,12 @@ internal fun certifyLpFarkas(
     basisRow: Int = -1,
     onRoute: ((FarkasRoute) -> Unit)? = null,
     observer: LpCertificationObserver? = null,
+    cancellation: ExecutionControl = ExecutionControl.Never,
+    accounting: WorkMeter? = null,
 ): LongArray? {
     return observeLpClaim(LpClaim.CONTRADICTION, observer) { observation ->
         var route = FarkasRoute.NONE
-        val scans = LpScanCount(model)
+        val scans = LpScanCount(model, accounting)
         val mechanismObserver = observation?.let { target ->
             object : LpCertificationObserver by target {
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
@@ -150,10 +153,11 @@ internal fun certifyLpFarkas(
             basisRow = basisRow,
             onRoute = { route = it },
             observer = mechanismObserver,
+            cancellation = cancellation,
             scans = scans,
         )?.takeIf {
             scans.scan()
-            sourceFarkasValid(model, it)
+            !cancellation() && sourceFarkasValid(model, it) && !cancellation()
         }
         observation?.observe(LpCertifier.EXACT_FARKAS, ray != null, scans.cost())
         onRoute?.invoke(if (ray != null) route else FarkasRoute.NONE)

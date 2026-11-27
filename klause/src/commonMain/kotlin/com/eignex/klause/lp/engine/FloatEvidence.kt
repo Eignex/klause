@@ -780,7 +780,12 @@ private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<
  * ray refutes only a model infeasible by more than it.
  */
 @Suppress("ReturnCount")
-internal fun floatFarkasRay(model: LpModel, ray: DoubleArray, slack: LpBoundSlack = LpBoundSlack.NONE): LongArray? {
+internal fun floatFarkasRay(
+    model: LpModel,
+    ray: DoubleArray,
+    slack: LpBoundSlack = LpBoundSlack.NONE,
+    refutationOnly: Boolean = false,
+): LongArray? {
     if (ray.size != model.m || !model.finiteExactInput()) return null
     var largest = 0.0
     for (value in ray) {
@@ -793,6 +798,7 @@ internal fun floatFarkasRay(model: LpModel, ray: DoubleArray, slack: LpBoundSlac
     val moved = SideSlack(view, slack)
     val rows = lazy { RowView(view, moved.takeUnless { slack == LpBoundSlack.NONE }) }
     val sign = farkasSign(view, normalized, rows, moved) ?: return null
+    if (refutationOnly) return LongArray(0)
     val oriented = DoubleArray(ray.size) { sign * normalized[it] }
     val open = openColumns(view)
     foldOpenColumns(view, oriented, rows, open)

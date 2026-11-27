@@ -40,8 +40,9 @@ feasibility query. Admission excludes small or row-heavy relaxations, a dominant
 block and splits with limited aggregate tableau savings. The query projects and
 retires one block at a time under a shared allowance. A feasible block supplies
 only its status. A candidate contradiction maps its ray to parent rows and uses
-the parent's certificate policy and source slack. An inconclusive split may spend
-the remaining allowance on the full relaxation. Later search opens its own LP state.
+the parent's certificate policy and source slack. A declined layout uses the
+ordinary root query. A stopped split supplies no deduction. Later search opens
+its own LP state.
 
 `lp.lattice` is a leaf over `util`, owning exact integer matrix reductions and
 triangular-block bounds. Its sparse fraction-free elimination polls cancellation

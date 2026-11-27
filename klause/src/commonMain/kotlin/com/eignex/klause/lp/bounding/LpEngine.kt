@@ -860,6 +860,8 @@ internal class LpEngine(
     var lpRelaxer: CpToLpRelaxation? = null
         private set
 
+    internal var presolveFeasibility: LpPresolveFeasibility? = null
+
     // Structure-based cut separators, run against the sparse LP point.
     var lpSeparators: List<CutSeparator> = emptyList()
         private set
@@ -1406,9 +1408,9 @@ internal class LpEngine(
             persistentRelaxation = null
             preparedRootRelaxation = null
             if (admitted != null && cancellation()) throw LpAssemblyCancelled()
-            val base = admitted ?: relaxer.build(RootDomains(problem), emptyList(), cancellation) {
-                noteNodeOverhead(it * LpNodeOverhead.BUILD)
-            }
+            val domains = RootDomains(problem)
+            val base = admitted ?: presolveFeasibility?.build(relaxer, domains)
+                ?: relaxer.build(domains, emptyList(), cancellation) { noteNodeOverhead(it * LpNodeOverhead.BUILD) }
             if (admitted == null) noteNodeOverhead(base.model.extent() * LpNodeOverhead.BUILD)
             if (base.persistentEligible && !base.model.hasContinuous) {
                 persistentRelaxation = base

@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
@@ -26,7 +27,7 @@ internal sealed interface LpCertifierCost {
  * products run [Long.SIZE_BITS] wide costs one unit per entry, and a wider one the square of its word length, as an
  * exact continuation multiplication does, so a wide model or operand is not undercharged.
  */
-internal class LpScanCount(private val model: LpModel) {
+internal class LpScanCount(private val model: LpModel, private val accounting: WorkMeter? = null) {
     private var units = 0L
 
     /** One pass whose operand values are at most [operandBits] wide. */
@@ -34,13 +35,14 @@ internal class LpScanCount(private val model: LpModel) {
         val words = (maxOf(model.coefficientBits, Long.SIZE_BITS) + operandBits - 1L) / Long.SIZE_BITS
         val square = words * words
         units = if (units > Long.MAX_VALUE - square) Long.MAX_VALUE else units + square
+        accounting?.charge(work(square))
     }
 
-    fun cost(): LpCertifierCost.Metered {
+    fun cost(): LpCertifierCost.Metered = LpCertifierCost.Metered(work(units))
+
+    private fun work(scans: Long): Long {
         val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong() + model.numVars + model.m
-        return LpCertifierCost.Metered(
-            if (units > 0 && entries > Long.MAX_VALUE / units) Long.MAX_VALUE else entries * units,
-        )
+        return if (scans > 0 && entries > Long.MAX_VALUE / scans) Long.MAX_VALUE else entries * scans
     }
 }
 

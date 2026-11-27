@@ -32,12 +32,11 @@ internal fun ExecutionOptionReader.presolve(base: PresolveConfig): SourcePresolv
         ordered.withEffort(
             preserveStructure = preserve ?: ordered.preserveStructure,
             structuralImpactLimit = impact ?: ordered.structuralImpactLimit,
-            lpComponents = lpComponents ?: ordered.lpComponents,
             abortFraction = fraction ?: ordered.abortFraction,
             maxRounds = rounds ?: ordered.maxRounds,
             probeBudgetPerVar = perVariable ?: ordered.probeBudgetPerVar(),
             probeTotalBudget = total ?: ordered.probeTotalBudget(),
-        ),
+        ).withLpComponents(lpComponents ?: ordered.lpComponents),
         true,
     )
 }

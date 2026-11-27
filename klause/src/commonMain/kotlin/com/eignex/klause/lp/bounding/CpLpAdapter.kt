@@ -186,9 +186,14 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         if (!core.atLevel(depth)) return null
         if (retained.depth > depth) retained.retract(depth)
-        var edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) {
-            engine.noteNodeOverhead(it * LpNodeOverhead.BUILD)
-        } ?: return null
+        val presolve = engine.presolveFeasibility
+        val onWork: (Long) -> Unit = {
+            val work = it * LpNodeOverhead.BUILD
+            engine.noteNodeOverhead(work)
+            presolve?.charge(work)
+        }
+        var edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation, onWork)
+            ?: return null
         weakenedBoundDepth(edit)?.let { assertionDepth ->
             if (assertionDepth < 0) return null
             val target = maxOf(0, assertionDepth - 1)
@@ -200,9 +205,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             retained.retract(minOf(retained.depth, target))
             cuts.retract(minOf(cuts.depth, target))
             if (!core.atLevel(depth)) return null
-            edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) {
-                engine.noteNodeOverhead(it * LpNodeOverhead.BUILD)
-            } ?: return null
+            edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation, onWork)
+                ?: return null
         }
         if (!core.editSources(edit) { column, upper -> boundPremise(edit, column, upper, session) }) return null
         val rebound = retained.relaxation(requireNotNull(core.state), domains)

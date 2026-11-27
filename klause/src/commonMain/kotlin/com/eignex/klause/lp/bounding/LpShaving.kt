@@ -302,13 +302,23 @@ private fun LpEngine.widestFirst(n: Int, minimumSpan: Long): List<Int> {
  *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
  *  oracle [shaveVariableBounds] leans on). A true result proves the whole problem has no solution. Bake
  *  propagation already reports its own infeasibility, so a root already Unsat is left to that path. */
-internal fun LpEngine.rootInfeasible(token: ExecutionControl, componentFeasibility: Boolean): Boolean {
+internal fun LpEngine.rootInfeasible(token: ExecutionControl, componentFeasibility: Boolean?): Boolean {
     if (lpRelaxer == null || token()) return false
-    if (problem.admitsPresolveFeasibility()) presolveFeasibilityQuery(token, componentFeasibility)?.let { return it }
-    if (token()) return false
-    val s = PropagationSession(problem)
-    if (s.isUnsatAtRoot) return false
-    return pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
+    val scope = componentFeasibility?.takeIf { problem.admitsPresolveFeasibility() }?.let {
+        LpPresolveFeasibility(it, token, rootCertificationObserver())
+    }
+    presolveFeasibility = scope
+    var infeasible = false
+    try {
+        val session = PropagationSession(problem, scope?.token ?: ExecutionControl.Never)
+        if (!session.isUnsatAtRoot && !token()) {
+            infeasible = pruneNode(session, Double.POSITIVE_INFINITY, -1, true) && (scope == null || !token())
+        }
+        return infeasible
+    } finally {
+        presolveFeasibility = null
+        scope?.finish(infeasible)
+    }
 }
 
 /** Whether the root relaxation is Farkas-certifiably infeasible over the problem's *declared* domains,

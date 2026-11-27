@@ -461,14 +461,31 @@ internal fun LpEngine.sparseSafePrune(
     if (!numericalDeductions && model.rowStrict.any { it }) {
         strictSourcePrune(relaxation, session, bound, sink, cancellation, learn)?.let { return it }
     }
+    val presolve = presolveFeasibility
+    if (presolve != null && satisfactionOnly && cutPool.size == 0) {
+        splitPresolveFeasibility(model, presolve)?.let { refuted ->
+            if (refuted) {
+                recordPruneBound(Double.POSITIVE_INFINITY)
+                sink.lp.observeInfeasiblePrune()
+                LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.ROOT))
+            }
+            return LpNodeOutcome(refuted, null)
+        }
+        if (cancellation()) return LpNodeOutcome(false, null)
+    }
     val attempted = solveNode(model, warm, cancellation)
     if (attempted == null) {
+        presolve?.solved(propagator.lastMetrics)
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
         noteSolveOps(propagator.lastMetrics.workOps)
         observeNodePause()
         return LpNodeOutcome(false, null)
     }
     val (simplex, floatResult) = attempted
+    presolve?.let {
+        it.solved(if (nodeUsesTrail) propagator.lastMetrics else simplex.lastMetrics)
+        it.complete = floatResult?.optimal == true && !cancellation()
+    }
     // Read the cost off the solver rather than the result: a solve that terminates dual-unbounded
     // returns none, and those are the solves that prune — costing only the ones that return a result
     // would drop the most valuable work from the average.
@@ -495,7 +512,11 @@ internal fun LpEngine.sparseSafePrune(
         // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm its ray before pruning ([infeasibilityRay]). Any other failure (non-convergence /
         // singular) keeps the node.
-        val ray = simplex.infeasibleRay?.let { infeasibilityRay(model, it, sink) }
+        val ray = simplex.infeasibleRay?.let {
+            if (presolve != null && !learn && cutPool.size == 0) {
+                if (verifyPresolveFeasibilityRay(model, it, presolve)) LongArray(0) else null
+            } else infeasibilityRay(model, it, sink)
+        }
         if (ray != null) {
             observeCutRayUse(relaxation, ray)
             recordPruneBound(Double.POSITIVE_INFINITY)

@@ -88,9 +88,10 @@ class PresolveConfig(
     val preserveStructure: Boolean = false,
     /** Maximum factor/entry visits per rewrite impact observation; zero disables it. */
     val structuralImpactLimit: Int = 0,
-    /** Solve independent blocks in eligible LP harvest feasibility queries. */
-    val lpComponents: Boolean = true,
 ) {
+    internal var lpComponents: Boolean = true
+        private set
+
     init {
         require(abortFraction.isFinite() && abortFraction in 0.0..1.0)
         require(maxRounds >= 0)
@@ -117,8 +118,7 @@ class PresolveConfig(
             maxRounds,
             preserveStructure,
             structuralImpactLimit,
-            lpComponents,
-        )
+        ).also { it.lpComponents = lpComponents }
 
     /** Return a request-local effort plan, keeping unspecified limits. */
     fun withEffort(
@@ -128,11 +128,13 @@ class PresolveConfig(
         probeTotalBudget: Int? = probeTotalBudgetOverride,
         preserveStructure: Boolean = this.preserveStructure,
         structuralImpactLimit: Int = this.structuralImpactLimit,
-        lpComponents: Boolean = this.lpComponents,
     ): PresolveConfig = PresolveConfig(
         emphasis, overrides, probeBudgetPerVar, probeTotalBudget, affinePivotOrder, abortFraction, maxRounds,
-        preserveStructure, structuralImpactLimit, lpComponents,
-    )
+        preserveStructure, structuralImpactLimit,
+    ).also { it.lpComponents = lpComponents }
+
+    internal fun withLpComponents(enabled: Boolean): PresolveConfig =
+        if (lpComponents == enabled) this else withEffort().also { it.lpComponents = enabled }
 
     /** Whether [pass] runs under [context]. */
     fun resolved(pass: PresolvePass, context: PresolveContext): Boolean =
@@ -183,8 +185,8 @@ class PresolveConfig(
     internal fun withoutObjectiveSymmetry(): PresolveConfig = PresolveConfig(
         emphasis, overrides + (PresolvePass.BREAK_OBJECTIVE_SYMMETRIES to false),
         probeBudgetPerVarOverride, probeTotalBudgetOverride, affinePivotOrder, abortFraction, maxRounds,
-        preserveStructure, structuralImpactLimit, lpComponents,
-    )
+        preserveStructure, structuralImpactLimit,
+    ).also { it.lpComponents = lpComponents }
 
     /** Disable solution-set-collapsing passes for a pure local-search route. */
     fun forLocalSearch(): PresolveConfig = PresolveConfig(
@@ -199,8 +201,7 @@ class PresolveConfig(
         maxRounds,
         preserveStructure,
         structuralImpactLimit,
-        lpComponents,
-    )
+    ).also { it.lpComponents = lpComponents }
 
     /** Predefined plans and parser. */
     companion object {

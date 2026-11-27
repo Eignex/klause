@@ -242,7 +242,8 @@ class LpHarvestTest {
     fun `component harvest should lift a contradiction from one block`() {
         val problem = coverSystem(independentRows = 24).bake()
 
-        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true))
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
+            componentFeasibility = true)
 
         assertTrue(result.report.rootInfeasible)
         assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_REFUTED"))
@@ -254,10 +255,44 @@ class LpHarvestTest {
             SourceFormat.MPS, feasibilityTolerance = SourceTolerance(SemanticRational.ONE),
         ).resolve()).bake()
 
-        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true), numericalLp = true)
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
+            numericalLp = true, componentFeasibility = true)
 
         assertSame(problem, result.problem)
         assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("SPLIT_INCONCLUSIVE"))
+    }
+
+    @Test
+    fun `component harvest opt out should retain the ordinary refutation`() {
+        val problem = coverSystem(independentRows = 24).bake()
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
+            componentFeasibility = false)
+
+        assertTrue(result.report.rootInfeasible)
+        assertEquals(1L, result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]?.outcomes?.get("UNSPLIT_REFUTED"))
+    }
+
+    @Test
+    fun `public harvest should honor the caller LP cadence`() {
+        val problem = coverSystem(independentRows = 24).bake()
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true, boundEvery = 2))
+
+        assertSame(problem, result.problem)
+    }
+
+    @Test
+    fun `component harvest should debit its assembly before a proof`() {
+        val problem = coverSystem(independentRows = 24).bake()
+        val budget = PresolveBudget(200L)
+
+        val result = lpHarvestReporting(problem, LinearObjective(), LpPlan(bounding = true),
+            cancellation = budget.orSpent(ExecutionControl.Never), componentFeasibility = true)
+
+        assertSame(problem, result.problem)
+        assertTrue(budget.remaining() == 0L)
+        assertTrue(assertNotNull(result.stats.phases["PRESOLVE_FEASIBILITY_ROOT"]).work > 0L)
     }
 
     @Test

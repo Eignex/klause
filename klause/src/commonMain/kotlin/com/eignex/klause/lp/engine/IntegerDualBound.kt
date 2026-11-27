@@ -434,8 +434,9 @@ internal fun integerFarkasRay(
     scans: LpScanCount? = null,
 ): LongArray? {
     fun certifies(rho: LongArray): Boolean {
+        if (cancellation()) return false
         scans?.scan()
-        return farkasCertifies(model, rho)
+        return !cancellation() && farkasCertifies(model, rho)
     }
     if (cancellation()) {
         onRoute?.invoke(FarkasRoute.NONE)

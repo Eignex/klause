@@ -1,23 +1,28 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpComponentLayout
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpProjectionMeter
 import com.eignex.klause.lp.engine.LpProjectionStop
+import com.eignex.klause.lp.engine.LpScalingView
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.acceptNullable
+import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.componentLayout
 import com.eignex.klause.lp.engine.floatFarkasRay
-import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
-import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.RelaxationDomains
+import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.util.ExecutionControl
-import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.saturatedAdd
 import com.eignex.util.numbers.saturatedMul
 
 private const val MIN_COMPONENT_QUERY_CELLS = 4096L
@@ -34,128 +39,104 @@ internal fun Problem.admitsPresolveFeasibility(): Boolean {
         saturatedMul(rows, columns + rows + 1L) >= MIN_COMPONENT_QUERY_CELLS
 }
 
-internal fun LpEngine.presolveFeasibilityQuery(token: ExecutionControl, split: Boolean): Boolean? {
-    val relaxer = lpRelaxer ?: return null
-    val observer = rootCertificationObserver()
-    val timer = LpPhaseTimer(observer, LpSolvePhase.PRESOLVE_FEASIBILITY)
-    val session = PropagationSession(problem, token)
-    if (session.isUnsatAtRoot || token()) {
-        timer.finish("UNAVAILABLE")
-        return false
+internal class LpPresolveFeasibility(
+    val split: Boolean,
+    val token: ExecutionControl,
+    observer: LpCertificationObserver,
+) {
+    private val timer = LpPhaseTimer(observer, LpSolvePhase.PRESOLVE_FEASIBILITY)
+    private var extraWork = 0L
+    private var numerical = LpSolveMetrics()
+    var complete = false
+    var attemptedSplit = false
+
+    fun charge(work: Long) {
+        token.charge(work)
+        extraWork = saturatedAdd(extraWork, work)
     }
-    val activeModel = try {
-        relaxer.build(session, cancellation = token).model
-    } catch (_: CheckedLongOverflowException) {
-        null
-    } catch (_: LpAssemblyCancelled) {
-        null
+
+    fun build(relaxer: CpToLpRelaxation, domains: RelaxationDomains): LpRelaxation {
+        var built: LpRelaxation? = null
+        relaxer.prepareBuild(domains, token, onWork = { charge(it * LpNodeOverhead.BUILD) },
+            onComplete = { built = it }).forEach { }
+        return checkNotNull(built)
     }
-    if (token()) {
-        timer.finish("STOPPED")
-        return false
+
+    fun solved(metrics: LpSolveMetrics) {
+        numerical += metrics
+        charge(metrics.preparationOps)
     }
-    if (activeModel == null || activeModel.n == 0 || activeModel.exactState != null) {
-        timer.finish("UNAVAILABLE")
-        return null
+
+    fun finish(refuted: Boolean) {
+        val route = when {
+            attemptedSplit -> "SPLIT"
+            split -> "FALLBACK"
+            else -> "UNSPLIT"
+        }
+        val outcome = when {
+            refuted -> "REFUTED"
+            complete -> "COMPLETE"
+            else -> "INCONCLUSIVE"
+        }
+        timer.finish("${route}_$outcome", saturatedAdd(extraWork, numerical.workOps),
+            numerical.pivots, numerical.componentSolves)
     }
-    val objectiveWork = activeModel.numVars.toLong()
-    token.charge(objectiveWork)
-    if (token()) {
-        timer.finish("STOPPED", objectiveWork)
-        return false
-    }
-    val model = activeModel.withRowObjective(intArrayOf(), longArrayOf())
-    val iterations = (50L * (model.m.toLong() + model.numVars) + 200).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+}
+
+internal fun LpEngine.splitPresolveFeasibility(
+    model: LpModel,
+    scope: LpPresolveFeasibility,
+): Boolean? {
+    if (!scope.split || model.m > MAX_ROWS_PER_COLUMN * model.n ||
+        model.tableauCells() < MIN_COMPONENT_QUERY_CELLS || model.rowStrict.any { it }
+    ) return null
     val projection = LpProjectionMeter(
         MAX_COMPONENT_PREPARATION_WORK,
         MAX_COMPONENT_PREPARATION_BYTES,
-        token,
-        token.accounting,
+        scope.token,
+        WorkMeter(scope::charge),
     )
-    val components = if (split && model.m <= MAX_ROWS_PER_COLUMN * model.n &&
-        model.tableauCells() >= MIN_COMPONENT_QUERY_CELLS
-    ) {
-        solvePresolveComponents(model, token, projection, iterations)
-    } else null
-    val route = when {
-        components != null -> "SPLIT"
-        split -> "FALLBACK"
-        else -> "UNSPLIT"
-    }
-    if (components == null && token()) {
-        timer.finish("${route}_STOPPED", projection.work + objectiveWork)
-        return false
-    }
-    var result = components ?: solvePresolveFeasibility(model, token, iterations)
-    var metrics = result.metrics
-    var refuted = refutesPresolveFeasibility(model, result.ray, token)
-    val remaining = iterations - metrics.pivots
-    if (components != null && !result.optimal && !refuted && remaining > 0 && !token()) {
-        result = solvePresolveFeasibility(model, token, remaining)
-        metrics += result.metrics
-        refuted = refutesPresolveFeasibility(model, result.ray, token)
-    }
-    observeRootWork(metrics)
-    val outcome = when {
-        refuted -> "REFUTED"
-        result.optimal && !token() -> "COMPLETE"
-        else -> "INCONCLUSIVE"
-    }
-    timer.finish("${route}_$outcome", projection.work + metrics.workOps + objectiveWork,
-        metrics.pivots, metrics.componentSolves)
-    return refuted
-}
-
-private fun LpEngine.refutesPresolveFeasibility(model: LpModel, ray: DoubleArray?, token: ExecutionControl): Boolean =
-    ray != null && !token() && verifyPresolveFeasibilityRay(model, ray, token)
-
-private data class PresolveFeasibilityOutcome(
-    val optimal: Boolean,
-    val metrics: LpSolveMetrics,
-    val ray: DoubleArray?,
-)
-
-private fun LpEngine.solvePresolveFeasibility(
-    model: LpModel,
-    token: ExecutionControl,
-    iterations: Int,
-): PresolveFeasibilityOutcome = newTableauCutSolver(
-    model, token, iterationLimit = iterations, factory = solveContext.engineFactory, pricing = pricingOptions,
-).use { solver ->
-    val result = solver.solve()
-    PresolveFeasibilityOutcome(result?.optimal == true, solver.lastMetrics, solver.infeasibleRay.takeIf { result == null })
-}
-
-private fun LpEngine.solvePresolveComponents(
-    model: LpModel,
-    token: ExecutionControl,
-    projection: LpProjectionMeter,
-    iterations: Int,
-): PresolveFeasibilityOutcome? {
-    var metrics = LpSolveMetrics()
-    var ray: DoubleArray? = null
-    val completed = try {
-        val layout = model.componentLayout(token, projection) ?: return null
+    val offer = nodeWorkBudget()
+    var numerical = LpSolveMetrics()
+    var refuted = false
+    try {
+        val layout = model.componentLayout(scope.token, projection) ?: return null
         if (!admitPresolveBlocks(model, layout)) return null
         projection.reserve(4L * layout.size, 32L * layout.size, matrix = false)
         val order = (0 until layout.size).sortedBy { layout.rows(it).toLong() + layout.columns(it) }
-        layout.visit(token, projection, order, copyCosts = false) { part ->
-            val remaining = iterations - metrics.pivots
-            if (remaining <= 0) return@visit false
-            val result = solvePresolveFeasibility(part.model, token, remaining)
-            metrics += result.metrics.copy(componentSolves = 1)
-            result.ray?.let { candidate ->
-                projection.reserve(model.m.toLong() + candidate.size, 8L * model.m, matrix = false)
-                val lifted = DoubleArray(model.m)
-                for (row in candidate.indices) lifted[part.rows[row]] = candidate[row]
-                ray = lifted
+        scope.complete = layout.visit(scope.token, projection, order, copyCosts = false) { part ->
+            val remaining = offer - numerical.workOps
+            if (offer > 0L && remaining <= 0L) return@visit false
+            // Scaling is prepared before the numerical solver has a chance to poll.
+            val scaling = LpScalingView.constructionWorkBound(part.model)
+            if ((offer > 0L && scaling >= remaining) ||
+                (scope.token.admission?.quotaRemaining?.let { scaling >= it } == true)
+            ) return@visit false
+            scope.attemptedSplit = true
+            newTableauCutSolver(
+                part.model, scope.token, workLimit = if (offer == 0L) 0L else remaining,
+                factory = solveContext.engineFactory, pricing = pricingOptions,
+            ).use { solver ->
+                val point = solver.solve()
+                val metrics = solver.lastMetrics.copy(componentSolves = 1)
+                numerical += metrics
+                scope.solved(metrics)
+                solver.infeasibleRay?.takeIf { !scope.token() }?.let { candidate ->
+                    projection.reserve(model.m.toLong() + candidate.size, 8L * model.m, matrix = false)
+                    val lifted = DoubleArray(model.m)
+                    for (row in candidate.indices) lifted[part.rows[row]] = candidate[row]
+                    refuted = verifyPresolveFeasibilityRay(model, lifted, scope)
+                }
+                point?.optimal == true && !scope.token()
             }
-            result.optimal
         }
     } catch (_: LpProjectionStop) {
-        false
+        scope.complete = false
     }
-    return if (metrics.componentSolves == 0) null else PresolveFeasibilityOutcome(completed, metrics, ray)
+    if (!scope.attemptedSplit) return null
+    noteSolveOps(numerical.workOps)
+    sink.lp.observeEngineCost(LpRoute.ROOT, numerical)
+    return refuted && !scope.token()
 }
 
 private fun admitPresolveBlocks(model: LpModel, blocks: LpComponentLayout): Boolean {
@@ -171,15 +152,21 @@ private fun admitPresolveBlocks(model: LpModel, blocks: LpComponentLayout): Bool
 
 private fun LpModel.tableauCells(): Long = m.toLong() * (m.toLong() + n + 1L)
 
-private fun LpEngine.verifyPresolveFeasibilityRay(model: LpModel, ray: DoubleArray, token: ExecutionControl): Boolean {
-    token.charge(model.extent())
+internal fun LpEngine.verifyPresolveFeasibilityRay(
+    model: LpModel,
+    ray: DoubleArray,
+    scope: LpPresolveFeasibility,
+): Boolean {
+    val token = scope.token
     if (token()) return false
     val accepted = if (numericalDeductions) {
-        floatFarkasRay(model, ray, solveContext.refutationSlack) != null
+        scope.charge(4L * model.extent())
+        !token() && floatFarkasRay(model, ray, solveContext.refutationSlack, refutationOnly = true) != null
     } else {
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.EXACT_FARKAS,
-            integerFarkasRay(model, ray, observer = rootCertificationObserver(), cancellation = token),
+            certifyLpFarkas(model, ray, observer = rootCertificationObserver(), cancellation = token,
+                accounting = WorkMeter(scope::charge)),
         ) != null
     }
     return accepted && !token()
