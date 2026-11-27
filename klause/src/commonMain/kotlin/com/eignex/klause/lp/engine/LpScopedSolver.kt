@@ -117,7 +117,10 @@ internal class LpScopedSolver(
     fun prepare(token: ExecutionControl, workAllowance: Long?): Boolean {
         requireAvailable()
         if (closed || token() || state.model.m > maxRetainedRows) return false
-        if (numericalRefreshPending && !adoptNumerical(state, token)) return false
+        if (numericalRefreshPending) {
+            if (workAllowance != null && workAllowance <= 0L) return false
+            if (!adoptNumerical(state, token)) return false
+        }
         if (solver != null) return true
         if (workAllowance != null && workAllowance <= 0L) return false
         val available = when {
@@ -579,7 +582,10 @@ internal class LpScopedSolver(
             return true
         }
         if (next.canProjectWorkingModel(token)) {
-            if (!current.adopt(next, token)) return false
+            if (!current.adopt(next, token)) {
+                if (numericalRefreshPending) retireNumerical()
+                return false
+            }
             numericalRefreshPending = false
             return true
         }

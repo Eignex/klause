@@ -54,6 +54,44 @@ class LpScopedSolverTest {
     }
 
     @Test
+    fun `a declined deferred adoption should rebuild the numerical owner from exact bounds`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10, cost = 1) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        var declineAdoption = false
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val solver = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by solver {
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
+                        !declineAdoption && solver.adopt(state, token)
+                }
+            }
+        }
+        val context = LpSolveContext(engineFactory = factory)
+        LpScopedSolver(LpExactState(source), context = context, deferBoundProjection = true).use { owner ->
+            assertNotNull(owner.solve())
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+
+            declineAdoption = true
+            assertNull(owner.solve())
+            declineAdoption = false
+            assertEquals(BigFraction.ofLong(4L), owner.solve()?.lowerBound)
+            assertEquals(2L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
     fun `cancellation after exact conflict certification should withhold the result`() {
         var cancelled = false
         val observer = object : LpCertificationObserver {

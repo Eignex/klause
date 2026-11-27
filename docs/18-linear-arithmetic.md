@@ -105,7 +105,7 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 Pure-real production scopes apply bound edits to exact authority before checking
-retained points. Projection of those bounds waits until a numerical solve or a
+retained points. The numerical owner refresh waits until a numerical solve or a
 structural edit needs it.
 The invocation can retain a certified point as a guess across edits and retraction.
 Before reuse, the linear adapter checks all current LP bounds, including strict
