@@ -700,6 +700,7 @@ sides, and pop restores bounds and deactivates scoped rows.
 Trail edits borrow owned immutable assertion lists for reading. An empty scope
 push shares its predecessor's captured list; changed assertions receive a fresh
 capture, and caller snapshots remain independent copies.
+Row appends share unchanged immutable matrix columns and validate the added entries.
 Adjacent states with the same base region and active rows expose their changed
 bound columns through an identity token. This token retains no predecessor state;
 unrelated states require a full check instead of borrowing the delta.
