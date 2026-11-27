@@ -157,6 +157,7 @@ class Portfolio(
     internal var runTimeSource: TimeSource = TimeSource.Monotonic
     internal var workerExitReporting: Boolean = onProgress != null
     internal var invocationStarted: TimeMark? = null
+    internal var initialProofProbeMillis: Long = 0L
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var disjointBooleanProof: Boolean = false
     internal var disjointBooleanProbe: Boolean = false
@@ -1308,7 +1309,13 @@ class Portfolio(
             }
             val allowance = if (diagnostics == null) ordinaryAllowance else
                 minOf(ordinaryAllowance, diagnostics.workLimit - chargedWork)
-            val time = if (baseAllowance && !continuingCore) baseSliceMillis else slice
+            val time = when {
+                initialProofProbeMillis > 0L && initialProbe && !continuingCore &&
+                    workers[arm].family == ArmFamily.Backtrack && workers[arm].permitsSourceProofs ->
+                    initialProofProbeMillis.coerceIn(baseSliceMillis, maxSliceMillis)
+                baseAllowance && !continuingCore -> baseSliceMillis
+                else -> slice
+            }
             val remainingTime = if ((handles[arm] as? ResumableSearch)?.preparationPending != false) {
                 preparationTimeLimit - trialPreparationTime[arm]
             } else trialTimeLimit - trialSearchTime[arm]

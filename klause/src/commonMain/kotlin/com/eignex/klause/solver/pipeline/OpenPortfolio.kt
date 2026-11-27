@@ -153,13 +153,12 @@ internal class OpenPortfolio(
                 .bindInvocation(binding, lifetime.includingStop( cancellation),
                 ),
         ) { workers ->
-            val probeWeights = if (lanes == 1 && request?.route == ProblemPipeline.EXACT_LRA) {
-                leadingProbeWeights(workers)
-            } else intArrayOf()
+            val realLinearProofProbe = lanes == 1 && request?.route == ProblemPipeline.EXACT_LRA
             PortfolioInvocationPolicy(
                 ProblemProfile.of(model, optimizing = false),
                 reservedShares(workers, if (request != null) THEORY_SHARE else 0.0),
-                probeWeights = probeWeights,
+                probeWeights = if (realLinearProofProbe) leadingProbeWeights(workers, 3) else intArrayOf(),
+                initialProofProbeMillis = if (realLinearProofProbe) REAL_LINEAR_PROBE_MILLIS else 0L,
             )
         }
         val result = portfolio.use { it.solve(cancellation) }
@@ -586,6 +585,7 @@ internal class OpenPortfolio(
 
         // The theory's least share of a satisfaction run, the rest to local search: only the theory can refute.
         const val THEORY_SHARE: Double = 0.75
+        const val REAL_LINEAR_PROBE_MILLIS: Long = 3_250L
 
         // Wall-clock ceiling on the seed LP, a small slice beside any portfolio budget.
         val SEED_BUDGET: Duration = 500.milliseconds
