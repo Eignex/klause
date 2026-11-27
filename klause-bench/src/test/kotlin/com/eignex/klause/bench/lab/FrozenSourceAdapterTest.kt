@@ -21,6 +21,7 @@ class FrozenSourceAdapterTest {
         "cache,MPS", "temporary,MPS", "cli,MPS",
         "cache,OPB", "temporary,OPB", "cli,OPB",
         "cache,MINIZINC", "temporary,MINIZINC",
+        "cache,SMTLIB", "temporary,SMTLIB", "cli,SMTLIB",
     )
     fun `ordinary frozen planning preserves source identity across seeded repeat blocks`(
         target: String,
@@ -29,6 +30,7 @@ class FrozenSourceAdapterTest {
         val extension = when (format) {
             "DIMACS" -> "cnf.zst"
             "MINIZINC" -> "mzn"
+            "SMTLIB" -> "smt2.zst"
             else -> "${format.lowercase()}.zst"
         }
         val input = BenchInput("offline/tiny.$extension", BenchInputRoot.CORPUS, "model", "1".repeat(64))
