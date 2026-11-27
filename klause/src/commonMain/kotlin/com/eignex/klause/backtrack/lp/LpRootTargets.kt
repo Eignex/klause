@@ -8,7 +8,11 @@ import com.eignex.klause.lp.bounding.RootPrimalTargets
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.round
 
-internal fun LpEngine.orderRootValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
+internal fun LpEngine.orderRootValues(
+    variable: VarRef,
+    values: Sequence<Long>,
+    onSourcePreference: ((RootPrimalTargets, Long) -> Unit)? = null,
+): Sequence<Long> {
     val targets = rootPrimalTargets
     val components = rootComponentValues
     if (targets == null && components == null) return values
@@ -29,6 +33,11 @@ internal fun LpEngine.orderRootValues(variable: VarRef, values: Sequence<Long>):
             return@sequence
         }
         observeRootValuePreference(currentTargets, currentComponents, saved != null)
+        if (onSourcePreference != null && saved == null && currentTargets != null &&
+            !currentTargets.auxiliary && currentTargets.knownColumns == null
+        ) {
+            onSourcePreference(currentTargets, preferred)
+        }
         yield(preferred)
         for (value in ordinary) if (value != preferred) yield(value)
     }
