@@ -573,7 +573,7 @@ internal class LpScopedSolver(
 
     private fun adoptNumerical(next: LpExactState, token: ExecutionControl, boundEdit: Boolean = false): Boolean {
         val current = solver ?: return !token.pollStop()
-        if (deferBoundProjection && boundEdit && next.rows === state.rows) {
+        if (deferBoundProjection && !componentSplit && boundEdit && next.rows === state.rows) {
             if (token.pollStop()) return false
             numericalRefreshPending = true
             return true
@@ -662,6 +662,7 @@ internal class LpScopedSolver(
             val old = solver
             if (old != null) recordPendingAppendSolve(old)
             solver = replacement.first
+            numericalRefreshPending = false
             clearPendingAppendSolve()
             publish(next)
             published = true
