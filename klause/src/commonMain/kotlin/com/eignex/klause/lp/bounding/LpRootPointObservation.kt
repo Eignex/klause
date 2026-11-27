@@ -7,7 +7,7 @@ internal fun interface LpRootPointObserver {
 }
 
 internal enum class LpRootPointStage {
-    ADMISSION, OWNER, QUERY_CALL, COPY, GUIDANCE, TARGETS, HANDOFF, CONSUMER, CLOSE_BEGIN, CLOSE_END,
+    ADMISSION, OWNER, QUERY_CALL, COPY, GUIDANCE, TARGETS, HANDOFF, CONSUMER, BOUND, CLOSE_BEGIN, CLOSE_END,
 }
 
 internal enum class LpRootPointDisposition {
@@ -15,6 +15,7 @@ internal enum class LpRootPointDisposition {
     PROBE_DISABLED, CANCELLED, STORAGE, LP_WORK, ROOT_WORK, BRANCH_DISABLED, REAL_VARIABLES,
     OBJECTIVE, SHAPE, MASK, OWNER, NO_GUIDANCE, NO_POINT, NOT_PAUSABLE, NO_DECISIONS,
     TREE_SEARCH, NOT_RETAINED, COMPONENT_TRIAL, HANDED_OFF, VALUE_OFFERED, COMPONENT_OFFERED, VALUE_COMMITTED,
+    BOUND_CHECKED, BOUND_APPLIED,
     NOT_CONFIGURED, NOT_CONSIDERED, PROJECTION_SKIPPED, ATTEMPTED_DECLINED, ADMITTED, BEGIN, END,
 }
 
@@ -41,6 +42,8 @@ internal class LpRootPointObservation(
     val pointObjective: Any?,
     val admission: LpRootAdmissionObservation? = null,
     val valueCommit: LpRootValueCommit? = null,
+    val bound: Double? = null,
+    val priorSharedBound: Double? = null,
 )
 
 internal class LpRootValueCommit(

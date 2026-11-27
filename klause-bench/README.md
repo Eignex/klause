@@ -1084,7 +1084,9 @@ committed corpus entry and records the worker's stored encoding separately.
 Guard masks cover evaluated operands only. Missing or interrupted events leave
 the corresponding outcome unknown. The journal associates a committed integer
 split with the full root target that supplied its preferred value when it can
-trace the split through ordinary search. The benchmark JVM profile and observer
+trace the split through ordinary search. Checked continuation bounds carry their
+root model identity, and an applied bound records the prior shared objective floor.
+The benchmark JVM profile and observer
 overhead have a separate cost scope from ordinary CLI solves.
 
 `ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
