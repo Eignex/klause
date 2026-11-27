@@ -9,6 +9,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionOptions
@@ -73,11 +74,13 @@ internal object JointRepairLpCapture {
         val original = requireNotNull(call(invocation, "getLinearSource"))
         val mapping = call(preparation, "getSourceMapping")
         val authorityKind = options["capture-authority"] ?: "nominal"
-        val toleranceAuthority = if (authorityKind == "accepted") {
+        val nominalPinCompletion = regionalPins != null && authorityKind == "nominal"
+        val compatibleAuthority = if (authorityKind == "accepted" || nominalPinCompletion) {
             requireNotNull(call(original, "getToleranceAuthority")).also {
                 require(call(it, "compatible", mapping, model, objective, stop) == true)
             }
         } else null
+        val toleranceAuthority = compatibleAuthority.takeIf { authorityKind == "accepted" }
         val captureContext = companion.javaClass.declaredMethods.single { it.name == "captureContext" }
             .apply { isAccessible = true }
         val context = requireNotNull(captureContext.invoke(companion, model, objective, stop, toleranceAuthority, null))
@@ -89,7 +92,8 @@ internal object JointRepairLpCapture {
             RegionalPublicationRejection(original, mapping, source.objective?.sense == ObjectiveSense.MAXIMIZE)
         } else null
         val checker = rejection?.observe(nativeChecker) ?: nativeChecker
-        val active = stop or ExecutionControl.after(4_000.milliseconds)
+        val activeLimitMs = if (nominalPinCompletion) 2_000L else 4_000L
+        val active = stop or ExecutionControl.after(activeLimitMs.milliseconds)
         val projection = regionalCenter?.let {
             require(model.numIntVars in 1..256 && (0 until model.numIntVars).all { id ->
                 val bounds = model.intBounds
@@ -103,10 +107,13 @@ internal object JointRepairLpCapture {
             require(pins != null && sha256(pins.encodeToByteArray()) == it)
         }
         if (projection != null && pins == null) return
+        if (nominalPinCompletion) require(requireNotNull(pins).count { it == ',' } == model.numIntVars - 1)
         val cutPolicy = options["capture-cut-policy"] ?: "ordinary"
+        val workLimit = if (nominalPinCompletion) 20_000_000L else 500_000_000L
+        val allocationLimit = if (nominalPinCompletion) 64L * 1024 * 1024 else 256L * 1024 * 1024
         val params = TheoryParams(timeout = active, randomSeed = seed + 9,
-            sourceLpWorkLimit = 500_000_000L - (projection?.work ?: 0L),
-            sourceLpAllocationLimit = 256L * 1024 * 1024 - (projection?.allocation ?: 0L),
+            sourceLpWorkLimit = workLimit - (projection?.work ?: 0L),
+            sourceLpAllocationLimit = allocationLimit - (projection?.allocation ?: 0L),
             sourceIncumbentCompletion = pins == null,
             sourcePointCuts = cutPolicy == "selected", sourceAggregateCuts = cutPolicy == "selected")
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
@@ -116,7 +123,7 @@ internal object JointRepairLpCapture {
         if (pins != null) {
             val consultations = options["regional-consultations"]?.toInt() ?: 64
             replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, consultations,
-                sha256(bytes), out)
+                sha256(bytes), out, objective, activeLimitMs, params)
             rejection?.inspect(sha256(bytes), sha256(pins.encodeToByteArray()), stop, out)
             return
         }
@@ -267,7 +274,8 @@ internal object JointRepairLpCapture {
 
     private fun replayRegion(
         owner: AutoCloseable, specification: String, integers: Int, context: SourceProofContext, stop: ExecutionControl,
-        consultations: Int, sourceHash: String, out: File,
+        consultations: Int, sourceHash: String, out: File, objective: LinearObjective, activeLimitMs: Long,
+        params: TheoryParams,
     ) {
         val entries = specification.split(',')
         val pins = entries.associate { entry ->
@@ -282,15 +290,19 @@ internal object JointRepairLpCapture {
         var attempts = 0
         var disposition = "Paused"
         var reason: String? = null
+        var sample: Sample? = null
         val started = System.nanoTime()
         owner.use {
             while (attempts < consultations && disposition == "Paused" && !stop()) {
                 val attempt = requireNotNull(call(owner, "attempt", condition, stop))
-                disposition = requireNotNull(call(attempt, "getResult")).javaClass.simpleName
+                val result = requireNotNull(call(attempt, "getResult"))
+                disposition = result.javaClass.simpleName
+                if (disposition == "Witness") sample = call(result, "getSample") as Sample
                 reason = call(attempt, "getReason")?.toString()
                 attempts++
             }
         }
+        val elapsed = System.nanoTime() - started
         val stats = requireNotNull(call(owner, "getStats")) as SolveStats
         out.resolve("regional-replay.json").writeText(buildJsonObject {
             put("sourceSha256", sourceHash)
@@ -300,9 +312,13 @@ internal object JointRepairLpCapture {
             put("pinCount", pins.size)
             put("attempts", attempts)
             put("consultationLimit", consultations)
-            put("attemptAndRetirementNs", System.nanoTime() - started)
+            put("activeLimitMs", activeLimitMs)
+            put("sourceLpWorkLimit", params.sourceLpWorkLimit)
+            put("sourceLpAllocationLimit", params.sourceLpAllocationLimit)
+            put("attemptAndRetirementNs", elapsed)
             put("disposition", disposition)
             put("reason", reason)
+            put("witnessWorkingObjective", sample?.let { objective.evaluateExact(it).toString() })
             put("chargedWork", call(owner, "getWork") as Long)
             put("cancelled", stop())
             put("stageCounters", buildJsonObject {

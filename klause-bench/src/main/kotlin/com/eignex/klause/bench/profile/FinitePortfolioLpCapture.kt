@@ -77,8 +77,12 @@ internal object FinitePortfolioLpCapture {
         }
         options["regional-explain-rejection"]?.let { require(regional && it.toBooleanStrict()) }
         if (regional) {
-            require(mode == "joint-before" && options["capture-authority"] == "accepted" &&
-                options["capture-cut-policy"] == "selected" && options["presolve"] == "off")
+            require(mode == "joint-before" && options["presolve"] == "off")
+            val acceptedSelected = options["capture-authority"] == "accepted" &&
+                options["capture-cut-policy"] == "selected"
+            val nominalFixed = options["capture-authority"] == "nominal" &&
+                options["capture-cut-policy"] == "ordinary" && regionPins != null
+            require(acceptedSelected || nominalFixed)
             require(regionPins == null || regionPins.length in 1..32768)
         }
         options["presolve"]?.let {
