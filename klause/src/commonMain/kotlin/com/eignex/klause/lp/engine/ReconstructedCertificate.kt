@@ -110,18 +110,26 @@ private class FixedReconstructionVerifier(
         var value = from(a.constant)
         for (j in x.indices) {
             val bounds = a.bounds[j]
-            bounds.lower?.let {
-                val compare = compare(x[j], from(it.number.value))
-                if (compare < 0 || (compare == 0 && it.strict)) {
-                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+            if (j >= a.n && bounds.isZeroEquality()) {
+                meter.step(2L)
+                if (!x[j].isZero) {
+                    pointRejection = LpPointRejection.LOGICAL_BOUND
                     return null
                 }
-            }
-            bounds.upper?.let {
-                val compare = compare(x[j], from(it.number.value))
-                if (compare > 0 || (compare == 0 && it.strict)) {
-                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
-                    return null
+            } else {
+                bounds.lower?.let {
+                    val compare = compare(x[j], from(it.number.value))
+                    if (compare < 0 || (compare == 0 && it.strict)) {
+                        pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                        return null
+                    }
+                }
+                bounds.upper?.let {
+                    val compare = compare(x[j], from(it.number.value))
+                    if (compare > 0 || (compare == 0 && it.strict)) {
+                        pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                        return null
+                    }
                 }
             }
             if (a.costs[j].isZero) meter.step()
@@ -229,18 +237,26 @@ private class BigReconstructionVerifier(
         var value = from(a.constant)
         for (j in x.indices) {
             val bounds = a.bounds[j]
-            bounds.lower?.let {
-                val compare = compare(x[j], from(it.number.value))
-                if (compare < 0 || (compare == 0 && it.strict)) {
-                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+            if (j >= a.n && bounds.isZeroEquality()) {
+                meter.step(2L)
+                if (!x[j].isZero) {
+                    pointRejection = LpPointRejection.LOGICAL_BOUND
                     return null
                 }
-            }
-            bounds.upper?.let {
-                val compare = compare(x[j], from(it.number.value))
-                if (compare > 0 || (compare == 0 && it.strict)) {
-                    pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
-                    return null
+            } else {
+                bounds.lower?.let {
+                    val compare = compare(x[j], from(it.number.value))
+                    if (compare < 0 || (compare == 0 && it.strict)) {
+                        pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                        return null
+                    }
+                }
+                bounds.upper?.let {
+                    val compare = compare(x[j], from(it.number.value))
+                    if (compare > 0 || (compare == 0 && it.strict)) {
+                        pointRejection = classifyPointRejection(j, a.n, compare == 0 && it.strict)
+                        return null
+                    }
                 }
             }
             if (a.costs[j].isZero) meter.step()
@@ -309,6 +325,10 @@ private class BigReconstructionVerifier(
         return ReconstructedDual(big(value), reduced, selected.toList(), strict)
     }
 }
+
+private fun ExactLpBounds.isZeroEquality(): Boolean =
+    lower?.let { !it.strict && it.number.value.isZero } == true &&
+        upper?.let { !it.strict && it.number.value.isZero } == true
 
 private fun classifyPointRejection(column: Int, structuralColumns: Int, strictEndpoint: Boolean): LpPointRejection =
     if (strictEndpoint) {
