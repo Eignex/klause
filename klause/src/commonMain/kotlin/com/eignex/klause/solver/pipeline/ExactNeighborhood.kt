@@ -105,7 +105,13 @@ internal class ExactNeighborhood(
     fun advance(
         cancellation: ExecutionControl,
         allowance: Long,
-        offeredMillis: Long? = null,
+        onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
+    ): Boolean = advance(cancellation, allowance, null, onIncumbent)
+
+    fun advance(
+        cancellation: ExecutionControl,
+        allowance: Long,
+        offeredMillis: Long?,
         onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
     ): Boolean {
         check(!closed) { "neighborhood owner is closed" }
