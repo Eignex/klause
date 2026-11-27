@@ -292,6 +292,8 @@ class ExactLiraSearchComponent private constructor(
             },
             solveContext = solveContext,
             cancellation = lpStop,
+            deferBoundProjection = model.numIntVars == 0 &&
+                solveContext.certificationPolicy === ProductionLpCertificationPolicy,
             certificationObserver = object : LpCertificationObserver {
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                     if (cost is LpCertifierCost.Metered) lpStop.charge(cost.work)

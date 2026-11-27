@@ -96,6 +96,7 @@ internal class LpPropagator(
     private val queryWorkAllowance: () -> Long? = { null },
     private val onPreparation: ((LpSolveMetrics) -> Unit)? = null,
     private val continuationAllowance: () -> Long? = { null },
+    private val deferBoundProjection: Boolean = false,
 ) : SearchComponent,
     SearchBrancher,
     SearchBranchProposal,
@@ -215,6 +216,7 @@ internal class LpPropagator(
             maxRetainedRows = profile.maxRows,
             pricing = profile.pricing,
             componentSplit = profile.componentSplit,
+            deferBoundProjection = deferBoundProjection,
         )
     }
 

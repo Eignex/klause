@@ -20,6 +20,7 @@ internal class LpScopedSolver(
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
+    private val deferBoundProjection: Boolean = false,
 ) : AutoCloseable {
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
@@ -29,6 +30,7 @@ internal class LpScopedSolver(
     internal val pointRecoveryCache = LpRefinementCache()
     private var trail = LpBoundTrail(initial)
     private var solver: RetainedLpSolver? = null
+    private var numericalRefreshPending = false
     private class PendingFloat(val cursor: LpSolveCursor<FloatLpResult?>, var allowance: LpFloatAllowance) {
         var reported = LpSolveMetrics()
     }
@@ -115,6 +117,7 @@ internal class LpScopedSolver(
     fun prepare(token: ExecutionControl, workAllowance: Long?): Boolean {
         requireAvailable()
         if (closed || token() || state.model.m > maxRetainedRows) return false
+        if (numericalRefreshPending && !adoptNumerical(state, token)) return false
         if (solver != null) return true
         if (workAllowance != null && workAllowance <= 0L) return false
         val available = when {
@@ -135,11 +138,11 @@ internal class LpScopedSolver(
 
     fun partialPrimalGuidance(token: ExecutionControl): LpPrimalGuidance? {
         requireAvailable()
-        if (closed || token()) return null
+        if (closed || numericalRefreshPending || token()) return null
         return (solver as? ComponentLpSolverCapability)?.partialPrimalGuidance(token)
     }
 
-    fun push(token: ExecutionControl = cancellation): Boolean = edit(token) { it.push(token) }
+    fun push(token: ExecutionControl = cancellation): Boolean = edit(token, boundEdit = true) { it.push(token) }
 
     fun assertBound(
         column: Int,
@@ -147,7 +150,7 @@ internal class LpScopedSolver(
         side: ExactLpSide,
         witness: Long,
         token: ExecutionControl = cancellation,
-    ): Boolean = edit(token) { it.assertBound(column, upper, side, witness, token) }
+    ): Boolean = edit(token, boundEdit = true) { it.assertBound(column, upper, side, witness, token) }
 
     @Suppress("TooGenericExceptionCaught") // Numerical refresh can retire factors before a cleanup failure.
     fun assertBounds(assertions: List<LpBoundAssertion>, token: ExecutionControl = cancellation): LpBoundBatchResult {
@@ -159,7 +162,7 @@ internal class LpScopedSolver(
         if (result is LpBoundBatchResult.Declined || next.state === state) return result
         discardFloatProgress()
         try {
-            if (!adoptNumerical(next.state, token)) return LpBoundBatchResult.Declined(result.count)
+            if (!adoptNumerical(next.state, token, boundEdit = true)) return LpBoundBatchResult.Declined(result.count)
         } catch (primary: Throwable) {
             try {
                 close()
@@ -174,7 +177,7 @@ internal class LpScopedSolver(
     }
 
     fun pop(targetDepth: Int, token: ExecutionControl = cancellation): Boolean =
-        edit(token) { it.pop(targetDepth, token) }
+        edit(token, boundEdit = true) { it.pop(targetDepth, token) }
 
     fun resetRoot(token: ExecutionControl = cancellation): Boolean = edit(token) { it.resetRoot(token) }
 
@@ -313,7 +316,7 @@ internal class LpScopedSolver(
             token() -> LpProbeDecline.CANCELLED
             closed -> LpProbeDecline.OWNER
             workingActive || pendingFloat != null -> LpProbeDecline.BUSY
-            state !== pointModel.exactState -> LpProbeDecline.STALE_POINT
+            numericalRefreshPending || state !== pointModel.exactState -> LpProbeDecline.STALE_POINT
             solver !is LpDirectionalProbeSolver -> LpProbeDecline.OWNER
             else -> null
         }
@@ -353,7 +356,7 @@ internal class LpScopedSolver(
             token() -> LpProbeDecline.CANCELLED
             closed -> LpProbeDecline.OWNER
             workingActive || pendingFloat != null -> LpProbeDecline.BUSY
-            state !== source.model.exactState -> LpProbeDecline.STALE_POINT
+            numericalRefreshPending || state !== source.model.exactState -> LpProbeDecline.STALE_POINT
             solver !is LpDirectionalValueSolver -> LpProbeDecline.OWNER
             else -> null
         }
@@ -373,7 +376,9 @@ internal class LpScopedSolver(
         token: ExecutionControl,
         charge: (Long) -> Unit,
     ): List<LpDirectionalCost?>? {
-        if (closed || workingActive || pendingFloat != null || state !== pointModel.exactState || token()) return null
+        if (closed || workingActive || pendingFloat != null || numericalRefreshPending ||
+            state !== pointModel.exactState || token()
+        ) return null
         return (solver as? LpDirectionalCostSolver)?.directionalCosts(pointModel, columns, allowance, token, charge)
     }
 
@@ -544,6 +549,7 @@ internal class LpScopedSolver(
         token: ExecutionControl,
         append: Boolean = false,
         compaction: LpLayoutRemap? = null,
+        boundEdit: Boolean = false,
         change: (LpBoundTrail) -> Boolean,
     ): Boolean {
         requireAvailable()
@@ -557,16 +563,26 @@ internal class LpScopedSolver(
         }
         discardFloatProgress()
         if (next.state.matrixRevision != state.matrixRevision) {
+            if (numericalRefreshPending && !adoptNumerical(state, token)) return false
             return replace(next, token, append, compaction)
         }
-        if (!adoptNumerical(next.state, token)) return false
+        if (!adoptNumerical(next.state, token, boundEdit)) return false
         publish(next)
         return true
     }
 
-    private fun adoptNumerical(next: LpExactState, token: ExecutionControl): Boolean {
+    private fun adoptNumerical(next: LpExactState, token: ExecutionControl, boundEdit: Boolean = false): Boolean {
         val current = solver ?: return !token.pollStop()
-        if (next.canProjectWorkingModel(token)) return current.adopt(next, token)
+        if (deferBoundProjection && boundEdit && next.rows === state.rows) {
+            if (token.pollStop()) return false
+            numericalRefreshPending = true
+            return true
+        }
+        if (next.canProjectWorkingModel(token)) {
+            if (!current.adopt(next, token)) return false
+            numericalRefreshPending = false
+            return true
+        }
         if (token.pollStop()) return false
         retireNumerical()
         return !token.pollStop()
@@ -576,6 +592,7 @@ internal class LpScopedSolver(
         val current = solver ?: return
         recordPendingAppendSolve(current)
         solver = null
+        numericalRefreshPending = false
         closeOwner(current)
     }
 

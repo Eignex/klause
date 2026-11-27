@@ -19,6 +19,41 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `deferred projection should solve using the current bound and its retraction`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10, cost = 1) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+
+        LpScopedSolver(LpExactState(source), deferBoundProjection = true).use { owner ->
+            assertEquals(BigFraction.ZERO, owner.solve()?.lowerBound)
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 1L))
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), 2L))
+
+            assertEquals(BigFraction.ofLong(4L), owner.solve()?.lowerBound)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ZERO, owner.solve()?.lowerBound)
+        }
+    }
+
+    @Test
+    fun `a stopped deferred refresh should allow a later solve at the same exact bound`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0, 10, cost = 1) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+
+        LpScopedSolver(LpExactState(source), deferBoundProjection = true).use { owner ->
+            assertNotNull(owner.solve())
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(4L)), 1L))
+            val current = owner.state
+            var polls = 0
+            assertNull(owner.solveFloat(token = ExecutionControl { ++polls >= 2 }))
+
+            assertSame(current, owner.state)
+            assertEquals(BigFraction.ofLong(4L), owner.solve()?.lowerBound)
+        }
+    }
+
+    @Test
     fun `cancellation after exact conflict certification should withhold the result`() {
         var cancelled = false
         val observer = object : LpCertificationObserver {
