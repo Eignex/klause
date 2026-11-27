@@ -386,6 +386,8 @@ Session teardown and mixed-store retirement work have no separate integer-row to
 clause is unit on an integer order bound. `row-first` and `clause-first` register both
 factors and seed one fixpoint in the requested order. `separate` propagates the row
 before installing the clause and is also used when the unit-bound check fails.
+`matching-clause-first` requires an unguarded row with the same raw integer
+assertion as the clause, verified within the optional arithmetic allowance.
 The paired counters record attachments and the factor that first establishes the
 clause's order bound during a completed attachment fixpoint.
 

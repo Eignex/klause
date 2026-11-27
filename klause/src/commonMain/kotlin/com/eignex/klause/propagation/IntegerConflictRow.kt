@@ -98,6 +98,16 @@ internal class IntegerConflictRow private constructor(
         return if (next.fitsLong()) next.toLongExact() else null
     }
 
+    fun assertsOrderBound(state: PropagationState, lit: Int, budget: ArithmeticLearningBudget): Boolean {
+        if (guard != Lit.NONE) return false
+        return state.withOrderBound(lit) { variable, target, lower ->
+            val coefficient = coefficient(variable)
+            val directionMatches = if (lower) coefficient < BIG_ZERO else coefficient > BIG_ZERO
+            directionMatches && target in state.intDomains[variable] &&
+                boundFor(state, variable, state.undoTop, budget) == target
+        }
+    }
+
     fun assertsAt(state: PropagationState, trail: Int, budget: ArithmeticLearningBudget? = null): Boolean {
         if (!state.integerGuardTrueAt(guard, trail)) return false
         budget?.spend(bytes = variables.size.toLong() * 48)

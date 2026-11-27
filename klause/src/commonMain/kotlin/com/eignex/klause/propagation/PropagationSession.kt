@@ -1097,6 +1097,9 @@ class PropagationSession private constructor(
         try {
             unit = unitOrderBound(fallback.literals)
             if (unit == Lit.NONE) return null
+            if (state.integerRowAttachmentOrder == IntegerRowAttachmentOrder.MATCHING_CLAUSE_FIRST &&
+                !rowMatchesOrderBound(learned.row, unit)
+            ) return null
             row = registerIntegerRow(learned.row, learned.lbd)
             noteLearnedAttachment(row)
             clause = state.addLearnedClause(Clause(fallback.literals), fallback.lbd)
@@ -1106,10 +1109,10 @@ class PropagationSession private constructor(
             state.runCancelled = true
             return PropagationResult.Implied.EMPTY
         }
-        val order = if (state.integerRowAttachmentOrder == IntegerRowAttachmentOrder.CLAUSE_FIRST) {
-            intArrayOf(clause, row)
-        } else {
+        val order = if (state.integerRowAttachmentOrder == IntegerRowAttachmentOrder.ROW_FIRST) {
             intArrayOf(row, clause)
+        } else {
+            intArrayOf(clause, row)
         }
         state.integerRowPairedAttachments++
         val conflict = state.runToFixpoint(allFactors = false, initialFactors = order, cancellation = cancellation)
@@ -1124,6 +1127,17 @@ class PropagationSession private constructor(
             }
         }
         return finishLearnedPropagation(conflict, publicationBase)
+    }
+
+    private fun rowMatchesOrderBound(row: IntegerConflictRow, unit: Int): Boolean {
+        val before = state.work
+        try {
+            return row.assertsOrderBound(state, unit, ArithmeticLearningBudget(state))
+        } catch (_: ArithmeticLearningDeclined) {
+            return false
+        } finally {
+            state.integerRowOverlapWork += state.work - before
+        }
     }
 
     private fun unitOrderBound(literals: IntArray): Int {
@@ -1570,6 +1584,7 @@ class PropagationSession private constructor(
             "learningIntegerPairedAttachments" to it.integerRowPairedAttachments,
             "learningIntegerPairedClauseOwners" to it.integerRowPairedClauseOwners,
             "learningIntegerPairedRowOwners" to it.integerRowPairedRowOwners,
+            "learningIntegerOverlapWork" to it.integerRowOverlapWork,
             "learningIntegerPropagationWork" to it.integerRowPropagationWork,
             "learningIntegerPostInitialFires" to it.integerRowPostInitialFires,
             "learningIntegerPostInitialUsefulFires" to it.integerRowPostInitialUsefulFires,

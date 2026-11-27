@@ -525,13 +525,13 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
 
     @Test
     fun `attachment order should select the reason for a shared bound`() {
-        for (order in listOf(IntegerRowAttachmentOrder.ROW_FIRST, IntegerRowAttachmentOrder.CLAUSE_FIRST)) {
+        for (order in IntegerRowAttachmentOrder.entries.filter { it != IntegerRowAttachmentOrder.SEPARATE }) {
             val native = publishOverlappingIntegerBounds(order)
             val counts = native.learnedLifecycle()
 
             assertEquals(3L, native.intDomain(0).max)
             assertEquals(1L, counts["learningIntegerPairedAttachments"])
-            assertEquals(if (order == IntegerRowAttachmentOrder.CLAUSE_FIRST) 1L else 0L,
+            assertEquals(if (order == IntegerRowAttachmentOrder.ROW_FIRST) 0L else 1L,
                 counts["learningIntegerPairedClauseOwners"])
             assertEquals(if (order == IntegerRowAttachmentOrder.ROW_FIRST) 1L else 0L,
                 counts["learningIntegerPairedRowOwners"])
@@ -547,7 +547,18 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
         assertEquals(2L, result.intMaxOrNullCompat(0))
     }
 
-    private fun publishOverlappingIntegerBounds(order: IntegerRowAttachmentOrder): PropagationSession {
+    @Test
+    fun `matching clause priority should keep separate propagation for a different bound`() {
+        val native = publishOverlappingIntegerBounds(IntegerRowAttachmentOrder.MATCHING_CLAUSE_FIRST, clauseMax = 4L)
+
+        assertEquals(3L, native.intDomain(0).max)
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerPairedAttachments"])
+    }
+
+    private fun publishOverlappingIntegerBounds(
+        order: IntegerRowAttachmentOrder,
+        clauseMax: Long = 3L,
+    ): PropagationSession {
         val variables = intArrayOf(0, 1)
         val native = PropagationSession(Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
             arrayOf(Linear(intArrayOf(1, 1), variables, LinearOp.LE, 14))), pbLearning = false)
@@ -558,7 +569,7 @@ class IntegerConflictLearnerTest : RuntimeInitializedTest() {
         val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), variables,
             longArrayOf(1, 1), variables, LinearOp.LE, 5), useLo = true))
         val clause = ConflictAnalyzer.AnalysisResult.Learned(
-            intArrayOf(Lit.make(state.atomVarLe(1, 1), true), Lit.make(state.atomVarLe(0, 3), true)),
+            intArrayOf(Lit.make(state.atomVarLe(1, 1), true), Lit.make(state.atomVarLe(0, clauseMax), true)),
             backjumpLevel = 1, lbd = 1, decisionLevels = intArrayOf(1))
         val learned = ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
             row, backjumpLevel = 1, lbd = 1, decisionLevels = intArrayOf(1), fallbackClause = clause)

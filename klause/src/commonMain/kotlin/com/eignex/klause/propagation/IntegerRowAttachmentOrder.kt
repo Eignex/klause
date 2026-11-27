@@ -10,4 +10,7 @@ enum class IntegerRowAttachmentOrder {
 
     /** Seed one fixpoint with the unit order-bound clause before its row. */
     CLAUSE_FIRST,
+
+    /** Prefer the clause when the unguarded row establishes the same raw order bound. */
+    MATCHING_CLAUSE_FIRST,
 }

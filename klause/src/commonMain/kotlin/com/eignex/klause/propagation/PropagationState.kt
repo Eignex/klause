@@ -378,6 +378,7 @@ class PropagationState private constructor(
     internal var integerRowPairedAttachments = 0L
     internal var integerRowPairedClauseOwners = 0L
     internal var integerRowPairedRowOwners = 0L
+    internal var integerRowOverlapWork = 0L
     internal var integerRowPropagationWork = 0L
     internal var integerRowPostInitialFires = 0L
     internal var integerRowPostInitialUsefulFires = 0L

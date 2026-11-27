@@ -261,6 +261,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
             "separate" -> IntegerRowAttachmentOrder.SEPARATE
             "row-first" -> IntegerRowAttachmentOrder.ROW_FIRST
             "clause-first" -> IntegerRowAttachmentOrder.CLAUSE_FIRST
+            "matching-clause-first" -> IntegerRowAttachmentOrder.MATCHING_CLAUSE_FIRST
             else -> pipelineConfigError("unknown integer row attachment order '$it'")
         }
     }
