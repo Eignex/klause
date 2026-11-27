@@ -152,7 +152,8 @@ internal class JointLinearRepair(
         private set
     val productiveTrialPending: Boolean
         get() = incumbentTrialPending || (params.sourceJointDistanceRepair && !stop() && !exhausted &&
-            (distanceTrial != null || (!distanceTried && distanceBootstrap != null)))
+            (distanceTrial != null || (!distanceTried && distanceBootstrap != null &&
+                repairGuidance?.finiteCutReady(source) != false)))
     private var closed = false
     private var declined = false
     private var preparationWork = 0L
@@ -335,7 +336,8 @@ internal class JointLinearRepair(
             centerPreparationPending = { rootPreparationPending },
             continuePausedCompletion = {
                 val proposal = checkedProposal
-                val distancePending = (distanceBootstrap != null && distanceBootstrap === queryOriginalCondition) ||
+                val distancePending = (distanceBootstrap != null && distanceBootstrap === queryOriginalCondition &&
+                    repairGuidance?.finiteCutReady(source) != false) ||
                     distanceTrial?.replacement?.let { queryOriginalCondition == null || it === queryOriginalCondition } == true
                 val carries = distancePending || (proposal != null && proposal.condition === queryOriginalCondition &&
                     query?.hasIncumbent == true)
@@ -430,19 +432,21 @@ internal class JointLinearRepair(
                     .also { condition ->
                         if (sharedStart && params.sourceJointDistanceRepair && nominalPublicationCapture != null &&
                             sourceIntegers == null) {
-                            if (repairGuidance?.finiteCutReady(source) == true) distanceBootstrap = condition
+                            if (repairGuidance?.finiteCutReady(source) != false) distanceBootstrap = condition
                             else observe("jointRepairDistanceAdmissionDeclined")
                         }
                         if (!distanceTried && distanceBootstrap != null && round > 0L) {
                             val work = 1L + model.numIntVars
                             val bytes = 128L + 16L * model.numIntVars
-                            if (model.numIntVars - condition.lower.size in 1..2 &&
+                            val cutReady = repairGuidance?.finiteCutReady(source)
+                            if (cutReady == true && model.numIntVars - condition.lower.size in 1..2 &&
                                 funding.remainingWork > work && funding.remainingAllocation > bytes) {
                                 budget.observe(preparation = work)
                                 funding.charge(0L, bytes)
                                 distanceTrial = DistanceTrial(condition, from.take(model.numIntVars))
                             } else {
-                                observe("jointRepairDistanceAdmissionDeclined")
+                                observe(if (cutReady == null) "jointRepairDistanceReceiptPending"
+                                else "jointRepairDistanceAdmissionDeclined")
                                 distanceTried = true
                                 distanceBootstrap = null
                             }
