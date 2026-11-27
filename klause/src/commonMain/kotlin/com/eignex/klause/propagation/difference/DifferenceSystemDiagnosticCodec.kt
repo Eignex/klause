@@ -3,6 +3,7 @@ package com.eignex.klause.propagation.difference
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.factor.codec.FactorCodec
 import com.eignex.klause.factor.codec.factorCodec
+import com.eignex.klause.ir.Problem
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -23,6 +24,13 @@ private class DiagnosticDifferenceEdge(
 
 @Serializable
 private class DiagnosticDifferenceIndex(val variable: Int, val value: String)
+
+internal fun differenceSystemDiagnosticBytesLowerBound(problem: Problem): Long {
+    val shortestEdge = """{"source":0,"target":0,"bound":"0","guard":0,"domainBound":true}""".length
+    return problem.factors.sumOf { factor ->
+        if (factor is DifferenceSystem) factor.edges.size.toLong() * shortestEdge else 0L
+    }
+}
 
 internal fun differenceSystemDiagnosticCodec(): FactorCodec<*, *> =
     factorCodec<DifferenceSystem, DiagnosticDifferenceSystem>(

@@ -46,19 +46,31 @@ import java.util.IdentityHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 internal object PortfolioArithmeticLearningCapture {
-    private val nativeCodec by lazy {
+    private const val MODEL_BYTE_LIMIT = 262_144
+    private val sourceCodec = ProblemJson()
+    private val nativeDiagnostics by lazy {
         val owner = "com.eignex.klause.propagation.difference.DifferenceSystemDiagnosticCodecKt"
-        val difference = Class.forName(owner).getMethod("differenceSystemDiagnosticCodec").invoke(null)
+        Class.forName(owner)
+    }
+    private val nativeCodec by lazy {
+        val difference = nativeDiagnostics.getMethod("differenceSystemDiagnosticCodec").invoke(null)
         ProblemJson(FactorCodecs.builtin + (difference as FactorCodec<*, *>))
+    }
+    private val graphBytesLowerBound by lazy {
+        nativeDiagnostics.getMethod("differenceSystemDiagnosticBytesLowerBound", Problem::class.java)
     }
 
     private class Snapshot(val json: String?, val decline: String?)
 
-    private fun snapshot(codec: ProblemJson, problem: Problem): Snapshot {
+    private fun snapshot(problem: Problem, native: Boolean = false): Snapshot {
         if (problem.numBoolVars > 4096 || problem.numIntVars > 4096) return Snapshot(null, "coordinate limit")
+        if (native && (graphBytesLowerBound.invoke(null, problem) as Long) > MODEL_BYTE_LIMIT) {
+            return Snapshot(null, "model byte limit")
+        }
+        val codec = if (native) nativeCodec else sourceCodec
         return try {
             val json = codec.encodeToString(problem)
-            if (json.encodeToByteArray().size <= 262_144) Snapshot(json, null) else Snapshot(null, "model byte limit")
+            if (json.encodeToByteArray().size <= MODEL_BYTE_LIMIT) Snapshot(json, null) else Snapshot(null, "model byte limit")
         } catch (missing: MissingFactorCodecException) {
             Snapshot(null, missing.message?.take(512) ?: "missing factor codec")
         }
@@ -78,7 +90,6 @@ internal object PortfolioArithmeticLearningCapture {
         val seed = (options["seed"] ?: "1").toLong()
         val kind = options["learning"] ?: "integer"
         val traceMode = options["trace"] ?: "first-integer"
-        val codec = ProblemJson()
         val cpu = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { records ->
             for (learning in listOf(false, true)) {
@@ -117,7 +128,7 @@ internal object PortfolioArithmeticLearningCapture {
                 val request = SourceExecutionRequest(invocation, policy, ExecutionOptions.parse(pairs),
                     cores = 1, randomSeed = seed, timeout = stop, cancellation = stop)
                 val finiteRoute = SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE
-                val originalSnapshot = if (finiteRoute) snapshot(codec, invocation.finiteShape().problem)
+                val originalSnapshot = if (finiteRoute) snapshot(invocation.finiteShape().problem)
                 else Snapshot(null, "finite route unavailable")
                 val original = originalSnapshot.json
                 var observed = request
@@ -131,7 +142,7 @@ internal object PortfolioArithmeticLearningCapture {
                         }
                         val started = System.nanoTime()
                         try {
-                            val payload = snapshot(nativeCodec, native.problem)
+                            val payload = snapshot(native.problem, native = true)
                             val model = payload.json
                             if (model == null) {
                                 snapshotDeclines += "$worker: ${payload.decline}"
@@ -163,7 +174,7 @@ internal object PortfolioArithmeticLearningCapture {
                 val completed = finite?.outcome as? FiniteSolveOutcome.Completed
                 val label = if (learning) kind else "clause"
                 original?.let { out.resolve("$label-original.json").writeText(it) }
-                val preparedSnapshot = finite?.let { snapshot(nativeCodec, it.preparation.problem) }
+                val preparedSnapshot = finite?.let { snapshot(it.preparation.problem, native = true) }
                 preparedSnapshot?.json?.let { out.resolve("$label-prepared.json").writeText(it) }
                 for (session in ordered) {
                     val index = session.ordinal
