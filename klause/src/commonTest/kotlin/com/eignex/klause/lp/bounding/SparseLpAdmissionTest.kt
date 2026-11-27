@@ -51,6 +51,38 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `a reused sparse root layout has private numerical state and preparation charges`() {
+        val source = boundedLpEngineProblem().withSettings(
+            ProblemSettings(lpMaxTableauCells = 1L, lpCeilingTableauCells = 1L))
+        val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
+        val params = LpParams(lpConfig = LpConfig.parse("default,+automatic-sparse"))
+        val firstFactory = RecordingLpEngineFactory()
+        val secondFactory = RecordingLpEngineFactory()
+        val secondSink = SolveStatsSink("reused-sparse-root")
+
+        LpEngine(problem, objective, params, SolveStatsSink("first-sparse-root"), LpSolveContext(firstFactory))
+            .use { first ->
+                assertTrue(first.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+                val firstWork = first.totalSolveWork()
+                LpEngine(problem, objective, params, secondSink, LpSolveContext(secondFactory)).use { second ->
+                    val secondBeforeLayout = second.totalSolveWork()
+                    assertTrue(second.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+
+                    val firstState = requireNotNull(first.propagator.state)
+                    val secondState = requireNotNull(second.propagator.state)
+                    assertNotSame(firstState, secondState)
+                    assertNotSame(firstState.model, secondState.model)
+                    assertTrue(firstFactory.calls.any { it.kind == EngineConstruction.PERSISTENT })
+                    assertTrue(secondFactory.calls.any { it.kind == EngineConstruction.PERSISTENT })
+                    assertTrue(second.totalSolveWork() > secondBeforeLayout)
+                    assertEquals(firstWork, first.totalSolveWork())
+                }
+            }
+        assertTrue(requireNotNull(secondSink.snapshot().lp.sparseTrial["ReusedPreparationWork"]) > 0L)
+    }
+
+    @Test
     fun `automatic sparse preparation shares the paid layout for the same source and objective`() {
         val source = boundedLpEngineProblem()
         val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
