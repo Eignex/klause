@@ -28,6 +28,14 @@ internal class RegionalPublicationRejection(
         }
     }
 
+    fun workingBinaryPins(): String? {
+        val sample = rejected?.sample ?: return null
+        if (sample.numBoolVars != 0 || sample.numIntVars !in 1..256) return null
+        val values = (0 until sample.numIntVars).map { sample.exactIntValue(it).toString() }
+        if (values.any { it != "0" && it != "1" }) return null
+        return values.mapIndexed { id, value -> "$id=$value" }.joinToString(",")
+    }
+
     fun inspect(sourceHash: String, pinsHash: String, stop: ExecutionControl, out: File) {
         val start = System.nanoTime()
         val deadline = stop or ExecutionControl.after(250.milliseconds)

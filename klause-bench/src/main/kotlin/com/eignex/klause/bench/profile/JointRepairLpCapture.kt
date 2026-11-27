@@ -23,6 +23,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -92,6 +93,7 @@ internal object JointRepairLpCapture {
             RegionalPublicationRejection(original, mapping, source.objective?.sense == ObjectiveSense.MAXIMIZE)
         } else null
         val checker = rejection?.observe(nativeChecker) ?: nativeChecker
+        val sequenceStarted = System.nanoTime()
         val activeLimitMs = if (nominalPinCompletion) 2_000L else 4_000L
         val active = stop or ExecutionControl.after(activeLimitMs.milliseconds)
         val projection = regionalCenter?.let {
@@ -117,13 +119,57 @@ internal object JointRepairLpCapture {
             sourceIncumbentCompletion = pins == null,
             sourcePointCuts = cutPolicy == "selected", sourceAggregateCuts = cutPolicy == "selected")
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
-        val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
-            .newInstance(model, context, objective, params, policy, true, { null }, active, null,
-                null, null, true, null, checker, null, null, null)
+        val constructor = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 17 }
+        fun openRegion(scope: SourceProofContext, limits: TheoryParams, check: Any): Any =
+            constructor.newInstance(model, scope, objective, limits, policy, true, { null }, active, null,
+                null, null, true, null, check, null, null, null)
+        val owner = openRegion(context, params, checker)
         if (pins != null) {
             val consultations = options["regional-consultations"]?.toInt() ?: 64
-            replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, consultations,
+            val regionalCost = replayRegion(owner as AutoCloseable, pins, model.numIntVars, context, active, consultations,
                 sha256(bytes), out, objective, activeLimitMs, params)
+            if (options["regional-nominal-after-rejection"] == "true") {
+                val fixed = rejection?.workingBinaryPins()
+                var contextWork = 0L
+                var nominalCost: RegionalCost? = null
+                if (fixed != null && !active()) {
+                    val remainingWork = (params.sourceLpWorkLimit - regionalCost.work).coerceAtLeast(0L)
+                    val remainingBytes = (params.sourceLpAllocationLimit - regionalCost.allocation).coerceAtLeast(0L)
+                    val metered = object : ExecutionControl() {
+                        override fun isCancelled(): Boolean = active() || contextWork >= remainingWork
+                        override fun deadline() = active.deadline()
+                        override val accounting = WorkMeter { contextWork += it }
+                    }
+                    val nominal = captureContext.invoke(companion, model, objective, metered, null, null)
+                        as SourceProofContext?
+                    val limits = params.copy(sourceLpWorkLimit = minOf(20_000_000L,
+                        (remainingWork - contextWork).coerceAtLeast(0L)),
+                        sourceLpAllocationLimit = minOf(64L * 1024 * 1024, remainingBytes),
+                        sourcePointCuts = false, sourceAggregateCuts = false)
+                    if (nominal != null && !metered() && limits.sourceLpAllocationLimit > 0L) {
+                        val nominalOwner = openRegion(nominal, limits, nativeChecker) as AutoCloseable
+                        nominalCost = replayRegion(nominalOwner, fixed, model.numIntVars, nominal, active, 64,
+                            sha256(bytes), out, objective, activeLimitMs, limits, "nominal-after-rejection.json",
+                            contextWork)
+                    }
+                }
+                val elapsed = System.nanoTime() - sequenceStarted
+                out.resolve("regional-sequence.json").writeText(buildJsonObject {
+                    put("sourceSha256", sha256(bytes))
+                    put("regionPinsSha256", sha256(pins.encodeToByteArray()))
+                    put("nominalPinsSha256", fixed?.let { sha256(it.encodeToByteArray()) })
+                    put("activeLimitMs", activeLimitMs)
+                    put("combinedElapsedNs", elapsed)
+                    put("combinedMeasuredWork", (projection?.work ?: 0L) + regionalCost.work + contextWork +
+                        (nominalCost?.work ?: 0L))
+                    put("combinedModeledAllocation", (projection?.allocation ?: 0L) + regionalCost.allocation +
+                        (nominalCost?.allocation ?: 0L))
+                    put("nominalContextWork", contextWork)
+                    put("nominalContextAllocationMeasured", false)
+                    put("invokedNominalReplay", nominalCost != null)
+                    put("cancelled", active())
+                }.toString())
+            }
             rejection?.inspect(sha256(bytes), sha256(pins.encodeToByteArray()), stop, out)
             return
         }
@@ -272,11 +318,13 @@ internal object JointRepairLpCapture {
         if (options["inspect-rays"] == "true") JointRayInspection.inspect(out, stop)
     }
 
+    private data class RegionalCost(val work: Long, val allocation: Long)
+
     private fun replayRegion(
         owner: AutoCloseable, specification: String, integers: Int, context: SourceProofContext, stop: ExecutionControl,
         consultations: Int, sourceHash: String, out: File, objective: LinearObjective, activeLimitMs: Long,
-        params: TheoryParams,
-    ) {
+        params: TheoryParams, artifact: String = "regional-replay.json", contextWork: Long = 0L,
+    ): RegionalCost {
         val entries = specification.split(',')
         val pins = entries.associate { entry ->
             val id = entry.substringBefore('=').toInt()
@@ -304,7 +352,8 @@ internal object JointRepairLpCapture {
         }
         val elapsed = System.nanoTime() - started
         val stats = requireNotNull(call(owner, "getStats")) as SolveStats
-        out.resolve("regional-replay.json").writeText(buildJsonObject {
+        val stages = stats.smt.completeSearchStages.orEmpty()
+        out.resolve(artifact).writeText(buildJsonObject {
             put("sourceSha256", sourceHash)
             put("pinsSha256", sha256(specification.encodeToByteArray()))
             put("rootScope", NumericalFrontierSnapshot.scope(context.scope))
@@ -315,6 +364,7 @@ internal object JointRepairLpCapture {
             put("activeLimitMs", activeLimitMs)
             put("sourceLpWorkLimit", params.sourceLpWorkLimit)
             put("sourceLpAllocationLimit", params.sourceLpAllocationLimit)
+            put("nominalContextWork", contextWork)
             put("attemptAndRetirementNs", elapsed)
             put("disposition", disposition)
             put("reason", reason)
@@ -322,10 +372,11 @@ internal object JointRepairLpCapture {
             put("chargedWork", call(owner, "getWork") as Long)
             put("cancelled", stop())
             put("stageCounters", buildJsonObject {
-                stats.smt.completeSearchStages.orEmpty().forEach { (name, value) -> put(name, value) }
+                stages.forEach { (name, value) -> put(name, value) }
             })
             put("sourceVerdictClaim", false)
         }.toString())
+        return RegionalCost(stages["jointRepairFundedWork"] ?: 0L, stages["jointRepairFundedAllocation"] ?: 0L)
     }
 
     private fun captureRay(session: Any, id: Int, scope: SourceScope, state: JsonObject, out: File): String? {
