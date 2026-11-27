@@ -30,13 +30,18 @@ the optimizing tier for long runs.
 | `mps` | `.mps` | Linear/mixed-integer status, objective and named values |
 
 `--format <name>` (alias `--mode`) takes priority over the input extension; an
-unrecognized extension defaults to MiniZinc mode. Compressed `.zst` inputs require
-`zstd` on `PATH`. MiniZinc source models go through the
+unrecognized extension defaults to MiniZinc mode. A trailing `.zst`, `.xz`, `.gz` or `.bz2`
+suffix is set aside before the extension is matched, and reading it can require the
+matching decompressor (`zstd`, `xz`, `gzip`, `bzip2`) on `PATH`. MiniZinc source models go through the
 [MiniZinc integration](../klause-mzn-lib/README.md), which compiles them to FlatZinc
 first. The registry in
 [Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/Main.kt) and the
 flags in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
 define supported names, aliases and help text.
+
+Usage, configuration and format errors exit with status 2. Status 3 reports an
+`UnsoundnessException` that reached the CLI: an independent check refuted an engine verdict.
+It marks a solver defect, never a property of the input.
 
 Each loader closes its input source when parsing returns or fails, including when
 the parser stops before end of file. Compressed sources release their readers and
@@ -111,7 +116,9 @@ proof. A representation decline does not mean that a search budget was exhausted
 
 ## Flags
 
-Solver-control flags are common to every mode; `--help` lists every parameter.
+Solver-control flags are common to every mode; `--help` lists every flag. Unknown flags
+are ignored with a note on stderr, since MiniZinc may pass standard flags that Klause does
+not implement.
 
 The `source-cuts`, `source-point-cuts` and `source-aggregate-cuts` Boolean parameters
 configure [source cut selection](20-linear-programming.md#cuts) in admitted numerical
@@ -163,8 +170,8 @@ this is separate from heap measurements and diagnostic payload-category sums.
   - `backtrack` (aliases `bt`, `cp`; `-f` / `--free-search`): backtrack-only
     portfolio ignoring search annotations. Selector `--param`s edit the whole pool;
     `bt-arm=label,…` pins named arms.
-  - `mixed` (default): backtrack plus local search.
-  - `localsearch` (alias `ls`): local-search portfolio. Strategy `--param`s and the
+  - `mixed` (default; aliases `portfolio`, `pf`): backtrack plus local search.
+  - `localsearch` (aliases `ls`, `local-search`): local-search portfolio. Strategy `--param`s and the
     recipe axes `sources`, `scoring` and `acceptance` edit the pool; `arm=label`
     pins one catalog arm, which the axes still edit.
   - `alns` (aliases `lns`, `hybrid-lns`): adaptive large-neighbourhood search.
@@ -176,7 +183,8 @@ this is separate from heap measurements and diagnostic payload-category sums.
   across finite presolve and consuming LP engines independently of that intensity.
   Earned selective reuse is the default; `preparation=index` selects complete-index reuse.
   Arms choose intensity below it. `--lp-pricing` selects zero-objective
-  entering policy. Native arithmetic routes reject explicit LP flags.
+  entering policy. `-e fixed` accepts only `off`, and native arithmetic routes reject
+  explicit LP flags.
 - `--exact`: continuous float interpretation and zero source feasibility and optimality
   tolerances for the format's declared policies. MPS and FlatZinc declare a positive tolerance, so their
   finite LP deductions are [numerical](21-lp-engine.md#numerical-and-exact-deductions)
@@ -381,6 +389,7 @@ replaces its default independently, and explicit source bounds stay authoritativ
 | `--float-semantics continuous` | Continuous source real coordinates |
 | `--source-absolute-tolerance N` / `--source-relative-tolerance N` | Source feasibility slack components |
 | `--source-absolute-optimality-tolerance N` / `--source-relative-optimality-tolerance N` | Source optimality gap components |
+| `--pin-absent-optional-values true\|false` | Canonical value of absent optional coordinates |
 
 `--source-tolerance-envelope true` opts an MPS source into exact LP separation and
 completion over its absolute-tolerance accepted set. It requires zero relative
