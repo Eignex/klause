@@ -268,15 +268,25 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             state.arithmeticLearningTrace?.record("integer.endpoint-decline.combination-shape-or-guard")
             return null
         }
+        val workBeforeCheck = state.work
+        val bytesBeforeCheck = budget.allocatedBytes
+        val initiallyConflicting = combination.minimum(state, budget = budget) > combination.bound
+        val checkWork = state.work - workBeforeCheck
+        val checkBytes = budget.allocatedBytes - bytesBeforeCheck
         var roundedReason = false
-        if (combination.minimum(state, budget = budget) <= combination.bound) {
+        if (!initiallyConflicting) {
             val reduced = sourceRow.reduced(state, sourceRow.coefficient(variable).abs(), budget)
             reduced?.let { row.resolve(it, variable, budget) }?.let {
                 combination = it
                 roundedReason = true
             }
         }
-        if (combination.minimum(state, budget = budget) <= combination.bound) return null
+        val conflicting = if (!roundedReason && budget.replayIfFunded(checkWork, checkBytes)) {
+            initiallyConflicting
+        } else {
+            combination.minimum(state, budget = budget) > combination.bound
+        }
+        if (!conflicting) return null
         if (factorId >= state.baseFactorCount) state.integerRowRetainedEndpointUses++
         state.arithmeticLearningTrace?.record("integer.eliminate", variable.toLong(), factorId.toLong(),
             marker[2].toLong(), if (roundedReason) 1L else 0L)

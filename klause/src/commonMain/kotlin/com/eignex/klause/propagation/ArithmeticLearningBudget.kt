@@ -19,7 +19,8 @@ internal class ArithmeticLearningBudget(
     private val limits: ArithmeticLearningLimits = state.arithmeticLearningLimits,
 ) {
     private val initialWork = state.work
-    private var allocation = 0L
+    var allocatedBytes = 0L
+        private set
 
     fun spend(work: Long = 1, bytes: Long = 0) {
         require(work >= 0 && bytes >= 0)
@@ -27,12 +28,24 @@ internal class ArithmeticLearningBudget(
         if (work > state.workLimit - state.work) throw FinitePropagationInterrupted()
         val reason = when {
             work > limits.work - (state.work - initialWork) -> "work"
-            bytes > limits.allocationBytes - allocation -> "allocation"
+            bytes > limits.allocationBytes - allocatedBytes -> "allocation"
             else -> null
         }
         if (reason != null) throw ArithmeticLearningDeclined(reason)
         state.work += work
-        allocation += bytes
+        allocatedBytes += bytes
+    }
+
+    fun replayIfFunded(work: Long, bytes: Long): Boolean {
+        if (work > state.workLimit - state.work ||
+            work > limits.work - (state.work - initialWork) ||
+            bytes > limits.allocationBytes - allocatedBytes
+        ) return false
+        // A partial payment must replay the original scan to preserve its cancellation and decline boundary.
+        state.finiteWork.checkNow()
+        state.work += work
+        allocatedBytes += bytes
+        return true
     }
 
     fun scalar(left: BigInt, right: BigInt = left) {
