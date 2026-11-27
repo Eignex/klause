@@ -44,6 +44,23 @@ class JointRepairCenterTest {
     }
 
     @Test
+    fun `a borrowed point should rank legal cited center steps by agreement`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2) { 1 }, null, null), factors = emptyArray())
+        val funding = SourceLpFunding(10_000, 10_000)
+        val policy = JointRepairCenter(model, SourceLpBudget(funding = funding), ExecutionControl.Never) { true }
+        val pins = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
+        val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
+        val first = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
+        val support = linkedSetOf(SourceDerivation.Assumption(first, true), SourceDerivation.Assumption(second, true))
+
+        val step = policy.suggest(support, condition, condition, mapOf(first to 0.1, second to 0.45))
+
+        assertEquals(1, assertNotNull(step).coordinate)
+    }
+
+    @Test
     fun `blocked bound sides should not suggest an illegal center`() {
         val model = Problem(0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null), factors = emptyArray())

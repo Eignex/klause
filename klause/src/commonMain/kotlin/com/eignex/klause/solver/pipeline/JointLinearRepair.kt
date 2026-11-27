@@ -919,7 +919,9 @@ internal class JointLinearRepair(
                 observe(disposition)
                 if (queryCenterStep == null && centerProgress != null && !proposalHasCheckedCenter) {
                     queryOriginalCondition?.let { original ->
-                        queryCenterStep = centerProgress.suggest(support.assumptions, condition, original)
+                        val point = rootPoint.takeIf { sharedFractionalRoot }
+                        queryCenterStep = centerProgress.suggest(support.assumptions, condition, original, point)
+                        if (queryCenterStep != null && point != null) observe("jointRepairSharedRootRankedRefutations")
                         if (queryCenterStep != null) observe("jointRepairAdvisoryCenterProposals")
                     }
                 }

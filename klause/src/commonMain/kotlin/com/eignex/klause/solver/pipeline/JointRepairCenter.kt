@@ -8,6 +8,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
+import kotlin.math.abs
 
 internal class JointRepairCenter(
     private val model: Problem,
@@ -28,11 +29,13 @@ internal class JointRepairCenter(
     }
 
     fun suggest(assumptions: Set<SourceDerivation.Assumption>, captured: ExactNeighborhoodCondition,
-        original: ExactNeighborhoodCondition): Step? {
+        original: ExactNeighborhoodCondition, rootPoint: Map<SourceCoordinate, Double>? = null): Step? {
         if (captured.cutoff != null) return null
         var visited = 0
+        var best: Step? = null
+        var bestAlignment = Double.NEGATIVE_INFINITY
         for (assumption in assumptions) {
-            if (++visited > MAX_ENTRIES || !pay(1L, 64L)) return null
+            if (++visited > MAX_ENTRIES || !pay(1L, 64L)) break
             val coordinate = assumption.coordinate
             val id = coordinate.id
             if (coordinate.kind != SourceCoordinate.Kind.Integer || id !in 0 until model.numIntVars ||
@@ -46,9 +49,19 @@ internal class JointRepairCenter(
             if (after.num.magnitudeBitLength().toLong() + after.den.magnitudeBitLength() > MAX_SCALAR_BITS) continue
             if (!legal(id, after)) continue
             if (stop() || budget.funding?.exhausted != false) return null
-            return Step(original, id, before, after)
+            if (rootPoint == null) return Step(original, id, before, after)
+            val target = rootPoint[coordinate]
+            val alignment = if (target == null) Double.NEGATIVE_INFINITY else {
+                if (!pay(4L + 2L * (bits + 1L) * (bits + 1L) / 64L)) break
+                (abs(target - before.toDouble()) - abs(target - after.toDouble()))
+                    .takeIf(Double::isFinite) ?: Double.NEGATIVE_INFINITY
+            }
+            if (best == null || alignment > bestAlignment) {
+                best = Step(original, id, before, after)
+                bestAlignment = alignment
+            }
         }
-        return null
+        return best?.takeUnless { stop() || budget.funding?.exhausted != false }
     }
 
     private fun legal(id: Int, value: BigFraction): Boolean {
