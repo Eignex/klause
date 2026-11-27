@@ -33,8 +33,8 @@ finite propagation.
 ### Solving and composition
 
 Satisfaction with a native finite peer uses backtracking, including in mixed
-execution. At a partial state, the certified envelope LP consumes active Boolean facts and the
-bounds of the shared finite integers. Certified integer deductions return to CP
+execution. At a partial state, the certified envelope LP consumes active Boolean
+facts and the bounds of the shared finite integers. Certified integer deductions return to CP
 with those facts as trailed premises. A fixed finite leaf checks its native
 factors and pins the shared values for nonlinear integer search and exact real
 completion. Only open integer coordinates enter arithmetic candidate traversal.
@@ -153,9 +153,9 @@ undecided.
 
 #### Quadratic objectives
 
-`OpenTheoryPipeline.minimize` accepts the same request with an exact source
-`QuadraticObjectiveSpec`. Every incumbent checks integrality, the original formula
-and the exact objective before publication.
+For sources with full arithmetic ownership, `OpenTheoryPipeline.minimize`
+accepts an exact source `QuadraticObjectiveSpec`. Every incumbent checks
+integrality, the original formula and the exact objective before publication.
 
 Complete traversal uses `SearchSession` with a theory component. Exact real
 optimization supplies node lower bounds, and fractional integer coordinates split

@@ -109,9 +109,10 @@ class FactorPolynomialProjectionTest {
             val execution = assertIs<SourceExecutionResult.Polynomial>(
                 SourceSetup.execute(SourceExecutionRequest(invocation, params)))
 
-            val assignment = assertIs<OpenTheoryResult.Sat>(execution.result.result).assignment
-            assertEquals(guard, assignment.boolValue(0))
-            assertEquals(value, assignment.intValue(1))
+            val result = assertIs<OpenTheoryResult.Sat>(execution.result.result)
+            assertEquals(guard, result.assignment.boolValue(0))
+            assertEquals(value, result.assignment.intValue(1))
+            if (guard) assertEquals(0.0, result.stats.search.nodes.sum)
         }
     }
 
@@ -175,7 +176,7 @@ class FactorPolynomialProjectionTest {
             SourceAttachment(coupledCube()), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
         ))
         val params = NonlinearIntegerTheoryParams(
-            maximumCandidates = 2,
+            maximumCandidates = 1,
             polynomial = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
                 backtrack = BacktrackParams(valueSelector = IndomainMax),
             )),
