@@ -49,8 +49,9 @@ internal fun differenceSystemDiagnosticCodec(): FactorCodec<*, *> =
                     edge.index?.let { put(id, DifferenceIndexGuard(it.variable, it.value.toLong())) }
                 }
             }
-            val edges = payload.edges.map { DifferenceEdge(it.source, it.target, it.bound.toLong(), it.guard,
-                it.domainBound) }
+            val edges = payload.edges.map { edge ->
+                DifferenceEdge(edge.source, edge.target, edge.bound.toLong(), edge.guard, edge.domainBound)
+            }
             DifferenceSystem(edges, payload.privateVertices, indexGuards)
         },
     )

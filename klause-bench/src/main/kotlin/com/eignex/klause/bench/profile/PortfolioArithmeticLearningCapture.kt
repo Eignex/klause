@@ -70,7 +70,11 @@ internal object PortfolioArithmeticLearningCapture {
         val codec = if (native) nativeCodec else sourceCodec
         return try {
             val json = codec.encodeToString(problem)
-            if (json.encodeToByteArray().size <= MODEL_BYTE_LIMIT) Snapshot(json, null) else Snapshot(null, "model byte limit")
+            if (json.encodeToByteArray().size <= MODEL_BYTE_LIMIT) {
+                Snapshot(json, null)
+            } else {
+                Snapshot(null, "model byte limit")
+            }
         } catch (missing: MissingFactorCodecException) {
             Snapshot(null, missing.message?.take(512) ?: "missing factor codec")
         }
