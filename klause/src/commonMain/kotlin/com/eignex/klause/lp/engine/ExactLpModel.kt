@@ -132,6 +132,9 @@ internal class ExactLpObjective(
 
     fun cost(column: Int): ExactLpNumber = costs[column]
 
+    fun withCosts(values: List<ExactLpNumber>): ExactLpObjective =
+        ExactLpObjective(values, constant, scale, externalConstant, sense)
+
     fun minimizedValue(point: List<BigFraction>): BigFraction {
         require(point.size == size)
         var value = constant.value

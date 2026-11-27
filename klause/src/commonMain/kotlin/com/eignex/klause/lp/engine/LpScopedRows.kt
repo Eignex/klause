@@ -162,11 +162,3 @@ internal fun ExactLpModel.compactLayout(remap: LpLayoutRemap): ExactLpModel = Ex
         remap.retainedColumns.map { objective.cost(it) } + remap.retainedRows.map { objective.cost(n + it) },
     ),
 )
-
-private fun ExactLpObjective.withCosts(costs: List<ExactLpNumber>): ExactLpObjective = ExactLpObjective(
-    costs,
-    constant,
-    scale,
-    externalConstant,
-    sense,
-)
