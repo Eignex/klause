@@ -63,7 +63,8 @@ of distinct declared families in the pool (a probe, its probe-weighted share of
 half). The finite CLI exposes `slice-work`, `slice-max-work` and `slice-growth`
 and reports the effective settings.
 On one lane, pure-real linear satisfaction with neighborhood workers assigns the
-complete worker half the initial probe weight. The other workers share the remainder.
+complete worker three quarters of the initial probe weight and a 3.25-second
+outer cap on its first slice. The other workers share the remaining probe weight.
 
 Backtrack arms charge decisions, propagation visits and LP work to their scheduler
 at the [slice prices](06-sessions.md#resource-allowances); the solve-wide

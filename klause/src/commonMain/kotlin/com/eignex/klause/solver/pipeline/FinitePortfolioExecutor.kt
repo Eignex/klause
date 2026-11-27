@@ -250,14 +250,14 @@ internal fun heuristicSecondProbeRanks(workers: List<PortfolioWorker>): IntArray
     }
 }
 
-internal fun leadingProbeWeights(workers: List<PortfolioWorker>): IntArray {
+internal fun leadingProbeWeights(workers: List<PortfolioWorker>, multiplier: Int = 1): IntArray {
     val initial = workers.indices.filter {
         !workers[it].startAfterIncumbent && !workers[it].improvementOnly && !workers[it].auxiliaryProof
     }
     val leader = initial.firstOrNull {
         workers[it].family == ArmFamily.Backtrack && workers[it].permitsSourceProofs
     } ?: return intArrayOf()
-    return IntArray(workers.size) { if (it == leader) (initial.size - 1).coerceAtLeast(1) else 1 }
+    return IntArray(workers.size) { if (it == leader) (initial.size - 1).coerceAtLeast(1) * multiplier else 1 }
 }
 
 internal fun lpTransferredProbeWeights(workers: List<PortfolioWorker>): IntArray {
