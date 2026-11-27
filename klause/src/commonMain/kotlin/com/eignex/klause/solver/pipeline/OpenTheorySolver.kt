@@ -371,7 +371,7 @@ class OpenTheoryEngine internal constructor(
         params: TheoryParams,
         state: OpenTheorySolveState,
         nodePolicy: SearchNodePolicy,
-        deferPartialNumericalChecks: Boolean = false,
+        automaticRealLinearScheduling: Boolean = false,
     ): OpenTheoryStart {
         val work = state.work
         val cancellation = params.timeout.withAccounting(params.cancellation).includingStop( params.cancellation)
@@ -438,12 +438,13 @@ class OpenTheoryEngine internal constructor(
         var handedOff = false
         var failure: Throwable? = null
         try {
+            val automaticRealLinear = automaticRealLinearScheduling && plan.theoryPipeline == ProblemPipeline.EXACT_LRA
             (planned.theory as? ExactLiraSearchComponent)?.let {
                 it.observePrimaryLpWith(stats.lp.certificationObserver(LpRoute.STANDALONE))
                 it.observeCompleteTraversal()
                 it.useMixedPointCompletion()
                 if (params.openLinearIncremental) it.useIncrementalLinearPropagation()
-                if (deferPartialNumericalChecks && plan.theoryPipeline == ProblemPipeline.EXACT_LRA) {
+                if (automaticRealLinear) {
                     it.deferAlternatePartialNumericalChecks()
                 }
             }
@@ -465,10 +466,9 @@ class OpenTheoryEngine internal constructor(
                     ),
                 )
             }
-            val activityRestart = if (params.openBranching == OpenBranching.Automatic &&
-                plan.theoryPipeline == ProblemPipeline.EXACT_LRA &&
-                params.openHintFlips == null && params.sharedRestart == null
-            ) ActivityRestartBooleanBranching(model.numBoolVars, REAL_LINEAR_RESTART_DECISIONS) else null
+            val activityRestart = if (automaticRealLinear && model.numBoolVars > 0) {
+                ActivityRestartBooleanBranching(model.numBoolVars, REAL_LINEAR_RESTART_DECISIONS)
+            } else null
             val solveParams = SearchSolveParams(
                 maxDecisions = state.remainingDecisions(),
                 restart = activityRestart ?: params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,

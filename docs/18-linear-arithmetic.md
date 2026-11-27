@@ -106,10 +106,10 @@ A check proceeds in four steps:
 4. **Complete.** Once every Boolean is assigned, the exact candidate point is
    checked against every selected source row before it becomes a witness.
 
-Automatic complete pure-real traversal starts with source-order Boolean decisions.
-Without an explicit restart schedule or hint allowance, a traversal that reaches
-768 decisions can restart once and use conflict-activity order. The restart
-repropagates retained learned clauses and spends the same solve-wide allowances.
+In the default single-lane real feasibility portfolio, the complete worker starts
+with source-order Boolean decisions. A traversal that reaches 768 decisions can
+restart once and use conflict-activity order. The restart repropagates retained
+learned clauses and spends the same solve-wide allowances.
 
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.

@@ -372,7 +372,7 @@ internal class OpenPortfolio(
     ): ResumableSolve = object : ResumableSolve {
         private val search = ResumableOpenTheory(
             OpenTheoryPipeline.engineFor(request), params,
-            deferPartialNumericalChecks = lanes == 1 && request.route == ProblemPipeline.EXACT_LRA &&
+            automaticRealLinearScheduling = lanes == 1 && request.route == ProblemPipeline.EXACT_LRA &&
                 params.openLinearIncremental && params.openBranching == OpenBranching.Automatic &&
                 params.openHintFlips == null && params.openHintMinSplits == DEFAULT_HINT_MIN_SPLITS &&
                 params.sharedRestart == null,

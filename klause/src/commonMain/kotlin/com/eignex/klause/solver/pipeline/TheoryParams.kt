@@ -68,9 +68,9 @@ data class TheoryParams(
      * Boolean branching for each feasibility traversal.
      *
      * [OpenBranching.Automatic] selects activity for a complete mixed worker with one default point owner.
-     * A complete pure-real worker can switch from source order to activity at a single restart, when there
-     * is no explicit restart schedule or hint allowance. Other openings use source order. The theory decides
-     * the arithmetic residual at a leaf.
+     * A complete pure-real worker in the default single-lane feasibility portfolio can switch from source order
+     * to activity at a single restart. Other automatic openings use source order. The theory decides the
+     * arithmetic residual at a leaf.
      */
     val openBranching: OpenBranching = OpenBranching.Automatic,
     /**
