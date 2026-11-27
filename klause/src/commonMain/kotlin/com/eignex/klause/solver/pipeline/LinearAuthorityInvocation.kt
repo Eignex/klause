@@ -243,8 +243,9 @@ internal class LinearAuthorityInvocation(
             if (component.gapBound() != null) return finish(null, TerminationReason.SearchExhausted, gapClosed = true)
             return when (event) {
                 SearchRunEvent.Paused -> {
-                    if (stop() || funding.exhausted || component.allocationStop != null) finish(null, incompleteReason())
-                    else null
+                    if (stop() || funding.exhausted || component.allocationStop != null) {
+                        finish(null, incompleteReason())
+                    } else null
                 }
                 SearchRunEvent.Exhausted -> {
                     val terminal = component.completed()
