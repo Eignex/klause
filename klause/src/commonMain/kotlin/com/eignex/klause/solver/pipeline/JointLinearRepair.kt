@@ -78,6 +78,7 @@ internal class JointLinearRepair(
     private class CheckedProposal(val condition: ExactNeighborhoodCondition, val sample: Sample)
     private class BinaryPins(val width: Int, val fixed: Long, val ones: Long)
     private class PrivateQueryReceipt(val proposal: Long, val query: Long, val pins: BinaryPins?) {
+        var advisorySourceRowsOnly = false
         var consultations = 0L
         var firstSearchWork = 0L
         var firstLpWork = SourceLpWorkStats()
@@ -393,6 +394,7 @@ internal class JointLinearRepair(
             put(prefix + "Proposal", receipt.proposal)
             put(prefix + "Query", receipt.query)
             put(prefix + "Consultations", receipt.consultations)
+            if (receipt.advisorySourceRowsOnly) put(prefix + "AdvisorySourceRowsOnly", 1L)
             receipt.pins?.let { pins ->
                 put(prefix + "PinWidth", pins.width.toLong())
                 put(prefix + "PinCount", pins.fixed.countOneBits().toLong())
@@ -914,6 +916,9 @@ internal class JointLinearRepair(
             queryOriginalCondition = condition
             val refutationGuidance = completion != null && anchor == null && preparedCenter == null &&
                 condition.cutoff == null
+            val separateCuts = boundOrdered && params.sourceCuts
+            val advisorySourceRowsOnly = separateCuts && queryProximity && proximityAdvisory != null
+            privateQueryReceipt?.advisorySourceRowsOnly = advisorySourceRowsOnly
             query = LinearAuthorityInvocation(querySource,
                 params.copy(sourceIncumbentCompletion = false, sourceRefutationCenterStep = false),
                 external = {
@@ -926,7 +931,7 @@ internal class JointLinearRepair(
                     }
                 }, state = state, borrowedAuthority = authority, borrowedBudget = budget,
                 boundOrdered = boundOrdered, guidance = true, funding = funding,
-                cuts = boundOrdered && params.sourceCuts && !(queryProximity && proximityAdvisory != null),
+                cuts = separateCuts && !advisorySourceRowsOnly,
                 onNumericalFeedback = if (refutationGuidance) { feedback ->
                     guideRefutation(captured, querySource, feedback)
                 } else null,

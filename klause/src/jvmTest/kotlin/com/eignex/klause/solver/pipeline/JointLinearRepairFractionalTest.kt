@@ -100,6 +100,8 @@ class JointLinearRepairFractionalTest(
                 assertEquals("checked", publication.disposition)
                 assertEquals(publication.proposal, stages[receipt + "Proposal"])
                 assertEquals(1L, stages[receipt + "PublicationChecked"])
+                assertEquals(if (advisory && boundOrdered) 1L else null,
+                    stages[receipt + "AdvisorySourceRowsOnly"])
                 assertTrue((stages[receipt + "OfferAccepted"] ?: 0L) > 0L)
                 assertEquals(2L, stages[receipt + "PinWidth"])
                 assertEquals(0L, stages[receipt + "FixedIntegerMask"])
