@@ -444,6 +444,8 @@ ordinary component root uses the same scoped owner for its initial bound and lat
 node queries; when no owner exists, preparation partitions source and cuts together,
 and a declined live append falls back to the ordinary owner. Finite basis entry
 limits are divided among the blocks.
+If adoption stops after some children change, the numerical collection retires.
+The next preparation rebuilds the numerical owners from the accepted exact trail.
 
 Child bounds stay exact rationals until their sum, isolated-column contributions and
 the objective constant, scale and sense are combined; rounding applies to that

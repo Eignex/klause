@@ -412,7 +412,7 @@ internal class LpScopedSolver(
         var solveStarted = false
         val result = try {
             try {
-                if (!current.adopt(state, token)) return null
+                if (!adoptPrepared(current, state, token)) return null
                 solveStarted = true
                 val queryAllowance = allowance ?: if (current is ComponentLpSolver) {
                     LpFloatAllowance(workLimit, iterationLimit)
@@ -481,9 +481,11 @@ internal class LpScopedSolver(
             pending.allowance = allowance
         }
         if (pending == null) {
-            if (!current.adopt(state, floatInvocationToken)) {
-                solver = null
-                closeOwner(current)
+            if (!adoptPrepared(current, state, floatInvocationToken)) {
+                if (solver === current) {
+                    solver = null
+                    closeOwner(current)
+                }
                 return null
             }
             observeFloatQuery(current, current === previous, allowance, token,
@@ -600,7 +602,7 @@ internal class LpScopedSolver(
                 val bound = LpScalingView.constructionWorkBound(model)
                 projection.reserve(bound, 0L, matrix = true)
                 constructionBound = bound
-                return current.adopt(next, token)
+                return adoptPrepared(current, next, token)
             } catch (_: LpProjectionStop) {
                 return false
             } finally {
@@ -611,11 +613,18 @@ internal class LpScopedSolver(
                     (current as? PersistentLpSolver)?.takePendingPreparationWork() ?: 0L)
             }
         }
-        if (next.canProjectWorkingModel(token)) return current.adopt(next, token)
+        if (next.canProjectWorkingModel(token)) return adoptPrepared(current, next, token)
         if (token.pollStop()) return false
         retireNumerical()
         return !token.pollStop()
     }
+
+    private fun adoptPrepared(current: RetainedLpSolver, next: LpExactState, token: ExecutionControl): Boolean =
+        try {
+            current.adopt(next, token)
+        } finally {
+            if (current is ComponentLpSolver && current.isClosed) retireNumerical()
+        }
 
     private fun retireNumerical() {
         val current = solver ?: return

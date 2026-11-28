@@ -42,6 +42,7 @@ internal class ComponentLpSolver(
     var lastReservedConstructionWork: Long = 0L
         private set
     private var closed = false
+    val isClosed: Boolean get() = closed
     private var continuationTarget: Basis? = null
     override var recessionDirection: DoubleArray? = null
         private set
