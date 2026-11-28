@@ -2,6 +2,7 @@ package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.util.SparseSlices
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.transpose
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntDoubleMap
@@ -286,10 +287,10 @@ private class LuConstruction(
             pivots++
         }
         val symbolic = SymbolicLu(rowOrder, columnOrder)
-        val l = lower.matrix(n, symbolic.rowPosition, null)
-        val u = upper.matrix(n, null, symbolic.columnPosition)
-        val lt = lower.matrix(n, symbolic.rowPosition, null, transpose = true)
-        val ut = upper.matrix(n, null, symbolic.columnPosition, transpose = true)
+        val lt = lower.matrix(n, symbolic.rowPosition)
+        val u = upper.matrix(n, symbolic.columnPosition)
+        val l = lt.transpose() as SparseMatrix
+        val ut = u.transpose() as SparseMatrix
         return LuAttemptResult.Built(LuFactors(basisColumns, unitRows, symbolic, l, u, lt, ut), work())
     }
 
@@ -456,7 +457,7 @@ private class LuConstruction(
             if (!multiplier.isFinite() || multiplier == 0.0) return false
             multipliers[k] = multiplier
             if (!reserveEntry()) return false
-            lower.add(affectedRows[k], pivots, multiplier)
+            lower.add(pivots, affectedRows[k], multiplier)
         }
         return true
     }
@@ -550,27 +551,37 @@ private fun SparseMatrix.copyOwned(): SparseMatrix = SparseMatrix.wrap(
 private class LuPivot(val row: Int, val column: Int)
 
 private class LuEntries {
-    private val rows = IntArrayList()
-    private val columns = IntArrayList()
+    private val pivots = IntArrayList()
+    private val sourceIndices = IntArrayList()
     private var values = DoubleArray(8)
-    val size: Int get() = rows.size
+    val size: Int get() = pivots.size
 
-    fun add(row: Int, column: Int, value: Double) {
+    fun add(pivot: Int, sourceIndex: Int, value: Double) {
         if (size == values.size) values = values.copyOf(size * 2)
         values[size] = value
-        rows.add(row)
-        columns.add(column)
+        pivots.add(pivot)
+        sourceIndices.add(sourceIndex)
     }
 
-    fun matrix(n: Int, rowMap: IntArray?, columnMap: IntArray?, transpose: Boolean = false): SparseMatrix {
-        val row = IntArray(size) { rowMap?.get(rows[it]) ?: rows[it] }
-        val column = IntArray(size) { columnMap?.get(columns[it]) ?: columns[it] }
-        return SparseMatrix.ofTriplets(
-            n,
-            n,
-            if (transpose) column else row,
-            if (transpose) row else column,
-            values.copyOf(size),
-        )
+    // Elimination emits each pivot's indices once. Scattering in that order leaves every column sorted.
+    fun matrix(n: Int, columnPositions: IntArray): SparseMatrix {
+        val pointers = columnStarts(n, columnPositions)
+        val rows = IntArray(size)
+        val entries = DoubleArray(size)
+        for (k in 0 until size) {
+            val out = pointers[columnPositions[sourceIndices[k]]]++
+            rows[out] = pivots[k]
+            entries[out] = values[k]
+        }
+        for (column in n downTo 1) pointers[column] = pointers[column - 1]
+        pointers[0] = 0
+        return SparseMatrix.wrap(n, n, pointers, rows, entries)
+    }
+
+    private fun columnStarts(n: Int, columnPositions: IntArray): IntArray {
+        val pointers = IntArray(n + 1)
+        for (k in 0 until size) pointers[columnPositions[sourceIndices[k]] + 1]++
+        for (column in 0 until n) pointers[column + 1] += pointers[column]
+        return pointers
     }
 }

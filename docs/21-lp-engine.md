@@ -84,7 +84,9 @@ dimension, both permutations and three-valued update results. Mutable coefficien
 inputs are captured defensively before use. Dense partial-pivot LU is selected only
 for dimensions 2–6 with at least 50% density in the selected basis and a pivot policy
 without entry or work limits; it produces the
-same CSC factors as sparse LU, and a numerical decline retries sparse. Rational
+same CSC factors as sparse LU, and a numerical decline retries sparse. Sparse LU
+emits sorted CSC directly from elimination order and derives the paired
+triangular views by transposition. Rational
 factors reuse orderings but never approximate numeric factors, and only complete
 exact rank determination establishes singularity. Koblas supplies the containers
 and kernels; see [integration contracts](22-exact-arithmetic.md#numerical-dependencies).
