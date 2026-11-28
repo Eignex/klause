@@ -61,7 +61,8 @@ internal object LabRuntime {
         val archive = context.outputDirectory.resolve("klause.aot")
         val launcher = tree.resolve("klause-cli/build/install/klause-cli-jvm/bin/klause-cli")
         val input = tree.resolve("klause-bench/smoke-corpus/dimacs/php4.cnf")
-        val trainingOptions = argumentFile("aot-training.args", runtime + "-XX:AOTCacheOutput=$archive")
+        val sharedOptions = listOf("-XX:-AOTClassLinking")
+        val trainingOptions = argumentFile("aot-training.args", runtime + sharedOptions + "-XX:AOTCacheOutput=$archive")
         val training = ProcessBuilder(
             launcher.toString(), "--exact", "-p", "1", "-r", "1", "-t", "30000",
             "--param", "node-limit=100000", input.toString(),
@@ -79,7 +80,9 @@ internal object LabRuntime {
             training.destroyForcibly()
         }
         check(complete && training.exitValue() == 0 && Files.size(archive) > 0) { "AOT cache training failed" }
-        val startupOptions = listOf("-XX:AOTCache=$archive", "-XX:AOTMode=on")
+        val startupOptions = sharedOptions + listOf(
+            "-XX:AOTCache=$archive", "-XX:AOTMode=on", "-Xlog:aot*=off:stdout", "-Xlog:aot*=warning:stderr",
+        )
         Files.writeString(
             context.outputDirectory.resolve("runtime.json"),
             buildJsonObject {
