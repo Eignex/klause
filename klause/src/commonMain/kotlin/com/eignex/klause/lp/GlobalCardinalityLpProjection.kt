@@ -5,27 +5,18 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.values
 import com.eignex.util.collections.IntArrayList
 
-/**
- * One-hot selector model for the count-variable form `counts(k) = #{i : xs(i) = cover(k)}`: a one-hot
- * selector `z_iv ∈ [0,1]` per variable/value over `xs(i)`'s root box with `Σ_v z_iv = 1` and the
- * channel `Σ_v v·z_iv = xs(i)`, and per cover value the exact count linkage `Σ_i z_{i,cover(k)} =
- * counts(k)` — so a count variable in the objective reads a true LP bound. Large encodings and the
- * constant-bound and optional-presence forms are skipped. Rows contribute as [Contribution.HULL].
- *
- * The selectors enumerate each variable's root box and the channel then confines the column to what was
- * enumerated, so over a side the model leaves open the encoding would exclude values the model admits,
- * and the count rows would undercount them — declined there.
- */
+// One-hot selectors per variable over its root box, channelled to `xs(i)`, and per cover value the exact
+// count row `Σ z(i, cover(k)) = counts(k)`, so a count variable in the objective reads a true LP bound.
+// The channel confines each column to its enumerated box, so an open-sided variable is declined: the
+// count rows would undercount values the model admits.
 internal fun GlobalCardinality.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
-    if (presents.isNotEmpty()) return // count is over present vars only — defer
-    val counts = countVars ?: return // constant-bound form has no count var to bound
+    if (presents.isNotEmpty()) return
+    val counts = countVars ?: return
     if (!builder.statesBothBounds(xs)) return
     var cells = 0L
     for (x in xs) cells += builder.rootDomain(x).values.size.toLong()
     if (cells == 0L || cells > MAX_GCC_CELLS) return
-    // Selector columns per cover value, indexed by cover position via [coverIndexByValue], whose
-    // Long keys address cover values across the full value range.
     val selByCover = Array(cover.size) { IntArrayList() }
     for ((position, x) in xs.withIndex()) {
         if (!builder.emitOneHotValues(
@@ -38,7 +29,7 @@ internal fun GlobalCardinality.emitLpRelaxation(builder: RelaxationBuilder) {
             )
         ) return
     }
-    // Σ_i z_{i,cover(k)} − counts(k) = 0 per cover value (a cover value in no domain forces 0).
+    // A cover value in no domain forces its count to 0.
     for (k in cover.indices) {
         val sel = selByCover[k]
         val cols = IntArray(sel.size + 1)
@@ -73,9 +64,8 @@ internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: GlobalCardinality
         if ((position + 1) % 256 == 0) yield(Unit)
     }
     if (cells == 0L || cells > MAX_GCC_CELLS) return null
-    // One z selector per var×root-box value; (Σz=1, channel) per var + one count row per cover value.
     return LpSizeEstimate(cols = cells, rows = 2L * xs.size + cover.size)
 }
 
-/** GCCs whose total domain-cell count exceeds this are skipped — the columns would dominate. */
+// Larger encodings are skipped: their selector columns would dominate the LP.
 private const val MAX_GCC_CELLS: Int = 1024

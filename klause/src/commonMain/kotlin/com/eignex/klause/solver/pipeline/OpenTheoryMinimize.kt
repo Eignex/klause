@@ -112,10 +112,9 @@ sealed interface OpenTheoryOptimum {
     ) : OpenTheoryOptimum
 }
 
-/** This integer as an exact rational, the form an [OpenTheoryOptimum] states its value in. */
 internal fun BigInt.asFraction(): BigFraction = BigFraction.of(this, BIG_ONE)
 
-/** Retain a round's outcome while reporting the enclosing optimization's elapsed time. */
+// Keeps a round's outcome but reports the enclosing optimization's wall time.
 internal fun SolveStats.withOptimizationEnvelope(envelope: SolveStats): SolveStats = copy(
     run = run.copy(wallMs = envelope.run.wallMs),
     lp = envelope.lp.mergedWith(lp),
@@ -126,22 +125,11 @@ internal fun SolveStats.withOptimizationEnvelope(envelope: SolveStats): SolveSta
  *
  * Each round asks the model's own theory route to decide the model plus one row stating that the
  * objective beats the incumbent. A satisfying answer tightens the row; a refutation proves the incumbent
- * optimal. So the descent needs no optimizing simplex — the route's feasibility answer carries it, and
- * the objective enters as a constraint the route already reasons about.
+ * optimal, so the descent needs no optimizing simplex.
  *
- * A bound tightened by one per round reaches an optimum in as many rounds as there are objective values
- * between the first witness and it, and an objective unbounded below has no optimum for it to reach at
- * all. Every witness is therefore also asked for a ray ([objectiveUnboundedBelow]): a direction of its
- * own branch along which the objective strictly decreases states [OpenTheoryOptimum.Unbounded], where the
- * descent would otherwise improve until a budget fired.
- *
- * Source-safe preparation runs once, on the model without the bound row: the row is the descent's own,
- * and no source pass reads its constant. The route and the ownership plan are then selected once from
- * the prepared model carrying the row, so re-bounding re-reads neither the factors nor the preparation.
- * Closing the open sides runs once with them, over that same row-less model: each round adds a strictly
- * tighter row, and a row only removes solutions, so a bound proved for the model holds for every round of
- * the descent. The opening round drops the row: with no incumbent there is nothing to beat, and stating
- * any bound there would refute a model whose own optimum lies above it.
+ * Every witness is also asked for a ray ([objectiveUnboundedBelow]): a direction of its own branch along
+ * which the objective strictly decreases states [OpenTheoryOptimum.Unbounded], where the descent would
+ * otherwise improve until a budget fired.
  */
 class OpenTheoryMinimizer internal constructor(
     model: Problem,
@@ -168,7 +156,7 @@ class OpenTheoryMinimizer internal constructor(
     private val coefficients: LongArray
     private val source: Problem
 
-    // The route the descent plans under, which the objective row may leave outside every complete open theory.
+    // May fall outside every complete open theory once the objective row is added.
     private val plannedRoute: ProblemPipeline by lazy {
         val planning = source.boundedForPlanning()
         (projections?.forEngineView(planning)?.let { planning.componentPlan(it) }
@@ -177,13 +165,11 @@ class OpenTheoryMinimizer internal constructor(
 
     private val route: ProblemPipeline by lazy {
         // A row at PLANNING_RHS carries no potential, so a model whose rows were all differences leaves
-        // that fragment by being optimized at all — the row's weight, not its shape, is what moves it.
-        // Say so here rather than at the first round's engine build.
+        // that fragment by being optimized at all. Fail here rather than at the first round's engine build.
         require(decidesEveryRound) { "objective row leaves the model outside every complete open theory" }
         plannedRoute
     }
 
-    /** Whether a complete open theory decides the model with the descent's bound row, and so every round. */
     internal val decidesEveryRound: Boolean
         get() = plannedRoute != ProblemPipeline.UNSUPPORTED_OPEN && plannedRoute != ProblemPipeline.FINITE_CP
 
@@ -233,26 +219,17 @@ class OpenTheoryMinimizer internal constructor(
         }
     }.withSourceSemantics(source.semantics)
 
-    /**
-     * The descent advanced a slice at a time, for a portfolio to schedule beside other arms.
-     *
-     * [externalBound] is an objective value some other arm has reached, read as each round starts: a round
-     * refutes the better of it and the descent's own incumbent, so the descent never re-proves ground another arm
-     * has covered. A round that refutes a bound read there proves only that nothing beats that arm's value, which
-     * the descent reports as [OpenTheoryOptimum.Bounded] by [TerminationReason.SearchExhausted].
-     */
+    // [externalBound] is an objective value another arm has reached, read as each round starts: a round
+    // refutes the better of it and the descent's own incumbent. Refuting an external bound proves only that
+    // nothing beats that arm's value, reported as [OpenTheoryOptimum.Bounded] by
+    // [TerminationReason.SearchExhausted].
     internal fun descent(params: TheoryParams, externalBound: () -> BigInt? = { null }): Descent =
         Descent(params, externalBound)
 
-    /** The exact objective value of [assignment]. */
     internal fun valueOf(assignment: OpenTheoryAssignment): BigInt = objective.valueOf(assignment)
 
-    /**
-     * One descent, its preparation done once and each round a [ResumableOpenTheory] kept across slices.
-     *
-     * Preparation and each round's setup run whole in the slice that reaches them; a slice ends only inside a
-     * round's search, or between rounds once its share is spent.
-     */
+    // Preparation and each round's setup run whole in the slice that reaches them; a slice ends only inside a
+    // round's search, or between rounds once its share is spent.
     internal inner class Descent(private val params: TheoryParams, private val externalBound: () -> BigInt?) :
         AutoCloseable {
         private val sink = SolveStatsSink(backend = "")
@@ -270,25 +247,19 @@ class OpenTheoryMinimizer internal constructor(
         private var roundGapBound: BigFraction? = null
         private var verdict: OpenTheoryOptimum? = null
 
-        /** Whether the descent has reached its verdict. */
         val isDone: Boolean get() = verdict != null
 
-        /** Work spent so far, in `openWork` units. */
+        // In `openWork` units.
         val work: Long get() = state.work.spent
 
-        /** The verdict's stats once decided, else the work and progress counters so far. */
         val stats: SolveStats
             get() = verdict?.stats ?: SolveStats(
                 openTheory = state.work.snapshot(),
                 search = round?.progress ?: state.progress(null),
             )
 
-        /**
-         * Advance until a verdict, [global] firing, or the slice ending: after [sliceWork] `openWork` units when
-         * non-negative, or after [sliceMillis], whichever comes first. [onIncumbent] sees every witness the
-         * descent installs, with its objective value. The verdict once there is one, else null with the descent
-         * paused.
-         */
+        // Advances until a verdict, [global] firing, or the slice ending after [sliceWork] `openWork` units
+        // (when non-negative) or [sliceMillis]. Returns null while the descent is paused.
         fun runSlice(
             global: ExecutionControl,
             sliceMillis: Long,
@@ -489,14 +460,12 @@ class OpenTheoryMinimizer internal constructor(
             return OpenTheoryOptimum.Bounded(standing?.assignment, standing?.objective?.asFraction(), reason, stats)
         }
 
-        /**
-         * What the standing incumbent proves once the descent has nothing left to refute: it is optimal, or —
-         * with no witness ever installed — the model is infeasible, because the round that ended the descent
-         * was the opening one, which decided the model under no bound at all.
-         *
-         * Only for a descent that ended in a proof. A round the budget stopped refuted nothing, so its
-         * incumbent bounds the optimum instead of naming it.
-         */
+        // What the standing incumbent proves once the descent has nothing left to refute: it is optimal, or —
+        // with no witness ever installed — the model is infeasible, because the round that ended the descent
+        // was the opening one, which decided the model under no bound at all.
+        //
+        // Only for a descent that ended in a proof. A round the budget stopped refuted nothing, so its
+        // incumbent bounds the optimum instead of naming it.
         private fun proven(stats: SolveStats): OpenTheoryOptimum {
             val standing = incumbents.current() ?: return OpenTheoryOptimum.Infeasible(stats)
             return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective.asFraction(), stats,
@@ -523,18 +492,16 @@ class OpenTheoryMinimizer internal constructor(
     // What the descent prepares once: the prepared source, its closed model, and the plan selected with the row.
     private class Opening(val prepared: PreparedSource, val base: Problem, val boundedPlan: ComponentPlan)
 
-    /**
-     * Whether the objective descends without limit through the branch [witness] lies in.
-     *
-     * Asked of the model without the descent's own row. The row states that nothing feasible sits at the
-     * incumbent or above it, which is a fact about where the descent has reached rather than one about the
-     * model, and the ray the certificate looks for is the model's own.
-     *
-     * A model whose witnesses all lie in one branch answers this once: the cone system it builds is the
-     * same every round, and rebuilding it per improvement would cost an exact rational run to reach the
-     * refusal already on hand. Only a refusal is remembered — a run the stop cut short decided nothing,
-     * and reading it as a refusal would retire the certificate over a question never asked.
-     */
+    // Whether the objective descends without limit through the branch [witness] lies in.
+    //
+    // Asked of the model without the descent's own row. The row states that nothing feasible sits at the
+    // incumbent or above it, which is a fact about where the descent has reached rather than one about the
+    // model, and the ray the certificate looks for is the model's own.
+    //
+    // A model whose witnesses all lie in one branch answers this once: the cone system it builds is the
+    // same every round, and rebuilding it per improvement would cost an exact rational run to reach the
+    // refusal already on hand. Only a refusal is remembered — a run the stop cut short decided nothing,
+    // and reading it as a refusal would retire the certificate over a question never asked.
     private fun unboundedBelow(
         model: Problem,
         witness: OpenTheoryAssignment,
@@ -554,14 +521,12 @@ class OpenTheoryMinimizer internal constructor(
         return ray == true
     }
 
-    /**
-     * The row `Σ c(i)·x(i) ≤ bound − constant`.
-     *
-     * Widened only when the right-hand side leaves 64 bits, which the descent can reach because it
-     * subtracts one per improvement without knowing how far it will go. Widening unconditionally would
-     * be sound and is not free: a wide row routes the exact core through its digit-chain encoder, which
-     * on a model with thousands of rows costs more than deciding it.
-     */
+    // The row `Σ c(i)·x(i) ≤ bound − constant`.
+    //
+    // Widened only when the right-hand side leaves 64 bits, which the descent can reach because it
+    // subtracts one per improvement without knowing how far it will go. Widening unconditionally would
+    // be sound and is not free: a wide row routes the exact core through its digit-chain encoder, which
+    // on a model with thousands of rows costs more than deciding it.
     private fun boundRow(bound: BigInt): Factor {
         val rhs = bound - bigIntOf(objective.constant)
         if (rhs >= LONG_MIN && rhs <= LONG_MAX) {
@@ -571,28 +536,23 @@ class OpenTheoryMinimizer internal constructor(
         return Linear(terms, wideCoeffs, LinearOp.LE, rhs)
     }
 
-    /**
-     * This model plus the row in the shape ownership is selected from.
-     *
-     * The right-hand side, not the bound, is what the route reads, so the widest one a 64-bit row can
-     * state is what is planned under: an objective bound would shift it by [LinearObjective.constant],
-     * and a shifted-light row would offer the difference fragment — the one route that could not hold a
-     * row the descent later widens — a selection the descent goes on to invalidate.
-     */
+    // This model plus the row in the shape ownership is selected from.
+    //
+    // The right-hand side, not the bound, is what the route reads, so the widest one a 64-bit row can
+    // state is what is planned under: an objective bound would shift it by [LinearObjective.constant],
+    // and a shifted-light row would offer the difference fragment — the one route that could not hold a
+    // row the descent later widens — a selection the descent goes on to invalidate.
     private fun Problem.boundedForPlanning(): Problem =
         withObjectiveRow { Linear(coefficients.copyOf(), terms.copyOf(), LinearOp.LE, PLANNING_RHS) }
 
-    /** This model plus the row holding the objective at or below [bound]. */
     private fun Problem.boundedBy(bound: BigInt): Problem = withObjectiveRow { boundRow(bound) }
 
-    /**
-     * This model plus [row], or itself when the objective weights no column.
-     *
-     * A constant objective has nothing to descend and no row to bound it by: the model is decided as it
-     * stands and every feasible assignment is optimal. That is also the one case where a plan selected
-     * here indexes the same factors as the model it came from, which is what decides whether the
-     * appended owner has to come back off the plan for a round that drops the row.
-     */
+    // This model plus [row], or itself when the objective weights no column.
+    //
+    // A constant objective has nothing to descend and no row to bound it by: the model is decided as it
+    // stands and every feasible assignment is optimal. That is also the one case where a plan selected
+    // here indexes the same factors as the model it came from, which is what decides whether the
+    // appended owner has to come back off the plan for a round that drops the row.
     private fun Problem.withObjectiveRow(row: () -> Factor): Problem = if (terms.isEmpty()) this else withRow(row())
 
     // The declared metadata rides along, so the projection a round builds does not depend on whether that
@@ -645,14 +605,12 @@ class OpenTheoryMinimizer internal constructor(
     }
 
     private companion object {
-        /**
-         * The right-hand side ownership is selected under: the widest a 64-bit row can state.
-         *
-         * No round asserts it. It is the shape the plan reads, and reading it at the widest right-hand
-         * side is what keeps one selection valid for every bound the descent tightens to: an edge this
-         * heavy carries no potential, so the difference fragment is declined here rather than left to be
-         * invalidated mid-descent.
-         */
+        // The right-hand side ownership is selected under: the widest a 64-bit row can state.
+        //
+        // No round asserts it. It is the shape the plan reads, and reading it at the widest right-hand
+        // side is what keeps one selection valid for every bound the descent tightens to: an edge this
+        // heavy carries no potential, so the difference fragment is declined here rather than left to be
+        // invalidated mid-descent.
         const val PLANNING_RHS: Long = Long.MAX_VALUE
         val LONG_MIN: BigInt = bigIntOf(Long.MIN_VALUE)
         val LONG_MAX: BigInt = bigIntOf(Long.MAX_VALUE)
@@ -718,7 +676,6 @@ private fun Sample.rationalRayWitness(realColumns: Int): ExactWitness? {
     return RouteWitness(realColumns, ::boolValue, values::get, { exactIntValue(it).asFraction() })
 }
 
-/** This witness reading its integer columns off [ints] instead, with [realColumns] reals ahead of them. */
 private fun ExactWitness.withInts(realColumns: Int, ints: Array<BigInt>): ExactWitness = object : ExactWitness {
     override fun at(column: Int): BigFraction = if (column < realColumns) {
         this@withInts.at(column)
@@ -729,14 +686,13 @@ private fun ExactWitness.withInts(realColumns: Int, ints: Array<BigInt>): ExactW
     override fun truth(boolVar: Int): Boolean = this@withInts.truth(boolVar)
 }
 
-/** This witness reading its Boolean columns through [truth] instead. */
 private fun ExactWitness.withTruth(truth: (Int) -> Boolean): ExactWitness = object : ExactWitness {
     override fun at(column: Int): BigFraction = this@withTruth.at(column)
 
     override fun truth(boolVar: Int): Boolean = truth(boolVar)
 }
 
-/** One route's witness over the certificate's mixed column space: reals first, then integer columns. */
+// Reals first, then integer columns.
 private class RouteWitness(
     private val realColumns: Int,
     private val bool: (Int) -> Boolean,

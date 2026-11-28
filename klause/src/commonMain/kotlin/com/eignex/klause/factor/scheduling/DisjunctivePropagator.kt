@@ -21,26 +21,23 @@ import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.subExact
 
-/**
- * CP propagator for the no-overlap case of [Cumulative] (`unary = true`, built via [Cumulative.unary]):
- * time-tabling, pairwise detectable precedences, and Θ-tree edge-finding in both directions (P. Vilím,
- * "O(n log n) Filtering Algorithms for Unary Resource Constraint", CPAIOR 2004,
- * https://doi.org/10.1007/978-3-540-24664-0_23).
- *
- * Those passes wait for every duration to be fixed. Before them, a Θ-tree overload check over minimum durations
- * runs while a duration is unfixed or a presence unknown: every solution shortens to one where each task runs
- * exactly its minimum, so present tasks whose minima cannot fit between their earliest start and latest
- * completion conflict, and an unknown task whose minimum would overload them is absent. Tasks sharing one exact
- * signed presence literal are present together, so an unknown literal is ruled out when its tasks' minima would
- * together overload the present tasks.
- *
- * Each deduction cites only the tasks it rests on: a detectable precedence its pair, a time-table shave the
- * tasks whose compulsory parts block the shaved starts, an edge-finding bound the tasks of the overloaded set
- * and of the set the bound comes from, an exclusion the present tasks it would overload and the excluded tasks'
- * own windows and minimum durations, never their presence. All but the detectable precedence cost O(tasks) and
- * are built only when conflict analysis reads them, from the bounds as they stood ([explain]). Bounds are cited
- * only as far as the deduction needs them.
- */
+// Time-tabling, pairwise detectable precedences, and Θ-tree edge-finding in both directions (P. Vilím,
+// "O(n log n) Filtering Algorithms for Unary Resource Constraint", CPAIOR 2004,
+// https://doi.org/10.1007/978-3-540-24664-0_23).
+//
+// Those passes wait for every duration to be fixed. Before them, a Θ-tree overload check over minimum durations
+// runs while a duration is unfixed or a presence unknown: every solution shortens to one where each task runs
+// exactly its minimum, so present tasks whose minima cannot fit between their earliest start and latest
+// completion conflict, and an unknown task whose minimum would overload them is absent. Tasks sharing one exact
+// signed presence literal are present together, so an unknown literal is ruled out when its tasks' minima would
+// together overload the present tasks.
+//
+// Each deduction cites only the tasks it rests on: a detectable precedence its pair, a time-table shave the
+// tasks whose compulsory parts block the shaved starts, an edge-finding bound the tasks of the overloaded set
+// and of the set the bound comes from, an exclusion the present tasks it would overload and the excluded tasks'
+// own windows and minimum durations, never their presence. All but the detectable precedence cost O(tasks) and
+// are built only when conflict analysis reads them, from the bounds as they stood ([explain]). Bounds are cited
+// only as far as the deduction needs them.
 internal class DisjunctivePropagator(
     val intVars: IntArray,
     private val starts: IntArray,
@@ -79,7 +76,7 @@ internal class DisjunctivePropagator(
         guardRuns = runs.toIntArray()
     }
 
-    /** Effective per-task durations, or null while any duration var is unfixed (propagation then waits). */
+    // Effective per-task durations, or null while any duration var is unfixed (propagation then waits).
     private fun effDurOrNull(state: PropagationState): LongArray? {
         if (durationVars.isEmpty()) return LongArray(n) { durations[it] }
         val out = LongArray(n)
@@ -150,10 +147,8 @@ internal class DisjunctivePropagator(
         !OptionalPresence.isDefinitelyPresent(presents, i, state) &&
             !OptionalPresence.isDefinitelyAbsent(presents, i, state)
 
-    /**
-     * Fail on present tasks whose minimum durations overload a window, and exclude each unknown task whose minimum
-     * would. With fixed durations and no unknown task, edge-finding already checks the overload.
-     */
+    // Fail on present tasks whose minimum durations overload a window, and exclude each unknown task whose minimum
+    // would. With fixed durations and no unknown task, edge-finding already checks the overload.
     private fun overloadCheck(state: PropagationState): Boolean {
         if (durationVars.isEmpty() && presents.isEmpty()) return true
         val mandatory = IntArrayList()
@@ -332,8 +327,8 @@ internal class DisjunctivePropagator(
         return false
     }
 
-    /** Build the mandatory profile from each task's `[lst, ect)` compulsory part; fail on
-     *  level > 1; shave any non-fixed task's start endpoints whose placement would overlap the profile. */
+    // Fails where the compulsory parts overlap, then shaves each start endpoint whose placement would
+    // overlap the profile.
     private fun timeTable(state: PropagationState, effDur: LongArray): Boolean {
         val profile = mandatoryProfile(state, effDur)
         if (!profile.build(cap = 1L)) {
@@ -409,8 +404,7 @@ internal class DisjunctivePropagator(
         return true
     }
 
-    /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
-     *  i must come strictly after j. Tighten `start_i.min ≥ est_j + dur_j`. */
+    // If `est_i + dur_i > lst_j`, task i must come after j: `start_i.min ≥ est_j + dur_j`.
     private fun detectablePrecedences(state: PropagationState, effDur: LongArray): Boolean {
         for (i in 0 until n) {
             checkSubsetWork(state)
@@ -593,7 +587,7 @@ internal class DisjunctivePropagator(
         return true
     }
 
-    /** The tasks' bounds, durations and presence as of [atTrail], with the literals a reason collects. */
+    // The tasks' bounds, durations and presence as of [atTrail], with the literals a reason collects.
     private inner class View(val state: PropagationState, val atTrail: Int, val atLevel: Int) {
         private val seen = IntHashSet()
         private val out = IntArrayList()
@@ -627,7 +621,7 @@ internal class DisjunctivePropagator(
             if (durationVars.isNotEmpty()) add(state.boundLiteral(durationVars[i], true, dur(i), atTrail, atLevel))
         }
 
-        /** [before] precedes [after]: [after] cannot end before [before]'s latest start. */
+        // [before] precedes [after]: [after] cannot end before [before]'s latest start.
         fun precedes(before: Int, after: Int) {
             task(before)
             task(after)
@@ -654,10 +648,8 @@ internal class DisjunctivePropagator(
             }
         }
 
-        /**
-         * Task [i]'s start moved to [bound] ([lower]) because every start it skipped overlaps another task's
-         * compulsory part: cite those parts that meet the skipped placements, and [i]'s own bound on that side.
-         */
+        // Task [i]'s start moved to [bound] ([lower]) because every start it skipped overlaps another task's
+        // compulsory part: cite those parts that meet the skipped placements, and [i]'s own bound on that side.
         fun timeTableReason(i: Int, lower: Boolean, bound: Long) {
             task(i)
             val d = dur(i)
@@ -728,7 +720,7 @@ internal class DisjunctivePropagator(
             return out
         }
 
-        /** The tasks completing by [tau] cannot all fit after their own earliest start: an overload. */
+        // The tasks completing by [tau] cannot all fit after their own earliest start: an overload.
         fun overloadedBy(reversed: Boolean, tau: Long) {
             val (e, subset) = ectSubset(theta(reversed, tau, -1), reversed)
             for (k in 0 until subset.size) {
@@ -737,10 +729,8 @@ internal class DisjunctivePropagator(
             }
         }
 
-        /**
-         * [cand] runs after every task the set completing by [tau] must hold: with it the set overflows [tau], so
-         * it follows each of its members; its bound is the earliest completion of the members that set it.
-         */
+        // [cand] runs after every task the set completing by [tau] must hold: with it the set overflows [tau], so
+        // it follows each of its members; its bound is the earliest completion of the members that set it.
         fun edgeReason(reversed: Boolean, cand: Int, tau: Long) {
             val theta = theta(reversed, tau, cand)
             val withCand = IntArrayList()
@@ -759,10 +749,8 @@ internal class DisjunctivePropagator(
             }
         }
 
-        /**
-         * Unknown task [cand], completing by [tau], would overload the present tasks completing by [tau]: the
-         * overloaded set's windows and minimum durations, and the presence of its members other than [cand].
-         */
+        // Unknown task [cand], completing by [tau], would overload the present tasks completing by [tau]: the
+        // overloaded set's windows and minimum durations, and the presence of its members other than [cand].
         fun excludedBy(cand: Int, tau: Long) {
             val withCand = theta(reversed = false, tau, except = cand)
             withCand.add(cand)

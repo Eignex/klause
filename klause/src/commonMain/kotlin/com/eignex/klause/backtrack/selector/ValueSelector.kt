@@ -14,19 +14,11 @@ import kotlin.math.ln
 import kotlin.random.Random
 
 /**
- * Picks the order of values to try for a chosen variable. Returns a `Sequence` so iteration
- * is lazy — for bool vars the sequence is at most 2 elements; for int vars at most
- * `domain.size`. The engine pops each yielded value into the session in order; on conflict
- * it advances to the next.
- *
- * For bool vars, the int values are `0` (false) and `1` (true).
- *
- * Notification hooks parallel [VariableSelector]'s, scoped to the (var, value) pair
- * that the engine actually attempted. Impact-based value selection and solution-guided
- * heuristics consume these.
+ * Picks the order of values to try for a chosen variable, lazily; on conflict the engine advances to the
+ * next value. Bool values are `0` (false) and `1` (true).
  */
 interface ValueSelector {
-    /** Candidate values for `varRef`, yielded in trial order. */
+    /** Candidate values for [varRef], yielded in trial order. */
     fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long>
 
     /** A fresh, unshared instance for one solve: stateless selectors return this, stateful ones
@@ -42,21 +34,15 @@ interface ValueSelector {
     /** Hook: the search restarted. */
     fun onRestart() {}
 
-    /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
-     *  the assignment here so they can bias future picks toward it. Default no-op. */
+    /** Called once per solution the search reaches. */
     fun onSolution(snapshot: Sample) {}
 }
 
-/** Floor of `(min(d) + max(d)) / 2` without overflow: `d.max - d.min` wraps on spans wider than
- *  `Long.MAX_VALUE` (e.g. a full-`Long` domain), collapsing the midpoint onto `d.min` and turning
- *  dichotomic search linear. Shift-and-carry stays exact for every bound pair. */
+// Shift-and-carry: `d.max - d.min` wraps on spans wider than `Long.MAX_VALUE`.
 internal fun boundsMidpoint(d: IntDomain): Long = (d.min shr 1) + (d.max shr 1) + (d.min and d.max and 1L)
 
-/** Present domain values ordered by distance from [center] (ties prefer the upper value), skipping
- *  holes via the `in d` membership check. The first value drives [IndomainMiddle]/[IndomainMedian]'s
- *  int bound split; the tail keeps the sequence complete for any consumer that enumerates past it.
- *  Cursor-based rather than `center ± offset`: the offset arithmetic wraps once a cursor would pass
- *  a bound near the ends of the `Long` range, turning the walk into an endless spin. */
+// Cursor-based rather than `center ± offset`: the offset arithmetic wraps near the ends of the `Long`
+// range and spins forever.
 internal fun centeredDomainValues(d: IntDomain, center: Long): Sequence<Long> = sequence {
     if (center in d) yield(center)
     var up = center
@@ -73,16 +59,8 @@ internal fun centeredDomainValues(d: IntDomain, center: Long): Sequence<Long> = 
     }
 }
 
-/**
- * Shared probing core for [Impact] and [MaxSd]. For each candidate value of `varRef`:
- *   - push a real propagation pin via [PropagationSession.probeBool] / `probeInt`;
- *   - score by the log of the remaining-domain product;
- *   - revert with [PropagationSession.popLast] (Unsat probes self-revert, are dropped).
- *
- * [ascending] = `true` orders smallest-residual first (Impact); `false` orders largest-
- * residual first (MaxSd). For int domains larger than [maxProbes], a random subset is
- * probed and the rest of the domain follows the ordered values so DFS coverage is preserved.
- */
+// Scores each probed value by the log of the remaining-domain product; refuted values are dropped. The rest
+// of a domain wider than `maxProbes` follows the ordered values so coverage is preserved.
 internal fun probeAndOrder(
     session: PropagationSession,
     varRef: VarRef,
@@ -106,8 +84,7 @@ internal fun probeAndOrder(
                 var i = 0
                 var guard = 0
                 while (i < maxProbes && guard < maxProbes * 8) {
-                    // Positional sampling is uniform only over an enumerable domain; a saturated
-                    // index space never reaches values past the first 2^31, so sample the bounds.
+                    // A saturated index space never reaches values past the first 2^31, so sample the bounds.
                     val candidate = d.randomValue(rng)
                     if (seen.add(candidate)) {
                         sample[i] = candidate
@@ -120,16 +97,12 @@ internal fun probeAndOrder(
         }
     }
     val scored = ArrayList<Pair<Long, Double>>(candidates.size)
-    // Every candidate a probe actually reached: ordered when it survived, dropped when the probe refuted
-    // it (no assignment needs to revisit those). Kept apart from the ones left unprobed below.
+    // Candidates a probe reached, surviving or refuted; the unprobed ones are kept apart.
     val settled = LongHashSet(candidates.size * 2)
     var probed = 0
     for (v in candidates) {
-        // Each probe is a whole propagation fixpoint, so one decision over a wide domain spends
-        // [maxProbes] of them, and one such fixpoint alone can run seconds long. The engine polls between
-        // nodes and cannot see inside this loop, so the deadline is read here and inside every probe (which
-        // yields null when cut, leaving its value unprobed for the tail below). Either sighting stops the
-        // engine at this node — the ranking is worth nothing once the time is gone.
+        // One probe fixpoint can run for seconds and the engine polls only between nodes, so the deadline
+        // is read here and inside every probe (null when cut, leaving the value unprobed).
         if (session.cancelRequested) {
             session.probeCancelled = true
             break
@@ -156,17 +129,15 @@ internal fun probeAndOrder(
         settled.add(v)
         scored.add(v to post)
     }
-    // Whatever the probes did not reach still has to be offered, or the search would silently skip
-    // values the domain holds and could report unsat over a region it never entered.
+    // Unreached values must still be offered, or the search could report unsat over a region it never
+    // entered.
     val unprobed = if (probed < candidates.size) candidates.copyOfRange(probed, candidates.size) else emptyLongArray()
     if (ascending) scored.sortBy { it.second } else scored.sortByDescending { it.second }
     if (varRef is VarRef.IntVar) {
         val d = session.intDomain(varRef.varId)
-        // The tail is "every other value the domain holds", so it exists only on a domain that can be
-        // walked. On a wider one the probed candidates are the offer; a bound split covers the rest.
+        // Only a walkable domain gets the full tail; on a wider one a bound split covers the rest.
         val walkable = d.spanOrNull()
         if (walkable != null && candidates.size < walkable.size) {
-            // Already offered (ordered) or deliberately dropped; everything else in the domain follows.
             val ordered = scored.asSequence().map { it.first }
             return ordered + sequence {
                 for (i in 0 until walkable.size) {
@@ -175,15 +146,13 @@ internal fun probeAndOrder(
                 }
             }
         }
-        // An empty order tells the engine every value is refuted. A sample of a domain too wide to walk
-        // cannot show that, so it still offers a split point and the bound split covers the rest.
+        // An empty order means every value is refuted, which a sample of an unwalkable domain cannot show.
         if (walkable == null && scored.isEmpty() && unprobed.isEmpty()) return sequenceOf(boundsMidpoint(d))
     }
     return scored.asSequence().map { it.first } + unprobed.toList().asSequence()
 }
 
-/** Sum of `ln(size)` over every unpinned variable (bools count as `ln 2` when free). Log-
- *  space to dodge `Double` overflow on problems with hundreds of free vars. */
+// Log-space to avoid `Double` overflow on problems with hundreds of free vars.
 internal fun logRemainingDomainProduct(session: PropagationSession, visit: (() -> Boolean)? = null): Double? {
     var s = 0.0
     val p = session.problem
@@ -200,12 +169,9 @@ internal fun logRemainingDomainProduct(session: PropagationSession, visit: (() -
     return s
 }
 
-/** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
- *  the engine can early-exit before enumerating the full domain on a backtrack. */
 internal fun domainValuesAscending(d: IntDomain): Sequence<Long> =
     sequence { for (i in 0 until d.values.size) yield(d.values.valueAt(i)) }
 
-/** Descending sequence; same skip-holes semantics. */
 internal fun domainValuesDescending(d: IntDomain): Sequence<Long> = sequence {
     // O(max - min) membership walk, holes included.
     for (v in d.max downTo d.min) if (v in d) yield(v)

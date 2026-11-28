@@ -6,10 +6,8 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
 internal object OptPresence {
-    // Factor constructors call this to extend boolVars so the propagation engine wakes on presence changes.
-    // Deduplicated in first-occurrence order: boolVars is a variable *scope*, and positions sharing one
-    // presence variable would otherwise enter every occurrence list once per position and be flipped once
-    // per position by the moves that walk a factor's scope (an even count cancelling out to no move).
+    // Deduplicated because boolVars is a scope: a shared presence variable listed per position would be
+    // flipped once per position by scope-walking moves, and an even count cancels to no move.
     fun presenceVarIds(presents: IntArray): IntArray {
         if (presents.isEmpty()) return emptyIntArray()
         val seen = IntHashSet(presents.size)

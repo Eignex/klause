@@ -12,11 +12,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 
-/**
- * What one arm was asked to run: [ref] as requested, [revision] when an immutable commit binds it, the [parameters]
- * its cases must carry (null when the arm leaves a key unset and so inherits the solver default of its revision),
- * and its resolved [plan] by case key when retained.
- */
+// A null parameter value means the arm leaves the key unset and inherits its revision's solver default.
 internal data class ArmExpectation(
     val ref: String?,
     val revision: String?,
@@ -24,24 +20,18 @@ internal data class ArmExpectation(
     val plan: Map<String, BenchCase>? = null,
 )
 
-/**
- * The expected case matrix from [source]: paired row keys mapped to their case keys and declared input hashes.
- * A [filtered] cohort may hold rows the lab's reference filter dropped, so its absent rows are unverified.
- */
+// Paired row keys mapped to their case keys and declared input hashes. A filtered cohort may hold rows the lab's
+// reference filter dropped, so its absent rows are unverified.
 internal data class Cohort(
     val source: String,
     val rows: Map<String, Map<String, Map<String, String?>>>,
     val filtered: Boolean,
 )
 
-/** Binds retained cases to the treatments, revisions and cohort a lab request and its resolved plans declare. */
 internal object DeclaredExperiment {
-    /**
-     * Expectations for every arm of [experiment]. Each arm is its config over `base`; its request parameters are
-     * `bench.request.parameters` overridden by its `param.` values. [plans] maps a retained `bench-plan-N.jsonl`
-     * index to its cases, N counting the repository arms in config order; [revisions] pins arms whose ref is not a
-     * commit.
-     */
+    // Each arm is its config over `base`; its request parameters are `bench.request.parameters` overridden by its
+    // `param.` values. plans keys count the repository arms in config order; revisions pins arms whose ref is not a
+    // commit.
     fun declaration(
         experiment: JsonObject,
         plans: Map<Int, List<BenchCase>> = emptyMap(),
@@ -105,21 +95,16 @@ internal object DeclaredExperiment {
         )
     }
 
-    /** Resolved plan cases of one retained `bench-plan-N.jsonl`. */
     fun plan(text: String): List<BenchCase> =
         BenchProtocol.json.parseToJsonElement(text).jsonObject.getValue("cases").jsonArray
             .map { BenchProtocol.json.decodeFromJsonElement(BenchCase.serializer(), it) }
 
-    /** The executed case of one retained `cases/N/bench-case.json`. */
     fun case(text: String): BenchCase = BenchProtocol.json.decodeFromString(BenchCase.serializer(), text)
 
-    /** The lab's comparison identity of a case, which pairs it with the same workload in every arm. */
     fun caseKey(case: BenchCase): String = case.attributes["comparisonKey"] ?: case.id
 
-    /**
-     * Why [case] departs from its arm's declared revision, treatment values, resolved plan or the cohort. Treatment
-     * values and plans are compared only with an executed case: a lab-cases row holds its first arm's case for all.
-     */
+    // Treatment values and plans are compared only with an executed case: a lab-cases row holds its first arm's case
+    // for all.
     fun reasons(case: AuditedCase, declaration: PairedAudit.Declaration): List<String> = buildList {
         val record = case.record ?: return@buildList
         val arm = declaration.expected[case.arm]
@@ -148,7 +133,6 @@ internal object DeclaredExperiment {
         }
     }
 
-    /** Job-level contradictions between the request, the resolved plans and retained build evidence. */
     fun errors(declaration: PairedAudit.Declaration, prepared: Set<String>?): List<String> = buildList {
         for ((label, arm) in declaration.expected) {
             val plan = arm.plan ?: continue
@@ -166,7 +150,7 @@ internal object DeclaredExperiment {
         }
     }
 
-    /** Declared-experiment coverage; [DeclaredCoverage.verified] is withheld while any gap remains. */
+    // verified is withheld while any gap remains.
     fun coverage(
         retained: List<AuditedCase>,
         declaration: PairedAudit.Declaration,
@@ -206,7 +190,6 @@ internal object DeclaredExperiment {
         )
     }
 
-    /** Commits whose accepted preparation archives a `lab files --json` listing retains. */
     fun prepared(files: JsonArray): Set<String> = files.mapNotNull { text(it.jsonObject, "path") }
         .mapNotNull { ARCHIVE.matchEntire(it)?.groupValues?.get(1) }.toSet()
 
@@ -237,10 +220,8 @@ internal object DeclaredExperiment {
         )
     }
 
-    /**
-     * Planner-owned case parameters that differ between resolved plans of the same case: a request treatment the
-     * planner translates, such as `engines` into `engine`. Pass-through keys keep their request expectations.
-     */
+    // Planner-owned parameters a request treatment is translated into, such as `engines` into `engine`. Pass-through
+    // keys keep their request expectations.
     private fun resolved(plans: Collection<Map<String, BenchCase>>): Set<String> =
         plans.flatMap { it.keys }.distinct().flatMap { key ->
             val cases = plans.mapNotNull { it[key] }

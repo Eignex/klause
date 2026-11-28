@@ -9,15 +9,9 @@ import com.eignex.klause.propagation.RevLongArray
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.MutableIntIntMap
 
-/**
- * CP propagator for [GaussianXor]. Holds the Gaussian elimination data structures so they are only
- * allocated when a CP engine is initialised.
- *
- * Implements incremental Gauss-Jordan elimination over GF(2): substitutes the current partial
- * assignment, maintains a row-echelon form, and pins variables / raises conflicts as the system
- * forces them. Reason bitsets are xor-combined through each elimination step so even-occurrence
- * variables cancel and the derived reason is the minimal assigned support.
- */
+// Incremental Gauss-Jordan elimination over GF(2), allocated only when a CP engine initializes. Reason
+// bitsets are xor-combined through each elimination step so even-occurrence variables cancel and the
+// derived reason is the minimal assigned support.
 internal class GaussianXorPropagator(private val constraints: List<Xor>, val boolVars: IntArray) : Propagator {
 
     val intVars: IntArray = emptyIntArray()
@@ -53,10 +47,7 @@ internal class GaussianXorPropagator(private val constraints: List<Xor>, val boo
         }
     }
 
-    /**
-     * Per-[PropagationState] reversible incremental Gauss-Jordan state. The reduced matrix is
-     * maintained *across* fires on the engine undo trail instead of being rebuilt every fire.
-     */
+    // The reduced matrix persists across fires on the engine undo trail instead of being rebuilt every fire.
     private class IncrState(state: PropagationState, rows: Int, cols: Int, words: Int) {
         internal val mask = RevLongArray(state, rows * words)
         internal val reason = RevLongArray(state, rows * words)

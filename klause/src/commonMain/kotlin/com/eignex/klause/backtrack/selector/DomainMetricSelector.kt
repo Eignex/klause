@@ -4,15 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 
-/**
- * The shared scan behind the four domain-metric variable selectors ([SmallestDomain],
- * [LargestDomain], [SmallestLowerBound], [LargestUpperBound]). Walks every free variable and
- * keeps the one whose score is the most extreme in [maximize]'s direction: a free bool scores
- * [boolScore], a free int (domain size > 1) scores [intScore] of its domain. Determined
- * variables — assigned bools and singleton int domains — never branch, so they are skipped.
- * Ties keep the earliest candidate, with bools preceding ints, matching each selector's
- * documented tie-break.
- */
+// Ties keep the earliest candidate, bools before ints, matching each selector's documented tie-break.
 internal fun pickByDomainMetric(
     session: PropagationSession,
     maximize: Boolean,
@@ -40,6 +32,5 @@ internal fun pickByDomainMetric(
     return best
 }
 
-/** True when [candidate] beats [best] in [maximize]'s direction (strict, so ties keep the earlier). */
 private fun improves(candidate: Long, best: Long, maximize: Boolean): Boolean =
     if (maximize) candidate > best else candidate < best

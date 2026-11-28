@@ -5,7 +5,6 @@ import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-/** Construction policy for the simplex's private numerical scaling view. */
 internal data class LpScalingOptions(val enabled: Boolean = true, val equilibrationPasses: Int = 4) {
     init {
         require(equilibrationPasses in 1..MAX_EQUILIBRATION_PASSES)
@@ -23,7 +22,6 @@ internal enum class LpScalingDecline {
     UPDATE_UNSAFE,
 }
 
-/** Observable scaling decision and source-unit residuals for one numerical owner. */
 internal data class LpScalingMetrics(
     val eligible: Boolean = false,
     val applied: Boolean = false,
@@ -39,17 +37,13 @@ internal data class LpScalingMetrics(
     val sourcePrimalResidual: Double = 0.0,
     val sourceBoundViolation: Double = 0.0,
     val sourceBasicDualResidual: Double = 0.0,
-    /** Modeled entries the view's construction visited: conditioning scans, matrix and vector copies, equilibration. */
+    // Modeled entries visited by conditioning scans, matrix and vector copies, and equilibration.
     val work: Long = 0L,
 )
 
-/**
- * A private numerical presentation of [source]. Exact authority never enters this object.
- *
- * With row exponents `p` and column exponents `q`, the simplex sees
- * `2^p M 2^q z = 2^p b`, where source shifted coordinates satisfy `x = 2^q z`.
- * Logical exponent `q[n+i] = -p[i]` keeps every logical column equal to `e_i`.
- */
+// Exact authority never enters this view. With row exponents p and column exponents q the simplex sees
+// 2^p M 2^q z = 2^p b, where source shifted coordinates satisfy x = 2^q z. The logical exponent q(n+i) = -p(i)
+// keeps every logical column equal to e_i.
 internal class LpScalingView private constructor(
     val source: LpModel,
     val rowExponents: IntArray,
@@ -109,7 +103,7 @@ internal class LpScalingView private constructor(
         else 2L * next.m + 8L * next.numVars + 32L
     }
 
-    /** Refresh vectors under the immutable matrix scale. Null leaves this view untouched. */
+    // Keeps the matrix scale; null leaves this view untouched.
     fun refresh(next: LpModel): LpScalingView? {
         if (next.n != n || next.m != m) return null
         next.exactState?.projectedScalarChanges(source, next)?.let { changes ->
@@ -313,10 +307,8 @@ internal class LpScalingView private constructor(
             )
         }
 
-        /**
-         * The most [LpScalingMetrics.work] any view [create] builds over [model] can charge: an equilibration that
-         * runs every allowed pass and then falls back to an identity copy.
-         */
+        // The most [LpScalingMetrics.work] [create] can charge: every allowed equilibration pass, then an identity
+        // copy.
         fun constructionWorkBound(model: LpModel): Long {
             val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong()
             val conditioning = entries + model.m

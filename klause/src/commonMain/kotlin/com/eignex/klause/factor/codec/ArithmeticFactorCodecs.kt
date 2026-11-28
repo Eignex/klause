@@ -29,11 +29,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 internal class ProductPayload(val a: Int, val b: Int, val result: Int)
 
-/** `result = base^exponent`; [real] places both coordinates in the real namespace. */
+// `result = base^exponent`; [real] places both coordinates in the real namespace.
 @Serializable
 internal class PowerPayload(val base: Int, val exponent: Int, val result: Int, val real: Boolean = false)
 
-/** `result = int · real` with the real operand's declared bounds; an absent side is infinite. */
+// `result = int · real` with the real operand's declared bounds; an absent side is infinite.
 @Serializable
 internal class RealProductPayload(
     val intOperand: Int,
@@ -43,7 +43,7 @@ internal class RealProductPayload(
     val realUpper: Double? = null,
 )
 
-/** `result = a · b` over reals; [choices] retain the declared finite values of [choiceOperand]. */
+// `result = a · b` over reals; [choices] retain the declared finite values of [choiceOperand].
 @Serializable
 internal class ContinuousProductPayload(
     val a: Int,
@@ -57,7 +57,7 @@ internal class ContinuousProductPayload(
 @Serializable
 internal class AbsPayload(val operand: Int, val result: Int)
 
-/** Exact affine value `Σ coefficients·vars + constant` over integer columns. */
+// Exact affine value `Σ coefficients·vars + constant` over integer columns.
 @Serializable
 internal class AffinePayload(
     val vars: IntArray,
@@ -74,7 +74,7 @@ internal class AffineAbsPayload(val operand: AffinePayload, val result: AffinePa
 @Serializable
 internal class ArrayMinMaxPayload(val result: Int, val xs: IntArray, val max: Boolean)
 
-/** Exactly one of [divisor] (a column) and [constantDivisor] (an exact literal) is present. */
+// Exactly one of [divisor] (a column) and [constantDivisor] (an exact literal) is present.
 @Serializable
 internal class DivModPayload(
     val dividend: Int,
@@ -85,7 +85,7 @@ internal class DivModPayload(
     val convention: DivisionConvention = DivisionConvention.TRUNCATING,
 )
 
-/** Euclidean division of exact affine values by an exact literal. */
+// Euclidean division of exact affine values by an exact literal.
 @Serializable
 internal class WideDivModPayload(
     val dividend: AffinePayload,

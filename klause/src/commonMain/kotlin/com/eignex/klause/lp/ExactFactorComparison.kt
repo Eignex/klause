@@ -12,44 +12,28 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 
-/** Exact values of the mixed columns an [ExactComparison] states its terms over. */
 internal interface ExactColumnValues {
-    /** The value at mixed column [column]. */
     fun at(column: Int): BigFraction
 }
 
-/**
- * One witness read as the branch its rows are taken in: the column values, and the Boolean assignment
- * that says which conditional rows hold.
- */
+// A witness plus the Boolean assignment that says which conditional rows hold.
 internal interface ExactWitness : ExactColumnValues {
-    /** Truth of Boolean variable [boolVar] at this witness. */
     fun truth(boolVar: Int): Boolean
 }
 
-/**
- * One comparison in exact rationals over the mixed column space: `[0, realColumns)` are the continuous
- * columns and `realColumns + v` is integer column `v`.
- *
- * What a factor states and what an exact lane asserts are different things: an `=` is two rows, a `≥` is
- * a negated `≤`, and a `≠` is one row only once a consumer has said which side of it holds. Reading a
- * factor's width and complementing its operator therefore happen here, once, and [rowsInto] states the
- * rows that follow.
- */
+// Mixed column space: `[0, realColumns)` are continuous and `realColumns + v` is integer column `v`.
+// An `=` is two rows, a `≥` a negated `≤`, and a `≠` one row only once a consumer picks its side, so
+// operator complementing happens here once and [rowsInto] states the rows.
 internal class ExactComparison(
-    /** Coefficient per mixed column; a column absent from it carries none. */
     val terms: Map<Int, BigFraction>,
-    /** The right-hand side [terms] is compared against. */
     val bound: BigFraction,
     val op: LinearOp,
-    /** Whether the comparison is strict, which a row read against its own statement also is. */
     val strict: Boolean,
-    /** Whether a continuous column carries a term, which decides how a disequality tightens. */
+    // Decides how a disequality tightens.
     val hasReals: Boolean,
     val ordered: ExactOrderedTerms = ExactOrderedTerms(terms),
 ) {
 
-    /** The weighted sum at [values]. */
     fun activityAt(values: ExactColumnValues): BigFraction {
         var total = BigFraction.ZERO
         for ((column, coefficient) in terms) total += coefficient * values.at(column)
@@ -66,25 +50,15 @@ internal class ExactComparison(
         }
     }
 
-    /**
-     * The side of a disequality [values] holds it on.
-     *
-     * A `≠` is the union of two half-spaces and only a point picks one of them, so a consumer that reads
-     * the side off a satisfying point keeps the row implied by the model rather than strengthening it.
-     */
+    // Reading the side of a `≠` off a satisfying point keeps the row implied by the model rather than
+    // strengthening it.
     fun directionAt(values: ExactColumnValues): LinearOp = if (activityAt(values) < bound) LinearOp.LE else LinearOp.GE
 
-    /** Append the rows this comparison states to [rows], directing a disequality by [values]. */
     fun rowsInto(rows: MutableList<ExactRationalInequality>, values: ExactColumnValues) =
         rowsInto(rows, if (op == LinearOp.NE) directionAt(values) else null)
 
-    /**
-     * Append the `a·x ≤ b` rows this comparison states to [rows].
-     *
-     * [direction] is the side a [LinearOp.NE] is asserted on and is read for nothing else. An integer
-     * disequality tightens by one; a continuous one turns strict, because no next value exists below a
-     * real bound.
-     */
+    // [direction] is read only for a `≠`. An integer disequality tightens by one; a continuous one turns
+    // strict, because no next value exists below a real bound.
     fun rowsInto(rows: MutableList<ExactRationalInequality>, direction: LinearOp? = null) {
         if (terms.isEmpty()) {
             val holds = when (op) {
@@ -120,12 +94,7 @@ internal class ExactComparison(
     }
 }
 
-/**
- * The comparison this row states when the Boolean gating it holds [truth].
- *
- * A row read under a false activator states its complement exactly, which is what separates an exact
- * lane from a relaxation that weakens the same row through a big-M.
- */
+// Under a false activator the row states its exact complement, not a big-M weakening.
 internal fun LinearRow.exactComparison(
     realColumns: Int,
     truth: Boolean,
@@ -143,11 +112,8 @@ internal class ExactRowTermPool {
         terms.getOrPut(coefficients) { ExactRowTerms(coefficients) }
 }
 
-/**
- * A row's terms in exact rationals, read once, with the Booleans it carries left open: a Boolean term only
- * moves the right-hand side, and the activator only picks the operator, so a consumer that states the same
- * row under many assignments keeps one form per row.
- */
+// Booleans are left open: a Boolean term only moves the right-hand side and the activator only picks the
+// operator, so one form serves the row under every assignment.
 internal class ExactRowForm(
     private val terms: Map<Int, BigFraction>,
     private val rhs: BigFraction,
@@ -187,7 +153,6 @@ internal class ExactRowForm(
         return fixedComparison ?: ExactComparison(terms, bound, relation, strict, hasReals, ordered)
     }
 
-    /** The comparison the row states when its activator holds [truth] under [booleanValue]. */
     fun comparison(truth: Boolean, booleanValue: (Int) -> Boolean): ExactComparison {
         if (truth) fixedComparison?.let { return it }
         var bound = rhs
@@ -206,7 +171,6 @@ internal class ExactRowForm(
     }
 }
 
-/** This row's [ExactRowForm] over the mixed columns, the first [realColumns] of them continuous. */
 internal fun LinearRow.exactForm(realColumns: Int, pool: ExactRowTermPool? = null): ExactRowForm {
     val terms = HashMap<Int, BigFraction>()
     val booleanLiterals = ArrayList<Int>()
@@ -251,7 +215,7 @@ internal fun LinearRow.exactForm(realColumns: Int, pool: ExactRowTermPool? = nul
     )
 }
 
-/** Nonzero terms in ascending column order, with their negation, shared by every row stated over them. */
+// Shared by every row stated over the same terms.
 internal class ExactOrderedTerms(terms: Map<Int, BigFraction>) {
     private val columns: IntArray
     private val coefficients: List<BigFraction>
@@ -264,16 +228,13 @@ internal class ExactOrderedTerms(terms: Map<Int, BigFraction>) {
         negated = coefficients.map { it.negated() }
     }
 
-    /** `Σ terms·x ≤ bound`. */
     fun row(bound: BigFraction, strict: Boolean): ExactRationalInequality =
         ExactRationalInequality(columns, coefficients, bound, strict)
 
-    /** `−Σ terms·x ≤ bound`. */
     fun negatedRow(bound: BigFraction, strict: Boolean): ExactRationalInequality =
         ExactRationalInequality(columns, negated, bound, strict)
 }
 
-/** One exact `Σ terms·x ≤ bound` row over the columns carrying a nonzero coefficient. */
 internal fun exactRow(
     terms: Map<Int, BigFraction>,
     bound: BigFraction,
@@ -283,21 +244,17 @@ internal fun exactRow(
     return ExactRationalInequality(ordered.map { it.key }.toIntArray(), ordered.map { it.value }, bound, strict)
 }
 
-/** `x(column) ≥ bound`, as the `≤` row it is. */
 internal fun exactColumnLower(column: Int, bound: BigFraction): ExactRationalInequality =
     exactRow(mapOf(column to BigFraction.MINUS_ONE), bound.negated())
 
-/** `x(column) ≤ bound`. */
 internal fun exactColumnUpper(column: Int, bound: BigFraction): ExactRationalInequality =
     exactRow(mapOf(column to BigFraction.ONE), bound)
 
-/** This integer as the exact fraction it is. */
 internal fun BigInt.asFraction(): BigFraction = BigFraction.of(this, BIG_ONE)
 
-/** This finite double as the exact fraction it is: every finite double is one exactly. */
+// Every finite double is exactly a fraction.
 internal fun Double.asFraction(): BigFraction = requireNotNull(BigFraction.ofDouble(this))
 
-/** Accumulate [value] onto [column], dropping a term the sum cancels. */
 internal fun MutableMap<Int, BigFraction>.add(column: Int, value: BigFraction) {
     val sum = (this[column] ?: BigFraction.ZERO) + value
     if (sum.isZero) remove(column) else this[column] = sum

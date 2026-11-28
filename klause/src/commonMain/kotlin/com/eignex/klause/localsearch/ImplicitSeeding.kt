@@ -6,54 +6,38 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 /**
- * Implicit-solving setup for an ongoing solve: the elected structured globals, the scope-disjoint
- * seed set, the per-int-var owner map, and the binary-implication graph. All built lazily on first
- * access and paid once per solve rather than per move.
+ * Lazily built implicit-solving setup for one solve: elected structured globals, the scope-disjoint seed set, the
+ * int-var owner map and the binary-implication graph.
  */
 class ImplicitSeeding(
     private val problem: Problem,
     private val projection: LocalSearchProblem = LocalSearchProblem(problem),
-    /** Free-Boolean probe cap for [implicationGraph]. */
     private val maxImplicationCandidates: Int = IMPLICATION_SEED_MAX_CANDIDATES,
 ) {
 
     private var preparedElected: IntArray? = null
     private var preparedSeedFactors: IntArray? = null
 
-    /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals whose
-     *  [Invariant.proposeStructuredMoves] preserves their own feasibility (see
-     *  [Invariant.providesImplicitNeighbourhood]). The engine draws their feasibility-preserving moves
-     *  even during infeasibility, and seeds them feasible at search start. */
+    /** Factors whose structured moves preserve their own feasibility ([Invariant.providesImplicitNeighbourhood]);
+     *  the engine draws those moves even while infeasible and seeds them feasible at start. */
     val electedImplicit: IntArray
         get() = preparedElected ?: electImplicitFactors().also { preparedElected = it }
 
-    /** Scope-disjoint subset of [electedImplicit] for feasible-init seeding: greedily chosen
-     *  largest-scope-first so no two seed factors share an int variable. Disjointness guarantees one
-     *  factor's [Invariant.seedFeasible] never overwrites another's seeded vars, so the post-seed
-     *  assignment satisfies every seeded global simultaneously. */
+    /** Largest-scope-first subset of [electedImplicit] sharing no int variable, so seeding one never overwrites
+     *  another and the seeded assignment satisfies all of them. */
     val implicitSeedFactors: IntArray
         get() {
             seedSetSteps().forEach { }
             return checkNotNull(preparedSeedFactors)
         }
 
-    /** Implicit-solving owner map over int vars: `ownerInt[v]` is the factor id that owns int var
-     *  `v`, or `-1` if `v` is searched freely. A variable is owned once [seedImplicitFeasible] seeds
-     *  its [implicitSeedFactors] global feasibly; from then on only that global's structure-preserving
-     *  [Invariant.proposeStructuredMoves] may change it, so the generic neighbourhood can never break
-     *  the implicitly-solved constraint. `null` until the first seeding pass, and populated only
-     *  when implicit feasible-init is enabled. The [MoveSink] enforces the filter via
-     *  [MoveSink.setOwners]. */
+    /** `ownerInt(v)` is the factor owning int var `v`, or `-1` when `v` is searched freely. Once its global is seeded
+     *  feasibly, only that global's structured moves change it. Null until the first seeding pass. */
     var ownerInt: IntArray? = null
         private set
 
-    /** Binary-implication graph of [problem], literal-indexed at `2·numBoolVars`: `graph[Lit.make(v,
-     *  value)]` lists every literal that pinning `v = value` forces (sound, from probing-style
-     *  propagation). Built once on first access — the implication-aware move sources
-     *  ([com.eignex.klause.localsearch.movesource.FlipAndPropagate]) bundle a flip's forced
-     *  literals into one atomic move. Probing is bounded to [maxImplicationCandidates] free Booleans
-     *  (in id order); seeds past the cap find no forced literals, so the move source degrades to
-     *  lone flips. */
+    /** Literal-indexed implication graph: `graph(Lit.make(v, value))` lists the literals pinning `v = value` forces.
+     *  Probing covers the first [maxImplicationCandidates] free Booleans; later seeds find none. */
     val implicationGraph: Array<IntArray> by lazy {
         problem.propagatedImplicationGraph(maxImplicationCandidates, ExecutionControl.Never)
     }
@@ -160,8 +144,5 @@ class ImplicitSeeding(
     }
 }
 
-/** Free-Boolean probe cap for [ImplicitSeeding.implicationGraph], mirroring the presolve
- *  implication-graph pass: each candidate costs up to two `propagate` calls to harvest its outgoing
- *  implications, and an uncapped build materialises an O(numBoolVars²) adjacency that exhausts the
- *  heap on Boolean-heavy models. */
+// Each candidate costs up to two propagations, and an uncapped build materializes an O(numBoolVars²) adjacency.
 private const val IMPLICATION_SEED_MAX_CANDIDATES = 2_048

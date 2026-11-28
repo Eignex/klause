@@ -12,23 +12,16 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 
-/**
- * A resolved catalog [ProblemRef] with a lazily materialized [Problem]. Subprocess solves
- * pass the file directly to the CLI; only in-process consumers request the model, so
- * their finite-domain restrictions do not filter subprocess inputs. Operation metadata
- * can defer its exact objective until an in-process consumer reads it.
- */
+// Subprocess solves pass the file directly to the CLI; only in-process consumers request the model, so their
+// finite-domain restrictions do not filter subprocess inputs.
 internal class ResolvedProblem(
     internal val ref: ProblemRef,
     private val ingest: Lazy<Problem>,
     objective: LinearObjective? = null,
-    /** True when the source maximises its objective, so "better" means higher. [objective] stays
-     *  minimise-canonical either way. */
+    // objective stays minimization-canonical either way.
     internal val maximize: Boolean = false,
-    /** Search heuristics from the model's `solve :: int_search(...)` annotation (see
-     *  `FlatZincProgram.searchHints`); null when the model has none. Metrics merge their
-     *  budget/seed/restart config into this so benchmark runs honour the model author's
-     *  intended search the same way the CLI does. */
+    // From the model's `solve :: int_search(...)` annotation, so benchmark runs honor the author's intended search
+    // as the CLI does.
     searchParams: BacktrackParams? = null,
     deferredObjective: Lazy<LinearObjective?>? = null,
     deferredSearchParams: Lazy<BacktrackParams?>? = null,
@@ -39,29 +32,19 @@ internal class ResolvedProblem(
 
     internal val name: String get() = ref.name
 
-    /**
-     * Lazily parsed in-process model; throws when the frontend cannot build it.
-     * Subprocess solves do not request it.
-     */
+    // Throws when the frontend cannot build the model.
     internal val problem: Problem get() = ingest.value
 }
 
-/** Wall-clock / effort budget threaded into solver params by metrics that honor it. */
+/** Wall-clock solve budget. */
 data class Budget(internal val timeoutMillis: Long = 10_000L)
 
-/**
- * Resolves a [ProblemRef] into a [ResolvedProblem]. The runner axis is *how a problem becomes
- * a klause `Problem`*: [InProcessRunner] parses an in-process format (or runs an `InCode`
- * builder); `MiniZincRunner` compiles `.mzn`→`.fzn` via the `minizinc` CLI first.
- * Solving the resulting `Problem` is then uniform across runners (see the solver axis).
- */
 internal interface Runner {
     val id: String
     fun supports(ref: ProblemRef): Boolean
     fun resolve(ref: ProblemRef): ResolvedProblem
 }
 
-/** Resolves every format whose `ProblemFormat.inProcess` holds, and `InCode` builders. */
 internal object InProcessRunner : Runner {
     override val id = "in-process"
 
@@ -92,9 +75,8 @@ internal object InProcessRunner : Runner {
         return runCatching { format.ingest(file) }
             .map { ResolvedProblem(ref, lazy { it.problem }, it.objective, maximize = it.maximize) }
             .getOrElse { failure ->
-                // The in-process frontend cannot build this model — an open-bounded one, say. A
-                // subprocess run does not need it to, so carry the failure instead of dropping the
-                // instance, and let it surface only if something actually asks for the model.
+                // A subprocess run does not need the in-process model, so the failure surfaces only if something asks
+                // for it.
                 ResolvedProblem(ref, lazy { throw failure })
             }
     }

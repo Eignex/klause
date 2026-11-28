@@ -5,20 +5,13 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.process.flushStandardOutput
 
-/**
- * Shared competition output plumbing. Formats may stream finite optimization assignments;
- * accepted arithmetic assignments stream with their exact objectives. Terminal status and proof
- * metadata remain separate from incumbent output. Subclasses supply comment and objective formatting,
- * status lines and the statistics filter.
- */
+// Terminal status and proof metadata stay separate from incumbent output.
 internal abstract class BufferedBestOutput : OutputProtocol {
     protected var best: String? = null
     private var emittedWitness: String? = null
 
-    /** Comment-line prefix for the statistics block (e.g. `;`, `c`). */
     protected abstract val commentPrefix: String
 
-    /** When true, print the objective as each improving incumbent streams in. */
     protected open val streamObjective: Boolean = false
 
     protected open val streamFiniteWitness: Boolean = false
@@ -27,36 +20,27 @@ internal abstract class BufferedBestOutput : OutputProtocol {
 
     protected open fun completionMetadata(verdict: Verdict): List<String> = emptyList()
 
-    /** Render an incumbent objective for an output protocol. */
     protected open fun formatObjective(objective: Long): String = objective.toString()
 
-    /** Render an incumbent objective that a continuous column contributes to. Only a format whose
-     *  models can carry one needs this; the default never sees it. */
     protected open fun formatContinuousObjective(objective: Double): String = objective.toString()
 
     protected open fun formatExactObjective(objective: BigFraction): String =
         objective.toString()
 
-    /** The single status line this format prints for [verdict] at completion. */
     protected abstract fun statusLine(verdict: Verdict): String
 
-    /** Whether the search-counter [key] is included in this format's statistics block. */
     protected abstract fun keepStat(key: String): Boolean
 
-    /** The incumbent's objective, for a format whose status line depends on it. */
     protected open fun onSolutionObjective(objective: Long?) = Unit
 
     protected open fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> = lpStatPairs(stats)
 
     protected open fun acceptsSourceWitness(): Boolean = true
 
-    /** Why the run stopped; see [VerdictContext]. Set before the verdict is rendered. */
     protected var context: VerdictContext = VerdictContext()
         private set
 
-    /** The cause to print beside [verdict] as a comment, or null when the verdict speaks for itself.
-     *  The status line has already named the verdict, so this carries only what it does not say. A
-     *  format overrides this to add a cause of its own. */
+    // Carries only what the status line does not already say.
     protected open fun verdictReason(verdict: Verdict): String? =
         if (verdict == Verdict.UNKNOWN) context.softVerdictCause() else null
 
@@ -69,8 +53,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         best = rendered
         onSolutionObjective(objective)
         if (!streamObjective) return
-        // A continuous contribution has no exact integer form, so it supersedes the discrete value
-        // rather than riding alongside it.
+        // A continuous contribution has no exact integer form, so it supersedes the discrete value.
         if (continuousObjective != null) {
             println("$objectivePrefix${formatContinuousObjective(continuousObjective)}")
         } else if (objective != null) {
@@ -111,8 +94,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     final override fun onComplete(verdict: Verdict) {
         println(statusLine(verdict))
         completionMetadata(verdict).forEach { println("$commentPrefix $it") }
-        // A comment, so it rides alongside the status line without touching what either protocol
-        // promises: `;` is an SMT-LIB comment and `c` is one in the competition protocol.
+        // A comment line, so it leaves what either protocol promises untouched.
         verdictReason(verdict)?.let { println("$commentPrefix $it") }
         // A terminal status does not republish an incumbent already streamed with its objective.
         if (verdict in FEASIBLE_VERDICTS) {
@@ -127,14 +109,11 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     final override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("$commentPrefix solveTime=${solveTimeMs / 1000.0}")
         println("$commentPrefix solutions=$solutions")
-        // Presolve runs before any engine and gates itself on having done something, so it is reported
-        // whatever backend followed — including none. These protocols carry the open-model formats, where
-        // presolve is the only phase that runs before the route is even chosen, so leaving it unreported
-        // is what makes a source-lane reduction impossible to observe from a run.
+        // Presolve is reported whatever backend followed, including none: on the open-model formats it is
+        // the only phase that runs before the route is chosen.
         printStatPairs(commentPrefix, presolveStatPairs(stats))
-        // The search block is unconditional counters, so it is worth printing only for an engine that
-        // ran; the LP block reports nothing unless the LP did work, so it gates itself and must not sit
-        // behind the backend check — a run that records no backend can still have solved relaxations.
+        // The LP block gates itself and must stay outside the backend check: a run that records no backend
+        // can still have solved relaxations.
         if (stats.run.backend.isNotEmpty()) {
             printStatPairs(commentPrefix, searchStatPairs(stats).filter { (k, _) -> keepStat(k) })
             printStatPairs(commentPrefix, caStatPairs(stats))
@@ -146,7 +125,6 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     }
 
     private companion object {
-        /** The verdicts that report an assignment: everything but a refutation and a soft stop. */
         val FEASIBLE_VERDICTS =
             setOf(Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND, Verdict.UNBOUNDED)
     }

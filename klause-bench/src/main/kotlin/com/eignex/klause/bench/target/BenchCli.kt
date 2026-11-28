@@ -26,11 +26,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.system.exitProcess
 
-/**
- * The bench commands klause-lab runs: `select` names problems, `solve-one` solves one and writes its
- * [SolveMetric] record, `provenance` captures the installed build, and `corpus` maintains the cache.
- * Experiments, references and comparisons live in klause-lab.
- */
+/** Bench commands klause-lab runs: `select`, `solve-one`, `provenance` and `corpus`. */
 object BenchCli {
     private const val MIB = 1024L * 1024
 
@@ -71,9 +67,7 @@ object BenchCli {
         }
     }
 
-    /** `corpus compress [<dir>]`: compress the plain instances under [dir] (default: the corpus cache) in
-     *  place. Safe to interrupt and re-run; see [CorpusFiles.compressTree]. `corpus gc` applies the cache cap
-     *  and `corpus status` lists the cached collections; see [CorpusCache]. */
+    // `compress` is safe to interrupt and re-run.
     private fun corpus(args: List<String>) {
         when (args.firstOrNull()) {
             "compress" -> corpusCompress(args.getOrNull(1)?.let { File(it) } ?: CorpusFetcher.cacheRoot)
@@ -114,11 +108,8 @@ object BenchCli {
 
     private fun mibColumn(bytes: Long): String = "${bytes / MIB} MiB".padStart(MIB_COLUMN_WIDTH)
 
-    /** Print the [filterArgs] selection one JSON object per line: the suite and problem that name each instance
-     *  exactly for `solve-one`, its source collection (`collection`), family, format and category. Resolving
-     *  a dynamic suite fetches its collection, so a selection also leaves every instance it names on disk.
-     *  `files=true` materializes plain `model` and `data` files and MiniZinc `includeDirs`, which lets a runner
-     *  outside the bench solve the instance. */
+    // Resolving a dynamic suite fetches its collection. `files=true` materializes plain model and data files and
+    // MiniZinc includeDirs, so a runner outside the bench can solve the instance.
     private fun printSelection(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val features = f["features"] == "true"
@@ -162,10 +153,8 @@ object BenchCli {
         for (collection in changedCollections) if (cache.isPresent(collection)) cache.recordSize(collection)
     }
 
-    /** Solve exactly one problem, `suite=<id> problem=<name>` as `select` prints it, writing its record to
-     *  `out=<dir>`. The suite resolves uncapped, so any instance a selection could name is found. Exits non-zero
-     *  only when the problem is unknown; one that fails to load or to solve still writes its record, saying why.
-     *  Keys it does not know are ignored. */
+    // The suite resolves uncapped, so any instance a selection could name is found. Exits non-zero only for an unknown
+    // problem; a load or solve failure still writes its record. Unknown keys are ignored.
     private fun solveOne(args: List<String>) {
         val f = args.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val suite = requireNotNull(f["suite"]) { "solve-one needs suite=<id>" }
@@ -193,7 +182,6 @@ object BenchCli {
         println("${record.problem}: feasible=${record.feasible} objective=${record.objective} proven=${record.proven}")
     }
 
-    /** Map an `engine=` alias to a klause-cli `-e` value (fixed | cp | mixed | ls | alns). */
     private fun parseEngine(name: String): String = when (name.lowercase()) {
         "cp", "backtrack", "bt" -> "cp"
         "ls", "localsearch", "local-search" -> "ls"
@@ -203,13 +191,9 @@ object BenchCli {
         else -> error("engine must be fixed|cp|mixed|ls|alns, got '$name'")
     }
 
-    /** Build the selection from filters: suites (`core` expands to the in-process core; static-only unless
-     *  named) → category/tag/name filter → per-family caps → overall cap. Dynamic suites resolve
-     *  uncapped, so `per-family`/`seed` sample each corpus by its provider's own family key; a suite's default
-     *  per-family cap applies only when `per-family` is unset. Families are counted per suite, so two suites
-     *  sharing a family name do not share its cap. `kind=cop|csp` is checked only on the instances a cap
-     *  reaches (via [ProblemKind]), so a capped selection fills its cap with the requested kind without reading
-     *  every source of a large corpus. */
+    // Dynamic suites resolve uncapped, so per-family sampling uses each provider's own family key; a suite's default
+    // cap applies only when `per-family` is unset. Families are counted per suite. `kind` is checked only on instances
+    // a cap reaches, so a capped selection does not read every source of a large corpus.
     internal fun selectProblems(f: Map<String, String>): List<SelectedProblem> {
         val suiteIds = f["suite"]?.split(",")?.map { it.trim() }?.flatMap { expandSuiteIds(it) }
             ?: Catalog.suites.map { it.id }
@@ -255,8 +239,7 @@ object BenchCli {
     private fun compatible(candidate: SelectedProblem): Boolean =
         MiniZincCompatibility.admit(candidate.suite, candidate.ref)
 
-    /** The problems of the named sets, restricted to [suites] when given. A set is selected whole: no suite's
-     *  default per-family cap applies to it, only an explicit `per-family`. */
+    // A set is selected whole: no suite's default per-family cap applies, only an explicit `per-family`.
     private fun setProblems(names: List<String>, suites: Set<String>?): List<SelectedProblem> {
         val entries = ProblemSets.load(names).filter { suites == null || it.suite in suites }
         val bySuite = entries.groupBy { it.suite }.mapValues { (id, members) ->
@@ -271,22 +254,19 @@ object BenchCli {
         return entries.map { SelectedProblem(it.suite, bySuite.getValue(it.suite).getValue(it.problem)) }
     }
 
-    /** `kind=cop` keeps optimization problems, `kind=csp` keeps satisfaction problems. */
     private fun parseKind(kind: String): Boolean = when (kind.lowercase()) {
         "cop", "opt", "optimization" -> true
         "csp", "sat", "satisfaction" -> false
         else -> error("kind must be cop|csp, got '$kind'")
     }
 
-    /** Expand a suite token: `core` → every in-process core suite; otherwise the named suite. */
     private fun expandSuiteIds(token: String): List<String> = when (token) {
         "core" -> Targets.IN_PROCESS_CORE
         else -> listOf(token)
     }
 
     private fun matches(pattern: String, name: String): Boolean = if ('*' in pattern) {
-        // Escape each literal segment between `*`s (Regex.escape wraps in \Q…\E, so escaping the
-        // whole pattern then substituting `*` doesn't work), and join with `.*`.
+        // Regex.escape wraps in \Q…\E, so escape each literal segment rather than the whole pattern.
         val rx = pattern.split('*').joinToString(".*") { Regex.escape(it) }
         Regex("^$rx$").containsMatchIn(name)
     } else {

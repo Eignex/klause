@@ -14,9 +14,7 @@ internal class CardinalityPropagator(
     private val max: Int,
 ) : Propagator {
 
-    /** Number of literals to watch on the at-least-min side (0 if min == 0, else min+1), or -1 when
-     *  `min + 1` exceeds the literal count ("all literals must be true"), which the watched scheme
-     *  can't represent; [initialBoolWatchers] is then null and the general scanner handles it. */
+    // -1 when `min + 1` exceeds the literal count, which the watched scheme can't represent.
     private val atLeastWatchSize: Int =
         if (min == 0) 0 else (min + 1).let { if (it > literals.size) -1 else it }
 
@@ -29,22 +27,13 @@ internal class CardinalityPropagator(
             }
         }
 
-    /**
-     * Watched-literal opt-in. Generalises the clause two-watch scheme to cardinality (Chai and Kuehlmann,
-     * "A fast pseudo-Boolean constraint solver", IEEE TCAD 24(3), 2005,
-     * https://doi.org/10.1109/TCAD.2004.842808):
-     *  - At-least-min side: watch `min + 1` literals; the constraint stays alive while
-     *    all are non-false. When one becomes false and no non-false replacement exists,
-     *    the remaining `min` must all be true → unit-propagate them.
-     *  - At-most-max side: symmetric, on literal negations — watch `n - max + 1`
-     *    literals as non-true candidates; when one becomes true and no non-true
-     *    replacement exists, the remaining `n - max` must all stay false → force them.
-     *
-     * Falls back to occurrence-list wakeup (returns `null`) when either side wants
-     * more watches than the constraint has literals (degenerate: `min == n` or `max == 0`),
-     * or when both sides are trivial (`min == 0 && max == n`). The general scanner in
-     * [propagate] handles those cases correctly without watched-literal bookkeeping.
-     */
+    // Generalizes the two-watch scheme to cardinality (Chai and Kuehlmann, "A fast pseudo-Boolean
+    // constraint solver", IEEE TCAD 24(3), 2005, https://doi.org/10.1109/TCAD.2004.842808):
+    //  - At-least side: watch `min + 1` literals. When one becomes false with no non-false replacement,
+    //    the remaining `min` must all be true.
+    //  - At-most side: watch `n - max + 1` literals as non-true. When one becomes true with no non-true
+    //    replacement, the remaining `n - max` must all be false.
+    // Null falls back to the scanner when a side wants more watches than literals or both sides are trivial.
     override val initialBoolWatchers: IntArray? = run {
         if (atLeastWatchSize < 0 || atMostWatchSize < 0) return@run null
         if (atLeastWatchSize == 0 && atMostWatchSize == 0) return@run null
@@ -63,14 +52,7 @@ internal class CardinalityPropagator(
         propagateScanning(state)
     }
 
-    /**
-     * Clause-form nogood when [propagate] returns false. Two failure modes:
-     *  - min-side: `trueCount + unassigned < min` — too many literals are forced false to
-     *    ever reach `min` true. The disjunction of currently-false literals must contain
-     *    at least one truth.
-     *  - max-side: `trueCount > max` — too many literals are forced true. Their negations
-     *    form the violated disjunction (at least one must actually be false).
-     */
+    // A min-side failure is explained by the false literals, a max-side failure by the negated true ones.
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         var trueCount = 0
         var falseCount = 0
@@ -99,14 +81,8 @@ internal class CardinalityPropagator(
         return null
     }
 
-    /**
-     * Load the constraint into [acc] as a coefficient-carrying `≥` reason for cutting-planes conflict
-     * analysis. A cardinality is two unit-weight bounds; the relevant half is chosen by
-     * [forcedLit] when resolving a pivot (forced-true own-literal ⇒ at-least side `Σ ℓ ≥ min`; forced-false
-     * ⇒ at-most side `Σ ℓ ≤ max` ⇒ `Σ ¬ℓ ≥ n − max`). For a *seed* (`forcedLit == Lit.NONE`, the conflicting
-     * constraint) the violated side is detected from [state]: too many true literals ⇒ at-most, too few
-     * non-false ⇒ at-least. Returns false for a degenerate bound or a variable not in scope.
-     */
+    // Loads the relevant half as a `≥` reason for cutting-planes analysis: a forced-true own literal selects
+    // `Σ ℓ ≥ min`, a forced-false one `Σ ¬ℓ ≥ n − max`. A seed (`forcedLit == Lit.NONE`) picks the violated side.
     fun loadReason(acc: PbAccumulator, forcedLit: Int, state: PropagationState): Boolean {
         val n = literals.size
         val ones = LongArray(n) { 1L }
@@ -149,10 +125,7 @@ internal class CardinalityPropagator(
         return if (occ == forcedLit) loadAtLeast() else loadAtMost()
     }
 
-    /** Antecedents for a forced pin. For an at-least pin ([collectTrue] = false) the reason is the
-     *  currently-*false* literals (their being false forced the pin), recorded as-is. For an at-most
-     *  pin ([collectTrue] = true) it is the negations of the currently-*true* literals (their being
-     *  true forced the pin to false). Excludes [excludeVar]; returns `null` when nothing to record. */
+    // At-least pins are explained by the false literals, at-most pins by the negated true literals.
     private fun antecedentsForPin(state: PropagationState, excludeVar: Int, collectTrue: Boolean): IntArray? {
         var n = 0
         for (lit in literals) {
@@ -173,12 +146,8 @@ internal class CardinalityPropagator(
         return out
     }
 
-    /**
-     * Watched-literal propagation. The watches array packed into [PropagationState.refPayload]
-     * stores the at-least watch indices in `[0, atLeastWatchSize)` and the at-most watch
-     * indices in `[atLeastWatchSize, atLeastWatchSize + atMostWatchSize)`. Each side runs
-     * a scan-and-replace pass; failures unit-propagate the remaining watched literals.
-     */
+    // [PropagationState.refPayload] holds the at-least watch indices in `[0, atLeastWatchSize)` and the
+    // at-most ones after them.
     private fun propagateWatched(state: PropagationState, factorId: Int): Boolean {
         val watches = (state.refPayload[factorId] as IntArray?) ?: run {
             val w = IntArray(atLeastWatchSize + atMostWatchSize) { i ->
@@ -207,14 +176,8 @@ internal class CardinalityPropagator(
         return true
     }
 
-    /**
-     * Propagate one watched side. [atLeast] = true is the at-least side (pins unwatched literals
-     * *true* once every watcher is false); [atLeast] = false is the at-most side (pins them *false*
-     * once every watcher is true). The two are exact mirrors under literal negation: the trigger is
-     * a watcher already assigned to the "bad" value ([atLeast] ⇒ false, else true), the replacement
-     * is any outside literal not yet at that value, and a watch relocates on the plain literal
-     * (at-least) or its negation (at-most).
-     */
+    // The two sides mirror under literal negation: a watcher at the bad value (false for at-least, true for
+    // at-most) moves to an outside literal not at that value, or else the other watched literals are pinned.
     private fun propagateSide(
         state: PropagationState,
         factorId: Int,
@@ -236,8 +199,6 @@ internal class CardinalityPropagator(
         return true
     }
 
-    /** Index of a literal outside the watched range whose truth is not [value] (unassigned counts),
-     *  or -1 if every outside literal is already assigned [value]. */
     private fun findNonOutside(state: PropagationState, watches: IntArray, start: Int, end: Int, value: Boolean): Int {
         outer@ for (i in literals.indices) {
             for (w in start until end) if (watches[w] == i) continue@outer
@@ -246,8 +207,6 @@ internal class CardinalityPropagator(
         return -1
     }
 
-    /** Pins every watched literal except [skipIdx] to [pinTrue] (true = at-least, false = at-most);
-     *  returns false on conflict. */
     private fun unitPinWatched(
         state: PropagationState,
         watches: IntArray,
@@ -271,20 +230,13 @@ internal class CardinalityPropagator(
         return true
     }
 
-    /** True iff the literal at index [idx] is currently assigned and evaluates to [value]
-     *  (unassigned ⇒ false for either value). */
     private fun litIs(state: PropagationState, idx: Int, value: Boolean): Boolean {
         val lit = literals[idx]
         val b = state.boolValues[Lit.variable(lit)] ?: return false
         return Lit.evaluate(lit, b) == value
     }
 
-    /**
-     * Fallback scanner — O(n) per fire, used when the constraint shape can't be watched
-     * (`min == n` "all must be true", `max == 0` "none can be true", or the trivial
-     * `min == 0 && max == n`). The plain scan suffices because these shapes typically have
-     * small or degenerate [literals].
-     */
+    // O(n) per fire, for shapes the watched scheme can't represent.
     private fun propagateScanning(state: PropagationState): Boolean {
         var trueCount = 0
         var falseCount = 0

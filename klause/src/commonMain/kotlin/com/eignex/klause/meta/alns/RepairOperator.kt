@@ -15,8 +15,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
 import kotlin.random.Random
 
-/** The objective's largest-magnitude coefficient — the scale ALNS insertion noise is measured in. Zero
- *  for an empty (constant) objective, so noise is inert where there is nothing to perturb. */
+// The scale ALNS insertion noise is measured in; zero for a constant objective, so noise is inert there.
 private fun objectiveScale(objective: LinearObjective): Double {
     var m = 0L
     for (w in objective.boolWeightValues) {
@@ -30,21 +29,11 @@ private fun objectiveScale(objective: LinearObjective): Double {
     return m.toDouble()
 }
 
-/**
- * The "repair" half of an ALNS iteration: fill in the freed variables under the pinned
- * assumptions. The standard implementation [InnerLsRepair] delegates to the inner LS
- * engine; custom operators can vary the flip budget, the restart cadence, or even use
- * a different solver entirely.
- *
- * Returning `null` signals "this repair couldn't reach feasibility" — ALNS treats it as
- * a rejected iteration and applies the bandit's reject reward.
- */
+// A null repair could not reach feasibility; ALNS scores it as a rejected iteration.
 internal fun interface RepairOperator {
     fun repair(context: RepairContext): Sample?
 
     companion object {
-        /** Default operator menu: three flip-budget profiles for the inner LS plus a pure and a noisy
-         *  greedy-construction filler. The bandit learns which fits the current problem. */
         val Defaults: List<RepairOperator> = listOf(
             InnerLsRepair(label = "standard"),
             InnerLsRepair(label = "quick", flipsOverride = 200L),
@@ -55,13 +44,8 @@ internal fun interface RepairOperator {
     }
 }
 
-/** Bundle of everything a [RepairOperator] needs to fill a freed neighbourhood. When
- *  [session] is provided, operators that delegate to the inner solver should route
- *  calls through it so cross-iteration state (DDFW weights, activity recency) survives;
- *  the [inner] reference remains for operators that need raw `Optimizer` access.
- *
- *  [backtrack] / [backtrackParams] are present when the caller supplies a backtrack LCG+LP engine for
- *  CP repair ([BacktrackRepair]); null on a pure-LS ALNS. */
+// Operators delegating to the inner solver should route through session, when present, so cross-iteration
+// state survives.
 internal data class RepairContext(
     val inner: Optimizer<LocalSearchParams>,
     val params: LocalSearchParams,
@@ -73,22 +57,13 @@ internal data class RepairContext(
     val session: LocalSearchSession? = null,
     val backtrack: Optimizer<BacktrackParams>? = null,
     val backtrackParams: BacktrackParams? = null,
-    /** A persistent repair handle reusing one session + LP across fragments; when present,
-     *  [BacktrackRepair] uses it instead of a fresh solve per repair. */
+    // Reuses one session and LP across fragments, so it prunes against the monotone bestObjective cutoff.
     val repairSearch: RepairSearch? = null,
-    /** The monotone (non-increasing) best-so-far objective — the cutoff [BacktrackRepair] prunes the
-     *  fragment against when using [repairSearch] (the reused session needs a monotone cutoff). */
     val bestObjective: Double = Double.POSITIVE_INFINITY,
     val recordInnerWork: ((nodes: Long, moves: Long) -> Unit)? = null,
     val recordRepairResult: ((MinimizeResult) -> Unit)? = null,
 )
 
-/**
- * Repair via the inner LS engine: invoke `inner.minimize` with the pin assumptions
- * applied. [flipsOverride] optionally caps the inner search budget independent of
- * `params.maxFlips` — useful for differentiating "quick probe" from "deep investment"
- * variants the ALNS bandit can choose between.
- */
 internal class InnerLsRepair(val label: String = "standard", val flipsOverride: Long? = null) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val params = if (flipsOverride != null) context.params.copy(maxFlips = flipsOverride) else context.params
@@ -106,16 +81,8 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
     override fun toString(): String = "InnerLsRepair($label${flipsOverride?.let { ", flips=$it" }.orEmpty()})"
 }
 
-/**
- * CP repair via the backtrack LCG+LP engine — the hybrid LS+CP move. Pins the complement of the
- * freed set as root assumptions and runs a small bounded branch-and-bound over the freed neighbourhood,
- * so the fragment gets full propagation, clause learning, and LP bounding, unlike the LS/greedy
- * repairs. The incumbent objective is wired as [BacktrackParams.objectiveBoundSupplier] so the search
- * prunes against best-known and abandons a hopeless fragment early; only a strictly-improving completion
- * comes back (else null, which ALNS treats as a rejected iteration). [maxDecisions] is the repair budget
- * the ALNS bandit picks between — a quick probe vs a deep investment. A no-op (null) when the context
- * carries no backtrack engine.
- */
+// A bounded branch-and-bound over the freed neighbourhood under the pinned complement, pruning against the
+// incumbent objective so a hopeless fragment is abandoned early and only a strictly improving completion returns.
 internal class BacktrackRepair(val label: String = "standard", val maxDecisions: Long = 2_000L) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         // The reused session's accumulated objective bounds only tighten, so it needs the monotone cutoff.
@@ -153,8 +120,6 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
     override fun toString(): String = "BacktrackRepair($label, maxDecisions=$maxDecisions)"
 
     companion object {
-        /** Three repair-budget profiles for the ALNS bandit to choose between — quick probe, standard,
-         *  and deep fragment solve. */
         val Defaults: List<RepairOperator> = listOf(
             BacktrackRepair(label = "quick", maxDecisions = 500L),
             BacktrackRepair(label = "standard", maxDecisions = 2_000L),
@@ -163,29 +128,13 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
     }
 }
 
-/**
- * Myopic value-by-value fill of the freed variables, starting from the incumbent
- * assignment. For each freed bool, try flipping and keep if the shaped score
- * (`params.costShaping(violationCount, objective)`) strictly improves. For each freed
- * int, scan its domain (sampled to [intDomainSampleCap] for large domains) and pick
- * the value with the lowest shaped score.
- *
- * No local search runs after the greedy pass — that's the point. Compared to
- * [InnerLsRepair], greedy is cheap (one pass over freed vars, no flip budget), and
- * surfaces problem-specific local structure: when there's a clear local choice per
- * variable, greedy finds it directly; when the freed neighbourhood requires
- * coordination, LS-based repair wins. The ALNS bandit learns the split.
- *
- * Scoring uses [LocalSearchParams.costShaping] so the operator respects the caller's
- * feasibility-vs-objective trade-off; with the default [com.eignex.klause.localsearch.CostShaping.FeasibilityFirst]
- * infeasible candidates are scored `+∞` and greedy stays inside the feasible region
- * whenever it can.
- */
+// One myopic pass from the incumbent with no local search after it: cheap, and finds a clear per-variable choice
+// directly where LS repair wins on neighbourhoods that need coordination. Scoring uses the caller's cost shaping,
+// so under feasibility-first shaping greedy stays feasible whenever it can.
 internal class GreedyConstructionRepair(
     val intDomainSampleCap: Int = 20,
-    /** ALNS insertion noise (Ropke and Pisinger, see [Alns]): each candidate's score is perturbed by a uniform
-     *  draw in `±noise · maxObjectiveCoefficient`, so the greedy fill occasionally takes a non-locally-best
-     *  value and diversifies. `0.0` (default) is pure greedy; `~0.1` is the usual diversifying setting. */
+    // ALNS insertion noise (Ropke and Pisinger): each score is perturbed by a uniform draw in
+    // `±noise · maxObjectiveCoefficient`, so the fill occasionally takes a non-best value.
     val noise: Double = 0.0,
 ) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
@@ -245,19 +194,14 @@ internal class GreedyConstructionRepair(
     override fun toString(): String = "GreedyConstructionRepair(cap=$intDomainSampleCap, noise=$noise)"
 }
 
-/**
- * Regret-based repair, after the regret insertion of J.-Y. Potvin and J.-M. Rousseau, "A parallel route
- * building algorithm for the vehicle routing and scheduling problem with time windows", European Journal
- * of Operational Research 66(3), 1993, https://doi.org/10.1016/0377-2217(93)90221-8. For each freed
- * integer variable, the *regret* is the gap between the score of its best sampled value and its
- * second-best, both measured against the starting assignment; the best values are then applied in
- * descending regret order. Booleans take a single best-flip pass, as regret over a two-value domain
- * reduces to that.
- */
+// Regret insertion after J.-Y. Potvin and J.-M. Rousseau, "A parallel route building algorithm for the vehicle
+// routing and scheduling problem with time windows", European Journal of Operational Research 66(3), 1993,
+// https://doi.org/10.1016/0377-2217(93)90221-8. An int variable's regret is the gap between its best and
+// second-best sampled value; best values are applied in descending regret order. Booleans take a single
+// best-flip pass, to which regret over two values reduces.
 internal class RegretRepair(
     val intDomainSampleCap: Int = 20,
-    /** Insertion noise, as in [GreedyConstructionRepair]: candidate scores are perturbed by `±noise ·
-     *  maxObjectiveCoefficient` before the regret ordering, diversifying the assignment. `0.0` disables it. */
+    // Insertion noise, as in GreedyConstructionRepair.
     val noise: Double = 0.0,
 ) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
@@ -320,17 +264,7 @@ internal class RegretRepair(
     override fun toString(): String = "RegretRepair(cap=$intDomainSampleCap, noise=$noise)"
 }
 
-/**
- * Best-improving (hill-climbing) repair. Repeatedly scans every freed variable and every
- * candidate value (sampled to [intDomainSampleCap] for large int domains) and applies the
- * single move that *most* reduces the shaped score. Terminates when no improving move
- * exists — i.e. a strict local optimum over the freed neighbourhood under shaped scoring.
- *
- * Distinguished from [InnerLsRepair] by being purely deterministic-best-improvement
- * (no tabu, noise, or restart). Good when the freed neighbourhood is small and the
- * objective surface near the incumbent is smooth — the bandit learns when best-improving
- * outperforms stochastic LS.
- */
+// Best-improvement hill climbing over the freed neighbourhood, with no tabu, noise or restart.
 internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIterations: Int = 100) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem

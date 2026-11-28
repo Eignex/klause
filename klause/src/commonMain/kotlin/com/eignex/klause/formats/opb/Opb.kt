@@ -4,8 +4,7 @@ import com.eignex.klause.formats.FormatException
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 
-/** Raised when an OPB/WBO document is malformed, so a caller can catch it via [FormatException] like
- *  the other input formats. */
+/** Raised when an OPB/WBO document is malformed. */
 class OpbFormatException(msg: String) : FormatException("OPB", msg)
 
 /** OPB/WBO format facade. It parses external syntax into an immutable source document. */

@@ -6,13 +6,9 @@ import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.storage.PackedBits
 
-/**
- * Build a domain from a non-empty sorted-distinct survivor array. Picks the most compact rep:
- * gap-free ⇒ contiguous; span `<=` [DomainStorageSettings.bitsetThreshold] ⇒ bitset; the run list when
- * `2·runs <= survivors`; a bitset when no larger than the survivor list (`2·words <= survivors`), whose
- * O(1) `contains` beats the survivor list's binary search; else the survivor list. The array is adopted
- * by-reference for the survivor rep, so callers must not mutate it after.
- */
+// From a non-empty sorted-distinct survivor array, picking the most compact representation: gap-free ⇒
+// contiguous; span within bitsetThreshold ⇒ bitset; 2·runs <= survivors ⇒ run list; 2·words <= survivors ⇒
+// bitset; else the survivor list, which adopts the array by reference, so callers must not mutate it after.
 internal fun intDomainFromSurvivors(
     sv: LongArray,
     storage: DomainStorageSettings = defaultDomainStorageSettings,
@@ -47,9 +43,8 @@ internal fun intDomainFromSurvivors(
         runs[ri] = sv[s - 1]
         return RunsDomain(newMin, newMax, runs, storage)
     }
-    // A scattered domain the run list can't compact still prefers a bitset when it is no larger than the
-    // survivor array: O(1) `contains` in place of a binary search, at memory parity. A wide span makes
-    // `words` huge, so `2·words <= s` is false and we fall through to the survivor list (span-independent).
+    // A scattered domain still prefers a bitset when it is no larger than the survivor array: O(1) contains in place
+    // of a binary search. A wide span makes words huge, so it falls through to the span-independent survivor list.
     val words = (span + 63) ushr 6
     if (!spanHuge && 2 * words <= s) {
         val bits = LongArray(words.toInt())
@@ -59,11 +54,8 @@ internal fun intDomainFromSurvivors(
     return SurvivorsDomain(newMin, newMax, sv, storage)
 }
 
-/**
- * Build a domain from a non-empty, normalized run list (flattened `lo,hi` pairs, sorted, disjoint
- * with strict gaps). Same selection rule as [intDomainFromSurvivors], expanding to a survivor list
- * only in the scattered (comb) case.
- */
+// From a non-empty normalized run list (flattened lo,hi pairs, sorted, strict gaps), with the same selection rule as
+// intDomainFromSurvivors.
 internal fun intDomainFromRuns(
     runs: LongArrayList,
     storage: DomainStorageSettings = defaultDomainStorageSettings,
@@ -93,9 +85,8 @@ internal fun intDomainFromRuns(
         return BitsetDomain(newMin, newMax, bits, newMin, storage)
     }
     if (2 * r <= s) return RunsDomain(newMin, newMax, runs.toLongArray(), storage)
-    // Same memory-parity bitset preference as [intDomainFromSurvivors], filled straight from the runs.
-    // A wide span makes `words` huge so this is skipped, and a huge run makes `2·r <= s` true above, so
-    // the O(s) survivor materialisation below is only reached for a genuinely small scattered set.
+    // Same memory-parity bitset preference as intDomainFromSurvivors. A wide span makes words huge and a huge run
+    // makes 2·r <= s true above, so the O(s) survivor list below is only reached for a small scattered set.
     val words = (span + 63) ushr 6
     if (!spanHuge && 2 * words <= s) {
         val bits = LongArray(words.toInt())
@@ -122,11 +113,8 @@ internal fun intDomainFromRuns(
     return SurvivorsDomain(newMin, newMax, sv, storage)
 }
 
-/**
- * The present values of this domain as a flattened run list (`lo,hi` pairs, sorted, disjoint with strict
- * gaps), the inverse of [intDomainFromRuns]. Contiguous and run-list representations answer directly, so
- * a wide sparse domain costs its run count rather than its span; any other representation is enumerated.
- */
+// The inverse of intDomainFromRuns. Contiguous and run-list representations answer directly, so a wide sparse
+// domain costs its run count rather than its span.
 internal fun IntDomain.runBounds(): LongArray = when (this) {
     is ContiguousDomain -> longArrayOf(min, max)
     is RunsDomain -> copyRuns()

@@ -5,25 +5,19 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.util.numbers.Int128
 import com.eignex.util.numbers.addExactOrNull
 
-/** A bound the objective cutoff proves on an integer variable: `varId ≤ hi`. */
+// varId ≤ hi, proved by the objective cutoff.
 internal class CutoffBound(val varId: Int, val hi: Long)
 
-/**
- * Bounds open integer columns using the incumbent cutoff `Σ c·x + constant ≤ incumbent − 1`.
- * For `c_j > 0`, propagation gives `lo_j + ⌊(incumbent − 1 − L) / c_j⌋`, where `L` is the
- * objective minimum over declared domains. Every other term is at least its own minimum,
- * so this bound is sound without an LP relaxation.
- *
- * The cutoff retains only strictly better integral objectives. The caller must restrict it
- * to branch-and-bound optimization, never enumeration.
- *
- * `L` accumulates exactly in 128 bits. An inexact column minimum yields no bound. Columns
- * with an invented lower endpoint are skipped because the formula would bound the search box
- * rather than the source model.
- *
- * H. Crowder, E. L. Johnson, M. Padberg, "Solving Large-Scale Zero-One Linear Programming Problems",
- * Operations Research 31(5), 1983, https://doi.org/10.1287/opre.31.5.803.
- */
+// Bounds open integer columns using the incumbent cutoff `Σ c·x + constant ≤ incumbent − 1`. For `c_j > 0`,
+// propagation gives `lo_j + ⌊(incumbent − 1 − L) / c_j⌋`, where `L` is the objective minimum over declared
+// domains; every other term is at least its own minimum, so the bound is sound without an LP relaxation.
+//
+// The cutoff retains only strictly better integral objectives, so the caller must restrict it to
+// branch-and-bound optimization, never enumeration. Columns with an invented lower endpoint are skipped: the
+// formula would bound the search box rather than the source model.
+//
+// H. Crowder, E. L. Johnson, M. Padberg, "Solving Large-Scale Zero-One Linear Programming Problems",
+// Operations Research 31(5), 1983, https://doi.org/10.1287/opre.31.5.803.
 internal fun objectiveCutoffBounds(
     problem: BakedProblem,
     objective: LinearObjective,

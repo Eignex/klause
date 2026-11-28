@@ -12,26 +12,11 @@ import java.util.zip.CRC32
 import java.util.zip.CheckedInputStream
 import java.util.zip.ZipFile
 
-/**
- * Resolves a [ProblemSource] to a concrete [File] on disk.
- *
- *  - [ProblemSource.Vendored] → a path under the workspace root (tracked in git).
- *  - [ProblemSource.External] → a path inside a cached clone/download of an
- *    [ExternalCollection]; the collection is fetched on first use into [cacheRoot] and reused
- *    thereafter.
- *  - [ProblemSource.InCode] has no file and is resolved by the solver layer, not here.
- *
- * Fetched instances can be stored zstd-compressed (see [CorpusFiles]), so a resolved file may be
- * `<name>.<ext>.zst`; read it through [CorpusFiles], never directly.
- */
+// A resolved file may be stored zstd-compressed as `<name>.<ext>.zst`; read it through CorpusFiles, never directly.
 internal object CorpusFetcher {
 
-    /** Compression suffix → the system decompressor that strips it in place (see [decompressInPlace]), ahead
-     *  of the recompression to zstd. */
     private val DECOMPRESS_TOOLS = mapOf("xz" to "unxz", "bz2" to "bunzip2", "gz" to "gunzip")
 
-    /** The workspace root: `-Dklause.workspace.root`, otherwise the nearest ancestor of the working
-     *  directory holding `klause-mzn-lib/`. */
     fun workspaceRoot(): File {
         System.getProperty("klause.workspace.root")?.let { return File(it) }
         var cur: File? = File(".").absoluteFile
@@ -42,9 +27,7 @@ internal object CorpusFetcher {
         error("could not locate workspace root (no klause-mzn-lib parent); set -Dklause.workspace.root")
     }
 
-    /** Where fetched external collections are cached. Defaults outside the repo tree — under
-     *  `$XDG_CACHE_HOME` (or `~/.cache`) — so multi-GB fetches survive `git clean` / a `build/`
-     *  wipe and are shared across worktrees. Overridable via `-Dklause.bench.corpusCache`. */
+    // Outside the repo tree so multi-GB fetches survive `git clean` and are shared across worktrees.
     val cacheRoot: File
         get() = System.getProperty("klause.bench.corpusCache")?.let { File(it) }
             ?: defaultCacheRoot()
@@ -62,15 +45,11 @@ internal object CorpusFetcher {
             return address?.takeIf { it.isNotBlank() }?.let { CorpusMirror(URI(it)) }
         }
 
-    /** `$XDG_CACHE_HOME` when set, else `~/.cache` (the XDG base-dir default). */
     private fun xdgCacheHome(): File = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotBlank() }?.let { File(it) }
         ?: File(System.getProperty("user.home"), ".cache")
 
-    /**
-     * Whether this process plans for a lab that accepts declared input hashes in place of local bytes: the lab sets
-     * `LAB_DECLARED_INPUTS` (mapped to this property by the lab adapter), publishes inputs by content hash and verifies
-     * every fetched byte. Only then may a plan select from a [CorpusIndex] without materializing the collection.
-     */
+    // Set when the lab publishes inputs by content hash and verifies every fetched byte; only then may a plan select
+    // from a CorpusIndex without materializing the collection.
     val declaredInputs: Boolean get() = System.getProperty("klause.bench.declaredInputs") == "true"
 
     private val indexes: CorpusIndexes get() = CorpusIndexes(storageRoot)
@@ -81,11 +60,8 @@ internal object CorpusFetcher {
     fun declaredPaths(collection: ExternalCollection): List<String>? =
         if (declaredInputs) knownIndex(collection)?.files?.map { it.path } else null
 
-    /**
-     * [collection] by its complete pack index when [declaredInputs] is on and some indexed members are absent locally.
-     * A complete local tree needs no listing skeleton. A missing index is fetched from the mirror; the pack itself
-     * is never downloaded here. Returns null when declared inputs are off or no index describes the pack.
-     */
+    // Only for declared inputs with indexed members absent locally; fetches a missing index from the mirror but never
+    // the pack itself.
     fun indexed(collection: ExternalCollection): IndexedCollection? {
         if (!declaredInputs) return null
         // A committed index keeps planning offline; the mirror is only a fallback for collections without one.
@@ -104,7 +80,6 @@ internal object CorpusFetcher {
         return indexes.view(index)
     }
 
-    /** The root to discover [collection]'s instances under: its index listing when [indexed], else its fetched tree. */
     fun listing(collection: ExternalCollection): File = indexed(collection)?.root ?: ensure(collection)
 
     fun selectivePaths(collection: ExternalCollection): List<String>? =
@@ -133,8 +108,7 @@ internal object CorpusFetcher {
         }
     }
 
-    /** Resolve [source] to a file, fetching an external collection if needed. [root] locates a collection's tree; an
-     *  index listing ([IndexedCollection.root]) resolves the same relative path without the collection's bytes. */
+    // An index listing root resolves the same relative path without the collection's bytes.
     fun resolve(source: ProblemSource, root: ((ExternalCollection) -> File)? = null): File = when (source) {
         is ProblemSource.Prepared -> source.file.also { require(it.isFile) }
 
@@ -170,7 +144,6 @@ internal object CorpusFetcher {
         is ProblemSource.InCode -> error("InCode sources have no file")
     }
 
-    /** The MiniZinc include directories [source]'s collection ships, which `minizinc -I` needs beside the model. */
     fun includeDirs(source: ProblemSource): List<File> = if (source is ProblemSource.Prepared) {
         source.includes
     } else if (source is ProblemSource.External && source.collection.includeDirs.isNotEmpty()) {
@@ -183,7 +156,7 @@ internal object CorpusFetcher {
     private fun mirrorWrite(): Boolean =
         (System.getenv("LAB_CORPUS_MIRROR_WRITE") ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE")) == "true"
 
-    /** [file] when present, otherwise its plain or compressed counterpart. Catalog paths may name either form. */
+    // Catalog paths may name either the plain or the compressed form.
     private fun stored(file: File): File {
         if (file.isFile) return file
         val counterpart = if (CorpusFiles.isCompressed(file)) {
@@ -194,14 +167,12 @@ internal object CorpusFetcher {
         return if (counterpart.isFile) counterpart else file
     }
 
-    /** Collections resolved in this JVM, which the cache cap never evicts. */
+    // The cache cap never evicts collections resolved in this JVM.
     private val usedThisRun: MutableSet<String> = HashSet()
 
-    /** The size-capped view of [cacheRoot] (see [CorpusCache]), pinning what this run has resolved. */
     fun cache(): CorpusCache = CorpusCache(storageRoot, CorpusCache.configuredCapBytes(), usedThisRun, log = ::log)
 
-    /** The root directory of [collection] in the cache, fetching it if not already present. A fetch first
-     *  evicts least recently used collections to fit the cache cap, and again once the new one has landed. */
+    // A fetch evicts least recently used collections to fit the cache cap, before and after it lands.
     fun ensure(collection: ExternalCollection): File {
         selectiveZip(collection)?.let { zip ->
             zip.paths.forEach { member(collection, it) }
@@ -305,7 +276,6 @@ internal object CorpusFetcher {
     private fun tarball(c: ExternalCollection, dir: File) {
         dir.mkdirs()
         downloaded(c.url, dir, ".tar.gz") { tar -> run("tar", "xzf", tar.absolutePath, "-C", dir.absolutePath) }
-        // MIPLIB 2010 ships `*.mps.gz` inside its tarball, some of them too large to be worth keeping.
         dropOversized(c, dir)
         decompressInPlace(dir)
         compress(dir)
@@ -314,7 +284,6 @@ internal object CorpusFetcher {
     private fun tar(c: ExternalCollection, dir: File) {
         dir.mkdirs()
         downloaded(c.url, dir, ".tar") { tar -> run("tar", "xf", tar.absolutePath, "-C", dir.absolutePath) }
-        // PB competition instances ship individually `*.opb.xz`/`*.wbo.xz`; recompress them to zstd.
         decompressInPlace(dir)
         compress(dir)
     }
@@ -343,7 +312,7 @@ internal object CorpusFetcher {
         }.onFailure { dir.deleteRecursively() }.getOrThrow()
     }
 
-    /** One instance at a time, so the disk never holds more than one decompressed instance beside the stored ones. */
+    // One instance at a time, so the disk never holds more than one decompressed instance beside the stored ones.
     private fun gbdFiles(c: ExternalCollection, m: FetchMethod.GbdFiles, dir: File) {
         dir.mkdirs()
         // A failed fetch leaves no directory behind: a partial one would read as a fetched collection.
@@ -364,11 +333,9 @@ internal object CorpusFetcher {
         }.onFailure { dir.deleteRecursively() }.getOrThrow()
     }
 
-    /** Give each extension-less file under [dir] whose first line that is not a comment starts with [marker] the
-     *  extension [ext]. */
     private fun nameBare(dir: File, marker: String, ext: String) {
         dir.walkTopDown().filter { it.isFile && CorpusFiles.formatExtension(it).isEmpty() }.forEach { file ->
-            // MPS comment lines (`*…`) may come first: MIPLIB 3 heads each file with a commented summary.
+            // MPS comment lines (`*…`) may precede the marker.
             val head = CorpusFiles.open(file).bufferedReader().useLines { lines ->
                 lines.map { it.trimStart() }.firstOrNull { it.isNotEmpty() && !it.startsWith("*") }
             }.orEmpty()
@@ -386,7 +353,6 @@ internal object CorpusFetcher {
         dir.mkdirs()
         downloaded(c.url, dir, ".zip") { zip -> extractZip(zip, dir) }
         dropOversized(c, dir)
-        // Competition archives ship individually compressed instances, which need unpacking before zstd.
         decompressInPlace(dir)
         compress(dir)
     }
@@ -422,8 +388,7 @@ internal object CorpusFetcher {
         }
     }
 
-    /** Drop extracted files over [ExternalCollection.maxFileMb] (measured on the still-compressed
-     *  size) before decompression, so a huge archive's giant members never inflate the cache. */
+    // Runs before decompression, so giant members never inflate the cache.
     private fun dropOversized(c: ExternalCollection, dir: File) {
         val cap = c.maxFileMb?.let { it * 1024L * 1024 } ?: return
         val victims = dir.walkTopDown().filter { it.isFile && it.length() > cap }.toList()
@@ -431,13 +396,9 @@ internal object CorpusFetcher {
         if (victims.isNotEmpty()) log("dropped ${victims.size} file(s) over ${c.maxFileMb}MB from '${c.id}'")
     }
 
-    /** Decompress every individually-compressed instance under [dir] in place, stripping the
-     *  compression suffix (`foo.cnf.xz` → `foo.cnf`) so [compress] can store it as zstd. Covers the
-     *  suffixes competition corpora use; a no-op for anything already plain. Chunked to stay under the
-     *  argument-length limit. */
+    // Chunked to stay under the argument-length limit.
     private fun decompressInPlace(dir: File) {
-        // Some archives (e.g. the 2007 PB tarball) store read-only dirs/files; decompressing in place
-        // must write the plain file and unlink the packed one, which a read-only parent dir forbids.
+        // Some archives store read-only dirs, which forbid replacing the packed file with the plain one.
         run("chmod", "-R", "u+w", dir.absolutePath)
         for (packed in dir.walkTopDown().filter { it.isFile && it.extension == "lzma" }) unpackLzma(packed)
         for ((ext, tool) in DECOMPRESS_TOOLS) {
@@ -456,7 +417,6 @@ internal object CorpusFetcher {
         check(packed.delete()) { "cannot remove unpacked instance: $packed" }
     }
 
-    /** Store every instance under a freshly extracted [dir] zstd-compressed. */
     private fun compress(dir: File) {
         val done = CorpusFiles.compressTree(dir, ::log)
         if (done.files > 0) log("compressed ${done.files} instance(s) in '${dir.name}'")

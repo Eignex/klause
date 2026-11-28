@@ -11,19 +11,11 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.util.arrays.emptyIntArray
 
-/**
- * Everything needed to count / sample one family of XOR-hash cells over a fixed projection of a
- * problem: the [problem] the solver enumerates, the variable ids the hashes range over
- * ([hashDomain]), and how to project / decode an enumerated model back to the original variables.
- *
- * A purely-Boolean projection runs natively over the original problem — no transformation, full
- * native propagation. When the projection includes integer variables, the chosen variables are
- * channelled to fresh Boolean bits via [IntBitChannel] (a binary encoding, kept native — every
- * original constraint is preserved) and the hashes range over those bits; counting is over distinct
- * integer *values* (the encoding is a bijection on in-domain values, so projecting back is exact).
- * The channel only *appends* variables and factors, so the original ids are unchanged — projecting
- * and decoding read them directly. Built once per count/sample run and reused across hash families.
- */
+// One family of XOR-hash cells over a fixed projection: the problem the solver enumerates, the variable ids the
+// hashes range over, and how to project and decode a model. A purely Boolean projection runs over the original
+// problem. Integer projection variables are channelled to Boolean bits by IntBitChannel, a bijection on in-domain
+// values, and the hashes range over those bits. The channel only appends variables and factors, so original ids
+// are unchanged.
 internal class CellContext private constructor(
     val problem: BakedProblem,
     val hashDomain: IntArray,
@@ -32,7 +24,7 @@ internal class CellContext private constructor(
     private val baseNumBoolVars: Int,
     private val baseNumIntVars: Int,
 ) {
-    /** Projection key of an enumerated [model]: chosen Boolean values (0/1) then integer values. */
+    // Chosen Boolean values (0/1), then integer values.
     fun projectionKey(model: Sample): List<Long> {
         val key = ArrayList<Long>(boolSet.size + intSet.size)
         for (v in boolSet) key.add(if (model.boolValue(v)) 1L else 0L)
@@ -40,7 +32,6 @@ internal class CellContext private constructor(
         return key
     }
 
-    /** Decode an enumerated [model] back to an assignment over the original problem's variables. */
     fun decode(model: Sample): Sample {
         if (model.numBoolVars == baseNumBoolVars && model.numIntVars == baseNumIntVars) {
             return model.withSourceSemantics(problem.semantics)
@@ -55,7 +46,6 @@ internal class CellContext private constructor(
         ).withSourceSemantics(problem.semantics)
     }
 
-    /** Count distinct projections, preserving whether the cell was completely checked. */
     fun countCell(hashes: List<Xor>, cap: Int, maxDecisions: Long = CELL_DECISION_BUDGET): CellResult {
         require(cap >= 0)
         if ((0 until problem.numRealVars).any { problem.realLower[it] > problem.realUpper[it] }) {
@@ -79,10 +69,7 @@ internal class CellContext private constructor(
     }
 
     companion object {
-        /**
-         * Resolve the projection from a config's [boolSet]/[intSet] (see [ApproxCountConfig]) and build
-         * the context. Both `null` projects over every variable; otherwise only the listed ones.
-         */
+        // Both sets null projects over every variable.
         fun resolve(base: BakedProblem, boolSet: IntArray?, intSet: IntArray?): CellContext {
             val bools: IntArray
             val ints: IntArray

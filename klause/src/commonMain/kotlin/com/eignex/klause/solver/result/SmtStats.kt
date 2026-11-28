@@ -65,7 +65,7 @@ data class SmtStats(
     val reductionNs: Long = 0,
     /** Exact source-witness candidates made available by an exact theory check. */
     val witnessCandidates: Long = 0,
-    /** Existing consumer paths that accepted an exact source witness. */
+    /** Consumer paths that accepted an exact source witness. */
     val witnessAccepted: Long = 0,
     /** Witness candidates over a source system containing a strict row. */
     val strictWitnessCandidates: Long = 0,
@@ -149,7 +149,7 @@ private fun mergeCompleteSearchCounts(
     else -> (first.keys + second.keys).associateWith { (first[it] ?: 0L) + (second[it] ?: 0L) }
 }
 
-/** Mutable exact-SMT telemetry for one top-level open-theory request. */
+// Scoped to one top-level open-theory request.
 internal class SmtStatsSink {
     val hintUsage = OpenHintUsageSink()
 

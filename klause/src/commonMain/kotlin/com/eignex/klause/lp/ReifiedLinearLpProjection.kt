@@ -20,9 +20,8 @@ internal fun LinearRow.emitReifiedIntegerLpRelaxation(builder: RelaxationBuilder
     }
 }
 
-/** Exact convex-hull rows for `aux ⇔ (c·v == bound)` when `v` has a two-value root box the model
- *  itself states — over an invented endpoint the box is a search restriction, and the equality it
- *  linearizes would hold only inside it. */
+// Exact hull of `aux ⇔ (c·v == bound)` over a two-value root box. The box must be the model's own: over
+// an invented endpoint the linearized equality would hold only inside the search box.
 private fun LinearRow.emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerRow): Boolean {
     val variables = intVars
     if (relation != LinearOp.EQ || variables.size != 1) return false
@@ -55,32 +54,23 @@ private fun LinearRow.emitExactBinaryEquality(builder: RelaxationBuilder, row: I
     return true
 }
 
-/**
- * Indicator rows via big-M, each side gated on the row's own activation bound being one the model states.
- *
- * `lMax` and `lMin` are what the big-M is: the row is `Σ c·x ⟨relation⟩ bound` slackened by the widest the left
- * side can reach, so an endpoint the model never stated makes the slack an invention. The row then holds
- * inside the search box only — and at the root the column enters the LP genuinely open, where it holds
- * nowhere.
- *
- * Dropping one row only ever weakens, so the stated side is still emitted when the other is not: on `≤`
- * and `≥` the two rows are the reification's two independent implications, and on `=` and `≠` they are
- * the two halves of a single one, which the survivor then states in one direction alone.
- */
+// Big-M indicator rows. `lMin`/`lMax` are the big-M, so each side is emitted only when the activity bound it
+// reads is stated by the model; an invented endpoint makes the slack hold inside the search box only.
+// Dropping one side only weakens the relaxation.
 private fun LinearRow.emitBigMRows(builder: RelaxationBuilder, row: IntegerRow) {
     val variables = intVars
     var maxStated = true
     var minStated = true
     for (k in variables.indices) {
         val c = row.coeffs[k]
-        if (c == 0L) continue // a zero coefficient reads neither endpoint
+        if (c == 0L) continue
         val v = variables[k]
         maxStated = maxStated && if (c > 0L) builder.statesUpperBound(v) else builder.statesLowerBound(v)
         minStated = minStated && if (c > 0L) builder.statesLowerBound(v) else builder.statesUpperBound(v)
     }
     if (!maxStated && !minStated) return
-    // An unstated side is never summed: its endpoint sits where the finite lane clamped the column, and
-    // the product there would overflow and take the stated side's row down with it.
+    // An unstated side is never summed: the product at its clamped endpoint could overflow and take the
+    // stated side's row down with it.
     var lMin = 0L
     var lMax = 0L
     var lMinD = 0L

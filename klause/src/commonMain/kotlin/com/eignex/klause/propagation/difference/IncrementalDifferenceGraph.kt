@@ -8,45 +8,29 @@ import com.eignex.klause.arithmetic.difference.differenceShortestPaths
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/**
- * A difference-constraint system maintained under assertion and retraction, carrying a feasible
- * potential function alongside it.
- *
- * The potential π satisfies `π(u) + w ≥ π(v)` for every asserted edge `u → v` of weight `w`. That is
- * exactly the statement that `x ↦ π(x)` solves the asserted subsystem, so maintaining π *is* the
- * consistency check — and retracting an edge can never break it, which is why the structure needs no
- * trail of its own and survives backtracking untouched. Only [assertEdge] does work, and it touches
- * only the vertices whose potential actually has to move rather than re-deriving the whole system.
- *
- * The same invariant makes the reduced weight `π(u) + w − π(v)` non-negative, so [shortestPathsFrom]
- * can run Dijkstra over a system whose real weights are negative (D. B. Johnson, "Efficient Algorithms for
- * Shortest Paths in Sparse Networks", JACM 24(1), 1977, https://doi.org/10.1145/321992.321993). Those
- * shortest paths are what let a consumer see a cycle *before* the edge closing it is asserted.
- *
- * Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
- * SAT 2006, LNCS 4121, https://doi.org/10.1007/11814948_19.
- */
+// A difference-constraint system under assertion and retraction with a feasible potential π:
+// `π(u) + w ≥ π(v)` for every asserted edge `u → v` of weight w. Maintaining π is the consistency check,
+// and retraction can never break it, so the structure needs no trail.
+//
+// The invariant makes reduced weights `π(u) + w − π(v)` non-negative, so shortest paths run Dijkstra
+// over negative real weights (D. B. Johnson, "Efficient Algorithms for Shortest Paths in Sparse
+// Networks", JACM 24(1), 1977, https://doi.org/10.1145/321992.321993).
+//
+// Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
+// SAT 2006, LNCS 4121, https://doi.org/10.1007/11814948_19.
 internal class IncrementalDifferenceGraph(
     val numNodes: Int,
     private val source: IntArray,
     private val target: IntArray,
     private val weight: LongArray,
-    /**
-     * Edges stating a declared range rather than a row, every one of them incident to the constant node.
-     * They stay in the system — the potential has to stay feasible for them, and a cycle through them is
-     * a real conflict — but [shortestPathsFrom] does not walk them, because doing so makes that node a
-     * hub and every search spans the graph. [refreshZeroDistances] is where they are traversed,
-     * twice per sweep instead of once per head.
-     */
+    // Declared-range edges, all incident to the constant node. They stay in the system but only
+    // refreshZeroDistances walks them; walking them per head would make that node a hub.
     private val hub: BooleanArray = BooleanArray(source.size),
 ) {
     val numEdges: Int get() = source.size
 
-    /**
-     * Whether the system's numbers leave room for potentials at all. A potential is a sum of up to
-     * [numNodes] edge weights, so a system whose weights cannot be summed that many times inside [Long]
-     * gets no deduction from this structure rather than one drawn from a wrapped sum.
-     */
+    // False when weights cannot be summed numNodes times inside Long; such a system yields no deductions
+    // rather than wrapped ones.
     val usable: Boolean
 
     private val potential = LongArray(numNodes)
@@ -71,9 +55,8 @@ internal class IncrementalDifferenceGraph(
     private val radjStart = IntArray(numNodes + 1)
     private val radjEdge = IntArray(source.size)
 
-    // Distances to and from the constant node, refreshed once per sweep and read per head. Held apart
-    // from the query scratch above precisely because a per-head search must not clobber them: the
-    // predecessor chains are what recover the guards on a route through that node.
+    // Distances to and from the constant node, refreshed once per sweep. Kept apart from the query scratch
+    // so a per-head search cannot clobber the predecessor chains that recover a route's guards.
     private val outDist = LongArray(numNodes)
     private val outPred = IntArray(numNodes)
     private val outStamp = IntArray(numNodes)
@@ -104,34 +87,18 @@ internal class IncrementalDifferenceGraph(
 
     fun isActive(edge: Int): Boolean = active[edge]
 
-    /**
-     * The potential of [node] — a value the asserted subsystem admits for it. Everything else here rests
-     * on `π(u) + w ≥ π(v)` holding for every asserted edge, so this is the handle a test needs to check
-     * that invariant directly rather than through its consequences.
-     */
     fun potentialOf(node: Int): Long = potential[node]
 
-    /**
-     * Vertices the last [assertEdge] settled. The scan order is what bounds this by [numNodes]; a test
-     * reads it because an order that re-settles a vertex still reaches the right answer, only slower, so
-     * the cost is the sole observable difference between a monotone scan and a non-monotone one.
-     */
+    // Vertices the last assertEdge settled; bounded by numNodes only under a monotone scan order.
     var settlements: Int = 0
         private set
 
-    /** Drop [edge] from the asserted system. The potential stays feasible for a smaller system. */
     fun retract(edge: Int) {
         active[edge] = false
     }
 
-    /**
-     * Add [edge] to the asserted system, returning `null` when it stays consistent. On a negative cycle
-     * the edge is left out and the potential rolled back, so the structure still describes the system
-     * without it, and the returned edge indices are the cycle that names the conflict.
-     *
-     * A system that is not [usable] admits nothing at all: the edge stays out and the answer is always
-     * "consistent", since a potential over those weights could not be maintained.
-     */
+    // Returns null when the system stays consistent, else the negative cycle's edges, with the edge left
+    // out and the potential rolled back. An unusable system admits nothing and always answers null.
     fun assertEdge(edge: Int): IntArray? {
         if (!usable) return null
         val u = source[edge]
@@ -156,17 +123,11 @@ internal class IncrementalDifferenceGraph(
         return cycle
     }
 
-    /**
-     * Settle the pending potential decreases, stopping at [origin] — reaching it means the decrease came
-     * round to the new edge's own tail, which is a negative cycle.
-     *
-     * The queue is keyed by the pending decrease γ itself, not by the resulting potential. Every edge
-     * other than the new one was feasible before, `π(s) + w ≥ π(t)`, so a decrease propagated along it
-     * is never larger than the one that caused it: γ is non-decreasing along the scan, and each vertex
-     * settles once. Keying by `π + γ` loses that on a negative weight and re-queues vertices instead —
-     * the answer stays right, because a vertex whose potential must fall further is simply queued
-     * again by the comparison below, but the linear settle bound is gone.
-     */
+    // Reaching origin means the decrease came round to the new edge's tail: a negative cycle.
+    //
+    // The queue is keyed by the pending decrease γ, not by `π + γ`. Every other edge was feasible before,
+    // so a propagated decrease never exceeds its cause and each vertex settles once; keying by `π + γ`
+    // re-queues vertices on negative weights.
     private fun repair(origin: Int): IntArray? {
         while (!heap.isEmpty()) {
             val s = heap.pop()
@@ -191,7 +152,6 @@ internal class IncrementalDifferenceGraph(
         return null
     }
 
-    /** The cycle through [origin] recorded in the predecessor chain the repair laid down. */
     private fun cycleFrom(origin: Int): IntArray {
         val edges = IntArrayList()
         var cur = origin
@@ -203,30 +163,18 @@ internal class IncrementalDifferenceGraph(
         return edges.toIntArray()
     }
 
-    /**
-     * Shortest paths from [origin] over the asserted edges, run far enough to settle every vertex in
-     * [needed]. Read back with [distanceTo] and [pathTo]; a later call invalidates both.
-     */
+    // Settles every vertex in needed; read back with distanceTo and pathTo until the next call.
     fun shortestPathsFrom(origin: Int, needed: IntArray) {
         differenceShortestPaths(queryEdges, active, potential, origin, needed, query, skipped = hub)
     }
 
-    /**
-     * Refresh the distances to and from [zero], over the whole system including the declared-range edges.
-     *
-     * Every path this structure can derive either avoids [zero] — in which case [shortestPathsFrom]
-     * already has it — or passes through it exactly once, since a second visit encloses a cycle that is
-     * either negative, and so a conflict, or non-negative, and so removable. Splitting at that single
-     * visit is what makes two searches per sweep enough to keep the deductions exact while every
-     * per-head search stays inside the rows.
-     */
+    // A shortest path visits zero at most once, so splitting there keeps deductions exact while per-head
+    // searches skip the declared-range edges. Returns whether any distance moved.
     fun refreshZeroDistances(zero: Int): Boolean {
         zeroStamp++
         zeroNode = zero
         search(zero, outDist, outPred, outStamp, forward = true)
         search(zero, inDist, inPred, inStamp, forward = false)
-        // Reported as changed or not so a caller can tell whether a route through this node could have
-        // moved for some pair it is not otherwise revisiting.
         var changed = false
         for (v in 0 until numNodes) {
             val out = distanceFromZeroTo(v)
@@ -243,7 +191,6 @@ internal class IncrementalDifferenceGraph(
         return changed
     }
 
-    /** Dijkstra over Johnson's reduced weights, settling every vertex it can reach. */
     private fun search(origin: Int, d: LongArray, pred: IntArray, seen: IntArray, forward: Boolean) {
         heap.clear()
         d[origin] = 0L
@@ -258,8 +205,7 @@ internal class IncrementalDifferenceGraph(
                 val e = if (forward) adjEdge[i] else radjEdge[i]
                 if (!active[e]) continue
                 val t = if (forward) target[e] else source[e]
-                // Non-negative in either direction of travel: it is a property of the edge, not of the
-                // way the search walks it.
+                // Non-negative in either direction of travel.
                 val reduced = potential[source[e]] + weight[e] - potential[target[e]]
                 val candidate = d[s] + reduced
                 if (seen[t] == zeroStamp && candidate >= d[t]) continue
@@ -271,19 +217,16 @@ internal class IncrementalDifferenceGraph(
         }
     }
 
-    /** Weight of the shortest path from [node] to the constant node, or [UNREACHABLE]. */
     fun distanceToZeroFrom(node: Int): Long {
         if (inStamp[node] != zeroStamp) return UNREACHABLE
         return inDist[node] + potential[zeroNode] - potential[node]
     }
 
-    /** Weight of the shortest path from the constant node to [node], or [UNREACHABLE]. */
     fun distanceFromZeroTo(node: Int): Long {
         if (outStamp[node] != zeroStamp) return UNREACHABLE
         return outDist[node] - potential[zeroNode] + potential[node]
     }
 
-    /** Edge indices of the shortest path from [node] to the constant node. */
     fun pathToZeroFrom(node: Int): IntArray {
         val edges = IntArrayList()
         var cur = node
@@ -296,7 +239,6 @@ internal class IncrementalDifferenceGraph(
         return edges.toIntArray()
     }
 
-    /** Edge indices of the shortest path from the constant node to [node]. */
     fun pathFromZeroTo(node: Int): IntArray {
         val edges = IntArrayList()
         var cur = node
@@ -309,26 +251,19 @@ internal class IncrementalDifferenceGraph(
         return edges.toIntArray()
     }
 
-    /** Weight of the shortest path from the last [shortestPathsFrom] origin to [node], or [UNREACHABLE]. */
     fun distanceTo(node: Int): Long {
         if (query.completion != DifferencePathCompletion.Completed || !query.settled(node)) return UNREACHABLE
         return query.distance[node] - potential[query.origin] + potential[node]
     }
 
-    /** Edge indices of that shortest path, tail first. Empty when [node] is the origin itself. */
+    // Tail first; empty when node is the origin.
     fun pathTo(node: Int): IntArray = query.pathTo(node, source) ?: intArrayOf()
 
     internal companion object {
-        /** [distanceTo] for a vertex no asserted path reaches. */
         const val UNREACHABLE: Long = Long.MAX_VALUE
 
-        /**
-         * The largest edge weight a system over [numNodes] vertices can carry.
-         *
-         * A potential is a shortest-path weight, so it stays within [numNodes] edge weights of zero; the
-         * reduced weights and path lengths built on top of it add a further constant factor. Exposed so
-         * the decision to post the factor at all can be made against the same rule the structure applies.
-         */
+        // A potential stays within numNodes edge weights of zero; reduced weights and path lengths add a
+        // constant factor.
         fun weightRoom(numNodes: Int): Long = Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
     }
 }

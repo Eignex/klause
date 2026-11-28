@@ -28,15 +28,9 @@ sealed interface Move {
     ) : Move
 
     /**
-     * Two or more single-variable moves applied as one transition. The engine commits
-     * each part in `parts` order, but break score / net delta / tabu are evaluated
-     * against the full post-state — so a Compound that resolves a conflict via two
-     * coupled changes can score better than either part alone.
-     *
-     * Parts must be `BoolFlip`, `IntSet` or `RealSet` (no Compound-of-Compound); the LS engine
-     * uses apply-then-revert to evaluate cost diffs, which only works for invertible
-     * primitives. Constructed via [com.eignex.klause.localsearch.MoveSink.addCompound];
-     * a Compound is tabu if *any* part is tabu (conservative).
+     * Two or more primitive moves applied in order as one transition, scored against the full post-state so
+     * coupled changes can beat either part alone. Parts must be primitive because scoring applies and reverts
+     * them; a compound is tabu when any part is.
      */
     data class Compound(
         /** The single-variable moves applied together, in order. */

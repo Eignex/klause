@@ -14,19 +14,13 @@ data class Segment(val schedule: Schedule, val steps: Int) {
 }
 
 /**
- * Runs a list of [Segment] sub-schedules back to back, so different phases of one search use
- * different temperature regimes — e.g. a hot, fast-cooling exploratory leg followed by a cool,
- * slow-cooling exploitative leg. Each [step] advances the active leg's schedule; once a leg has
- * taken its [Segment.steps] steps, the sequence moves to the next leg and **resets** it, so each leg
- * begins at its own start temperature.
- *
- * After the final leg's budget is spent the sequence stays on it (continuing to [step] it) when
- * [loop] is false, or wraps back to the first leg — resetting it — when [loop] is true. [reheat] and
- * [observe] are forwarded to the active leg; [reset] returns to the first leg and resets every leg.
+ * Runs [Segment] sub-schedules back to back, resetting each leg as it starts so it begins at its own start
+ * temperature. After the final leg the sequence holds it, or wraps to the first when [loop] is set.
+ * [reheat] and [observe] go to the active leg.
  */
 class SequenceSchedule(
     private val segments: List<Segment>,
-    /** Whether to wrap back to the first leg after the last (cycling) instead of holding the last. */
+    /** Whether to wrap back to the first leg after the last instead of holding it. */
     val loop: Boolean = false,
 ) : Schedule {
     init {
@@ -48,7 +42,7 @@ class SequenceSchedule(
 
     private fun advance() {
         val onLast = index == segments.size - 1
-        if (onLast && !loop) return // hold the final leg, continuing to cool it
+        if (onLast && !loop) return
         index = if (onLast) 0 else index + 1
         stepsInSegment = 0
         active.reset()
@@ -65,9 +59,5 @@ class SequenceSchedule(
     }
 }
 
-/**
- * Cycles a list of [Segment] sub-schedules indefinitely: identical to a [SequenceSchedule] with
- * `loop = true`, wrapping back to the first leg (and resetting it) after the last. Useful for a
- * repeating explore/exploit cadence over a long run.
- */
+/** Cycles [Segment] sub-schedules indefinitely: a [SequenceSchedule] with `loop = true`. */
 class LoopSchedule(segments: List<Segment>) : Schedule by SequenceSchedule(segments, loop = true)

@@ -6,23 +6,13 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BigFraction
 
-/**
- * Component-decomposed LP solve: when the structural columns split into independent blocks (two
- * columns are coupled iff they share a row of the union sparsity), each block is its own [LpModel]
- * solved by its own engine, and the block results stitch back into one full-model [FloatLpResult].
- * Unlike a neighborhood restriction this is **exact**, not a relaxation — no dropped row shares a
- * variable with a kept one — so the stitched optimum, primal point, and dual vector are precisely
- * what the monolithic solve would produce, while each block's basis factorization costs a fraction
- * of the monolithic one. An infeasible block certifies the whole model infeasible: its Farkas ray
- * scattered to full row length (zeros on the other blocks' rows) is a valid full-model ray.
- *
- * Structural columns in no row ([isolated]) need no solve at all: each rides to whichever of its
- * bounds its cost prefers; an isolated column that prefers an infinite bound makes the LP unbounded,
- * reported as a null result with an unbounded-candidate termination, as the monolithic engine does.
- *
- * External warm-start handles are not split across blocks. Retained children keep their own bases;
- * compatible unchanged blocks also keep their result authority.
- */
+// Blocks of columns coupled by shared rows solve as separate [LpModel]s and stitch into one full-model
+// [FloatLpResult]. Unlike a neighborhood restriction this is exact: no dropped row shares a variable with a kept one,
+// so the stitched optimum, primal and duals equal the monolithic solve's. An infeasible block's Farkas ray, zero on
+// the other blocks' rows, refutes the whole model. [isolated] columns sit at the bound their cost prefers; an infinite
+// preferred bound makes the LP unbounded, reported as a null result with an unbounded-candidate termination.
+// External warm-start handles are not split across blocks. Retained children keep their own bases; compatible
+// unchanged blocks also keep their result authority.
 internal class ComponentLpSolver(
     private var model: LpModel,
     private var parts: List<LpNeighborhood>,
@@ -186,7 +176,7 @@ internal class ComponentLpSolver(
         }.also { activeSolve = it }
     }
 
-    @Suppress("TooGenericExceptionCaught") // Retire every child when adoption fails, including native failures.
+    @Suppress("TooGenericExceptionCaught") // Retire every child when adoption fails, whatever the exception.
     override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
         if (activeSolve != null) return false
         val previous = model.exactState ?: return false
@@ -937,13 +927,8 @@ internal class ComponentLpSolver(
     }
 }
 
-/**
- * Decompose [model] into its column components and wrap them as a [ComponentLpSolver], or null when
- * decomposition does not apply: fewer than two row-coupled blocks. Empty structural rows form
- * a separate logical-column child, retaining their feasibility and objective authority.
- * [engine] builds each block's solver — the same monolithic selection [newLpSolver]
- * uses, so a block solves exactly as the whole model would.
- */
+// Null for fewer than two row-coupled blocks. Empty structural rows form a separate logical-column child that keeps
+// their feasibility and objective authority.
 internal fun componentLpSolverOrNull(
     model: LpModel,
     cancellation: ExecutionControl,
@@ -959,7 +944,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
 ): T? = componentLpSolverOrNull(model, cancellation, projection,
     { part, token, _ -> engine(part, token) }, component)
 
-@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
+@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, whatever the failure.
 internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     model: LpModel,
     cancellation: ExecutionControl,

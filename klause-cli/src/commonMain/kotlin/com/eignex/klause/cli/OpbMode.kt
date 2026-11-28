@@ -8,15 +8,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 
-/**
- * OPB/WBO pseudo-Boolean front-end (`.opb`, `.wbo`). Satisfaction (`SAT`), optimisation (`min:`),
- * and WBO soft-constraint (weighted-violation) instances are handled; the objective is always a
- * minimisation. Emits the PB-competition output protocol: an `o <cost>` line paired with a
- * `v <literals>` line per improving incumbent, followed by a final `s SATISFIABLE` / `s OPTIMUM FOUND`
- * / `s UNSATISFIABLE` / `s UNKNOWN` status. The `v` line lists each variable `xi` (1-based) as `xi`
- * when true, `-xi` when false. Satisfaction emits its `v` line after the final status.
- * `-s` statistics are emitted as `c` comment lines.
- */
+// The objective is always a minimization. Satisfaction emits its `v` line after the final status.
 internal object OpbMode : CliMode {
     override val names = listOf("opb", "pb", "wbo")
     override val extensions = listOf("opb", "wbo")
@@ -33,10 +25,8 @@ internal object OpbMode : CliMode {
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} factors=${parsed.problem.numFactors}"
             }
-            // Only the declared x1..xN belong in the `v` line — not the Tseitin/soft indicators that
-            // `Problem.numBoolVars` also counts.
+            // Only the declared x1..xN belong in the `v` line, not the auxiliary indicators.
             val render: (Sample) -> String = { s -> renderPbModel(parsed.numDeclaredVars, s) }
-            // OPB objectives are minimisations; there is no maximisation form.
             return sourceSolvable(
                 parsed.problem, parsed.objective?.toLinearObjective(), false, common, render,
                 { assignment -> renderPbModel(parsed.numDeclaredVars, assignment::boolValue) },
@@ -48,8 +38,6 @@ internal object OpbMode : CliMode {
     }
 }
 
-/** Render a PB-competition `v <literals>` line: each variable `xi` (1-based) as `xi` when true,
- *  `-xi` when false. */
 internal fun renderPbModel(numVars: Int, s: Sample): String = renderPbModel(numVars, s::boolValue)
 
 private fun renderPbModel(numVars: Int, boolValue: (Int) -> Boolean): String = buildString {
@@ -57,8 +45,6 @@ private fun renderPbModel(numVars: Int, boolValue: (Int) -> Boolean): String = b
     for (v in 0 until numVars) append(if (boolValue(v)) " x${v + 1}" else " -x${v + 1}")
 }
 
-/** PB-competition output protocol. Each optimizing incumbent streams its `o` cost and `v` literals
- *  together; the final `s` status is emitted at completion. */
 internal class OpbOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true

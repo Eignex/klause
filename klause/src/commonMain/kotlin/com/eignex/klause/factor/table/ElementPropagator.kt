@@ -65,11 +65,8 @@ internal class ElementPropagator(
         Lit.NONE
     }
 
-    /**
-     * Cell [a] and the result share no value: below the overlap of their bounds the variable with the higher
-     * least value excludes everything, above it the one with the lower greatest value, and inside it each value
-     * is a hole of one of the two.
-     */
+    // Cell [a] and the result share no value: below their bounds' overlap the one with the higher least value
+    // excludes everything, above it the one with the lower greatest value, and inside it each value is a hole.
     private fun Lits.disjoint(state: PropagationState, a: Int) {
         val now = state.undo.size
         val lvl = state.currentLevel
@@ -197,15 +194,14 @@ internal class ElementPropagator(
         return true
     }
 
-    /** GAC for a variable array; domains wider than the walk cap filter by bounds overlap only. */
+    // Domains wider than the walk cap filter by bounds overlap only.
     private fun elementPropagateVarArray(state: PropagationState): Boolean {
         state.propagatorFailures.remove(this)
         val len = arr.size
         val atRoot = state.currentLevel == 0
         val resultDom = state.intDomains[result]
         val idxDom = state.intDomains[idx]
-        // Walk array positions, not the index domain: only in-range indices act here, and `len` is the
-        // array length — so a wide index domain is tested by membership, never enumerated.
+        // Walk array positions, so a wide index domain is tested by membership, never enumerated.
         var toExclude: LongArrayList? = null
         for (pos in 0 until len) {
             val iv = indexOffset + pos.toLong()
@@ -237,8 +233,7 @@ internal class ElementPropagator(
         }
 
         var resExclude: LongArrayList? = null
-        // A result domain too large to walk skips its per-value support scan (sound — the scan resumes once
-        // it narrows below the cap, and every leaf has singleton domains).
+        // Skipping a domain too large to walk is sound: the scan resumes once it narrows, and leaves are singletons.
         if (state.intDomains[result].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
             state.intDomains[result].values.forEach { rv ->
                 var supported = false
@@ -277,8 +272,6 @@ internal class ElementPropagator(
                 val sel = arr[pos.toInt()].toInt()
                 val resD = state.intDomains[result]
                 var selExclude: LongArrayList? = null
-                // A selected-cell domain too large to walk skips its per-value scan (sound — it resumes
-                // once the cell narrows below the cap, and leaves have singleton domains).
                 if (state.intDomains[sel].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
                     state.intDomains[sel].values.forEach { v ->
                         if (v !in resD) (selExclude ?: LongArrayList().also { selExclude = it }).add(v)
@@ -308,12 +301,9 @@ internal class ElementPropagator(
     }
 }
 
-/** Whether [a] and [b] share at least one live value (hole-aware). */
 internal fun elementDomainsIntersect(a: IntDomain, b: IntDomain): Boolean {
     if (a.max < b.min || b.max < a.min) return false
-    // Walking the smaller domain to find a shared value is O(span) for a large domain. When either is
-    // larger than the walk cap, report an intersection whenever the bounds overlap — a sound over-
-    // approximation (it can only leave an index unpruned, never prune a supported one).
+    // Past the walk cap, overlapping bounds count as an intersection: it can only leave an index unpruned.
     if (a.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null || b.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null) return true
     val small = if (a.values.size <= b.values.size) a else b
     val large = if (a.values.size <= b.values.size) b else a

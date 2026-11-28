@@ -15,16 +15,9 @@ import java.util.HexFormat
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
-/**
- * The inventory of one collection: each file's path relative to the collection root, its sha256 and its size.
- * Mirror indexes describe stored bytes; committed input indexes may name their materialized plain counterparts.
- * A lab plan that may declare input hashes (`LAB_DECLARED_INPUTS`) selects from this
- * index alone, so a fresh node no longer downloads and unpacks every pack a selection touches; the lab fetches each
- * case's own bytes by content hash and verifies them against these hashes before the case runs.
- *
- * Mirror indexes come from restored packs, winning pack publications or the mirror (see [CorpusFetcher.ensure]).
- * Committed input indexes bind the original bytes of those sources; materialization and publication verify them.
- */
+// Paths are relative to the collection root. Mirror indexes describe stored bytes; committed input indexes may name
+// their materialized plain counterparts. A plan with declared inputs selects from the index alone; the lab fetches each
+// case's bytes by content hash and verifies them before the case runs.
 @Serializable
 internal data class CorpusIndex(val collection: String, val files: List<Entry>, val version: Int = VERSION) {
     @Serializable
@@ -60,7 +53,7 @@ internal data class CorpusIndex(val collection: String, val files: List<Entry>, 
 
         fun decode(text: String): CorpusIndex = json.decodeFromString(serializer(), text)
 
-        /** The index of the tree a pack of [collection] holds: the files [CorpusMirror] packs, in the same walk. */
+        // The same walk and files as CorpusMirror packs.
         fun of(id: String, collection: File): CorpusIndex = CorpusIndex(
             id,
             collection.walkTopDown().onEnter { it.name != ".plain" }.filter { it.isFile }.sorted().map { file ->
@@ -84,20 +77,15 @@ internal data class CorpusIndex(val collection: String, val files: List<Entry>, 
     }
 }
 
-/** A collection known only by its [index]. [root] is a listing skeleton of empty files, for discovery only. */
+// root is a listing skeleton of empty files, for discovery only.
 internal class IndexedCollection(val index: CorpusIndex, val root: File) {
-    /** The index entry of [file], a path under [root]. */
     fun entry(file: File): CorpusIndex.Entry? =
         index.entry(root.toPath().relativize(file.toPath().normalize()).toString().replace('\\', '/'))
 }
 
-/**
- * Collection indexes committed with the source under `klause-bench/corpus-index/<id>.tsv.gz`: a header line, then
- * one `path<TAB>sha256<TAB>bytes` line per input. [fromSources] hashes original bytes rather than their compressed
- * encoding, so recompression preserves input identity. Planning reads these
- * instead of fetching an index or a collection, so a plan needs no network and costs no corpus transfer. A stale entry
- * cannot admit wrong bytes: the lab fetches each case's inputs by these hashes and verifies them before the case runs.
- */
+// `<DIRECTORY>/<id>.tsv.gz`: a header line, then one `path<TAB>sha256<TAB>bytes` line per input. fromSources hashes
+// original bytes, not their compressed encoding, so recompression preserves identity. Planning reads these, so it needs
+// no network; a stale entry cannot admit wrong bytes because the lab verifies every case input by hash.
 internal object CommittedCorpusIndexes {
     const val DIRECTORY = "klause-bench/corpus-index"
     private const val HEADER = "path\tsha256\tbytes"
@@ -205,7 +193,7 @@ internal object CommittedCorpusIndexes {
         }
     }
 
-    /** Writes the committed index of every complete collection tree under [cache], or of [ids] alone. */
+    // Writes the committed index of every complete collection tree in the cache, or of the named ids alone.
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.size >= 2) { "usage: CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]" }
@@ -232,10 +220,8 @@ internal object CommittedCorpusIndexes {
     }
 }
 
-/**
- * Local copies of collection indexes and their listing skeletons, under `.index/` of the corpus cache. Dot directories
- * are never collections, so the cache cap, discovery and pack publication all pass over them.
- */
+// Under `.index/` of the corpus cache: dot directories are never collections, so the cache cap, discovery and pack
+// publication all pass over them.
 internal class CorpusIndexes(private val root: File) {
     private val directory: File get() = File(root, ".index")
 
@@ -254,11 +240,8 @@ internal class CorpusIndexes(private val root: File) {
         }
     }
 
-    /**
-     * A tree of empty files at the paths [index] lists, so the existing [CorpusSelection.Layout] discovery and
-     * [CorpusFetcher.resolve] walk it exactly as they walk the real collection and select the same instances. Its
-     * files carry no content: callers map a resolved file back to its [CorpusIndex.Entry] and never read it.
-     */
+    // Empty files at the indexed paths, so Layout discovery and CorpusFetcher.resolve select the same instances as on
+    // the real collection. Callers map a resolved file back to its entry and never read it.
     fun view(index: CorpusIndex): IndexedCollection {
         val key = HexFormat.of().formatHex(
             MessageDigest.getInstance("SHA-256").digest(CorpusIndex.encode(index).toByteArray()),

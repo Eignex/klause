@@ -3,14 +3,8 @@ package com.eignex.klause.solver.incumbent
 /**
  * An **untrusted** proposal for a new incumbent: an [assignment] with the [objective] value its producer
  * claims for it. Assignment and objective payloads must be immutable through verification and
- * publication; custom verifiers capture borrowed producer state before accepting it. A candidate carries
- * no guarantee — it may come from a heuristic engine, a peer arm
- * running a different objective representation, or an engine whose feasibility test is weaker than the
- * consumer's. Nothing reads a candidate as a solution until a [CandidateVerifier] has accepted it.
- *
- * Generic over the assignment type `A` and the objective type `V` so the same protocol serves a finite-domain
- * [com.eignex.klause.solver.Sample] scored by `Double` and an exact open-model witness scored by a rational
- * — neither is reduced to the other.
+ * publication; custom verifiers capture borrowed producer state before accepting it. Nothing reads a
+ * candidate as a solution until a [CandidateVerifier] has accepted it.
  */
 data class Candidate<out A, out V>(val assignment: A, val objective: V)
 
@@ -45,9 +39,8 @@ fun interface CandidateVerifier<A, V> {
 
 /**
  * An accepted candidate installed as the incumbent, stamped with the [version] it was installed at.
- * Versions of one [IncumbentExchange] are strictly increasing, so a consumer decides freshness by comparing
- * versions rather than by assignment identity — which cannot distinguish a re-published assignment from an
- * unchanged one, and cannot order two arms' publications at all.
+ * Versions of one [IncumbentExchange] are strictly increasing, so consumers decide freshness by version
+ * rather than by assignment identity.
  */
 class VerifiedIncumbent<out A, out V>(
     /** The verified [Candidate.assignment]. */

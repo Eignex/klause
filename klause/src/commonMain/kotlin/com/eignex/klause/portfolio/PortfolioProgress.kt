@@ -50,7 +50,7 @@ data class PortfolioProgress(
     val idleCredit: Boolean = false,
 )
 
-/** Opt-in reward experiment. Results must be finite and in `[0, 1]`; coverage and family priors remain intact. */
+/** Optional reward policy. Results must be finite and in `[0, 1]`; coverage and family priors are unaffected. */
 fun interface PortfolioRewardPolicy {
     /** Score a settled segment or delayed-use credit. Failed and refuted segments receive zero. */
     fun reward(progress: PortfolioProgress): Double

@@ -120,7 +120,6 @@ internal fun FlatZincCompiler.emitBool2Int(c: FznConstraint) {
     )
 }
 
-/** Shared lowering for bool element constraints. */
 internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: Boolean) {
     expectArity(c, 3)
     val idx = resolveIntVar(c.args[0])

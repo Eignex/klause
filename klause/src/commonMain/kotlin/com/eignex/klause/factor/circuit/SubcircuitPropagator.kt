@@ -13,13 +13,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.util.collections.IntArrayList
 
-/**
- * CP implementation for [Circuit]: propagation of the optional-cycle constraint over successor vars.
- *
- * Every deduction carries the edges and bounds it rests on, so the clauses conflict analysis learns from it name
- * a few successors rather than the whole tour; a clause citing every successor describes one partial tour and
- * prunes almost nothing else. A strong-connectivity failure cites the cut that separates two mandatory nodes.
- */
+// Every deduction cites only the edges and bounds it rests on: a clause citing every successor describes one
+// partial tour and prunes almost nothing else.
 internal class SubcircuitPropagator(private val succ: IntArray, private val n: Int) : Propagator {
 
     override val initialIntEventWatches: IntArray = buildSuccWatches(succ)
@@ -33,8 +28,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = state.propagatorFailures[this]
 
-    // Each pass is its own method: one method holding every loop is compiled again for each loop it enters
-    // on-stack, and each such compile of the whole body costs C2 more than many solves' propagation.
+    // Each pass is its own method so an on-stack replacement compile covers one loop, not the whole body.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.propagatorFailures.remove(this)
         val work = (state.refPayload[factorId] as? Work)
@@ -168,7 +162,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         return false
     }
 
-    /** Clause-form literals, each false in the current state, that together justify a deduction over [succ]. */
+    // Clause-form literals, each false in the current state.
     private inner class Reason(val state: PropagationState) {
         private val literals = IntArrayList()
 
@@ -177,7 +171,6 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             return this
         }
 
-        /** The edge `succ(i) = t` that node [i] is fixed to. */
         fun fixed(i: Int): Reason = lower(succ[i]).upper(succ[i])
 
         fun lower(v: Int): Reason {
@@ -192,7 +185,6 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             return this
         }
 
-        /** Node [u] can no longer move to [target]. */
         fun lacks(u: Int, target: Int): Reason {
             val literal = if (state.undoLogging) {
                 state.exclusionLiteral(succ[u], target.toLong(), state.undo.size)
@@ -205,7 +197,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             return this
         }
 
-        /** Every node of [inside] lacks every target outside it: no arc leaves the set. */
+        // No arc leaves the set.
         fun closed(inside: BooleanArray): Reason {
             for (u in 0 until n) {
                 if (!inside[u]) continue
@@ -214,7 +206,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             return this
         }
 
-        /** Every node outside [inside] lacks every target in it: no arc enters the set. */
+        // No arc enters the set.
         fun unentered(inside: BooleanArray): Reason {
             for (u in 0 until n) {
                 if (inside[u]) continue
@@ -223,7 +215,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             return this
         }
 
-        /** One node outside [excluded] cannot opt out, so the cycle must visit it. */
+        // One node outside excluded cannot opt out, so the cycle must visit it.
         fun mandatoryOutside(mandatory: BooleanArray, excluded: BooleanArray): Reason {
             var chosen = -1
             for (k in 0 until n) {
@@ -244,17 +236,9 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         fun build(): IntArray? = if (literals.size == 0) null else literals.toIntArray()
     }
 
-    /**
-     * Necessary condition for the single sub-cycle: every node that cannot opt out (its own index is
-     * no longer in `succ(i)`'s domain, so it must lie on the cycle) must reach, and be reached by,
-     * every other such mandatory node over non-self candidate arcs — the cycle visits them all in
-     * one strongly-connected loop. Optional nodes may serve as intermediate stops, so reachability
-     * is taken over the full candidate graph. A correct sub-circuit never trips it.
-     *
-     * A mandatory node `m` the root cannot reach fails on the set `R` the root does reach: no arc leaves `R`, so
-     * the cycle through the root stays inside it and misses `m`; the reason is the two nodes' opt-outs being gone
-     * and every arc out of `R`. One that cannot reach the root mirrors it on the arcs into the root's ancestors.
-     */
+    // Every mandatory node must reach, and be reached by, every other over non-self candidate arcs, with
+    // optional nodes as intermediate stops. A mandatory node the root cannot reach fails on the set R the
+    // root does reach, explained by the two opt-outs and every arc out of R; the backward case mirrors it.
     private fun stronglyConnectedSubcircuit(state: PropagationState, work: Work): Boolean {
         val mandatory = BooleanArray(n)
         var mandCount = 0

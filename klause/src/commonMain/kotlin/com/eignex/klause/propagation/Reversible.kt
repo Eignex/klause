@@ -3,23 +3,14 @@ package com.eignex.klause.propagation
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/*
- * Backtrackable mutable state for incremental propagators, using the bool/int domain undo trail.
- * While PropagationState.undoLogging is on, writes record each cell's prior value on
- * UndoLog.revTrail. PropagationState.undoTo restores cells in reverse order, costing
- * O(changes-since-mark).
- *
- * Every mutation must use the reversible API: a raw write bypasses restoration and corrupts
- * propagator state across backtracking.
- */
+// Backtrackable state for incremental propagators: while undo logging is on, writes record each cell's prior value
+// and undoTo restores them in reverse, O(changes since the mark). Every mutation must go through this API; a raw
+// write bypasses restoration and corrupts propagator state across backtracking.
 
-/** A cell that can roll back one logged mutation; registered on [UndoLog.revTrail]. */
 internal interface Trailed {
-    /** Undo the single most-recent logged mutation (LIFO). Called by [PropagationState.undoTo]. */
     fun restore()
 }
 
-/** A backtrackable `Int`. Reads via [value]; mutate via [set]. */
 internal class RevInt(private val state: PropagationState, initial: Int) : Trailed {
     var value: Int = initial
         private set
@@ -41,7 +32,6 @@ internal class RevInt(private val state: PropagationState, initial: Int) : Trail
     }
 }
 
-/** A backtrackable `Long`. Reads via [value]; mutate via [set]. */
 internal class RevLong(private val state: PropagationState, initial: Long) : Trailed {
     var value: Long = initial
         private set
@@ -63,7 +53,6 @@ internal class RevLong(private val state: PropagationState, initial: Long) : Tra
     }
 }
 
-/** A backtrackable reference cell. */
 internal class RevRef<T>(private val state: PropagationState, initial: T) : Trailed {
     var value: T = initial
         private set
@@ -84,7 +73,6 @@ internal class RevRef<T>(private val state: PropagationState, initial: T) : Trai
     }
 }
 
-/** A backtrackable `LongArray`: per-element writes are individually trailed and rolled back. */
 internal class RevLongArray(private val state: PropagationState, size: Int, init: Long = 0L) : Trailed {
     private val data = LongArray(size) { init }
     private val priorIdx = IntArrayList()
@@ -112,7 +100,6 @@ internal class RevLongArray(private val state: PropagationState, size: Int, init
     }
 }
 
-/** A backtrackable `IntArray`: per-element writes are individually trailed and rolled back. */
 internal class RevIntArray(private val state: PropagationState, size: Int, init: Int = 0) : Trailed {
     private val data = IntArray(size) { init }
     private val priorIdx = IntArrayList()

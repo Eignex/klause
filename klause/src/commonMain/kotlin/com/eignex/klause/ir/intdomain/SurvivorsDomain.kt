@@ -7,7 +7,7 @@ import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.util.arrays.binarySearchLong
 
-/** Survivor list: the sorted present values, with `>= 1` interior gap. */
+// The sorted present values, with at least one interior gap.
 internal class SurvivorsDomain(
     override val min: Long,
     override val max: Long,

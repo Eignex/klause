@@ -18,29 +18,22 @@ import com.eignex.skema.serialization.JsonNodeCatalog
 import com.eignex.skema.serialization.jsonNode
 import kotlinx.serialization.Serializable
 
-/**
- * Wire form of a [com.eignex.klause.ir.Problem]. Variables are their column ids; a Boolean literal is the
- * [com.eignex.klause.ir.Lit] code `2·variable + negated`, and a mixed coordinate is the
- * [com.eignex.klause.ir.Term] code. Every optional field defaults to the IR default it stands for.
- */
+// Variables are their column ids; a Boolean literal is the Lit code `2·variable + negated` and a mixed
+// coordinate is the Term code. Every optional field defaults to the IR default it stands for.
 @Serializable
 internal class ProblemDocument<F>(
     val bools: Int = 0,
     val ints: List<IntColumnDocument> = emptyList(),
     val reals: List<RealColumnDocument> = emptyList(),
     val factors: List<F> = emptyList(),
-    /** Indices of factors the model declared implied. */
     val implied: List<Int>? = null,
     val symmetryBreaking: Boolean = false,
     val settings: SettingsDocument? = null,
     val semantics: SemanticsDocument? = null,
 )
 
-/**
- * One integer column. An absent side is open. [values] lists the declared value set as `[lo, hi]` runs
- * when it is narrower than the closed range; [box] lists the finite fallback box a lane materialized for
- * a column with an open side, which declares nothing.
- */
+// An absent side is open. `values` lists the declared value set as `[lo, hi]` runs when narrower than the
+// closed range; `box` is the finite fallback box a lane materialized for an open side and declares nothing.
 @Serializable
 internal class IntColumnDocument(
     val lower: Long? = null,
@@ -49,7 +42,7 @@ internal class IntColumnDocument(
     val box: List<LongArray>? = null,
 )
 
-/** One real column; an absent side is infinite. */
+// An absent side is infinite.
 @Serializable
 internal class RealColumnDocument(val lower: Double? = null, val upper: Double? = null)
 
@@ -83,7 +76,7 @@ internal class SettingsDocument(
     }
 }
 
-/** Declared format defaults, and the effective caller contract when it differs. */
+// The effective caller contract is present only when it differs from the declared format defaults.
 @Serializable
 internal class SemanticsDocument(
     val declared: SourceSemanticsDocument,
@@ -138,11 +131,11 @@ internal class SourceSemanticsDocument(
     }
 }
 
-/** An absent endpoint is open. */
+// An absent endpoint is open.
 @Serializable
 internal class IntegerRangeDocument(val lower: Long? = null, val upper: Long? = null)
 
-/** An absent endpoint is open. */
+// An absent endpoint is open.
 @Serializable
 internal class RationalRangeDocument(
     @Serializable(with = SemanticRationalSerializer::class) val lower: SemanticRational? = null,
@@ -155,7 +148,6 @@ internal class ToleranceDocument(
     @Serializable(with = SemanticRationalSerializer::class) val relative: SemanticRational = SemanticRational.ZERO,
 )
 
-/** Continuous float interpretation. */
 @Serializable(with = FloatSemanticsSerializer::class)
 internal sealed interface FloatSemanticsDocument {
     fun toSemantics(): FloatSemantics

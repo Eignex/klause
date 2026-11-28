@@ -13,7 +13,6 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntIntMap
 import com.eignex.util.collections.LongHashSet
 
-/** CP propagation logic for `inverse`. */
 internal class InversePropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -25,9 +24,7 @@ internal class InversePropagator(
     private val gIndexOf: IntIntMap,
 ) : Propagator {
 
-    /** Advisor subscription: channel GAC over interior domains, so subscribe to every kind on
-     *  every (distinct) channel variable and consume the dirty-variable delta — the propagator
-     *  scopes its O(n²) channel sweep to the rows/columns whose domain actually changed. */
+    // Channel GAC reads interior domains; the dirty-variable delta scopes the O(n²) sweep to changed rows.
     override val initialIntEventWatches: IntArray = run {
         val distinct = intVars.toHashSet()
         val out = IntArray(distinct.size * IntEvent.COUNT)

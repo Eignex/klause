@@ -7,10 +7,8 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.util.arrays.argsortBy
 import kotlin.math.max
 
-/**
- * LS invariant for the no-overlap case of [Cumulative] (`unary = true`). Cost, delta and move logic
- * delegate to a unit-capacity [CumulativeInvariant]; only the feasible seeding is its own.
- */
+// Cost, delta and move logic delegate to a unit-capacity CumulativeInvariant; only the feasible seeding
+// is its own.
 internal class DisjunctiveInvariant(
     private val starts: IntArray,
     private val durations: LongArray,
@@ -24,7 +22,6 @@ internal class DisjunctiveInvariant(
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         cumulativeBacking.isViolated(state, factorId)
 
-    /** The total time-overlap energy `Σ_t max(0, concurrency(t) − 1)`. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         cumulativeBacking.violationDegree(state, factorId)
 
@@ -45,14 +42,11 @@ internal class DisjunctiveInvariant(
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
-    /** Compaction, reorders and equal-duration swaps, from the unit-capacity backing. */
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
         cumulativeBacking.proposeStructuredMoves(state, factorId, sink)
 
-    /** Feasible init: left-pack the tasks in earliest-start order, each placed at the first
-     *  in-domain time at or after the previous task's end so no two overlap. Returns false —
-     *  leaving the random assignment — for the optional form or when a task can't be placed
-     *  (domain exhausted, or a frozen start overlaps the packing). */
+    // Left-packs the tasks in earliest-start order. Declines for the optional form or when a task can't be
+    // placed (domain exhausted, or a frozen start overlaps the packing).
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (presents.isNotEmpty() || starts.isEmpty()) return false
         val order = argsortBy(starts.size) { a, b ->

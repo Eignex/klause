@@ -5,37 +5,20 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Time-indexed `x_{i,t}` relaxation of one scheduling [view] over the bounded horizon
- * `[T0, T1)`. For each task a binary `x_{i,t} ∈ [0,1]` per root-feasible start `t`
- * (pinned to 0 when `t` left the live start domain — layout stable across nodes for warm
- * starts), with `Σ_t x_{i,t} = 1` (starts once), the start channel `Σ_t t·x_{i,t} = startᵢ`
- * (ties to the integer column), and per-time-point resource rows
- * `Σ_i Σ_{t: t≤tt<t+durᵢ} resᵢ·x_{i,t} ≤ capacity`. Every integer schedule satisfies all three,
- * so the rows are globally valid; the resource ceiling uses the declared **max** capacity and
- * the **min** demand, so it is a sound relaxation. Columns are O(n·H) — hard-gated on
- * [CpToLpRelaxation.MAX_TI_HORIZON] and [CpToLpRelaxation.MAX_TI_COLS]; above either the model is
- * skipped (only loosens). Column and row emission order is warm-start load-bearing — the layout
- * must be reproducible across nodes, so nothing here may reorder by live state.
- *
- * Pritsker, Watters and Wolfe, "Multiproject scheduling with limited resources: a zero-one programming
- * approach", Management Science 16 (1969), https://doi.org/10.1287/mnsc.16.1.93.
- *
- * ## Open-sided starts
- * The layout gives each task one column per start in its root box and `Σ_t x_{i,t} = 1` then pins it
- * there. Over a start side the model left open that box is a search restriction, so the rows would
- * exclude starts the model admits — such a view is declined, as the circuit arc model declines an
- * open-sided successor.
- *
- * ## No separate makespan row
- * There is deliberately no disaggregated makespan row here. The makespan links through the
- * start channel and the model's own `M ≥ startᵢ + durᵢ` `Linear`s, so the LP makespan is
- * `Σ_t t·x_{i,t} + durᵢ` — the *expected* completion under a fractional `x`. Disaggregated
- * `M ≥ (t+durᵢ)·x_{i,t}` rows (and the completion-indicator step variant) cannot tighten that: any
- * makespan lower bound linear in one task's `x` is dominated by the expected-completion value, which
- * `M ≥ startᵢ + durᵢ` already attains exactly. The makespan lever is the *cross-task* resource
- * coupling above, which lifts the bound past the energetic windowed row on multi-capacity profiles.
- */
+// Time-indexed relaxation: per task a column x_{i,t} per root-feasible start t (pinned to 0 once t
+// leaves the live domain), Σ_t x_{i,t} = 1, the channel Σ_t t·x_{i,t} = startᵢ, and per-time resource
+// rows against the declared maximum capacity and minimum demands. Every integer schedule satisfies them.
+// Emission order must not depend on live state: the layout has to be reproducible across nodes.
+//
+// Pritsker, Watters and Wolfe, "Multiproject scheduling with limited resources: a zero-one programming
+// approach", Management Science 16 (1969), https://doi.org/10.1287/mnsc.16.1.93.
+//
+// A view with an open-sided start is declined: Σ_t x_{i,t} = 1 would pin the start inside the root box,
+// a search restriction, and exclude starts the model admits.
+//
+// No disaggregated makespan row: through the start channel and the model's M ≥ startᵢ + durᵢ rows the LP
+// makespan is already the expected completion, which dominates any bound linear in one task's x. The
+// cross-task resource rows are what lift the bound.
 internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) {
     if (!statesBothBounds(view.starts)) return
     val n = view.starts.size
@@ -54,7 +37,7 @@ internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) 
     val horizon = t1 - t0
     if (horizon <= 0 || horizon > CpToLpRelaxation.MAX_TI_HORIZON || cols > CpToLpRelaxation.MAX_TI_COLS) return
 
-    // Per-task start-time columns, indexed by (t - est_i); assignment + start channel rows.
+    // Per-task start-time columns, indexed by t − estᵢ.
     val taskCols = Array(n) { IntArray((lst[it] - est[it] + 1).toInt()) }
     for (i in 0 until n) {
         val live = liveDomain(view.starts[i])

@@ -39,7 +39,6 @@ internal class ReifiedLinearInvariant(
     private fun reifiedDegreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
         reifiedDegree(aux, linearHolds(sum, op, bound)) { linearDegree(sum, op, bound, softCap) }
 
-    // The pre-move degree is already maintained in factorDegree; reuse it instead of recomputing.
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
@@ -55,7 +54,7 @@ internal class ReifiedLinearInvariant(
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        // aux already flipped in the assignment; report Δdegree (cost is reconciled by the engine).
+        // The assignment already holds the flipped aux.
         val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
         return reifiedDegreeFor(sum, aux, state.violationSoftCap) -
@@ -97,7 +96,6 @@ internal class ReifiedLinearInvariant(
             if (c == 0L) continue
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c * cur
-            // Shift the body so the predicate matches the current aux.
             val targetSame = snapLinearTarget(op, bound, c, sumWithout, aux)
             if (targetSame != null) {
                 val clamped = state.rootDomains[v].clamp(targetSame)
@@ -105,7 +103,6 @@ internal class ReifiedLinearInvariant(
                     sink.addChannelingIntSet(state, v, clamped)
                 }
             }
-            // Flip aux and shift the body so the predicate matches the flipped aux.
             val targetOpp = snapLinearTarget(op, bound, c, sumWithout, !aux)
             if (targetOpp != null) {
                 val clamped = state.rootDomains[v].clamp(targetOpp)
@@ -137,8 +134,7 @@ internal class ReifiedLinearInvariant(
         }
     }
 
-    /** Single-var EQ indicator channeling: when the body var is set to a new value, flip the aux iff
-     *  that changes the truth of `coeff·v == bound`, so the indicator tracks the value in one move. */
+    // A single-var EQ indicator tracks its body's truth within the same move.
     override fun contributeChanneling(
         state: LocalSearchState,
         factorId: Int,
@@ -155,9 +151,7 @@ internal class ReifiedLinearInvariant(
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    /** The bool scope contains only [auxBoolVar], so a bool flip is always an aux flip. Flipping
-     *  aux always toggles violation (sum unchanged), so the aux's own contribution simply
-     *  swaps between break and make. */
+    // The only Boolean is the aux, and flipping it always toggles violation.
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val nowViolated = state.assignment.boolValue(auxBoolVar) !=
             linearHolds(state.longPayload[factorId], op, bound)
@@ -172,8 +166,7 @@ internal class ReifiedLinearInvariant(
 
     override val maintainsIntBreakMakeIncrementallyForIntSet: Boolean get() = true
 
-    /** Aux's break/make contribution depends only on `holds(sum)` and `aux`. An int set
-     *  may flip `holds`, in which case the aux's contribution swaps; otherwise no change. */
+    // The aux's break/make contribution swaps only when the set flips `holds(sum)`.
     override fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long) {
         val newSum = state.longPayload[factorId]
         val coeff = coeffIndex.coeffOf(intVar)
@@ -184,7 +177,6 @@ internal class ReifiedLinearInvariant(
         if (oldHolds == newHolds) return
         val aux = state.assignment.boolValue(auxBoolVar)
         val newViolated = aux != newHolds
-        // oldViolated != newViolated, so the aux's contribution swaps break↔make.
         if (newViolated) {
             state.boolBreakCount[auxBoolVar]--
             state.boolMakeCount[auxBoolVar]++

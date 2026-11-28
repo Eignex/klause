@@ -1,4 +1,4 @@
-% Keep `mdd` native (klause has an LS-capable Mdd factor) instead of the std linear encoding.
+% Keeps `mdd` native instead of the std linear encoding.
 predicate klause_mdd(array [int] of var int: x, int: N, array [int] of int: level,
                      int: E, array [int] of int: from, array [int] of set of int: label,
                      array [int] of int: to);

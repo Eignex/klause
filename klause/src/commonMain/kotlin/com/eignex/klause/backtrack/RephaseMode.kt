@@ -1,30 +1,23 @@
 package com.eignex.klause.backtrack
 
-/**
- * Polarity source for a fresh decision's first-tried value. [PhaseSaving] rotates through these every
- * [BacktrackParams.rephaseInterval] conflicts via [next], so search periodically samples a different phase
- * bias without popping to root.
- */
+// Polarity source for a fresh decision's first-tried value. PhaseSaving rotates through these every
+// rephaseInterval conflicts without restarting.
 internal enum class RephaseMode {
-    /** Bias toward the deepest conflict-free assignment seen (falls back to saved). */
+    // The deepest conflict-free assignment seen, falling back to saved.
     TARGET,
 
-    /** Bias toward the best feasible incumbent's value (falls back to saved). */
+    // The best incumbent's value, falling back to saved.
     SOLUTION,
 
-    /** Plain phase saving — the last value committed for the variable. */
+    // The last value committed for the variable.
     SAVED,
 
-    /** Force all decisions to try `true` first. */
     TRUE,
 
-    /** Force all decisions to try `false` first. */
     FALSE,
 
-    /** Random polarity per decision. */
     RANDOM,
     ;
 
-    /** The next mode in the rotation, wrapping back to [TARGET] after [RANDOM]. */
     fun next(): RephaseMode = entries[(ordinal + 1) % entries.size]
 }

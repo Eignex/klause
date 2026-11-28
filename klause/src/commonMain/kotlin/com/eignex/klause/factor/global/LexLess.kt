@@ -20,8 +20,6 @@ import com.eignex.klause.ir.materializeKey
  *
  * If `xs.size != ys.size` the shorter array is treated as a prefix: a proper prefix
  * compares strictly less than the longer one (MiniZinc semantics).
- *
- * LS recomputes the relation on each query.
  */
 class LexLess(
     /** Left vector variable ids. */
@@ -34,8 +32,6 @@ class LexLess(
 
     override fun remap(mapping: VarRemap): Factor = LexLess(mapping.ints(xs), mapping.ints(ys), strict)
 
-    /** Lexicographic order is position-faithful and asymmetric, so [xs] and [ys] are both positional
-     *  and kept in their roles; [strict] distinguishes `<` from `≤`. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.LEX_LESS, ::buildKey)
 
     override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.LEX_LESS, mapping, ::buildKey)

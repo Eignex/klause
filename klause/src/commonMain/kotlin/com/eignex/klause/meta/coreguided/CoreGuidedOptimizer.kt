@@ -22,42 +22,20 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.numbers.addExact
 
-/**
- * Core-guided MaxSAT optimiser: Fu-Malik (Z. Fu and S. Malik, "On Solving the Partial MAX-SAT Problem",
- * SAT 2006, https://doi.org/10.1007/11814948_25) with the weight splitting of WPM1 (C. Ansótegui,
- * M. L. Bonet and J. Levy, "Solving (Weighted) Partial MaxSAT through Satisfiability Testing", SAT 2009,
- * https://doi.org/10.1007/978-3-642-02777-2_39) and weight stratification (C. Ansótegui, M. L. Bonet,
- * J. Gabàs and J. Levy, "Improving SAT-Based Weighted MaxSAT Solvers", CP 2012,
- * https://doi.org/10.1007/978-3-642-33558-7_9). Iteratively calls [satisfyUnderAssumptions] on a sliding
- * assumption set; each unsat core triggers a "relax-one-of-these-softs" cardinality constraint and bumps
- * the cost lower bound by the core's min weight. Termination is `Sat` under the current assumption set,
- * at which point the lower bound equals the cost of the returned sample.
- *
- * Per-soft state across cores:
- *  - Each soft gets one fresh **initial selector** `r_i` baked into its relaxer clause
- *    `(origLit ∨ r_i)` before the loop. Initial assumption is `¬r_i`.
- *  - Each unsat core replaces its selectors, allocates fresh per-core blockers `{b_K}`,
- *    extends each cored soft's relaxer clause with its core's blocker, and adds the
- *    cardinality `ExactlyOne(b_K) = 1`. The extended clauses remain soft, so another
- *    core can admit further relaxation when the first one is insufficient.
- *  - Weight split: when a cored soft's weight strictly exceeds the core's `wMin`,
- *    the residual `(weight − wMin)` is shed as a fresh independent soft with its own
- *    initial selector; the residual is scheduled into the stratum queue so it gets
- *    revisited when the threshold drops.
- *
- * The Problem is rebuilt each iteration because the immutable-Problem contract prevents
- * clause replacement (a relaxer clause's blocker list grows from `(s ∨ r)` to
- * `(s ∨ r ∨ b₁)` to `(s ∨ r ∨ b₁ ∨ b₂)` as a soft gets re-cored). Bake cost grows
- * linearly with cores.
- */
+// Fu-Malik (Z. Fu and S. Malik, "On Solving the Partial MAX-SAT Problem", SAT 2006,
+// https://doi.org/10.1007/11814948_25) with the weight splitting of WPM1 (C. Ansótegui, M. L. Bonet and J. Levy,
+// "Solving (Weighted) Partial MaxSAT through Satisfiability Testing", SAT 2009,
+// https://doi.org/10.1007/978-3-642-02777-2_39) and weight stratification (C. Ansótegui, M. L. Bonet, J. Gabàs and
+// J. Levy, "Improving SAT-Based Weighted MaxSAT Solvers", CP 2012, https://doi.org/10.1007/978-3-642-33558-7_9).
+//
+// Each soft has a relaxer clause `(origLit ∨ r_i)` assumed under `¬r_i`. Each core raises the lower bound by its
+// minimum weight, gives every cored soft a fresh selector and a fresh blocker joined by `ExactlyOne`, and sheds
+// any residual weight as a new soft scheduled into the stratum queue. Sat under the full assumption set ends the
+// loop with the lower bound equal to the sample's cost. The Problem is rebuilt each iteration because relaxer
+// clauses grow and Problems are immutable.
 internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
 
-    /**
-     * One soft constraint: literal that *should* be true, with positive integer weight
-     * paid if it ends up false. Uses [Lit] encoding (`(var shl 1) or polarityBit`);
-     * `Lit.make(varId, positive = true)` penalises a Boolean being false,
-     * `Lit.make(varId, positive = false)` penalises it being true.
-     */
+    // [weight] is paid when [lit] ends up false.
     data class Soft(val lit: Int, val weight: Long = 1L) {
         init {
             require(weight > 0) { "Soft weight must be positive, was $weight" }
@@ -166,8 +144,7 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
                     for (idx in coreSoftIdx) {
                         val w = workings[idx]
                         if (w.weight > wMin) {
-                            // Shed (w − wMin) as an independent fresh soft so its cost stays
-                            // accounted for, revisited once its stratum is reached.
+                            // The residual stays accounted for and is revisited once its stratum is reached.
                             val residual = Working(
                                 origLit = w.origLit,
                                 weight = w.weight - wMin,
@@ -230,8 +207,6 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
             if (lits.size >= 2) {
                 factors.add(Cardinality(lits, min = 1, max = 1))
             } else if (lits.size == 1) {
-                // Singleton core: ExactlyOne reduces to "this lit = true", i.e. the
-                // relaxation must fire.
                 factors.add(Clause(lits))
             }
         }

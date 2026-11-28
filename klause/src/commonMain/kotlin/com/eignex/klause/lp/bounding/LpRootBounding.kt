@@ -33,10 +33,8 @@ import kotlin.math.nextDown
 import kotlin.math.round
 
 /**
- * The root-node LP relaxation objective (with the harvested [globalCuts]) on the undecided problem,
- * or NaN when the relaxation is empty / not optimal / overflows — the revised simplex +
- * [certifiedTightObjectiveLowerBound], the same sound bound the per-node prune reports. Solved once before search,
- * so the value is a sound *global* lower bound on the objective — the integrality-gap baseline for `-s`.
+ * The sound global objective lower bound at the root ([certifiedTightObjectiveLowerBound]) with the
+ * harvested cuts, or NaN when the relaxation is empty, not optimal or overflows.
  */
 internal fun LpEngine.rootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
@@ -366,13 +364,8 @@ private fun LpEngine.projectCertifiedLowerBound(relaxation: LpRelaxation, lower:
     }
 }
 
-/**
- * The **true** root LP optimum (the float simplex objective, plus the relaxation's objective constant),
- * or NaN when the relaxation is empty / not optimal / overflows. Unlike [rootLpRelaxationBound] this is
- * the raw LP value, not a sound under-estimate — so it reflects how much a hull actually tightens the
- * relaxation, which the sound bound can miss. Used only to compare relaxation variants in
- * [LpEngine.pruneIneffectiveHulls], never as a sound prune bound.
- */
+// The raw float root LP optimum, or NaN. Not a sound bound: it only compares relaxation variants when
+// pruning ineffective hulls.
 internal fun LpEngine.rootLpObjective(
     relaxer: CpToLpRelaxation,
     cancellation: ExecutionControl = ExecutionControl.Never,
@@ -399,13 +392,8 @@ internal fun LpEngine.rootLpObjective(
     Double.NaN
 }
 
-/**
- * Harvest a persistent pool of **global** cuts from the root relaxation on the sparse
- * revised-simplex path. Each round solves the (cut-augmented) root LP, separates violated cuts from the
- * LP point, and keeps the fresh ones whose source proof or separator scope is global. A root box may
- * close a source-open side, so root separation alone does not make a cut global. A 64-bit overflow
- * keeps the global cuts already pooled.
- */
+// Root separation alone does not make a cut global: a root box may close a source-open side. A 64-bit
+// overflow keeps the global cuts already pooled.
 @Suppress("LongParameterList", "TooGenericExceptionCaught") // root ownership must preserve arbitrary solver failures
 internal fun LpEngine.harvestRootCuts(
     relaxer: CpToLpRelaxation,
@@ -494,8 +482,7 @@ internal fun LpEngine.harvestRootCuts(
                 result = next
                 resultObserved = false
             }
-            // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
-            // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
+            // Trim the inherited pool to the cuts most active at the final LP point.
             if (!resultObserved) pool.observe(result.primal)
             pool.retainMostActive()
         } catch (failure: Throwable) {
@@ -515,7 +502,7 @@ internal fun LpEngine.harvestRootCuts(
             }
         }
     } catch (_: CheckedLongOverflowException) {
-        return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
+        return pool.cuts()
     } catch (_: LpAssemblyCancelled) {
         return pool.cuts()
     } finally {
@@ -525,20 +512,14 @@ internal fun LpEngine.harvestRootCuts(
     return pool.cuts()
 }
 
-/** Most Gomory cuts to draw from one tableau per separation round. */
 internal const val GOMORY_CUTS_PER_ROUND: Int = 8
 
 internal fun objectiveCoefficients(model: LpModel): DoubleArray = DoubleArray(model.n) { model.costD(it) }
 
-/** Separation rounds when harvesting the persistent root cut pool. */
 internal const val CUT_POOL_ROUNDS: Int = 8
 
-/** Separation rounds per during-search node — fewer than the root harvest, since the node solve
- *  repeats deeper in the tree. */
+// Fewer than the root harvest, since the node solve repeats deeper in the tree.
 internal const val SEARCH_CUT_ROUNDS: Int = 4
 
-/**
- * [RootRelaxationSize.cost] ceiling for per-candidate shave, redundancy and equality probes.
- * Bounds the cumulative cost of these solves during the root harvest.
- */
+// RootRelaxationSize.cost ceiling for per-candidate shave, redundancy and equality probes.
 internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L

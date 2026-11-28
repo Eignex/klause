@@ -81,11 +81,8 @@ internal class LpExactState internal constructor(
     changedColumns: List<Int> = emptyList(),
     val rows: LpScopedRows = LpScopedRows.initial(baseModel.m),
     val rowRevision: Long = 0L,
-    /**
-     * The state this one follows on the trail. When it shares this state's base model and rows, only the columns
-     * whose assertions differ are rebuilt and the rest are taken from it: a search push otherwise rebuilds every
-     * column and rechecks every assertion, which on a large model costs more than the node it is for.
-     */
+    // The predecessor on the trail. When it shares the base model and rows, only columns whose assertions differ
+    // are rebuilt; rebuilding and rechecking every column per push costs more than the node on a large model.
     previous: LpExactState? = null,
 ) {
     private val activeAssertions: List<LpBoundAssertion> = if (

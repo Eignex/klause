@@ -39,11 +39,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * protocols. Shared flag parsing lives here; [SolveCore] owns the solve driver.
  */
 
-/**
- * Routing work allowance for [com.eignex.klause.solver.pipeline.pipelineRoute].
- * Slices the shared presolve allowance and observes the invocation deadline.
- * Consumes `open-bound-proof` once and retains the token across frontend requests.
- */
+// Consumes `open-bound-proof` once and retains the token across frontend requests.
 internal fun CommonOptions.routingCancellation(): ExecutionControl {
     routingToken?.let { return it }
     if (!takeOpenBoundProof()) return ExecutionControl { true }.also { routingToken = it }
@@ -81,10 +77,7 @@ internal class RoutingPreparationScope(containing: ExecutionControl, private var
     }
 }
 
-/**
- * Retain the measured frontend route for invocation statistics and log it under `-v`. The elapsed
- * ceiling can stop routing before its work allowance is exhausted.
- */
+// The elapsed ceiling can stop routing before its work allowance is exhausted, so both are logged.
 internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) {
     val lane = when (route) {
         is SourceProblemRoute.NativeFormula -> "native-formula"
@@ -100,16 +93,13 @@ internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) 
     }
 }
 
-/** Routing receives one pass-sized slice of the shared allowance; source preparation keeps the rest. */
+// Routing receives half of the remaining shared allowance; source preparation keeps the rest.
 internal fun routingSlice(budget: PresolveBudget, solveStop: ExecutionControl): ExecutionControl =
     budget.slice((budget.remaining() / 2).coerceAtLeast(1L)) or solveStop
 
-/**
- * One work allowance for routing and the source preparation that follows it, or `null` when the cap is
- * disabled. The milliseconds [SolveCore.derivedPresolveBudgetMs] derives from `-t` are converted at
- * [CliKnobs.PRESOLVE_WORK_PER_MS], so `-t` scales deterministic effort. A shared elapsed ceiling stops preparation
- * when the work calibration underestimates its cost.
- */
+// One work allowance for routing and the source preparation after it; null when the cap is disabled.
+// Milliseconds derived from `-t` convert to work, so `-t` scales deterministic effort. The shared elapsed
+// ceiling stops preparation when the work calibration underestimates its cost.
 internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
     if (!presolveAllowanceInitialized) {
         val explicit = processProperty(CliKnobs.presolveBudgetMs)?.toLongOrNull()
@@ -128,18 +118,13 @@ internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
     return presolveBudget
 }
 
-/** The work allowance [budgetMs] milliseconds of presolve buy, saturating rather than wrapping. */
 internal fun presolveWorkFor(budgetMs: Long): Long = if (budgetMs > Long.MAX_VALUE / CliKnobs.PRESOLVE_WORK_PER_MS) {
     Long.MAX_VALUE
 } else {
     budgetMs * CliKnobs.PRESOLVE_WORK_PER_MS
 }
 
-/**
- * Consumes and removes `open-bound-proof` from [CommonOptions.engineParams], so engines
- * do not reject the CLI-owned key. Disabling the proof retains open traversal even
- * when the proof could close its bounds.
- */
+// Removes `open-bound-proof` from the engine params so engines do not reject the CLI-owned key.
 internal fun CommonOptions.takeOpenBoundProof(): Boolean {
     val entries = engineParams.filter { it.startsWith("$OPEN_BOUND_PROOF_KEY=") }
     if (entries.isEmpty()) return true
@@ -160,7 +145,6 @@ internal fun CommonOptions.takeOpenBoundProof(): Boolean {
 
 private const val OPEN_BOUND_PROOF_KEY = "open-bound-proof"
 
-/** Solver-control flags shared by every mode; populated by [commonFlagSpecs] during parsing. */
 internal class CommonOptions {
     var diagnostic: (String) -> Unit = ::printErrorLine
     var config: KlauseConfig = KlauseConfig.current
@@ -171,10 +155,8 @@ internal class CommonOptions {
     var engine: String? = null
     var timeLimitMs: Long? = null
 
-    /** Absolute wall-clock instant (in [nowMillis] units) at which the `-t` budget expires,
-     *  anchored once before the input is loaded. A single deadline shared by the construction-time bake
-     *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
-     *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
+    // Anchored once before loading and shared by the load-time bake and the solve, so the two phases
+    // do not each spend a full `-t` budget.
     var deadlineAtMs: Long? = null
         set(value) {
             field = value
@@ -182,7 +164,7 @@ internal class CommonOptions {
                 ?: Cancellation.Never
         }
 
-    /** Null also represents an explicitly disabled cap, so initialization is tracked separately. */
+    // Null budget also means an explicitly disabled cap, so initialization is tracked separately.
     internal var presolveAllowanceInitialized = false
     internal var presolveBudget: PresolveBudget? = null
     internal var presolveTimeCancellation: ExecutionControl = ExecutionControl.Never
@@ -191,7 +173,7 @@ internal class CommonOptions {
     internal var invocationDeadline: Cancellation = Cancellation.Never
     internal var nodeBudget: NodeBudget? = null
 
-    /** Inclusive frontend load time, including parsing, lowering, routing and solvable construction. */
+    // Includes parsing, lowering, routing and solvable construction.
     var loadElapsedMs: Long? = null
     internal var frontendRouting: CliRoutingStats? = null
     var randomSeed: Long? = null
@@ -205,45 +187,33 @@ internal class CommonOptions {
     var parallel: Int? = null
     var freeSearch = false
 
-    /** `--format NAME` / `--mode NAME`: force a specific mode regardless of file extension. */
     var formatOverride: String? = null
 
-    /** `--presolve STRENGTH`: the presolve effort level — `off` | `conservative` | `default` |
-     *  `aggressive`. Parsed into a `PresolveConfig` by `PresolveConfig.parse`. */
     var presolve: String? = null
 
-    /**
-     * Portfolio LP ceiling: an emphasis plus optional technique deltas, parsed by `LpConfig.parse`.
-     * Absent or `aggressive` means uncapped; `off` disables LP across the pool.
-     * `-e fixed` accepts only `off`. Help defaults are rendered before engine resolution.
-     */
+    // Absent or `aggressive` means uncapped; `off` disables LP across the pool. `-e fixed` accepts only `off`.
     var lp: String? = null
 
     var lpPricingExplicit: Boolean = false
         private set
 
-    /** `--lp-pricing POLICY`: entering-column policy for zero-objective LP solves. */
     var lpPricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT
         set(value) {
             field = value
             lpPricingExplicit = true
         }
 
-    /** Raw repeatable `--param key=value` engine params; interpreted per engine (see
-     *  [com.eignex.klause.solver.pipeline.EngineParams]). */
     val engineParams = mutableListOf<String>()
 
-    /** `--help` / `-h`: print usage and exit 0 (checked before any input file is required). */
+    // Checked before any input file is required.
     var showHelp = false
 
-    /** `--version`: print `<name> <version>` and exit 0. */
     var showVersion = false
 
-    /** The single positional input file. */
     var inputPath: String? = null
 }
 
-/** `--help` sections, rendered in declaration order. A flag's [FlagSpec.group] places it here. */
+// `--help` sections, rendered in declaration order.
 internal enum class FlagGroup(val title: String) {
     STANDARD("Standard FlatZinc options (MiniZinc fzn-spec)"),
     ENGINE("Engine selection"),
@@ -251,14 +221,8 @@ internal enum class FlagGroup(val title: String) {
     MODE("Front-end options"),
 }
 
-/**
- * One recognised flag. [takesValue] flags consume the following argument; [apply] receives it
- * (or `null` for boolean flags). The parser derives its value-flag set from these specs, so
- * routing and parsing never drift — and `--help` renders its option list from [group] /
- * [valueLabel] / [help] / [default], so the help text can't drift from the real flags either.
- * A `null` [help] hides the flag from `--help` (aliases / no-op compat flags / advanced knobs).
- * [default], when set, is shown as `(default: X)` after the description.
- */
+// The parser and `--help` both derive from these specs, so neither drifts from the real flags.
+// A null help hides the flag from `--help`.
 internal class FlagSpec(
     val names: List<String>,
     val takesValue: Boolean,
@@ -269,9 +233,7 @@ internal class FlagSpec(
     val apply: (String?) -> Unit,
 )
 
-/** The engine for a bare invocation (no `-e`, no `-f`): the `KLAUSE_ENGINE` env var /
- *  `klause.engine` property when set — so a packaged image (e.g. a MiniZinc-Challenge-compliant
- *  Docker build) can ship a different default — else [FiniteEngine.DEFAULT]. `-e` and `-f` override it. */
+// `KLAUSE_ENGINE` lets a packaged image ship a different default; `-e` and `-f` override it.
 internal fun defaultEngine(): FiniteEngine = processProperty(CliKnobs.engine)
     ?.let { parseEngine(it) ?: usageError("unknown KLAUSE_ENGINE `$it`; expected ${engineIds()}") }
     ?: FiniteEngine.DEFAULT
@@ -280,7 +242,6 @@ internal fun CommonOptions.resolvedEngine(): FiniteEngine = engine
     ?.let { parseEngine(it) ?: usageError("unknown engine `$it`; expected ${engineIds()}") }
     ?: if (freeSearch) FiniteEngine.BACKTRACK else defaultEngine()
 
-/** Translate a CLI engine token into the orchestration route it requests. */
 internal fun parseEngine(token: String): FiniteEngine? = when (token.trim().lowercase()) {
     "fixed" -> FiniteEngine.FIXED
     "backtrack", "bt", "cp" -> FiniteEngine.BACKTRACK
@@ -290,15 +251,11 @@ internal fun parseEngine(token: String): FiniteEngine? = when (token.trim().lowe
     else -> null
 }
 
-/** Canonical engine ids rendered by CLI help and diagnostics. */
 internal fun engineIds(): String = FiniteEngine.entries.joinToString(" | ") { it.id }
 
-/** The `--lp` ceiling spec for a bare invocation: the `KLAUSE_LP` env var / `klause.lp` property when
- *  set — so a packaged image can ship a different LP default — else null (the per-engine built-in
- *  default applies). An explicit `--lp` overrides it. The spec is parsed by `LpConfig.parse`. */
+// `KLAUSE_LP` lets a packaged image ship a different LP default; null keeps the per-engine default.
 internal fun defaultLp(): String? = processProperty(CliKnobs.lp)
 
-/** The solver-control flags every mode accepts. Mode-specific flags are appended per mode. */
 internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     FlagSpec(
         listOf("--exact"),
@@ -312,8 +269,8 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.STANDARD,
         help = "report all solutions (satisfy) / all improving incumbents (optimize)",
     ) { o.allSolutions = true },
-    // Improving incumbents stream on the optimize path unconditionally — `-i` semantics — so
-    // the flag is accepted as a no-op for MiniZinc-protocol compatibility.
+    // Improving incumbents always stream on the optimize path, so `-i` is a no-op kept for the
+    // MiniZinc protocol.
     FlagSpec(
         listOf("-i", "--intermediate", "--intermediate-solutions"),
         false,
@@ -449,19 +406,9 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     ) { o.showVersion = true },
 ) + sourceFlagSpecs(o)
 
-/**
- * Spec-driven, getopt-style argument parser. Walks [args], dispatching each recognised flag to
- * its [FlagSpec]. It accepts the conventional Unix spellings:
- *  - long options with a space- or `=`-attached value: `--time-limit 5000` / `--time-limit=5000`;
- *  - short options with a space- or directly-attached value: `-t 5000` / `-t5000`;
- *  - bundled boolean shorts: `-as` ≡ `-a -s` (a value-taking short ends the bundle and takes the
- *    remainder as its value, so `-asn10` ≡ `-a -s -n 10`);
- *  - a bare `--` terminator after which every token is a positional.
- *
- * Unknown `-flags` are tolerated (noted on stderr, not fatal) to stay forward-compatible with
- * MiniZinc passing standard flags this solver doesn't implement. Each non-flag token (and `-`,
- * the stdin convention) is a positional reported via [onPositional].
- */
+// Getopt-style: `--name value`, `--name=value`, `-t 5000`, `-t5000`, bundled shorts (`-asn10` is
+// `-a -s -n 10`) and a `--` terminator. Unknown flags are only noted, since MiniZinc passes standard
+// flags this solver does not implement.
 internal fun parseArgs(args: Array<String>, specs: List<FlagSpec>, onPositional: (String) -> Unit) {
     val byName = HashMap<String, FlagSpec>()
     for (s in specs) for (n in s.names) byName[n] = s
@@ -488,7 +435,7 @@ internal fun parseArgs(args: Array<String>, specs: List<FlagSpec>, onPositional:
     }
 }
 
-/** Parse one `--name` / `--name=value` token; returns the next index to read. */
+// Returns the next index to read.
 private fun parseLong(token: String, args: Array<String>, i: Int, byName: Map<String, FlagSpec>): Int {
     val eq = token.indexOf('=')
     val name = if (eq >= 0) token.substring(0, eq) else token
@@ -518,7 +465,7 @@ private fun parseLong(token: String, args: Array<String>, i: Int, byName: Map<St
     }
 }
 
-/** Parse one short-option cluster (`-a`, `-as`, `-t5000`, `-asn10`); returns the next index. */
+// Returns the next index to read.
 private fun parseShortCluster(token: String, args: Array<String>, i: Int, byName: Map<String, FlagSpec>): Int {
     var j = 1
     while (j < token.length) {
@@ -550,46 +497,35 @@ private fun parseShortCluster(token: String, args: Array<String>, i: Int, byName
     return i + 1
 }
 
-/** A command-line usage error. [runCli] catches it to print the message and exit 2; throwing (rather
- *  than exiting in place) keeps arg parsing testable and unwinds cleanly through the CLI. */
+// Thrown rather than exiting in place so argument parsing stays testable; [runCli] prints it and exits 2.
 internal class CliUsageException(message: String) : RuntimeException(message)
 
 internal fun usageError(msg: String): Nothing = throw CliUsageException(msg)
 
-/** Terminal classification reported to an [OutputProtocol] once the solve loop ends. */
 internal enum class Verdict {
-    /** Satisfaction: at least one solution found (search may or may not be exhausted). */
     SATISFIABLE,
 
-    /** Optimisation: optimality proven for the last emitted incumbent. */
+    // Optimality proven for the last emitted incumbent.
     OPTIMAL,
 
-    /** Optimisation: incumbent(s) found but optimality NOT proven (budget/incomplete). */
+    // Incumbents found, optimality not proven.
     BEST_FOUND,
 
-    /** Optimisation: the objective descends without limit, so the model has solutions and no optimum. */
+    // The objective descends without limit: solutions exist but no optimum.
     UNBOUNDED,
 
-    /** No solution exists (only a complete search that ran to completion may report this). */
+    // Only a complete search that ran to completion may report this.
     UNSATISFIABLE,
 
-    /** Budget/cancellation hit before any verdict, or an incomplete search found nothing. */
     UNKNOWN,
 }
 
-/**
- * Why a run stopped, for the modes that explain a soft verdict.
- *
- * `unknown` is emitted for causes that call for completely different responses — a longer budget, a
- * different pool, or nothing at all — and the verdict alone cannot tell them apart, so the cause
- * travels alongside it.
- */
+// An unknown verdict covers causes that call for different responses (a longer budget, a different
+// pool, or nothing), so the cause travels alongside it.
 internal class VerdictContext(
-    /** The wall-clock budget fired before the search finished. */
     val budgetExhausted: Boolean = false,
-    /** Recorded solver stop reason when one is available. */
     val terminationReason: TerminationReason? = null,
-    /** Resolved complete-search admission; absent when preparation ended before strategy selection. */
+    // Absent when preparation ended before strategy selection.
     val completePool: Boolean? = null,
 )
 
@@ -605,20 +541,12 @@ internal fun VerdictContext.softVerdictCause(): String = when {
     else -> "search stopped without a verdict"
 }
 
-/**
- * How a mode prints solutions and verdicts. The [SolveCore] driver calls these in order:
- * [begin] once, [onSolution] per feasible/improving solution (streamed), [onComplete] once
- * with the terminal [Verdict], and [onStatistics] last when `-s` is set.
- *
- * Streaming vs buffering is the mode's choice: MiniZinc prints each solution immediately and
- * emits a terminator in [onComplete]; XCSP/SMT buffer the best solution and print the final
- * `v`/model line only in [onComplete], after the status line.
- */
+// The driver calls begin once, onSolution per solution, onComplete once, and onStatistics last under
+// `-s`. Each mode chooses whether to stream solutions or buffer the best one until onComplete.
 internal interface OutputProtocol {
     fun begin(optimize: Boolean, maximize: Boolean) {}
 
-    /** One solution. [objective] carries the discrete terms; [continuousObjective] the whole value
-     *  when a continuous column carries cost, which no exact integer can express. */
+    // continuousObjective is the whole value when a continuous column carries cost.
     fun onSolution(rendered: String, objective: Long?, continuousObjective: Double? = null)
 
     fun onExactSolution(rendered: String, objective: BigFraction)
@@ -634,17 +562,11 @@ internal interface OutputProtocol {
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
     fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {}
 
-    /** Record why the run stopped, before [onComplete] renders the verdict. Ignored by default — only
-     *  the modes that report a reason consume it. */
+    // Called before onComplete; only modes that report a stop reason consume it.
     fun onVerdictContext(context: VerdictContext) {}
 
-    /** `-s` on a portfolio optimize: one line per strict global improvement, naming the arm that
-     *  produced it (`-p N` races several). A machine-readable FlatZinc comment — every other output
-     *  parser treats a `%`-prefixed line as a comment, so it is mode-agnostic; the default renders it
-     *  and modes need not override. [objective] is the exact model-oriented discrete value. When a
-     *  continuous column carries cost, [continuousObjective] carries the whole model-oriented value;
-     *  its absence means the exact discrete value is the whole objective. A non-finite value has no
-     *  decimal form, so it is omitted rather than printed — read back as "no continuous channel". */
+    // One line per strict global improvement under `-s`, naming the arm. Every output parser reads a `%`
+    // line as a comment, so the default serves all modes. A non-finite continuous value is omitted.
     fun onImprovement(arm: String, objective: Long, continuousObjective: Double? = null, elapsedMs: Long) {
         val continuous = continuousObjective?.takeIf(Double::isFinite)?.let { " continuousObjective=$it" }.orEmpty()
         println("%%%klause-arm: label=$arm objective=$objective$continuous time=$elapsedMs")
@@ -655,24 +577,18 @@ internal interface OutputProtocol {
     }
 }
 
-/** Per-invocation parsing + loading + output for one front-end. Created fresh per run via
- *  [CliMode.newSession] so mode-specific flag state never leaks between invocations. */
+// Created fresh per run so mode-specific flag state never leaks between invocations.
 internal interface ModeSession {
-    /** Mode-specific flags appended to [commonFlagSpecs]. */
     fun flags(): List<FlagSpec>
     fun load(path: String, common: CommonOptions): Solvable
     fun output(common: CommonOptions): OutputProtocol
 
-    /** Run a format's command stream, or return false to use the single-source driver. */
+    // Returns false to use the single-source driver.
     fun runCommands(path: String, common: CommonOptions): Boolean = false
 }
 
-/**
- * Build a [Solvable] from a single [LinearObjective]-shaped instance — the common case for
- * XCSP3 and SMT-LIB, where one parsed [LinearObjective] serves as both the LS-gradient and
- * the bounding objective. [maximize] is the original goal direction; the objective already
- * negates for it, so the reported value is sign-corrected back here.
- */
+// maximize is the original goal direction; the objective already negates for it, so reported values
+// are sign-corrected here.
 internal fun linearSolvable(
     problem: Problem,
     objective: LinearObjectiveSpec?,
@@ -721,8 +637,7 @@ internal fun linearSolvable(
             preparedRoute = preparedRoute,
         )
     }
-    // The gradient view reads every fold (evaluating through a fold is always safe — it only needs
-    // to see the objective through the indicator, not exclude the indicator from search).
+    // The gradient view reads every fold: evaluating through one never excludes its indicator from search.
     val objSweep = if (boolFolds.isEmpty()) {
         sweep
     } else {
@@ -732,9 +647,7 @@ internal fun linearSolvable(
         problem = problem,
         optimize = true,
         maximize = maximize,
-        // Gradient view over the definitional cone (when the objective's terms are functionally
-        // defined), so LS descends the true objective on the decision vars; else null and LS
-        // descends the linear objective directly.
+        // Null when no objective term is functionally defined; LS then descends the linear objective.
         lsObjective = functionalObjectiveFor(objective, objSweep),
         linearObjective = objective,
         objVarId = objective.singleIntObjective()?.varId,
@@ -749,19 +662,13 @@ internal fun linearSolvable(
     )
 }
 
-/**
- * The sign-corrected objective including its continuous terms, or null when no continuous column carries
- * cost and [LinearObjective.evaluateLong] is already the whole of it.
- *
- * [LinearObjective.evaluate] reads the real values off the sample, which only a leaf whose residual LP
- * resolved them carries; a reported solution is such a leaf.
- */
+// Null when no continuous column carries cost. evaluate reads real values that only a leaf whose
+// residual LP resolved them carries; a reported solution is such a leaf.
 private fun LinearObjective.continuousObjectiveValue(maximize: Boolean): ((Sample) -> Double)? {
     if (realCoefficients.none { it != 0.0 }) return null
     return { s -> evaluate(s).let { if (maximize) -it else it } }
 }
 
-/** Unit folds retain literal coordinates; wider folds derive only from priced inputs. */
 private fun foldsOverObjectiveVars(
     folds: List<BoolFoldDefinition>,
     objective: LinearObjective,
@@ -772,10 +679,7 @@ private fun foldsOverObjectiveVars(
     return folds.filter { spec -> spec.lits.size == 1 || spec.lits.all { isObjectiveVar(Lit.variable(it)) } }
 }
 
-/** Build a functional-objective gradient view of [objective] over [sweep]'s int and bool cones, or
- *  null when none of its terms are functionally defined (a plain [LinearObjective] suffices).
- *  [objective]'s coefficients already encode the maximize sign ("lower is better"), so the functional
- *  objective minimizes them directly. */
+// The coefficients already encode the maximize sign, so the functional objective minimizes them.
 private fun functionalObjectiveFor(objective: LinearObjective, sweep: DefinitionalSweep?): IncrementalObjective? {
     if (sweep == null) return null
     val ic = objective.intCoefficients
@@ -788,12 +692,12 @@ private fun functionalObjectiveFor(objective: LinearObjective, sweep: Definition
     return sweep.functionalObjective(terms, coeffs, objective.constant, minimize = true, boolTerms, boolCoeffs)
 }
 
-/** A front-end. Stateless; all per-run state lives in the [ModeSession] it creates. */
+// Stateless; per-run state lives in the ModeSession it creates.
 internal interface CliMode {
-    /** `--format` names; the first is canonical. */
+    // `--format` names; the first is canonical.
     val names: List<String>
 
-    /** Recognised file extensions (lowercase, no dot). */
+    // Lowercase, no dot.
     val extensions: List<String>
     fun newSession(): ModeSession
 }

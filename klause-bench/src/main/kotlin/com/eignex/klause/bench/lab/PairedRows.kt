@@ -8,7 +8,7 @@ import com.eignex.klause.bench.lab.PairedAudit.text
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** Validity of one paired row: declared arms from one accepted worker attempt under matched controls. */
+// A valid row has the declared arms from one accepted worker attempt under matched controls.
 internal object PairedRows {
     fun audit(
         key: String,
@@ -53,10 +53,9 @@ internal object PairedRows {
         )
     }
 
-    /** Whether [arm] ran in [row] to an end the worker committed, successful or not. */
+    // Ran to an end the worker committed, successful or not.
     fun ran(row: List<AuditedCase>, arm: String): Boolean = row.any { it.arm == arm && it.status != CANCELLED }
 
-    /** A verdict that ends the run: a proof, or a solution of a satisfaction problem. */
     fun terminal(proven: Boolean, kind: String, feasible: Boolean?): Boolean =
         proven || (kind == "satisfy" && feasible == true)
 

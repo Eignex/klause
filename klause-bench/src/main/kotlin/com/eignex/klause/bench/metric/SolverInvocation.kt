@@ -19,28 +19,17 @@ import java.io.InterruptedIOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
-/**
- * Runs `klause-cli` as a subprocess on the model: the compiled `.fzn` for a MiniZinc instance, or the
- * original file for every other format. klause-cli renders the model's objective, so a maximize objective
- * is reported in the model's orientation, not klause's internal minimised form.
- *
- * Output is parsed off the format's stream — `_objective`/`objective = N`, `----------`
- * (timestamped as read for time-to-best), `==========` (proven), `=====UNSATISFIABLE=====` (proven infeasible) — plus
- * `%%%mzn-stat` lines (klause `-s` statistics). The raw stdout is returned verbatim for saving.
- */
+// Runs `klause-cli` as a subprocess on the compiled `.fzn` for MiniZinc, else the original file. klause-cli renders
+// the objective in the model's orientation, not klause's internal minimized form.
 internal object SolverInvocation {
 
-    /** klause-cli knobs, each forwarded as is. [engine] maps to `-e` and [params] to repeatable `--param
-     *  key=value`; null [engine] passes no `-e`, so the cli's own default applies. [processors] maps to `-p`,
-     *  emitted when supplied, including single-core controls. [seed] is `-r`. */
+    // Each knob is forwarded as is; a null engine passes no `-e`, so the cli's default applies.
     internal data class Settings(
         val engine: String? = null,
         val processors: Int? = null,
         val seed: Long = DEFAULT_SEED,
         val params: List<String> = emptyList(),
-        /** klause-cli `--lp CEILING` (LP-relaxation emphasis); null = unset. */
         val lp: String? = null,
-        /** klause-cli `--presolve` (presolve emphasis + per-pass deltas); null = unset. */
         val presolve: String? = null,
         val exact: Boolean = false,
         val captureDirectory: File? = null,
@@ -51,14 +40,10 @@ internal object SolverInvocation {
         val verbose: Boolean? = null,
     )
 
-    /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
-     *  statistics, the per-arm [attribution] stream (portfolio `-s` only), and the raw stdout. */
     internal data class Result(
         val feasible: Boolean?,
         val objective: Double?,
         val timeToBestMs: Long?,
-        /** Wall-clock ms to the *first* feasible solution (the first `----------`), distinct from
-         *  [timeToBestMs] (the last/best). Null when never feasible. */
         val timeToFirstFeasibleMs: Long? = null,
         val proven: Boolean,
         val stats: Map<String, String>,
@@ -66,7 +51,7 @@ internal object SolverInvocation {
         val rawOutput: String,
         val command: String,
         val buildProvenance: BuildProvenance? = null,
-        /** Subprocess wall-clock duration, including launch and output consumption; null when unavailable. */
+        // Includes launch and output consumption.
         val elapsedMs: Long? = null,
         val exactObjective: String? = null,
         val stderr: String? = null,
@@ -78,7 +63,6 @@ internal object SolverInvocation {
     internal class Failure(val result: Result, message: String, cause: Throwable? = null) :
         IllegalStateException(message, cause)
 
-    /** Run klause-cli over [entry] under [budget]. [optimize] selects intermediate-solution mode (`-a`). */
     fun run(entry: ResolvedProblem, settings: Settings, budget: Budget, optimize: Boolean): Result {
         val file = if (entry.ref.format == Format.MINIZINC) {
             MiniZincRunner().compileFzn(entry.ref)
@@ -211,21 +195,15 @@ internal object SolverInvocation {
 
     private class SourcePreparationTimeout : IOException("Source preparation budget exhausted")
 
-    /** The provisioned klause-cli launcher. */
     fun klauseCliBin(): File = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)
 
-    /**
-     * Why the klause dist at [bin] cannot solve anything, or null when it can. A dist compiled for a
-     * newer JDK than the default `java` kills every subprocess identically with an
-     * `UnsupportedClassVersionError`, and one error record per instance is indistinguishable from a
-     * selection nothing was decided on: a whole sweep reports "0 feasible" in seconds. A run asks this
-     * once up front so that failure stops it instead of being spread over the selection.
-     */
+    // A dist that cannot start (e.g. compiled for a newer JDK) fails every instance identically, which looks like a
+    // selection where nothing was decided. Checking once up front stops the run instead.
     fun klauseCliDefect(bin: File = klauseCliBin()): String? {
         if (!bin.isFile) return "$bin is missing — run `./gradlew :klause-cli:installJvmDist`"
         val proc = runCatching { cliVersionCommand(bin).start() }
             .getOrElse { return "$bin will not start: ${it.message}" }
-        // Same watchdog shape as [invoke]: kill a child that never answers so the read below returns.
+        // Kill a child that never answers so the read below returns.
         Thread {
             runCatching { if (!proc.waitFor(PREFLIGHT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) proc.destroyForcibly() }
         }.apply {
@@ -246,7 +224,6 @@ internal object SolverInvocation {
             }
         }
 
-    /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
     internal fun klauseCommand(
         entry: ResolvedProblem,
         s: Settings,
@@ -258,8 +235,7 @@ internal object SolverInvocation {
         check(bin.canExecute()) { "klause-cli is not executable at $bin" }
         return buildList {
             add(bin.absolutePath)
-            // MPS instances (notably extension-less MIPLIB files) can't be auto-detected by suffix;
-            // the bench knows the format, so pass it explicitly.
+            // Extensionless MPS files cannot be detected by suffix.
             if (entry.ref.format == Format.MPS) {
                 add("--format")
                 add("mps")
@@ -279,9 +255,7 @@ internal object SolverInvocation {
             if (s.completeAssignment && entry.ref.format == Format.MINIZINC) add("--output-complete-assignment")
             if (optimize) {
                 add("-a")
-                // Emit `_objective = <value>;` per solution. The objective var is usually not in the
-                // model's `output` section, so without this the parser records objective=null even when
-                // klause proves the optimum.
+                // The objective var is usually not in the model's `output` section.
                 add("--output-objective")
             }
             // No -f: the engine value encodes free vs fixed search (fixed = follow the annotation).
@@ -313,11 +287,8 @@ internal object SolverInvocation {
         }
     }
 
-    /** Which output stream a subprocess emits, so the read loop parses the right markers. klause-cli
-     *  speaks the front-end bound to the *input* format — MiniZinc
-     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml`, MPS,
-     *  OPB, DIMACS CNF and WCNF (the DIMACS/MaxSAT conventions are the same `s`/`o`/`v`/`c` shape),
-     *  and the SMT-LIB convention (`sat`/`unsat`/`unknown` + `; key=value` comments) for `.smt2`. */
+    // klause-cli speaks the output convention of the input format; XCSP3, MPS, OPB, CNF and WCNF share the
+    // `s`/`o`/`v`/`c` shape.
     internal enum class Dialect { MINIZINC, PB_COMPETITION, SMT_LIB }
 
     internal fun dialectFor(format: Format): Dialect = when {
@@ -355,9 +326,7 @@ internal object SolverInvocation {
         var outputFailure: Throwable? = null
         val stdoutCapture = runCatching { captureDirectory?.resolve("cli.stdout")?.bufferedWriter() }
             .onFailure { outputFailure = it }.getOrNull()
-        // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
-        // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
-        // killed child's stream closes, the loop returns, and the partial output is scored as usual.
+        // The read loop blocks until stdout closes; killing a runaway closes it and the partial output is scored.
         val killed = AtomicReference<String?>(null)
         val watchdog = Thread {
             runCatching {
@@ -398,7 +367,6 @@ internal object SolverInvocation {
             return true
         }
 
-        // An improving incumbent (a new solution / better objective): stamp time-to-best afresh.
         fun markIncumbent() {
             anySolution = true
             val elapsed = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
@@ -406,8 +374,7 @@ internal object SolverInvocation {
             if (timeToFirstFeasibleMs == null) timeToFirstFeasibleMs = elapsed
         }
 
-        // A terminal status proving a solution exists but without its own timestamp: don't clobber the
-        // incumbent time already stamped by an `o`/`----------` line; only stamp if none was seen.
+        // A terminal status keeps the incumbent time already stamped by an `o`/`----------` line.
         fun markFeasible() {
             anySolution = true
             if (timeToBestMs == null) markIncumbent()
@@ -494,7 +461,6 @@ internal object SolverInvocation {
 
                         line == XCSP_UNKNOWN -> Unit
 
-                        // `o <cost>`: one line per improving incumbent (model-oriented objective).
                         line.startsWith(XCSP_OBJECTIVE_PREFIX) -> {
                             if (recordObjective(line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim())) markIncumbent()
                         }
@@ -504,13 +470,11 @@ internal object SolverInvocation {
                             attribution.add(it.copy(processElapsedMs = arrivedMs))
                         }
 
-                        // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
                         line.startsWith(XCSP_COMMENT_PREFIX) ->
                             recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
                     }
 
                     Dialect.SMT_LIB -> when {
-                        // `; <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
                         smtTopLevel && line.startsWith(SMT_COMMENT_PREFIX) -> {
                             val kv = line.removePrefix(SMT_COMMENT_PREFIX).trim()
                             recordStat(kv)
@@ -642,11 +606,8 @@ internal object SolverInvocation {
         if (carriageReturn) emit("\r") else if (line.isNotEmpty()) emit("")
     }
 
-    /** Parse a `%%%klause-arm:` body. `label`, `objective` (an exact integer or rational value), and
-     *  `time` are required — a line missing or malformed on any of those is unusable and the whole
-     *  entry is dropped. `continuousObjective` is optional (the whole objective when a continuous
-     *  column carries cost) and independent of the required fields: a malformed or non-finite value
-     *  degrades to "no continuous channel" rather than discarding an otherwise-valid entry. */
+    // A missing or malformed `label`, `objective` or `time` drops the entry; a malformed `continuousObjective`
+    // only drops that channel.
     private fun parseArm(body: String): Attribution? {
         val kv = body.trim().split(' ').mapNotNull {
             it.split('=', limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] }
@@ -683,7 +644,6 @@ internal object SolverInvocation {
     )
     private const val ARM_PREFIX = "%%%klause-arm:"
 
-    // XCSP3 competition output stream (klause-cli's `.xml` front-end).
     private const val XCSP_SATISFIABLE = "s SATISFIABLE"
     private const val XCSP_OPTIMUM = "s OPTIMUM FOUND"
     private const val XCSP_UNSATISFIABLE = "s UNSATISFIABLE"
@@ -691,7 +651,6 @@ internal object SolverInvocation {
     private const val XCSP_OBJECTIVE_PREFIX = "o "
     private const val XCSP_COMMENT_PREFIX = "c "
 
-    // SMT-LIB output stream (klause-cli's `.smt2` front-end).
     private const val SMT_SAT = "sat"
     private const val SMT_UNSAT = "unsat"
     private const val SMT_COMMENT_PREFIX = "; "
@@ -699,24 +658,15 @@ internal object SolverInvocation {
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000
 
-    /** How long the exit path waits for the stderr drain before reading what it collected. */
     private const val STDERR_DRAIN_WAIT_MS = 2_000L
 
-    /** The stat key a record keeps quarantined portfolio arms under. */
     const val QUARANTINED = "quarantined"
 
-    /** Ceiling on the dist's answer to `--version`, so a child that never answers cannot hang a run. */
     private const val PREFLIGHT_TIMEOUT_MS = 30_000L
 }
 
-/**
- * A portfolio incumbent record parsed from `%%%klause-arm:`. [exactObjective] stores
- * model-oriented discrete cost or the checked original source cost as exact rational text;
- * [continuousObjective] stores the whole cost when a legacy continuous channel contributes.
- *
- * Arrival order may differ from improvement order because publication and emission
- * use separate critical sections. Find the best holder with [SolveMetric.best].
- */
+// A `%%%klause-arm:` incumbent. Arrival order may differ from improvement order because publication and emission
+// use separate critical sections; use SolveMetric.best for the best holder.
 @Serializable
 internal data class Attribution(
     val label: String,

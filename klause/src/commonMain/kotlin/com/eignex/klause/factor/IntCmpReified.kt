@@ -5,11 +5,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.IntCmpOp
 
 /**
- * Convenience factory: build a [ReifiedLinear] from an [IntCmpOp] over a single int var.
- * `aux ↔ (intVar ⟨op⟩ bound)` with unit coefficient.
- *
- * [IntCmpOp.LT] and [IntCmpOp.GT] are folded into [LinearOp.LE] / [LinearOp.GE] with the
- * bound shifted by 1, since [LinearOp] has no strict-inequality forms.
+ * Builds `aux ↔ (intVar ⟨op⟩ bound)` as a [ReifiedLinear]. Strict comparisons shift the bound by 1,
+ * since [LinearOp] has no strict forms.
  */
 fun reifiedIntCompare(auxBoolVar: Int, intVar: Int, op: IntCmpOp, bound: Int): ReifiedLinear {
     val (linOp, adjustedBound) = when (op) {

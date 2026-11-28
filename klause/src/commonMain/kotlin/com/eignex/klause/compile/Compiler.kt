@@ -112,7 +112,7 @@ internal class Lowering(
 ) : CnfLowering {
     internal val problemBuilder = ProblemBuilder(settings, semantics)
 
-    /** Factors posted by implied or symmetry-breaking constraints, by index. */
+    // Factors posted by implied or symmetry-breaking constraints.
     val impliedFactors = HashSet<Int>()
     var hasSymmetryBreaking = false
     val pinAbsentOptVars = checkNotNull(semantics.effective.pinAbsentOptionalValues)
@@ -121,7 +121,7 @@ internal class Lowering(
     val boolVarIdByName get() = problemBuilder.boolVarIdByName
     val intVarIdByName get() = problemBuilder.intVarIdByName
 
-    // Reverse indices kept consistent by [bindIntName] / [bindBoolName] avoid linear name scans.
+    // Reverse indices kept consistent by bindIntName / bindBoolName avoid linear name scans.
     val idToIntName = MutableIntObjectMap<String>()
     val idToBoolName = MutableIntObjectMap<String>()
     val intDomains get() = problemBuilder.intDomains
@@ -132,14 +132,9 @@ internal class Lowering(
     val floatDecoders = mutableMapOf<String, FloatSpec>()
     val realVarIdByName get() = problemBuilder.realVarIdByName
 
-    /**
-     * Indicator layout for each set variable: indicator i is true iff universe element i belongs
-     * to the set. [SetSpec] uses integer elements; [MultipleSpec] uses label indices.
-     */
+    // MultipleSpec sets use label indices as their universe.
     val setLayouts = mutableMapOf<String, SetLayout>()
 
-    /** Label → universe index for set vars whose universe is a nominal label list.
-     *  Empty for int-universe set vars. */
     val setLabelOrder = mutableMapOf<String, List<String>>()
     internal var auxIntCounter = 0
 
@@ -169,16 +164,14 @@ internal class Lowering(
         hasSymmetryBreaking = hasSymmetryBreaking,
     )
 
-    /** Register `name → id` for an int/float var and the reverse `id → name`. Every write to
-     *  [intVarIdByName] must go through here so [idToIntName] stays consistent. */
+    // Every write to intVarIdByName goes through here so idToIntName stays consistent.
     fun bindIntName(name: String, id: Int): Int {
         problemBuilder.bindIntName(name, id)
         idToIntName.put(id, name)
         return id
     }
 
-    /** Register `name → id` for a bool var and the reverse `id → name`. Every write to
-     *  [boolVarIdByName] must go through here so [idToBoolName] stays consistent. */
+    // Every write to boolVarIdByName goes through here so idToBoolName stays consistent.
     fun bindBoolName(name: String, id: Int): Int {
         problemBuilder.bindBoolName(name, id)
         idToBoolName.put(id, name)
@@ -413,7 +406,6 @@ internal class Lowering(
         return Lit.make(aux, positive = true)
     }
 
-    // Shared [CnfLowering] gates lower Boolean combinations to literals.
     fun tseitinAnd(children: List<BoolExpr>): Int = tseitinAnd(lowerAllBool(children).asList())
 
     fun tseitinOr(children: List<BoolExpr>): Int = tseitinOr(lowerAllBool(children).asList())
@@ -441,17 +433,14 @@ internal class Lowering(
     internal fun falseLit(): Int = Lit.negate(trueLit())
 }
 
-/** Compile this schema's [VariableSchema.definition] into a solver-ready [CompiledSchema],
- *  using [config] (defaults to the ambient [KlauseConfig.current]). */
+/** Compile this schema's [VariableSchema.definition] into a solver-ready [CompiledSchema]. */
 fun VariableSchema.compile(
     config: KlauseConfig = KlauseConfig.current,
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
     factorCodecs: FactorCodecs = FactorCodecs.builtin,
 ): CompiledSchema = Compiler(config, semanticOverrides, factorCodecs).compile(this.definition())
 
-// Schema-entry driver: turns a SchemaDef into a CompiledSchema by declaring variables,
-// asserting constraints, and packaging the engine state. Kept off the Lowering class so the
-// engine itself stays free of any SchemaDef / schema-shape dependency.
+// Kept off the Lowering class so it stays free of any SchemaDef dependency.
 
 private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     for ((name, entry) in def.entries) {
@@ -475,7 +464,6 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
             is IntDomainSpec -> bindIntName(name, declareIntDomain(entry))
 
             is SetSpec -> {
-                // Set universes are deduplicated and sorted by [setVar].
                 val universe = entry.universe.toIntArray()
                 val indicators = IntArray(universe.size) { newBoolVar() }
                 setLayouts[name] = SetLayout(universe, indicators)
@@ -510,9 +498,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     // Canonical absent values remove dead-value symmetry.
     if (pinAbsentOptVars) emitOptVarPins(def)
 
-    // The compiler builds a plain base-baked `Problem`; the SAC / failed-literal probing tiers, resolved
-    // from the presolve config, run in the presolve lane via [RootBaker] (kernel → presolve would
-    // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
+    // Probing bake tiers run later in presolve (RootBaker); compile depending on presolve would cycle.
     val source = buildProblem()
     val namedReals = realVarIdByName.toMap()
     val binding = CompiledSourceBinding(source, intVarIdByName, namedReals,
@@ -530,12 +516,8 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     )
 }
 
-/**
- * Emit `¬present → value = default` for each optional variable identified by [PresenceSpec].
- * Defaults are zero clamped to the declared integer or real domain,
- * false for Booleans, and the first nominal label. Each default lies in its value domain, so
- * the pin cannot force presence.
- */
+// Emits `¬present → value = default`. Each default (zero clamped to the domain, false, the first label) lies
+// in its value domain, so the pin cannot force presence.
 private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
     for ((name, entry) in def.entries) {
         if (entry !is PresenceSpec) continue

@@ -7,13 +7,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 
-/**
- * DIMACS **CNF** front-end (`.cnf`) for Boolean satisfiability. Emits the SAT-competition
- * convention: an `s SATISFIABLE` / `s UNSATISFIABLE` / `s UNKNOWN` status line, and on sat a
- * `v`-prefixed model listing each variable as `i` (true) or `-i` (false), 1-based, terminated
- * by `0`. `-s` statistics are emitted as `c` comment lines. Weighted CNF (MaxSAT) is a distinct
- * format with an objective, handled by [WcnfMode].
- */
 internal object DimacsMode : CliMode {
     override val names = listOf("dimacs", "cnf", "sat")
     override val extensions = listOf("cnf")
@@ -41,8 +34,6 @@ internal object DimacsMode : CliMode {
     }
 }
 
-/** Render a DIMACS SAT model line: each variable `i` (1-based) as `i` when true, `-i` when
- *  false, terminated by `0`. */
 internal fun renderDimacsModel(numVars: Int, s: Sample): String = renderDimacsModel(numVars, s::boolValue)
 
 private fun renderDimacsModel(numVars: Int, boolValue: (Int) -> Boolean): String = buildString {
@@ -51,8 +42,6 @@ private fun renderDimacsModel(numVars: Int, boolValue: (Int) -> Boolean): String
     append(" 0")
 }
 
-/** DIMACS output protocol: `s SATISFIABLE`/`s UNSATISFIABLE`/`s UNKNOWN` + the buffered model on sat.
- *  Shares the buffered-model plumbing with the other competition front-ends via [BufferedBestOutput]. */
 internal class DimacsOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
 
@@ -62,6 +51,5 @@ internal class DimacsOutput : BufferedBestOutput() {
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
-    // SAT competition output carries the full search-counter block.
     override fun keepStat(key: String): Boolean = true
 }

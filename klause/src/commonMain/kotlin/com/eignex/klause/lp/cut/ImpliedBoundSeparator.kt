@@ -7,19 +7,8 @@ import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.propagatedImplicationGraph
 
-/**
- * Implied-bound cuts from the binary **implication graph**. Probing derives implications
- * `litA ⇒ litB` that hold at every solution; those of explicit binary clauses already enter the LP as
- * clause rows and so never separate. Each implication is the linear inequality
- * `litVal(A) ≤ litVal(B)` — where `litVal` of a positive literal over Boolean column `c` is `x_c` and of
- * a negative literal is `1 − x_c` — valid at every integer solution (if `A` holds so must `B`, so
- * `litVal(A) ≤ litVal(B)` always). The separator emits the ones the fractional LP point violates.
- *
- * The implication graph is computed once (probing is expensive) from the root problem and cached; it is
- * literal-indexed (`graph[lit]` = the literals `lit` implies). Cuts are [Cut.global] — probing
- * implications are problem-wide. Sound: every emitted cut holds at every solution, so it only tightens
- * the relaxation, never removes a feasible point.
- */
+// Each probed implication `A ⇒ B` is the inequality `litVal(A) ≤ litVal(B)`, with `litVal` of a negative literal
+// `1 − x_c`. Explicit binary clauses already enter the LP as rows; probing is expensive, so the graph is cached.
 internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MAX_CANDIDATES) : CutSeparator {
     override val family: CutFamily = CutFamily.IMPLIED_BOUND
 
@@ -32,7 +21,6 @@ internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MA
         for (fromLit in g.indices) {
             for (toLit in g[fromLit]) {
                 val cut = impliedBoundCut(fromLit, toLit, boolColOf) ?: continue
-                // litVal(from) − litVal(to): a violation means the fractional point breaks the implication.
                 val fromVal = litValue(fromLit, boolColOf, ctx)
                 val toVal = litValue(toLit, boolColOf, ctx)
                 if (fromVal - toVal > VIOLATION_TOL) cuts.add(cut)
@@ -41,34 +29,23 @@ internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MA
         return cuts
     }
 
-    /** The LP value of [lit]: `x_c` for a positive literal over Boolean column `c`, `1 − x_c` for a negative one. */
     private fun litValue(lit: Int, boolColOf: IntArray, ctx: CutContext): Double {
         val col = boolColOf[Lit.variable(lit)]
         val x = ctx.primalOf(col)
         return if (Lit.isPositive(lit)) x else 1.0 - x
     }
 
-    /** Harvest bounded propagation implications without depending on presolve policy. */
     private fun implicationGraph(problem: Problem): Array<IntArray> = problem.propagatedImplicationGraph(maxCandidates)
 
     internal companion object {
-        /** Probe at most this many Boolean variables when building the implication graph. */
         const val DEFAULT_MAX_CANDIDATES: Int = 512
 
-        /** Minimum `litVal(A) − litVal(B)` for the LP point to count as violating `A ⇒ B`. */
         private const val VIOLATION_TOL: Double = 1e-6
 
-        /**
-         * The implied-bound cut for `fromLit ⇒ toLit` as `Σ coeffs·x ≤ rhs`, or null when the two share a
-         * variable (a unit fact, not a two-variable bound) or a literal's variable has no LP column.
-         * Derivation of `litVal(from) − litVal(to) ≤ 0`, with `litVal(+v)=xᵥ`, `litVal(−v)=1−xᵥ`:
-         * the per-literal coefficient is `±1` by polarity and the `1`s from negative literals move to
-         * the right-hand side. Valid at every solution because the implication is.
-         */
         fun impliedBoundCut(fromLit: Int, toLit: Int, boolColOf: IntArray): Cut? {
             val fv = Lit.variable(fromLit)
             val tv = Lit.variable(toLit)
-            if (fv == tv) return null // same variable ⇒ a unit fact, not a pairwise bound cut
+            if (fv == tv) return null // a unit fact, not a pairwise bound
             val fc = boolColOf.getOrElse(fv) { -1 }
             val tc = boolColOf.getOrElse(tv) { -1 }
             if (fc < 0 || tc < 0) return null

@@ -12,21 +12,12 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntObjectMap
 
-/** At-most-one cliques (each a set of Lit-encoded literals, at most one satisfied) recognised
- *  soundly from a single factor:
- *   - a [Cardinality] `Σ lit ≤ max` with `max == 1` (covers both at-most-one and exactly-one);
- *   - any binary [Clause] `(l1 ∨ l2)` ⟺ at most one of `{¬l1, ¬l2}`;
- *   - a positive-weight [PseudoBoolean] knapsack `Σ wⱼ lⱼ ≤ b` (or `= b`): the largest-weight
- *     literals whose two smallest weights already exceed `b` are pairwise exclusive (see
- *     [pbKnapsackClique]).
- *
- *  These are the *base* cliques; [maximalAmoCliques] grows them across factors into larger ones. */
+// Base cliques from single factors: a cardinality with max 1, a binary clause `(l1 ∨ l2)` as at most one
+// of `{¬l1, ¬l2}`, and a positive-weight knapsack's heaviest literals.
 internal fun amoCliques(factors: List<Factor>): List<Set<Int>> = collectCliques(factors, includeKnapsacks = true)
 
-/** [amoCliques] restricted to cliques backed by a [Cardinality] or [Clause] — factors a knapsack
- *  drop never removes. A clique implied by a [PseudoBoolean] knapsack only holds while that knapsack
- *  is present, so it is unsound for redundancy elimination to use one to *drop* a knapsack (it could
- *  drop the very constraint the clique rests on); this restricted set is the one safe to drop by. */
+// A knapsack-implied clique holds only while its knapsack is present, so redundancy elimination must not
+// drop a knapsack by one; this set excludes them.
 internal fun persistentAmoCliques(factors: List<Factor>): List<Set<Int>> = collectCliques(
     factors,
     includeKnapsacks = false,
@@ -47,11 +38,7 @@ private fun collectCliques(factors: List<Factor>, includeKnapsacks: Boolean): Li
     return cliques
 }
 
-/** The at-most-one clique implied by a positive-weight `≤`/`=` knapsack `Σ wⱼ lⱼ ⟨op⟩ b`, or
- *  `null` when none of size ≥ 2 exists. Two literals `i, j` cannot both hold when `wᵢ + wⱼ > b`;
- *  taking the literals in *descending* weight, the largest prefix whose two smallest members still
- *  sum past `b` is pairwise exclusive — an at-most-one clique. Only `≤` and `=` bound the activity
- *  from above (a lone `≥` does not); non-positive weights and `b < 0` are skipped. */
+// Only `≤` and `=` bound the activity from above.
 private fun pbKnapsackClique(pb: PseudoBoolean): Set<Int>? {
     if (!permitsLongPseudoBoolean(pb.constants)) return null
     if (pb.op != PbOp.LE && pb.op != PbOp.EQ) return null
@@ -71,44 +58,25 @@ private fun pbKnapsackClique(pb: PseudoBoolean): Set<Int>? {
     return null
 }
 
-/**
- * Budget for [mergeCliques], counted in conflict-graph neighbour visits — the quantity the greedy
- * extension actually spends, which is `Σ_clique Σ_member Σ_{base clique ∋ member} |base clique|` and
- * so grows with how densely the cliques overlap rather than with how many there are. A clique count
- * bounds neither: a handful of wide, heavily overlapping at-most-ones costs more than a hundred
- * thousand disjoint binary ones.
- */
+// Counted in conflict-graph neighbour visits, which grow with clique overlap rather than clique count:
+// a few wide overlapping at-most-ones cost more than many disjoint binary ones.
 private const val CLIQUE_MERGE_WORK_BUDGET = 20_000_000L
 
-/** Poll the cancellation once per this many base cliques in the extension loop. */
 private const val CLIQUE_MERGE_CANCEL_POLL_MASK = 0x3F
 
-/** The [amoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
 internal fun maximalAmoCliques(factors: List<Factor>, cancellation: ExecutionControl =
     ExecutionControl.Never): List<Set<Int>> =
     mergeCliques(amoCliques(factors), cancellation)
 
-/** The [persistentAmoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
 internal fun maximalPersistentAmoCliques(
     factors: List<Factor>,
     cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<Set<Int>> = mergeCliques(persistentAmoCliques(factors), cancellation)
 
-/**
- * Merge a set of at-most-one [cliques] into maximal ones. Every unordered pair *within* a base
- * clique is a sound exclusion edge, so their union is a conflict graph (see [ConflictGraph]);
- * greedily extending each base clique with literals adjacent to all its members yields larger
- * at-most-one cliques (e.g. three binary clauses forming a triangle collapse to one size-3 clique).
- * Cliques that end up a subset of another are dropped. Deterministic (cliques in input order,
- * literals in id order) and sound because a literal joins only when it conflicts with every current
- * member. Clique merging as in Achterberg, Bixby, Gu, Rothberg and Weninger, "Presolve Reductions in
- * Mixed Integer Programming", INFORMS J. Comput. 2020, https://doi.org/10.1287/ijoc.2018.0857.
- *
- * Extension is metered against [CLIQUE_MERGE_WORK_BUDGET] and stops on [cancellation]: a clique
- * whose own extension would overrun what is left is kept as it came in. That only forgoes further
- * growth — every returned clique is still a valid at-most-one — so the result degrades in strength,
- * never in soundness.
- */
+// Greedy extension is sound because a literal joins only when it conflicts with every current member. A
+// clique whose extension would overrun the budget is kept as it came in, losing strength, never soundness.
+// Clique merging as in Achterberg, Bixby, Gu, Rothberg and Weninger, "Presolve Reductions in Mixed Integer
+// Programming", INFORMS J. Comput. 2020, https://doi.org/10.1287/ijoc.2018.0857.
 internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: ExecutionControl =
     ExecutionControl.Never): List<Set<Int>> {
     if (cliques.size < 2) return cliques
@@ -142,13 +110,8 @@ internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: ExecutionContro
     return dropSubsumedCliques(grown)
 }
 
-/**
- * Drop every clique of [grown] that is a strict subset of another, and dedup equals. Taking them in
- * descending size means any strict superset of a clique is already kept — a superset dropped as a
- * subset of a third clique leaves that third one a superset too — and a superset must contain *every*
- * member, so only the kept cliques indexed under the member with the fewest of them can be one. That
- * probe is what keeps this off the all-pairs `O(K²·|clique|)` scan.
- */
+// In descending size every strict superset is already kept, and it must contain every member, so probing
+// only the kept cliques of the member held by the fewest avoids the all-pairs scan.
 private fun dropSubsumedCliques(grown: List<Set<Int>>): List<Set<Int>> {
     val sorted = grown.distinct().sortedByDescending { it.size }
     val kept = ArrayList<Set<Int>>(sorted.size)
@@ -177,31 +140,22 @@ private fun dropSubsumedCliques(grown: List<Set<Int>>): List<Set<Int>> {
     return kept
 }
 
-/**
- * The conflict graph of a set of at-most-one [cliques], held as *clique membership* rather than as
- * an adjacency list. Two literals conflict exactly when some clique contains both, so membership
- * answers the same queries in `Σ|clique|` space where an explicit adjacency needs `Σ|clique|²` — one
- * at-most-one over 5632 literals is 32 M neighbour entries, and materializing that exhausts the
- * heap on a large pseudo-Boolean model.
- *
- * Literals are Lit-encoded and arbitrarily sparse, so they are mapped once to dense positions and
- * everything below is flat primitive arrays, held as a CSR whose per-literal slice lists the
- * containing clique ids ascending.
- */
+// Held as clique membership rather than adjacency: two literals conflict exactly when some clique holds
+// both, so membership needs `Σ|clique|` space where adjacency needs `Σ|clique|²`, which one wide
+// at-most-one turns into heap exhaustion. Sparse Lit ids map to dense positions, and a CSR lists each
+// literal's containing clique ids ascending.
 private class ConflictGraph(private val cliques: List<Set<Int>>) {
     private val positionOf = MutableIntIntMap()
     private val cliqueStart: IntArray
     private val cliquesOf: IntArray
 
-    /** Scratch for [commonNeighbours]: adjacent-member count per position, and the stamp of the
-     *  member it was last counted for, so a literal sharing two cliques with one member counts once.
-     *  The stamp only ever increases, so [countedFor] needs no clearing between calls. */
+    // The stamp counts a literal sharing two cliques with one member once; it only increases, so
+    // countedFor needs no clearing between calls.
     private val adjacentCount: IntArray
     private val countedFor: IntArray
     private var stamp = 0
 
-    /** Per literal, the neighbour visits one [forEachNeighbour] sweep of it costs — the summed size
-     *  of the base cliques containing it. The unit [mergeCliques] budgets in. */
+    // Summed size of the base cliques containing each literal: the unit the merge budget counts.
     private val visitCost: LongArray
 
     init {
@@ -220,8 +174,6 @@ private class ConflictGraph(private val cliques: List<Set<Int>>) {
         for (clique in cliques) for (u in clique) visitCost[positionOf.getOrDefault(u, 0)] += clique.size
     }
 
-    /** The neighbour visits [commonNeighbours] spends on [clique] — two sweeps over every member's
-     *  containing cliques. */
     fun extensionCost(clique: Set<Int>): Long {
         var cost = 0L
         for (u in clique) {
@@ -231,8 +183,7 @@ private class ConflictGraph(private val cliques: List<Set<Int>>) {
         return cost
     }
 
-    /** Whether [u] and [v] are pairwise exclusive — i.e. co-members of some base clique. Both slices
-     *  are ascending, so this is a merge rather than a scan of the smaller against a set. */
+    // Both slices are ascending, so this is a merge.
     fun adjacent(u: Int, v: Int): Boolean {
         val pu = positionOf.getOrDefault(u, -1)
         val pv = positionOf.getOrDefault(v, -1)
@@ -253,12 +204,8 @@ private class ConflictGraph(private val cliques: List<Set<Int>>) {
         return false
     }
 
-    /**
-     * The literals adjacent to *every* member of [clique] and not in it — the candidates
-     * [mergeCliques] may extend it with, ascending so the greedy extension is deterministic.
-     * Counted by sweeping each member's containing cliques rather than intersecting neighbour sets,
-     * which keeps the working set to the literals actually reachable from [clique].
-     */
+    // Ascending so the greedy extension is deterministic. Sweeping containing cliques rather than
+    // intersecting neighbour sets keeps the working set to literals reachable from the clique.
     fun commonNeighbours(clique: Set<Int>): IntArray {
         val common = IntArrayList()
         for (u in clique) {
@@ -275,8 +222,7 @@ private class ConflictGraph(private val cliques: List<Set<Int>>) {
         return common.toIntArray().apply { sort() }
     }
 
-    /** Apply [action] to every literal sharing a base clique with [u], by position and value. The
-     *  same literal is visited once per shared clique, so callers that must count dedup themselves. */
+    // Visits a literal once per shared clique; callers that count dedup themselves.
     private inline fun forEachNeighbour(u: Int, action: (Int, Int) -> Unit) {
         val pu = positionOf.getOrDefault(u, -1)
         if (pu < 0) return

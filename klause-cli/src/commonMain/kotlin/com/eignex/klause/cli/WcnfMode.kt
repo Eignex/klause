@@ -8,15 +8,8 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 
-/**
- * DIMACS **WCNF** (MaxSAT) front-end (`.wcnf`). Soft clauses are relaxed with a fresh indicator and
- * the total weight of falsified soft clauses is minimised, so both new-format (`h` hard clauses,
- * `<weight>` soft) and old-format (`p wcnf … <top>`) instances are handled. Emits the MaxSAT-Evaluation
- * protocol: an `o <cost>` line paired with a `v` line per improving incumbent, followed by a final
- * `s OPTIMUM FOUND` / `s SATISFIABLE` / `s UNSATISFIABLE` / `s UNKNOWN` status. The `v` line gives
- * each original variable's value as a `0`/`1` bit-string (relaxation variables are not reported).
- * `-s` statistics are `c` comment lines.
- */
+// Soft clauses are relaxed with a fresh indicator; both `h`-style and `p wcnf … <top>` headers are read.
+// The `v` line omits relaxation variables.
 internal object WcnfMode : CliMode {
     override val names = listOf("wcnf", "maxsat")
     override val extensions = listOf("wcnf")
@@ -35,7 +28,6 @@ internal object WcnfMode : CliMode {
                     "auxiliaries=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"
             }
             val render: (Sample) -> String = { s -> renderWcnfModel(parsed.numOriginalBoolVars, s) }
-            // MaxSAT minimises the weight of falsified soft clauses.
             return sourceSolvable(
                 parsed.problem, parsed.objective.toLinearObjective(), false, common, render,
                 { assignment -> renderWcnfModel(parsed.numOriginalBoolVars, assignment::boolValue) },
@@ -47,7 +39,6 @@ internal object WcnfMode : CliMode {
     }
 }
 
-/** Render a MaxSAT-Evaluation `v` line: `v` followed by one `0`/`1` bit per original variable (1-based). */
 internal fun renderWcnfModel(numOriginalVars: Int, s: Sample): String =
     renderWcnfModel(numOriginalVars, s::boolValue)
 
@@ -56,8 +47,6 @@ private fun renderWcnfModel(numOriginalVars: Int, boolValue: (Int) -> Boolean): 
     for (v in 0 until numOriginalVars) append(if (boolValue(v)) '1' else '0')
 }
 
-/** MaxSAT-Evaluation output protocol. Each incumbent streams its `o` cost and `v` model together;
- *  the final `s` status is emitted at completion. */
 internal class WcnfOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true

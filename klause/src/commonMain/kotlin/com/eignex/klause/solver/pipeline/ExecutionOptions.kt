@@ -696,9 +696,8 @@ class ExecutionSetting<T> internal constructor(
 )
 
 /**
- * Immutable execution configuration. Repeated tuning settings use the last value. The same options
- * can resolve independent plans; each plan owns its consumption view and each worker owns its selectors.
- * Source execution resolves resource settings once into the containing invocation's ledgers.
+ * Immutable execution configuration. Repeated tuning settings use the last value; repeated allowances must
+ * agree. The same options can resolve independent plans.
  */
 class ExecutionOptions private constructor(
     private val values: Map<String, OptionValue>,

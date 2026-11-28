@@ -13,9 +13,7 @@ import com.eignex.klause.ir.materializeKey
 
 /**
  * `XOR(lit_1, ..., lit_n) == targetParity`. `targetParity = 1` means an odd number of literals
- * must be true; `targetParity = 0` means even. Payload at `intPayload(factorId)` is the current
- * parity (0 or 1). Each Boolean flip toggles the parity exactly once per occurrence of that var
- * in the literal list.
+ * must be true; `targetParity = 0` means even.
  */
 class Xor(
     /** The literals whose parity is constrained. */

@@ -21,9 +21,8 @@ internal class RegularPropagator(
 
     override val expensiveBake: Boolean get() = true
 
-    /** Advisor subscription: GAC over interior domains, so subscribe to every kind on every
-     *  (distinct) sequence variable and consume the dirty-variable delta — the incremental
-     *  propagator (`RegularIncrementalState`) recomputes only the layers a changed position reaches. */
+    // GAC over interior domains needs every event kind; the incremental state recomputes only the layers a
+    // changed position reaches.
     override val initialIntEventWatches: IntArray = allEventWatches(seq)
 
     override val consumesIntEventDelta: Boolean = true

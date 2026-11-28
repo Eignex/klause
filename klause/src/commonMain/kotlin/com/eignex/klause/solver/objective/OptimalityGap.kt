@@ -21,13 +21,12 @@ import kotlin.math.nextUp
  * falls as the incumbent rises, so the cutoff of an earlier, worse incumbent proved at least as much.
  */
 class OptimalityGap(
-    /** Positive gap in the units `scale` and `offset` map onto. */
+    // Positive gap in the units `scale` and `offset` map onto.
     private val tolerance: OptimalityTolerance,
-    /** Positive source units per working unit. */
+    // Positive source units per working unit.
     private val scale: BigFraction = BigFraction.ONE,
-    /** Source value at working zero. */
     private val offset: BigFraction = BigFraction.ZERO,
-    /** Whether every feasible working value is an integer, so a proved bound rounds up to one. */
+    // Every feasible working value is an integer, so a proved bound rounds up to one.
     private val integral: Boolean = false,
 ) {
     init {

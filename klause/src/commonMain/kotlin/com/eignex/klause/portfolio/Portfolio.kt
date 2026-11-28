@@ -81,7 +81,7 @@ internal fun initialProbeFraction(arm: Int, eligible: List<Int>, weights: IntArr
 class Portfolio(
     /** The arms; each carries its own engine, params, and objective form. */
     val workers: List<PortfolioWorker>,
-    /** kumulant arm-selection policy over rewards in `[0, 1]`; see [thompson] for the default. */
+    /** Arm-selection policy over rewards in `[0, 1]`; see [thompson] for the default. */
     private val bandit: UnivariateBandit,
     /** Threads running segments at once; capped at the number of arms, since an arm runs on one lane at a time. */
     lanes: Int = 1,
@@ -93,34 +93,22 @@ class Portfolio(
     /** Geometric growth applied to a restarting arm's slice after each segment. */
     private val sliceGrowth: Double = 1.5,
     /**
-     * Work the first segment of a counted arm spends, resumable or local search; later segments grow by
-     * [sliceGrowth] up to [maxSliceWork].
+     * Work the first segment of a counted arm spends; later segments grow by [sliceGrowth] up to [maxSliceWork].
      *
-     * Work is measured in node-equivalents, one unit for every arm whatever its engine. A resumable backtrack arm
-     * spends one per search node plus its LP work at the rate [com.eignex.klause.solver.ResumableSearch.runSlice]
-     * charges it. A local-search or ALNS arm ([PortfolioWorker.acceptsInstructionBudget]) spends one per
-     * [lsInstructionsPerWork] instructions of its counted allowance; ALNS spends it across its own outer
-     * destroy/repair loop instead of one inner solve (see [com.eignex.klause.meta.alns.Alns]'s class KDoc). A
-     * common unit is what lets one schedule give every arm a comparable turn.
-     * Retained Boolean clause walks also charge their priced scoring inspections to this allowance.
+     * Work is measured in node-equivalents for every engine: a backtrack arm spends one per search node plus its LP
+     * work, a local-search or ALNS arm one per [lsInstructionsPerWork] instructions. A common unit gives every arm a
+     * comparable turn.
      *
-     * A counted segment ends at its work or at its time slice, whichever comes first. A segment bounded by time
-     * pauses somewhere different on every run, and since the search resumes from wherever it stopped, every counter
-     * a solve reports inherits that. A work-bound segment pauses at the same point for the same incoming state;
-     * elapsed coverage can still change later arm choices on one lane. Work binds first wherever
-     * [lsInstructionsPerWork] prices an arm's steps about right; the time slice is there for models where it does
-     * not, on which one segment of a few thousand units can otherwise run for seconds and hold the core past every
-     * later choice the policy would make.
+     * A counted segment ends at its work or its time slice, whichever comes first. A work-bound segment pauses at
+     * the same point for the same incoming state, where a time-bound one pauses somewhere different on every run.
+     * The time slice covers models where [lsInstructionsPerWork] misprices an arm's steps.
      */
     private val baseSliceWork: Long = 5_000,
     /** Cap on a single counted segment's work. */
     private val maxSliceWork: Long = 150_000,
-    /**
-     * Wall-clock cap on a counted arm's probe segment, which every arm runs before the policy has seen any of
-     * them; later counted segments are capped by their growing time slice ([baseSliceMillis]).
-     */
+    /** Wall-clock cap on a counted arm's probe segment, which every arm runs before the policy has seen any. */
     private val probeSliceMillis: Long = 1_000,
-    /** Local-search instructions that cost as much as one search node; see `LS_INSTRUCTIONS_PER_WORK`. */
+    /** Local-search instructions that cost as much as one search node. */
     private val lsInstructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     /**
      * Non-improving segments before an observable arm reseeds; scheduled restarting backtrack arms count
@@ -129,27 +117,24 @@ class Portfolio(
     private val reseedStaleThreshold: Int = 3,
     /**
      * Share of the bandit's evidence that survives the first incumbent. Finding a solution and improving one are
-     * different jobs, so the scheduler starts the second with only a weak memory of who did well at the first:
-     * enough that it need not re-explore every arm, little enough that a few segments overturn it. The search
-     * itself carries over whole. Applies to [thompson]'s policy; another policy keeps its evidence.
-     * Priced family evidence retains the same fraction; the classification priors stay fixed.
+     * different jobs, so the improvement phase starts with a weak memory of the feasibility phase. Applies to
+     * [thompson]'s policy and to priced family evidence; another policy keeps its evidence.
      */
     private val phaseRetention: Double = DEFAULT_PHASE_RETENTION,
     /** The model's classification, which sets the lean each engine family starts from; null leans none. */
     private val profile: ProblemProfile? = null,
-    /** Checks every result an arm claims before it is accepted; null trusts the arms. See [WitnessCheck]. */
+    /** Checks every result an arm claims before it is accepted; null trusts the arms. */
     private val witnessCheck: WitnessCheck? = null,
-    /** Told about each arm the run quarantines for a refuted claim; see [ArmFault]. */
+    /** Told about each arm the run quarantines for a refuted claim. */
     private val onFault: ((ArmFault) -> Unit)? = null,
     /**
-     * Least share of the run's segment time each arm is owed, by arm; empty owes none. An arm below its share is
-     * scheduled before the policy chooses, so an arm whose progress earns no credit until it proves something — a
-     * complete search closing in on a bound — is not starved by arms that improve the incumbent often.
+     * Least share of the run's segment time each arm is owed; empty owes none. An arm below its share is scheduled
+     * before the policy chooses, so a complete search that earns no credit until it proves something is not starved.
      */
     private val minShares: DoubleArray = DoubleArray(0),
-    /** Charged-work scheduling and streaming diagnostics; null preserves elapsed-time scheduling. */
+    /** Charged-work scheduling and streaming diagnostics; null uses elapsed-time scheduling. */
     private val diagnostics: PortfolioDiagnostics? = null,
-    /** Opt-in reward experiment, independent of coverage and admission. Null retains ordinary rewards. */
+    /** Optional reward policy, independent of coverage and admission; null uses ordinary rewards. */
     private val rewardPolicy: PortfolioRewardPolicy? = null,
     /** Physical progress stream; it grants no deterministic scheduling or proof authority. */
     private val onProgress: ((PortfolioEvent) -> Unit)? = null,
@@ -887,8 +872,7 @@ class Portfolio(
         return if (reason == null) Verification.Accepted(Candidate(sample, value)) else Verification.Rejected(reason)
     }
 
-    /** One segment's assignment: the arm a lane claimed and what it may spend, plus what its segment found. A
-     *  [whole] segment is the arm's share of the entire solve, run on a lane of its own until the run ends. */
+    // A whole segment is the arm's share of the entire solve, run on a lane of its own until the run ends.
     private class Claim(
         val arm: Int,
         val probing: Boolean,
@@ -899,10 +883,9 @@ class Portfolio(
         val preparationRevisit: Boolean = false,
         val segment: Long = 0L,
     ) {
-        /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
+        // A negative allowance leaves the bound to the run's token.
         val handleNodes: Long get() = if (whole) -1L else sliceWork
 
-        /** When the lane claimed the segment. */
         val started = TimeSource.Monotonic.markNow()
 
         var indeterminate = false
@@ -933,22 +916,19 @@ class Portfolio(
         // Why the segment's claim was refuted, when it was; the arm is quarantined as the segment settles.
         var fault: String? = null
 
-        // When the segment's next candidate check is due.
         private var nextCheck = TimeSource.Monotonic.markNow()
 
         fun checkDue(): Boolean = nextCheck.hasPassedNow()
 
-        /** A check that took [cost] defers the next until checking has used no more than [CHECK_SHARE] of the time. */
+        // Defers the next check until checking has used no more than CHECK_SHARE of the time.
         fun checked(cost: Duration) {
             nextCheck = TimeSource.Monotonic.markNow() + cost * ((1.0 - CHECK_SHARE) / CHECK_SHARE)
         }
     }
 
-    /**
-     * The state one `solve` or `minimize` call shares across its lanes: the ledger, the arms' [handles] and stats,
-     * which arms are busy or retired, and the slice sizes. Everything but the handles is touched under [locked]; a
-     * handle is advanced only by the lane holding its arm; preparation hints are read only while the arm is idle.
-     */
+    // The state one `solve` or `minimize` call shares across its lanes. Everything but the handles is touched under
+    // locked; a handle is advanced only by the lane holding its arm; preparation hints are read only while the arm
+    // is idle.
     @Suppress("TooGenericExceptionCaught")
     private inner class Schedule<H : AutoCloseable>(cancellation: ExecutionControl, val handles: Array<H?>) {
         private val scopedReward = if (rewardPolicy is SourceRateReward)
@@ -993,7 +973,6 @@ class Portfolio(
         private val lock = Mutex(concurrent = lanes > 1)
         private val stopped = AtomicBoolean(false)
 
-        /** The run's token: the caller's, stopped early once any lane settles the run. */
         private val external = if (diagnostics == null) cancellation else object : ExecutionControl() {
             override val workScheduled: Boolean = true
             override fun isCancelled(): Boolean = cancellation()
@@ -1092,8 +1071,6 @@ class Portfolio(
         private var continuingPreparation = -1
         private var nextPreparationArm = 0
 
-        // Segment time each arm has run ([armNanos]) and all arms together ([totalNanos]), for the shares
-        // [minShares] owes.
         private val armNanos = LongArray(workers.size)
         private val activeSince = arrayOfNulls<TimeMark>(workers.size)
         private val armWork = DoubleArray(workers.size)
@@ -1132,7 +1109,6 @@ class Portfolio(
             if (diagnostics != null) armWork[arm] else
                 armNanos[arm].toDouble() + (activeSince[arm]?.elapsedNow()?.inWholeNanoseconds ?: 0L)
 
-        /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
         val workLimitReached: Boolean get() = diagnostics?.let { chargedWork >= it.workLimit } == true
 
@@ -1150,13 +1126,10 @@ class Portfolio(
 
         fun <T> locked(action: () -> T): T = lock.withLock { action() }
 
-        /** End the run: every lane stops at its next poll and claims nothing more. */
+        // Every lane stops at its next poll and claims nothing more.
         fun finish() = stopped.store(true)
 
-        /**
-         * Run [segment] on the lanes until the run is finished, cancelled, or out of arms, then close every handle
-         * still open and rethrow the first failure a lane hit, a close failure suppressed into it.
-         */
+        // Rethrows the first failure a lane hit after closing every open handle, a close failure suppressed into it.
         fun execute(segment: (Claim) -> Unit) {
             val execution = runCatching {
                 for ((arm, worker) in workers.withIndex()) {
@@ -1208,8 +1181,7 @@ class Portfolio(
         // The first failure any lane hit; it ends the run and is rethrown once every lane has joined.
         private var laneFailure: Throwable? = null
 
-        // Runs segments until the run ends. Never throws: a native lane cannot hand an exception back, so a failure
-        // is recorded for [execute] to rethrow.
+        // Never throws: a native lane cannot hand an exception back, so a failure is recorded for execute to rethrow.
         private fun lane(index: Int, segment: (Claim) -> Unit) {
             try {
                 while (!token() && (diagnostics == null || chargedWork < diagnostics.workLimit)) {
@@ -1234,13 +1206,9 @@ class Portfolio(
             }
         }
 
-        /**
-         * The next arm for lane [lane], or null when none is free. With a lane for every arm, each lane keeps its own
-         * arm: there is nothing to share, so neither a probe nor the policy has a choice to make. Otherwise every arm
-         * first runs one base slice in order, with eligible early core trials preceding heuristic probes. The policy
-         * then picks among arms neither busy nor retired. Improvement variants are admitted at the first
-         * incumbent, or when the initial pool retires.
-         */
+        // With a lane for every arm, each lane keeps its own arm. Otherwise every arm first runs one base slice in
+        // order, early core trials before heuristic probes, and the policy then picks among free arms. Improvement
+        // variants are admitted at the first incumbent, or when the initial pool retires.
         private fun claim(lane: Int): Claim? = locked {
             if (feasibilityComplete) {
                 for (arm in firstWitnessArms) if (!busy[arm]) retire(arm, "first-witness")
@@ -1472,7 +1440,7 @@ class Portfolio(
             }
         }
 
-        // A policy that cannot be restricted to [candidates] is asked until it names one of them.
+        // A policy that cannot be restricted to candidates is asked until it names one of them.
         private fun armAmong(candidates: List<Int>): Int {
             (bandit as? DiscountedThompson)?.let { return it.chooseAmong(candidates) }
             repeat(workers.size) {
@@ -1482,8 +1450,7 @@ class Portfolio(
             return candidates.first()
         }
 
-        /** The first incumbent ends the feasibility hunt: the ledger's rates restart, the bandit keeps
-         *  [phaseRetention] of its evidence, and LNS arms become eligible. Call under [locked]. */
+        // Call under locked.
         fun startImprovementPhase() {
             improving = true
             ledger.resetPhase()
@@ -1508,12 +1475,8 @@ class Portfolio(
             return owed
         }
 
-        /**
-         * Settle [claim]'s segment: fold its [stats], credit its progress and every contribution used since the
-         * last settle, and score the arm. A segment weighs the share of its slice it spent, so one cut short by a
-         * verdict counts as less evidence; every arm runs the same slice, so a full segment of any arm weighs one. A
-         * segment that [failed] earns nothing and weighs a full one. Call under [locked].
-         */
+        // A segment weighs the share of its slice it spent, so one cut short by a verdict counts as less evidence;
+        // a failed segment earns nothing and weighs a full one. Call under locked.
         @Suppress("LongParameterList")
         fun record(
             claim: Claim,
@@ -1647,8 +1610,7 @@ class Portfolio(
             if (trialExit != null) retire(arm, trialExit)
         }
 
-        /** Quarantine [claim]'s arm for its refuted claim: retire it, count the fault, and report it. Call under
-         *  [locked]. */
+        // Call under locked.
         fun quarantine(claim: Claim) {
             val worker = workers[claim.arm]
             log.fault(claim.arm)
@@ -1656,8 +1618,7 @@ class Portfolio(
             onFault?.invoke(ArmFault(worker.label, worker.armId, checkNotNull(claim.fault)))
         }
 
-        /** Retire [arm]: close its handle and never schedule it again; the run ends once none remain. Call under
-         *  [locked]. */
+        // Call under locked.
         fun retire(arm: Int, cause: String) {
             if (retired[arm]) return
             retired[arm] = true
@@ -1675,7 +1636,6 @@ class Portfolio(
             observer(observations.event(arm, workers[arm].label, cause))
         }
 
-        /** The pool's total counters, every arm that did work included, with the schedule attached. */
         fun folded(): SolveStats {
             val stats = (completedStats.filterNotNull() + liveStats.filterNotNull())
                 .fold(SolveStats.EMPTY) { acc, snapshot -> acc.mergedWith(snapshot) }
@@ -1751,7 +1711,6 @@ class Portfolio(
         else -> "failure"
     }
 
-    /** The instruction allowance a counted local-search segment of [work] units receives. */
     private fun instructionsFor(work: Long): Long = (work * lsInstructionsPerWork).toLong().coerceAtLeast(1L)
 
     // A whole segment runs until the run ends, so it has no allowance of its own.
@@ -1782,16 +1741,8 @@ class Portfolio(
         return native + auxiliaryWork.coerceIn(0L, Long.MAX_VALUE - native)
     }
 
-    /**
-     * The cancellation token bounding one non-resumable arm's segment: its time slice, or [probeSliceMillis] for a
-     * counted arm's probe, and never more than its [remainingShare] of the time the run has left. The share keeps a
-     * short budget from going to a few long segments: with the probes and a couple of grown slices spending it, the
-     * policy would get almost no choices to make. A counted arm ([PortfolioWorker.acceptsInstructionBudget]) usually
-     * ends at its instruction budget first; see [baseSliceWork]. An arm with neither a counter nor a resumable handle
-     * has only the time bounds,
-     a deadline it can size a sub-phase against ([ExecutionControl.shorten]). A whole segment
-     * has none.
-     */
+    // The time slice, or probeSliceMillis for a counted arm's probe, capped at remainingShare of the time the run has
+    // left so the probes and a few grown slices cannot spend a short budget before the policy gets to choose.
     private fun segmentToken(worker: PortfolioWorker, cancellation: ExecutionControl, claim: Claim): ExecutionControl {
         if (diagnostics != null) return cancellation
         if (claim.whole) return cancellation
@@ -1804,27 +1755,22 @@ class Portfolio(
         (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
     } ?: Long.MAX_VALUE
 
-    /**
-     * The share of the time the run has left one segment may take: half of it split between the families the
-     * policy chooses among, since the policy shares time by family and an arm's segments add up to its family's.
-     * A segment cut to a share per arm would chop a proof into pieces too short to finish however much of the run
-     * its family won. Probes run before the policy chooses among newly admitted arms, so each takes a share per
-     * admitted arm by its probe weight, and the probes together never take more than half the run.
-     */
+    // Half the remaining time split between families, not arms: the policy shares time by family, and a share per
+    // arm would chop a proof into pieces too short to finish. Each probe takes its probe-weighted share, so the
+    // probes together never take more than half the run.
     private fun remainingShare(claim: Claim): Double =
         if (claim.probing) REMAINING_SHARE * claim.probeFraction else REMAINING_SHARE / familyCount
 
     private fun until(millis: Long): ExecutionControl =
         ExecutionControl.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
 
-    /** Geometric growth shared by every slice axis (millis and work): grow by [sliceGrowth], never past [cap]. */
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
 
     override fun close() {
         workers.forEach { runCatching { it.close() } }
     }
 
-    /** Policy factories. The primary constructor takes any kumulant [UnivariateBandit] reading rewards in `[0, 1]`. */
+    /** The default policy factory and its constants. */
     companion object {
         /** Full segments after which an observation counts half as much; see [thompson]. */
         const val DEFAULT_HALF_LIFE: Double = 200.0
@@ -1833,11 +1779,8 @@ class Portfolio(
         const val DEFAULT_PHASE_RETENTION: Double = 0.25
 
         /**
-         * Discounted Thompson sampling, the default policy, on [lanes] threads. An arm that keeps earning nothing
-         * is tried less and less, with no fixed exploration share to tax the run, and evidence fades over
-         * [halfLife] full segments so the schedule follows whichever arm is paying now. Every arm first runs
-         * one base slice, in order, so the policy starts from evidence on each; at one base slice apiece the probe
-         * costs little however many arms there are.
+         * Discounted Thompson sampling, the default policy, on [lanes] threads. Evidence fades over [halfLife] full
+         * segments so the schedule follows whichever arm is paying now.
          */
         fun thompson(
             workers: List<PortfolioWorker>,
@@ -1892,6 +1835,5 @@ private const val AUXILIARY_PREPARATION_ALLOWANCES = 12
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
 private const val CHECK_SHARE = 0.2
 
-// The caller's token that also stops on [flag], keeping the caller's deadline.
 private fun ExecutionControl.alsoStoppedBy(flag: AtomicBoolean): ExecutionControl =
     withStopFlag( flag)

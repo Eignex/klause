@@ -6,11 +6,9 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
 /**
- * Domain bisection (`indomain_split`): branch `v ≤ mid` first, then `v ≥ mid+1`, with
- * `mid` the floor midpoint of the current interval. The engine's int decisions are bound
- * splits around the heuristic's first value (see `splitIntAlternatives`), so yielding
- * the midpoint produces exactly the dichotomic search the annotation asks for — log-depth
- * on wide domains where value enumeration is linear.
+ * Domain bisection (`indomain_split`): branch `v ≤ mid` first, then `v ≥ mid+1`, with `mid` the floor
+ * midpoint of the current interval. Int decisions bound-split around the first value, so yielding the
+ * midpoint gives dichotomic search.
  */
 object IndomainSplit : ValueSelector {
     override fun fresh() = this
@@ -21,9 +19,8 @@ object IndomainSplit : ValueSelector {
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
             val mid = boundsMidpoint(d)
-            // The midpoint may sit in a hole; the bound split doesn't care, but the
-            // trailing ascending walk keeps the sequence complete for any consumer that
-            // enumerates past the first value.
+            // The ascending tail keeps the sequence complete for a consumer that enumerates past the
+            // midpoint, which may sit in a hole.
             sequenceOf(mid) + sequence {
                 for (i in 0 until d.values.size) {
                     val v = d.values.valueAt(i)

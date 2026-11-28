@@ -5,19 +5,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.storage.forEachSlot
 
-/**
- * Layer-expanded DFA flow hull — the exact convex hull of the automaton's accepting strings. An arc
- * variable `y ∈ [0,1]` per reachable `(position t, state q, symbol s)` whose transition `δ(q, s)` is
- * live. Rows: a source row `Σ y out of (0, q0) = 1`, flow conservation at every interior `(t, q)`, an
- * acceptance row at the last layer, and a channel `Σ_s s·y = seq(t)` per position. The flow polytope is
- * integral, so the LP is the true convex hull. Large arc sets and inputs with no accepting path are skipped.
- * Côté, Gendron and Rousseau, "Modeling the Regular Constraint with Integer Programming", CPAIOR 2007,
- * https://doi.org/10.1007/978-3-540-72397-4_3.
- *
- * The layer expansion screens each position's symbols through its root box and the flow rows then confine
- * the column to the arcs built, so over a side the model leaves open an invented endpoint would refute
- * strings the automaton accepts — declined there.
- */
+// Layer-expanded DFA flow hull: the flow polytope is integral, so the LP is the exact convex hull of the
+// accepted strings. The flow rows confine each column to the arcs built from its root box, so an
+// open-sided column is declined: an invented endpoint would refute accepted strings.
+//
+// Côté, Gendron and Rousseau, "Modeling the Regular Constraint with Integer Programming", CPAIOR 2007,
+// https://doi.org/10.1007/978-3-540-72397-4_3.
 @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
 internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
@@ -39,7 +32,6 @@ internal fun Regular.emitLpRelaxation(builder: RelaxationBuilder) {
                 if (sym !in box) continue
                 val nxt = delta(state, sym)
                 if (nxt == 0) continue
-                // The arc is present while symbol sym stays in seq[t]'s live domain.
                 val col = builder.auxColumn(
                     0L,
                     if (live.contains(sym)) 1L else 0L,
@@ -65,13 +57,11 @@ internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Regular, boxes: R
 
     if (!prepareStatesBothBounds(boxes, seq)) return null
     val reach = prepareForwardReach(factor, boxes::domain) ?: return null
-    // arc columns + conservation (≤ arcs) + channel (len) + source + acceptance.
     return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 2L)
 }
 
 private class RegularReach(val states: Array<IntHashSet>, val arcCount: Long)
 
-/** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count. */
 private fun Regular.forwardReach(domainOf: (Int) -> IntDomain): RegularReach? {
     var result: RegularReach? = null
     sequence<Unit> { result = prepareForwardReach(this@forwardReach, domainOf) }.forEach { }
@@ -103,9 +93,7 @@ private suspend fun SequenceScope<Unit>.prepareForwardReach(
         current.forEachSlot { occupied, state ->
             if (++visits % 256 == 0) yield(Unit)
             if (!occupied) return@forEachSlot
-            // Walk the alphabet (1..s), not the domain: only symbols in range have a transition, and
-            // s is the automaton's alphabet size (bounded), never the variable's span — so a wide
-            // sequence domain is tested by membership, never enumerated.
+            // Walk the bounded alphabet, not the domain, so a wide sequence domain is never enumerated.
             for (sym in 1..s) {
                 if (++visits % 256 == 0) yield(Unit)
                 if (sym.toLong() in dom) {
@@ -118,11 +106,11 @@ private suspend fun SequenceScope<Unit>.prepareForwardReach(
                 }
             }
         }
-        if (reach[t + 1].isEmpty()) return null // no accepting path under these domains
+        if (reach[t + 1].isEmpty()) return null
     }
     if (arcCount == 0L || arcCount > MAX_REGULAR_ARCS) return null
     return RegularReach(reach, arcCount)
 }
 
-/** Above this many reachable arcs the hull is skipped — the arc columns would dominate. */
+// Larger arc sets are skipped: their columns would dominate the LP.
 private const val MAX_REGULAR_ARCS: Int = 4096

@@ -8,13 +8,6 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Runs the propagation engine over an immutable `Problem` and reports deductions beyond [assumptions].
- *
- * This belongs to propagation rather than `Problem`: creating a [PropagationState], scheduling
- * propagators, and extracting conflicts are propagation-engine work. The model owns only the data
- * used to build that projection.
- */
 internal fun runRootPropagation(
     problem: Problem,
     assumptions: Assumptions,
@@ -150,7 +143,7 @@ internal fun PropagationState.rootDeductions(assumptions: Assumptions): Propagat
     )
 }
 
-/** Run the construction-time propagation bake and merge deductions supplied by presolve. */
+// Merges deductions supplied by presolve.
 internal fun rootBake(
     problem: Problem,
     seedDeductions: PropagationResult,

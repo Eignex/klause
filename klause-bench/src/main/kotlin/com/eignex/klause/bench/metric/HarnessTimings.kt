@@ -1,9 +1,6 @@
 package com.eignex.klause.bench.metric
 
-/*
- * Per-case monotonic elapsed observations, accumulating nanoseconds before whole-millisecond output.
- * Nested phases are inclusive: do not sum them. An absent phase was not observed.
- */
+// Nested phases are inclusive: do not sum them. An absent phase was not observed.
 internal class HarnessTimings(private val nanoTime: () -> Long = System::nanoTime) {
     private val durations = linkedMapOf<String, Long>()
 

@@ -1,29 +1,14 @@
 package com.eignex.klause.localsearch.schedule
 
 /**
- * Temperature schedule for simulated annealing: owns the current [temperature] and evolves it as
- * the search runs. Stateful and per-instance — never share one across concurrent searches.
- *
- * The search loop drives a schedule with three signals:
- *  - [step] once per annealing move; cooling schedules lower the temperature here.
- *  - [observe] at the end of each round ([RoundLog]); adaptive schedules retune, static ones
- *    ignore it.
- *  - [reheat] to raise the temperature by a factor — periodic reheating or an explicit kick.
- *
- * [reset] returns to the start temperature (e.g. on restart). The schedule never touches the search
- * assignment, so reheating re-diversifies without discarding the incumbent.
- *
- * Implementations: [Geometric] (fixed cooling rate), [AdaptiveCooling] (rate tracks the observed
- * acceptance ratio), and the [Reheating] decorator.
- *
- * A schedule is an [AdaptivePolicy]: it `observe`s the shared per-round feedback channel and
- * `reset`s like every other adaptive policy, adding the temperature-specific `step`/`reheat` hooks.
+ * Temperature schedule for simulated annealing. Stateful; never share one across concurrent searches.
+ * The schedule never touches the assignment, so reheating re-diversifies without discarding the incumbent.
  */
 interface Schedule : AdaptivePolicy {
     /** Current temperature; always strictly positive. */
     val temperature: Double
 
-    /** Advance one annealing step. Cooling schedules lower the temperature here. */
+    /** Advance one annealing step. */
     fun step()
 
     /** Multiply the current temperature by [factor] (≥ 1), capped at the schedule's ceiling. */
@@ -31,9 +16,7 @@ interface Schedule : AdaptivePolicy {
 }
 
 /**
- * Shared temperature state for the cooling schedules: holds the current [temperature] bounded to
- * `[minTemperature, maxTemperature]` and implements [reheat]/[reset]. Subclasses supply the
- * per-[step] cooling and, optionally, an [observe] response. The ceiling defaults to
+ * Temperature state bounded to `[minTemperature, maxTemperature]`. The ceiling defaults to
  * [initialTemperature], so repeated reheats never run hotter than the start.
  */
 abstract class AbstractSchedule(
@@ -94,18 +77,9 @@ class Geometric(
 }
 
 /**
- * Geometric cooling whose rate adapts each round to hold the observed acceptance ratio near
- * [targetAcceptance]. The temperature still cools by the current [coolingRate] on every [step];
- * [observe] nudges that rate:
- *
- *  - acceptance **above** target ⇒ the walk is too free (temperature too high) ⇒ cool faster, by
- *    pushing the rate down toward [minRate];
- *  - acceptance **below** target ⇒ the walk is too frozen ⇒ cool slower, by pushing the rate up
- *    toward [maxRate].
- *
- * The rate moves geometrically by `1 − adjustStep·(acceptance − target)` per round, bounded to
- * `[minRate, maxRate]`. Cost variance is reported in [RoundLog] for callers that want it, but the
- * controller keys off the acceptance ratio alone — the most robust, scale-free signal.
+ * Geometric cooling whose rate adapts each round to hold the acceptance ratio near [targetAcceptance]:
+ * acceptance above target cools faster, below target cools slower, within [minRate] and [maxRate]. The
+ * acceptance ratio is used alone because it is scale-free.
  */
 class AdaptiveCooling(
     initialTemperature: Double = 1.0,
@@ -133,7 +107,7 @@ class AdaptiveCooling(
 
     private val startRate: Double = initialRate
 
-    /** Current geometric cooling rate; retuned by [observe], reset by [reset]. */
+    /** Current geometric cooling rate. */
     var coolingRate: Double = initialRate
         private set
 
@@ -154,10 +128,8 @@ class AdaptiveCooling(
 }
 
 /**
- * Decorates a base [Schedule] with periodic geometric reheating: it forwards every [step] to
- * [base], and every [period] steps raises the base temperature by [reheatFactor] (≥ 1). A
- * cooled-and-stuck run re-diversifies without a restart — the schedule never touches the
- * assignment, so the incumbent is preserved. The base's own ceiling caps the reheated temperature.
+ * Decorates [base] with periodic reheating: every [period] steps its temperature is multiplied by
+ * [reheatFactor], capped by the base's own ceiling.
  */
 class Reheating(private val base: Schedule, val period: Int, val reheatFactor: Double = 4.0) : Schedule {
     init {

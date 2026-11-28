@@ -26,8 +26,7 @@ val Problem.baked: PropagationResult
  * Build the finite, root-propagated projection of this model's declared integer domains.
  *
  * A column that declares a value set keeps it, holes included; one that declares its whole range has that
- * range materialized. Every declared side must be closed — no fallback endpoint is invented here, because
- * inventing one narrows the model.
+ * range materialized. Every declared side must be closed: inventing a fallback endpoint would narrow the model.
  */
 fun Problem.bake(cancellation: ExecutionControl = ExecutionControl.Never): BakedProblem =
     bakeSelected(null, cancellation, null)
@@ -76,7 +75,7 @@ private fun Problem.bakeSelected(
     )
 }
 
-/** Append a root-inert factor to an already baked propagation projection. */
+// The factor must be root-inert: the existing root deductions are reused.
 internal fun BakedProblem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
     settings = this.settings,
     semantics = this.semantics,

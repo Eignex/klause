@@ -35,16 +35,9 @@ enum class VarKind {
 }
 
 /**
- * Stateful propagator with a decision trail. Push pins via [pinBool] / [pinInt]; each push
- * increments [decisionLevel] and propagates incrementally (only factors whose vars changed
- * are revisited). On [PropagationResult.Unsat], the result carries `conflictLevels` so a
- * CSP-style DFS sampler can backjump directly past the deepest non-conflicting level.
- *
- * One persistent [PropagationState] is reused across pushes. Each successful push records a
- * [PropagationState.LevelMark]; [popLast] / [popToLevel] rewind to the target level's mark
- * by replaying the state's undo log in O(changes), no re-propagation. Conflict on push
- * reverts the state to the last good mark before returning Unsat — the session's trail is
- * left at the pre-push level.
+ * Stateful propagator with a decision trail. Each push via [pinBool] / [pinInt] adds a [decisionLevel] and
+ * propagates incrementally; an Unsat result carries `conflictLevels` for backjumping and leaves the trail at the
+ * pre-push level. [popLast] / [popToLevel] rewind through the undo log in O(changes) without re-propagation.
  *
  * Not thread-safe. One consumer per session.
  */
@@ -150,8 +143,7 @@ class PropagationSession private constructor(
         pendingRootSourceRetirement = null
     }
 
-    /** Subscribe to per-variable unassign events fired by every backtrack/undo; see
-     *  [PropagationState.undoTo]. Combined-index encoding: bool id `v`, int id `numBoolVars + v`. */
+    /** Called with each variable a backtrack unassigns: bool id `v`, int id `numBoolVars + v`. */
     var unassignListener: ((Int) -> Unit)?
         get() = state.unassignListener
         set(value) {
@@ -164,9 +156,7 @@ class PropagationSession private constructor(
             state.retractingListener = value
         }
 
-    /** `levelStates[L]` is the [PropagationState.LevelMark] right after level `L`'s
-     *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
-     *  doubling. Marks are tiny (five ints + rare payload copies) — no pooling needed. */
+    // `levelStates[L]` is the mark after level `L`'s fixpoint; index 0 is post-bake.
     private var levelStates: Array<PropagationState.LevelMark?> = arrayOfNulls(8)
     private var levelTop: Int = 0
     private fun levelLast(): PropagationState.LevelMark = requireNotNull(levelStates[levelTop - 1])
@@ -183,12 +173,8 @@ class PropagationSession private constructor(
         levelTop = 1
     }
 
-    // Decision pins, primitive-encoded to keep a push allocation- and boxing-free.
-    // [boolPinned] holds -1 (free) / 0 (false) / 1 (true) per bool var; [intPinnedSet] + [intPinnedVal]
-    // hold the int decisions. Only
-    // *decision* pins live here — propagation-implied facts are read from [state]. [trail]
-    // is the decision stack used as a LIFO, each entry encoded as `v` (bool) or
-    // `numBoolVars + v` (int), matching PropagationState's level encoding.
+    // Decision pins only, primitive-encoded so a push is allocation- and boxing-free; implied facts are read from
+    // [state]. [trail] entries are `v` (bool) or `numBoolVars + v` (int).
     private val boolPinned: IntArray = preparedBuffers?.boolPinned ?: (IntArray(problem.numBoolVars) { -1 })
     private val intPinnedSet: BooleanArray = preparedBuffers?.intPinnedSet ?: (BooleanArray(problem.numIntVars))
     private val intPinnedVal: LongArray = preparedBuffers?.intPinnedVal ?: (LongArray(problem.numIntVars))
@@ -317,10 +303,10 @@ class PropagationSession private constructor(
     private fun encInt(v: Int): Int = problem.numBoolVars + v
     private fun trailIsBool(enc: Int): Boolean = enc < problem.numBoolVars
 
-    /** The clause forbidding the exact total assignment `(bools, ints)`: one literal per
-     *  variable demanding it differ. Blocking a found solution's full assignment (rather than
-     *  the decisions that led to it) is order-independent — the same assignment reached later
-     *  through a different decision sequence is still excluded. */
+    /**
+     * The clause forbidding the exact total assignment `(bools, ints)`. Unlike blocking the decisions, it also
+     * excludes the same assignment reached through another decision sequence.
+     */
     fun assignmentNogood(bools: BooleanArray, ints: LongArray): IntArray {
         val out = IntArray(bools.size + ints.size)
         var j = 0
@@ -339,9 +325,7 @@ class PropagationSession private constructor(
     /** Literal `x_v ≤ threshold` ([positive]) or its negation. See [boundGeLit]. */
     fun boundLeLit(v: Int, threshold: Long, positive: Boolean): Int = Lit.make(state.atomVarLe(v, threshold), positive)
 
-    /** Whether the deadline token has fired. Read by the heuristics that run propagation *inside* one
-     *  decision — see [com.eignex.klause.backtrack.selector.probeAndOrder], which spends a fixpoint per
-     *  candidate value — since the engine only polls between nodes and cannot see past them. */
+    // Read by heuristics that run propagation inside one decision, since the engine only polls between nodes.
     internal val cancelRequested: Boolean get() = state.work >= state.workLimit || cancellation.pollStop()
 
     internal fun extensionalDensities(variable: Int, values: LongArray, maxVisits: Int = 65_536): DoubleArray? {
@@ -378,11 +362,8 @@ class PropagationSession private constructor(
      *  then abort to `BudgetCapped` rather than read the partial state as a solved leaf. */
     val fixpointCancelled: Boolean get() = state.runCancelled
 
-    /** Set when a value probe saw the deadline fire (see [probeFixpoint] and
-     *  [com.eignex.klause.backtrack.selector.probeAndOrder]). The brancher reads and clears it per node and
-     *  asks the run to poll before committing: another decision would spend its own multi-second
-     *  fixpoint past the deadline.
-     *  Not sticky — a probe leaves no partial state behind, so a paused arm resumes on this session. */
+    // Set when a value probe saw the deadline fire; the brancher reads and clears it per node and polls before
+    // committing another decision. Not sticky: a probe leaves no partial state behind.
     internal var probeCancelled: Boolean = false
 
     // Initial point pins can refute this root while the underlying model remains feasible.
@@ -478,9 +459,8 @@ class PropagationSession private constructor(
         }
         rootWork = state.work
         rootPropagationNanos = state.propagationNanos
-        // The bake-time fixpoint runs with logging off (it never backtracks). Undo logging starts
-        // before the first push, so the level-0 mark has undoSize 0 and undoing to it rewinds every
-        // search mutation back to this post-bake baseline.
+        // Undo logging starts before the first push, so the level-0 mark rewinds every search mutation back to
+        // this post-bake baseline.
         state.undoLogging = true
         levelPush(preparedMark ?: state.mark())
     }
@@ -609,15 +589,12 @@ class PropagationSession private constructor(
     val decisionLevel: Int get() = trail.size
 
     /**
-     * True when bake-time propagation already proved the problem Unsat. The bake fixpoint stops at
-     * the first conflict, so the post-bake domains are then a *partial* propagation state — callers
-     * that read domains without pinning (e.g. the LP rounding probe snapshotting an assignment)
-     * must treat the session as conflicted rather than trust them.
+     * True when bake-time propagation proved the problem Unsat. The bake stops at the first conflict, so the
+     * post-bake domains are then partial and must not be trusted.
      */
     val isUnsatAtRoot: Boolean get() = bakedUnsat != null
 
-    /** Cumulative count of factor-forced assignments across this session — backs the
-     *  `propagations` solve stat. Monotonic; the engine reads deltas around each pin. */
+    /** Cumulative count of factor-forced assignments in this session; monotonic. */
     val propagationCount: Long get() = retainedState?.propagations ?: retiredPropagationCount
 
     /** Current bool value: pinned by decision OR forced by propagation. `null` = free. */
@@ -628,18 +605,13 @@ class PropagationSession private constructor(
 
     private var leafColumns: LeafColumns? = null
 
-    /**
-     * Leave [columns] to leaf completion: [needsBoolDecision] and [needsIntDecision] stop offering them, and a
-     * leaf reads `false` or the domain minimum for each one still free. Null decides every column again.
-     */
+    // Null decides every column again.
     internal fun completeAtLeaves(columns: LeafColumns?) {
         leafColumns = columns
     }
 
-    /** True while Boolean column [v] is free and a traversal still has to decide it. */
     internal fun needsBoolDecision(v: Int): Boolean = state.boolValues[v] == null && leafColumns?.bool(v) != true
 
-    /** True while integer column [v] admits more than one value and a traversal still has to decide it. */
     internal fun needsIntDecision(v: Int): Boolean = !state.intDomains[v].isFixed && leafColumns?.int(v) != true
 
     internal val explanationState: PropagationState get() = state
@@ -669,12 +641,7 @@ class PropagationSession private constructor(
         return fixed
     }
 
-    /**
-     * Domain integer column [v] was seeded with, before any decision on this trail.
-     *
-     * What a consumer needing an instance-wide scale or a "narrowed past the root" test reads;
-     * [intDomain] answers the same question only while the trail is empty.
-     */
+    /** Domain integer column [v] was seeded with, before any decision on this trail. */
     fun rootIntDomain(v: Int): IntDomain = state.rootDomains[v]
 
     /** Install (once, at the root) the incremental objective bool lower bound over [weights]; returns
@@ -686,13 +653,11 @@ class PropagationSession private constructor(
     fun objectiveBoolLowerBound(): Long = state.objectiveBoolLowerBound()
 
     /**
-     * Seed with an initial assumption set. Resets any prior trail to level 0 first, then
-     * pushes each assumption in iteration order (bools, ints, then domain restrictions). Each gets its own
-     * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
-     * A seed refutation retains its complete applied prefix: propagated levels alone can
-     * omit earlier assumptions that contributed through a reason chain.
-     * ExecutionControl stops before the next pin and sets [fixpointCancelled]; the applied
-     * prefix is incomplete and cannot certify the full assumption set.
+     * Seed with an initial assumption set: reset to level 0, then push bools, ints and domain restrictions, each
+     * at its own decision level. Returns the cumulative implied set beyond the seed pins, or Unsat; a refutation
+     * keeps its complete applied prefix, since propagated levels alone can omit contributing assumptions.
+     * Cancellation stops before the next pin and sets [fixpointCancelled]; the applied prefix then cannot
+     * certify the full assumption set.
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
@@ -785,19 +750,11 @@ class PropagationSession private constructor(
     }
 
     /**
-     * Re-seed to [desired] by diffing against the live pin trail instead of clearing to root and
-     * re-pushing every pin (as [seed] does). The longest bottom prefix of the trail whose pins already
-     * agree with [desired] is kept — its propagation stands untouched — and only the divergent suffix is
-     * popped, then the still-missing pins are pushed. When successive fragments free a small fraction of
-     * the variables, the shared complement stays pinned across calls, so the work scales with the changed
-     * pins rather than the total variable count.
-     *
-     * The outcome is identical to [seed] with the same [desired]: on return the pinned set is exactly
-     * [desired], one decision level per pin. Any leftover search decisions sit above the seed prefix and,
-     * differing from [desired], are popped like any other mismatch. Returns the cumulative implied set
-     * beyond the pins, or the first [PropagationResult.Unsat] a push hits.
-     * An interrupted push retracts to the completed prefix and sets [fixpointCancelled]; a later
-     * call retries the missing pins under its current cancellation token.
+     * Re-seed to [desired] by diffing against the live pin trail: the longest bottom prefix that agrees with
+     * [desired] keeps its propagation and only the divergent suffix is popped and re-pushed, so the work scales
+     * with the changed pins. The outcome equals [seed] with the same [desired]. Returns the cumulative implied set
+     * beyond the pins, or the first [PropagationResult.Unsat] a push hits. An interrupted push retracts to the
+     * completed prefix and sets [fixpointCancelled]; a later call retries under its current cancellation token.
      */
     fun reseedFrom(desired: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
@@ -860,8 +817,7 @@ class PropagationSession private constructor(
         return PropagationResult.Implied.EMPTY
     }
 
-    /** Drop every decision pin, restoring the primitive pin arrays to "free". Iterates the
-     *  trail (the decided vars) rather than clearing the whole arrays. */
+    // Iterates the trail rather than clearing the whole arrays.
     private fun clearPins() {
         for (i in 0 until trail.size) {
             val e = trail[i]
@@ -888,11 +844,9 @@ class PropagationSession private constructor(
         return pushInt(v, value)
     }
 
-    /** [pinBool] as a probe — see [probeFixpoint]. */
     internal fun probeBool(v: Int, value: Boolean): PropagationResult? =
         probeFixpoint { pushBool(v, value, reportImplied = false) }
 
-    /** [pinInt] as a probe — see [probeFixpoint]. */
     internal fun probeInt(v: Int, value: Long): PropagationResult? =
         probeFixpoint { pushInt(v, value, reportImplied = false) }
 
@@ -923,15 +877,9 @@ class PropagationSession private constructor(
         return probeFixpoint { pushIntBound(variable, bound, atMost, reportImplied = false) }
     }
 
-    /**
-     * One probe pin: the fixpoint polls the deadline from its first fire (no [PROPAGATION_CANCEL_FLOOR]
-     * wait, since a probe over a wide domain is exactly the runaway that floor hides), and a cut fixpoint
-     * reverts the pin and yields `null`.
-     *
-     * The revert lands on the previous level's *complete* fixpoint, so — unlike a cut search pin — no
-     * under-propagated state survives the call and [fixpointCancelled] stays clear: the session is left
-     * usable and a paused arm can resume on it. [probeCancelled] carries the deadline sighting instead.
-     */
+    // Polls the deadline from the first fire: a probe over a wide domain is the runaway [PROPAGATION_CANCEL_FLOOR]
+    // would hide. A cut fixpoint reverts to the previous complete fixpoint and yields null, so
+    // [fixpointCancelled] stays clear and a paused arm can resume on the session.
     private inline fun probeFixpoint(push: () -> PropagationResult): PropagationResult? {
         bakedUnsat?.let { return it }
         if (state.runCancelled) return null
@@ -951,12 +899,7 @@ class PropagationSession private constructor(
         return null
     }
 
-    /**
-     * Decide `v ≤ hi` at a fresh decision level (a single-bound decision). Unlike [pinInt]
-     * this narrows only the upper bound, so the decision contributes a single 1UIP literal
-     * to any conflict it seeds — letting CDCL learn an asserting clause where an equality
-     * pin (two same-level bound atoms) could not. The complementary branch is [pinIntAtLeast].
-     */
+    /** Decide `v ≤ hi` at a fresh decision level; the complementary branch is [pinIntAtLeast]. */
     fun pinIntAtMost(v: Int, hi: Long): PropagationResult = pushIntBound(v, hi, atMost = true)
 
     /** Decide `v ≥ lo` at a fresh decision level. See [pinIntAtMost]. */
@@ -979,31 +922,21 @@ class PropagationSession private constructor(
     }
 
     /**
-     * Register a learned [clause] and immediately propagate it. Used by the
-     * BacktrackSolver after a CDB backjump to make the analyzer's 1UIP clause stick:
-     * the clause stays alive for the rest of the session and participates in every
-     * future propagation cycle through [BoolWatcherIndex.byLit]. Returns
-     * the propagation result of asserting it — typically [PropagationResult.Implied]
-     * with the UIP literal forced, or [PropagationResult.Unsat] if the assertion
-     * cascades into another conflict (the engine handles that as a fresh CDB round).
-     *
-     * Unlike [pinBool] / [pinInt], this does *not* open a new trail level — the
-     * learned clause is a constraint over existing variables, not a decision. So no
-     * snapshot is pushed and no decision counter is bumped.
+     * Register a learned [clause] for the rest of the session and propagate it immediately. Opens no trail level.
+     * Returns the result of asserting it: [PropagationResult.Unsat] when that cascades into another conflict.
      */
     fun addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): PropagationResult {
         if (permanent) scopedLearnedAssertion = true
         return registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent) }
     }
 
-    /** [addLearnedClause] for a clause derived from one imported from [origin], which keeps the credit. */
+    // The clause derives from one imported from [origin], which keeps the credit.
     internal fun addLearnedClause(clause: Clause, lbd: Int, origin: Int): PropagationResult =
         registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent = false, origin) }
 
     /**
-     * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` and
-     * immediately propagate it, exactly as [addLearnedClause] does for a clause. Used by the engine's
-     * cutting-planes backjump to make the learned PB constraint stick and force its asserting literal.
+     * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` and propagate it immediately,
+     * as [addLearnedClause] does for a clause.
      */
     fun addLearnedPb(
         weights: LongArray,
@@ -1100,8 +1033,6 @@ class PropagationSession private constructor(
             }
         }
 
-    /** Shared body of [addLearnedClause] / [addLearnedPb]: register the constraint via [register], fire it
-     *  once, and either surface the cascaded conflict or re-baseline the level with the asserted facts. */
     private inline fun registerAndPropagate(
         base: Int,
         attachmentStage: String? = null,
@@ -1127,27 +1058,18 @@ class PropagationSession private constructor(
             )
         }
         if (conflict != null) return revertAndUnsat(conflict)
-        // The asserted facts are implied by the decisions up to the current level, so they join the
-        // level's baseline: re-snapshot the top mark. Otherwise the next failed pin's revert — which
-        // restores to the top mark — silently rewinds them while the constraint stays registered, and the
-        // search can re-derive the same conflict forever.
+        // The asserted facts are implied by the decisions up to this level, so they join its baseline. Otherwise
+        // the next failed pin's revert rewinds them while the constraint stays registered, and search can
+        // re-derive the same conflict forever.
         if (state.runCancelled) return PropagationResult.Implied.EMPTY
         levelStates[levelTop - 1] = state.mark()
         return impliedSince(base)
     }
 
     /**
-     * Assert a permanent objective bound on an integer variable as a propagating unit
-     * clause: `[v <= hi]` ([atMost]) or `[v >= lo]` (`atMost = false`). Branch-and-bound
-     * calls this on each new incumbent so the bound is pushed into the objective variable
-     * and the constraint defining it (linear, product, element, a global's output — any
-     * structure) propagates the tightening back into the decision variables. This is
-     * objective propagation, strictly stronger than a passive lower-bound
-     * check, and it gives objective pruning even for non-linear-defined objectives that the
-     * predicate path cannot bound. Permanent: survives forgetting and persists for the rest
-     * of the session; later incumbents assert progressively tighter (subsuming) units.
-     * Returns the propagation result, [PropagationResult.Unsat] if the bound is already
-     * infeasible at the root (the remaining objective space is empty).
+     * Assert a permanent objective bound `[v <= bound]` ([atMost]) or `[v >= bound]` as a propagating unit clause,
+     * so the defining constraint propagates it back into the decision variables, whatever its structure. Returns
+     * [PropagationResult.Unsat] when the bound is infeasible at the root.
      */
     fun assertObjectiveBound(v: Int, bound: Long, atMost: Boolean): PropagationResult {
         val atom = if (atMost) state.atomVarLe(v, bound) else state.atomVarGe(v, bound)
@@ -1155,16 +1077,10 @@ class PropagationSession private constructor(
     }
 
     /**
-     * Apply a domain reduction inferred at the **current** decision level — for LP reduced-cost
-     * fixing. Like [addLearnedClause] and unlike the `pin*` decisions, this opens **no** new
-     * level: the tightening is folded into the current level's baseline (re-snapshotted mark), so
-     * [popLast] of that level undoes it. That is exactly right for a subtree-local inference, which
-     * is valid only under this node's bounds and the current incumbent and must vanish on backtrack.
-     *
-     * The reduction is recorded with no antecedents, so conflict analysis treats its bound atom as a
-     * level leaf (like a decision). That is sound: a conflict it triggers is a real infeasibility of
-     * the problem under the path bounds plus this tightening, so any learned nogood is globally
-     * valid; the reduction itself never escapes its level.
+     * Apply a reduction inferred at the current decision level, such as LP reduced-cost fixing. It opens no level:
+     * it folds into the current level's baseline, so popping that level undoes it. Recorded without antecedents,
+     * so conflict analysis treats it as a leaf; any learned nogood stays valid because the conflict is a real
+     * infeasibility under the path bounds plus this tightening.
      */
     fun implyIntAtMost(v: Int, hi: Long): PropagationResult = implyAtCurrentLevel { state.tightenIntMax(v, hi) }
 
@@ -1175,12 +1091,8 @@ class PropagationSession private constructor(
     fun implyBool(v: Int, value: Boolean): PropagationResult = implyAtCurrentLevel { state.pinBool(v, value) }
 
     /**
-     * Like [implyIntAtLeast]/[implyIntAtMost], but records [reason] as the antecedent of the new bound
-     * atom so conflict analysis can resolve *through* the tightening instead of treating it as a leaf.
-     * [reason] is a set of currently-false literals — the negated seated bounds whose
-     * conjunction (with the always-valid constraints) implies the bound — so the implicit reason clause
-     * `(new bound atom) ∨ reason` is globally valid. The antecedent is journaled and undone on
-     * backtrack like any other; the tightening itself still folds into the current level.
+     * Like [implyIntAtLeast], but records [reason], currently-false literals implying the bound, as its
+     * antecedent so conflict analysis resolves through the tightening instead of treating it as a leaf.
      */
     fun implyIntAtLeastWithReason(v: Int, lo: Long, reason: IntArray): PropagationResult =
         implyAtCurrentLevel { state.tightenIntMin(v, lo, reason) }
@@ -1358,11 +1270,9 @@ class PropagationSession private constructor(
     fun litTruth(lit: Int): Boolean? = state.litTruth(lit)
 
     /**
-     * The clause that forced the current pin of Boolean variable [v], as `pinned ∨ antecedents`, or
-     * null when the pin was a decision or came from a factor that records no antecedents.
-     *
-     * This is the same antecedent set native first-UIP analysis walks, exposed so a shared analyzer
-     * can resolve through a CP-implied literal instead of stopping at it.
+     * The clause that forced the current pin of Boolean variable [v], as `pinned ∨ antecedents`, or null for a
+     * decision or a factor that records no antecedents. Lets a shared analyzer resolve through a CP-implied
+     * literal instead of stopping at it.
      */
     fun boolReasonClause(v: Int): IntArray? {
         val antecedents = state.reasonOf(state.boolAntecedents[v]) ?: return null
@@ -1373,9 +1283,6 @@ class PropagationSession private constructor(
         return reason
     }
 
-    /** Run 1UIP conflict analysis from an externally supplied all-false conflict clause (e.g. an LP
-     *  Farkas certificate) to obtain a learned clause and backjump level. See
-     *  [ConflictAnalyzer.analyzeConflictClause]. */
     internal fun analyzeConflictClause(conflictClause: IntArray): ConflictAnalyzer.AnalysisResult =
         state.conflictAnalyzer.analyzeConflictClause(conflictClause)
 
@@ -1556,34 +1463,24 @@ class PropagationSession private constructor(
     /** True iff learned clause [learnedIndex] survives every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
-    /** The arm learned clause [learnedIndex] was imported from, or [OWN_ORIGIN] for one learned here. */
     internal fun learnedClauseOrigin(learnedIndex: Int): Int = state.learnedClauseOrigin(learnedIndex)
 
-    /** The learned clause at [learnedIndex]. Read by the engine's vivification pass and the
-     *  glue-clause export, both clause-only. Fails loudly on a non-clause learned constraint rather than
-     *  through a bare cast, so a pseudo-Boolean nogood reaching a clause-only pass names the site that
-     *  needs a clause filter instead of surfacing an opaque ClassCastException. */
+    // Fails loudly on a non-clause learned constraint, naming the clause-only pass that needs a filter.
     internal fun learnedClauseAt(learnedIndex: Int): ClausePropagator =
         state.learnedClauses[learnedIndex] as? ClausePropagator
             ?: error(
                 "learned constraint at $learnedIndex is not a clause; vivification and glue export are clause-only",
             )
 
-    /** Literals of learned clause [learnedIndex]. Routes to the native-SAT store when active (its
-     *  clauses aren't in the general database), else through [learnedClauseAt]. */
     internal fun learnedClauseLiterals(learnedIndex: Int): IntArray =
         state.nativeEngine?.literalsOf(learnedIndex) ?: learnedClauseAt(learnedIndex).literals
 
-    /** True iff [learnedIndex] names an active clause. Clause-only passes skip other constraint
-     * kinds and retired slots. */
     internal fun isLearnedClause(learnedIndex: Int): Boolean =
         state.nativeEngine?.let { !it.retiredOf(learnedIndex) }
             ?: (!state.learned.retiredOf(learnedIndex) && state.learnedClauses[learnedIndex] is ClausePropagator)
 
-    /** Three-tier DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)
 
-    /** Set the three-tier DB tier of learned clause [learnedIndex]. */
     internal fun setLearnedClauseTier(learnedIndex: Int, tier: ClauseTier) =
         state.setLearnedClauseTier(learnedIndex, tier)
 
@@ -1595,10 +1492,8 @@ class PropagationSession private constructor(
     fun clearLearnedClauseUsed(learnedIndex: Int) = state.clearLearnedClauseUsed(learnedIndex)
 
     /**
-     * Export this session's **glue** learned clauses — those with LBD ≤ [maxLbd] and length ≤
-     * [maxLen] — in session-portable [SharedClause] form, for cross-arm sharing. Int-bound atom
-     * literals are decoded to `(intVar, kind, threshold, sign)` via the atom registry; boolean
-     * literals travel as-is. Cheap: the glue set is small by construction. (See [ClauseExchange].)
+     * Export this session's glue learned clauses (LBD ≤ [maxLbd], length ≤ [maxLen]) in session-portable
+     * [SharedClause] form for cross-arm sharing.
      */
     fun exportGlueClauses(maxLbd: Int, maxLen: Int, skipPermanent: Boolean = false): List<SharedClause> =
         checkNotNull(exportGlueClausesBounded(maxLbd, maxLen, skipPermanent) { false })
@@ -1614,9 +1509,8 @@ class PropagationSession private constructor(
         var tokens = LongArray(0)
         for (i in 0 until learnedClauseCount) {
             if (cancelled()) return null
-            // Permanent clauses are the search-conditioned assertions — the incumbent objective bound
-            // (assertObjectiveBound) and blocking nogoods — not globally-valid resolvents. A caller
-            // learning under assumptions/incumbent (LNS repair) must skip them or it poisons peers.
+            // Permanent clauses are search-conditioned assertions (the incumbent objective bound, blocking
+            // nogoods), not globally valid resolvents; a caller learning under assumptions must skip them.
             if (skipPermanent && learnedClausePermanent(i)) continue
             if (!isLearnedClause(i)) continue // pseudo-Boolean nogoods aren't clause-portable
             // Another arm's clause, or one inprocessing derived from it, is that arm's to publish.
@@ -1653,12 +1547,7 @@ class PropagationSession private constructor(
         return out.takeUnless { cancelled() }
     }
 
-    /**
-     * One clause's [lits] (this session's literals) in session-portable [SharedClause] form: boolean
-     * literals travel as-is, int-bound atom literals decode to `(intVar, kind, threshold, sign)` via the
-     * atom registry. The decode shared by [exportGlueClauses] and the direct publish of globally-valid
-     * nogoods (LP Farkas certificates), which bypass the LBD glue filter.
-     */
+    // Also publishes globally valid nogoods (LP Farkas certificates) outside the glue filter.
     internal fun asSharedClause(lits: IntArray, lbd: Int): SharedClause = asSharedClause(lits, lbd, null)
 
     private fun asSharedClause(lits: IntArray, lbd: Int, key: Long?): SharedClause {
@@ -1687,15 +1576,10 @@ class PropagationSession private constructor(
     }
 
     /**
-     * Register an imported [shared] nogood (learned by another arm of the same problem) into this
-     * session's learned DB, translating its int-atom literals into this session's lazily-allocated
-     * atom space. Call at a restart or the post-assumption root of a compatible search scope.
-     * Attachment evaluates existing root facts, including an immediate unit or conflict, at the
-     * next fixpoint. Native SAT attachment can pin the unit during registration.
-     * The receiving store owns its literal copy independently of the portable payload.
-     *
-     * [origin] names the arm the clause came from, a non-negative id, and is counted each time the clause is used;
-     * see [drainImportUses].
+     * Register an imported [shared] nogood from another arm of the same problem, translating its atom literals
+     * into this session's atom space. Call at a restart or the post-assumption root of a compatible search scope;
+     * the next fixpoint evaluates it against existing root facts. [origin] names the source arm and is credited
+     * each time the clause is used; see [drainImportUses].
      */
     fun importClause(shared: SharedClause, origin: Int = OWN_ORIGIN) {
         state.work += shared.boolLits.size.toLong() + shared.atomQuads.size
@@ -1778,19 +1662,12 @@ class PropagationSession private constructor(
         }
     }
 
-    /**
-     * Build the Unsat result from [levels] (which references the *failed-push* level
-     * encoding still on the state), then restore the pre-push snapshot. Extraction must
-     * happen before restore, since restore wipes the level-to-var mapping.
-     */
+    // [levels] uses the failed push's level encoding, which the restore wipes.
     private fun revertAndUnsat(levels: IntArray): PropagationResult.Unsat {
         // Must extract factors *before* restoring — restore wipes the seed + reason arrays.
         val factors = state.extractConflictFactors()
-        // Run 1UIP analysis BEFORE restore — the analyzer walks `state.boolAntecedents` /
-        // `state.boolPinOrder` / `state.boolLevel`, all of which restore would rewind.
-        // Only applicable when a factor's `propagate` triggered the conflict (so
-        // `currentFactor >= 0`); seed-assumption conflicts don't have a clause-form
-        // antecedent to seed analysis with.
+        // Analysis also runs before the restore, which rewinds the antecedents and trail it walks. A seed
+        // assumption conflict has no clause-form antecedent to seed it.
         val learned: ConflictAnalyzer.AnalysisResult? = run {
             val nativeReason = state.nativeConflictReason
             val failingFid = state.currentFactor
@@ -1807,10 +1684,8 @@ class PropagationSession private constructor(
                 else -> null
             }
         }
-        // Conflict-reason variable sets for activity heuristics (VSIDS / dom-wdeg). When
-        // 1UIP analysis produced a clause, prefer the canonical CDCL bump set — every
-        // variable seen while walking the implication graph — over the coarse "decision
-        // vars at the conflict levels" extraction. Sharper conflict focus ⇒ fewer conflicts.
+        // Prefer 1UIP's bump set, every variable seen walking the implication graph, over the decision vars at
+        // the conflict levels.
         val bools: IntArray
         val ints: IntArray
         if (learned is ConflictAnalyzer.AnalysisResult.LearnedConstraint) {
@@ -1894,12 +1769,7 @@ class PropagationSession private constructor(
         return if (trailIsBool(e)) VarKind.Bool to e else VarKind.Int to (e - problem.numBoolVars)
     }
 
-    /**
-     * Build a fresh [PropagationResult.Implied] from the propagation state, excluding
-     * already-pinned vars. Iterates the var spaces in ascending id order so the resulting
-     * primitive arrays are naturally sorted — no separate sort step required. Used only for
-     * [seed]'s full-implied return (the hot push path uses the incremental [impliedSince]).
-     */
+    // Ascending id iteration yields sorted arrays directly. Only [seed] uses it; pushes use [impliedSince].
     private fun computeImplied(): PropagationResult.Implied {
         val bKeys = IntArrayList(initialCapacity = 8)
         val bVals = ArrayList<Boolean>()
@@ -1927,13 +1797,8 @@ class PropagationSession private constructor(
         )
     }
 
-    /**
-     * Newly-implied facts of a push (its "diff"): the variables mutated since undo position
-     * [base] that are now *determined* (bool assigned / int domain singleton) and aren't
-     * themselves decision pins. Read straight off the state's undo log in O(changes) rather
-     * than scanning every variable. Keys come out sorted ascending, as
-     * [PropagationResult.Implied]'s binary-search lookups require.
-     */
+    // Read off the undo log in O(changes) rather than scanning every variable; keys come out sorted as
+    // [PropagationResult.Implied] requires.
     private fun impliedSince(base: Int): PropagationResult.Implied {
         if (state.runCancelled) return PropagationResult.Implied.EMPTY
         val top = state.undoTop

@@ -7,15 +7,9 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Layered flow hull — the exact convex hull of the diagram's accepting paths. An arc variable
- * `y ∈ [0,1]` represents each forward-reachable transition. Source, conservation, acceptance,
- * value-channel, and optional cost-channel rows describe the path polytope. Large arc sets are skipped.
- *
- * The layer expansion screens each layer's values through its root box and the flow rows then confine the
- * column to the arcs built, so over a side the model leaves open an invented endpoint would refute paths
- * the diagram accepts — declined there.
- */
+// Layered flow hull: the exact convex hull of the diagram's accepting paths, one arc column per
+// forward-reachable transition. The flow rows confine each column to the arcs built from its root box,
+// so an open-sided column is declined: an invented endpoint would refute accepted paths.
 @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
 internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
     if (!builder.hullEnabled()) return
@@ -132,5 +126,5 @@ private suspend fun SequenceScope<Unit>.prepareForwardReach(
     return MddReach(reach, arcCount)
 }
 
-/** Above this many reachable arcs the hull is skipped — the arc columns would dominate. */
+// Larger arc sets are skipped: their columns would dominate the LP.
 private const val MAX_MDD_ARCS: Int = 4096

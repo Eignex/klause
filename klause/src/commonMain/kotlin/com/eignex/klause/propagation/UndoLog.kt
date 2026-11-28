@@ -4,25 +4,10 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/**
- * Column-wise undo journal for [PropagationState].
- *
- * Each mutation that a pop must rewind appends one record capturing the cell's *prior* value. A pop
- * replays records from the top down to a [PropagationState.LevelMark]'s undo size —
- * O(changes-since-mark) instead of a snapshot/restore's O(numVars) per level. Records are stored
- * column-wise across parallel lists (no per-record object alloc). Record kinds by [tag]:
- *  - 0 — bool pin: a bool was assigned (prior state is always unassigned, since `pinBoolImpl` only
- *    proceeds when the var was free), so only [varId] is meaningful. The int/obj columns are padding
- *    on mixed models and stay empty on models without integer variables.
- *  - 1 — int change: a tighten / exclude replaced the var's domain. The full prior int-var state is
- *    recorded so replay restores it exactly even when the same var is narrowed several times within
- *    a level.
- *  - 2 — interior carve, journalled as just the carved value (see `logIntCarve`).
- *
- * Atom-table slots are logged on their own reversible trail (`AtomStore.undoAtomId` and parallels),
- * captured by a [PropagationState.LevelMark]'s atom-undo size and replayed by `undoTo` alongside
- * these records — so an atom-lit forced directly by a clause backtracks even when no bound moved.
- */
+// Column-wise undo journal: each record captures a cell's prior value, so a pop costs O(changes since the mark)
+// rather than a snapshot's O(numVars). Tags: 0 bool pin (prior is always unassigned; int columns are padding),
+// 1 int change (the full prior int-var state), 2 interior carve (just the carved value). Atom slots have their own
+// trail in [AtomStore].
 internal class UndoLog {
     val tag = IntArrayList()
     val varId = IntArrayList()
@@ -37,14 +22,10 @@ internal class UndoLog {
     val maxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents
     val holeHistLen = IntArrayList() // int: prior holeHist length for the var
 
-    /** Separate trail for [Trailed] reversible cells (incremental factor state). Kept apart from the
-     *  bool/int columns above so the hot domain-mutation path pays nothing; a
-     *  [PropagationState.LevelMark] captures its size, `undoTo` replays it top-down. Each entry is a
-     *  cell that changed (the cell holds its own typed prior-value stack), so restore is box-free.
-     *  See [Trailed] / `Reversible.kt`. */
+    // Kept apart from the domain columns so the hot mutation path pays nothing; each cell holds its own typed
+    // prior-value stack, so restore is box-free.
     val revTrail = ArrayList<Trailed>()
 
-    /** Number of records; a [PropagationState.LevelMark] captures this. */
     val size: Int get() = tag.size
 
     fun truncateTo(n: Int) {

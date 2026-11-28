@@ -13,58 +13,29 @@ import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 
-/**
- * E. H. Bareiss, *Sylvester's Identity and Multistep Integer-Preserving Gaussian Elimination*, Math. Comp.
- * 22 (1968), https://doi.org/10.1090/S0025-5718-1968-0226829-0, for the fraction-free identity, with the
- * row content stripped after each step as in G. C. Nakos, P. R. Turner and R. M. Williams, *Fraction-free
- * algorithms for linear and polynomial equations*, ACM SIGSAM Bulletin 31(3) (1997),
- * https://doi.org/10.1145/271130.271133: an integer matrix stays integer throughout and the entries stay
- * small, without the whole-matrix rescaling that makes the plain Bareiss sweep dense.
- *
- * A system reduced to row echelon form by fraction-free elimination, with the pivot column of each row.
- *
- * [rows] is the reduced matrix; [pivots] holds, per reduced row, the column its leading entry sits in,
- * ascending. A row that reduced to all zeros is dropped, so [rows] has exactly the system's rank.
- */
+// Fraction-free elimination (E. H. Bareiss, *Sylvester's Identity and Multistep Integer-Preserving Gaussian
+// Elimination*, Math. Comp. 22 (1968), https://doi.org/10.1090/S0025-5718-1968-0226829-0), stripping row content
+// after each step as in G. C. Nakos, P. R. Turner and R. M. Williams, *Fraction-free algorithms for linear and
+// polynomial equations*, ACM SIGSAM Bulletin 31(3) (1997), https://doi.org/10.1145/271130.271133.
+// [pivots] holds each row's leading column, ascending; zero rows are dropped, so [rows] has exactly the rank.
 internal class BareissEchelon(
     val rows: List<SparseIntRow>,
     val pivots: IntArray,
-    /** The right-hand sides carried through the same row operations, when the caller supplied them.
-     *  Index-aligned with [rows]; empty when the elimination was run on coefficients alone. */
+    // Index-aligned with [rows]; empty when run on coefficients alone.
     val rhs: Array<BigInt> = emptyArray(),
-    /** True when a row reduced to `0 = c` with `c` non-zero: the equalities alone are unsatisfiable.
-     *  Only ever set when right-hand sides were supplied, since without them it cannot be seen. */
+    // A row reduced to `0 = c` with `c` non-zero; detectable only with right-hand sides.
     val inconsistent: Boolean = false,
-    /**
-     * Input rows that reduced to `0 = 0`, in ascending order: each is a rational combination of the rows
-     * kept as pivots, which are never among them, so the whole set can be dropped at once without
-     * changing the solution set. Empty when the elimination stopped early, since a row it never reached
-     * was never shown dependent.
-     */
+    // Rows that reduced to `0 = 0`, ascending; droppable together since no pivot row is among them. Empty when
+    // the elimination stopped early, since an unreached row was never shown dependent.
     val dependentRows: IntArray = IntArray(0),
 )
 
 internal data class EchelonLimits(val maxRowEntries: Int, val maxTotalEntries: Int, val maxBits: Int)
 
-/**
- * Row echelon form of [a] by fraction-free elimination over the sparse rows.
- *
- * Ordinary Gaussian elimination over the rationals would carry denominators; combining two rows by the
- * cross-multiplied `p·rᵢ − f·rₚ` keeps every entry integral, and dividing the result through by the gcd
- * of its own entries — the right-hand side included, so the equation is unchanged — keeps the entries
- * from compounding the way a naive fraction-free scheme's do.
- *
- * Dividing a row through by a constant leaves the equation it states untouched, so the reduced system is
- * still implied by the original one and a bound derived from it is still the model's. That is what the
- * whole chain needs; the plain Bareiss sweep additionally rescales the rows that do *not* meet the pivot,
- * which pins every entry to a minor of the input but touches every row at every step. On a matrix with
- * five non-zeros per row that rescaling, not the elimination, is what turns the sweep dense.
- *
- * The pivot row for a column is the sparsest of the rows leading there, which is the Markowitz rule
- * specialised to a single candidate column: fill-in is what the reduction is fighting, and the sparsest
- * candidate creates the least of it. Zero rows are dropped rather than kept, so [BareissEchelon.rows] is
- * exactly the rank — a system whose equalities are dependent contributes only its independent ones.
- */
+// Combining rows by `p·rᵢ − f·rₚ` keeps entries integral, and dividing by the row content (right-hand side
+// included) keeps them from compounding. Rows that do not meet the pivot are not rescaled as in the plain Bareiss
+// sweep, since that rescaling is what turns a sparse sweep dense. The pivot is the sparsest row leading in the
+// column, the Markowitz rule for a single candidate column.
 internal fun bareissEchelon(
     a: List<SparseIntRow>,
     cols: Int,
@@ -75,8 +46,7 @@ internal fun bareissEchelon(
     val m = a.size
     if (m == 0 || cols == 0) return BareissEchelon(emptyList(), IntArray(0))
     val w = a.toMutableList()
-    // The right-hand side is just another column: it must take every swap and every elimination the
-    // coefficients take, or the reduced rows end up paired with bounds that belong to other rows.
+    // The right-hand side takes every operation the coefficients take.
     val rhs = rhsIn?.copyOf()
     var entries = a.sumOf { it.index.size.toLong() }
     if (limits != null && (entries > limits.maxTotalEntries || a.any { row ->
@@ -154,14 +124,13 @@ private fun productFits(row: SparseIntRow, scale: BigInt, rhs: BigInt?, maxBits:
         (rhs == null || rhs.magnitudeBitLength().toLong() + scaleBits + 1 <= maxBits)
 }
 
-/** The candidate with the fewest non-zeros, ties broken by row order so the reduction is reproducible. */
+// Ties break by row order so the reduction is reproducible.
 private fun sparsestRow(bucket: List<Int>, w: List<SparseIntRow>): Int {
     var best = bucket[0]
     for (i in bucket) if (w[i].index.size < w[best].index.size) best = i
     return best
 }
 
-/** `scaleTarget·target − scaleSource·source`, as a merge over the two supports. */
 private fun combine(
     target: SparseIntRow,
     scaleTarget: BigInt,
@@ -223,7 +192,6 @@ private fun combine(
     return SparseIntRow(index.copyOf(n), Array(n) { value[it]!! })
 }
 
-/** The gcd of the row's entries and [extra], or one as soon as nothing more can be divided out. */
 private fun content(row: SparseIntRow, extra: BigInt?): BigInt {
     var g = extra?.abs() ?: BIG_ZERO
     for (v in row.value) {
@@ -236,8 +204,7 @@ private fun content(row: SparseIntRow, extra: BigInt?): BigInt {
 private fun divide(row: SparseIntRow, by: BigInt): SparseIntRow =
     SparseIntRow(row.index, Array(row.index.size) { row.value[it] / by })
 
-// Work units per big-integer entry an elimination step touches, against one simplex op: routing time per unit
-// over the calibration sample's models that reached the reduction (QF_LIA), ~4e-3 ms.
+// Work units per big-integer entry an elimination step touches, relative to one simplex operation.
 internal const val LATTICE_WORK_WEIGHT = 1500L
 
 private const val SUPPORT_WORK_CHUNK = 64L

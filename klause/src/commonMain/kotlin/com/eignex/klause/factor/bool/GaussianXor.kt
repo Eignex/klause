@@ -12,27 +12,14 @@ import com.eignex.klause.propagation.Propagator
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over
  * GF(2) (Soos, Nohl and Castelluccia, "Extending SAT Solvers to Cryptographic Problems", SAT 2009,
- * https://doi.org/10.1007/978-3-642-02777-2_24). Each constraint is `XOR(vars) == rhs`; the factor
- * owns all of them as one matrix.
+ * https://doi.org/10.1007/978-3-642-02777-2_24). Each constraint is `XOR(vars) == rhs`.
  *
- * Unlike a single [Xor] factor — which can only force a variable once a constraint has exactly
- * one unassigned variable left — Gaussian elimination *combines* equations, so it detects an
- * inconsistency (`0 = 1`) or forces a variable as soon as the linear system implies it. That is
- * what makes XOR-hash model counting / sampling tractable: without it, the parity subspace has
- * no short clausal refutations and the search thrashes on every infeasible branch. With it,
- * enumerating a hashed cell visits essentially only its real solutions.
+ * Unlike a single [Xor], elimination combines equations, so it detects an inconsistency or forces a
+ * variable as soon as the linear system implies it. Each [Propagator.propagate] explains a conflict or
+ * pin by the odd-occurrence assigned support of the derived row.
  *
- * Each [Propagator.propagate] substitutes the current partial assignment, reduces the residual system to
- * row-echelon form, and pins every variable the system forces (rows that collapse to a single
- * variable). Conflicts and forced pins are explained sharply: every row carries a reason
- * bitset of the assigned variables feeding it, xor-combined through each elimination step,
- * so even-occurrence variables cancel and a derived row's reason is exactly its
- * odd-occurrence assigned support — the minimal sufficient set.
- *
- * This factor is **propagation-only**: its local-search projection is deliberately inert
- * (always-satisfied, zero deltas). The Gaussian system is redundant with the per-row [Xor]
- * factors posted alongside it, which carry the same parity semantics *with* real LS support,
- * so LS enforces each parity row via those siblings.
+ * Propagation-only: its local-search projection is inert, since the per-row [Xor] factors posted
+ * alongside it carry the same parity with local-search support.
  */
 class GaussianXor internal constructor(
     /** The individual parity constraints forming this Gaussian system. */
@@ -45,8 +32,7 @@ class GaussianXor internal constructor(
 
     override fun remap(mapping: VarRemap): Factor = GaussianXor(constraints.map { it.remap(mapping) as Xor })
 
-    /** A system of parity equations is order-insensitive, so the constraints are encoded as a sorted
-     *  multiset — each as its target parity and its literal set. */
+    /** Order-insensitive: the constraints are encoded as a sorted multiset. */
     // No allocation-free KeySink hash: the key sorts nested sub-constraints by their own (remapped)
     // structuralKey, which the linear sink walk can't reproduce.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GAUSSIAN_XOR) {

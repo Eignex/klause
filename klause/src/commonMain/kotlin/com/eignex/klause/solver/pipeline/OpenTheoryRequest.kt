@@ -48,20 +48,13 @@ class OpenTheoryRequest internal constructor(
     val objective: LinearObjective? = null,
     /** Whether [objective] is maximized rather than minimized. */
     val maximize: Boolean = false,
-    /**
-     * Decomposition of the untransformed [model], which is what a frontend routes and renders by.
-     *
-     * Source-safe preparation retains this plan only for the identical model and projection binding;
-     * transformed sources select their own plan — see [OpenSourcePreparation].
-     */
+    // Decomposition of the untransformed [model], which a frontend routes and renders by. Preparation
+    // retains it only for the identical model and projection binding; transformed sources select their own.
     internal val componentPlan: ComponentPlan,
-    /** Source-safe presolve configuration. */
     internal val presolveConfig: PresolveConfig = PresolveConfig.DEFAULT,
-    /** Whether source preparation must preserve the complete solution set. */
     internal val solutionSetSensitive: Boolean = false,
-    /** ExecutionControl token for source preparation. */
     internal val presolveCancellation: ExecutionControl = ExecutionControl.Never,
-    /** Optional preparation allowance shared with source passes. */
+    // Shared with source passes.
     internal val presolveBudget: PresolveBudget? = null,
     /** Shared ownership preparation, retaining source identity through routing. */
     val preparedPlan: PreparedSourcePlan = model.preparedWithComponents(
@@ -167,15 +160,11 @@ sealed interface OpenTheoryExecution {
 object OpenTheoryPipeline {
     /**
      * Run what the open lane does before any theory sees the model, and stop: the source-safe passes, then
-     * the bound closing.
-     *
-     * For a caller inspecting or A/B-comparing a presolve configuration. On an open model this phase is
-     * the only reduction that runs before a route is chosen, and its effect on the open sides is what
-     * decides how much the theory is left to do — neither of which a solving run reports.
+     * the bound closing. For a caller inspecting a presolve configuration.
      *
      * Inspection only: a pass may resolve a Boolean column away and leave it unconstrained, and the
-     * reconstruction that recovers it stays with the preparation rather than travelling on the model. A
-     * caller that wants a witness runs [execute], which lifts one before it leaves the route.
+     * reconstruction that recovers it stays with the preparation. A caller that wants a witness runs
+     * [execute], which lifts one before it leaves the route.
      */
     fun prepare(request: OpenTheoryRequest): OpenPreparation {
         val source = request.model.prepareOpenSource(
@@ -286,7 +275,6 @@ object OpenTheoryPipeline {
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
     }
 
-    /** The engine that decides the satisfaction [request]. */
     internal fun engineFor(request: OpenTheoryRequest): OpenTheoryEngine = OpenTheoryEngine(
         request.model,
         request.route,

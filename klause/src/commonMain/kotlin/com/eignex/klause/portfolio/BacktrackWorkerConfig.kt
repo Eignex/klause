@@ -34,14 +34,8 @@ import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 
-/**
- * A portfolio arm wrapping a [BacktrackRecipe] for execution — the backtrack counterpart of
- * [LocalSearchWorkerConfig], so every portfolio arm, LS or backtrack, is declared in one place and
- * selected by the same [PortfolioComposition] decision algorithm. The recipe (from [BacktrackCatalog],
- * the public boundary a caller injects via `PortfolioScenario.btPool`) owns the config; this adapter
- * owns only the run-time wiring (shared pools, bound pruning, event sink) and the portfolio-side
- * `--lp` ceiling capping.
- */
+// The recipe owns the search config; this adapter owns only the run-time wiring (shared pools, bound
+// pruning, event sink).
 internal class BacktrackWorkerConfig(
     val recipe: BacktrackRecipe,
     internal val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
@@ -103,12 +97,6 @@ internal class BacktrackWorkerConfig(
 
     override val label: String get() = recipe.label
 
-    /** Build a backtrack worker: fresh [BacktrackSolver] session + params from the recipe, bound-pruning
-     *  on the shared incumbent when an objective is present, and per-arm [PoolClauseExchange] /
-     *  [PoolCutExchange] when [pools] supplies them (cross-arm learned-clause sharing — the lp arm's
-     *  globally valid Farkas nogoods travel through it like any other glue clause — and global-cut
-     *  sharing). LS-only knobs ([lsLambda], [lsObjective], [definitionalSweep]) are ignored. The label
-     *  is `bt/<recipe label>`. */
     override fun materialize(
         problem: BakedProblem,
         index: Int,
@@ -198,8 +186,6 @@ internal class BacktrackWorkerConfig(
             )
             if (params.separatesCuts()) sharing += Contribution.Cut
         }
-        // Wire this arm to the shared objective lower-bound manager when optimising: publish
-        // the bounds it proves and tighten its objective floor to the cross-arm maximum.
         if (objective != null) {
             matchedPools?.bounds?.let { bounds ->
                 params = params.copy(
@@ -300,22 +286,16 @@ internal class BacktrackWorkerConfig(
     }
 
     companion object {
-        /** The credit-ordered backtrack pool for [kind] — [BacktrackCatalog.ranked] wrapped as arms. */
         fun ranked(kind: Kind): List<BacktrackWorkerConfig> =
             BacktrackCatalog.ranked(kind).map { BacktrackWorkerConfig(it) }
 
-        /** A fresh arm for the recipe named [label]. */
         fun byLabel(label: String): BacktrackWorkerConfig = BacktrackWorkerConfig(BacktrackCatalog.byLabel(label))
 
-        /** Wrap a pre-built [BacktrackParams] template as a recipe — the model-derived annotation arm.
-         *  The template's seed and event sink are overridden per slot, so one template is safe to reuse. */
+        // The seed and event sink are overridden per slot, so one template is safe to reuse.
         fun ofParams(label: String, template: BacktrackParams): BacktrackRecipe =
             BacktrackRecipe(label) { seed, onEvent -> template.copy(randomSeed = seed, onEvent = onEvent) }
 
-        /** The top-[count] prefix of [BacktrackCatalog.ranked], wrapping past the pool size so larger
-         *  pools repeat the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls).
-         *  Each arm is capped under [lpCeiling] (default `AGGRESSIVE`, no overrides = uncapped) and
-         *  spends [nodeBudget]. Only arms the model behind [facts] offers the needs of are built. */
+        // Wraps past the pool size, so larger pools repeat the strong arms on fresh seeds.
         fun diverse(
             kind: Kind,
             count: Int,
@@ -345,16 +325,13 @@ private fun BacktrackParams.separatesCuts(): Boolean {
         (config != null && (config.resolved(LpTechnique.CUTS) || config.resolved(LpTechnique.CIRCUIT)))
 }
 
-/** This recipe with [edit] applied to the [BacktrackParams] it builds, per worker so selector state stays
- *  unshared; itself when [edit] is null. Keeps the arm's label. */
+// Applied per worker so selector state stays unshared.
 internal fun BacktrackRecipe.editing(edit: ((BacktrackParams) -> BacktrackParams)?): BacktrackRecipe =
     if (edit == null) this else BacktrackRecipe(label) { seed, onEvent -> edit(build(seed, onEvent)) }
 
-/** Cap this recipe under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
- *  emphasis lowered and the ceiling's per-technique overrides applied — so no arm runs LP above what the
- *  user permitted, and `--lp aggressive,-cuts` / `off,+energetic` toggle individual techniques across the
- *  pool. An explicit preparation policy also reaches raw LP plans. Non-LP arms keep no LP;
- *  an all-`AGGRESSIVE`, no-override ceiling is a no-op. */
+// Caps each LP arm under the `--lp` ceiling so no arm runs LP above what the user permitted, and the
+// ceiling's per-technique overrides toggle techniques across the pool. Non-LP arms keep no LP, though an
+// explicit preparation policy still reaches their raw LP plans.
 internal fun BacktrackRecipe.capLp(ceiling: LpConfig): BacktrackRecipe = BacktrackRecipe(label) { seed, onEvent ->
     val p = build(seed, onEvent)
     val intended = p.lpConfig
@@ -363,8 +340,6 @@ internal fun BacktrackRecipe.capLp(ceiling: LpConfig): BacktrackRecipe = Backtra
     else p.copy(lpPlan = p.lpPlan.copy(sourcePreparation = ceiling.sourcePreparation))
 }
 
-/** This recipe with every arm it builds spending [budget], the solve-spanning node allowance. A null
- *  budget leaves the recipe untouched, so an uncapped run composes exactly the pool it would anyway. */
 internal fun BacktrackRecipe.spending(budget: NodeBudget?): BacktrackRecipe {
     if (budget == null) return this
     return BacktrackRecipe(label) { seed, onEvent -> build(seed, onEvent).copy(nodeBudget = budget) }

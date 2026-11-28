@@ -18,34 +18,13 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.satisfyUnderAssumptions
 import com.eignex.util.collections.MutableIntIntMap
 
-/**
- * Threshold-chain core-guided MaxSAT optimiser for **unweighted** problems. Builds
- * one `Problem` up front with:
- *  - per soft, a fresh selector `r_i` and a relaxer clause `(origLit ∨ r_i)`;
- *  - a chain of `n` reified cardinality threshold bits `T_k ↔ (Σ r_i ≥ k)` for
- *    `k = 1..n`.
- *
- * The loop then iterates by **only changing the assumption layer**: at lower bound
- * `lb`, assume `T_{lb+1} = false` (i.e. fewer than `lb+1` selectors are true, equivalent
- * to "cost ≤ lb"). On unsat, `lb++` and switch the assumption to the next threshold bit
- * — no Problem rebuild, no fresh blockers, no per-core cardinalities. Termination is
- * the first `Sat`; at that point `lb` equals the optimum.
- *
- * Trade-off vs the per-core Fu-Malik shape in [CoreGuidedOptimizer]: the up-front bake
- * is more expensive (one [ReifiedCardinality] per threshold), but every iteration after
- * is cheap — one solve under a single-bit assumption. On problems with many cores the
- * amortised cost is lower.
- *
- * The encoding counts selectors uniformly; [minimizeWeighted] and [CoreGuidedOptimizer]
- * handle weights.
- */
+// Unweighted threshold chain: one Problem with a relaxer clause per soft and reified bits `T_k ↔ (Σ r_i ≥ k)`.
+// Each round only changes the assumption `T_{lb+1} = false`, so the up-front bake is dearer than per-core
+// rebuilding but every round after is one solve. The first Sat ends the loop at the optimum.
 internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
 
-    /** Soft literal that should be true; cost 1 if it ends up false. Weight is fixed at
-     *  1 — this optimiser is the unweighted-MaxSAT specialisation. */
     data class Soft(val lit: Int)
 
-    /** Weighted soft literal: cost [weight] (positive integer) if [lit] ends up false. */
     data class WeightedSoft(val lit: Int, val weight: Long) {
         init {
             require(weight > 0) { "weight must be positive, was $weight" }
@@ -134,19 +113,8 @@ internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
         return Result.Infeasible()
     }
 
-    /**
-     * Weighted MaxSAT via a pseudo-Boolean threshold chain. Each threshold value `k` gets
-     * a [ReifiedPseudoBoolean] reifying `aux_k ↔ (Σ wᵢ·rᵢ ≥ k)`; the loop assumes
-     * `aux_{k} = false` (cost < k). Binary search over the bounded integer cost range
-     * raises the lower bound after a refutation and lowers the upper bound after a witness.
-     *
-     * **Lazy thresholds.** Only the threshold bits the loop actually assumes are
-     * materialised — one per round, so logarithmically many reifications rather
-     * than the `O(totalWeight)` up-front bake the chain would otherwise need. The solver is
-     * rebuilt when a fresh threshold is added; each round needs at most one new
-     * reification. The rebuild cost mirrors the per-core rebuild in
-     * [CoreGuidedOptimizer] and is far cheaper than baking thousands of unused PB factors.
-     */
+    // Binary search over the cost with bits `aux_k ↔ (Σ wᵢ·rᵢ ≥ k)`, assuming `aux_k = false`. Only the bits a round
+    // assumes are materialised, so logarithmically many rather than `O(totalWeight)` up front.
     fun minimizeWeighted(
         softs: List<WeightedSoft>,
         params: BacktrackParams = BacktrackPresets.conflictDriven(),

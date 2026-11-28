@@ -6,16 +6,9 @@ import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-/**
- * Where a pausable search's current slice ends: after a number of work units or at a wall-clock deadline,
- * whichever comes first.
- *
- * A work budget makes the pause point a property of the search rather than of machine load, which is what
- * lets two identical invocations report identical counters. A unit is one search node, and LP work is charged
- * against the same budget at [LP_WORK_PER_NODE] per node. Propagation dispatches and visits are charged at
- * [PROPAGATION_WORK_PER_NODE] per node. [nodeCount] is the search's own work in nodes, inprocessing included;
- * see [searchWork].
- */
+// Where a pausable search's current slice ends: after a number of work units or at a wall-clock deadline,
+// whichever comes first. A work budget makes the pause point a property of the search rather than of machine load.
+// A unit is one search node; LP work costs LP_WORK_PER_NODE and propagation work PROPAGATION_WORK_PER_NODE per unit.
 internal class SliceBudget(
     private val nodeCount: () -> Long,
     private val lpWork: () -> Long,
@@ -24,13 +17,11 @@ internal class SliceBudget(
     // A containing budget already charges cumulative work and repays overspend for private searches.
     private val ownsWorkDebt: Boolean = true,
 ) {
-    /** The armed slice's wall-clock end; null before the first slice. */
     var deadline: TimeSource.Monotonic.ValueTimeMark? = null
         private set
 
     private var timeExpired: Cancellation = Cancellation.Never
 
-    /** Whether the armed slice is bounded by work rather than by [deadline]. */
     var workBounded: Boolean = false
         private set
 
@@ -58,10 +49,7 @@ internal class SliceBudget(
         nodeDebt = preparation.nodeDebt
     }
 
-    /**
-     * Arm the next slice: [sliceNodes] work units when non-negative, and at most [sliceMillis] of wall time. False
-     * when debt from earlier slices consumes the whole allowance, so the caller pauses without searching.
-     */
+    // False when debt from earlier slices consumes the whole allowance, so the caller pauses without searching.
     fun begin(sliceMillis: Long, sliceNodes: Long): Boolean {
         repaidWork = 0L
         val end = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
@@ -101,12 +89,11 @@ internal class SliceBudget(
         return (allowance - fractional).coerceAtLeast(0L)
     }
 
-    /** Work spent so far: nodes plus LP and propagation work, charged or not. */
+    // Nodes plus LP and propagation work, charged or not.
     fun spent(): Long = saturatedAdd(
         saturatedAdd(nodeCount(), lpWork() / LP_WORK_PER_NODE), propagationWork() / PROPAGATION_WORK_PER_NODE,
     )
 
-    /** Whether the armed slice has spent its allowance. */
     fun expired(): Boolean {
         charge()
         return workExpired() || timeExpired()
@@ -116,11 +103,8 @@ internal class SliceBudget(
 
     private fun sliceSpent(): Long = saturatedAdd((nodeCount() - nodeStart).coerceAtLeast(0L), auxiliaryNodes)
 
-    /**
-     * Spend the LP and propagation work done since the last charge from the slice's budget. The charge lands at a
-     * cancellation poll or node boundary and increases the completed work, so the slice pauses as if it had explored
-     * that many nodes; it stays a function of the search, and runs remain reproducible.
-     */
+    // Charges LP and propagation work done since the last charge at a poll or node boundary, so the slice pauses as
+    // if it had explored that many nodes and runs stay reproducible.
     fun charge() {
         if (!workBounded) return
         val nodes = (lpWork() - lpWorkMark) / LP_WORK_PER_NODE
@@ -131,7 +115,7 @@ internal class SliceBudget(
         propagationWorkMark += propagationNodes * PROPAGATION_WORK_PER_NODE
     }
 
-    /** Carry what the slice spent past its budget, including uncharged work, into the next. */
+    // Carries what the slice spent past its budget, uncharged work included, into the next.
     fun noteOverspend() {
         if (!workBounded) return
         charge()
@@ -149,6 +133,6 @@ internal const val LP_WORK_PER_NODE = 600L
 // Converts propagation visits to approximate CP-node cost without changing slice sizes.
 internal const val PROPAGATION_WORK_PER_NODE = 4_000L
 
-/** Decision work; inprocessing scans and probes enter the propagation-work ledger. */
+// Decision work; inprocessing scans and probes enter the propagation-work ledger.
 internal val SearchStatsSink.searchWork: Long
     get() = nodeCount

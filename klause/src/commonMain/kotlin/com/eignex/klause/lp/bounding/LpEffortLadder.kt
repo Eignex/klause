@@ -1,19 +1,8 @@
 package com.eignex.klause.lp.bounding
 
-/**
- * Ordered LP effort rungs, cheapest first — the **runtime** counterpart of the static
- * [LpTiming] technique tiers. Where [LpTiming] / [LpEmphasis] decide *which* relaxation techniques a
- * solve may build (a config-time ceiling), these rungs decide *how hard* the per-node simplex is
- * pushed during search, and the [LpEffortLadder] descends them under cost. The two vocabularies meet
- * at the emphasis→ceiling boundary, one rung per simplex tier:
- *  - [CUTS]  — the per-node LP plus during-search cut separation; the runtime form of [LpTiming.EXHAUSTIVE].
- *  - [BOUND] — the per-node LP bound / infeasibility prune, no during-search cuts; the [LpTiming.MEDIUM] tier.
- *  - [OFF]   — no per-node LP (the bare combinatorial [LpTiming.FAST] arms, if any, are separate and
- *              not governed by this ladder).
- *
- * The [LpEmphasis] ceiling fixes the ladder's top rung via [ceiling]: AGGRESSIVE (cuts permitted) →
- * [CUTS], DEFAULT (simplex, no cuts) → [BOUND]; a lower emphasis leaves the simplex off, so no ladder.
- */
+// Runtime per-node simplex effort, cheapest first: the counterpart of the static LpTiming tiers. CUTS adds
+// during-search separation (EXHAUSTIVE), BOUND is the bare LP prune (MEDIUM), and OFF runs no node LP. The
+// FAST combinatorial bounds are outside this ladder.
 internal enum class LpEffort {
     OFF,
     BOUND,
@@ -21,40 +10,14 @@ internal enum class LpEffort {
     ;
 
     companion object {
-        /** The ladder's ceiling rung for a resolved plan: [CUTS] when during-search cuts are permitted,
-         *  else the bare [BOUND]. */
         fun ceiling(cutsPermitted: Boolean): LpEffort = if (cutsPermitted) CUTS else BOUND
     }
 }
 
-/**
- * Adaptive per-node LP effort ladder over the ordered [LpEffort] rungs. The `--lp` emphasis fixes
- * the [top] rung (a ceiling the ladder never exceeds); from there a tumbling window demotes one rung
- * at a time when a rung's prunes no longer justify its cost, and a demoted ladder re-probes the next
- * rung up on exponential backoff, recovering a subtree where the extra effort becomes useful again.
- *
- * The demotion is reward-driven: a rung holds only if its window prune count clears a floor
- * scaled by the rung's per-node cost ([cutCostWeight] for [LpEffort.CUTS], `1` for the bare bound).
- * So the expensive cut tier — which issues extra separation re-solves per node — is shed unless it
- * earns proportionally more prunes, while a cheaper bound that prunes occasionally is kept. This is the
- * count-based, deterministic analogue of a reward-per-cost bandit over the rungs (no wall-clock).
- *
- * Soundness: every rung is a valid bound / infeasibility check / off, so the rung only changes *how
- * much* work is done, never the search's correctness — dropping effort loses pruning, not solutions.
- * With `top = BOUND` it reduces exactly to a two-rung auto-off.
- *
- * @param top          the ceiling rung from the emphasis; the ladder starts here and never exceeds it.
- * @param warmup       passes before the first demotion — never demote during the warmup.
- * @param window       size of the tumbling prune-rate window evaluated after the warmup.
- * @param minWindowPrunes lowest prune count a window may have and hold the bare [LpEffort.BOUND] rung;
- *                        below it the ladder demotes. The default `1` keeps a bound that prunes rarely.
- * @param cutCostWeight cost multiplier of the [LpEffort.CUTS] rung relative to [LpEffort.BOUND]:
- *                      a node at CUTS issues extra separation re-solves, so the reward-driven demote
- *                      requires the cut rung to prune `cutCostWeight ×` as often to justify staying.
- *                      `1` makes the rule cost-blind (demote any rung at `< minWindowPrunes`).
- * @param reprobeBase  eligible nodes between the first re-probes of the next rung up.
- * @param reprobeMax   ceiling on the backoff interval — a demoted ladder still re-probes this often.
- */
+// Starts at the emphasis ceiling `top`; a tumbling window demotes one rung when its prunes fall below
+// minWindowPrunes scaled by the rung's cost (cutCostWeight for CUTS), and a demoted ladder re-probes the
+// next rung up on exponential backoff. Count-based, so deterministic. Every rung is sound; dropping effort
+// loses pruning, not solutions.
 internal class LpEffortLadder(
     private val top: LpEffort,
     private val warmup: Int = DEFAULT_WARMUP,
@@ -65,15 +28,13 @@ internal class LpEffortLadder(
     private val reprobeMax: Int = 8192,
 ) {
     companion object {
-        /** Default sample count for [LpEffortGovernor], this ladder and [LpPivotBudget]. Each policy
-         *  admits observations under its own progress and cutoff conditions. */
+        // Shared by LpEffortGovernor and LpPivotBudget; each admits observations under its own conditions.
         const val DEFAULT_WARMUP: Int = 64
 
-        /** Default first backoff interval; `Int.MAX_VALUE` instead makes a demotion irreversible. */
+        // `Int.MAX_VALUE` instead makes a demotion irreversible.
         const val DEFAULT_REPROBE_BASE: Int = 64
 
-        /** Default cut-rung cost weight: the per-node cut separation runs up to a few extra LP
-         *  re-solves, so the cut rung must earn proportionally more prunes than the bare bound to hold. */
+        // Node cut separation runs a few extra LP re-solves, so the cut rung must earn more prunes to hold.
         const val DEFAULT_CUT_COST_WEIGHT: Int = 3
     }
 
@@ -83,23 +44,18 @@ internal class LpEffortLadder(
     private var runEffort = top
     private var totalSolves = 0
 
-    // Tumbling-window accounting at the current rung.
     private var windowSolves = 0
     private var windowPrunes = 0
 
-    // Re-probe schedule while below the ceiling.
     private var sinceLastProbe = 0
     private var reprobeDelay = reprobeBase
     private var probing = false
 
-    /** The settled rung the ladder has descended/promoted to (excludes the transient re-probe rung). */
+    // Excludes the transient re-probe rung.
     val rung: LpEffort get() = current
 
-    /** The rung to run for the pass [shouldRun] just authorized — the current rung, or the next rung
-     *  up during a re-probe. */
     val effort: LpEffort get() = runEffort
 
-    /** Whether during-search cut separation runs this pass — i.e. the run rung is [LpEffort.CUTS]. */
     val cutsEnabled: Boolean get() = runEffort == LpEffort.CUTS
 
     // Eligibility constrains effort without renewing reward windows or the re-probe clock.
@@ -110,12 +66,7 @@ internal class LpEffortLadder(
         if (probing && runEffort == current) probing = false
     }
 
-    /**
-     * Call once per LP-eligible node (after the depth / cadence gates pass). Returns true when the LP
-     * should run now — always while the current rung is above [LpEffort.OFF], and on the scheduled
-     * re-probe of the next rung up while below the ceiling. Sets [effort] to the rung to run. Stateful:
-     * advances the re-probe clock, so call it exactly once per eligible node.
-     */
+    // Advances the re-probe clock, so call it exactly once per LP-eligible node.
     fun shouldRun(): Boolean {
         if (current.ordinal < ceiling.ordinal) {
             sinceLastProbe++
@@ -129,12 +80,10 @@ internal class LpEffortLadder(
         return current != LpEffort.OFF
     }
 
-    /** Call after an LP run started by [shouldRun], with whether it pruned. */
     fun record(pruned: Boolean) {
         totalSolves++
         if (probing) {
-            // A re-probe of the next rung up: a prune means that rung is worth its cost — promote and
-            // re-arm the window; otherwise back off (doubling, capped) and hold the current rung.
+            // A pruning re-probe promotes; otherwise the backoff doubles up to its cap.
             probing = false
             sinceLastProbe = 0
             if (pruned) {
@@ -160,6 +109,5 @@ internal class LpEffortLadder(
         }
     }
 
-    /** Per-node cost of running rung [e], relative to the bare [LpEffort.BOUND] solve. */
     private fun costWeight(e: LpEffort): Int = if (e == LpEffort.CUTS) cutCostWeight else 1
 }

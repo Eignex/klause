@@ -98,7 +98,7 @@ internal class DualSimplexPhase(
                     haveBeta && model.exactState == null,
                 )
             }
-            // Work budget, checked before the iteration that would exceed it.
+            // Checked before the iteration that would exceed it.
             if (control.workExhausted()) {
                 return stop(LpFloatTermination.WORK, haveBeta)
             }
@@ -288,8 +288,7 @@ internal class DualSimplexPhase(
                 PivotFold.FAILED -> return DualPhaseResult.FAILED
             }
         }
-        // Iteration budget spent. Same reasoning as the cancellation exit: the iterate bounds, so hand
-        // it back rather than discarding the work.
+        // The completed iterate still bounds, so hand it back rather than discarding the work.
         return stop(LpFloatTermination.PIVOTS, haveBeta)
     }
 
@@ -297,10 +296,7 @@ internal class DualSimplexPhase(
     private var leavingViolation = 0.0
     private var leavingBelowLower = false
 
-    /*
-     * Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate dual steepest
-     * edge); -1 when every basic value is within its bounds.
-     */
+    // -1 when every basic value is within its bounds.
     private fun mostInfeasibleRow(
         model: LpModel,
         numerical: LpScalingView,
@@ -365,10 +361,7 @@ internal class DualSimplexPhase(
         return@profiled touchedCount
     }
 
-    /*
-     * Collect the dual-feasible entering candidates into [eligibleColumns] and their ratios into [enteringRatios];
-     * eligibility is the sign rule that keeps reduced costs feasible as the leaving variable moves to its bound.
-     */
+    // Eligibility is the sign rule that keeps reduced costs feasible as the leaving variable moves to its bound.
     private fun collectEligibleEntering(
         model: LpModel,
         numerical: LpScalingView,
@@ -462,7 +455,7 @@ internal class DualSimplexPhase(
         return@profiled EnteringChoice.Selected(null) // defensive: the loop handles the last element
     }
 
-    // Stable ascending order by ratio.
+    // Stable, so ratio ties keep their eligibility order.
     private fun sortByRatio(elig: IntArrayList, ordered: IntArray, ratioBuf: DoubleArray) {
         val order = argsortBy(elig.size, pricingOrder, pricingScratch) { a, b ->
             ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]])
@@ -601,10 +594,10 @@ internal class DualSimplexPhase(
     }
 
     private companion object {
-        /* A Devex weight below this fraction of the computed pivotal-row norm is corrected. */
+        // A Devex weight below this fraction of the computed pivotal-row norm is corrected.
         const val DEVEX_WEIGHT_THRESHOLD: Double = 0.25
 
-        /* Theory pricing samples only pivots large enough to be meaningful at simplex tolerance. */
+        // Theory pricing samples only pivots large enough to be meaningful at simplex tolerance.
         const val THEORY_PIVOT_MAGNITUDE_FLOOR: Double = 1e-6
 
         const val THEORY_SAMPLE_LIMIT: Int = 8
@@ -614,7 +607,7 @@ internal class DualSimplexPhase(
         const val MIX_MULTIPLIER_2: Long = -7723592293110705685L
         const val CANCEL_POLL: Int = 32
 
-        /* Widening rounds before the basis goes to the primal: past 1e15 a seat swamps double precision. */
+        // Widening rounds before the basis goes to the primal: past 1e15 a seat swamps double precision.
         const val MAX_ARTIFICIAL_WIDENINGS: Int = 2
     }
 }

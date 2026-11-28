@@ -13,15 +13,8 @@ import kotlin.math.floor
 import kotlin.math.min
 import kotlin.math.roundToLong
 
-/**
- * Per-call cache of the most recent fractional LP value of each variable, for LP-guided value
- * ordering. Filled by the node LP solve and read by the descent to order branch values toward
- * the LP value (round-toward-LP diving). Purely advisory — it reorders candidate values the value
- * heuristic already produced, so it can change search order but never the optimum or feasibility.
- *
- * `NaN` means "no current LP value" (the LP has not solved for this variable, or not at this node),
- * in which case ordering is left untouched.
- */
+// LP values, reduced-cost pseudo-costs and directional history from node solves, read by the descent to
+// order variables and values. Advisory only: it changes search order, never feasibility or the optimum.
 internal class LpHints(
     numIntVars: Int,
     numBoolVars: Int,
@@ -346,16 +339,13 @@ internal class LpHints(
     private val intVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numIntVars) { Double.NaN } }
     private val boolVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numBoolVars) { Double.NaN } }
 
-    // Freshness stamps: hints are consulted only when written by the latest LP solve. Values are
-    // never invalidated on backtrack, so without the stamp a hint recorded in an abandoned subtree
-    // would keep steering value order at unrelated nodes.
+    // Hints count only when written by the latest LP solve: values are never invalidated on backtrack, so a
+    // hint from an abandoned subtree would otherwise steer unrelated nodes.
     private val intStamp by lazy(LazyThreadSafetyMode.NONE) { IntArray(numIntVars) { -1 } }
     private val boolStamp by lazy(LazyThreadSafetyMode.NONE) { IntArray(numBoolVars) { -1 } }
     private var solveStamp = 0
 
-    // Decayed running average of `|reduced cost|` each variable showed while nonbasic, a
-    // reduced-cost pseudo-cost (an estimate of the objective's sensitivity to the variable). NaN = the
-    // variable has never been nonbasic, so there is no estimate yet. Read by [branchScore]; advisory.
+    // Decayed average of |reduced cost| while nonbasic, a pseudo-cost; NaN until first nonbasic.
     private val intRc by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numIntVars) { Double.NaN } }
     private val boolRc by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numBoolVars) { Double.NaN } }
 
@@ -389,13 +379,6 @@ internal class LpHints(
         recorded = false
     }
 
-    /**
-     * Record an LP solution: its fractional primal (per structural column,
-     * `FloatLpResult.primal`) and, from the [duals], the decayed reduced-cost average of
-     * each variable (the reduced cost `dⱼ = cⱼ − yᵀAⱼ`; near-zero for basic columns). Keyed by the
-     * relaxation's column→variable map. Purely advisory — drives value ([order]) and variable
-     * ([branchScore]) selection, never feasibility or the optimum.
-     */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
         if (passiveChoice != null) {
             charge(2L)
@@ -412,7 +395,7 @@ internal class LpHints(
         solveStamp++
         for (col in relaxation.colVarId.indices) {
             val v = relaxation.colVarId[col]
-            if (v < 0 || col >= primal.size) continue // auxiliary column (e.g. circuit arc) — no CP variable to hint
+            if (v < 0 || col >= primal.size) continue
             if (relaxation.colIsBool[col]) {
                 boolVal[v] = primal[col]
                 boolStamp[v] = solveStamp
@@ -420,13 +403,12 @@ internal class LpHints(
                 intVal[v] = primal[col]
                 intStamp[v] = solveStamp
             }
-            // Reduced cost dⱼ = cⱼ − yᵀAⱼ over the structural column; |dⱼ| feeds the pseudo-cost average. Read
-            // through the double view, which holds a real row's coefficients; the integer store holds it as zeros.
+            // dⱼ = cⱼ − yᵀAⱼ, read through the double view: the integer store holds a real row's coefficients as zeros.
             if (col >= model.n) continue
             var dot = 0.0
             model.forEachInColumnD(col) { i, a -> dot += duals[i] * a }
             val rc = abs(model.costD(col) - dot)
-            if (rc <= RC_TOL) continue // basic / zero-reduced-cost: no objective-sensitivity signal
+            if (rc <= RC_TOL) continue
             if (relaxation.colIsBool[col]) {
                 boolRc[v] = if (boolRc[v].isNaN()) rc else RC_DECAY * boolRc[v] + (1.0 - RC_DECAY) * rc
             } else {
@@ -435,12 +417,7 @@ internal class LpHints(
         }
     }
 
-    /**
-     * Branching priority of [varRef] for reduced-cost-average variable selection: its reduced-cost
-     * pseudo-cost weighted by how fractional its last LP value is (distance to the nearest integer).
-     * A variable the LP already pins to an integer scores `0` (no branching needed); one with no LP
-     * value scores `NaN` (the selector falls back). Higher = branch here first.
-     */
+    // Pseudo-cost × distance of the fresh LP value to the nearest integer; NaN without a fresh LP value.
     fun branchScore(varRef: VarRef): Double = branchScore(varRef.varId, varRef is VarRef.Bool)
 
     fun branchScore(id: Int, isBool: Boolean): Double {
@@ -451,21 +428,15 @@ internal class LpHints(
         val lpVal = vals[id]
         if (lpVal.isNaN()) return Double.NaN
         val frac = lpVal - floor(lpVal)
-        val fractionality = min(frac, 1.0 - frac) // 0 when the LP value is integral
+        val fractionality = min(frac, 1.0 - frac)
         val rc = (if (isBool) boolRc else intRc)[id]
         val weight = if (rc.isNaN()) 1.0 else rc + RC_EPS // unseen variables get the bare fractionality
         return weight * fractionality
     }
 
-    /**
-     * Steer [values] by the variable's fresh LP value; unchanged when none exists. For an int var
-     * with a *fractional* LP value the head becomes `floor(lp)`: the engine's int decision is the
-     * bound split `x ≤ head` / `x ≥ head + 1`, and splitting at the floor is the dichotomy that
-     * separates the fractional LP point between the two children. An integral LP value (and a bool)
-     * keeps round-toward-LP diving order instead — there is nothing to separate, the LP point is a
-     * pin preference. Lazy for the int case: the original sequence is never materialised, so a wide
-     * domain costs O(consumed), not a full sort.
-     */
+    // A fractional integer LP value puts floor(lp) first: the int decision splits x ≤ head / x ≥ head + 1, and
+    // the floor separates the LP point between the children. An integral value or a Boolean rounds toward the
+    // LP. Lazy for integers, so a wide domain costs O(consumed).
     fun order(varRef: VarRef, values: Sequence<Long>): Sequence<Long> {
         if (!recorded) return values
         val id = when (varRef) {
@@ -487,21 +458,17 @@ internal class LpHints(
         hint = boolVal.getOrElse(id) { Double.NaN }
         if (hint.isNaN() || boolStamp.getOrElse(id) { -1 } != solveStamp) return values
         val target = hint.roundToLong()
-        // Stable sort by |value − round(LP)|: two candidates at most for a bool.
         return values.sortedBy { abs(it - target) }.asSequence()
     }
 
     private companion object {
-        /** Below this, a reduced cost is treated as zero (basic column) — no pseudo-cost update. */
         const val RC_TOL = 1e-7
 
-        /** Exponential-decay factor for the reduced-cost running average (older solves fade). */
         const val RC_DECAY = 0.9
 
-        /** Floor added to the pseudo-cost weight so fractionality still ranks unseen-cost variables. */
+        // Keeps fractionality ranking variables whose cost is unseen.
         const val RC_EPS = 1e-6
 
-        /** LP values within this of an integer count as integral (solver feasibility tolerance). */
         const val INT_TOL = 1e-6
     }
 }

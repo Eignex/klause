@@ -14,7 +14,6 @@ import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource.Monotonic
 
-/** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     var sparseTrial: Map<String, Long> = emptyMap()
     private val phases = LinkedHashMap<String, LpPhaseStats>()
@@ -223,18 +222,16 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var demoted = false
     private var clock: TimeMark? = null
 
-    /** One node visited by LP bounding, irrespective of how many re-solves cuts require. */
+    // Counts nodes, not the re-solves cuts require.
     fun observeNodePass() {
         if (probeRoute == LpRoute.NODE) nodePasses++
     }
 
-    /** One node LP solve, the cost denominator; [observeNodePass] is the node count. */
     fun observeSolve() {
         if (probeRoute == LpRoute.NODE) solves.update(1.0)
     }
 
-    /** Route-specific engine cost. The pivot, work, warm-start and refactor totals are node-only,
-     * so their denominator ([solves]) always names the same route. */
+    // Pivot, work, warm-start and refactor totals are node-only so [solves] stays their denominator.
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics, finished: Boolean = true) {
         recordEngineCost(route, metrics, finished)
     }
@@ -368,7 +365,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             standaloneComponent = component && route == LpRoute.STANDALONE)
     }
 
-    /** The local bridge passed into engine exact checks. */
     fun certificationObserver(route: LpRoute = LpRoute.NODE): LpCertificationObserver {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
         return certificationObservers[effectiveRoute.ordinal]
@@ -380,7 +376,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (active > 0) cutActive.update(active.toDouble())
     }
 
-    /** Count a selection before its build and make it active only after that build succeeds. */
+    // Selected cuts become active only after the build succeeds.
     fun <T> observeCutBuild(selected: Int, build: () -> T): T {
         observeCutAccounting(candidates = 0, selected = selected, active = 0)
         val result = build()
@@ -392,27 +388,22 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (probeRoute == LpRoute.NODE) rootReducedCostFixes += count.coerceAtLeast(0)
     }
 
-    /** A node whose subtree was cut by the LP-relaxation bound because its bound dominated the
-     *  incumbent (or an LP-derived deduction emptied a domain). */
+    // Also counts nodes where an LP-derived deduction emptied a domain.
     fun observePrune() {
         if (probeRoute == LpRoute.NODE) pruned.update(1.0)
     }
 
-    /** A node pruned because the LP relaxation was infeasible — counted in both [pruned] (the total)
-     *  and [infeasible] (the feasibility-filter share). */
     fun observeInfeasiblePrune() {
         if (probeRoute != LpRoute.NODE) return
         pruned.update(1.0)
         infeasible.update(1.0)
     }
 
-    /** Record the root-node (decision level 0) LP relaxation objective; last write at the root wins,
-     *  so it reflects the strengthened post-cut bound. Ignored off the root or for a non-finite value. */
+    // Last write at the root wins, so the bound reflects the post-cut relaxation.
     fun observeRootBound(decisionLevel: Int, value: Double) {
         if (decisionLevel == 0 && value.isFinite()) rootBound = value
     }
 
-    /** Bracket LP-bounding wall time: [clockStart] then [clockStop] adds the interval to [ms]. */
     fun clockStart() {
         if (probeRoute == LpRoute.NODE) clock = Monotonic.markNow()
     }
@@ -422,55 +413,43 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         clock = null
     }
 
-    /** One domain reduction applied by LP reduced-cost fixing. */
     fun observeFix() {
         if (probeRoute == LpRoute.NODE) fixed.update(1.0)
     }
 
-    /** Record that LP work spent its cumulative allowance. */
     fun observeWorkAllowanceSpent() {
         workAllowanceSpent = true
     }
 
-    /** Record that the node LP stands demoted to its floor budget, whichever rule decided. */
     fun observeDemoted() {
         demoted = true
     }
 
-    /** Record one node LP solve's deterministic work. Accumulated in a single update: the figure runs
-     *  to millions of operations, so a per-unit loop would cost more than the solve it measures. */
+    // One update per solve: the figure runs to millions of operations.
     fun observeWork(ops: Long) {
         routeMetrics[LpRoute.NODE.ordinal].observeWork(ops)
     }
 
-    /** Record node-LP work the simplex does not meter; see [LpStats.overheadOps]. */
     fun observeOverhead(ops: Long) {
         if (ops > 0L && probeRoute == LpRoute.NODE) overheadOpsTotal += ops
     }
 
-    /** Record one node LP solve's sparse-LU fill ratio, density, and basis dimension. [luMaxDim] is
-     *  the largest basis seen across all solves, tracked independently of [luMaxDensity] — a single
-     *  running max cannot also report the dimension at which the max density occurred, so treat the
-     *  two as separate signals (how sparse things get, and how big things get) rather than a pair. */
+    // Independent running maxima: [luMaxDim] is not the dimension at which [luMaxDensity] occurred.
     fun observeLuFill(fill: Double, density: Double, dimension: Int = 0) {
         if (fill > 0.0) luMaxFill.update(fill)
         if (density > 0.0) luMaxDensity.update(density)
         if (dimension > 0) luMaxDim.update(dimension.toDouble())
     }
 
-    /** Record [count] cuts added by separators. */
     fun observeCuts(count: Int) {
         repeat(count) { cuts.update(1.0) }
     }
 
-    /** A non-chronological backjump driven by an LP infeasibility certificate. */
     fun observeBackjump() {
         backjumps.update(1.0)
     }
 
-    /** Record the root-node (decision level 0) relaxation's coefficient spread; first write at the root
-     *  wins, since the matrix is fixed for a model's lifetime. Ignored off the root or for an empty
-     *  matrix. */
+    // First write at the root wins: the matrix is fixed for a model's lifetime.
     fun observeRootConditioning(decisionLevel: Int, minValue: Double, maxValue: Double, rowRatio: Double) {
         if (probeRoute != LpRoute.NODE || decisionLevel != 0 || !rootMatrixMinValue.isNaN() || maxValue <= 0.0) return
         rootMatrixMinValue = minValue
@@ -478,14 +457,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         rootRowRatio = rowRatio
     }
 
-    /**
-     * Record how one certified solve was decided, and where it declined if it did.
-     *
-     * The decline rate sizes the exact layer's reach — a decline is at once a lost prune, a lost clause
-     * and a fall-through to the rational decider — so the two causes are counted apart. A continuous
-     * decline is the certifier refusing a real coefficient by design; only a numeric one is a
-     * certificate that was arithmetically out of reach.
-     */
+    // Decline causes are counted apart: a continuous decline is a refusal by design, a numeric one is
+    // a certificate out of arithmetic reach.
     fun observeCertification(
         certified: Boolean,
         continuousDecline: Boolean,
@@ -500,7 +473,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (rows > 0) certifyMaxRows.update(rows.toDouble())
     }
 
-    /** Which route produced one Farkas certificate, or that none did. */
     fun observeFarkasRoute(reconstructed: Boolean, exactBasis: Boolean, rounded: Boolean, none: Boolean) {
         if (reconstructed) farkasReconstructed.update(1.0)
         if (exactBasis) farkasExactBasis.update(1.0)
@@ -508,8 +480,6 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         if (none) farkasNone.update(1.0)
     }
 
-    /** One certified LP solve that decomposed into [blocks] column components. A monolithic solve
-     *  (`blocks == 1`) is not recorded, so [componentSplits] counts only the split ones. */
     fun observeComponentSplit(blocks: Int) {
         if (blocks <= 1) return
         componentSplits.update(1.0)

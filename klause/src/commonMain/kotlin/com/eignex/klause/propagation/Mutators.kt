@@ -8,8 +8,6 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
-/** Push every pin and deduced restriction in `a` as a fresh decision; return `false` (so
- *  [PropagationState.seeded] becomes `false`) on the first contradiction. */
 internal fun PropagationState.seedAssumptions(a: Assumptions): Boolean {
     val bk = a.boolKeys
     val bv = a.boolValues
@@ -57,10 +55,6 @@ internal fun PropagationState.seedAssumptions(a: Assumptions): Boolean {
     return true
 }
 
-/**
- * Push a bool var as a new decision: bumps the level and pins it. Used by the driver to
- * seed input assumptions and by [PropagationSession] to push branches.
- */
 internal fun PropagationState.pinBoolAsDecision(v: Int, value: Boolean): Boolean {
     levelToDecisionVar.add(v)
     currentLevel = levelToDecisionVar.size
@@ -68,11 +62,8 @@ internal fun PropagationState.pinBoolAsDecision(v: Int, value: Boolean): Boolean
     return pinBoolImpl(v, value, antecedents = null)
 }
 
-/**
- * Push an int var as a new decision. With the undo log on, the decision is the literal `[v = value]`: it is
- * stamped first, with no reason, and both bound moves cite it, so the level carries one unexplained literal for
- * 1UIP to stop at instead of two bound atoms it cannot collapse.
- */
+// With the undo log on, the decision is `[v = value]`, stamped without a reason and cited by both bound moves, so
+// the level carries one unexplained literal for 1UIP to stop at instead of two bound atoms it cannot collapse.
 internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
@@ -83,11 +74,7 @@ internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
     return tightenIntMinImpl(v, value, reason) && tightenIntMaxImpl(v, value, reason)
 }
 
-/**
- * Stamp atom variable [atom] true as the current level's decision, with no reason, and return that literal as a
- * reason for the moves it causes. Stamped ahead of those moves, it precedes everything they establish, and their
- * own wakes find it already true and leave it unexplained.
- */
+// Stamped ahead of the moves it causes, so their wakes find it already true and leave it unexplained.
 private fun PropagationState.stampDecision(atom: Int): IntArray {
     val atomId = atom - problem.numBoolVars
     recordAtomTruthChange(atomId)
@@ -98,18 +85,10 @@ private fun PropagationState.stampDecision(atom: Int): IntArray {
     return intArrayOf(Lit.make(atom, false))
 }
 
-/**
- * Push an int upper-bound tightening (`v ≤ hi`) as a new decision. Unlike
- * [setIntAsDecision], this records a *single* bound atom at the new decision level, so
- * conflicts seeded by it have a single 1UIP literal there (an equality pin contributes
- * two same-level bound atoms that 1UIP cannot collapse). The caller must ensure `hi`
- * strictly narrows the domain (`hi in d.min until d.max`) so the level is non-empty.
- *
- * With the undo log on, `[v ≤ hi]` is stamped as the decision before the move. A move that snaps past a hole below
- * `hi` lands on a tighter bound, which cites `[v ≤ hi]`; woken after it, `[v ≤ hi]` would otherwise take that bound
- * as its channeling reason, and the two would explain each other with no unexplained literal left at the level.
- * The move itself keeps no reason, which is how a decided bound is told apart when a reason lifts it.
- */
+// The caller ensures `hi` strictly narrows the domain. With the undo log on, `[v ≤ hi]` is stamped before the
+// move: a move snapping past a hole lands on a tighter bound citing `[v ≤ hi]`, and woken later `[v ≤ hi]` would
+// take that bound as its reason, leaving no unexplained literal at the level. The move keeps no reason, which
+// marks a decided bound when a reason lifts it.
 internal fun PropagationState.setIntMaxAsDecision(v: Int, hi: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
@@ -119,7 +98,6 @@ internal fun PropagationState.setIntMaxAsDecision(v: Int, hi: Long): Boolean {
     return tightenIntMaxImpl(v, hi, null)
 }
 
-/** Push an int lower-bound tightening (`v ≥ lo`) as a new decision. See [setIntMaxAsDecision]. */
 internal fun PropagationState.setIntMinAsDecision(v: Int, lo: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
@@ -133,11 +111,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     // Packed bits avoid boxing a Boolean on each propagation pin.
     if (boolAssigned.get(v)) {
         if (boolValueBits.get(v) == value) return true
-        // Conflict — record levels of both contributors, and seed the factor core with
-        // the prior pin's reason (whichever factor forced `cur`, if any) plus the
-        // currently-running factor (if any). Also record [v] so the analyzer can
-        // synthesise a clause-form seed from the prior pin's antecedents when this
-        // is a decision-level vs prior-pin contradiction (currentFactor == -1).
+        // Record [v] so the analyzer can seed a clause from the prior pin when a decision contradicts it.
         recordConflictLevels(boolLevel[v], currentLevel)
         seedConflictFactor(boolReason[v])
         seedConflictFactor(currentFactor)
@@ -166,19 +140,16 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     return true
 }
 
-/** Append the prior bound atom's clause-form literal to [base] when the prior bound was
- *  itself search-derived ([cite]); a root-level bound is a global fact and needs none. */
+// A root-level prior bound is a global fact and needs no citation.
 internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, base: IntArray?): IntArray? {
     if (!cite) return base
     if (!isLazyReason(base) && base != null && base.contains(priorLit)) return base
     return extendReason(base, intArrayOf(priorLit))
 }
 
-/** Citation cap for a snapped bound's crossed holes; a wider block takes the decision-cut reason. */
+// A wider block of crossed holes takes the decision-cut reason.
 private const val MAX_HOLE_CITATIONS = 4096
 
-/** The coarse always-sound reason: [base] plus every decision variable's current pin / root-tightened
- *  bound atoms, negated. See [antecedentsAcrossHoles]'s over-wide fallback. */
 private fun PropagationState.decisionCutAntecedents(base: IntArray?): IntArray {
     val lits = IntArrayList()
     reasonOf(base)?.forEach { lits.add(it) }
@@ -198,16 +169,8 @@ private fun PropagationState.decisionCutAntecedents(base: IntArray?): IntArray {
     return lits.toIntArray()
 }
 
-/**
- * Antecedents for a bound move that snapped past interior holes. The supplied [base] reason
- * justifies the *requested* bound only; when the hole-aware domain update lands the endpoint
- * further (because the values in between are excluded), the deduction additionally rests on
- * those exclusions. Each value in [crossed] that exists in the root domain was carved out
- * during search, so its positive eq-atom literal joins the reason — omitting it makes the
- * recorded implication stronger than what was actually derived, and clauses learned through
- * it can prune feasible assignments. Values absent from the root domain are global facts and
- * need no citation.
- */
+// The supplied reason justifies only the requested bound. Each crossed value in the root domain was carved during
+// search and must be cited, or learned clauses can prune feasible assignments.
 internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange, base: IntArray?): IntArray? {
     var out: IntArrayList? = null
     val orig = rootDomains[v]
@@ -215,10 +178,8 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
         val o = out ?: IntArrayList().also { out = it }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
-    // Cite the search-carved values the bound snapped past — those in [crossed] still in the root
-    // domain. Walk the root's members inside [crossed] by neighbour steps: both the crossed span and
-    // the root can be astronomically wide (a clamped Long domain), but the members visited are
-    // bounded by the search-removal events that carved them, so this never scans value-by-value.
+    // Walk the root's members by neighbour steps: the span can be astronomically wide, but the members visited
+    // are bounded by the carves that removed them.
     if (!crossed.isEmpty()) {
         val start = if (crossed.first in orig) {
             crossed.first
@@ -227,11 +188,8 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
         } else {
             crossed.last + 1 // past the range: nothing to cite
         }
-        // Count before citing (citing materializes eq-atoms): a block past the cap gets the coarse
-        // decision-cut reason instead — every decision variable's current pins/bounds negated. Those
-        // premises are at least as strong as the decisions themselves, and everything derived at this
-        // node follows from the decisions, so the implication (and the clauses learned through it)
-        // stays sound; the reason is just less reusable than the per-value citation.
+        // Count before citing, since citing materializes eq-atoms. Past the cap, every decision's current pins and
+        // bounds negated is a sound but less reusable reason.
         var count = 0
         var probe = start
         while (probe <= crossed.last) {
@@ -255,11 +213,7 @@ internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Long, antecedents: I
 internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Long, antecedents: IntArray?): Boolean =
     tightenBoundImpl(v, hi, antecedents, isMin = false)
 
-/**
- * Shared core for the two one-sided bound tightenings: raise `v.min` to `bound` (`isMin`) or lower
- * `v.max` to `bound`. `inline` so each caller expands a side-specialised copy with the `isMin`
- * branches folded away — the propagation hot loop pays no extra dispatch or allocation.
- */
+// Inline so each side gets a specialised copy with no dispatch or allocation in the hot loop.
 @Suppress("NOTHING_TO_INLINE")
 private inline fun PropagationState.tightenBoundImpl(
     v: Int,
@@ -270,9 +224,7 @@ private inline fun PropagationState.tightenBoundImpl(
     val d = intDomains[v]
     if (if (isMin) bound <= d.min else bound >= d.max) return true
     if (if (isMin) bound > d.max else bound < d.min) {
-        // Two-sided narrowing emptied the domain: the existing opposite bound came from
-        // `intMaxReason[v]` / `intMinReason[v]`, and `currentFactor` is the one trying to push
-        // this side past it. Both go into the core seed.
+        // The opposite bound's reason and the current factor both seed the core.
         recordConflictLevels(intLevel[v], currentLevel)
         seedConflictFactor(if (isMin) intMaxReason[v] else intMinReason[v])
         seedConflictFactor(currentFactor)
@@ -282,12 +234,9 @@ private inline fun PropagationState.tightenBoundImpl(
     if (currentFactor >= 0) propagations++
     // Preserves interior holes.
     val newDomain = if (isMin) d.withMinAtLeast(bound) else d.withMaxAtMost(bound)
-    // A landing value inside a hole snaps the bound further. The snapped bound rests on the requested
-    // bound plus the crossed holes. The requested-bound atom is cited only for a *decision* move
-    // (`antecedents == null`): a decision to set `v ≥ bound` has no factor reason, so its sole
-    // representation in conflict analysis is that atom. A *propagation* supplies `antecedents` that
-    // already imply the bound, so citing the atom too is redundant — and since the atom resolves
-    // back to this very bound it would be a same-var cycle 1UIP cannot collapse.
+    // A landing value inside a hole snaps further, so the bound also rests on the crossed holes. The requested
+    // bound atom is cited only for a decision move: a propagation's antecedents already imply it, and the atom
+    // resolves back to this bound, a same-var cycle 1UIP cannot collapse.
     val snapped = if (isMin) newDomain.min > bound else newDomain.max < bound
     val ant = if (snapped) {
         val priorLit = Lit.make(if (isMin) atomVarGe(v, bound) else atomVarLe(v, bound), false)
@@ -321,18 +270,6 @@ private inline fun PropagationState.tightenBoundImpl(
     return true
 }
 
-/**
- * Punch a hole at [value] in `intDomains[v]`. Three cases:
- *  - `value` not in the current domain → no-op, returns `true`.
- *  - `value` is at the current min or max → equivalent to a one-step bound tighten.
- *  - `value` is interior → the domain transitions to sparse representation. Other
- *    propagators still see the same `min`/`max` until further tightening; the hole
- *    affects `contains(value)` lookups and `forEach` iteration.
- *
- * Returns `false` only when removing [value] would empty the domain (singleton
- * domain whose sole value is [value]). On conflict, seeds the factor core with the
- * level / reason fields already tracked for the min and max sides.
- */
 internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, antecedents: IntArray?): Boolean {
     val d = intDomains[v]
     if (value !in d) return true
@@ -349,13 +286,9 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
     }
     if (currentFactor >= 0) propagations++
     val newDomain = d.excludeValue(value)
-    // An edge exclusion advances the endpoint: the new bound rests on the *prior* bound, the
-    // exclusion itself, and any further holes crossed on the way. The supplied reason only
-    // justifies the exclusion, so the prior bound atom and the crossed values' exclusions
-    // must join the recorded reason (see [antecedentsAcrossHoles]) — without them the
-    // implication is stronger than what was derived and learned clauses can prune feasible
-    // assignments. Kept as separate near/far reason sets (the one-step bound move vs. the
-    // hole-snapped landing) so each flipped atom can take the weakest sufficient one.
+    // An edge exclusion's new bound also rests on the prior bound and any holes crossed; without them learned
+    // clauses can prune feasible assignments. Near and far sets stay separate so each flipped atom takes the
+    // weakest sufficient one.
     val antNear = when {
         newDomain.min != d.min -> appendPriorBound(
             Lit.make(atomVarGe(v, d.min), false),
@@ -379,14 +312,8 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
     intDomains[v] = newDomain
     noteLearnedUse(currentFactor)
     intLevel[v] = maxOf(intLevel[v], currentLevel)
-    // An interior carve (no endpoint moved) records the hole-carve record — the level/reason source
-    // for an eq atom materialized after its value was already carved. (A bound move instead stamps
-    // the level/reason directly on each crossed order literal's trail slot, see [wakeAtom].)
+    // Only an interior carve needs the hole record; a bound move stamps each crossed literal's trail slot.
     if (newDomain.min == d.min && newDomain.max == d.max) pushHoleHist(v, value, currentLevel, antecedents)
-    // Reason attribution: which side (min/max) "moved" depends on where the hole
-    // landed. Pure interior holes don't shift either endpoint; in that case the
-    // current factor still becomes the relevant reason for any future propagator
-    // walking back through this variable.
     if (newDomain.min != d.min) {
         intMinLevel[v] = currentLevel
         intMinReason[v] = currentFactor
@@ -397,7 +324,6 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = ant
     }
-    // Edge exclusions advance a bound (LB/UB); a pure interior carve leaves both intact.
     val kindBit = when {
         newDomain.min != d.min -> IntEvent.LB_RAISED_BIT
         newDomain.max != d.max -> IntEvent.UB_LOWERED_BIT
@@ -431,14 +357,7 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
     return true
 }
 
-/**
- * Like [antecedentsAcrossHoles] but for a batched exclusion: cite only the *pre-existing*
- * search-carved holes crossed in `[from, until)`. A value still present in [prior] is one this
- * very batch is excluding — its reason is the shared [base] (which already carries the batch's
- * antecedents), so citing its eq atom here would be circular. Values absent from [prior] but
- * inside the root domain were carved by an *earlier* propagation and must be cited; values absent
- * from the root domain are global facts and need none.
- */
+// A value still in [prior] is one this batch excludes, covered by [base]; citing its eq atom would be circular.
 internal fun PropagationState.citeCrossedSearchHoles(
     v: Int,
     from: Long,
@@ -452,10 +371,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
         val o = out ?: IntArrayList().also { out = it }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
-    // Cite the search-carved holes crossed in the range: values absent from [prior] but inside the
-    // root domain (a value still present in [prior] is one this batch excludes, covered by [base]).
-    // Enumerate the smaller side — a survivor set over a wide span has span-many holes but few members,
-    // so walking holes would be O(span); iterate the root's members instead. Identical cited set.
+    // Enumerate the smaller side: a survivor set over a wide span has span-many holes but few members.
     val lo = maxOf(from, prior.min)
     val hi = minOf(until - 1, prior.max)
     val members = if (root.valueCount <= prior.holeCount) root.spanOrNull() else null
@@ -471,20 +387,8 @@ internal fun PropagationState.citeCrossedSearchHoles(
     return out?.let { extendReason(base, it.toIntArray()) } ?: base
 }
 
-/**
- * Exclude every value in [values] (sorted ascending, distinct) from int var [v] in a single
- * pass — the batched form of [excludeIntValueImpl]. Element's constant-array GAC prunes a wide
- * result domain down to a small reachable set; doing that one value at a time rebuilds the hole
- * array per value (O(domain^2)), whereas `IntDomain.excludeValues` merges them
- * in O(domain).
- *
- * Reasoning matches the single-value path: the two endpoints that may move each cite the prior
- * bound, the shared [antecedents] (which justifies the whole batch — Element passes one reason for
- * every value), and any pre-existing search holes crossed on the way ([citeCrossedSearchHoles]);
- * interior carves each cite [antecedents]. Atom truth/level end state is identical to folding
- * [excludeIntValueImpl] over [values]. Returns false, seeding the conflict core, when the
- * exclusions empty the domain.
- */
+// Batched form of [excludeIntValueImpl]: excluding one value at a time rebuilds the hole array per value,
+// O(domain²). The atom end state equals folding the single-value path over [values].
 internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antecedents: IntArray?): Boolean {
     if (values.isEmpty()) return true
     val d = intDomains[v]
@@ -551,10 +455,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = antMax
     }
-    // A batched exclusion can move both endpoints and carve interior holes at once; raise every
-    // event kind that actually occurred so typed-event advisors (e.g. a bounds-consistent [Linear]
-    // subscribed to LB_RAISED / UB_LOWERED, dropped from this var's occurrence-list wakeup) wake.
-    // A missing kind bit would silently drop that wake.
+    // Raise every kind that occurred: a missing bit drops a typed-event advisor's wake.
     var kindMask = 0
     if (newMin != d.min) kindMask = kindMask or IntEvent.LB_RAISED_BIT
     if (newMax != d.max) kindMask = kindMask or IntEvent.UB_LOWERED_BIT
@@ -612,14 +513,8 @@ internal fun PropagationState.seedConflictFactor(fid: Int) {
 internal fun PropagationState.setIntImpl(v: Int, value: Long, antecedents: IntArray?): Boolean =
     tightenIntMinImpl(v, value, antecedents) && tightenIntMaxImpl(v, value, antecedents)
 
-/**
- * Restrict `v`'s domain to [survivors] (ascending, the bake's folded fixpoint for a sparse variable) as
- * one seed decision — the compact counterpart to excluding each hole individually. Sets the domain in a
- * single step and wakes the affected order/eq atoms off the value-sorted atom index
- * ([propagateAtomsForSetRestriction]), so both the domain write and the atom wakeups are O(survivors +
- * eq-atoms) rather than O(span). A search-time seed retains its compact before/after domains and level
- * through reversible history; root preparation needs no conditional hole reasons.
- */
+// Wakes atoms off the value-sorted index, so the write and wakeups are O(survivors + eq-atoms) rather than O(span).
+// A search-time seed keeps its before/after domains in reversible history.
 internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: LongArray): Boolean {
     val d = intDomains[v]
     var kept = 0

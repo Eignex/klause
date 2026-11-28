@@ -23,16 +23,14 @@ import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 
-/**
- * CP propagator for [Cumulative]: energetic reasoning, profile-based height pruning, Θ-tree edge-finding
- * in both directions, and time-tabling.
- *
- * Each deduction cites only the tasks it rests on, recorded lazily and built when conflict analysis reads it
- * from the bounds as they stood ([explain]): a time-table shave the compulsory parts that block the skipped
- * starts, an edge-finding bound the set that must precede the task and the subset that sets the bound, an
- * energetic bound the tasks inside its window, a height bound the compulsory parts stacked on its peak.
- * Bounds are cited only as far as the deduction needs them, and each failure records its own reason.
- */
+// CP propagator for [Cumulative]: energetic reasoning, profile-based height pruning, Θ-tree edge-finding
+// in both directions, and time-tabling.
+//
+// Each deduction cites only the tasks it rests on, recorded lazily and built when conflict analysis reads it
+// from the bounds as they stood ([explain]): a time-table shave the compulsory parts that block the skipped
+// starts, an edge-finding bound the set that must precede the task and the subset that sets the bound, an
+// energetic bound the tasks inside its window, a height bound the compulsory parts stacked on its peak.
+// Bounds are cited only as far as the deduction needs them, and each failure records its own reason.
 internal class CumulativePropagator(
     val intVars: IntArray,
     private val starts: IntArray,
@@ -243,15 +241,13 @@ internal class CumulativePropagator(
     private fun capMax(state: PropagationState): Long =
         if (capacityVar < 0) capacity else state.intDomains[capacityVar].max
 
-    /**
-     * Naive energetic reasoning (after P. Baptiste, C. Le Pape and W. Nuijten, "Constraint-Based
-     * Scheduling", Springer 2001, https://doi.org/10.1007/978-1-4615-1479-4). For
-     * the running window `[xMin, xMax]` spanned by the tasks seen so far in non-decreasing latest
-     * completion order, every such task's whole execution lies inside the window, so their minimum
-     * energies sum to at most `capacity · |window|`. That bounds the current task's resource height
-     * and duration and lower-bounds the capacity, and an exceeded budget is a contradiction. Sound
-     * for any task order; unlike the time-tabling pass it reasons over variable demands/durations.
-     */
+    // Naive energetic reasoning (after P. Baptiste, C. Le Pape and W. Nuijten, "Constraint-Based
+    // Scheduling", Springer 2001, https://doi.org/10.1007/978-1-4615-1479-4). For
+    // the running window `[xMin, xMax]` spanned by the tasks seen so far in non-decreasing latest
+    // completion order, every such task's whole execution lies inside the window, so their minimum
+    // energies sum to at most `capacity · |window|`. That bounds the current task's resource height
+    // and duration and lower-bounds the capacity, and an exceeded budget is a contradiction. Sound
+    // for any task order; unlike the time-tabling pass it reasons over variable demands/durations.
     private fun energeticNaivePass(state: PropagationState): Boolean = try {
         energeticPrefixPass(state)
     } catch (_: CheckedLongOverflowException) {
@@ -310,13 +306,11 @@ internal class CumulativePropagator(
         return true
     }
 
-    /**
-     * Profile-based resource-height pruning. A mandatory profile built
-     * from each present task's compulsory part `[start.max, start.min + minDur)` at its *minimum*
-     * demand bounds how tall a task spanning a peak may be: `height ≤ capacity − (peak − ownMin)`.
-     * Sharper than the energetic area bound at a tall, narrow compulsory peak inside a long window.
-     * Bounds-only on min demands, so it is sound while heights are still ranges.
-     */
+    // Profile-based resource-height pruning. A mandatory profile built
+    // from each present task's compulsory part `[start.max, start.min + minDur)` at its *minimum*
+    // demand bounds how tall a task spanning a peak may be: `height ≤ capacity − (peak − ownMin)`.
+    // Sharper than the energetic area bound at a tall, narrow compulsory peak inside a long window.
+    // Bounds-only on min demands, so it is sound while heights are still ranges.
     @Suppress("ReturnCount")
     private fun profileHeightPass(state: PropagationState): Boolean {
         if (resourceVars.isEmpty()) return true
@@ -460,7 +454,7 @@ internal class CumulativePropagator(
         return true
     }
 
-    /** The tasks' bounds, demands and presence as of [atTrail], with the literals a reason collects. */
+    // The tasks' bounds, demands and presence as of [atTrail], with the literals a reason collects.
     private inner class View(val state: PropagationState, val atTrail: Int, val atLevel: Int) {
         private val seen = IntHashSet()
         private val out = IntArrayList()
@@ -539,10 +533,8 @@ internal class CumulativePropagator(
         private fun coversPoint(k: Int, t: Long): Boolean =
             present(k) && durMin(k) > 0 && resMin(k) > 0 && lst(k) <= t && t < est(k) + durMin(k)
 
-        /**
-         * The compulsory parts at [t], apart from [except]'s, load the resource past [room]: cite the tallest of
-         * them until they do, and the capacity they exceed.
-         */
+        // The compulsory parts at [t], apart from [except]'s, load the resource past [room]: cite the tallest of
+        // them until they do, and the capacity they exceed.
         fun overloadAt(t: Long, except: Int, room: Long = capMax()) {
             val covering = IntArrayList()
             for (k in 0 until n) if (k != except && coversPoint(k, t)) covering.add(k)
@@ -557,11 +549,9 @@ internal class CumulativePropagator(
             capLe(capMax())
         }
 
-        /**
-         * Task [i]'s start moved to [bound] ([lower]) because each start it skipped overloads the profile. When it
-         * retains a start after moving by at most its duration, the surviving placement isolates the point
-         * blocking the last skipped start; otherwise every compulsory part meeting a skipped placement is cited.
-         */
+        // Task [i]'s start moved to [bound] ([lower]) because each start it skipped overloads the profile. When it
+        // retains a start after moving by at most its duration, the surviving placement isolates the point
+        // blocking the last skipped start; otherwise every compulsory part meeting a skipped placement is cited.
         fun shaveReason(i: Int, lower: Boolean, bound: Long) {
             task(i)
             val d = durMin(i)
@@ -643,18 +633,16 @@ internal class CumulativePropagator(
             return bestEst to subset.toIntArray()
         }
 
-        /** The tasks completing by [tau] carry more energy than the capacity can place after their threshold. */
+        // The tasks completing by [tau] carry more energy than the capacity can place after their threshold.
         fun thetaOverload(tau: Long) {
             val (e, subset) = envelopeSubset(theta(tau, -1), capMax())
             for (k in subset) inWindow(k, e, tau)
             capLe(capMax())
         }
 
-        /**
-         * [i] ends after every task of a set completing by [tau]: with it, an est-suffix of the set overflows the
-         * capacity up to [tau]. Its new earliest start is the one an est-suffix of that set's energy beyond what
-         * fits beside [i] forces.
-         */
+        // [i] ends after every task of a set completing by [tau]: with it, an est-suffix of the set overflows the
+        // capacity up to [tau]. Its new earliest start is the one an est-suffix of that set's energy beyond what
+        // fits beside [i] forces.
         fun edgeReason(i: Int, tau: Long) {
             val cap = capMax()
             val c = resMin(i)
@@ -692,10 +680,8 @@ internal class CumulativePropagator(
             for (p in 0..bestAt) inWindow(byEstDesc[p], from, bestEnd)
         }
 
-        /**
-         * The tasks inside `[xMin, xMax]` carry their least energy there: it bounds [i]'s height or duration by
-         * what is left ([kind]), the capacity from below, or overloads the window.
-         */
+        // The tasks inside `[xMin, xMax]` carry their least energy there: it bounds [i]'s height or duration by
+        // what is left ([kind]), the capacity from below, or overloads the window.
         fun energyReason(i: Int, kind: Int, xMin: Long, xMax: Long) {
             for (k in 0 until n) {
                 if (k == i || !present(k) || durMin(k) <= 0 || resMin(k) < 0) continue
@@ -716,7 +702,7 @@ internal class CumulativePropagator(
             if (kind == RESOURCE) durGe(i, durMin(i)) else resGe(i, resMin(i))
         }
 
-        /** [i]'s height is bounded by the tallest stack of compulsory parts over its own compulsory part. */
+        // [i]'s height is bounded by the tallest stack of compulsory parts over its own compulsory part.
         fun heightReason(i: Int) {
             val lo = lst(i)
             val hi = est(i) + durMin(i) - 1

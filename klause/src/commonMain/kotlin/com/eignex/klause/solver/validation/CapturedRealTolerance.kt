@@ -384,7 +384,6 @@ private class ToleranceWitness(
         (result - value).magnitude() <= capturedSourceSlack(policy, BigFraction.ZERO,
             result.magnitude() + value.magnitude())
 
-    // `result = constant` read as the row `result = constant`.
     private fun constant(result: BigFraction, constant: BigFraction): Boolean =
         (result - constant).magnitude() <= capturedSourceSlack(policy, constant, result.magnitude())
 

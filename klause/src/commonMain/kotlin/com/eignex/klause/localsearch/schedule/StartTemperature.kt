@@ -3,22 +3,10 @@ package com.eignex.klause.localsearch.schedule
 import kotlin.math.ln
 
 /**
- * Calibrates the start temperature of an annealing [Schedule] from a short warm-up sample of
- * candidate move-cost deltas, instead of a hand-picked constant.
- *
- * The Metropolis rule accepts a worsening move of size `δ` with probability `exp(-δ / T)`. To make
- * an *average* worsening move accept with a target probability, solve for the temperature:
- *
- *   `T0 = -meanPositiveDelta / ln(targetAcceptance)`
- *
- * so a high target (e.g. 0.8) yields a hot start that accepts almost anything, and the schedule then
- * cools from there. Driving T0 off the observed deltas makes it scale with the instance
- * automatically — a problem whose moves swing the cost by larger amounts gets a proportionally
- * hotter start, no explicit size term needed.
- *
- * When the search is **warm-started** from a shared incumbent, the seeded assignment is already good,
- * so a full-hot start would immediately scramble it; a warm-start factor (`< 1`) scales T0 down to
- * protect the seed through the first cool phase.
+ * Calibrates the start temperature of an annealing [Schedule] from warm-up move-cost deltas so an average
+ * worsening move is accepted with a target probability under the Metropolis rule:
+ * `T0 = -meanPositiveDelta / ln(targetAcceptance)`. A warm start scales T0 down so a full-hot start does not
+ * scramble the seeded incumbent.
  */
 object StartTemperature {
     /**
@@ -28,8 +16,8 @@ object StartTemperature {
      *   `(0, 1)` — higher = hotter start
      * @param warmStart whether the run is seeded from an existing incumbent
      * @param warmStartFactor scale applied to T0 when [warmStart] is true, in `(0, 1]`
-     * @param minTemperature floor returned when no worsening deltas were sampled (a flat or
-     *   all-improving warm-up gives no signal), and a lower bound on the result
+     * @param minTemperature floor returned when no worsening deltas were sampled, and a lower bound on
+     *   the result
      * @return the calibrated start temperature, never below [minTemperature]
      */
     fun calibrate(
@@ -57,7 +45,6 @@ object StartTemperature {
         }
         if (n == 0) return minTemperature
         val meanPositive = sum / n
-        // ln(targetAcceptance) < 0 since targetAcceptance ∈ (0, 1), so T0 > 0.
         val t0 = -meanPositive / ln(targetAcceptance)
         val scaled = if (warmStart) t0 * warmStartFactor else t0
         return scaled.coerceAtLeast(minTemperature)

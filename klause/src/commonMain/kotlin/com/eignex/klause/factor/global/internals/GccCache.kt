@@ -6,63 +6,44 @@ import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
 
-/** Per-cover-index count under the current assignment (LS state). */
+// Per-cover-index counts under the local-search assignment.
 internal class GccState(val counts: IntArray)
 
-/**
- * Reversible delta state for the plain (no-presence) `global_cardinality` fire. Holds the per-cover
- * `definite` (variables pinned to that cover value) and `possible` (variables whose domain still holds
- * it) counts on the engine undo trail, so a fire patches only the variables whose domain changed since
- * the last fire instead of the O(n·m) full recount. Forward the counts are monotone (`possible` only
- * falls as values leave, `definite` only rises as variables pin), so [RevIntArray] restores them exactly
- * on backtrack. [valid] drops to 0 when a backtrack lands above the seeding level, forcing a rebuild.
- *
- * Only used when the constraint has no presence literals (the common case); the optional-variable path
- * keeps the full per-fire recount.
- */
+// Per-cover definite (variables pinned to the value) and possible (domains still holding it) counts on the
+// undo trail, so a plain (no-presence) fire patches only variables whose domain changed instead of an O(n·m)
+// recount. Both are forward-monotone, so the trail restores them exactly. The presence path keeps the full
+// recount.
 internal class GccIncrementalState(state: PropagationState, val xs: IntArray, val m: Int) {
     val n = xs.size
 
-    /** 1 once seeded at the current (or an ancestor) level; reversible → 0 after a backtrack above it. */
+    // Drops to 0 after a backtrack above the seeding level, forcing a rebuild.
     val valid = RevInt(state, 0)
 
-    /** Per-cover counts, reversible. `definite[k]` = #vars pinned to `cover[k]`; `possible[k]` = #vars
-     *  whose domain still contains `cover[k]`. */
     val definite = RevIntArray(state, m, 0)
     val possible = RevIntArray(state, m, 0)
 
-    /** Per-var pin bookkeeping so a newly-pinned variable is counted into `definite` exactly once:
-     *  `-1` = not yet pinned, `-2` = pinned to a non-cover value (never counted), `k >= 0` = pinned to
-     *  `cover[k]` (counted). Reversible; forward-monotone (a variable only ever pins once). */
+    // Counts a newly pinned variable into definite exactly once: -1 not yet pinned, -2 pinned outside the
+    // cover, k ≥ 0 pinned to cover(k).
     val pinnedCover = RevIntArray(state, n, -1)
 
-    /** Each var's `IntDomain` at its last fire — the delta base. Reversible, rolls back with the domains
-     *  so `current ⊆ domRef` (deletions-only) always holds forward. */
+    // Each variable's domain at its last fire, the delta base; current ⊆ domRef holds forward.
     val domRef = Array(n) { RevRef<IntDomain?>(state, null) }
 }
 
-/** Per-propagation-state scratch for GlobalCardinality. */
 internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
     val flow = GccFlowBuilder()
     var flowAssign: RevIntArray? = null
+    var assignmentReplay: GccAssignmentReplay? = null
 
-    /** Reversible delta state for the incremental `definite`/`possible` counts (plain, no-presence
-     *  path). Created on the first plain fire; a var-set change would recreate it (the var set is
-     *  stable for a given factor, so in practice it is built once). */
     var inc: GccIncrementalState? = null
 
-    // Persistent flow-network structure for the fixed-bound, no-other, plain path. The edge set is
-    // built once for the first-fire (root, widest) domains and reused across every later fire — later
-    // domains are subsets, so no edge is ever missing; a fire blocks the var→cover edges whose value has
-    // left. The structure spans the root domains, so it needs no reversibility; the flow itself lives on
-    // the trail (see [GccFlowBuilder.freeze]).
+    // Persistent flow-network structure for the fixed-bound, no-other, plain path, built over the first-fire
+    // root domains. Later domains are subsets, so no edge is ever missing; a fire blocks edges whose value
+    // left. Spanning the root domains, it needs no reversibility; the flow itself lives on the trail.
     var structBuilt = false
 
-    /** True once the flow network has been built at least once. The persistent structure may only be
-     *  frozen on the FIRST build — that fire sees the widest (root) domains, so the edge set and the
-     *  presence of the "other" (non-cover) node span every later state. A later build runs only when
-     *  search has narrowed domains (`anyOther` may have dropped, edges may be absent), and freezing then
-     *  would miss edges a backtrack restores. */
+    // The structure may only be frozen on the first build, which sees the root domains: a later build runs
+    // on narrowed domains and freezing then would miss edges a backtrack restores.
     var builtOnce = false
     var sN = 0
     var sM = 0
@@ -72,28 +53,25 @@ internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
     var sRequiredSSFlow = 0
     var pXToCov = IntArray(0) // persistent i*m + k → edge id (-1 = no edge), spans root domains
 
-    // Per-fire flow-network scratch for the rebuild path, grown on demand and refilled each fire (`excess`
-    // per node, the flattened `x→cover` edge-index map per var·cover, the per-var `x→other` edge index).
-    // Holds no cross-fire state; every entry is written before it is read.
+    // Per-fire scratch for the rebuild path, grown on demand; no entry is read before it is written.
     private var excessBuf = IntArray(0)
     private var xToCovBuf = IntArray(0)
     private var xToOtherBuf = IntArray(0)
     private var sccIdBuf = IntArray(0)
 
-    /** Per-node residual-SCC label scratch sized `>= nodes` (written in full by `computeSccResidual`). */
+    // Written in full by computeSccResidual.
     fun sccId(nodes: Int): IntArray {
         if (sccIdBuf.size < nodes) sccIdBuf = IntArray(nodes)
         return sccIdBuf
     }
 
-    /** `excess` scratch sized `>= nodes`, zeroed over `[0, nodes)`. */
     fun excess(nodes: Int): IntArray {
         if (excessBuf.size < nodes) excessBuf = IntArray(nodes)
         for (i in 0 until nodes) excessBuf[i] = 0
         return excessBuf
     }
 
-    /** Flattened `x·cover → edge-index` map (`i*m + k`), sized `>= n*m`, filled with `-1`. */
+    // Edge index at i·m + k, -1 for none.
     fun xToCov(n: Int, m: Int): IntArray {
         val need = n * m
         if (xToCovBuf.size < need) xToCovBuf = IntArray(need)
@@ -101,10 +79,21 @@ internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
         return xToCovBuf
     }
 
-    /** Per-var `x → other` edge index, sized `>= n`, filled with `-1`. */
     fun xToOther(n: Int): IntArray {
         if (xToOtherBuf.size < n) xToOtherBuf = IntArray(n)
         for (i in 0 until n) xToOtherBuf[i] = -1
         return xToOtherBuf
+    }
+}
+
+internal class GccAssignmentReplay(variableCount: Int, valueCount: Int) {
+    val supply = IntArray(variableCount)
+    val minimum = IntArray(valueCount)
+    val aboveMinimum = IntArray(valueCount)
+    var remainingTotal = -1
+
+    fun reset() {
+        minimum.fill(-1)
+        remainingTotal = -1
     }
 }

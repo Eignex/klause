@@ -1,11 +1,10 @@
 package com.eignex.klause.portfolio
 
-/** An arm a roster can seat: the [role] it declares, or null for a recipe outside the catalogs, and [make],
- *  which builds a fresh config for every slot the arm takes. */
+// role is null for a recipe outside the catalogs; make builds a fresh config for every slot the arm takes.
 internal class RosterCandidate(val role: ArmRole?, val make: () -> WorkerConfig)
 
-/** One engine's candidates in rank order. Past their end the rank repeats [repeating] on fresh seeds.
- *  [pinned] marks a rank the caller chose, whose first arm is seated whatever roles the model needs. */
+// Past its arms the rank repeats `repeating` on fresh seeds. A pinned rank is one the caller chose, whose first
+// arm is seated whatever roles the model needs.
 internal class RosterRank(
     val arms: List<RosterCandidate>,
     val repeating: List<RosterCandidate> = arms,
@@ -15,20 +14,16 @@ internal class RosterRank(
         ?: repeating.takeIf { it.isNotEmpty() }?.let { it[(position - arms.size) % it.size] }
 }
 
-/** An arm in a roster and the role it declares. [needed] says the roster seated it for that role; otherwise
- *  it filled a slot by rank. */
+// needed says the roster seated the arm for its role; otherwise it filled a slot by rank.
 internal class SeatedArm(val config: WorkerConfig, val role: ArmRole?, val needed: Boolean = false) {
-    /** How the record names the seat: the role it fills, or its rank fill and the role it declares. */
     val report: String get() = if (needed) checkNotNull(role).label else listOfNotNull("rank", role?.label)
         .joinToString("/")
 }
 
-/**
- * Seats a roster from declared roles. The best arm of a role is the first to declare it when the engines' ranks
- * are read one position at a time, in the order given. The roster takes the first arm of every pinned rank in
- * lead order, the best arm of every needed role, then fills by rank: the engines take turns, each seating
- * its next arm. No step reads the roster size, so a smaller roster is a prefix of a larger one.
- */
+// The best arm of a role is the first to declare it when the engines' ranks are read one position at a time, in
+// the order given. The roster takes the first arm of every pinned rank in lead order, the best arm of every needed
+// role, then fills by rank with the engines taking turns. No step reads the roster size, so a smaller roster is a
+// prefix of a larger one.
 internal object PortfolioRoster {
     fun seat(
         needed: List<ArmRole>,

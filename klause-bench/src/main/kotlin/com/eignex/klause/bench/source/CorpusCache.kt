@@ -6,12 +6,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Properties
 
-/**
- * Evicts whole collections under [root] in least-recently-used order until [capBytes] fits.
- * Size and last-use metadata live in `.meta/<id>.properties`, avoiding instance-file walks.
- * Missing size metadata is measured once; last use is written on first use in this JVM.
- * Collections in [inUse] are pinned for the run; evicted collections can be fetched again.
- */
+// Size and last-use metadata live in `.meta/<id>.properties`, avoiding instance-file walks. Collections in inUse are
+// pinned for the run; evicted collections can be fetched again.
 internal class CorpusCache(
     private val root: File,
     private val capBytes: Long?,
@@ -20,33 +16,26 @@ internal class CorpusCache(
     private val log: (String) -> Unit = {},
 ) {
 
-    /** One collection directory in the cache. */
     data class Entry(val id: String, val bytes: Long, val lastUsedMillis: Long, val inUse: Boolean)
 
-    /** The outcome of an [enforce] pass: what was evicted and the total left behind. */
     data class Eviction(val evicted: List<Entry>, val totalBytes: Long)
 
     private val metaDir: File get() = File(root, META_DIR)
 
     private val trashDir: File get() = File(root, TRASH_DIR)
 
-    /** Whether collection [id] is fetched. An eviction moves the directory out of place in one rename, so a
-     *  collection is either whole here or absent, never half-deleted. */
+    // An eviction moves the directory out in one rename, so a collection is whole or absent, never half-deleted.
     fun isPresent(id: String): Boolean = File(root, id).let { it.isDirectory && it.list()?.isNotEmpty() == true }
 
-    /** Pin [id] for the rest of the run and stamp its last use; later calls in the same run are free. */
     fun markUsed(id: String) {
         val first = synchronized(inUse) { inUse.add(id) }
         if (first) writeMeta(id, readMeta(id).apply { setProperty(LAST_USED, clock().toString()) })
     }
 
-    /** Record the size of [id], once a fetch or a compression pass has changed it. */
     fun recordSize(id: String) {
         writeMeta(id, readMeta(id).apply { setProperty(BYTES, sizeOf(File(root, id)).toString()) })
     }
 
-    /** Record the size of every collection holding files under [dir]: all of them when [dir] is the cache
-     *  root, the enclosing one when [dir] lies inside a collection, and none for a directory elsewhere. */
     fun recordSizesUnder(dir: File) {
         val top = root.absoluteFile
         if (dir.absoluteFile == top) {
@@ -58,14 +47,12 @@ internal class CorpusCache(
         if (cur != null && !cur.name.startsWith(".")) recordSize(cur.name)
     }
 
-    /** Every collection directory in the cache, least recently used first. */
     fun collections(): List<Entry> {
         val pinned = synchronized(inUse) { inUse.toSet() }
         return collectionDirs().map { entry(it, pinned) }.sortedWith(compareBy({ it.lastUsedMillis }, { it.id }))
     }
 
-    /** Evict least recently used collections until the cache fits [capBytes], skipping those in use. When
-     *  only in-use collections remain the pass warns and stops over the cap rather than failing the run. */
+    // When only in-use collections remain the pass warns and stops over the cap rather than failing the run.
     fun enforce(): Eviction {
         sweep()
         val entries = collections()
@@ -96,8 +83,7 @@ internal class CorpusCache(
         return Entry(dir.name, bytes, lastUsed, dir.name in pinned)
     }
 
-    /** Rename the collection into the trash before deleting it, so an interrupted delete leaves nothing
-     *  that [isPresent] reads as fetched; [sweep] finishes it on the next pass. */
+    // Renamed into the trash first, so an interrupted delete leaves nothing that reads as fetched; sweep finishes it.
     private fun evict(id: String) {
         trashDir.mkdirs()
         val trashed = File(trashDir, "$id.${System.nanoTime()}")
@@ -106,7 +92,6 @@ internal class CorpusCache(
         trashed.deleteRecursively()
     }
 
-    /** Finish interrupted evictions and drop metadata for collections absent from the cache. */
     private fun sweep() {
         trashDir.listFiles().orEmpty().forEach { it.deleteRecursively() }
         val pinned = synchronized(inUse) { inUse.toSet() }
@@ -133,7 +118,7 @@ internal class CorpusCache(
         return props
     }
 
-    /** Write through a temp file and a rename, so a reader never sees a torn file. */
+    // Temp file and rename, so a reader never sees a torn file.
     private fun writeMeta(id: String, props: Properties) {
         metaDir.mkdirs()
         val tmp = Files.createTempFile(metaDir.toPath(), "$id.", ".tmp").toFile()
@@ -144,7 +129,7 @@ internal class CorpusCache(
     private fun sizeOf(dir: File): Long = dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
 
     companion object {
-        /** Default cap on the cache, in GB: leaves a small disk room for one large collection fetched on top. */
+        // Leaves a small disk room for one large collection fetched on top.
         const val DEFAULT_MAX_GB = 60.0
 
         private const val GB = 1_000_000_000.0
@@ -161,15 +146,13 @@ internal class CorpusCache(
 
         private const val LAST_USED = "lastUsed"
 
-        /** The configured cap in bytes from `-Dklause.bench.corpus.maxGb` or `KLAUSE_BENCH_CORPUS_MAX_GB`
-         *  (default [DEFAULT_MAX_GB]), or null when it is `0` or `off`. */
         fun configuredCapBytes(): Long? {
             val raw = System.getProperty("klause.bench.corpus.maxGb")
                 ?: System.getenv("KLAUSE_BENCH_CORPUS_MAX_GB")?.takeIf { it.isNotBlank() }
             return parseCapBytes(raw)
         }
 
-        /** [raw] GB as bytes; null (no cap) for `0` or `off`, the default for an absent value. */
+        // Null (no cap) for `0` or `off`.
         fun parseCapBytes(raw: String?): Long? {
             val value = raw?.trim() ?: return (DEFAULT_MAX_GB * GB).toLong()
             if (value.equals("off", ignoreCase = true)) return null

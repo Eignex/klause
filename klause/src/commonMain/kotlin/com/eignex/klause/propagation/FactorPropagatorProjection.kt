@@ -21,7 +21,6 @@ import com.eignex.klause.propagation.difference.DifferenceSystemPropagator
 import com.eignex.klause.util.PermutationGroup
 import com.eignex.util.collections.LongHashSet
 
-/** Builds the propagation-engine view of immutable factor data. */
 internal fun Factor.propagatorProjection(
     preparation: FactorProjectionPreparation? = null,
     provider: PropagationProjectionProvider = BuiltInPropagationProjectionProvider,

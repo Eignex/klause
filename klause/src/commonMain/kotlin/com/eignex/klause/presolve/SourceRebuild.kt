@@ -16,67 +16,35 @@ import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 
-/**
- * One step of recovering the columns a pass eliminated, stated as data rather than as a closure.
- *
- * A reconstruction has to run on whichever witness the lane that solved the reduced model produced, and
- * those witnesses share no type: the finite lane yields a [com.eignex.klause.solver.Sample] over
- * `BooleanArray`, while an open route yields an assignment it answers by accessor. A `(Sample) -> Sample`
- * lambda can only serve the first. Declaring the step instead lets each lane evaluate the same record
- * over its own representation, which is what lets a column-eliminating pass run before either lane exists.
- *
- * Every step reads the values recovered so far and writes at most one variable, so a list of them is
- * applied in order and the producer is responsible for emitting an order in which each step's reads are
- * already recovered. Boolean and integer steps share one list rather than sitting in two, so that order
- * is stated once for the whole reconstruction instead of being implied between two carriers.
- *
- * A step names columns of the model before the elimination, and the reduced model keeps their slots.
- * Binary substitution can append Boolean columns; the evaluator reads those literals before the witness
- * adapter truncates the Boolean namespace. Neither namespace is renumbered.
- */
+// One step of recovering an eliminated column, stated as data rather than a closure so each lane can
+// evaluate it over its own witness representation (the finite lane's `Sample`, an open route's
+// arbitrary-precision assignment), which lets a column-eliminating pass run before either lane exists.
+// Each step reads values recovered so far and writes at most one variable; the producer emits an order in
+// which every read is already recovered. Boolean and integer steps share one list so that order is stated
+// once. Steps name pre-elimination columns; neither namespace is renumbered, and Booleans appended by
+// binary substitution are read before the witness adapter truncates them.
 internal sealed interface RebuildStep {
 
-    /**
-     * Give [variable] the value of [source] — its variable's value, negated when [source] is negative.
-     *
-     * The equivalent-literal form: a merged variable takes its representative's value.
-     */
+    // A merged variable takes its representative literal's value.
     class CopyLiteral(val variable: Int, val source: Int) : RebuildStep
 
     class IntegerFromLiteral(val variable: Int, val literal: Int) : RebuildStep
 
     class TupleValue(val variable: Int, val literals: IntArray, val values: LongArray) : RebuildStep
 
-    /** Give Boolean [variable] the truth of its defining integer comparison, before clause polarity. */
+    // Truth of the defining integer comparison, before clause polarity.
     class ComparisonValue(val variable: Int, val intVar: Int, val op: LinearOp, val bound: Long) : RebuildStep
 
-    /**
-     * Set [variable] to the polarity that satisfies the first of [clauses] no other literal satisfies,
-     * and to `false` when every clause is already satisfied.
-     *
-     * The resolution form: an eliminated variable is recovered from the clauses that mentioned it.
-     */
+    // Resolution form: the polarity satisfying the first clause no other literal satisfies, else false.
     class SatisfyClauses(val variable: Int, val clauses: List<IntArray>) : RebuildStep
 
-    /**
-     * Force [literal] true when [clause] is unsatisfied, and leave every value alone otherwise.
-     *
-     * The blocked-clause form: a clause dropped as satisfiability-redundant is repaired on the way back,
-     * which its blocking literal can always do without falsifying a clause holding the opposite literal.
-     */
+    // Blocked-clause form: forcing the blocking literal repairs the clause without falsifying any clause
+    // holding the opposite literal.
     class RepairClause(val clause: IntArray, val literal: Int) : RebuildStep
 
-    /**
-     * Give integer column [variable] the value `(constTerm + Σ termCoeffs·termVars) / divisor`.
-     *
-     * The affine form: a column an equality defines is rebuilt from the partners it was folded into.
-     * [divisor] is `1` for a unit pivot and the pivot coefficient for a residue-class doubleton, where
-     * the division is exact on the values the partner's restricted range admits.
-     *
-     * The coefficients stay `Long` whichever lane reads them — a model states them at that width — while
-     * the *values* do not: the finite lane holds `Long`, an open route arbitrary precision. That split is
-     * why this is a record rather than a closure.
-     */
+    // `(constTerm + Σ termCoeffs·termVars) / divisor`, rebuilding a column an equality defined. [divisor] is 1
+    // for a unit pivot and the pivot coefficient for a residue-class doubleton, where the division is exact.
+    // Coefficients are `Long` in every lane but values are not, which is why this is a record.
     class AffineValue(
         val variable: Int,
         val constTerm: Long,
@@ -85,16 +53,9 @@ internal sealed interface RebuildStep {
         val divisor: Long,
     ) : RebuildStep
 
-    /**
-     * Give integer column [variable] the extreme integer on the satisfying side of
-     * `(constTerm + Σ termCoeffs·termVars) / divisor`: the floor when [roundDown], the ceiling otherwise,
-     * then held inside [clamp] — an upper bound when rounding down, a lower bound when rounding up.
-     *
-     * The projection form: a column free in the direction that relaxes the one row it sat in is recovered
-     * as a value that row admits, since the row itself is gone. [clamp] is the column's other, closed side,
-     * or null when that side is open too. The division rounds toward the satisfying side rather than toward
-     * zero, which is what keeps the recovered value inside the row for a negative quotient.
-     */
+    // Projection form: a column free in the direction that relaxes its one (now removed) row is recovered as
+    // `(constTerm + Σ termCoeffs·termVars) / divisor` rounded toward the satisfying side (floor when
+    // [roundDown]), then held inside [clamp], the column's other closed side or null when that is open too.
     class QuotientValue(
         val variable: Int,
         val constTerm: Long,
@@ -106,12 +67,8 @@ internal sealed interface RebuildStep {
     ) : RebuildStep
 }
 
-/**
- * The columns a pass eliminated, in the order they are recovered.
- *
- * Immutable and lane-neutral: [rebuildInto] evaluates values in the reduced namespace, and the witness
- * adapter truncates appended Boolean coordinates to [sourceBoolVars] after all steps have read them.
- */
+// Immutable and lane-neutral, in recovery order. The witness adapter truncates appended Boolean
+// coordinates to [sourceBoolVars] after all steps have read them.
 internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int? = null) {
     init {
         require(sourceBoolVars == null || sourceBoolVars >= 0)
@@ -145,21 +102,13 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
         }
     }
 
-    /** Whether this recovers nothing, so a lane can skip adapting its witness at all. */
     val isEmpty: Boolean get() = steps.isEmpty() && sourceBoolVars == null
 
-    /** Whether any step reads or recovers an integer column, so a lane knows if it must carry values. */
     val touchesInts: Boolean get() = steps.any {
         it is RebuildStep.AffineValue || it is RebuildStep.QuotientValue || it is RebuildStep.ComparisonValue ||
             it is RebuildStep.IntegerFromLiteral || it is RebuildStep.TupleValue
     }
 
-    /**
-     * Recover the eliminated columns into [bools] and [ints], the reduced model's values.
-     *
-     * The `Long` evaluator, for a lane whose witness holds its integer columns at that width. An open
-     * route reads [rebuildInto] over arbitrary precision instead; the steps are the same records.
-     */
     fun rebuildInto(bools: BooleanArray, ints: LongArray) {
         for (step in steps) {
             if (step is RebuildStep.TupleValue) {
@@ -195,12 +144,6 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
         }
     }
 
-    /**
-     * Recover the eliminated columns into [bools] and [ints], where an integer value does not fit `Long`.
-     *
-     * A coefficient still does — the model states it that way — so each product is an arbitrary-precision
-     * value times a `Long`, and only the accumulation widens.
-     */
     fun rebuildInto(bools: BooleanArray, ints: Array<BigInt>) {
         for (step in steps) {
             if (step is RebuildStep.TupleValue) {
@@ -276,7 +219,6 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
         LinearOp.NE -> order != 0
     }
 
-    /** Recover the Boolean columns alone, for a lane with no integer column to carry. */
     fun rebuildInto(bools: BooleanArray) {
         for (step in steps) rebuildBool(step, bools)
     }
@@ -311,7 +253,6 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
         }
     }
 
-    /** Whether a literal other than the one over [v] satisfies [clause]. */
     private fun satisfiedIgnoring(clause: IntArray, v: Int, bools: BooleanArray): Boolean {
         for (l in clause) {
             if (Lit.variable(l) == v) continue
@@ -320,32 +261,22 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
         return false
     }
 
-    /** The value of [v] that satisfies its literal in [clause]. */
     private fun valueSatisfying(clause: IntArray, v: Int): Boolean {
         for (l in clause) if (Lit.variable(l) == v) return Lit.isPositive(l)
         return false
     }
 
-    /** Whether any literal satisfies [clause]. */
     private fun satisfied(clause: IntArray, bools: BooleanArray): Boolean {
         for (l in clause) if (Lit.evaluate(l, bools[Lit.variable(l)])) return true
         return false
     }
 
-    /** Ways to obtain a rebuild. */
     companion object {
-        /** No column was eliminated. */
         val NONE = SourceRebuilds(emptyList())
 
-        /**
-         * The rebuilds of [passes] as one, taking them in the order the passes ran.
-         *
-         * Recovery runs the other way round from elimination: each pass eliminated columns from the model
-         * the pass before it produced, so the last pass's columns are recovered first and every earlier
-         * pass's steps then read them. Composing a whole sequence rather than a pair keeps that reversal
-         * in one place — a pairwise operator reads as "this, then that" and states the opposite of what it
-         * does. [PresolveRoundEngine.compose] folds the finite lane's lifts over the same order.
-         */
+        // [passes] in run order. Recovery runs the other way round: the last pass's columns are recovered
+        // first and every earlier pass's steps then read them. Taking the whole sequence keeps that reversal
+        // in one place.
         fun compose(passes: List<SourceRebuilds>): SourceRebuilds {
             val steps = passes.asReversed().flatMap { it.steps }
             val sourceBoolVars = passes.firstNotNullOfOrNull { it.sourceBoolVars }
@@ -354,12 +285,7 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
     }
 }
 
-/**
- * This rebuild as the finite lane's sample lift, or `null` when it recovers nothing.
- *
- * The adapter, not the evaluator: a lane owns how its witness becomes the `BooleanArray` the steps read
- * and write, so that [SourceRebuilds] itself names no witness type.
- */
+// Null when it recovers nothing. The lane owns this adapter so [SourceRebuilds] names no witness type.
 internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty) {
     null
 } else {

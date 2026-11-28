@@ -55,8 +55,7 @@ while IFS= read -r -d '' mzn; do
       rm -f "$ozn" "$fzn" "$err"
       continue
     fi
-    # Use klause-fzn --ozn to drive the parser (parser is exercised at load time).
-    # We don't need to actually solve — kill after parser load by passing -n 0.
+    # The parser runs at load time, so one solution is enough.
     rc=0
     parse_err="$(timeout 10s "$KLAUSE_FZN" --ozn "$ozn" -n 1 "$fzn" 2>&1 >/dev/null)" || rc=$?
     if echo "$parse_err" | grep -qE "Ozn(Parse|Eval)Exception"; then
@@ -64,9 +63,7 @@ while IFS= read -r -d '' mzn; do
       echo "$rel,parse-fail,$detail"
       parse_fail=$((parse_fail + 1))
     else
-      # rc may be non-zero for solver-side bugs (unrelated to .ozn parsing). Either
-      # the parser worked or the .ozn was never reached because of an earlier crash;
-      # both count as "parses" for the purpose of this audit.
+      # A non-zero rc without an Ozn exception is a solver-side failure, not a parse failure.
       echo "$rel,parses,"
       parses=$((parses + 1))
     fi

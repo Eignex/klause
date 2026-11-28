@@ -29,57 +29,33 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
 
 /**
- * Local-search [Solver] around a `Problem`. The solver itself only carries engine setup
- * (strategy, restart cadence). Assignments, RNGs and factor payloads belong to each draw.
- * Searches must use the solver sequentially because strategy and restart policy are shared.
- * A resumable handle rejects other searches until it completes, fails or is closed.
- *
- * Three call kinds, each accepting a [LocalSearchParams]:
- *
- *  - [solve] — return a single [SolveResult]; root propagation is its only source of refutation.
- *  - [minimize] / [improvements] — best-effort optimisation of a linear objective.
- *  - [sample] / [enumerate] — both stream independent feasible draws with replacement.
- *    Local search has no notion of a "next" model, so enumerate is just a sample stream;
- *    duplicates may appear. Use [com.eignex.klause.backtrack.BacktrackSolver] when
- *    true without-replacement enumeration is required.
+ * Local-search [Solver]. The solver carries only strategy and restart policy, which searches share, so searches run
+ * sequentially; assignments, RNGs and payloads belong to each draw. Root propagation is the only source of
+ * refutation. [enumerate] is a sample stream that may repeat solutions.
  */
 class LocalSearchSolver(
     override val problem: BakedProblem,
-    /** SourceDrivenStrategy for the satisfy phase (and, when [optimizeStrategy] is null, the minimize
-     *  phase too, via its [SourceDrivenStrategy.feasibleDescent]). Default is [Cbls], whose
-     *  [FeasibleDescent.SelfOwned] descent (greedy over its objective / structured / pair-swap sources)
-     *  optimizes with no extra wiring. Override for a different arm — `ProbSat.adaptive()` for a boolean
-     *  core (ratcheted on a COP by the portfolio), `SimulatedAnnealing.optimizer(...)` to anneal. */
+    /** Strategy for the satisfy phase, and for minimization through its [FeasibleDescent] when [optimizeStrategy]
+     *  is null. */
     val strategy: SourceDrivenStrategy = Cbls(),
-    /** SourceDrivenStrategy driving both phases of [minimize]; `null` reuses [strategy]. Override to
-     *  decouple satisfy-mode and minimize-mode strategies, e.g. satisfy [ProbSat.adaptive] + minimize [Cbls]. */
+    /** Strategy driving both phases of [minimize], such as [Cbls] beside a [ProbSat.adaptive] satisfy strategy;
+     *  null reuses [strategy]. */
     val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Restart policy controlling diversification. */
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
-    /** When true (default), restarts on models of at least 32 variables run a greedy-repair pass after
-     *  randomizing so the search starts closer to feasibility: one pass over the vars in randomized order,
-     *  each set to the value that minimizes the current cost
-     *  ([com.eignex.klause.localsearch.movesource.GreedyInit]). */
+    /** Restarts on models of at least 32 variables run one greedy pass setting each var to its cost-minimizing
+     *  value. */
     val greedyRepairOnRestart: Boolean = true,
-    /** Optional definitional sweep (see [DefinitionalSweep]): after every restart's randomization,
-     *  defined (aux) vars are *evaluated* bottom-up from the free decision vars instead of left
-     *  random, so decomposed models start each restart at the "only real constraints violated"
-     *  frontier. */
+    /** Evaluates defined vars from the free ones after every restart, so only real constraints start violated. */
     val definitionalSweep: DefinitionalSweep? = null,
-    /** Per-move one-way invariants (opt-in): maintain [definitionalSweep]'s definitions incrementally
-     *  after every applied move and exclude defined vars from move generation, shrinking the move
-     *  space to true decision variables. Requires [definitionalSweep]; the restart-time sweep stays
-     *  active as the full (re)initializer. */
+    /** Maintains [definitionalSweep]'s definitions after every move and excludes defined vars from move
+     *  generation. Requires [definitionalSweep]. */
     val perMoveInvariants: Boolean = false,
-    /** Implicit-solving feasible init (opt-in): after each restart's randomization the engine seeds
-     *  elected structural globals (see [ImplicitSeeding.electedImplicit]) into a feasible
-     *  configuration via [com.eignex.klause.localsearch.Invariant.seedFeasible] — an all-different becomes a
-     *  partial permutation, a circuit a single tour — so the search starts inside those constraints'
-     *  feasible region and their structure-preserving moves are productive from the first step. */
+    /** Seeds elected structural globals ([ImplicitSeeding.electedImplicit]) feasible after each restart, so their
+     *  structure-preserving moves are productive from the first step. */
     val seedImplicitOnRestart: Boolean = false,
-    /** Decides each candidate of a model with LP-only continuous columns, whose rows local search scores only in
-     *  floating point. Without one such a model is declined; a model without continuous columns never consults
-     *  it. */
+    /** Decides candidates of a model with LP-only continuous columns, which are scored only in floating point;
+     *  such a model is declined without one. */
     val completion: CandidateCompletion? = null,
 ) : ResumableSolver<LocalSearchParams>,
     ResumableOptimizer<LocalSearchParams> {
@@ -109,7 +85,6 @@ class LocalSearchSolver(
         completion = completion,
     )
 
-    /** Objective-as-constraint ratchet handle; see [LocalSearchEngine.objectiveBound]. */
     internal var objectiveBound: MutableObjectiveBound?
         get() = engine.objectiveBound
         set(value) {
@@ -165,14 +140,13 @@ class LocalSearchSolver(
     ): SearchStream<MinimizeResult> =
         engine.openImprovements(objective, params, warm = null)
 
-    /** Return a [LocalSearchSession] that persists learned factor weights across calls and maintains an
-     *  assumption stack. */
+    /** A [LocalSearchSession] that keeps learned factor weights across calls. */
     override fun session(): LocalSearchSession = LocalSearchSession(this)
 
     /**
-     * Best-effort linear-objective minimisation under hard constraints; see [LocalSearchEngine.improvements].
-     * Local search is incomplete, so the verdict is [MinimizeResult.BestFound] or [MinimizeResult.Unknown],
-     * except a model root propagation refutes, which is [MinimizeResult.Infeasible].
+     * Best-effort minimization under the hard constraints. Local search is incomplete, so the verdict is
+     * [MinimizeResult.BestFound] or [MinimizeResult.Unknown], except a model root propagation refutes, which is
+     * [MinimizeResult.Infeasible].
      */
     override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
         engine.improvements(objective, params, warm = null).last()

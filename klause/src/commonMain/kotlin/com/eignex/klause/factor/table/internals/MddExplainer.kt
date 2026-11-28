@@ -10,19 +10,15 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongHashSet
 
-/**
- * Reasons for [com.eignex.klause.factor.table.Mdd] deductions as cuts of the layered diagram over the domains at a
- * past undo-log position. An edge on symbol `s` from layer `i` is live while `s` belongs to
- * `seq(i)`'s domain, and a cut edge cites the bound or interior removal excluding its symbol.
- *
- * A symbol leaves `seq(i)` when each of its edges starts at a state the root cannot reach or ends at one that
- * cannot reach acceptance; unreachability is explained by the state's edges on that side, each either cut or
- * leading to a state unreachable in turn, and each state is explained once per reason.
- *
- * A cost bound `cost >= L` holds because every live accepting path weighs at least `L`. A lighter path, if one
- * existed, would use some cut edge, and every edge of a path lighter than `L` lies on a path of the uncut diagram
- * lighter than `L`; so citing each cut edge on such a path suffices. The upper bound is the mirror image.
- */
+// Reasons for Mdd deductions as cuts of the layered diagram over the domains at a past undo-log position. An edge
+// on symbol `s` from layer `i` is live while `s` belongs to `seq(i)`'s domain, and a cut edge cites the removal
+// excluding its symbol. A symbol leaves `seq(i)` when each of its edges starts at a state the root cannot reach or
+// ends at one that cannot reach acceptance; unreachability is explained by the state's edges on that side, each
+// cut or leading to a state unreachable in turn, and each state is explained once per reason.
+//
+// A cost bound `cost >= L` holds because every live accepting path weighs at least `L`. A lighter path would use
+// some cut edge, and every edge of such a path lies on an uncut path lighter than `L`, so citing each cut edge on
+// such a path suffices. The upper bound is the mirror image.
 internal class MddExplainer(
     private val seq: IntArray,
     private val numStatesPerLayer: IntArray,
@@ -34,7 +30,6 @@ internal class MddExplainer(
 ) {
     private val n = seq.size
 
-    /** Reason for the symbols position [pos] lost as of [atTrail]. */
     fun prune(state: PropagationState, pos: Int, atTrail: Int, value: Long? = null): IntArray {
         val cut = Cut(state, atTrail)
         val idx = index()
@@ -83,7 +78,6 @@ internal class MddExplainer(
         return cut.literals()
     }
 
-    /** Reason for no accepted word remaining as of [atTrail]: no accepting state is reachable. */
     fun conflict(state: PropagationState, atTrail: Int): IntArray {
         val cut = Cut(state, atTrail)
         if (accepting.any { it in 0 until numStatesPerLayer[n] && cut.fwd[n][it] }) {
@@ -95,7 +89,6 @@ internal class MddExplainer(
         return cut.literals()
     }
 
-    /** Reason for the cost's lower ([lower]) or upper bound the diagram derived as of [atTrail]. */
     fun costBound(state: PropagationState, lower: Boolean, atTrail: Int): IntArray {
         val cut = Cut(state, atTrail)
         cut.cutLighter(lower, cut.livePathWeight(lower))
@@ -159,7 +152,6 @@ internal class MddExplainer(
             }
         }
 
-        /** Explain why [q] at [layer] is unreachable from the root: each incoming edge is cut or unreachable. */
         fun unreachable(layer: Int, q: Int) {
             val stack = IntArrayList()
             push(stack, explainedFwd, layer, q)
@@ -181,7 +173,6 @@ internal class MddExplainer(
             }
         }
 
-        /** Explain why [q] at [layer] cannot reach acceptance: each outgoing edge is cut or leads nowhere. */
         fun dead(layer: Int, q: Int) {
             val stack = IntArrayList()
             push(stack, explainedBwd, layer, q)
@@ -203,7 +194,6 @@ internal class MddExplainer(
             }
         }
 
-        /** The lightest ([lower]) or heaviest live accepting path's weight. */
         fun livePathWeight(lower: Boolean): Long {
             val best = extremeFromRoot(lower, live = true)
             var w = if (lower) INF else -INF
@@ -215,7 +205,7 @@ internal class MddExplainer(
             return w
         }
 
-        /** Cite each cut edge on an uncut path lighter than [bound] ([lower]), or heavier than it otherwise. */
+        // Cites each cut edge on an uncut path lighter than [bound] ([lower]), or heavier than it otherwise.
         fun cutLighter(lower: Boolean, bound: Long) {
             val from = extremeFromRoot(lower, live = false)
             val to = extremeToAccept(lower)

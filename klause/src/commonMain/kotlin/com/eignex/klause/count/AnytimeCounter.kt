@@ -18,27 +18,14 @@ import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 
-/**
- * Anytime exact projected counting. Independent Boolean clause components multiply their
- * intervals; other models use depth-first feasibility search over the whole projection.
- *
- * Each node is a partial assignment of a prefix of the projection variables that the solver has
- * proven feasible (extensible to a full model). Expanding a node pins the next projection variable
- * to each of its domain values and asks the solver whether the extended prefix is still feasible:
- *  - feasible and last variable → a distinct projected model, `lower += 1`;
- *  - feasible and more to go → a child node to expand later;
- *  - infeasible → pruned (its whole subtree leaves the upper bound);
- *  - undecided within the per-check budget → kept as "possibly feasible" (stays in the upper bound,
- *    so the result can't claim exactness).
- *
- * Each traversal reports `lower = proven models`, `upper = lower + Σ (open + undecided subtree
- * sizes)`, where a subtree at depth `d` has at most `Π domain-sizes[d..]` projected completions.
- * `lower` only rises and `upper` only falls; when the frontier empties (and nothing was undecided)
- * the interval collapses to the exact count. Mass accounting uses exact integers; an upper bound
- * beyond the [Long] range is reported as the unbounded sentinel [Long.MAX_VALUE]. The returned
- * [Count]s are emitted roughly every [ExactCountConfig.reportEvery] checks, so iterating the
- * sequence tightens on demand.
- */
+// Anytime exact projected counting. Independent Boolean clause components multiply their intervals; other models
+// use depth-first feasibility search over the whole projection.
+//
+// Each node is a solver-proven feasible prefix of the projection variables. Expanding it pins the next variable to
+// each value: a feasible full assignment adds one to lower, a feasible prefix becomes a child, an infeasible one is
+// pruned from upper, and an undecided one stays in upper, so the result cannot claim exactness. upper is lower plus
+// the open and undecided subtree sizes, where a subtree at depth d has at most Π domain-sizes[d..] completions.
+// lower only rises and upper only falls; an upper bound beyond Long is reported as Long.MAX_VALUE.
 internal object AnytimeCounter {
 
     private class Node(val depth: Int, val bools: Map<Int, Boolean>, val ints: Map<Int, Long>)

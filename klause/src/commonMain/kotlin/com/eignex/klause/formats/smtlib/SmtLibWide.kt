@@ -25,17 +25,12 @@ import com.eignex.util.numbers.toLongExact
 
 private val LONG_MAX = bigIntOf(Long.MAX_VALUE)
 
-/** The bounds of [v]'s current presolve domain; a side is null when the domain is open there. */
 private fun Compiler.Builder.domainBounds(v: Int): Pair<Long?, Long?> = when (val d = intDomains[v]) {
     is PresolveDomain.Finite -> d.domain.min to d.domain.max
     is PresolveDomain.Open -> d.lo to d.hi
 }
 
-/**
- * The exact range `[lo, hi]` of [w] over the current presolve domains, or null when a side is open. An
- * open side has no finite magnitude: the open theory pipeline carries the fresh quantity as an open
- * ordinary integer; only the finite CP pipeline needs a digit vector for a genuinely wide finite range.
- */
+// Null when a side is open: the open theory pipeline carries such a quantity as an ordinary open integer.
 internal fun Compiler.Builder.wideRange(w: WideLinComb): Pair<BigInt, BigInt>? {
     var lo = w.constant
     var hi = w.constant
@@ -51,7 +46,6 @@ internal fun Compiler.Builder.wideRange(w: WideLinComb): Pair<BigInt, BigInt>? {
     return lo to hi
 }
 
-/** A bound on `|value|` of [t]. */
 internal fun Compiler.Builder.intCombMagnitude(t: IntComb): BigInt? {
     val (lo, hi) = wideRange(t.toWide()) ?: return null
     val a = lo.abs()
@@ -59,13 +53,8 @@ internal fun Compiler.Builder.intCombMagnitude(t: IntComb): BigInt? {
     return if (a > b) a else b
 }
 
-/**
- * A fresh quantity able to take every value in `[-magnitude, magnitude]`.
- *
- * Inside `Long` that is one ordinary variable. Past it, the quantity is `Σᵢ dᵢ·2^(width·i)` over fresh
- * digit columns, the leading one signed — one digit vector per value, so search never revisits a value
- * it has already ruled out.
- */
+// Past `Long` the quantity is `Σᵢ dᵢ·2^(width·i)` over fresh digit columns, the leading one signed, with one
+// digit vector per value so search never revisits a ruled-out value.
 internal fun Compiler.Builder.freshWideInt(magnitude: BigInt?): IntComb {
     if (magnitude == null) return IntComb.Narrow(LinComb(mapOf(newInt(null, null) to 1), 0))
     val m = magnitude.abs()

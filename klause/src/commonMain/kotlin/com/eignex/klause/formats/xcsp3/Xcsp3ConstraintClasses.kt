@@ -4,12 +4,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.util.collections.DynamicBits
 import com.eignex.util.collections.MutableIntLongMap
 
-/**
- * The XCSP3 constraint classes the solver reads, inherited from every enclosing `block`, `group` and
- * `slide` by the constraints and templates inside it. `symmetryBreaking` declares source symmetry
- * breaking, and both it and `redundantConstraints` mark the factors a classified constraint emits as
- * implied. Every other class is inert.
- */
+// Constraint classes are inherited from every enclosing `block`, `group` and `slide`. `symmetryBreaking` and
+// `redundantConstraints` mark the factors a classified constraint emits as implied; every other class is inert.
 internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
     private var symmetry = false
     private var redundant = false
@@ -25,13 +21,11 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
     private var lastClasses: String? = null
     private var lastFlags = 0
 
-    /** Whether some constraint inherited the symmetry-breaking class. */
     var hasSymmetryBreaking = false
         private set
 
     private val classified: Boolean get() = symmetry || redundant
 
-    /** Run [body] with [classes] added to the inherited classes. */
     inline fun within(classes: String, body: () -> Unit) {
         if (classes.isEmpty()) return body()
         val saved = enter(classes)
@@ -42,7 +36,7 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
         }
     }
 
-    /** Add [classes] to the inherited classes; returns the state [exit] restores. */
+    // Returns the state [exit] restores.
     fun enter(classes: String): Int {
         val saved = (if (symmetry) SYMMETRY else 0) or (if (redundant) REDUNDANT else 0)
         val flags = flagsOf(classes)
@@ -55,18 +49,15 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
         return saved
     }
 
-    /** Leave the scope [enter] opened. The outermost classified scope marks every factor it emitted. */
+    // The outermost classified scope marks every factor it emitted.
     fun exit(saved: Int) {
         if (saved == 0 && classified) mark(scopeStart, factors.size)
         symmetry = (saved and SYMMETRY) != 0
         redundant = (saved and REDUNDANT) != 0
     }
 
-    /**
-     * Record a cached definition of [variable] whose lookup started at factor [start]. A lookup that
-     * emitted no factor reused an earlier definition, and an unclassified reuse leaves the definition
-     * unmarked: its factors are implied only while every constraint reading them is classified.
-     */
+    // A lookup from factor [start] that emitted nothing reused an earlier definition. An unclassified reuse unmarks
+    // it: shared definition factors are implied only while every constraint reading them is classified.
     fun define(variable: Int, start: Int) {
         val end = factors.size
         when {
@@ -82,15 +73,12 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
         implied?.clearRange((range ushr Int.SIZE_BITS).toInt(), range.toInt())
     }
 
-    /** Whether factor [index] is marked implied. */
     private fun isImplied(index: Int): Boolean = implied?.let { index < it.size && it[index] } == true
 
-    /** Mark the factor appended at [index] implied when every one of its [sources] is. */
     fun inherit(index: Int, sources: IntArray) {
         if (sources.isNotEmpty() && sources.all(::isImplied)) mark(index, index + 1)
     }
 
-    /** Drop the marks of the [removed] factors, keeping the survivors' order. */
     fun compact(removed: Set<Int>) {
         val marks = implied ?: return
         var next = 0
@@ -98,7 +86,6 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
         marks.resize(next)
     }
 
-    /** The per-factor implied flags over [count] factors, or null when no factor is implied. */
     fun mask(count: Int): BooleanArray? {
         val marks = implied ?: return null
         val mask = BooleanArray(count) { it < marks.size && marks[it] }

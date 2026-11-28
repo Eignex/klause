@@ -41,12 +41,7 @@ sealed interface SearchDecision {
      */
     data class IntEqual(val variable: Int, val value: Long) : SearchDecision
 
-    /**
-     * A theory-owned split or assertion whose representation is opaque to the shared engine.
-     *
-     * This is how exact and nonlinear arithmetic components retain their native terms while still sharing
-     * one decision level and backtracking lifecycle with CP and Boolean reasoning.
-     */
+    /** A theory-owned split or assertion whose representation is opaque to the shared engine. */
     data class Theory(
         /** Theory-local assertion payload. */
         val decision: SearchTheoryDecision,
@@ -124,26 +119,17 @@ interface SearchComponent {
     fun onRestart(context: SearchContext) {}
 
     /**
-     * Whether this component keeps its own conflict explanations in a database it propagates from.
-     *
-     * The shared engine leaves those explanations where they are rather than retaining a second copy,
-     * since one clause in two databases means two watch indexes and two reduction policies deducing the
-     * same thing. It is deliberately separate from [SearchConflictResolver.prefersNativeConflictAnalysis]:
-     * analysing a conflict natively and storing the result natively are different capabilities.
-     *
-     * It governs the component's own explanation only. A consequence the shared analyzer derives from
-     * one belongs to the engine and is retained whatever this says, which is why the property bites on
-     * the path where a native analyzer has stood the shared one down.
+     * Whether this component keeps its own conflict explanations in a database it propagates from, so the
+     * shared engine does not retain a second copy. Independent of
+     * [SearchConflictResolver.prefersNativeConflictAnalysis]. Consequences the shared analyzer derives are
+     * always retained by the engine.
      */
     val retainsOwnExplanations: Boolean get() = false
 
     /**
      * Clause-form reason for a Boolean consequence this component published without one, or null when
-     * it cannot name one.
-     *
-     * The shared analyzer asks only while resolving a conflict, so a component that would have to
-     * build the clause eagerly for every implication pays for it only where it is used. The returned
-     * clause must contain [literal] and hold under the root problem.
+     * it cannot name one. Asked only during conflict analysis. The clause must contain [literal] and hold
+     * under the root problem.
      */
     fun reasonFor(literal: Int): SearchExplanation? = null
 
@@ -152,12 +138,9 @@ interface SearchComponent {
 }
 
 /**
- * A component that can supply a complete, trailed split for the shared search engine.
- *
- * The component selects from its private state, but the returned alternatives are public
- * [SearchDecision]s. Consequently the session, rather than a CP or theory-specific loop, owns
- * levels, propagation scheduling, retraction, cancellation, and terminal model assembly.
- * Traversal-only extensions can supply [SearchBranchProposal] independently of this lifecycle.
+ * A component that can supply a complete, trailed split for the shared search engine. The session owns
+ * levels, propagation scheduling, retraction, cancellation and model assembly. Traversal-only extensions
+ * use [SearchBranchProposal] instead.
  */
 interface SearchBrancher : SearchComponent {
     /**
@@ -328,11 +311,8 @@ sealed interface SearchNodeDisposition {
 }
 
 /**
- * Owns mode-specific work at resumable traversal boundaries.
- *
- * Implementations may close over a native component session, but expose only a typed outcome to the
- * shared engine. This keeps root bounds, portfolio exchange, and cooperative slice pauses on the same
- * traversal lifecycle as every other theory.
+ * Owns mode-specific work at resumable traversal boundaries, such as root bounds, portfolio exchange and
+ * cooperative slice pauses, exposing only a typed outcome to the shared engine.
  */
 interface SearchRunLifecycle {
     /** Called once before the first branch of a run. */
@@ -369,44 +349,29 @@ sealed interface SearchRunDisposition {
     data object Indeterminate : SearchRunDisposition
 }
 
-/**
- * Complete mode-specific wiring for one [SearchRun].
- *
- * The session owns traversal; a policy only selects branching, limits, model continuation, and lifecycle
- * boundary work for one caller. Finite CP and optimization frontends can therefore share the
- * same decision stack and conflict path without reimplementing the run loop.
- */
+// Mode-specific wiring for one SearchRun; the session owns traversal.
 internal interface SearchTraversalPolicy {
-    /** Limits and restart schedule for this traversal. */
     val solveParams: SearchSolveParams
 
-    /** Boolean branching preceding component-local splits. */
+    // Boolean branching precedes component-local splits.
     val booleanBranching: BooleanBranching
 
-    /** Independent lazy selection of Boolean, finite and arithmetic proposals. */
     val branchSelection: SearchBranchSelection get() = SearchBranchSelection.Default
 
-    /** Shared-decision budget for this traversal. */
     val decisionBudget: SearchDecisionBudget
 
-    /** Traversal observations such as selector updates and statistics. */
     val observer: SearchRunObserver
 
-    /** Continuation after a surfaced or consumed model. */
     val modelContinuation: SearchModelContinuation
 
-    /** Model reporting policy. */
     val modelPolicy: SearchModelPolicy
 
-    /** Per-node pruning or learned-backjump policy. */
     val nodePolicy: SearchNodePolicy
 
     val pauseBeforeDecision: () -> Boolean get() = { false }
 
-    /** Restart, cancellation, and resumable boundary work. */
     val lifecycle: SearchRunLifecycle
 
-    /** Unverified branch-order steering for this traversal; the default is unsteered order. */
     val candidateHints: SearchCandidateHints get() = SearchCandidateHints.None
 }
 
@@ -449,7 +414,7 @@ sealed interface SearchRestart : SearchRestartPolicy {
  * Bound on the clause database a [SearchSession] has learned.
  *
  * A learned clause is implied by the root problem, so forgetting one only weakens propagation. The cap
- * is off by default: it is a measured knob rather than a correctness requirement.
+ * is off by default.
  */
 data class SearchLearnedDbParams(
     /** Retained clause cap applied at a restart boundary, or null to retain every learned clause. */
@@ -508,18 +473,14 @@ interface SearchContext {
     fun intUpperBoundPremise(variable: Int): SearchAtomPremise = SearchAtomPremise.Unavailable
 
     /**
-     * Assert a Boolean consequence at the current shared level.
-     *
-     * [explanation] is retained by the shared session for conflict analysis and clause learning. A
-     * component must not imply a literal without one.
+     * Assert a Boolean consequence at the current shared level. [explanation] is retained for conflict
+     * analysis and clause learning.
      */
     fun imply(literal: Int, explanation: SearchExplanation): ComponentResult
 
     /**
-     * Publish a Boolean consequence whose explanation remains owned by the producing component.
-     *
-     * The fact is visible to peers but cannot enter shared learning until that component exposes a
-     * clause-form reason.
+     * Publish a Boolean consequence whose explanation remains owned by the producing component, which
+     * supplies it on demand through [SearchComponent.reasonFor].
      */
     fun publish(literal: Int): ComponentResult
 
@@ -549,9 +510,9 @@ interface SearchContext {
     fun cancelled(): Boolean
 
     /**
-     * Ask the run to poll its cancellation token before it commits the branch being chosen, rather than at
-     * its next scheduled poll. A brancher that saw the deadline while choosing calls this: a value probe
-     * runs a whole fixpoint, and committing the branch would run another one past the deadline.
+     * Ask the run to poll its cancellation token before it commits the branch being chosen. A brancher
+     * that saw the deadline while probing calls this so committing the branch does not run another
+     * fixpoint past the deadline.
      */
     fun requestCancellationPoll()
 }
@@ -562,12 +523,7 @@ interface SearchModel {
     fun <V : Any> contribute(key: TypedSearchValueKey<V>, value: V)
 }
 
-/**
- * A typed source-model location whose value can be contributed by exactly one search component.
- *
- * The interface is open so a component can define its own source-symbol key without extending the shared
- * engine or exposing private theory state.
- */
+/** A source-model location whose value can be contributed by exactly one search component. */
 interface SearchValueKey
 
 /** Source Boolean variable value. The session contributes assigned Boolean values itself. */
@@ -578,10 +534,7 @@ data class SearchBoolValue(
     override val valueType: KClass<Boolean> get() = Boolean::class
 }
 
-/**
- * Source integer location in a [SourceBoundTerm].
- * Model contributions use [SearchExactIntValue].
- */
+/** Source integer location in a [SourceBoundTerm]; model contributions use [SearchExactIntValue]. */
 data class SearchIntValue(
     /** Source integer variable id. */
     val variable: Int,

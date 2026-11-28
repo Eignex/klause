@@ -8,25 +8,19 @@ import com.eignex.util.collections.IntArrayList
  * Boolean cardinalities hosted by the shared session, so `min ≤ #true ≤ max` is enforced on a route
  * that never builds a finite projection.
  *
- * A cardinality states no arithmetic, so an exact core reading linear rows skips it exactly as it skips
- * a clause — and this component is what makes that skip sound. Counting is the whole mechanism: a
- * literal's assignment wakes only the cardinalities holding it, and each bound explains itself in clause
- * form, the true literals' negations for the upper bound and the false literals themselves for the
- * lower one, so every deduction can enter shared learning.
- *
- * CP keeps its own watched-literal cardinality propagator for a finite projection; this is the counting
- * one open and hybrid component sets use.
+ * An exact core reading linear rows skips cardinalities as it skips clauses; this component makes that
+ * skip sound. A literal's assignment wakes only the cardinalities holding it, and each bound explains
+ * itself in clause form so every deduction can enter shared learning.
  */
 class CardinalitySearchComponent(cardinalities: Iterable<Cardinality>) : SearchComponent {
     private val literals: Array<IntArray>
     private val mins: IntArray
     private val maxs: IntArray
 
-    /** Cardinalities each Boolean variable occurs in, as `occStart[v] until occStart[v + 1]` of [occOf]. */
+    // Cardinalities of variable v are occOf[occStart[v] until occStart[v + 1]].
     private val occStart: IntArray
     private val occOf: IntArray
 
-    /** Cardinalities whose count has not been re-examined since a literal of theirs was assigned. */
     private val pending = IntArrayList()
     private val queued: BooleanArray
     private var active: SearchContext? = null
@@ -83,12 +77,8 @@ class CardinalitySearchComponent(cardinalities: Iterable<Cardinality>) : SearchC
     }
 
     /**
-     * Counts every cardinality once more at a candidate leaf.
-     *
-     * Propagation already refutes a violated count, so this repeats work only where the session is about
-     * to surface a model. It guards the component's reachability argument — that every assignment of a
-     * literal wakes the cardinalities holding it — which rests on how the session publishes Boolean facts;
-     * a gap there would otherwise surface as a wrong verdict.
+     * Recounts every cardinality at a candidate leaf. Guards the assumption that every Boolean assignment
+     * wakes the cardinalities holding it; a gap there would otherwise surface as a wrong verdict.
      */
     override fun check(context: SearchContext): ComponentCheck {
         val previous = active
@@ -120,13 +110,6 @@ class CardinalitySearchComponent(cardinalities: Iterable<Cardinality>) : SearchC
         return ComponentResult.Consistent
     }
 
-    /**
-     * Recount cardinality [c] and act on whichever bound the count has reached.
-     *
-     * The four outcomes are the ones a count admits: more true literals than the upper bound and fewer
-     * non-false than the lower one are refutations, while a count sitting exactly on either bound fixes
-     * every literal still unassigned — false on the upper bound, true on the lower one.
-     */
     private fun examine(c: Int): ComponentResult {
         val lits = literals[c]
         val counts = count(c)
@@ -140,12 +123,8 @@ class CardinalitySearchComponent(cardinalities: Iterable<Cardinality>) : SearchC
         return ComponentResult.Consistent
     }
 
-    /**
-     * Assign every still-unassigned literal of [c] to [toTrue], with the antecedents that force it.
-     *
-     * Both bounds have one antecedent set for all of the literals they fix — the true literals on the
-     * upper bound, the false ones on the lower — so the clause differs only in the literal it asserts.
-     */
+    // All literals fixed by one bound share an antecedent set, so their clauses differ only in the
+    // asserted literal.
     private fun fix(c: Int, toTrue: Boolean): ComponentResult {
         val context = session()
         val antecedents = assignedLiterals(c, wanted = !toTrue, negated = !toTrue, limit = Int.MAX_VALUE)
@@ -158,31 +137,20 @@ class CardinalitySearchComponent(cardinalities: Iterable<Cardinality>) : SearchC
             clause[antecedents.size] = implied
             val result = context.imply(implied, SearchExplanation(clause))
             if (result !is ComponentResult.Consistent) return result
-            // The session delivers an implication to every component except the one that made it, so this
-            // component wakes on its own consequences — a literal it fixes can be the one that pushes
-            // another cardinality, or this one under a repeated variable, onto a bound.
+            // The session does not deliver an implication back to the component that made it.
             wake(v)
         }
         return ComponentResult.Consistent
     }
 
-    /**
-     * The clause refuting a count above the upper bound, trimmed to the `max + 1` true literals that
-     * violate it. Any larger set is implied by this one, and the shorter clause is what enters learning.
-     */
+    // Trimmed to the max + 1 violating literals so the shorter clause enters learning.
     private fun violatedAbove(c: Int): IntArray =
         assignedLiterals(c, wanted = true, negated = true, limit = maxs[c] + 1)
 
-    /** The clause refuting a count below the lower bound, trimmed to `size - min + 1` false literals. */
     private fun violatedBelow(c: Int): IntArray =
         assignedLiterals(c, wanted = false, negated = false, limit = literals[c].size - mins[c] + 1)
 
-    /**
-     * Literals of [c] whose truth is [wanted], at most [limit] of them, negated when [negated].
-     *
-     * A repeated variable can put the same literal in twice, which only makes the clause redundant. A
-     * complementary pair cannot both be [wanted], so the result is never a tautology.
-     */
+    // A complementary pair cannot both be wanted, so the result is never a tautology.
     private fun assignedLiterals(c: Int, wanted: Boolean, negated: Boolean, limit: Int): IntArray {
         val context = session()
         val lits = literals[c]
@@ -201,7 +169,7 @@ class CardinalitySearchComponent(cardinalities: Iterable<Cardinality>) : SearchC
         return out
     }
 
-    /** True and false literal counts of [c], packed so one scan answers both. */
+    // True count in the high word, false count in the low word.
     private fun count(c: Int): Long {
         val context = session()
         var trues = 0

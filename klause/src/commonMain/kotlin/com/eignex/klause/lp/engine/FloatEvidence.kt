@@ -16,7 +16,6 @@ import kotlin.math.max
 import kotlin.math.nextUp
 import kotlin.math.sign
 
-/** Primal and dual feasibility tolerance of float LP evidence. */
 internal const val FLOAT_EVIDENCE_TOLERANCE: Double = 1e-7
 
 // Unit roundoff of binary64: a reduced cost summed from k terms, each a double standing in for an exact cost or
@@ -34,21 +33,16 @@ private const val EXACT_DUAL_ROUNDING: Int = 2
 internal enum class FloatDualVerdict {
     ACCEPTED,
 
-    /** Refused, and some reduced cost is wrong-signed beyond doubt under the duals checked. */
+    // Some reduced cost is wrong-signed beyond doubt under the duals checked.
     WRONG_SIGNED,
     REFUSED,
 }
 
-/**
- * Whether [result]'s duals prove its objective optimal within [tolerance]: every reduced cost off its sign, a basic
- * column's included, could improve the objective by at most its magnitude plus its noise times its column's range,
- * and the total of those improvements must stay within [tolerance] of the objective's own size, every constant
- * included — [offset] is the minimized objective's constant held outside [model], in source units. A column with
- * no opposite bound spans the range its rows imply; a wrong-signed reduced cost beyond its summation's rounding on
- * a column still unbounded rejects, however small. Read from the binary64 projection of the exact authority, which
- * is the working model [result] was solved on. With [exactDuals], the bound is taken for those duals instead of
- * [result]'s.
- */
+// Every wrong-signed reduced cost, basic columns included, improves the objective by at most its magnitude plus noise
+// times its column's range; the total must stay within [tolerance] of the objective's size. [offset] is the minimized
+// objective's constant held outside [model], in source units. A column with no opposite bound spans the range its
+// rows imply; a wrong sign beyond rounding on a column still unbounded rejects, however small. With [exactDuals] the
+// bound is taken for those duals instead of [result]'s.
 internal fun floatDualFeasible(
     model: LpModel,
     result: FloatLpResult,
@@ -162,14 +156,9 @@ internal fun floatDualVerdict(
     return if (improvement + residual <= limit) FloatDualVerdict.ACCEPTED else refusal()
 }
 
-/**
- * The duality gap the reported point's row residuals add: Σ|y(i)|·|A(i)·ẑ + s(i) − b(i)| over rows whose slack is
- * nonbasic, so at its bound, with |y(i)| read from [duals] (a magnitude bound serves). The reported objective is the
- * point's own, and a residual below the source tolerance still counts once a large dual multiplies it. A basic slack
- * is defined by its row and leaves no residual. When [padded], each residual is summed in doubles and padded by its
- * rounding; otherwise it is taken exactly from the point's doubles. Null when a nonbasic slack rests on no bound or a
- * value is not finite.
- */
+// Σ|y(i)|·|A(i)·ẑ + s(i) − b(i)| over rows with a nonbasic slack; [duals] may be magnitude bounds. A residual below
+// the source tolerance still counts once a large dual multiplies it; a basic slack leaves none. [padded] sums in
+// doubles padded by rounding, otherwise exactly. Null when a nonbasic slack rests on no bound or a value is not finite.
 private fun dualResidualGap(
     exact: FloatEvidenceModel,
     result: FloatLpResult,
@@ -306,20 +295,14 @@ private fun exactWrong(
     return if (wrong.signum() <= 0) 0.0 else magnitudeAbove(wrong)
 }
 
-/**
- * |[value]| rounded up to a double, null when it exceeds the double range. [BigFraction.toDouble] divides two
- * doubles, so a denominator past 2^1024 reads a real magnitude as 0; this takes an integer quotient of about 60 bits
- * instead and scales it by powers of two.
- */
+// Null past the double range. [BigFraction.toDouble] divides two doubles, so a denominator past 2^1024 reads a real
+// magnitude as 0; this scales a 60-bit integer quotient by powers of two instead.
 private fun magnitudeAbove(value: BigFraction): Double? =
     quotientAbove(if (value.num.signum() < 0) value.num.negate() else value.num, value.den)
 
-/*
- * The rows of [exact] as equalities `Σ a(i, j)·z(j) + s(i) = b(i)` over shifted structural columns and their slacks,
- * with each row's least and greatest activity, to imply a column's range from the other columns' bounds. Every
- * finite premise moves by [moved] before elimination. Implied bounds include the rounding of the perturbation's
- * operands as well as the resulting activities, so cancellation cannot understate a range.
- */
+// Rows as equalities Σ a(i, j)·z(j) + s(i) = b(i) with their activity extremes, implying a column's range from the
+// other columns' bounds. Every finite premise moves by [moved] first. Implied bounds include the rounding of the
+// perturbation's operands, so cancellation cannot understate a range.
 internal class RowView(private val exact: FloatEvidenceModel, private val moved: SideSlack? = null) {
     private val lower = DoubleArray(exact.numVars) {
         val side = exact.lower(it)
@@ -348,13 +331,9 @@ internal class RowView(private val exact: FloatEvidenceModel, private val moved:
         for (j in 0 until exact.n) exact.forEachInColumn(j) { row, a -> add(row, j, a) }
     }
 
-    /** A bound one row implies for a column: the row, the column's coefficient in it and the value. */
     class Implied(val row: Int, val coefficient: Double, val value: Double)
 
-    /**
-     * The tightest finite bound on [lowSide] of [j] that a single row implies. Rows whose validity a reason can cite
-     * are preferred; another row serves only when none of them bounds [j].
-     */
+    // Rows a reason can cite are preferred; another row serves only when none of them bounds [j].
     fun impliedBy(j: Int, lowSide: Boolean): Implied? {
         var best: Implied? = null
         var bestCitable: Implied? = null
@@ -371,12 +350,8 @@ internal class RowView(private val exact: FloatEvidenceModel, private val moved:
         return bestCitable ?: best
     }
 
-    /**
-     * Report to [cite] every column side, with 1 for the lower and 2 for the upper, that [implied] reads for [j]: the
-     * side of each other term in its row that the row's least or greatest activity takes. [cache], two slots per row,
-     * holds the first column cited through each row and direction, so a row is scanned once per direction and a later
-     * column bounded through it adds only the first column's read side.
-     */
+    // Sides are 1 for lower, 2 for upper. [cache], two slots per row, holds the first column cited through each row and
+    // direction, so a row is scanned once per direction and a later column adds only the first column's read side.
     fun citeReads(implied: Implied, j: Int, lowSide: Boolean, cache: IntArray, cite: (Int, Int) -> Unit) {
         val fromMost = lowSide == implied.coefficient > 0
         val slot = 2 * implied.row + if (fromMost) 0 else 1
@@ -431,10 +406,8 @@ internal class RowView(private val exact: FloatEvidenceModel, private val moved:
         return abs(side) + requireNotNull(moved).at(j, side)
     }
 
-    /** Width of [j]'s box intersected with the interval every row through it implies, never below zero. */
     fun impliedRange(j: Int): Double = impliedBounds(j).let { max(it.second - it.first, 0.0) }
 
-    /** [j]'s box intersected with the interval every row through it implies, as `(low, high)`. */
     fun impliedBounds(j: Int): Pair<Double, Double> {
         var low = lower[j]
         var high = upper[j]
@@ -513,7 +486,6 @@ internal class FloatEvidenceModel(val model: LpModel) {
     fun origin(column: Int): Double = source?.column(column)?.origin?.approximation ?: model.loShiftD(column)
     fun fixed(column: Int): Boolean = model.fixed(column)
 
-    /** Whether a reason can cite row [i]'s validity: a global row, or one carrying its premises. */
     fun rowCitable(i: Int): Boolean = source?.row(i)?.let { it.global || it.premises != null }
         ?: (model.rowGlobal.getOrElse(i) { false } || model.rowPremises.getOrNull(i) != null)
 
@@ -544,30 +516,25 @@ internal class FloatEvidenceModel(val model: LpModel) {
     }
 }
 
-/** One node model's binary64 view and its row-implied bounds, shared by the certificates priced against it. */
+// Shared by the certificates priced against one node model.
 internal class FloatNodeView(val model: LpModel) {
     val finite: Boolean by lazy { model.finiteExactInput() }
     val evidence = FloatEvidenceModel(model)
     val rows = lazy { RowView(evidence) }
 }
 
-/**
- * Lagrangian deduction data read from float duals, for finite-lane deductions accepted numerically
- * ([LpSolveContext.numericalDeductions]). `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` bounds the objective for any
- * multipliers; here it is summed in binary64, lowered by that summation's rounding and by an absolute and
- * relative slack, so float noise above an integer never rounds an integral bound up. A reduced cost beyond its
- * summation's rounding prices and cites its minimizing side; one within it prices both sides and cites the finite
- * ones. An open side is priced at the tightest bound a single row implies, citing that row and the sides the implied
- * bound reads; a reduced cost within rounding on a side no row bounds counts as zero. Binary64 evaluation and that
- * acceptance make the deductions numerical. Reduced costs are in source units.
- */
+// For [LpSolveContext.numericalDeductions]. L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ bounds the objective for any
+// multipliers; summed in binary64, it is lowered by its rounding and a slack so float noise above an integer never
+// rounds an integral bound up. A reduced cost beyond rounding prices and cites its minimizing side; one within it
+// prices both and cites the finite ones. An open side is priced at the tightest single-row implied bound, citing that
+// row and the sides it reads; within rounding on a side no row bounds, it counts as zero. Reduced costs are in
+// source units.
 internal class FloatDeductionCertificate private constructor(
     private val model: LpModel,
     private val duals: DoubleArray,
     private val reduced: DoubleArray,
     private val sides: ByteArray,
     private val rows: BooleanArray,
-    /** The source objective bound [exactObjectiveBound] states. */
     val lowerBound: Double,
 ) : LpDeductionCertificate {
     override fun extraCitedSides(col: Int): Int = sides[col].toInt()
@@ -608,12 +575,8 @@ internal class FloatDeductionCertificate private constructor(
     }
 
     companion object {
-        /**
-         * The certificate [y] supports on [model], or null when a reduced cost beyond its rounding meets a side no row
-         * bounds. [observer] sees the outcome as a node deduction phase; [node] shares the binary64 view and row bounds
-         * with the other certificates priced on the same model. Each priced side, a row's included, moves by [slack]
-         * against the bound, so the bound holds over the model with every side widened by it.
-         */
+        // Null when a reduced cost beyond its rounding meets a side no row bounds. Each priced side, rows included,
+        // moves by [slack] against the bound, so the bound holds with every side widened by it.
         fun of(
             model: LpModel,
             y: DoubleArray,
@@ -769,16 +732,11 @@ private fun reducedCost(view: FloatEvidenceModel, y: DoubleArray, j: Int): Pair<
     return d to (terms + 4) * UNIT_ROUNDOFF * magnitude
 }
 
-/**
- * [ray] oriented and rounded to integer multipliers when, summed in binary64, it shows the rows of [model] cannot
- * hold inside its box: `ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ)` by [FLOAT_EVIDENCE_TOLERANCE] times the terms' size. An open side
- * that the float ray meets is priced at the bound another row implies, and that row is then folded into the ray so
- * the column cancels: first in binary64, then exactly on the integral ray, slacks first. The integral ray is checked
- * again against the box alone, each column at the side the exact sign of its combination meets, which is the side an
- * infeasibility clause cites; when it fails, the empty ray refutes without a citable combination. The numerical
- * counterpart of [certifyLpFarkas]. Every finite side, a row's slack included, moves outward by [slack] first, so the
- * ray refutes only a model infeasible by more than it.
- */
+// Numerical counterpart of [certifyLpFarkas]: in binary64, ρ·rhs > Σⱼ max(ρ·Aⱼ·zⱼ) by [FLOAT_EVIDENCE_TOLERANCE]
+// times the terms' size. An open side the ray meets is priced at the bound another row implies, and that row is
+// folded in so the column cancels, first in binary64, then exactly on the integral ray. The integral ray is rechecked
+// against the box alone at the sides an infeasibility clause cites; when that fails, the empty ray refutes without a
+// citable combination. Every finite side moves outward by [slack] first, so only a model infeasible by more refutes.
 @Suppress("ReturnCount")
 internal fun floatFarkasRay(model: LpModel, ray: DoubleArray, slack: LpBoundSlack = LpBoundSlack.NONE): LongArray? {
     if (ray.size != model.m || !model.finiteExactInput()) return null

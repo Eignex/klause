@@ -74,11 +74,8 @@ class GlobalCardinality(
         mapping.lits(presents),
     )
 
-    // xs is a set (counts are per cover value, order-independent) so xs/presents pairs are sorted by
-    // var id; cover triples are sorted by value. Encodes every distinguishing field — fine enough
-    // that two non-equivalent GCCs never collide (a coarser key would let a symmetry swap through).
-    // Built with StructuralKey.of rather than the KeySink hash: the `pairsByKey(xs){ presents[it] }` value is a
-    // Boolean literal (remappable), which the sink's constant-value pair methods can't remap.
+    // Counts are order-independent in xs, so xs is keyed as a set. Every distinguishing field is encoded,
+    // since a coarser key would let a symmetry swap two non-equivalent GCCs.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GLOBAL_CARDINALITY) {
         bool(closed)
         bool(presents.isEmpty())
@@ -96,10 +93,7 @@ class GlobalCardinality(
         }
     }
 
-    /** Relabel the cover values. Only the constant-count form is value-relabelable: with count
-     *  *variables* the counts live in a second value universe that one map can't relabel, so that form
-     *  blocks value symmetry (returns `null`). A value transposition is a bijection, so the relabeled
-     *  cover stays distinct. */
+    // Count variables live in a second value universe that one map cannot relabel.
     override fun remapValues(valueMap: (Long) -> Long): Factor? {
         if (countVars != null) return null
         return GlobalCardinality(
@@ -121,8 +115,6 @@ class GlobalCardinality(
         boolVars = OptPresence.presenceVarIds(presents),
     )
 
-    /** Cover value → its 0-based index in [cover]. Used for O(1) per-probe lookup during
-     *  propagation and LS delta computation; `-1` for values outside the cover. */
     internal val coverIndexByValue: MutableLongIntMap =
         MutableLongIntMap().apply { for (i in cover.indices) put(cover[i], i) }
 }

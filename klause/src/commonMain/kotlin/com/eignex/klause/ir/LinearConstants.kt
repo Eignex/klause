@@ -45,11 +45,8 @@ class WideConstants(
     override fun exactCoeff(k: Int): BigInt = coefficients.at(k)
     override val exactBound: BigInt get() = bound
 
-    /**
-     * The decimal digits of [bound], then of each coefficient, as the character codes a structural key
-     * feeds them in. Colour refinement keys a row once per incident column every round, and converting a
-     * wide value to decimal costs far more than the rest of the key, so each value is converted once.
-     */
+    // Colour refinement keys a row once per incident column every round, and decimal conversion of a wide
+    // value costs far more than the rest of the key, so each value is converted once.
     internal val keyDigits: Array<LongArray> by lazy {
         Array(coefficients.size + 1) { i -> digitCodes(if (i == 0) bound else coefficients.at(i - 1)) }
     }

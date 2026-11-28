@@ -4,27 +4,17 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Combines hard-constraint violation count with the soft objective into a single scalar the
- * minimize engine uses for greedy descent. The default [FeasibilityFirst] is two-phase:
- * only consider the objective once `violationCount == 0`.
- *
- * For tight problems where the feasible region is narrow or disconnected, [linear] mixes
- * the objective in from the start so the descent can step *through* slightly-infeasible
- * neighbours to reach a strictly better feasible solution on the far side. [saturating]
- * adds a cap on the violation contribution: useful when individual violations are very
- * cheap relative to objective scale and would otherwise dominate.
- *
- * The engine still tracks "best feasible" snapshots separately — shaping only governs the
- * direction of greedy descent, not which assignments count as solutions.
+ * Combines the violation count and the objective into the scalar greedy descent minimizes. [FeasibilityFirst]
+ * considers the objective only at zero violation; [linear] mixes it in from the start so descent can cross
+ * slightly infeasible neighbours, and [saturating] caps the violation term. Shaping steers descent only; it
+ * does not decide which assignments count as solutions.
  */
 sealed interface CostShaping {
 
-    /** Shaped scalar; lower is better. [violationCount] is the graded total violation
-     *  (`LocalSearchState.cost`, a sum of per-factor degrees). */
+    /** Shaped scalar, lower is better; [violationCount] is the summed per-factor violation degree. */
     fun shape(violationCount: Long, objective: Double): Double
 
-    /** True iff descent should reject moves with `violationCount > 0`. Used to short-circuit
-     *  to the greedy-objective code path for [FeasibilityFirst]. */
+    /** True iff descent rejects moves with `violationCount > 0`. */
     val feasibilityGated: Boolean
 
     /** Two-phase: only optimise the objective once feasibility is reached. */
@@ -54,12 +44,10 @@ sealed interface CostShaping {
         /** Linear blend without saturation. */
         fun linear(lambda: Double): CostShaping = Linear(lambda)
 
-        /** Linear blend with a cap on the total violation contribution, so violations cannot
-         *  dominate the objective. */
+        /** Linear blend with the violation contribution capped at [cap]. */
         fun saturating(lambda: Double, cap: Double): CostShaping = Linear(lambda, ViolationPenalty.Saturating(cap))
 
-        /** Linear blend with square-root scaling on violations. Sub-linear: each extra
-         *  violation contributes less than the previous one. */
+        /** Linear blend with square-root scaling on violations. */
         fun sqrtViolation(lambda: Double): CostShaping = Linear(lambda, ViolationPenalty.SquareRoot)
     }
 }

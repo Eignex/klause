@@ -5,39 +5,10 @@ package com.eignex.klause.factor.scheduling.internals
  * propagator on `Cumulative` (P. Vilím, "Edge Finding Filtering Algorithm for Discrete Cumulative
  * Resources in O(kn log n)", CP 2009, https://doi.org/10.1007/978-3-642-04244-7_62).
  *
- * Tasks are addressed by a stable id `0..n-1` set at construction. The id is *not* a leaf
- * position — callers pass the per-leaf order to [setLeafOrder] (typically `argsort` by
- * ascending EST after each propagation pass) so the in-tree leaf positions stay sorted by
- * EST while the calling convention stays id-based.
- *
- * For an *active* task with earliest start `est_i` and energy `e_i = duration_i · resource_i`:
- *  - leaf energy contribution: `e_i`
- *  - leaf envelope contribution: `C · est_i + e_i`
- *
- * The "envelope" of a subset Ω ⊆ Θ is `Env(Ω) = C · est(Ω) + e(Ω)` where `est(Ω)` is the
- * smallest EST in Ω. With leaves stored in EST-ascending order, for any internal node v
- * with children L (smaller-EST half) and R (larger-EST half):
- *  - `e(v) = e(L) + e(R)`
- *  - `env(v) = max(env(L) + e(R), env(R))` — anchor at the left min-EST and add R's full
- *    energy, *or* re-anchor in R entirely. Mixing a left-anchored subset with a strict
- *    subset of R never beats those two by the definition of `env`.
- *
- * Inactive leaves contribute `e = 0` and `env = NO_ENV` (a large-negative sentinel chosen
- * so that `env + e_R` for any in-range non-negative `e_R` stays negative — i.e. an empty
- * subtree's contribution loses every `max` against an active subtree).
- *
- * All mutations are O(log n) (sift to the root). [envOfTheta] / [energyOfTheta] read the
- * root in O(1). [capacity] and the EST/energy of each active task are owned by the
- * caller; this class just maintains the recurrence.
- *
- * Implementation notes:
- *  - Tree is an implicit binary heap on `1..2·leafBase-1`, `leafBase` rounded up to the
- *    next power of two. Slot 0 is unused; the root is slot 1; leaves are slots
- *    `leafBase..2·leafBase-1`. Padding leaves stay inactive forever.
- *  - `env` is `Long` because `C · est` can exceed `Int` range for plausible scheduling
- *    horizons (capacity ~10^4, est ~10^6 → 10^10).
- *  - `NO_ENV = Long.MIN_VALUE / 2` leaves ~4·10^18 of headroom under non-negative-energy
- *    addition, which is well past any feasible cumulative instance.
+ * Tasks keep a stable id `0..n-1`; [setLeafOrder] maps ids to EST-sorted leaf positions. The envelope of
+ * Ω ⊆ Θ is `Env(Ω) = C · est(Ω) + e(Ω)`, and with leaves in EST order each node keeps
+ * `e(v) = e(L) + e(R)` and `env(v) = max(env(L) + e(R), env(R))`. Mutations are O(log n); the root
+ * queries are O(1). Inactive leaves hold `e = 0` and [NO_ENV].
  */
 class CumulativeThetaTree(private val n: Int, capacity: Long) {
 
@@ -58,14 +29,10 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
     private val energy = LongArray(treeSize)
     private val env = LongArray(treeSize) { NO_ENV }
 
-    /** id → leaf slot (`leafBase + leafPos`), default position is id itself. */
     private val leafOf = IntArray(n) { leafBase + it }
 
     /**
-     * Set the leaf position of every task in one shot. `leafPos[id]` is the position
-     * `0..n-1` for task `id` in EST-sorted order; positions must be a permutation of
-     * `0..n-1`. Resets the tree to all-inactive — call [activate] for each task whose
-     * Θ membership you want afterwards.
+     * Sets each task's EST-sorted leaf position from the permutation [leafPos] and deactivates every task.
      */
     fun setLeafOrder(leafPos: IntArray) {
         require(leafPos.size == n) { "leafPos.size=${leafPos.size}, expected n=$n" }
@@ -77,7 +44,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
         }
     }
 
-    /** Reset every leaf (real and padding) to the inactive state. O(2n). */
+    /** Deactivates every task. */
     fun clear() {
         for (k in 0 until treeSize) {
             energy[k] = 0L
@@ -85,8 +52,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
         }
     }
 
-    /** Activate (or update) task [id] with the given EST and energy contribution.
-     *  `taskEnergy` must be non-negative; pass `duration * resource` for cumulative. */
+    /** Activates or updates task [id] with [est] and non-negative [taskEnergy]. */
     fun activate(id: Int, est: Long, taskEnergy: Long) {
         require(id in 0 until n) { "task id $id out of 0..${n - 1}" }
         require(taskEnergy >= 0L) { "task energy must be non-negative, got $taskEnergy" }
@@ -96,7 +62,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
         siftUp(k)
     }
 
-    /** Deactivate task [id]: zero its energy contribution and clear its envelope. */
+    /** Removes task [id] from Θ. */
     fun deactivate(id: Int) {
         require(id in 0 until n) { "task id $id out of 0..${n - 1}" }
         val k = leafOf[id]
@@ -112,8 +78,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
         return env[leafOf[id]] != NO_ENV
     }
 
-    /** Envelope of the active subset Θ, i.e. `max over non-empty Ω ⊆ Θ of (C · est(Ω) + e(Ω))`.
-     *  Returns [NO_ENV] when Θ is empty. */
+    /** `max(C · est(Ω) + e(Ω))` over non-empty Ω ⊆ Θ, or [NO_ENV] when Θ is empty. */
     fun envOfTheta(): Long = env[1]
 
     /** Summed energy of active tasks in Θ. */
@@ -150,10 +115,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
             energy[k] = energy[l] + energy[r]
             val envL = env[l]
             val envR = env[r]
-            // env(v) = max(env(L) + e(R), env(R)). NO_ENV stays large-negative under any
-            // non-negative `e(R)`, so an empty L collapses naturally to env(R) without
-            // a special case. An empty R also collapses naturally: env(R) = NO_ENV and
-            // env(L) + 0 dominates.
+            // NO_ENV stays far below zero under any non-negative e(R), so empty children need no special case.
             env[k] = maxOf(envL + energy[r], envR)
             k = k ushr 1
         }
@@ -161,9 +123,7 @@ class CumulativeThetaTree(private val n: Int, capacity: Long) {
 
     /** Shared constants. */
     companion object {
-        /** Sentinel representing "no envelope" (subtree contains no active leaf). Chosen
-         *  far enough below zero that adding any non-negative `e(R)` keeps the value
-         *  smaller than any real envelope. */
+        /** Envelope of a subtree with no active task, low enough to stay below every real envelope. */
         const val NO_ENV: Long = Long.MIN_VALUE / 2
     }
 }

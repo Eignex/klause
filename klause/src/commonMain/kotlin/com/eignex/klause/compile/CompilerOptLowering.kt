@@ -37,12 +37,9 @@ import com.eignex.util.collections.LongHashSet
  * top-level assertions use native factors through CompilerAssertions.
  */
 
-/** Build a 0/1-valued IntExpr equal to 1 iff [cond] holds, 0 otherwise. The downstream
- *  affine-lift turns this into an aux int + reified equalities. */
 private fun indicatorInt(cond: BoolExpr): IntExpr = IntIfThenElse(cond, IntLit(1), IntLit(0))
 
-/** `b ↔ AllDifferent(terms)` (non-opt). The linear-size witness encoding where the operands are bare
- *  variables over a finite value window, else pairwise NE conjuncted via Tseitin. */
+// The linear-size witness encoding when it applies, else pairwise NE.
 internal fun Lowering.reifyAllDifferent(terms: List<IntExpr>): Int {
     witnessAllDifferent(terms)?.let { return it }
     val pairs = mutableListOf<BoolExpr>()
@@ -54,8 +51,6 @@ internal fun Lowering.reifyAllDifferent(terms: List<IntExpr>): Int {
     return tseitinAnd(pairs)
 }
 
-/** `b ↔ AllDifferentOpt`. The witness encoding over presence-substituted operands, else pairwise NE with
- *  each pair guarded by both presence bits. */
 internal fun Lowering.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
     val terms = expr.terms.map { lift(it) }
     val presentLits = IntArray(expr.presents.size) { lowerToLit(expr.presents[it]) }
@@ -63,7 +58,6 @@ internal fun Lowering.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
     val pairs = mutableListOf<BoolExpr>()
     for (i in terms.indices) {
         for (j in i + 1 until terms.size) {
-            // (p_i ∧ p_j) → x_i ≠ x_j  ≡  ¬p_i ∨ ¬p_j ∨ x_i ≠ x_j.
             pairs += Or(
                 listOf(
                     Not(expr.presents[i]),
@@ -76,9 +70,8 @@ internal fun Lowering.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
     return tseitinAnd(pairs)
 }
 
-/** The witness reification over [terms], or null when this lowering cannot supply what the global needs:
- *  bare variable operands (an arithmetic residual has no var id to index), no repeated operand (the
- *  matching filter assumes distinct columns), and a value window the global can index. */
+// Null unless the operands are distinct bare variables (the matching filter assumes distinct columns) over
+// a value window the global can index.
 private fun Lowering.witnessAllDifferent(terms: List<IntExpr>): Int? {
     if (terms.size < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
     if (!terms.all { it is IntRef }) return null
@@ -95,14 +88,8 @@ private fun Lowering.witnessAllDifferent(terms: List<IntExpr>): Int? {
     return reifyAllDifferentWitness(ids, lo, size) { min, max -> newIntVar(IntDomain(min, max)) }
 }
 
-/**
- * The witness reification over presence-gated [terms]. Presence is folded into the *value* rather than
- * into the global's presence literals, which the reification has already claimed: each position gets a
- * variable equal to its term when present and to a position-unique sentinel above the shared window when
- * absent. Distinct sentinels never collide, so all-different over the substituted variables is exactly
- * all-different over the present terms — and the witness pair then reports a duplicate only between two
- * genuinely present positions.
- */
+// Presence folds into the value, since the reification already claims the global's presence literals: an
+// absent position takes a position-unique sentinel above the window, so only present positions can collide.
 private fun Lowering.witnessAllDifferentOpt(terms: List<IntExpr>, presentLits: IntArray): Int? {
     val n = terms.size
     if (n < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
@@ -113,17 +100,14 @@ private fun Lowering.witnessAllDifferentOpt(terms: List<IntExpr>, presentLits: I
         if (d.min < lo) lo = d.min
         if (d.max > hi) hi = d.max
     }
-    // Sentinels sit in [hi + 1, hi + n]; they are compared against as [IntLit], so the window must stay
-    // inside Int for the substitution rows to be expressible at all.
+    // Sentinels in [hi + 1, hi + n] are IntLit values, so the window must fit in Int.
     if (hi > Int.MAX_VALUE - n.toLong() || lo < Int.MIN_VALUE.toLong()) return null
     val size = allDifferentWindowSize(lo, hi + n) ?: return null
     val ids = IntArray(n) { i -> presenceSubstituted(terms[i], presentLits[i], lo, hi + n, (hi + 1 + i).toInt()) }
     return reifyAllDifferentWitness(ids, lo, size) { min, max -> newIntVar(IntDomain(min, max)) }
 }
 
-/** A fresh variable equal to [term] when [presentLit] holds and to [sentinel] otherwise, over
- *  `[windowLo, windowHi]`. Both directions are pinned: leaving the absent case free would let two absent
- *  positions meet on a shared value and fake a duplicate. */
+// Both directions are pinned: a free absent case would let two absent positions fake a duplicate.
 private fun Lowering.presenceSubstituted(
     term: IntExpr,
     presentLit: Int,
@@ -140,18 +124,15 @@ private fun Lowering.presenceSubstituted(
     return intVarOf(name)
 }
 
-/** `b ↔ nvalue(n, xs, mode)` over a presence-gated subset. Enumerate the union domain;
- *  for each candidate value `v`, build the indicator `∃i (p_i ∧ x_i = v)`. Sum the
- *  indicators and compare against `n` per `mode`. */
+// Sums the indicators `∃i (p_i ∧ x_i = v)` over the union domain and compares against `n`.
 internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
-    // Union of the static domains of the lifted xs.
     val unionSet = LongHashSet()
     for (i in expr.xs.indices) {
         val xLifted = lift(expr.xs[i])
         val d = domainOf(xLifted)
         for (v in d.min..d.max) unionSet.add(v)
     }
-    // Iterate in ascending value order so the lowering is deterministic; commonMain has no sortedSetOf.
+    // Ascending order keeps the lowering deterministic.
     val perValue: List<IntExpr> = unionSet.toLongArray().sorted().map { v ->
         val anyHolds = expr.xs.indices.map { i ->
             And(listOf(expr.presents[i], IntCompare(expr.xs[i], IntCmpOp.EQ, IntLit(v.toInt()))))
@@ -169,8 +150,7 @@ internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
     return reifyIntCompare(IntCompare(expr.n, op, sum))
 }
 
-/** `b ↔ gcc(...)` over a presence-gated subset, with optional closed-set check.
- *  Per cover: `low[k] ≤ Σ_i 1{p_i ∧ x_i=cover[k]} ≤ high[k]`. */
+// Per cover value: `low(k) ≤ Σ_i 1{p_i ∧ x_i = cover(k)} ≤ high(k)`.
 internal fun Lowering.reifyGccOpt(expr: GccExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (k in expr.cover.indices) {
@@ -183,7 +163,7 @@ internal fun Lowering.reifyGccOpt(expr: GccExprOpt): Int {
         pieces += IntCompare(sum, IntCmpOp.LE, IntLit(expr.high[k]))
     }
     if (expr.closed) {
-        // Every present x_i must equal one of the cover values: p_i → ∨_k x_i = cover[k].
+        // p_i → ∨_k x_i = cover(k).
         val coverSet = expr.cover.toSet()
         for (i in expr.xs.indices) {
             val inCover: BoolExpr = if (coverSet.size == 1) {
@@ -197,7 +177,6 @@ internal fun Lowering.reifyGccOpt(expr: GccExprOpt): Int {
     return tseitinAnd(pieces)
 }
 
-/** `b ↔ disjunctive(starts, durations)` (non-opt). Pairwise non-overlap via reified Or. */
 internal fun Lowering.reifyDisjunctive(expr: DisjunctiveExpr): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (i in expr.starts.indices) {
@@ -211,7 +190,6 @@ internal fun Lowering.reifyDisjunctive(expr: DisjunctiveExpr): Int {
     return if (pieces.isEmpty()) trueLit() else tseitinAnd(pieces)
 }
 
-/** `b ↔ disjunctiveOpt(...)`. Each pair gated by both presence bits. */
 internal fun Lowering.reifyDisjunctiveOpt(expr: DisjunctiveExprOpt): Int {
     val pieces = mutableListOf<BoolExpr>()
     for (i in expr.starts.indices) {
@@ -233,27 +211,16 @@ private fun pairwiseNoOverlap(si: IntExpr, di: Int, sj: IntExpr, dj: Int): BoolE
     ),
 )
 
-/** `b ↔ cumulative(starts, durations, resources, capacity)` (non-opt). Time-tabling
- *  decomposition: at every integer t in the static horizon, the sum of `r_i ·
- *  runs_i(t)` must stay within capacity. The horizon spans `[minEst, maxLct)` derived from
- *  the static domains of the lifted starts. */
+// Time-tabling decomposition over the static horizon `[minEst, maxLct)`.
 internal fun Lowering.reifyCumulative(expr: CumulativeExpr): Int =
     cumulativeTimeTabling(expr.starts, expr.durations, expr.resources, expr.capacity, presents = null)
 
-/** Same as [reifyCumulative] but with per-task presence gates folded into each
- *  runs-at-t indicator. */
 internal fun Lowering.reifyCumulativeOpt(expr: CumulativeExprOpt): Int =
     cumulativeTimeTabling(expr.starts, expr.durations, expr.resources, expr.capacity, presents = expr.presents)
 
-/**
- * `b ↔ circuit(succ, valueOffset)`. Position-vector decomposition after Miller, Tucker and Zemlin,
- * "Integer Programming Formulation of Traveling Salesman Problems", JACM 1960
- * (https://doi.org/10.1145/321043.321046): the
- * successor array must be a permutation with no self-loops, and a single visit order
- * exists such that following `succ` from node 0 traverses every node before returning
- * to 0. Cost: `O(n)` extra constraints + `n - 1` aux position vars + the AllDifferent
- * over `succ` and over positions.
- */
+// Position-vector decomposition after Miller, Tucker and Zemlin, "Integer Programming Formulation of
+// Traveling Salesman Problems", JACM 1960 (https://doi.org/10.1145/321043.321046): `succ` is a
+// self-loop-free permutation whose walk from node 0 visits every node before returning.
 internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
     val n = expr.succ.size
     val offset = expr.valueOffset
@@ -287,13 +254,8 @@ internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
     return tseitinAnd(pieces)
 }
 
-/**
- * `b ↔ subcircuit(succ, valueOffset)`. Like [reifyCircuit] but `succ(i) = i + offset`
- * marks node `i` excluded; the included nodes (non-self-loops) form a single Hamiltonian
- * cycle in the induced sub-graph. AllDifferent over `succ` still holds, and each node satisfies
- * `excluded(i) ∨ pos(succ(i)) = pos(i) + 1 ∨ pos(succ(i)) = 0`: self-loops are exempt from the
- * chain, and the last included edge closes the loop at position zero.
- */
+// A self-loop `succ(i) = i + offset` excludes node `i`; each node satisfies
+// `excluded(i) ∨ pos(succ(i)) = pos(i) + 1 ∨ pos(succ(i)) = 0`.
 internal fun Lowering.reifySubcircuit(expr: SubcircuitExpr): Int {
     val n = expr.succ.size
     val offset = expr.valueOffset
@@ -314,7 +276,6 @@ internal fun Lowering.reifySubcircuit(expr: SubcircuitExpr): Int {
     return tseitinAnd(pieces)
 }
 
-/** Pairwise inequalities combined in an [And] for Tseitin reification of circuit constraints. */
 private fun allDiffAsAnd(terms: List<IntExpr>): BoolExpr {
     if (terms.size < 2) return IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(0))
     val pairs = mutableListOf<BoolExpr>()
@@ -333,7 +294,6 @@ private fun Lowering.cumulativeTimeTabling(
     capacity: Int,
     presents: List<BoolExpr>?,
 ): Int {
-    // Horizon from the static domains: [min est, max lct).
     var horizonLo = Long.MAX_VALUE
     var horizonHi = Long.MIN_VALUE
     for (i in starts.indices) {

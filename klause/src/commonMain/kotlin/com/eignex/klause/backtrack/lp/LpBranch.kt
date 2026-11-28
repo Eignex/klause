@@ -5,19 +5,12 @@ import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 
-/**
- * Reduced-cost-average branching: pick the unassigned variable with the highest LP branch score
- * (reduced-cost pseudo-cost × fractionality, [LpHints.branchScore]), or null when LP branching is off,
- * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
- * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
- * branch, so search stays complete and correct regardless. `O(unassigned)` per call, capped.
- *
- * Lives in the search layer (not [LpEngine]'s home) because it reads the backtrack [VarRef] selector type
- * and the search-owned [LpHints]; the engine only records LP solutions into the hint sink.
- */
+// The unassigned variable with the highest reduced-cost × fractionality score. Advisory only: on null the
+// descent uses the configured selector, and any chosen variable is a sound branch. It lives in the search
+// layer because it reads VarRef and the search-owned LpHints; the engine only records LP solutions.
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
-    if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
+    if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null
     noteNodeOverhead((problem.numBoolVars.toLong() + problem.numIntVars) * LpNodeOverhead.GUIDANCE)
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
@@ -48,9 +41,8 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         cancelled = { params.cancellation() })
 }
 
-/** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
- *  this a variable is effectively LP-integral / cost-free, so the configured heuristic decides. */
+// Below this a variable is effectively LP-integral or cost-free, so the configured selector decides.
 private const val LP_BRANCH_MIN_SCORE = 1e-9
 
-/** Skip reduced-cost-average branching above this variable count — the per-decision scan is `O(vars)`. */
+// The per-decision scan is O(vars).
 private const val LP_BRANCH_SCAN_CAP = 8192

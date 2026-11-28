@@ -4,27 +4,21 @@ import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.ir.Problem
 import java.io.File
 
-/*
- * The benchmark catalog groups [ProblemRef] entries into named [Suite]s by [Category].
- * References bind format and source.
- */
-
-/** Encoding of a problem instance. Drives which parser / pipeline turns it into a [Problem]. */
+/** Encoding of a problem instance; selects the parser that turns it into a [Problem]. */
 enum class Format {
-    /** DIMACS CNF (SAT). In-process via `Dimacs.parse`. */
+    /** DIMACS CNF (SAT). */
     DIMACS,
 
-    /** DIMACS WCNF (MaxSAT). In-process via `Dimacs.parseWcnf`. */
+    /** DIMACS WCNF (MaxSAT). */
     WCNF,
 
-    /** Pseudo-Boolean OPB. In-process via `Opb.parse`. */
+    /** Pseudo-Boolean OPB. */
     OPB,
 
-    /** klause JSON `SchemaDef`. In-process via `JsonSchema.parse` and compilation. */
+    /** klause JSON `SchemaDef`. */
     JSON_SCHEMA,
 
-    /** MiniZinc model (+ optional `.dzn`). Compiled to FlatZinc by the `minizinc` CLI, then
-     *  parsed in-process. See `runner.MiniZincRunner`. */
+    /** MiniZinc model (+ optional `.dzn`), compiled to FlatZinc by the `minizinc` CLI. */
     MINIZINC,
 
     /** XCSP3 instance. */
@@ -33,14 +27,13 @@ enum class Format {
     /** SMT-LIB source script; catalog membership is independent of Klause frontend support. */
     SMTLIB,
 
-    /** MPS (Mathematical Programming System) MIP instance. In-process via `Mps.parse(…).toProblem(…)`. */
+    /** MPS MIP instance. */
     MPS,
 
-    /** Programmatic — the instance is built directly in Kotlin, no file. */
+    /** Built directly in Kotlin, no file. */
     IN_CODE,
 }
 
-/** Coarse problem family, used to compose and filter suites. */
 internal enum class Category {
     SAT,
     UNSAT,
@@ -52,9 +45,9 @@ internal enum class Category {
     OPTIMIZATION,
 }
 
-/** Known/expected outcome for an instance — the oracle the bench checks solvers against. */
+/** Known outcome of an instance, the oracle the bench checks solvers against. */
 sealed interface Expected {
-    /** A satisfying assignment exists (satisfaction problem). */
+    /** A satisfying assignment exists. */
     data object Sat : Expected
 
     /** Proven infeasible. */
@@ -63,113 +56,89 @@ sealed interface Expected {
     /** Optimization instance with a known optimal objective [value] (minimization). */
     data class Opt(val value: Long) : Expected
 
-    /** Feasible/optimal status not recorded. */
+    /** Status not recorded. */
     data object Unknown : Expected
 
-    /** Whether a *feasible* assignment is expected to exist (true for [Sat] and [Opt]). */
+    /** Whether a feasible assignment is expected to exist (true for [Sat] and [Opt]). */
     val expectsSat: Boolean get() = this is Sat || this is Opt
 }
 
-/** How an [ExternalCollection] is materialized into the local cache. */
 internal sealed interface FetchMethod {
-    /** Shallow git clone of [ExternalCollection.url]. [sparsePath], when set, restricts checkout to that subtree. */
     data class GitClone(val depth: Int = 1, val sparsePath: String? = null) : FetchMethod
 
-    /** Download a `.tar.gz` from [ExternalCollection.url] and extract it. */
     data object Tarball : FetchMethod
 
-    /** Download a plain (uncompressed) `.tar` from [ExternalCollection.url] and extract it. Instances may stay
-     *  individually compressed inside (e.g. the PB competition's `*.opb.xz`). */
     data object Tar : FetchMethod
 
-    /** Download a `.tar.zst` (zstd-compressed tar) from [ExternalCollection.url] and extract it — the format the
-     *  SMT-LIB Zenodo releases ship per-logic archives in. */
     data object TarballZst : FetchMethod
 
-    /** Download a `.zip` from [ExternalCollection.url] and extract it (instances may stay individually
-     *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod
 
-    /** Discover [extension] instances from the ZIP directory and materialize only selected members. */
+    // Discovers `extension` instances from the ZIP directory and materializes only selected members.
     data class SelectiveZip(val extension: String) : FetchMethod
 
-    /** Fetch the uniquely named ZIP member through bounded HTTP ranges, unpack optional XZ compression,
-     *  and require the original plain bytes to match [sha256]. [name] is a basename, not an archive path. */
+    // Fetches the uniquely named member through bounded HTTP ranges, unpacks optional XZ compression and requires
+    // the plain bytes to match `sha256`. `name` is a basename, not an archive path.
     data class ZipMember(val name: String, val sha256: String) : FetchMethod
 
-    /** Download each of [names] from under [ExternalCollection.url] and [convert] it, (file name, text) to
-     *  (instance name, file text) pairs written as `<instance>.<extension>`, for a library whose instances need
-     *  translating, such as OR-Library's own text formats into MPS. */
+    // Downloads each name and converts (file name, text) to (instance name, file text) pairs written as
+    // `<instance>.<extension>`, for libraries whose own text formats need translating to MPS.
     data class Files(
         val names: List<String>,
         val extension: String,
         val convert: (String, String) -> List<Pair<String, String>>,
     ) : FetchMethod
 
-    /** Download each of [instances] from `<url>/file/<hash>`, where the Global Benchmark Database serves it as
-     *  `.cnf.xz`, keeping it only when its content hash is the pinned one. */
+    // Downloads `<url>/file/<hash>` as `.cnf.xz`, keeping it only when its content hash is the pinned one.
     data class GbdFiles(val instances: List<GbdInstance>) : FetchMethod
 }
 
-/** A Global Benchmark Database CNF instance pinned by its content [hash]
- *  ([com.eignex.klause.bench.source.GbdHash]), stored as [relPath] with the result the competition verified. */
+// `hash` is the GbdHash content hash; `expected` is the result the competition verified.
 internal data class GbdInstance(val hash: String, val family: String, val name: String, val expected: Expected) {
     val relPath: String get() = "$family/$name.cnf"
 }
 
-/** A collection fetched on demand, with [license] and the storage rationale in [reason]. */
+// `reason` records why the collection is fetched instead of vendored.
 internal data class ExternalCollection(
     val id: String,
     val url: String,
     val license: String,
     val reason: String,
     val fetch: FetchMethod,
-    /** Extra include directories (relative to the fetched root) added to the `minizinc` search
-     *  path via `-I`, for a corpus that keeps shared included files in a common dir. */
+    // Added to the `minizinc` search path via `-I`, for corpora that keep shared includes in a common dir.
     val includeDirs: List<String> = emptyList(),
-    /** Maximum compressed file size in MB. Larger extracted files are dropped before decompression. */
+    // Maximum compressed file size in MB; larger files are dropped before decompression.
     val maxFileMb: Int? = null,
-    /** A (marker, extension) pair: a fetched file with no extension whose text begins with the marker gains the
-     *  extension, so every reader recognises it. MIPLIB 3 ships its MPS files bare. */
+    // (marker, extension): an extensionless file whose text begins with the marker gains the extension, since
+    // MIPLIB 3 ships its MPS files bare.
     val extensionless: Pair<String, String>? = null,
 )
 
-/** Where a problem's bytes come from. Resolved to a concrete file by `source.CorpusFetcher`. */
 internal sealed interface ProblemSource {
-    /** A file resolved and pinned by the lab planner, without corpus discovery during execution. */
+    // Resolved and pinned by the lab planner, without corpus discovery during execution.
     data class Prepared(val file: File, val includes: List<File> = emptyList()) : ProblemSource
 
-    /** A file tracked in this repository, path relative to the workspace root. Use [corpus]
-     *  for the common case of a file under `klause-bench/smoke-corpus/`. */
+    // Path relative to the workspace root.
     data class Vendored(val workspaceRelPath: String) : ProblemSource
 
-    /** A source MPS with free rows and their coefficients removed, retaining its feasible set. */
+    // The source MPS with free rows removed, retaining its feasible set.
     data class MpsFeasibility(val source: ProblemSource) : ProblemSource
 
-    /** Built directly in Kotlin — no file, no parsing. */
     data class InCode(val build: () -> Problem) : ProblemSource
 
-    /** A file inside an [ExternalCollection] that is fetched (cloned/downloaded) on first
-     *  use into a cache. [relPath] is relative to the collection's root. */
+    // `relPath` is relative to the collection root; the collection is fetched into a cache on first use.
     data class External(val collection: ExternalCollection, val relPath: String) : ProblemSource
 
-    /** The [index]-th file with extension [ext] (sorted by name, searched recursively) inside a
-     *  fetched [ExternalCollection]. For collections whose member filenames aren't predictable —
-     *  e.g. the SATLIB random-3SAT tarballs sample instances with inconsistent zero-padding
-     *  (`uf50-031.cnf`, `uf50-0433.cnf`), so a fixed [External.relPath] can't name them. */
+    // The index-th file with extension `ext`, sorted by name, for collections whose member names are not
+    // predictable (SATLIB random-3SAT pads inconsistently: `uf50-031.cnf`, `uf50-0433.cnf`).
     data class ExternalIndexed(val collection: ExternalCollection, val index: Int, val ext: String) : ProblemSource
 }
 
-/** Convenience: a vendored file under `klause-bench/smoke-corpus/<relPath>`. */
 internal fun corpus(relPath: String): ProblemSource.Vendored = ProblemSource.Vendored(
     "klause-bench/smoke-corpus/$relPath",
 )
 
-/**
- * One catalog entry: a named instance in a [Format], sourced from a [ProblemSource], tagged
- * with a [Category] and its [Expected] oracle. [data] is an optional companion source (a
- * `.dzn` for MiniZinc). [license] records provenance so vendoring decisions stay auditable.
- */
+// `data` is an optional companion source (a `.dzn` for MiniZinc); `license` keeps vendoring decisions auditable.
 internal data class ProblemRef(
     val name: String,
     val format: Format,
@@ -179,37 +148,29 @@ internal data class ProblemRef(
     val data: ProblemSource? = null,
     val tags: Set<String> = emptySet(),
     val license: String = "internal",
-    /** The family a corpus provider grouped this instance under; null when the leading path component of [name]
-     *  is the family. */
+    // Null when the leading path component of `name` is the family.
     val family: String? = null,
 )
 
-/** A named, described collection of [ProblemRef]s. */
 internal data class Suite(val id: String, val description: String, val problems: List<ProblemRef>)
 
-/**
- * A suite whose [provider] discovers problems on resolution. Listing its [id] and
- * [description] does not trigger a fetch.
- */
+// Listing `id` and `description` does not trigger a fetch; `provider` discovers problems on resolution.
 internal data class DynamicSuite(
     val id: String,
     val description: String,
-    /** Instances kept per family when the caller sets no cap; null keeps the whole corpus. */
+    // Instances kept per family when the caller sets no cap; null keeps the whole corpus.
     val defaultPerFamily: Int? = null,
     val sourceLayout: ArchiveSourceLayout? = null,
     val admit: ((ProblemRef) -> Boolean)? = null,
-    /** Exact identity lookup for fixed sets, without enumerating the rest of a large corpus. */
+    // Exact identity lookup for fixed sets, without enumerating the rest of a large corpus.
     val namedProvider: ((List<String>) -> List<ProblemRef>)? = null,
     val provider: (CorpusSelection.Selection) -> List<ProblemRef>,
 )
 
-/** The registry. Static [suites] + [dynamicSuites] are assembled in [Suites]; lookups are by
- *  id / category / tag. */
 internal object Catalog {
     val suites: List<Suite> get() = Suites.all
     val dynamicSuites: List<DynamicSuite> get() = Suites.dynamic
 
-    /** All suite ids (static + dynamic), for listings and selection. */
     val suiteIds: List<String> get() = suites.map { it.id } + dynamicSuites.map { it.id }
 
     fun suite(id: String): Suite {
@@ -220,11 +181,8 @@ internal object Catalog {
         error("no such suite: $id (have $suiteIds)")
     }
 
-    /**
-     * All problems of suite [id], without its default per-family cap. Explicit
-     * `-Dklause.bench.select.*` selection settings apply to providers without an admission policy. Suites
-     * with admission policies discover every original identity without admission or caps.
-     */
+    // Explicit `-Dklause.bench.select.*` settings apply only to providers without an admission policy; suites with
+    // one discover every original identity without admission or caps.
     fun uncapped(id: String): Suite {
         val dynamic = dynamicSuites.firstOrNull { it.id == id } ?: return suite(id)
         return if (dynamic.admit == null) {
@@ -258,7 +216,6 @@ internal object Catalog {
         return Suite(dynamic.id, dynamic.description, problems)
     }
 
-    /** The per-family cap suite [id] applies when the caller sets none; null for a suite kept whole. */
     fun defaultPerFamily(id: String): Int? = dynamicSuites.firstOrNull { it.id == id }?.defaultPerFamily
 
     fun problems(vararg suiteIds: String): List<ProblemRef> =

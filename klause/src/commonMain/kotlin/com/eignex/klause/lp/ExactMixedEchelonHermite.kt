@@ -18,7 +18,6 @@ import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 
-/** One exact double-bounded row over real columns followed by integer columns. */
 internal class ExactMixedBoundedRow(
     val coefficients: Map<Int, BigFraction>,
     val lower: BigFraction,
@@ -30,13 +29,8 @@ internal class ExactMixedBoundedRow(
     }
 }
 
-/**
- * Mixed-echelon/Hermite form of a double-bounded system.
- *
- * The first [realColumns] transformed variables are rational and the remaining columns are integral.
- * [recover] maps the transformed point back to the source coordinate order. Integer columns are changed
- * only by a unimodular transform, so the integer lattice is preserved exactly.
- */
+// The first `realColumns` transformed variables are rational, the rest integral. Integer columns change
+// only by a unimodular transform, so the integer lattice is preserved exactly.
 internal class ExactMixedEchelonHermite(
     val rows: List<ExactMixedBoundedRow>,
     val realColumns: Int,
@@ -48,7 +42,6 @@ internal class ExactMixedEchelonHermite(
 
     fun recover(values: List<BigFraction>): List<BigFraction> = transform.recover(values)
 
-    /** Integer source coefficients of one transformed integer coordinate. */
     fun transformedIntegerCoefficients(integer: Int): SparseIntRow {
         require(integer in 0 until integerColumns)
         return sparseIntRow(
@@ -58,10 +51,8 @@ internal class ExactMixedEchelonHermite(
         )
     }
 
-    /** True for a transformed coordinate constrained by the double-bounded rows. */
     fun boundedColumn(column: Int): Boolean = rows.any { !(it.coefficients[column] ?: BigFraction.ZERO).isZero }
 
-    /** Apply the mixed column transformation to a source row. */
     fun transform(row: ExactRationalInequality): ExactRationalInequality {
         val coefficients = HashMap<Int, BigFraction>()
         for (entry in row.columns.indices) {
@@ -83,7 +74,6 @@ internal class ExactMixedEchelonHermite(
     }
 }
 
-/** Exact ranges implied by a mixed lower-triangular double-bounded system. */
 internal class ExactMixedTriangularBounds(
     val realLower: Array<BigFraction?>,
     val realUpper: Array<BigFraction?>,
@@ -97,13 +87,8 @@ internal class ExactMixedTriangularBounds(
     }
 }
 
-/**
- * Forward-substitute the transformed double-bounded rows into exact rational and integer ranges.
- *
- * Rational pivot columns retain rational bounds. Integer pivot columns use inward rounded division, so
- * an empty integer interval is an exact refutation rather than a relaxation artefact. A zero column is
- * deliberately left open: it belongs to the DBR extension lane and is not searched by the bounded phase.
- */
+// Integer pivot columns use inward rounded division, so an empty integer interval is an exact refutation.
+// A zero column stays open: it belongs to the extension lane, not the bounded phase.
 internal fun exactMixedTriangularBounds(system: ExactMixedEchelonHermite): ExactMixedTriangularBounds {
     val realLower = arrayOfNulls<BigFraction>(system.realColumns)
     val realUpper = arrayOfNulls<BigFraction>(system.realColumns)
@@ -154,14 +139,9 @@ private fun divideRange(
     upper?.times(coefficient.reciprocal()) to lower?.times(coefficient.reciprocal())
 }
 
-/**
- * Transform a double-bounded mixed system to an echelon rational block and a Hermite integer tail.
- *
- * Rational column operations isolate a real pivot without ever mixing an integer source column into a
- * real transformed column. They may add a rational source column to an integer transformed column,
- * which preserves integrality of the latter. The remaining integer matrix is row-scaled by positive
- * denominators and handed to the lattice layer for its unimodular Hermite reduction.
- */
+// Rational column operations never mix an integer source column into a real transformed column; adding a
+// rational source column to an integer transformed column preserves its integrality. The integer tail is
+// row-scaled by positive denominators and reduced to Hermite form by the lattice layer.
 internal fun exactMixedEchelonHermite(
     source: List<ExactMixedBoundedRow>,
     realColumns: Int,

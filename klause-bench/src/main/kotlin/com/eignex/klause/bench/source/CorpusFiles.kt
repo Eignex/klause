@@ -10,21 +10,14 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
-/**
- * Corpus file IO for plain and zstd-compressed instances. All readers use [open],
- * [readText] or [withPlainFile]; [unpack] materializes original bytes for file consumers.
- */
 internal object CorpusFiles {
 
-    /** The compression suffix of a stored instance. */
     const val SUFFIX = ".zst"
 
-    /** Instance extensions the cache stores compressed. MiniZinc sources (`.mzn`, `.dzn`, `.json`) are
-     *  absent on purpose: `minizinc` reads them as real files and resolves includes beside them. */
+    // MiniZinc sources are absent on purpose: `minizinc` reads them as real files and resolves includes beside them.
     val COMPRESSIBLE = setOf("cnf", "wcnf", "opb", "wbo", "xml", "smt2", "mps")
 
-    /** zstd decodes at the same speed at every level, so the level only trades one-off compression time
-     *  for size; 12 is well past the default ratio while staying far faster than the 19+ levels. */
+    // zstd decodes at the same speed at every level, so the level only trades one-off compression time for size.
     private const val LEVEL = 12
 
     private const val PARTIAL_SUFFIX = "$SUFFIX.part"
@@ -34,36 +27,26 @@ internal object CorpusFiles {
     private const val DIGEST_BUFFER_BYTES = 1 shl 16
     private const val MAX_STAGING_BUFFER_BYTES = 1 shl 16
 
-    /** Where [withPlainFile] stages decompressed copies: under the cache root (so inside `$HOME`, which a
-     *  colima docker VM mounts) and outside every collection directory, so discovery never walks into it. */
+    // Outside every collection directory, so discovery never walks into it.
     val stagingRoot: File get() = File(CorpusFetcher.cacheRoot, ".plain")
 
     fun isCompressed(file: File): Boolean = file.name.endsWith(SUFFIX)
 
-    /** [path] without the compression suffix: the name a stored instance has as plain text. */
     fun plainPath(path: String): String = path.removeSuffix(SUFFIX)
 
-    /**
-     * Orders paths by instance and, within one instance, puts the stored compressed form before a plain sibling. A
-     * tree that still holds a plain copy beside its `.zst` then plans exactly like one holding only the stored form,
-     * independent of directory listing order.
-     */
+    // A tree that still holds a plain copy beside its `.zst` plans exactly like one holding only the stored form,
+    // independent of directory listing order.
     val storedFirst: Comparator<String> = compareBy<String> { plainPath(it) }.thenBy { !it.endsWith(SUFFIX) }
 
-    /** The format extension of [file], looking past the compression suffix (`foo.mps.zst` → `mps`). */
     fun formatExtension(file: File): String = plainPath(file.name).substringAfterLast('.', "")
 
-    /** The plain bytes of [file], decompressing a `.zst` in the current JVM. */
     fun open(file: File): InputStream = if (isCompressed(file)) decompress(file) else file.inputStream()
 
     fun readText(file: File): String = open(file).bufferedReader().use { it.readText() }
 
-    /** Feed the plain bytes of [file] into [digest], so a compressed and a plain copy hash alike. */
     fun update(digest: MessageDigest, file: File) = open(file).use { it.feed(digest) }
 
-    /** Run [block] on a plain-text copy of [file], for a consumer that needs a real path (a docker mount,
-     *  a solver that cannot read stdin). A plain [file] is passed through; a compressed one is staged
-     *  under its plain name and deleted afterwards. */
+    // For consumers that need a real path; a compressed file is staged under its plain name and deleted afterwards.
     fun <T> withPlainFile(
         file: File,
         checkActive: () -> Unit = {},
@@ -139,9 +122,8 @@ internal object CorpusFiles {
         return plain
     }
 
-    /** Replace the plain instance [plain] with `<plain>.zst`, returning the compressed file. The archive is
-     *  written to a partial file and renamed only once its decompressed bytes hash equal to the original,
-     *  and the original is deleted only after that, so an interruption at any point loses nothing. */
+    // The archive is renamed into place only once its decompressed bytes hash equal to the original, and the original
+    // is deleted only after that, so an interruption at any point loses nothing.
     fun compress(plain: File): File {
         val packed = File(plain.path + SUFFIX)
         val partial = File(plain.path + PARTIAL_SUFFIX)
@@ -159,12 +141,10 @@ internal object CorpusFiles {
         return packed
     }
 
-    /** Totals of a [compressTree] pass. */
     data class Compressed(val files: Int, val plainBytes: Long, val packedBytes: Long)
 
-    /** Compress every plain [COMPRESSIBLE] instance under [root] in place. Idempotent: compressed files are
-     *  skipped, and a partial archive left by an interrupted pass is discarded and redone. Git checkouts
-     *  are skipped whole, since they hold MiniZinc corpora that `minizinc` and git read as real files. */
+    // Idempotent: a partial archive left by an interrupted pass is discarded and redone. Git checkouts are skipped
+    // whole, since they hold MiniZinc corpora that `minizinc` and git read as real files.
     fun compressTree(root: File, log: (String) -> Unit = {}): Compressed {
         val staging = stagingRoot.absoluteFile
         val tree = root.walkTopDown()

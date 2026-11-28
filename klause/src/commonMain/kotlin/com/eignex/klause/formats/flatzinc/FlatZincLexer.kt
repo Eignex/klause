@@ -4,7 +4,6 @@ import com.eignex.klause.formats.FormatException
 import com.eignex.util.io.CharReader
 import com.eignex.util.io.StringCharSource
 
-/** One lexical token from FlatZinc source. */
 internal sealed interface FznToken {
     val line: Int
     val col: Int
@@ -28,13 +27,8 @@ open class FlatZincParseException(message: String, sourceLine: Int, sourceCol: I
 class UnsupportedFlatZincException(message: String, sourceLine: Int, sourceCol: Int) :
     FlatZincParseException(message, sourceLine, sourceCol)
 
-/**
- * Single-pass FlatZinc tokenizer. Pulls characters from a [CharReader], so the whole source is never
- * held as one [String]; tokens are produced one at a time via [next] (the parser streams them), and
- * [tokenize] just drains that pull for the in-memory callers (tests).
- */
+// Pulls characters from a CharReader so the source is never held as one String.
 internal class FlatZincLexer(private val reader: CharReader) {
-    /** Tokenize a [String] in one shot — the in-memory path for tests. */
     constructor(src: String) : this(CharReader(StringCharSource(src)))
 
     private var line: Int = 1
@@ -46,9 +40,7 @@ internal class FlatZincLexer(private val reader: CharReader) {
         "output", "annotation", "any",
     )
 
-    /** The next token, or a terminal [FznToken.Eof] once the input is exhausted. Calling again after
-     *  end of input keeps returning [FznToken.Eof] (with the final position), which is the sentinel the
-     *  parser's lookahead expects. */
+    // Keeps returning Eof after end of input, the sentinel the parser's lookahead expects.
     fun next(): FznToken {
         skipWhitespaceAndComments()
         if (reader.eof()) return FznToken.Eof(line, col)

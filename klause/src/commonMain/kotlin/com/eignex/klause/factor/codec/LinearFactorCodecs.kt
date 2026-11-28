@@ -17,11 +17,7 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import kotlinx.serialization.Serializable
 
-/**
- * `Σ terms ⟨op⟩ bound` in one of three widths: 64-bit integer constants, `wide…` arbitrary-width ones,
- * or an LP-only row over real columns with binary64 constants (`intCoefficients` for [vars],
- * `realCoefficients` for [realVars], `realBound`, `strict`).
- */
+// `Σ terms ⟨op⟩ bound` with 64-bit, `wide…` arbitrary-width, or binary64 LP-only constants over real columns.
 @Serializable
 internal class LinearPayload(
     val vars: IntArray,
@@ -54,7 +50,7 @@ internal class ReifiedLinearPayload(
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
 )
 
-/** Exact row over `Term` codes; `activator`, when present, is the Boolean variable equivalent to it. */
+// Exact row over `Term` codes; `activator`, when present, is the Boolean variable equivalent to it.
 @Serializable
 internal class ExactLinearPayload(
     val terms: IntArray,

@@ -30,15 +30,8 @@ import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.toLongExact
 
-/**
- * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the
- * residual is affine (sums of [IntScale] over [IntRef] plus [IntLit] constants) — every
- * non-affine subexpression ([IntMul], [IntPower], [IntDiv], [IntMod], [IntElement], [IntIfThenElse],
- * [IntMax] / [IntMin], [IntAbs], [SetCard]) is replaced with a fresh aux [IntRef], and auxiliary
- * constraints are emitted that pin the aux to the correct value. After lifting, the
- * top-level assertion path (`CompilerAssertions`) and the reification path
- * (`Compiler.kt`) deal only with linear forms.
- */
+// Replaces every non-affine subexpression with an aux var pinned by auxiliary constraints, so assertion and
+// reification see only affine forms.
 internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
     is IntRef, is IntLit -> expr
     is IntScale -> IntScale(expr.coeff, lift(expr.child))
@@ -55,13 +48,8 @@ internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
     is SetCard -> liftSetCard(expr)
 }
 
-/**
- * Lower `n div d` and `n mod d` with truncated-toward-zero semantics (the FlatZinc
- * `int_div`/`int_mod` convention, the same as `kotlin.Int.rem`): `|r| < |d|`
- * and `r` takes the sign of the dividend `n`, e.g. `(-7) mod 3 = -1` with `q = -2`. The
- * relation is shared with the FlatZinc front-end via [IntFunctionLowering.truncatedDivMod];
- * `d ≠ 0` is required up front rather than left to propagation.
- */
+// Truncated-toward-zero semantics (FlatZinc `int_div`/`int_mod`, as `kotlin.Int.rem`): `r` takes the sign
+// of `n`, e.g. `(-7) mod 3 = -1` with `q = -2`. `d ≠ 0` is required up front rather than left to propagation.
 internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Boolean): IntExpr {
     val a = divModOperands.getOrPut(num) { intVarOf(materializeIntVar(lift(num)).name) }
     val b = divModOperands.getOrPut(den) { intVarOf(materializeIntVar(lift(den)).name) }
@@ -101,8 +89,7 @@ internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {
     return IntRef(idToIntName.getValue(result))
 }
 
-/** Force [expr] into a single [IntRef] so a factor that takes raw int var ids (like
- *  [Product]) can reference it. Affine `IntScale`/`IntSum` get pinned to a fresh aux. */
+/** Force [expr] into a single [IntRef] for factors that take raw int var ids, like [Product]. */
 internal fun Lowering.materializeIntVar(expr: IntExpr): IntRef = when (expr) {
     is IntRef -> expr
 
@@ -133,8 +120,7 @@ internal fun Lowering.newAuxIntVar(domain: IntDomain): String {
     return name
 }
 
-/** Domain of any [IntExpr] post-lift. The expression must reside in the affine
- *  fragment (caller is responsible for lifting non-affine subexpressions first). */
+// The expression must already be lifted to the affine fragment.
 internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
     is IntRef -> intDomains[intVarOf(expr.name)]
 
@@ -143,8 +129,7 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
     is IntScale -> {
         val c = expr.coeff.toLong()
         val d = domainOf(expr.child)
-        // Widen the constant fold to Long and require it fits Int — a wide coefficient times a
-        // wide domain otherwise wraps a 32-bit endpoint into a garbage domain.
+        // Fold in Long so a wide coefficient times a wide domain cannot wrap a 32-bit endpoint.
         val lo: Long
         val hi: Long
         if (c >= 0) {
@@ -177,7 +162,6 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
     else -> error("domainOf called on non-affine expression: $expr")
 }
 
-/** Narrow a lowering intermediate to `Int`, rejecting overflow with a compile error. */
 internal fun checkedInt(value: Long, what: () -> String): Int {
     require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
         "Compiler lowering overflows Int: ${what()} = $value"
@@ -194,8 +178,7 @@ internal fun Lowering.affine(expr: IntExpr): Affine = when (expr) {
     is IntLit -> Affine(emptyMap(), expr.value)
 
     is IntScale -> {
-        // Accumulate coefficients / constant in Long and narrow once, so a large literal or a
-        // wide coefficient can't wrap the Int product silently.
+        // Accumulate in Long and narrow once, so a wide coefficient cannot wrap the Int product silently.
         val a = affine(expr.child)
         val c = expr.coeff.toLong()
         val coeffs = HashMap<String, Int>(a.coeffs.size)

@@ -6,28 +6,15 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.differenceFragmentOf
 
-/*
- * This propagation projection with a [DifferenceSystem] over its difference rows appended, or the
- * projection unchanged when it carries none the joint propagator could act on.
- *
- * Posted exactly once, after the presolve fixpoint — never as a round pass. A factor pins every variable
- * it mentions into the model, so a system posted between rounds keeps a variable alive that affine
- * elimination would otherwise substitute away, trading a whole class of reductions for the deduction.
- * After the fixpoint no pass can be blocked, and the search sees the same system either way.
- *
- * The graph holds only weights it can sum safely in `Long`. Declared-range edges outside that range stay
- * enforced by CP but are omitted here, which weakens this redundant propagator without weakening the
- * model. This makes guarded refutations available on a large finite domain while preserving the model's
- * declared ranges.
- *
- * The first gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
- * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system
- * built only from those repeats work the model already does; it is the reified ones, whose truth the
- * Boolean layer decides, that the joint graph can refute ahead of a decision.
- * A joint system also needs an edge connecting two unfixed root columns. Edges to the zero vertex or
- * a root-fixed column are unary bounds, which the original factors already propagate. Unconditional
- * edges between unfixed columns can still join unary guarded bounds, so they qualify as well.
- */
+// Posted once, after the presolve fixpoint: a factor pins every variable it mentions, so a system posted
+// between rounds would block affine elimination.
+//
+// Edges whose weights cannot be summed safely in Long are omitted; CP still enforces them, so this only
+// weakens a redundant propagator.
+//
+// A system needs a guarded edge, since unconditional rows already propagate exactly through their own
+// Linear factors, and an edge between two unfixed root columns, since edges to the zero vertex or a fixed
+// column are unary bounds the original factors already propagate.
 internal fun BakedProblem.withDifferenceSystem(): BakedProblem {
     val fragment = differenceFragmentOf(factors, numIntVars, intBounds)?.withoutOverHeavyDomainEdges() ?: return this
     if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
@@ -35,7 +22,6 @@ internal fun BakedProblem.withDifferenceSystem(): BakedProblem {
             !edge.domainBound && edge.source != DifferenceFragment.ZERO && edge.target != DifferenceFragment.ZERO &&
                 !rootIntDomain(edge.source).isFixed && !rootIntDomain(edge.target).isFixed
         }) return this
-    // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
-    // [withAppendedFactor] reuses that fold and carries the proven root deductions forward.
+    // Redundant with the rows it reads, so withAppendedFactor can reuse the base fold's root deductions.
     return withAppendedFactor(DifferenceSystem(fragment.edges))
 }

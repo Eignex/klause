@@ -9,14 +9,12 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.refuteOpenWitness
 import com.eignex.klause.util.ExecutionControl
 
-/**
- * Completes a local-search candidate over an open model whose objective weighs continuous columns: the residual LP
- * minimizes [objective] over the candidate's continuous part, so the candidate is scored by its best completion.
- *
- * The LP relaxes a strict row to its closure, so its refutation stands, but its optimum can sit on a strict row's
- * boundary. That point is accepted only once the source model admits it exactly; any other case, or an LP that decides
- * nothing, falls back to [theory], whose completion is feasible but not optimized.
- */
+// Completes a local-search candidate over an open model whose objective weighs continuous columns: the residual LP
+// minimizes [objective] over the candidate's continuous part, so the candidate is scored by its best completion.
+//
+// The LP relaxes a strict row to its closure, so its refutation stands, but its optimum can sit on a strict row's
+// boundary. That point is accepted only once the source model admits it exactly; any other case, or an LP that decides
+// nothing, falls back to [theory], whose completion is feasible but not optimized.
 internal class OptimizingCompletion(
     private val model: Problem,
     objective: LinearObjective,

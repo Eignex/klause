@@ -24,26 +24,15 @@ import com.eignex.util.collections.MutableIntObjectMap
 
 internal object SymmetryBreaking {
 
-    /** Cap on a verified-symmetry candidate group; larger groups are skipped — verification is
-     *  quadratic in the group size, and skipping only forgoes symmetries, never invents one. */
+    // Verification is quadratic in the group size; skipping only forgoes symmetries.
     private const val MAX_VERIFIED_GROUP = 40
 
-    /**
-     * Symmetry breaking by detecting interchangeable variables. A variable transposition
-     * is broken only when swapping the two variables maps the factor multiset onto itself — verified by
-     * remapping every factor and comparing `Factor.structuralKey` counts, so it is sound by
-     * construction. Candidate groups come from Weisfeiler–Leman colour refinement (only same-colour
-     * variables can be interchangeable) and individualization–refinement (McKay and Piperno, "Practical
-     * graph isomorphism, II", J. Symbolic Computation 60, 2014, https://doi.org/10.1016/j.jsc.2013.09.003);
-     * each candidate is then checked. Ordering a verified orbit (`x₀ ≤ x₁ ≤ …` for ints, `¬gⱼ ∨ gⱼ₊₁` for
-     * bools) keeps exactly one representative per orbit.
-     *
-     * Variables in [objectiveIntVars] / [objectiveBoolVars] are excluded so an asymmetric objective
-     * can't be cut — keep those sets empty for pure feasibility. Enabled by default except in a pure
-     * local-search portfolio.
-     *
-     * Also breaks value symmetry ([breakValueSymmetry]).
-     */
+    // Breaks a variable transposition only when it maps the factor multiset onto itself, verified by
+    // comparing remapped `Factor.structuralKey` counts, so it is sound by construction. Candidates come from
+    // colour refinement and individualization–refinement (McKay and Piperno, "Practical graph isomorphism,
+    // II", J. Symbolic Computation 60, 2014, https://doi.org/10.1016/j.jsc.2013.09.003). Ordering a verified
+    // orbit keeps one representative. Objective variables are excluded so an asymmetric objective is never
+    // cut. Also breaks value symmetry ([breakValueSymmetry]).
     fun breakSymmetries(
         problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
@@ -76,24 +65,11 @@ internal object SymmetryBreaking {
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
 
-    /**
-     * [breakSymmetries] over a source model with real or open integer columns.
-     *
-     * Two columns are interchangeable only when their declarations match: the same value set for closed
-     * columns, and for a column with an open side the same open sides and the same finite endpoints, which
-     * is all such a column declares. A value orbit is grouped by which columns admit each value, open
-     * columns included, so a transposition within it maps every declaration to itself; the scanned values
-     * are those of the closed columns, so an open column never contributes an endpoint it does not have.
-     *
-     * Only breaks some theory can own are posted, since a CP-only factor over an open column leaves that
-     * column with no lane: the scalar total orders, the Boolean orders, and the single-column value pin.
-     * The generator lex and the value-precedence chain are CP propagators and wait for the finite lane.
-     * A model with only closed discrete columns is left to the finite form, which reads
-     * root-propagated domains and posts both.
-     *
-     * A total order needs only transpositions, so the source form never runs the generator search: it
-     * tests the pairs inside each colour class directly, against the factors the two columns read.
-     */
+    // Two columns are interchangeable only when their declarations match; a value orbit groups values by
+    // which columns admit them, open columns included. Only breaks some theory can own are posted (scalar
+    // total orders, Boolean orders, the single-column value pin), since a CP-only factor over an open column
+    // leaves it no lane; the generator lex and value-precedence chain wait for the finite lane. Total orders
+    // need only transpositions, so pairs inside each colour class are tested directly.
     fun breakSourceSymmetries(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
@@ -167,15 +143,8 @@ internal object SymmetryBreaking {
         return extra
     }
 
-    /**
-     * Total orders over the columns that single transpositions map onto each other.
-     *
-     * A transposition is an automorphism only between two columns of one colour class, so the classes of
-     * the equitable partition are the candidates, and only when two columns share a seed can any class
-     * hold two. Each candidate pair is checked by [swapsOntoItself], and the verified pairs are unioned:
-     * transpositions connecting a set generate its whole symmetric group, so ordering the set keeps one
-     * representative of every orbit. Both checks are exact, so an exhausted budget only finds fewer.
-     */
+    // Transpositions connecting a set generate its whole symmetric group, so ordering each union of verified
+    // same-colour pairs keeps one representative per orbit. An exhausted budget only finds fewer.
     private fun transpositionOrders(
         problem: Problem,
         columns: SymmetryColumns,
@@ -220,7 +189,6 @@ internal object SymmetryBreaking {
         return extra
     }
 
-    /** The columns of each colour outside [held], ascending, for every colour with 2 to [MAX_VERIFIED_GROUP]. */
     private fun colourCells(colour: IntArray, held: Set<Int>): List<IntArray> {
         val cells = MutableIntObjectMap<IntArrayList>()
         for (v in colour.indices) if (v !in held) cells.getOrPut(colour[v]) { IntArrayList() }.add(v)
@@ -230,7 +198,6 @@ internal object SymmetryBreaking {
         return out
     }
 
-    /** The members of [cell] that verified transpositions connect, each group ascending and of size 2 or more. */
     private fun verifiedGroups(
         problem: Problem,
         cell: IntArray,
@@ -250,13 +217,7 @@ internal object SymmetryBreaking {
         }
     }
 
-    /**
-     * Whether swapping columns [a] and [b] maps the factor multiset onto itself.
-     *
-     * A factor reading neither column is its own image, and the image of one that reads either still reads
-     * one of them, so the swap is an automorphism exactly when it maps the factors reading [a] or [b] onto
-     * themselves. [identity] is the identity map of the swapped space, restored before returning.
-     */
+    // Only factors reading [a] or [b] can change under the swap. [identity] is restored before returning.
     private fun swapsOntoItself(
         problem: Problem,
         incident: Array<IntArrayList>,
@@ -277,22 +238,11 @@ internal object SymmetryBreaking {
         return swapped
     }
 
-    /**
-     * Value symmetry breaking. A permutation of values that maps every domain to itself
-     * and the factor set to itself is a symmetry. Candidate orbits are values with the same
-     * domain-incidence (the set of variables whose domain contains them) — so any transposition
-     * within an orbit already maps every domain to itself. Each transposition is then *verified*
-     * against the factors: applying it via `Factor.remapValues` and comparing the `Factor.structuralKey`
-     * multiset proves the swap is a symmetry, the value analog of the `Factor.remap`-based
-     * automorphism check. Transpositions generate the full symmetric group on a verified orbit, so one variable
-     * whose domain lies entirely within an orbit is pinned to the orbit minimum — a sound break (a
-     * solution can always be relabeled within the orbit so that variable takes the minimum).
-     *
-     * When every factor is value-anonymous (`Factor.isValueAnonymous` — AllDifferent), verification is
-     * skipped: every relabeling is a symmetry, so the whole incidence group is one orbit. Otherwise
-     * verification covers value-relabelable factors (GlobalCardinality, Table, …); a factor that is
-     * unkeyed or returns `null` from `Factor.remapValues` blocks it.
-     */
+    // A value permutation mapping every domain and the factor set to itself is a symmetry. Candidate orbits
+    // share domain incidence, so a swap within one maps every domain to itself; each swap is verified via
+    // `Factor.remapValues`. One variable whose domain lies within a verified orbit is pinned to the orbit
+    // minimum, since any solution can be relabeled so. If every factor is value-anonymous, verification is
+    // skipped; an unkeyed or non-relabelable factor blocks it.
     private fun breakValueSymmetry(
         problem: Problem,
         columns: SymmetryColumns,
@@ -328,15 +278,8 @@ internal object SymmetryBreaking {
         return extra
     }
 
-    /**
-     * The verified-interchangeable value orbits shared by [breakValueSymmetry] and
-     * [breakValuePrecedence]: values grouped by domain-incidence, then refined against the factors
-     * ([verifyValueOrbits]) unless every factor is value-anonymous (the anonymity fast path skips
-     * verification). Returns the orbits of size ≥ 2, or `null` when nothing is eligible (no int
-     * variables, an unkeyed factor on the verified path, or an empty value range) — each caller maps
-     * `null` to its own "post nothing" result. Objective-variable exclusion happens at each caller's
-     * per-orbit action, not here.
-     */
+    // Values grouped by domain incidence, then verified unless every factor is value-anonymous. Orbits of
+    // size ≥ 2, or null when nothing is eligible; callers handle objective-variable exclusion.
     private fun verifiedValueOrbits(
         problem: Problem,
         columns: SymmetryColumns,
@@ -346,10 +289,8 @@ internal object SymmetryBreaking {
         val active = (0 until problem.numIntVars).filter { columns.active(it) }
         if (active.isEmpty()) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
-        // Verifying value swaps re-keys the whole factor set, so on a model whose factors carry large
-        // constant data (wide tables) the keying dominates while almost never yielding a value symmetry —
-        // the value-side analog of the generator search's [GENERATOR_ROUND_COST_BUDGET] skip. Bail before
-        // keying when the multiset would be that expensive (sound — skipping only forgoes value pins).
+        // Keying wide-table factor sets dominates while almost never yielding a value symmetry, so bail
+        // before keying when the multiset would be that expensive; skipping only forgoes value pins.
         if (!allAnonymous) {
             var keyCost = 0L
             for (f in problem.factors) {
@@ -357,8 +298,7 @@ internal object SymmetryBreaking {
                 if (keyCost > VALUE_ORBIT_KEY_BUDGET) return null
             }
         }
-        // The anonymous fast path needs no multiset; otherwise key every factor — but lazily, so a
-        // candidate-free model (or a fired budget) never pays for the (wide-table-) expensive keying.
+        // Keyed lazily, so a candidate-free model or a fired budget never pays for it.
         val base: Map<StructuralKey, Int> by lazy { PresolveShared.structuralKeyMultiset(problem.factors.asList()) }
         var lo = Long.MAX_VALUE
         var hi = Long.MIN_VALUE
@@ -368,18 +308,14 @@ internal object SymmetryBreaking {
             if (d.max > hi) hi = d.max
         }
         if (lo > hi) return null
-        // Size skip: the incidence scan below visits every value in [lo, hi] against every int
-        // variable, so a wide span across many variables is too costly to be worth the value pins.
-        // Written as `hi > lo + perVarSpan` to stay overflow-safe when the bounds straddle Long extremes.
+        // The incidence scan visits every value in [lo, hi] against every int variable. Written as
+        // `hi > lo + perVarSpan` to stay overflow-safe at the Long extremes.
         val perVarSpan = VALUE_ORBIT_SCAN_BUDGET / active.size
         if (hi > lo + perVarSpan) return null
-        // Group values by domain-incidence signature: same set of containing variables ⇒ a candidate
-        // orbit (a swap within it maps every domain to itself). The incident variable ids, in
-        // ascending order, are the signature words.
+        // Same set of containing variables ⇒ a candidate orbit; the ascending variable ids are the signature.
         val incidence = HashMap<RefineKey, MutableList<Long>>()
         for (value in lo..hi) {
-            // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
-            // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
+            // Returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
             cancellation.charge(active.size.toLong())
             val sig = LongArrayList()
@@ -398,20 +334,11 @@ internal object SymmetryBreaking {
         return orbits
     }
 
-    /**
-     * Value precedence, the strong value-symmetry break, posted with the native [ValuePrecede]
-     * propagator (Law and Lee, "Global Constraints for Integer and Set Value Precedence", CP 2004,
-     * https://doi.org/10.1007/978-3-540-30201-8_28). Each verified orbit of interchangeable values is
-     * forced to be *introduced in sorted order*: the first occurrence of the orbit's `j`-th smallest value
-     * precedes the first occurrence of its `(j+1)`-th, over the variables whose domain lies within the
-     * orbit. This is a `value_precede_chain`, one [ValuePrecede] per consecutive value pair. Every solution
-     * can be relabeled within the orbit to this canonical form, so exactly one representative per symmetry
-     * class survives — strictly stronger than pinning a single variable ([breakValueSymmetry]). The
-     * variable space is unchanged and no reconstruction is required.
-     *
-     * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns an
-     * empty delta when nothing is eligible.
-     */
+    // Value precedence via the native [ValuePrecede] propagator (Law and Lee, "Global Constraints for Integer
+    // and Set Value Precedence", CP 2004, https://doi.org/10.1007/978-3-540-30201-8_28): each verified orbit's
+    // values are introduced in sorted order over the variables whose domain lies within it. Every solution
+    // can be relabeled into this form, so one representative per class survives. Objective variables are
+    // excluded.
     fun breakValuePrecedence(
         problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
@@ -442,10 +369,7 @@ internal object SymmetryBreaking {
         return PassDelta(addedFactors = extra)
     }
 
-    /** Refine a domain-incidence candidate [values] into verified-interchangeable value orbits: union
-     *  the value pairs whose transposition is verified a symmetry ([verifyValueSwap]). Transpositions
-     *  generate the full symmetric group on each resulting orbit. Groups beyond [MAX_VERIFIED_GROUP]
-     *  are skipped (the O(n²·factors) guard, as for variables). */
+    // Unions the value pairs whose transposition verifies; groups beyond [MAX_VERIFIED_GROUP] are skipped.
     private fun verifyValueOrbits(
         problem: Problem,
         base: Map<StructuralKey, Int>,
@@ -461,10 +385,7 @@ internal object SymmetryBreaking {
         return ds.groups().map { group -> group.map { values[it] } }
     }
 
-    /** Whether the value transposition `(v w)` maps the factor multiset to itself — relabel every
-     *  factor via `Factor.remapValues` and compare `Factor.structuralKey` counts against [base].
-     *  `false` if any factor is not value-relabelable (returns `null`). The value analog of
-     *  [isAutomorphism]. */
+    // False if any factor is not value-relabelable.
     private fun verifyValueSwap(problem: Problem, base: Map<StructuralKey, Int>, v: Long, w: Long): Boolean {
         val swap = { x: Long ->
             if (x == v) {
@@ -487,37 +408,25 @@ internal object SymmetryBreaking {
         return true
     }
 
-    /** Test-only view of [refineColours] with no objective variables. */
     internal fun refineColoursForTest(problem: BakedProblem): Pair<IntArray, IntArray> =
         refineColours(problem, FiniteSymmetryColumns(problem), emptySet(), emptySet())
 
-    // Three guards on the generator search: a size skip for models too large to bother, a deterministic
-    // work budget on the refinement, and bailing with the generators found so far when it runs out.
-    // All three are sound: skipping or stopping early only ever finds *fewer* symmetries, never invents
-    // one (every returned permutation is verified by [isAutomorphism]).
+    // Guards on the generator search: a size skip, a deterministic work budget, and bailing with what was
+    // found. All are sound: every returned permutation is verified by [isAutomorphism].
 
-    /** Skip the search when a single colour-refinement round is too expensive. One round remaps every
-     *  factor once per incident variable and rebuilds its `Factor.structuralKey`, so a factor of degree
-     *  `d` and key weight `w` costs `Θ(d·w)` per round and the round costs `Σ_f d_f·w_f` (for a plain
-     *  factor `w ≈ d`, so this reduces to `Σ d²`; a data-heavy factor like a wide table has `w ≫ d`).
-     *  Skipping only reduces the symmetries found. */
+    // A factor of degree `d` and key weight `w` costs `Θ(d·w)` per refinement round, and a data-heavy
+    // factor such as a wide table has `w ≫ d`.
     private const val GENERATOR_ROUND_COST_BUDGET = 500_000L
 
-    /** Deterministic work budget for the whole generator search, charged per refinement arc visited
-     *  (a variable's incident factor, the unit of [equitablePartition] work). A work count, not wall-clock, so it is
-     *  reproducible across machines; when it runs out the search bails with what it has found. */
+    // Charged per refinement arc; a work count rather than wall-clock, so it is reproducible.
     private const val GENERATOR_WORK_BUDGET = 200_000
 
-    /** Size skip for value-symmetry detection: the value-incidence scan is
-     *  `O((maxValue − minValue) · numIntVars)`, so a wide value span across many variables is skipped. */
+    // The value-incidence scan is `O((maxValue − minValue) · numIntVars)`.
     private const val VALUE_ORBIT_SCAN_BUDGET = 50_000_000L
 
-    /** Skip value-symmetry verification when keying the factor set (summed `Factor.structuralKeyWeight`)
-     *  would exceed this, the value-side analog of [GENERATOR_ROUND_COST_BUDGET]. */
+    // Bound on summed `Factor.structuralKeyWeight` for value-symmetry verification.
     private const val VALUE_ORBIT_KEY_BUDGET = 1_000_000L
 
-    // Estimated cost of one refinement round: each factor is remapped and re-keyed once per incident
-    // variable, at its Factor.structuralKeyWeight.
     private fun generatorRoundCost(problem: Problem): Long {
         var roundCost = 0L
         for (f in problem.factors) {
@@ -527,14 +436,9 @@ internal object SymmetryBreaking {
         return roundCost
     }
 
-    /**
-     * Generators of the constraint-graph automorphism group, found by individualization–refinement
-     * over the unified variable+factor colouring. Unlike single transpositions this catches composite
-     * symmetries and, because the automorphism is verified on the whole factor multiset ([isAutomorphism]),
-     * symmetries whose factors mix bool and int variables (e.g. lowered set/list structure). Every
-     * returned permutation `(intMap, boolMap)` is a *verified* automorphism, so the
-     * downstream orbit/lex breaking is sound by construction; an imperfect search only finds fewer.
-     */
+    // Individualization–refinement over the unified variable+factor colouring. Unlike single transpositions
+    // this finds composite symmetries and ones mixing bool and int variables; every returned
+    // `(intMap, boolMap)` is a verified automorphism.
     private fun findGenerators(
         problem: Problem,
         columns: SymmetryColumns,
@@ -615,14 +519,9 @@ internal object SymmetryBreaking {
         return gens
     }
 
-    /**
-     * Individualize the global vertex [firstIndiv] (int `v` is id `v`; bool `v` is id `nInt+v`) and
-     * refine to a discrete partition, individualizing the lowest vertex of the lowest non-singleton
-     * cell at each subsequent step. Both the seed marker (the individualization step) and the target rule
-     * are canonical, so two calls that individualize structurally-equal vertices produce comparable
-     * labelings. Returns `leaf(rank) = globalVertex` (the canonical colour is the rank), or `null` if the
-     * budget runs out.
-     */
+    // Individualizes [firstIndiv] (int `v` is id `v`, bool `v` is `nInt + v`), then the lowest vertex of the
+    // lowest non-singleton cell until discrete. Both rules are canonical, so leaves are comparable labelings.
+    // Returns `leaf(rank) = globalVertex`, or null when the budget runs out.
     @Suppress("ReturnCount")
     private fun refineToDiscrete(
         problem: Problem,
@@ -683,8 +582,7 @@ internal object SymmetryBreaking {
         }
     }
 
-    /** The permutation mapping [refLeaf]'s rank-`i` vertex to [leaf]'s, split into `(intMap, boolMap)`.
-     *  `null` if any rank pairs an int with a bool vertex (then it is not a kind-preserving map). */
+    // Null if a rank pairs an int with a bool vertex.
     private fun buildPerm(refLeaf: IntArray, leaf: IntArray, nInt: Int, nBool: Int): Pair<IntArray, IntArray>? {
         val intMap = IntArray(nInt) { it }
         val boolMap = IntArray(nBool) { it }
@@ -700,14 +598,9 @@ internal object SymmetryBreaking {
         return intMap to boolMap
     }
 
-    /**
-     * Total-order chains for orbits that are *scalar* symmetric — every member individually
-     * interchangeable, i.e. each adjacent single transposition `(oⱼ oⱼ₊₁)` (moving only those two) is
-     * itself an automorphism. Then the orbit's symmetric group acts on the variables as singletons and
-     * `o₀ ≤ o₁ ≤ …` keeps exactly one representative (sound and strictly stronger than the generator
-     * lex). A lockstep matrix orbit fails the single-transposition check (swapping one cell without its
-     * row is not an automorphism), so it is left to the row-wise generator lex — never column-ordered.
-     */
+    // When every adjacent single transposition of an orbit is an automorphism, `o₀ ≤ o₁ ≤ …` is sound and
+    // strictly stronger than the generator lex. A lockstep matrix orbit fails that check and is left to the
+    // row-wise generator lex.
     private fun scalarTotalOrders(
         problem: Problem,
         generators: List<Pair<IntArray, IntArray>>,
@@ -768,8 +661,6 @@ internal object SymmetryBreaking {
             boolMap.indices.all { bools.getOrElse(it) { 0L } == bools.getOrElse(boolMap[it]) { 0L } }
     }
 
-    /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
-     *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
     private fun isAutomorphism(
         problem: Problem,
         base: Map<StructuralKey, Int>,
@@ -780,9 +671,7 @@ internal object SymmetryBreaking {
         return PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(mapping) }
     }
 
-    /** Test every unordered pair within [scope] with [verify] (skipping pairs already connected) and
-     *  union the verified ones in [ds], charging [pairCost] per pair tested. The shared inner step of every
-     *  verified-orbit grouping. */
+    // Charges [pairCost] per pair tested, skipping pairs already connected.
     private inline fun unionVerifiedPairs(
         ds: IntDisjointSet,
         scope: IntArray,

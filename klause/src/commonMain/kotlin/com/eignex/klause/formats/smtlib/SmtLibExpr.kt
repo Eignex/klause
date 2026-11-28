@@ -14,9 +14,8 @@ private sealed interface AssertionFrame {
     object PopScope : AssertionFrame
 }
 
-/** Post each conjunct of an assertion. `and`/`let` nesting is walked with an explicit worklist (not
- *  recursion) so a degenerate conjunction can't overflow the stack; relations, arithmetic equalities
- *  and `distinct` are posted as hard constraints, everything else is reified and forced true. */
+// An explicit worklist keeps deep `and`/`let` nesting off the stack. Relations, arithmetic equalities and
+// `distinct` post directly; everything else is reified and forced true.
 internal fun Compiler.Builder.assert(top: SExpr) {
     val work = ArrayDeque<AssertionFrame>()
     work.addLast(AssertionFrame.Visit(top))
@@ -40,10 +39,8 @@ internal fun Compiler.Builder.assert(top: SExpr) {
         }
         // Pop markers go under the conjuncts, so the scope stays active while they are processed.
         repeat(lets) { work.addLast(AssertionFrame.PopScope) }
-        // A `let`-bound Bool that nothing has asked for a literal yet can be asserted rather than
-        // reified: substituting its term here sends it back through this loop, where `and`, the
-        // comparisons and `distinct` each have a direct posting that allocates no auxiliary literal.
-        // Once its literal exists the binding is shared, so a name used elsewhere is unaffected.
+        // A `let`-bound Bool with no literal yet is asserted through this loop rather than reified, so it
+        // allocates no auxiliary literal. Once its literal exists the binding is shared.
         if (node is SExpr.Atom) {
             val bound = lookup(node.text)
             val src = bound?.takeIf { it.isBool && it.lit == null }?.srcBool
@@ -67,19 +64,14 @@ internal fun Compiler.Builder.assert(top: SExpr) {
                     continue
                 }
 
-                // An asserted disjunction *is* a clause. Reifying it would allocate an auxiliary literal,
-                // the implication clauses that define it and a unit clause forcing it true, where posting
-                // the disjuncts directly states the same thing. The disjuncts themselves still reify as
-                // needed; only the top node is saved. Empty `(or)` is false and left to the general path.
+                // An asserted disjunction is a clause, so it needs no auxiliary literal. Empty `(or)` is false
+                // and takes the general path.
                 h == "or" && args.isNotEmpty() -> {
                     factors.add(Clause(IntArray(args.size) { compileBool(args[it]) }))
                     continue
                 }
 
-                // `=>` is n-ary and right-associative: `(=> a1 .. an)` is `a1 -> (.. -> an)`, which holds
-                // exactly when some antecedent fails or the consequent holds. Asserting that is the clause
-                // `!a1 or .. or !a(n-1) or an`, where reifying it would build the implication chain first
-                // and then force its literal true. A one-argument `=>` is just its argument.
+                // Right-associative `(=> a1 .. an)` asserts the clause `!a1 or .. or !a(n-1) or an`.
                 h == "=>" && args.size >= 2 -> {
                     val lits = IntArray(args.size) { compileBool(args[it]) }
                     affineRealTables.implication(lits, trueLitCache)
@@ -116,7 +108,6 @@ internal fun Compiler.Builder.forceClause(a: Int, b: Int) {
     factors.add(Clause(intArrayOf(a, b)))
 }
 
-/** Fold [t] to a boolean literal (iteratively, via [evalTerm]). */
 internal fun Compiler.Builder.compileBool(t: SExpr): Int = (evalTerm(t, Sort.BOOL) as Res.B).lit
 
 internal fun Compiler.Builder.boolBinding(name: String, b: Compiler.Builder.Binding): Int {
@@ -124,16 +115,13 @@ internal fun Compiler.Builder.boolBinding(name: String, b: Compiler.Builder.Bind
     return boolLit(b)
 }
 
-/** Reify boolean ite as `(c and x) or (!c and y)`. */
 internal fun Compiler.Builder.tseitinIte(c: Int, x: Int, y: Int): Int =
     reifyOr(listOf(reifyAnd(listOf(c, x)), reifyAnd(listOf(Lit.negate(c), y))))
 
-/** Compile n-ary equality as pairwise equality to the first operand. */
 internal fun <T> Compiler.Builder.chainEqToFirst(items: List<T>, relate: (T, T) -> Int): Int =
     reifyAnd((1 until items.size).map { relate(items[0], items[it]) })
 
-/** Syntactic bool/int classifier for a term, following `ite`/`let` to their result term without
- *  recursion so a deeply nested chain cannot overflow the stack. */
+// Iterative so a deeply nested `ite`/`let` chain cannot overflow the stack.
 internal fun Compiler.Builder.isBoolExpr(t: SExpr): Boolean {
     var node = t
     while (true) {
@@ -157,10 +145,9 @@ internal fun Compiler.Builder.isBoolExpr(t: SExpr): Boolean {
     }
 }
 
-/** Channel a bool literal to a fresh 0/1 int term. */
 internal fun Compiler.Builder.litToIntTerm(lit: Int): LinComb {
     val z = newInt(0L, 1L)
-    val w = newBool() // w ⇔ lit
+    val w = newBool()
     val wlit = Lit.make(w, true)
     factors.add(Clause(intArrayOf(Lit.negate(wlit), lit)))
     factors.add(Clause(intArrayOf(wlit, Lit.negate(lit))))

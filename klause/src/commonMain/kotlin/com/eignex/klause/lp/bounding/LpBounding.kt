@@ -59,12 +59,6 @@ import com.eignex.util.numbers.mulExact
 import kotlin.math.abs
 import kotlin.math.nextUp
 
-/**
- * Sound lower bound on a [LinearObjective] given the current partial assignment in
- * [session]. Pinned vars contribute their exact value; unpinned bool vars take the
- * weight (or 0) that makes their contribution smallest; unpinned int vars take the
- * domain endpoint matching the coefficient's sign.
- */
 internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: PropagationSession): Long = try {
     var total = addExact(obj.constant, boolLowerBoundPart(obj, session))
     val sp = session.problem
@@ -82,13 +76,8 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
     Long.MIN_VALUE
 }
 
-/**
- * The `Σ_b contribution(b)` bool part of [linearLowerBound]. Maintained incrementally on the reversible
- * trail once installed at the root — an O(1) read instead of an O(numBoolVars) rescan, which matters on
- * large pseudo-Boolean optimization. Before the root install is possible (not at level 0), it rescans
- * directly. Throws [CheckedLongOverflowException] via [addExact] on the rescan path so the caller falls
- * back to no bound.
- */
+// Once installed at the root the trail maintains this sum incrementally, avoiding an O(numBoolVars)
+// rescan per node. The rescan path throws on overflow so the caller falls back to no bound.
 private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: PropagationSession): Long {
     if (session.installObjectiveBoolBound(obj.boolWeightValues)) return session.objectiveBoolLowerBound()
     var sum = 0L
@@ -109,13 +98,9 @@ private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: Propagati
     return sum
 }
 
-/** The smallest value `≥ lb` congruent to `r` modulo `g` (`g ≥ 1`, `0 ≤ r < g`). When `lb` already
- *  has residue `r` it is returned unchanged. */
+// The smallest value `≥ lb` congruent to `r` modulo `g` (`g ≥ 1`, `0 ≤ r < g`).
 internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).mod(g)
 
-/** A budgeted [TableauCutSolver] over [model]. The simplex always uses Devex pricing, the Harris
- *  two-pass ratio test, the bound-flipping long step and basis equilibration — all correctness-neutral
- *  (they change only the pivot path / conditioning, never the certified optimum). */
 internal fun LpEngine.dualSimplex(
     model: LpModel,
     cancellation: ExecutionControl,
@@ -136,12 +121,9 @@ internal fun LpEngine.dualSimplex(
     )
 }
 
-/*
- * Source nodes use their retained scoped owner. An external model installs separate exact authority;
- * models without that authority use a bounded fresh solve.
- * Warm hints apply only to a fresh solve; a retained scoped owner already has its basis factorized.
- */
-// Replacement cleanup must preserve arbitrary solve and close failures.
+// Source nodes use their retained scoped owner, which already has its basis factorized. An external
+// model installs separate exact authority; other models use a bounded fresh solve, the only one that
+// reads warm hints. Replacement cleanup must preserve arbitrary solve and close failures.
 @Suppress("TooGenericExceptionCaught", "ThrowsCount")
 internal fun LpEngine.solveNode(
     model: LpModel,
@@ -193,28 +175,19 @@ internal fun LpEngine.solveNode(
     }
 }
 
-/**
- * Charge one counted solve's cost to [SolveStatsSink], reading it off the engine rather than the result.
- *
- * Every `observeSolve` pairs with exactly one of these, so the per-solve rates divide counts that cover
- * the same set of solves. Taking the numbers from a [FloatLpResult] cannot do that: a dual-unbounded or
- * non-convergent solve has no result to read, and on a model that prunes often those are most of them.
- */
+// Reads the cost off the engine rather than the result: a dual-unbounded or non-convergent solve has
+// no result, and every `observeSolve` must pair with exactly one charge.
 private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
     sink.lp.observeEngineCost(LpRoute.NODE, solver.lastMetrics)
     observeSparseTrial(solver)
     noteSolveOps(solver.lastWorkOps)
 }
 
-/** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
- *  optional learned nogood (null when learning is off or the prune has no expressible reason). */
+// The explanation is null when learning is off or the prune has no expressible reason.
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
 
-/*
- * Bound pending LP clause storage and deduplicate across restarts. Entries retain whether the
- * persistent CP session already contains the clause so restart sharing does not register it twice.
- * Draining clears the pending batch; retained keys prevent a later node from queuing it again.
- */
+// Bounded, restart-spanning dedup of LP clauses. Entries record whether the persistent CP session
+// already holds the clause so restart sharing does not register it twice; retained keys outlive a drain.
 internal class LpNogoodPool(private val cap: Int = 4096) {
     class Entry(val literals: IntArray, val registered: Boolean)
 
@@ -237,13 +210,6 @@ internal class LpNogoodPool(private val cap: Int = 4096) {
     }
 }
 
-/**
- * LP-relaxation bounding, reduced-cost fixing and infeasibility pruning for one search node,
- * over the sparse revised-simplex pipeline. Builds the relaxation, solves it in float, and prunes when
- * it is infeasible (exact Farkas certificate) or its safe objective bound reaches the incumbent; also
- * propagates the objective variable and fixes reduced-cost-dominated variables. A 64-bit overflow
- * during the relaxation build falls back to [sparseCertifiedPrune].
- */
 @Suppress("LongParameterList")
 internal fun LpEngine.lpBoundAndFix(
     relaxer: CpToLpRelaxation,
@@ -267,8 +233,6 @@ internal fun LpEngine.lpBoundAndFix(
         cutsAllowed,
     )
 } catch (_: CheckedLongOverflowException) {
-    // A coefficient overflow in the relaxation build loses the bound; recover a sound one via the
-    // integer-multiplier 128-bit certification. A failure just keeps the node.
     sparseCertifiedPrune(relaxer, session, bound, sink, cancellation)
 } catch (_: LpAssemblyCancelled) {
     LpNodeOutcome(false, null)
@@ -278,12 +242,8 @@ internal fun LpEngine.lpBoundAndFix(
 }
 
 /**
- * Fold the pooled global cuts the LP point [res] violates into the node relaxation and re-solve.
- * [CutPool.select] ranks the pool by efficacy (normalised violation) at [res], drops the
- * cuts the point already satisfies, and keeps a mutually-orthogonal subset — so only cuts that actually
- * move this point are loaded, bounding the per-node cut count by efficacy rather than the whole pool.
- * The scoped owner loads selected rows in source coordinates and retains its basis. A failed solve
- * keeps the preceding immutable model and its result; infeasibility requires an exact certificate.
+ * Loads only the pooled cuts [CutPool.select] picks for this point. A failed solve keeps the preceding
+ * model and result; infeasibility requires an exact certificate.
  */
 private fun LpEngine.foldSelectedCuts(
     session: PropagationSession,
@@ -353,18 +313,11 @@ private fun LpHintSink.recordPoint(engine: LpEngine, relaxation: LpRelaxation, r
     if (result.optimal) recordObjective(relaxation, result.objective)
 }
 
-/**
- * Cheap sound prune + objective-bound propagation for the LP path: float revised simplex for the duals,
- * then the tighter of the Neumaier–Shcherbina safe bound and the certificate's integer-multiplier one
- * ([certifiedTightObjectiveLowerBound]) — both O(nnz), so the per-node cost is bounded and `-t` is honored.
- * Prunes when the relaxation is infeasible (exact Farkas certificate) or that bound reaches the
- * incumbent, tightens an ascending objective variable up to its ceiling (with the reduced-cost reason
- * when learning, otherwise reason-less), and fixes reduced-cost-dominated variables off their bounds.
- * Any solver failure keeps the node.
- *
- * Safe bound: A. Neumaier and O. Shcherbina, "Safe bounds in linear and mixed-integer linear
- * programming", Mathematical Programming 99, 2004. https://doi.org/10.1007/s10107-003-0433-3
- */
+// Float duals feed the tighter of the safe bound and the certificate's integer-multiplier bound, both
+// O(nnz) per node. Any solver failure keeps the node.
+//
+// Safe bound: A. Neumaier and O. Shcherbina, "Safe bounds in linear and mixed-integer linear
+// programming", Mathematical Programming 99, 2004. https://doi.org/10.1007/s10107-003-0433-3
 @Suppress("LongParameterList")
 internal fun LpEngine.sparseSafePrune(
     relaxer: CpToLpRelaxation,
@@ -380,18 +333,13 @@ internal fun LpEngine.sparseSafePrune(
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome {
     if (cancellation.pollStop()) return LpNodeOutcome(false, null)
-    // Gated residual fast path (pure-real satisfaction models): re-solve the persistent, structurally
-    // node-invariant gated model with its kept LU factorization — a feasible node (the common case
-    // along a dive) costs a few dual pivots instead of a fresh build + factorization. Any other
-    // outcome falls through to the per-node build below. Sound as a filter: the gated rows' inactive
-    // forms are implied by the box, so the gated and active models have the same feasible set, and a
-    // feasible verdict deduces nothing beyond "keep" — hence only when there is no incumbent to prune
-    // against and no objective to propagate.
+    // Gated residual fast path: re-solve the persistent node-invariant gated model with its kept LU
+    // factorization. Sound as a filter because the gated rows' inactive forms are implied by the box, so
+    // both models share a feasible set; a feasible verdict deduces only "keep", hence satisfaction only.
     val satisfactionOnly = !bound.isFinite() && !(objectiveVar >= 0 && objectiveAscending)
     if (satisfactionOnly) {
         gatedResidual(session)?.let { filter ->
-            // Unchanged enforcement after a feasible solve: the gated model is a pure function of the
-            // enforcement, so this node's verdict is the memoized one — no solve at all.
+            // The gated model is a pure function of the enforcement, so the verdict is memoized.
             if (filter.lastFeasible && filter.enforced.contentEquals(filter.lastEnforced)) {
                 return LpNodeOutcome(false, null)
             }
@@ -420,11 +368,9 @@ internal fun LpEngine.sparseSafePrune(
                 filter.lastFeasible = true
                 return LpNodeOutcome(false, null)
             }
-            // Certify the candidate infeasibility on the gated model directly: restricted to the enforced
-            // rows (zeroing the rest just picks another candidate ray — the certificate is checked
-            // exactly), a Farkas proof here IS one over the active submodel, so the common refutation
-            // prunes without ever building the per-node model. Strictness-only conflicts (no non-strict
-            // certificate exists) still fall through to the exact rational path below.
+            // A Farkas proof restricted to the enforced rows is one over the active submodel, so the common
+            // refutation prunes without building the per-node model. Strictness-only conflicts fall
+            // through to the exact rational path below.
             val gatedRay = filter.simplex.infeasibleRay?.copyOf()
             if (gatedRay != null && !cancellation.pollStop()) {
                 for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
@@ -450,8 +396,7 @@ internal fun LpEngine.sparseSafePrune(
     if (relaxation.model.n == 0 && relaxation.model.m == 0 && cutPool.size == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     val model = relaxation.model
-    // Measured only at the root: the pass is O(nnz), and the matrix a node solves is the root's, so a
-    // deeper reading would repeat it for the same answer.
+    // Nodes solve the root's matrix, so a deeper reading would repeat the O(nnz) pass for the same answer.
     if (session.decisionLevel == 0) {
         val spread = lpConditioning(model)
         sink.lp.observeRootConditioning(
@@ -472,9 +417,7 @@ internal fun LpEngine.sparseSafePrune(
         return LpNodeOutcome(false, null)
     }
     val (simplex, floatResult) = attempted
-    // Read the cost off the solver rather than the result: a solve that terminates dual-unbounded
-    // returns none, and those are the solves that prune — costing only the ones that return a result
-    // would drop the most valuable work from the average.
+    // Read the cost off the solver: a dual-unbounded solve, the kind that prunes, returns no result.
     if (nodeUsesTrail) {
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
         observeSparseTrial(simplex)
@@ -495,9 +438,7 @@ internal fun LpEngine.sparseSafePrune(
         if (lpCounterResults.read(model, solveContext.certificationPolicy)?.witness != null) {
             return LpNodeOutcome(false, null)
         }
-        // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
-        // confirm its ray before pruning ([infeasibilityRay]). Any other failure (non-convergence /
-        // singular) keeps the node.
+        // A dual-unbounded termination is only a candidate infeasibility until its ray is confirmed.
         val ray = simplex.infeasibleRay?.let { infeasibilityRay(model, it, sink) }
         if (ray != null) {
             observeCutRayUse(relaxation, ray)
@@ -505,8 +446,7 @@ internal fun LpEngine.sparseSafePrune(
             sink.lp.observeInfeasiblePrune()
             LpClaim.CONTRADICTION.consumed(sink.lp.certificationObserver(LpRoute.NODE))
             hints?.recordInfeasible()
-            // With learning, the Farkas ray becomes a bound-atom nogood for a 1UIP backjump;
-            // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
+            // A ray citing an auxiliary column or unbacked non-global row prunes reason-less.
             val clause = if (learn) learnedClause(relaxation, ray, session, sink) else null
             return LpNodeOutcome(true, null, clause)
         }
@@ -549,11 +489,8 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // Pooled global cuts the LP point violates are folded in first (see foldSelectedCuts). Then, at a
-    // gated shallow node, separation tightens the relaxation further: global cuts are persisted into
-    // the pool (descendants inherit them); node-local cuts retain their complete source proof and
-    // follow the owner's row trail. The bound, certificate and reduced-cost fixing below read the
-    // tightened immutable relaxation.
+    // After the pooled cuts, a shallow node separates further: global cuts persist into the pool for
+    // descendants; node-local cuts keep their source proof and follow the owner's row trail.
     val cutOutcome = foldSelectedCuts(session, relaxation, result, cancellation, sink, learn)
     if (cutOutcome is LpCutOutcome.Pruned) {
         hints?.recordInfeasible()
@@ -570,8 +507,6 @@ internal fun LpEngine.sparseSafePrune(
         var rounds = 0
         while (rounds++ < SEARCH_CUT_ROUNDS && !cancellation.pollStop()) {
             val ctx = CutContext(problem, boundRel, boundRes.primal, session)
-            // Per-separator gating: skip a family the gate has disabled for being unproductive, and
-            // credit each family it does run with whether it produced a violated cut this round.
             val fresh = ArrayList<Cut>()
             for (i in lpSeparators.indices) {
                 if (!lpSeparatorGate.shouldRun(i)) {
@@ -610,9 +545,8 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // The certificate backs the prune bound, the learnable objective-bound reason and the reduced-cost fixing.
-    // An exact one is computed once when any of them needs it; a singular/unbounded certify yields null and
-    // each falls back to its cheap certificate-less path, which is sound. A numerical one is the bound itself.
+    // One certificate backs the prune bound, the objective-bound reason and reduced-cost fixing. A null
+    // exact certificate sends each to its sound certificate-less path.
     if (cancellation.pollStop()) return LpNodeOutcome(false, null)
     hints?.recordPoint(this, boundRel, boundRes)
     if (cancellation.pollStop()) return LpNodeOutcome(false, null)
@@ -660,7 +594,6 @@ internal fun LpEngine.sparseSafePrune(
                 } else null,
             ),
         ).also {
-            // The node path is where certification actually happens; the certified wrapper is not on it.
             sink.lp.observeCertification(
                 certified = it != null,
                 continuousDecline = it == null && boundRel.model.hasContinuous,
@@ -697,8 +630,7 @@ internal fun LpEngine.sparseSafePrune(
             return LpNodeOutcome(true, null)
         }
     }
-    // Neither the float safe bound nor the certificate's integer-multiplier bound dominates the other,
-    // so the prune decides on the tighter of the two rather than on the float bound alone.
+    // Neither the float safe bound nor the integer-multiplier bound dominates, so take the tighter.
     val lower = if (numericalDeductions) numerical?.lowerBound else certifiedTightObjectiveLowerBound(
         boundRel.model.alsoCharged(this),
         boundRes.duals,
@@ -721,11 +653,8 @@ internal fun LpEngine.sparseSafePrune(
         LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
         return LpNodeOutcome(true, null)
     }
-    // Objective-bound propagation: the integer objective is ≥ ceil(LP lower bound). With learning,
-    // propagate the exact certified bound — the only one the reduced-cost reason proves — and attach that
-    // reason so an Unsat tightening backjumps; otherwise tighten to ceil of the combined bound,
-    // reason-less (a sound conflict-analysis leaf). Every bound here only under-estimates the optimum,
-    // so either floor ≤ the true optimum.
+    // With learning, propagate the exact certified bound, the only one the reduced-cost reason proves;
+    // otherwise tighten reason-less to the ceiling of the combined bound.
     if (canPropagate && sourceRange != null) {
         val exactFloor = if (learn && cert != null) {
             cert.objectiveBoundCeil(boundRel.objectiveConstant)
@@ -734,10 +663,8 @@ internal fun LpEngine.sparseSafePrune(
         }
         val sourceLower = exactFloor?.let(BigFraction::ofLong) ?: full
         val lpFloor = boundRel.objectiveVariableLowerBound(objectiveVar, sourceLower)
-        // Round the bound up to the objective variable's achievable residue (`v ≡ r mod g` from its
-        // defining equality): a tighter, still-sound cutoff. A strict lift cannot be witnessed by the
-        // reduced-cost reason (the modular premise is not in it), so it is imposed reason-less — a sound
-        // conflict-analysis leaf — while an unchanged bound keeps the certified reason.
+        // Round up to the residue `v ≡ r mod g` of the objective's defining equality. The reduced-cost
+        // reason lacks the modular premise, so a strict lift is imposed reason-less.
         val mod = objectiveModulus?.takeIf { it.first == objectiveVar }
         val rounded = if (lpFloor != null && mod != null) {
             roundUpToResidue(lpFloor, mod.second, mod.third)
@@ -768,10 +695,8 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // A certified Lagrangian bounds every point below the source cutoff without requiring
-    // an attained LP optimum. A declared objective ceiling also bounds feasible points before an incumbent.
-    // Fixings read the incumbent's own cutoff even when the prune reads a lower one, so they hold for every point
-    // that improves the incumbent and never carry an optimality gap into retained root facts.
+    // Fixings read the incumbent's own cutoff even when the prune reads a lower one, so they hold for every
+    // improving point and never carry an optimality gap into retained root facts.
     val fixingBound = fixingCutoff.takeUnless { it.isNaN() || !canPrune || it < bound } ?: bound
     if (canFix && cert != null &&
         !cancellation.pollStop() &&
@@ -834,12 +759,7 @@ private fun LpEngine.pruneWithComponentBound(
     return true
 }
 
-/**
- * Sound objective lower bound from the float revised simplex — the tighter of the safe float and
- * integer-multiplier 128-bit bounds ([certifiedTightObjectiveLowerBound]) — used when the cheap safe-bound path
- * overflowed during the relaxation build. Prunes when that bound (plus the relaxation's objective
- * constant) reaches the incumbent. Any failure keeps the node.
- */
+// Recovery when the relaxation build overflowed on the safe-bound path. Any failure keeps the node.
 internal fun LpEngine.sparseCertifiedPrune(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
@@ -847,9 +767,8 @@ internal fun LpEngine.sparseCertifiedPrune(
     sink: SolveStatsSink,
     cancellation: ExecutionControl,
 ): LpNodeOutcome {
-    if (!bound.isFinite()) return LpNodeOutcome(false, null) // no incumbent to prune against
-    // Cut-free recovery: this path is reached because the cut-augmented build overflowed, and cuts are a
-    // common overflow source, so the base relaxation (no cuts) is what yields a sound — if looser — bound.
+    if (!bound.isFinite()) return LpNodeOutcome(false, null)
+    // Cuts are a common overflow source, so recovery uses the cut-free base relaxation.
     val relaxation = nodeRelaxation(relaxer, session) ?: return LpNodeOutcome(false, null)
     if (relaxation.model.n == 0 && relaxation.model.m == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
@@ -867,10 +786,7 @@ internal fun LpEngine.sparseCertifiedPrune(
         }
     }
     if (result == null) return LpNodeOutcome(false, null)
-    if (cancellation.pollStop()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
-    // Both bounds are sound for any duals and neither dominates, so the larger wins: the
-    // integer-multiplier bound carries no rounding margin, the float one never declines. A null (neither
-    // available) keeps the node.
+    if (cancellation.pollStop()) return LpNodeOutcome(false, null)
     val lb = objectiveLowerBound(
         relaxation.model, result.duals, sink.lp.certificationObserver(LpRoute.NODE), charged = true,
     )
@@ -949,17 +865,15 @@ private fun LpEngine.strictSourcePrune(
     return null
 }
 
-/** Inward relative rhs perturbation applied to strict rows for the gated float filter solve. */
+// Inward relative rhs perturbation applied to strict rows for the gated float filter solve.
 private const val STRICT_FILTER_EPS = 1e-7
 
-/** [this] model, with an exact pass over it charged to [engine]: the certificates below work in rationals. */
+// Charges an exact pass over the model to [engine]: the certificates below work in rationals.
 internal fun LpModel.alsoCharged(engine: LpEngine): LpModel =
     also { engine.noteNodeOverhead(extent() * LpNodeOverhead.EXACT) }
 
-/** Whether this engine's deductions consume float results within tolerances rather than exact certificates. */
 internal val LpEngine.numericalDeductions: Boolean get() = solveContext.numericalDeductions
 
-/** A lower bound on [model]'s source objective under [duals]: numerical within tolerances, else certified. */
 internal fun LpEngine.objectiveLowerBound(
     model: LpModel,
     duals: DoubleArray,
@@ -973,10 +887,7 @@ internal fun LpEngine.objectiveLowerBound(
     )
 }
 
-/**
- * The infeasibility proof [floatRay] supports on [model]: numerical within tolerances, else an exact Farkas ray. An
- * empty numerical ray refutes the node without a combination a learned clause can cite.
- */
+// An empty numerical ray refutes the node without a combination a learned clause can cite.
 internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, sink: SolveStatsSink): LongArray? {
     if (numericalDeductions) return floatFarkasRay(model, floatRay, solveContext.refutationSlack)
     return solveContext.certificationPolicy.acceptNullable(
@@ -992,14 +903,12 @@ internal fun LpEngine.infeasibilityRay(model: LpModel, floatRay: DoubleArray, si
     )
 }
 
-// Learned-reason and conflict-clause outcomes, so how much learning each certification mode keeps is measurable.
 private fun SolveStatsSink.observeDeduction(outcome: String) =
     lp.certificationObserver(LpRoute.NODE).observePhase(LpPhaseMetrics(LpSolvePhase.NODE_DEDUCTION, outcome, 0L))
 
 internal fun SolveStatsSink.observeReason(kind: String, kept: Boolean) =
     observeDeduction("${kind}_REASON_${if (kept) "KEPT" else "WITHHELD"}")
 
-// The learned clause a Farkas ray supports, counted as citable or clause-less.
 private fun learnedClause(
     relaxation: LpRelaxation,
     ray: LongArray,

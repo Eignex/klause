@@ -4,32 +4,21 @@ import com.eignex.klause.ir.Problem
 import kotlin.reflect.KClass
 
 /**
- * Per-invariant dynamic weights for weighted-violation strategies. Strategies that bias toward repairing
- * persistently-violated invariants read and mutate [factorWeights] between picks; the engine also bumps
- * the factors an exact completion refutes.
- *
- * Lazily allocated on first [factorWeights] access, so weight-blind strategies pay no allocation.
- * [WarmState.captureFrom] probes [allocated] first to avoid forcing the allocation to capture
- * all-1.0 defaults.
+ * Per-invariant dynamic weights that weighted-violation strategies read and bump between picks; the engine also
+ * bumps factors an exact completion refutes. Allocated on first [factorWeights] access, so weight-blind strategies
+ * pay nothing.
  */
 class FactorWeightBook(private val problem: Problem) {
 
-    /** Seed [factorWeights] by per-class population so no constraint kind dominates by count. Set by
-     *  the engine from [LocalSearchParams.normalizeWeightsByClass] before the first weight access. */
+    /** Damps over-represented factor classes by population so no kind dominates by count; set before first access. */
     var normalizeWeightsByClass: Boolean = false
         internal set
 
     private var _factorWeights: DoubleArray? = null
     private var _baseFactorWeights: DoubleArray? = null
 
-    /** Per-invariant dynamic weights. Invariants the model declared implied
-     *  (`Problem.impliedFactorMask`) start at [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than 1.0, so the
-     *  implied bulk can't dominate the initial descent before structural constraints are met;
-     *  SAPS-style bumping still raises an implied invariant's weight if it persistently blocks
-     *  progress.
-     *
-     *  When [normalizeWeightsByClass] is set, non-implied invariants are additionally damped by class
-     *  population — see [preparation]. */
+    /** Live per-invariant weights. Implied invariants start at [IMPLIED_FACTOR_INITIAL_WEIGHT] so the implied bulk
+     *  cannot dominate the first descent; bumping still raises one that persistently blocks progress. */
     val factorWeights: DoubleArray
         get() {
             _factorWeights?.let { return it }
@@ -37,10 +26,8 @@ class FactorWeightBook(private val problem: Problem) {
             return checkNotNull(_factorWeights)
         }
 
-    /** The initial seeded per-factor weights ([preparation]), snapshotted once when
-     *  [factorWeights] is first allocated and never mutated. SAPS-style smoothing pulls the live
-     *  weights back toward this baseline rather than a flat constant, so the per-class / implied
-     *  seeding survives the reactive bumping. */
+    /** The seeded weights, never mutated; smoothing pulls the live weights back toward them, so the seeding survives
+     *  reactive bumping. */
     val baseFactorWeights: DoubleArray
         get() {
             _baseFactorWeights?.let { return it }

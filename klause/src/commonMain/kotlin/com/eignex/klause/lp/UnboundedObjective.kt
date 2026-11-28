@@ -15,24 +15,15 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
-/**
- * Whether `Σ coefficients(i)·x(terms(i))` descends without limit over this model, proved at [witness].
- *
- * A descent that re-bounds below its incumbent has no optimum to reach when the objective is unbounded
- * below, so it improves until a budget fires. This decides the question the descent's own rounds cannot:
- * [witness] fixes every conditional row, every disjunct and every disequality side, which leaves a
- * polyhedron that contains the witness and is contained in the model, and a rational direction of that
- * polyhedron's recession cone along which the objective strictly decreases is a ray of the model itself.
- * The cone of a rational polyhedron holding a mixed-integer point is the cone of its mixed-integer hull
- * (R. R. Meyer, "On the existence of optimal solutions to integer and mixed-integer programming problems",
- * Math. Programming 7, 1974, https://doi.org/10.1007/BF01585518), so such a direction scales to one whose
- * integer steps are integral and the objective takes every value below the witness's.
- *
- * Three-valued, because a refusal and an undecided run justify different things: `false` says this
- * witness's own branch carries no such direction, which a bounded branch of an unbounded model answers
- * too, and `null` says the question was not reached at all — a factor outside the linear shapes, or an
- * exact run the stop cut short. The descent goes on under either.
- */
+// The witness fixes every conditional row, disjunct and disequality side, leaving a polyhedron inside the
+// model that contains it; a rational recession direction strictly decreasing the objective is then a ray of
+// the model. The cone of a rational polyhedron holding a mixed-integer point is the cone of its
+// mixed-integer hull (R. R. Meyer, "On the existence of optimal solutions to integer and mixed-integer
+// programming problems", Math. Programming 7, 1974, https://doi.org/10.1007/BF01585518), so the direction
+// scales to integral integer steps.
+//
+// `false`: this witness's branch carries no such direction (a bounded branch of an unbounded model answers
+// that too). `null`: not decided.
 internal fun Problem.objectiveUnboundedBelow(
     terms: IntArray,
     coefficients: LongArray,
@@ -128,15 +119,8 @@ private fun Problem.admitsDirectionPreparation(token: ExecutionControl): Boolean
     return !token()
 }
 
-/**
- * Whether every witness of this model lies in the same branch, so [objectiveUnboundedBelow] reads one
- * polyhedron whichever witness it is handed.
- *
- * A witness enters the certificate to pick a disjunct, to say which side of a conditional row holds, and
- * to direct a disequality. A model stating none of those states one cone, and a cone a completed run
- * found no descending direction in carries none on any later round either — which is what lets a descent
- * ask the question once instead of rebuilding an exact cone system per improvement.
- */
+// A model with no disjunct, conditional row or disequality states one cone, so a descent can ask
+// [objectiveUnboundedBelow] once instead of rebuilding the exact cone system per improvement.
 internal fun Problem.statesOneBranch(): Boolean = factors.all { factor ->
     if (movesNoRay(factor)) return@all true
     factor.linearForm is LinearForm.Conjunction && factor.linearRows.all { row ->
@@ -144,20 +128,13 @@ internal fun Problem.statesOneBranch(): Boolean = factors.all { factor ->
     }
 }
 
-/** Whether every column the objective descends along is bounded on that side. */
 private fun Problem.descentSidesClosed(terms: IntArray, coefficients: LongArray): Boolean = terms.indices.all { index ->
     val column = terms[index]
     if (coefficients[index] > 0L) intBounds.hasLower(column) else intBounds.hasUpper(column)
 }
 
-/**
- * Exact rows of one polyhedron holding [witness] and held by this model, or `null` when a factor states
- * no row this can read.
- *
- * The declared bounds enter as rows, so a column bounded on both sides is pinned by the cone system
- * itself — which is also why a declared value set needs no reading here: a column declaring one is closed
- * on both sides, and no direction of the cone moves it.
- */
+// Declared bounds enter as rows, so a declared value set needs no reading: its column is closed on both
+// sides and no cone direction moves it.
 private fun Problem.branchRowsAt(witness: ExactWitness, token: ExecutionControl): List<ExactRationalInequality>? {
     val rows = ArrayList<ExactRationalInequality>()
     for (integer in 0 until numIntVars) {
@@ -191,14 +168,8 @@ private fun Problem.branchRowsAt(witness: ExactWitness, token: ExecutionControl)
     return rows
 }
 
-/**
- * Whether every column [factor] reads is bounded on both sides, so no direction of the cone moves one.
- *
- * Such a factor states nothing the cone system does not already: its own homogeneous row reads `0 ≤ 0`,
- * because a pinned column contributes no direction and a Boolean does not move at all. Leaving it out
- * therefore relaxes nothing — and it is the only way a factor outside the linear shapes can appear here,
- * since an open column reaches no lane but the theory's.
- */
+// Such a factor's homogeneous row reads `0 ≤ 0`, so leaving it out relaxes nothing; this is the only way a
+// factor outside the linear shapes can appear here.
 private fun Problem.movesNoRay(factor: Factor): Boolean =
     factor.intVars.all { intBounds.hasLower(it) && intBounds.hasUpper(it) } &&
         factor.variables.reals.all { realLower[it].isFinite() && realUpper[it].isFinite() }

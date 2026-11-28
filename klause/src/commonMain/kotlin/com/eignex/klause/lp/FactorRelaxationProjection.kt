@@ -21,7 +21,6 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.impliedLinearRows
 
-/** Emit this factor's LP relaxation into [builder]. */
 internal fun Factor.emitLpRelaxation(
     builder: RelaxationBuilder,
     linearProjection: LinearLpProjection? = null,

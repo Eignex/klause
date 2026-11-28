@@ -15,10 +15,8 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     // Reads through the shared ReasonGraph so its atom-level memo is reused.
     private val minimizer = ClauseMinimizer(state, graph)
 
-    // Reusable per-analysis scratch — grown once and cleared per call instead of reallocating
-    // O(numVars) flag arrays on every conflict. [universe] is the live var space (bool vars + atoms)
-    // for the current analysis; all loops bound by it, since a buffer may be larger than the current
-    // universe after a deeper earlier conflict.
+    // Scratch is grown once; loops bound by [universe] because a buffer may exceed it after a deeper earlier
+    // conflict.
     private var universe = 0
     private var seen = DynamicBits()
 
@@ -28,26 +26,16 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     // ping-pong forever (and grow [bumpIntVars] until OOM), so the guard stays.
     private var resolved = DynamicBits()
 
-    // Variables encountered (resolved through or kept) during the most recent analysis —
-    // the canonical CDCL VSIDS bump set (every var seen while walking the implication
-    // graph, not just the decision vars at the conflict levels). Recorded
-    // as a side effect of [resolve]; bool-var ids in [bumpBoolVars], underlying int-var
-    // ids (decoded from touched atoms) in [bumpIntVars]. Reused across analyses to avoid
-    // per-conflict allocation; the engine reads them after [analyze] when a clause is learned.
+    // The VSIDS bump set: every variable seen while walking the implication graph.
     override val bumpBoolVars = IntArrayList()
     override val bumpIntVars = IntArrayList()
 
-    // Atom-vars marked seen this analysis. The 1UIP pivot scan walks the unified pin trail
-    // ([PropagationState.boolPinOrder]); this list is the fallback frontier for atoms that are seen
-    // but NOT on the trail — ones materialised mid-analysis (off the trail, no pin position) — so
-    // the scan can still find them without sweeping all `atomCount` atoms (O(frontier), not
-    // O(total)). A superset of the currently-seen atoms (never pruned), so the scan re-checks
-    // [isFrontier]. Cleared per analysis.
+    // Fallback frontier for seen atoms materialized mid-analysis and so off the pin trail, scanned in
+    // O(frontier) rather than over all atoms. A superset of the seen atoms, so the scan re-checks [isFrontier].
     override val offTrailFrontier = IntArrayList()
 
-    // Literals waiting to be folded in. [resolve] pushes the reason here and drains it, so substituting
-    // an order literal for its own premises costs no recursion depth however long the derived-reason
-    // chain gets. Reused across analyses, cleared per call.
+    // Literals waiting to be folded in. Draining an explicit list keeps substituting an order literal for its
+    // premises free of recursion depth however long the derived-reason chain gets.
     private val pending = IntArrayList()
 
     // Order literals already resolved through by substitution this analysis — the [resolved] role for
@@ -56,20 +44,13 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     // with.
     private val substituted = IntHashSet()
 
-    // O(1) membership index for the leaf-literal dedup in [resolve] / [drainFrontier], so analysis
-    // stays linear rather than quadratic in clause size. Every literal added is
-    // `Lit.make(v, !currentTruth(v))` — one literal per variable, so this is equivalent to a by-variable
-    // dedup. Reused across analyses, cleared per call.
+    // Holds one literal per variable, so this is the O(1) by-variable dedup that keeps analysis linear.
     private val litsInLearned = IntHashSet()
 
-    // The accumulating nogood (disjunction of literals). Reused across analyses (cleared per call)
-    // rather than reallocated, since a conflict is on the hot path; [finalizeResult] copies it out
-    // to an IntArray, so nothing outlives the analysis.
+    // Reused because a conflict is on the hot path; [finalizeResult] copies it out.
     private val learned = IntArrayList()
 
-    // Frontier variables still at the conflict level; 1UIP terminates when resolving a pivot drops
-    // this to zero. Incremented as [resolve] admits new current-level variables, decremented by
-    // [resolveOut].
+    // 1UIP terminates when resolving a pivot drops this to zero.
     private var currentLevelCount = 0
 
     override val liveAtCurrentLevel: Int get() = currentLevelCount
@@ -105,15 +86,12 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         addLearned(uipLit(pivot))
     }
 
-    /** Append [lit] to [learned] and record it in [litsInLearned] so the leaf-literal dedup stays
-     *  O(1). Every literal reaches the clause through here, keeping the index exact. */
+    // Every literal reaches the clause through here, keeping [litsInLearned] exact.
     private fun addLearned(lit: Int) {
         learned.add(lit)
         litsInLearned.add(lit)
     }
 
-    /** Produce the literal for [pivot] as it should appear in the learned clause —
-     *  the negation of its current truth value, for both bool and atom pivots. */
     private fun uipLit(pivot: Int): Int {
         val numBoolVars = state.problem.numBoolVars
         return if (pivot < numBoolVars) {
@@ -126,13 +104,7 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         }
     }
 
-    /**
-     * Add each literal in [reason] to either the working `seen` set (if it's at [currentLevel] —
-     * resolution will continue through it) or directly to [learned] (lower level — it's part of the
-     * final clause). Increments [currentLevelCount] for each new-at-current-level variable so the
-     * driver can track resolution progress. An order literal that has no pin trail position is
-     * resolved through here instead of joining the frontier ([substituteOffTrail]).
-     */
+    // Current-level literals join the frontier; lower-level ones go straight to the clause.
     override fun resolve(reason: IntArray, currentLevel: Int) {
         for (lit in reason) pending.add(lit)
         val numBoolVars = state.problem.numBoolVars
@@ -184,21 +156,10 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         }
     }
 
-    /**
-     * Resolve order literal [v] out of the reason where it is cited, pushing its own premises onto
-     * [pending], and report whether it was consumed.
-     *
-     * 1UIP resolves the frontier in reverse establishment order, which the driver reads off the pin
-     * trail. An order literal materialised after its bound had already crossed never went on the trail,
-     * so the driver can only reach it once the whole trail is exhausted — long past the facts its reason
-     * cites, which then recur as already-resolved premises and cost the clause its literals. Resolving it
-     * where it is cited instead puts its premises in the frontier below the citing literal's position,
-     * since they all precede the bound move that established it.
-     *
-     * Its level and reason come from the bound move that first reached its threshold
-     * ([PropagationState.boundAtomEstablishment]); a decision move gives none, and the literal stays a leaf.
-     * Below the conflict level nothing is ever resolved out, so those literals stay leaves too.
-     */
+    // An order literal materialized after its bound crossed never went on the pin trail, so the driver would
+    // reach it only after the whole trail, past the facts its reason cites, which would then recur as already
+    // resolved and cost the clause its literals. Resolving it where it is cited puts its premises below the
+    // citing literal. A decision move gives no reason, and literals below the conflict level stay leaves.
     private fun substituteOffTrail(v: Int, currentLevel: Int): Boolean {
         val atomId = v - state.problem.numBoolVars
         if (atomId >= state.atoms.intVar.size || state.atoms.lvl[atomId] >= 0) return false
@@ -211,7 +172,6 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         return true
     }
 
-    /** Convert every still-seen variable into a literal in [learned], deduped via [litsInLearned]. */
     override fun drainFrontier() {
         val numBoolVars = state.problem.numBoolVars
         for (v in 0 until universe) {
@@ -228,11 +188,6 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         }
     }
 
-    /**
-     * Apply [ClauseMinimizer.reduce], then compute backjump level + LBD on the final
-     * clause and wrap into [ConflictAnalyzer.AnalysisResult.Learned]. Single tail call from every exit
-     * path of the driver so all exit shapes get the same post-processing.
-     */
     override fun finalizeResult(currentLevel: Int): ConflictAnalyzer.AnalysisResult {
         val minimized = minimizer.reduce(learned, currentLevel)
         val levels = distinctLevelsOf(minimized)
@@ -256,7 +211,6 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         )
     }
 
-    /** Sorted-ascending array of distinct decision levels touched by [learned]; its size is the LBD. */
     private fun distinctLevelsOf(learned: IntArrayList): IntArray {
         if (learned.size == 0) return emptyIntArray()
         val seen = IntHashSet(learned.size)
@@ -266,11 +220,7 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         return out
     }
 
-    /**
-     * Backjump target: the highest decision level below [currentLevel] (the clause's highest level, where
-     * the asserting literal sits) among the learned literals' variables, or 0. Popping back to it leaves the
-     * learned clause unit, so propagation re-fires it as a forced pin.
-     */
+    // Popping to the highest level below the clause's top leaves it unit.
     private fun backjumpLevelOf(learned: IntArrayList, currentLevel: Int): Int {
         var best = 0
         for (i in 0 until learned.size) {

@@ -5,33 +5,18 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.util.arrays.emptyDoubleArray
 
-/**
- * The LP relaxation of a system over its **genuinely open** integer ranges, built for
- * [tightenOpenIntBounds].
- *
- * A variable open below enters split, `x = x⁺ − x⁻` with both parts non-negative, never as a probe-
- * magnitude lower bound: the double view folds each column's lower bound into the row rhs in doubles, and
- * at the probe's magnitude that fold absorbs the true rhs — every row would degenerate and every derived
- * bound be void at the frontier. Splitting keeps the fold at zero. Real columns split for the same reason.
- */
+// A variable open below enters split as `x = x⁺ − x⁻` (`negCol(v)` is -1 otherwise), never with a huge
+// stand-in lower bound: the double view folds each column's lower bound into the row rhs, and at that
+// magnitude the fold absorbs the true rhs. Real columns split for the same reason.
 internal class OpenRelaxation(
     val builder: LpBuilder,
-    /** Per integer variable, its `x⁺` column. */
     val posCol: IntArray,
-    /** Per integer variable, its `x⁻` column, or `-1` when the variable is bounded below and needs none. */
     val negCol: IntArray,
-    /** Per real variable that appears in a row, its positive column. */
     val realPos: HashMap<Int, Int>,
-    /** Per real variable open below, its negative column. */
     val realNeg: HashMap<Int, Int>,
 )
 
-/**
- * Build the relaxation of [constraints] (and the real-bearing [realConstraints]) over [bounds].
- *
- * Every column is created with zero cost: the callers either probe one column at a time through the
- * in-place objective swaps on the built model, or state what they want as a row.
- */
+// Columns have zero cost: callers probe one column at a time through objective swaps on the built model.
 internal fun openRelaxation(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
@@ -51,7 +36,7 @@ internal fun openRelaxation(
             posCol[v] = if (b.hi != null && b.hi >= 0L) builder.addVar(0L, b.hi) else builder.addFreeVar(0L, null)
             negCol[v] = builder.addFreeVar(0L, null)
             if (b.hi != null && b.hi < 0L) {
-                // x⁺ is pinned to 0 above; the finite negative upper bound survives as a row on the pair.
+                // x⁺ is pinned to 0 above; the negative upper bound survives as a row on the pair.
                 builder.addRow(intArrayOf(posCol[v], negCol[v]), longArrayOf(1L, -1L), Relation.LE, b.hi)
             }
         }
@@ -62,9 +47,8 @@ internal fun openRelaxation(
         val (cols, vals) = splitTerms(f, posCol, negCol) ?: continue
         builder.addRow(cols, vals, rel, row.bound)
     }
-    // Mixed integer/real rows join through LP-only continuous columns, so a variable whose only definition
-    // rides a real row (a floor definition, a to_real bridge) is still reachable. A strict row enters
-    // non-strict — a relaxation, so every bound and every dual bound derived here stays sound.
+    // A variable defined only through a real row (a floor definition, a to_real bridge) stays reachable.
+    // A strict row enters non-strict, which is a sound relaxation.
     val realPos = HashMap<Int, Int>()
     val realNeg = HashMap<Int, Int>()
     for (f in realConstraints) {

@@ -17,19 +17,13 @@ import com.eignex.kpermute.longPermutation
 import kotlin.random.Random
 
 /**
- * Per-call params for [BruteForceSolver]. The brute-force engine is exact within its
- * step budget; [maxSteps] caps the number of assignments the walker will check before
- * giving up. The default [Long.MAX_VALUE] means "exhaust the entire space", but for
- * problems with billions of assignments and few satisfying ones, callers should set a
- * finite budget.
+ * Per-call params for [BruteForceSolver], which is exact within its step budget.
  *
- *  - [randomSeed] — controls the iteration order via kpermute.
- *  - [minHammingDistance] / [recentWindow] — opt-in diversity filter on
- *    [BruteForceSolver.enumerate]. Default `0 / 0` means no filter; the walker already
- *    visits each assignment at most once.
- *  - [maxSteps] — global cap on assignments visited per call. When the walker hits the
- *    cap, the sequence ends; for [BruteForceSolver.minimize] this means the returned
- *    sample is the best seen so far rather than guaranteed-optimal.
+ *  - [randomSeed] — iteration order.
+ *  - [minHammingDistance] / [recentWindow] — opt-in diversity filter on [BruteForceSolver.enumerate];
+ *    `0` disables it.
+ *  - [maxSteps] — cap on assignments visited per call; [Long.MAX_VALUE] exhausts the space. A capped
+ *    [BruteForceSolver.minimize] returns the best sample seen rather than a proven optimum.
  */
 data class BruteForceParams(
     val randomSeed: Long? = null,
@@ -37,15 +31,11 @@ data class BruteForceParams(
     val recentWindow: Int = 0,
     val maxSteps: Long = Long.MAX_VALUE,
     /**
-     * Wall-clock-independent operation budget across all backends. For [BruteForceSolver]
-     * one instruction = one assignment visited (the same unit [maxSteps] counts). When
-     * both are set, the smaller wins. `null` = no instruction-budget cap; use [maxSteps]
-     * alone. See the matching field on `BacktrackParams` / `LocalSearchParams` for the
-     * cross-backend rationale.
+     * Wall-clock-independent operation budget: one instruction is one assignment visited, the unit
+     * [maxSteps] counts, and the smaller cap wins. `null` means no instruction cap.
      */
     val maxInstructions: Long? = null,
 ) : SolverParams {
-    /** Effective per-call assignment cap honouring both [maxSteps] and [maxInstructions]. */
     internal val effectiveStepCap: Long get() = minOf(maxSteps, maxInstructions ?: Long.MAX_VALUE)
 }
 
@@ -81,10 +71,8 @@ class BruteForceSolver(override val problem: BakedProblem) :
     }
 
     /**
-     * Lowest-objective assignment found within the walker's step cap ([BruteForceParams.maxSteps] /
-     * [BruteForceParams.maxInstructions]).
-     * If the cap is generous enough to exhaust the assignment space, the result is the
-     * exact global minimum; otherwise it's the best-seen-so-far.
+     * Lowest-objective assignment found within the step cap: the exact minimum when the walk exhausts the
+     * space, otherwise the best seen.
      */
     override fun minimize(objective: LinearObjective, params: BruteForceParams): MinimizeResult {
         var bestObj = Double.POSITIVE_INFINITY
@@ -106,10 +94,8 @@ class BruteForceSolver(override val problem: BakedProblem) :
         }.withSourceSemantics(problem.semantics)
     }
 
-    /** With replacement: each yield is the first satisfying assignment of a freshly-seeded
-     *  permutation walk. Different seeds give different "first hit" positions, so the
-     *  sequence behaves like independent draws — duplicates can reappear, as the contract
-     *  requires. */
+    /** With replacement: each yield is the first satisfying assignment of a freshly seeded walk, so
+     *  duplicates can reappear. */
     override fun samples(params: BruteForceParams): Sequence<Sample> = sequence {
         var seed = params.randomSeed ?: 0L
         while (true) {
@@ -132,36 +118,28 @@ class BruteForceSolver(override val problem: BakedProblem) :
         }
     }
 
-    /**
-     * Walk the assignment space, capped at [BruteForceParams.effectiveStepCap] assignments visited.
-     * Yields satisfying assignments in kpermute-shuffled order across nested chunk permutations.
-     */
     private fun walk(params: BruteForceParams): Sequence<Sample> =
         walkWithBudget(params, StepBudget(params.effectiveStepCap))
 
-    /** Variant of [walk] that uses a caller-supplied [StepBudget], so the caller can
-     *  distinguish assignment-space exhaustion from a capped traversal. */
     private fun walkWithBudget(params: BruteForceParams, budget: StepBudget): Sequence<Sample> {
         val seed = params.randomSeed ?: 0L
         val state = LocalSearchState(problem, Random(seed))
         if (chunks.isEmpty()) {
-            // No variables — there's exactly one assignment to test.
+            // No variables: exactly one assignment to test.
             return sequence {
                 if (!budget.consume()) return@sequence
                 state.recompute()
                 if (state.cost == 0L) yield(state.assignment.snapshot().withSourceSemantics(problem.semantics))
             }
         }
-        // Use a different sub-seed per chunk so two chunks with the same size don't walk
-        // in lock-step. Overflow is irrelevant — kpermute accepts any Long seed.
+        // Distinct sub-seeds keep equal-size chunks from walking in lock-step; overflow is harmless.
         val perms = chunks.mapIndexed { i, c ->
             longPermutation(size = c.totalSize, seed = seed + i * 0x9E3779B97F4A7C15uL.toLong())
         }
         return walkChunks(perms, depth = 0, state = state, budget = budget)
     }
 
-    /** Mutable counter so the recursive [walkChunks] decrements one shared budget across
-     *  the cartesian-product walk rather than each depth holding its own. */
+    // One budget shared across every depth of the recursive [walkChunks].
     private class StepBudget(var remaining: Long) {
         var capped: Boolean = false
             private set
@@ -172,7 +150,6 @@ class BruteForceSolver(override val problem: BakedProblem) :
             return false
         }
 
-        /** Decrement the budget; return `false` if it's exhausted (caller should stop). */
         fun consume(): Boolean {
             if (!hasRemaining()) return false
             remaining--
@@ -199,8 +176,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
         }
     }
 
-    /** Decode [idx] into the variables held by [chunk] and write them into [state]'s
-     *  assignment. Mixed-radix: each dim consumes its radix from the running quotient. */
+    // Mixed-radix decode: each dim consumes its radix from the running quotient.
     private fun applyChunkIndex(chunk: Chunk, idx: Long, state: LocalSearchState) {
         var remaining = idx
         for (dim in chunk.dims) {
@@ -229,26 +205,22 @@ class BruteForceSolver(override val problem: BakedProblem) :
     private data class Dim(val kind: DimKind, val varId: Int, val radix: Long)
     private data class Chunk(val dims: List<Dim>, val totalSize: Long)
 
-    /** Factory and shared constants for [BruteForceSolver]. */
+    /** Shared constants and space gating for [BruteForceSolver]. */
     companion object {
         /** Largest per-chunk product. Stays well below [Long.MAX_VALUE] so adding one more
          *  dim's worth of multiplication can't overflow even for radix = Int.MAX_VALUE. */
         const val CHUNK_CAP: Long = 1L shl 60
 
-        /** Heuristic cap used by callers gating brute-force inclusion. Brute-force walking
-         *  is exact, but exhausting a 10¹²-assignment space takes longer than typical use
-         *  cases want to wait. */
+        /** Default assignment-space cap for callers gating brute-force inclusion. */
         const val DEFAULT_MAX_SPACE: Long = 1_000_000L
 
-        /** True when the total assignment space fits the caller's heuristic cap. The
-         *  sampler itself accepts any size; this is purely a gating decision for callers
-         *  that want brute force only when it'll finish quickly. */
+        /** True when the total assignment space fits [cap]; the solver itself accepts any size. */
         fun fits(problem: BakedProblem, cap: Long = DEFAULT_MAX_SPACE): Boolean {
             val size = computeSpaceSize(problem)
             return size in 1..cap
         }
 
-        /** Total space size, or [Long.MAX_VALUE] if it overflows. */
+        // [Long.MAX_VALUE] on overflow.
         private fun computeSpaceSize(problem: BakedProblem): Long {
             var size = 1L
             repeat(problem.numBoolVars) {
@@ -264,9 +236,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
             return size
         }
 
-        /** Build chunks sized so each per-chunk product stays under [CHUNK_CAP]. Bools
-         *  come first, then ints — order doesn't affect correctness, only iteration
-         *  shape. */
+        // Dim order affects only the iteration shape, not correctness.
         private fun buildChunks(problem: BakedProblem): List<Chunk> {
             val dims = ArrayList<Dim>(problem.numBoolVars + problem.numIntVars)
             for (b in 0 until problem.numBoolVars) dims.add(Dim(DimKind.BOOL, b, 2L))

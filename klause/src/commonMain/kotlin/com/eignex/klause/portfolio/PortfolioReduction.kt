@@ -8,10 +8,6 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 
-/**
- * Pure result reductions for the [Portfolio]: the verdict, terminal and stats logic, kept apart from how
- * the scheduler gathers its arms' results.
- */
 internal object PortfolioReduction {
 
     fun unsettledReason(reasons: List<TerminationReason>): TerminationReason = when {
@@ -20,13 +16,10 @@ internal object PortfolioReduction {
         else -> reasons.firstOrNull() ?: TerminationReason.Cancelled
     }
 
-    /** Merge every result's counters into one [SolveStats] — the pool's total cost, not the
-     *  winner's. [stats] projects the per-result counters (results carry no common supertype). */
+    // The pool's total cost, not the winner's.
     fun <T> foldStats(results: List<T>, stats: (T) -> SolveStats): SolveStats =
         results.fold(SolveStats.EMPTY) { acc, r -> acc.mergedWith(stats(r)) }
 
-    /** Reduce a pool of per-worker satisfaction results to one verdict, preferring Sat, then Unsat,
-     *  then Unknown/Cancelled, and folding every worker's counters into the winner. */
     fun verdict(results: List<SolveResult>): SolveResult {
         val stats = foldStats(results) { it.stats }
         return when (
@@ -40,10 +33,8 @@ internal object PortfolioReduction {
         }
     }
 
-    /** Whether a segment/worker terminal proves its whole space was covered (so any incumbent is
-     *  optimal, or there is no solution). A slice-truncated or cancelled run reports
-     *  Cancelled/BudgetExhausted instead, so `SearchExhausted` reliably tells a genuine exhaustion
-     *  from a timed-out run. `null` (no terminal produced) is not exhausted. */
+    // Whether a terminal proves its whole space was covered. A slice-truncated or cancelled run reports
+    // Cancelled or BudgetExhausted, so `SearchExhausted` reliably means genuine exhaustion.
     fun isExhausted(result: MinimizeResult?): Boolean = when (result) {
         is MinimizeResult.Optimal -> true
 
@@ -59,33 +50,20 @@ internal object PortfolioReduction {
         null -> false
     }
 
-    /**
-     * The bound an exhausted arm proved under an optimality gap: what its search reports having proved, else
-     * [fallback], the gap cutoff of the pool once it holds the arm's incumbents; read below [gapFloor], the least gap
-     * cutoff any arm's shared facts may carry. Never the gap cutoff of an earlier pool read, which a pending local
-     * incumbent may undercut.
-     */
+    // fallback is the pool's gap cutoff once it holds the arm's incumbents, never that of an earlier pool read,
+    // which a pending local incumbent may undercut. gapFloor is the least gap cutoff any arm's shared facts may
+    // carry.
     fun armExhaustionBound(searchBound: Double?, fallback: Double?, gapFloor: Double): Double? {
         val own = searchBound?.takeUnless { it.isNaN() } ?: fallback ?: return null
         return if (own < gapFloor) own else gapFloor
     }
 
-    /**
-     * The gap bound a clean stop reports for an incumbent of value [incumbent] and rounded-up value [incumbentBound]
-     * given the bound the run [proved]; null when that bound reaches the incumbent, which is then exactly optimal.
-     */
+    // Null when the proved bound reaches the incumbent, which is then exactly optimal.
     fun gapBound(gap: OptimalityGap?, incumbent: Double, incumbentBound: Double, proved: Double): Double? =
         if (gap == null || proved >= incumbent) null else gap.exhaustedBound(incumbentBound, proved)
 
-    /**
-     * The four-way optimisation terminal: given the run's verified [incumbent] (null when none was ever
-     * installed) and whether the run stopped [dirty] (without proving the space covered, i.e. any worker
-     * not [isExhausted]), classify the outcome. Clean exhaustion with an incumbent
-     * is Optimal; clean without one is Infeasible; a dirty stop keeps the incumbent as BestFound or, with
-     * none, reports Unknown. Taking one snapshot rather than a (sample, bound) pair is what keeps a reported
-     * bound from belonging to a different assignment than the sample reported beside it. A clean stop that proved
-     * only [gapBound] reports the optimum within the optimality gap.
-     */
+    // dirty means the run stopped without proving the space covered. Taking one incumbent snapshot rather than a
+    // (sample, bound) pair keeps a reported bound from belonging to a different assignment than its sample.
     fun terminal(
         incumbent: VerifiedIncumbent<Sample, Double>?,
         dirty: Boolean,

@@ -11,24 +11,18 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.LongHashSet
 
-// `<extension>` (positive/negative table) lowering for the XCSP3 front-end.
-//
-// A tuple column may be a value, a `*` wildcard, or a `lo..hi` range. Positive tables carry these as
-// short-support cells (each written tuple is one row — no Cartesian expansion), and negative tables
-// lower to one nogood clause per forbidden tuple. Both keep the encoding linear in the written tuples
+// A tuple column may be a value, a `*` wildcard, or a `lo..hi` range. Positive tables keep these as short-support
+// cells and negative tables lower to one nogood per forbidden tuple, so both stay linear in the written tuples
 // rather than in the Cartesian product the wildcards denote.
 
 internal fun Compiler.Builder.extension(e: XmlElement) {
     val vars = listVars(e)
-    // The raw (untrimmed) text is one shared String object across a group's rows, so the support
-    // template cache keys on it by identity; the tuple scan already skips surrounding whitespace.
+    // Untrimmed: the support template cache keys on the String object a group's rows share.
     val supports = e.child("supports")?.textContent
     val conflicts = e.child("conflicts")?.textContent
     when {
-        // No allowed tuple ⇒ the constraint (hence the instance) is unsatisfiable.
         supports != null && supports.isBlank() -> factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
 
-        // No forbidden tuple ⇒ trivially satisfied; post nothing.
         conflicts != null && conflicts.isBlank() -> Unit
 
         supports != null -> postSupportTable(vars, supports)
@@ -39,18 +33,13 @@ internal fun Compiler.Builder.extension(e: XmlElement) {
     }
 }
 
-/** The domain-product ceiling below which a negative table is complemented to a positive [Table] rather
- *  than lowered to nogood clauses. Not a size limit on the constraint — both paths are sound and always
- *  posted; this only selects the *representation*: a small complement materializes for GAC-strength STR2
- *  propagation, a large one degrades to forward-checking clauses so no astronomical complement is built. */
+// Selects the representation, not a size limit: below it a negative table is complemented to a positive Table
+// for GAC-strength STR2 propagation; above it, nogood clauses avoid building an astronomical complement.
 private const val COMPLEMENT_MATERIALIZE_CEILING = 1_000_000L
 
-/** Post a negative `<conflicts>` table. When the variables' domain Cartesian product is small enough
- *  ([COMPLEMENT_MATERIALIZE_CEILING]), complement it to a positive [Table] — STR2 propagates that at GAC
- *  strength, which matters for dense binary negatives (e.g. FRB) where forward checking is far too weak.
- *  Otherwise lower to nogood clauses (forward-checking strength) to avoid materializing a large complement.
- *  STR2: C. Lecoutre, "STR2: optimized simple tabular reduction for table constraints", Constraints 16(4),
- *  2011, https://doi.org/10.1007/s10601-011-9107-6. */
+// GAC matters for dense binary negative tables, where the forward checking of nogood clauses is far too weak.
+// STR2: C. Lecoutre, "STR2: optimized simple tabular reduction for table constraints", Constraints 16(4),
+// 2011, https://doi.org/10.1007/s10601-011-9107-6.
 internal fun Compiler.Builder.postConflicts(vars: IntArray, text: String) {
     val rows = parseShortRows(text, vars.size)
     var product = 1L
@@ -62,17 +51,13 @@ internal fun Compiler.Builder.postConflicts(vars: IntArray, text: String) {
     postConflictComplement(vars, rows)
 }
 
-/** The allowed complement of a forbidden-tuple table as a positive [Table]: every domain combination
- *  that matches no forbidden row. An empty complement ⇒ every assignment forbidden ⇒ unsatisfiable. */
 internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: ShortRows) {
     val arity = vars.size
     val doms = vars.map { v -> domains[v].span().let { values -> LongArray(values.size) { values.valueAt(it) } } }
     val nRows = rows.lo.size / arity
 
-    // A tuple of per-column domain indices encodes to a single mixed-radix [Long] in `[0, product)`,
-    // bounded by [COMPLEMENT_MATERIALIZE_CEILING]. Ground forbidden rows live in a primitive [LongHashSet]
-    // and the enumeration probes it by a code maintained incrementally down the recursion, so no tuple is
-    // boxed per row or per enumerated point.
+    // A tuple of per-column domain indices encodes to one mixed-radix Long, maintained incrementally down the
+    // recursion, so no tuple is boxed per row or per enumerated point.
     val stride = LongArray(arity)
     var acc = 1L
     for (c in 0 until arity) {
@@ -137,14 +122,10 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
     factors.add(Table(xs = vars, tuples = allowed.toLongArray()))
 }
 
-/** The parsed short-support tuple arrays of a `<supports>` table, shared across a group's rows: the
- *  row-major cell lower bounds [tuples] and, for a short table, the per-cell upper bounds [hi] (null
- *  for a fully-ground table). [triviallySat] flags a table with a fully unbounded row, which matches
- *  every assignment — the constraint posts nothing. */
+// Shared across a group's rows. [hi] is null for a fully ground table; [triviallySat] flags a fully unbounded
+// row, which matches every assignment.
 internal class SupportTemplate(val triviallySat: Boolean, val tuples: LongArray, val hi: LongArray?)
 
-/** Return the support template for [text], reusing the last one when [text] is the same object — the
- *  case for a `<group>`'s rows, which share one `<supports>` String object. */
 @Suppress("AvoidReferentialEquality")
 private inline fun Compiler.Builder.supportTemplateFor(text: String, compute: () -> SupportTemplate): SupportTemplate {
     cachedSupportTemplate?.let { if (text === cachedSupportsText) return it }
@@ -154,10 +135,6 @@ private inline fun Compiler.Builder.supportTemplateFor(text: String, compute: ()
     return built
 }
 
-/** Post a positive `<supports>` table as a [Table] factor. `*`/range columns become short-support
- *  cells (an interval `[lo, hi]`; a `*` is `[MIN, MAX]`), so each written tuple is exactly one row.
- *  A fully unbounded row matches every assignment, so the whole constraint is trivially satisfied. The
- *  parsed tuple arrays are cached by text identity and shared across a group's rows. */
 internal fun Compiler.Builder.postSupportTable(vars: IntArray, text: String) {
     val arity = vars.size
     val tpl = supportTemplateFor(text) { buildSupportTemplate(arity, text) }
@@ -178,13 +155,10 @@ private fun Compiler.Builder.buildSupportTemplate(arity: Int, text: String): Sup
         }
         if (allFree) return SupportTemplate(triviallySat = true, tuples = LongArray(0), hi = null)
     }
-    // Ground (all points) ⇒ no upper-bound array, so the table takes the point-only path.
     return SupportTemplate(triviallySat = false, tuples = rows.lo, hi = if (rows.short) rows.hi else null)
 }
 
-/** Post a negative `<conflicts>` table as one nogood clause per forbidden tuple — the disjunction of
- *  each column "differing" from its cell: `x ≠ v` for a point, `x < lo ∨ x > hi` for a range, and
- *  nothing for a `*` (it forbids regardless of that variable). Never materializes the complement. */
+// Each nogood is the disjunction of every column differing from its cell; a `*` column contributes nothing.
 internal fun Compiler.Builder.postConflictClauses(vars: IntArray, rows: ShortRows) {
     val arity = vars.size
     val n = rows.lo.size / arity
@@ -220,25 +194,15 @@ internal fun Compiler.Builder.postConflictClauses(vars: IntArray, rows: ShortRow
     }
 }
 
-/**
- * Flat short-tuple rows: [lo]/[hi] hold each cell's inclusive interval bounds row-major (equal for a
- * point value; `[MIN, MAX]` for a `*` wildcard).
- *
- * A ground table — every cell a point — carries no second array at all: [hi] then IS [lo], since the two
- * would be equal element for element, and a multi-MB table would otherwise pay a full duplicate that
- * [buildSupportTemplate] immediately discards. [short] reports whether an interval cell was actually
- * seen, so callers test it instead of rescanning both arrays. Both arrays are read-only.
- */
+// Row-major inclusive cell bounds. A ground table carries no second array, since a multi-MB table would otherwise
+// pay a full duplicate; [hi] is then [lo]. Both arrays are read-only.
 internal class ShortRows(val lo: LongArray, private val intervals: LongArray?) {
     val hi: LongArray get() = intervals ?: lo
 
-    /** True when some cell is a `*` or a `lo..hi` range, i.e. [hi] is a distinct array. */
     val short: Boolean get() = intervals != null
 }
 
-/** Parse `<supports>`/`<conflicts>` tuple text into short rows, one row per written tuple: a `*`
- *  column is `[MIN, MAX]`, a `lo..hi` column is that interval, everything else is a point `[v, v]`.
- *  Unary tables use the bare-value form (`0 1 2`, no parentheses). */
+// Unary tables may use the bare-value form (`0 1 2`, no parentheses).
 internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     val bare = arity == 1 && '(' !in text
     // Size the cell arrays exactly to avoid transient copies from growable lists. Materialize `hi` only
@@ -337,14 +301,12 @@ internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRow
     return if (k == cells) ShortRows(lo, intervals) else ShortRows(lo.copyOf(k), intervals?.copyOf(k))
 }
 
-/** Number of `(` — one per written tuple — so the cell arrays can be sized exactly before parsing. */
 private fun countTuples(text: String): Int {
     var count = 0
     for (c in text) if (c == '(') count++
     return count
 }
 
-/** Number of whitespace-separated tokens in the bare unary form (`0 1 2`), one cell each. */
 private fun countBareCells(text: String): Int {
     var count = 0
     var inToken = false
@@ -377,8 +339,6 @@ private fun parseLongIn(text: String, from: Int, to: Int): Long {
     return if (neg) v else -v
 }
 
-/** Invoke [cell] with each trimmed comma-separated field of every `(...)` group in [text], then [endRow]
- *  after the group — one linear scan per tuple. */
 internal inline fun forEachTuple(text: String, cell: (String) -> Unit, endRow: () -> Unit) {
     val n = text.length
     var i = 0

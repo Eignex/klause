@@ -7,18 +7,10 @@ import com.eignex.klause.util.OriginCounts
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.storage.borrowBackingArray
 
-/**
- * Learned-constraint database for [PropagationState]: the constraints learned during search plus the
- * parallel policy columns the three-tier reduction and forgetting passes read. Registration,
- * lookup and pruning live in `ClauseDb.kt`. Every learned constraint is stored as a [Propagator] so the
- * database is agnostic to the learned-constraint kind: a [com.eignex.klause.factor.bool.ClausePropagator]
- * and a pseudo-Boolean cutting-planes propagator share the same policy columns and forgetting machinery.
- */
+// Every learned constraint is stored as a [Propagator], so clauses and PB constraints share the policy columns
+// and forgetting machinery. Registration, lookup and pruning live in `ClauseDb.kt`.
 internal class LearnedClauseDb(
-    /** Count of binary (2-literal) clauses known — original problem clauses plus learned ones.
-     *  Gates binary-resolution minimization, which is a no-op without binary clauses.
-     *  Over-approximates after forgetting (never decremented), which only costs a harmless no-op
-     *  pass — never correctness. */
+    // Gates binary-resolution minimization. Never decremented on forgetting, which only costs a no-op pass.
     var binaryClauseCount: Int,
     initializeRows: Boolean = true,
     rowOwner: PropagationState? = null,
@@ -56,10 +48,8 @@ internal class LearnedClauseDb(
     internal var releasedConsumedPeerImports = 0
     internal var releasedConsumed = 0
 
-    /** Uses of imported clauses, by origin. */
     val importUses = OriginCounts()
 
-    /** Number of learned clauses. */
     val size: Int get() = initializedStore?.size ?: 0
 
     internal val activeCount: Int get() = size - retiredCount
@@ -153,9 +143,7 @@ internal class LearnedClauseDb(
     }
 }
 
-/** The origin of a learned clause the session derived itself rather than imported. */
 internal const val OWN_ORIGIN = -1
 
-/** The origin of an order-atom channeling clause: structural, rebuilt by every session that allocates the atoms, so
- *  never shared with another arm. */
+// Channeling clauses are structural and rebuilt by every session that allocates the atoms, so never shared.
 internal const val CHANNELING_ORIGIN = -2

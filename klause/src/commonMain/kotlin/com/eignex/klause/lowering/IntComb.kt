@@ -15,17 +15,12 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
-/**
- * Folded integer linear combination in 64-bit [Narrow] or arbitrary-precision [Wide] form.
- * A coefficient or constant overflowing `Long` promotes the fold to [Wide]; narrow folds
- * avoid big-integer allocation.
- */
+// A `Long` overflow promotes the fold to Wide; narrow folds avoid big-integer allocation.
 internal sealed interface IntComb {
     class Narrow(val lin: LinComb) : IntComb
     class Wide(val lin: WideLinComb) : IntComb
 }
 
-/** The `BigInt` analogue of [LinComb]: `Σ coeffs·vars + constant` with arbitrary-precision values. */
 internal data class WideLinComb(val coeffs: Map<Int, BigInt>, val constant: BigInt) {
     fun plus(other: WideLinComb): WideLinComb {
         val m = HashMap(coeffs)
@@ -43,16 +38,12 @@ internal fun IntComb.toWide(): WideLinComb = when (this) {
     is IntComb.Wide -> lin
 }
 
-/** True when this combination has no variable terms (a bare constant). */
 internal fun IntComb.isConstant(): Boolean = when (this) {
     is IntComb.Narrow -> lin.coeffs.values.all { it == 0L }
     is IntComb.Wide -> lin.coeffs.values.all { it == BIG_ZERO }
 }
 
-/**
- * Sum [combs], negating all elements after the first when [negateTail]. One mutable
- * accumulator keeps work linear in operand count. A `Long` overflow retries in arbitrary precision.
- */
+// One mutable accumulator keeps work linear in operand count.
 internal fun sumIntCombs(combs: List<IntComb>, negateTail: Boolean = false): IntComb {
     if (combs.all { it is IntComb.Narrow }) {
         runCatching {
@@ -78,7 +69,6 @@ internal fun sumIntCombs(combs: List<IntComb>, negateTail: Boolean = false): Int
     return IntComb.Wide(WideLinComb(m, constant))
 }
 
-/** This combination scaled by a `Long`, promoting to [IntComb.Wide] on overflow. */
 internal fun scaleIntComb(a: IntComb, k: Long): IntComb {
     if (a is IntComb.Narrow) {
         runCatching { return IntComb.Narrow(a.lin.scaled(k)) }.getOrElse { if (it !is ArithmeticException) throw it }
@@ -86,14 +76,9 @@ internal fun scaleIntComb(a: IntComb, k: Long): IntComb {
     return IntComb.Wide(a.toWide().scaled(bigIntOf(k)))
 }
 
-/** This combination scaled by an arbitrary-precision constant (always [IntComb.Wide]). */
 internal fun scaleIntCombWide(a: IntComb, k: BigInt): IntComb = IntComb.Wide(a.toWide().scaled(k))
 
-/**
- * The relation `a ⟨op⟩ b` reduced to `(vars, coeffs, bound)` as `Σ coeffs·vars ⟨op⟩ bound`, either 64-bit
- * ([LongRel]) or arbitrary-precision ([WideRel]). A wide fold whose every value happens to fit `Long` is
- * returned as a [LongRel].
- */
+// A wide fold whose every value fits `Long` is returned as a LongRel.
 internal sealed interface LinRelation {
     class LongRel(val vars: IntArray, val coeffs: LongArray, val bound: Long) : LinRelation
     class WideRel(val vars: IntArray, val coeffs: Array<BigInt>, val bound: BigInt) : LinRelation
@@ -120,7 +105,6 @@ internal fun intCombDiff(a: IntComb, b: IntComb, delta: Long): LinRelation {
     return LinRelation.WideRel(vars, coeffs, bound)
 }
 
-/** Product of the constant combinations in a `*` fold, staying `Long` until it overflows. */
 internal fun constProduct(consts: List<IntComb>): IntComb {
     if (consts.all { it is IntComb.Narrow }) {
         runCatching {
@@ -138,13 +122,11 @@ internal fun constProduct(consts: List<IntComb>): IntComb {
     }
 }
 
-/** Scale [term] by the constant value of [k] (a variable-free combination), promoting as needed. */
 internal fun scaleByConst(term: IntComb, k: IntComb): IntComb = when (k) {
     is IntComb.Narrow -> scaleIntComb(term, k.lin.constant)
     is IntComb.Wide -> scaleIntCombWide(term, k.lin.constant)
 }
 
-/** Whether the variable-free relation `0 ⟨op⟩ bound` holds (a wide row whose terms all cancelled). */
 internal fun wideConstHolds(op: LinearOp, bound: BigInt): Boolean = when (op) {
     LinearOp.LE -> BIG_ZERO <= bound
     LinearOp.GE -> BIG_ZERO >= bound

@@ -29,7 +29,7 @@ internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")
     if (p.constraintsRemoved != 0) out += "presolveConstraintsRemoved" to "${p.constraintsRemoved}"
     if (p.infeasible) out += "presolveInfeasible" to "true"
-    // The LP harvest's own contribution, broken out so it can be measured apart from the net counts above.
+    // Broken out so the LP harvest reads apart from the net counts above.
     p.lpHarvest?.let { lp ->
         if (lp.skipped) out += "lpHarvestSkipped" to "true"
         if (lp.rootInfeasible) out += "lpHarvestRootInfeasible" to "true"

@@ -61,74 +61,47 @@ internal data class LpAdmission(
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled only when the
  * problem contains the structure it targets and the [LpConfig] emphasis permits its cost tier:
  *
- *  - **[LpPlan.bounding]** — there is genuine integer-linear structure ([Linear] /
- *    [ReifiedLinear]) the relaxation can exploit, or a global whose relaxation/cuts need the LP
- *    ([AllDifferent], [GlobalCardinality], [Circuit], constant-array [Element], [Table]). With it
- *    come the bounding-stack techniques that need no extra structure: per-node objective propagation,
- *    Farkas learning ([LpPlan.learn]) and the LP-rounding incumbent probe
- *    ([LpPlan.probe]).
- *  - **[LpPlan.cuts]** — LP bounding is active and the cost tier permits separation.
- *    Structural separators target their factor families; Gomory/MIR candidates require supported
- *    integral LP columns and exact row data. Source mapping checks rounding and inherited premises
- *    before a cut enters the shared root pool.
- *  - **[LpPlan.circuit]** — a [Circuit] is present (subtour-elimination cuts).
- *  - **[LpPlan.element]** — a constant-array [Element] is present (its convex hull).
- *  - **[LpPlan.table]** — a [Table] is present (its convex hull).
- *  - **[LpPlan.nValue]** — an [NValue] is present (its one-hot value hull).
- *  - **[LpPlan.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
- *  - **[LpPlan.energeticReasoning]** — a [Cumulative] is present. When the auto path is
- *    the one enabling it, [LpPlan.energeticEvery] is derived from the model's task counts
- *    so the O(windows² · tasks) window scan stays within [ENERGETIC_OPS_PER_CHECK] per check;
- *    a caller who enabled the check explicitly keeps their cadence.
- *  - **[LpPlan.cumulative]** — a [Cumulative] with a *verifiable*
- *    makespan variable is present (the energetic makespan LP row). Applicability is the
- *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
- *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
+ *  - **[LpPlan.bounding]**: LP-emittable rows ([Linear], [ReifiedLinear], ...) or a global whose
+ *    relaxation or cuts need the LP. With it come objective propagation, Farkas learning
+ *    ([LpPlan.learn]) and the LP-rounding probe ([LpPlan.probe]).
+ *  - **[LpPlan.cuts]**: LP bounding is active and the cost tier permits separation.
+ *  - **Hulls** ([LpPlan.circuit], [LpPlan.element], [LpPlan.table], [LpPlan.nValue], ...): the
+ *    matching global ([Circuit], [Element], [Table], [NValue], ...) is present.
+ *  - **[LpPlan.lagrangian]**: an [AllDifferent] is present.
+ *  - **[LpPlan.energeticReasoning]**: a [Cumulative] is present. When this path enables it,
+ *    [LpPlan.energeticEvery] is derived from the task counts so the window scan stays within
+ *    [ENERGETIC_OPS_PER_CHECK] per check.
+ *  - **[LpPlan.cumulative]**: [CumulativeRelaxation] proves a makespan link for a scheduling global.
  *
- * The LP-relaxation flags have a **size guard** bounding per-node solve cost. Ordinary LP is declined once
- * the estimated relaxation size (`rows × (cols + rows + 1)`) exceeds the ceiling [KlauseConfig.lpCeilingTableauCells].
- * The gated hulls (circuit / element / table / nvalue / regular / mdd / gcc-count / time-indexed) then compete for a
- * hull budget — the base cap [KlauseConfig.lpMaxTableauCells] when the base relaxation fits it, else the ceiling —
- * accepted smallest-first, so a stack of hulls is shed rather than allowed to defeat the guard. The Lagrangian and
- * energetic bounds have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
- * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
- * An explicit [LpTechnique.SPARSE_TRIAL] request can instead select a resource-bounded root plan after inspecting
- * the emitted linear relaxation. This does not expand ordinary node admission or dense exact continuation.
- *
- * `LpEngine` resolves [LpParams.lpConfig] through this; the portfolio calls [resolve] directly to ask
- * whether an arm's emphasis enables any LP technique.
+ * A **size guard** bounds per-node solve cost. LP is declined once the estimated relaxation size
+ * (`rows × (cols + rows + 1)`) exceeds [KlauseConfig.lpCeilingTableauCells]. The gated hulls then compete
+ * smallest-first for a hull budget: [KlauseConfig.lpMaxTableauCells] when the base relaxation fits it, else
+ * the ceiling. The Lagrangian and energetic bounds have their own caps. Every flag is OR-ed onto `base`, so
+ * an explicit caller setting bypasses the guard and is never turned off. An explicit
+ * [LpTechnique.SPARSE_TRIAL] request can instead select a resource-bounded root plan after inspecting the
+ * emitted linear relaxation.
  */
 object LpAutoConfig {
 
     /**
      * Per-check operation budget the auto-derived [LpPlan.energeticEvery] normalises to:
-     * `cadence = ceil(Σ tasksᵢ³ / budget)` over the Cumulatives the scan actually visits (factors
-     * past the bound's own task cap are skipped there and cost nothing). A 48-task model stays at
-     * cadence 1; a 256-task model lands around 128.
+     * `cadence = ceil(Σ tasksᵢ³ / budget)` over the Cumulatives within the scan's own task cap.
      */
     const val ENERGETIC_OPS_PER_CHECK: Long = 1L shl 17
 
     /**
-     * Middle-tier size threshold: at [LpEmphasis.DEFAULT] a convex-hull technique (normally an
-     * [LpTiming.EXHAUSTIVE] add-on, so off until `AGGRESSIVE`) is still admitted when its estimated
-     * added dimensions `cols + rows` stay under this, since per-node simplex bounding is already paying
-     * for an LP there and a small hull only tightens it. The expensive hulls (a large Table / Regular /
-     * Mdd / time-indexed expansion) stay gated to `AGGRESSIVE`. Hulls are sound relaxations, so this only
-     * trades a little build cost for a tighter bound; the size budget still caps the admitted stack.
+     * At [LpEmphasis.DEFAULT] an [LpTiming.EXHAUSTIVE] hull is still admitted when its estimated added
+     * `cols + rows` stay at most this: the per-node simplex already pays for an LP, and a small hull only
+     * tightens it. The size budget still caps the admitted stack.
      */
     const val SMALL_HULL_DIM: Long = 128L
 
-    /** `base` with every ordinary structurally-applicable LP technique enabled — i.e. [resolve] at the
-     *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). */
+    /** [resolve] at the [LpEmphasis.AGGRESSIVE] ceiling. */
     fun recommend(problem: Problem, base: LpPlan = LpPlan()): LpPlan = resolve(problem, LpConfig.AGGRESSIVE, base)
 
     /**
-     * `base` with each LP technique enabled where [problem]'s structure makes it applicable **and**
-     * [config] permits it (the emphasis cost ceiling + per-technique overrides — see [LpConfig]).
-     * Structural applicability and the size guard are unchanged; the emphasis just caps
-     * which cost tiers may run, so `AGGRESSIVE` reproduces the all-applicable [recommend] and the
-     * cheaper levels switch the expensive tiers off. Flags are OR-ed onto `base`, so an explicit
-     * caller setting is never turned off.
+     * `base` with each LP technique enabled where [problem]'s structure makes it applicable and [config]
+     * permits it. Flags are OR-ed onto `base`, so an explicit caller setting is never turned off.
      */
     @Suppress("CyclomaticComplexMethod")
     fun resolve(problem: Problem, config: LpConfig, base: LpPlan = LpPlan()): LpPlan {
@@ -190,7 +163,6 @@ object LpAutoConfig {
         var rows = 0L
         for (f in problem.factors) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            // Plain rows do not need the optional hull classifier.
             if (f is Linear) {
                 lpEmittable = true
                 rows += 1
@@ -207,7 +179,6 @@ object LpAutoConfig {
                     rows += 2
                 }
 
-                // The relaxation gates a reified real row by its indicator: two big-M rows, like a ReifiedLinear.
                 is ReifiedRealLinear -> {
                     lpEmittable = true
                     rows += 2
@@ -238,14 +209,13 @@ object LpAutoConfig {
 
                 is GlobalCardinality -> {
                     globalCardinality = true
-                    // The count-var hull bounds the count variables; only that form has any to bound.
                     if (f.countVars != null && f.presents.isEmpty()) gccCount = true
                 }
 
                 is Cumulative -> {
                     cumulative = true
                     scheduling = true
-                    // The scan skips factors above its own task cap; they cost nothing.
+                    // The scan skips factors above its own task cap.
                     val t = f.starts.size.toLong()
                     if (t <= CumulativeEnergeticBound.MAX_TASKS) energeticOps += t * t * t
                 }
@@ -258,8 +228,7 @@ object LpAutoConfig {
 
                 is Circuit -> circuit = true
 
-                // Both constant- and variable-array Element route to the element hull (the variable case
-                // builds the big-M form); the size guard still caps it internally.
+                // A variable-array Element builds the big-M form of the hull.
                 is Element -> constArrayElement = true
 
                 is ArrayMinMax -> arrayMinMax = true
@@ -279,11 +248,6 @@ object LpAutoConfig {
                 else -> Unit
             }
         }
-        // Size guard: the per-node LP is the base relaxation PLUS every enabled gated-hull's columns/rows.
-        // Estimate each hull against the same MAX_* caps the builders skip at, then accept them
-        // smallest-first only while the combined `base + accepted` tableau stays under the budget — so
-        // a stack of hulls (Table + NValue + Circuit + time-indexed) can't defeat the guard: the
-        // largest are shed and the base LP still runs.
         val makespanPlans = if (scheduling) {
             val owner = CumulativeRelaxation(problem, deferred = true)
             owner.preparation().forEach { yield(Unit) }
@@ -292,8 +256,7 @@ object LpAutoConfig {
             0
         }
         rows += makespanPlans.toLong()
-        // Diffn contributes the same kind of makespan row, one per derived axis plan (over an existing
-        // column), counted separately so it gates under its own technique rather than lpCumulative.
+        // Counted apart from the cumulative plans so Diffn gates under its own technique.
         val diffnPlans = if (diffn) {
             val owner = CumulativeRelaxation(problem, includeCumulative = false, includeDiffn = true, deferred = true)
             owner.preparation().forEach { yield(Unit) }
@@ -303,9 +266,8 @@ object LpAutoConfig {
         }
         rows += diffnPlans.toLong()
         val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong() + problem.numRealVars.toLong()
-        // Two per-node cost-guard tiers; the bound is sound either way. `tableauCells` is a size proxy,
-        // not a literal allocation. The base cap bounds the hull budget of a small base relaxation; the
-        // ceiling is the absolute size past which LP is declined.
+        // The base cap bounds the hull budget of a small base relaxation; the ceiling is the size past
+        // which LP is declined.
         val baseCap = problem.settings.lpMaxTableauCells
         val ceilingCap = problem.settings.lpCeilingTableauCells
         val cells = tableauCells(rows, baseCols)
@@ -315,39 +277,28 @@ object LpAutoConfig {
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
                 table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0 ||
                 arrayMinMax || product
-        // An explicit objective-cone request drops the disjunctive big-M rows and every variable
-        // disconnected from the objective, so it always fits the cap even when the full model is over it.
+        // An objective-cone request drops the big-M rows and every variable disconnected from the
+        // objective, so it is treated as fitting every cap.
         val coneRequested = base.objectiveCone
         val baseFits = coneRequested || cells <= baseCap
-        // LP runs whenever the model is structurally amenable, the emphasis permits it, and the base
-        // relaxation fits the ceiling (a cone request always fits).
         val lpActive = structApplicable && config.resolved(LpTechnique.BOUNDING) &&
             (coneRequested || cells <= ceilingCap)
 
-        // A small base relaxation budgets its hulls against the base cap; a larger (but in-ceiling) base
-        // budgets against the ceiling, since its per-node LP is already that size.
         val makespanLp = lpActive && makespanPlans > 0
         val diffnLp = lpActive && diffnPlans > 0
         val hullCap = if (baseFits) baseCap else ceilingCap
 
-        // Structurally-present hulls compete for the budget once admitted (a non-admitted hull is never
-        // built, so it costs nothing). Each estimate sums over its factors and honours that hull's own
-        // MAX_* cap, exactly as the builder does. [hullAdmitted] gates by emphasis: AGGRESSIVE admits
-        // every hull, DEFAULT admits only the small ones (the middle tier), and an override wins either
-        // way — the global budget still caps whatever is admitted.
+        // Each estimate honours its hull's own MAX_* cap exactly as the builder does.
         val candidates = if (!lpActive) {
             emptyList()
         } else {
             buildList {
                 fun admit(e: HullEstimate?) = e?.let { if (hullAdmitted(config, it)) add(it) }
-                // The whole-table root-box reading copies, so it is materialized on the first family
-                // that needs it and shared from there — never per family, and never on a model
-                // carrying no hull factor at all.
+                // The root-box reading copies the whole table, so it is materialized once, on the first
+                // family that needs it.
                 var boxes: RootBoxes? = null
                 suspend fun SequenceScope<Unit>.rootBoxes(): RootBoxes =
                     boxes ?: prepareRootBoxes(problem).also { boxes = it }
-                // Per-factor hull sizes come from each factor's LP hull estimate (single source with
-                // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
                 if (circuit) admit(circuitEstimate(problem))
                 if (constArrayElement) {
                     for (estimate in elementEstimates(problem, rootBoxes())) admit(estimate)
@@ -363,8 +314,6 @@ object LpAutoConfig {
         val selection = acceptUnderBudget(rows, baseCols, candidates, hullCap)
         val acceptedHulls = selection.techniques
 
-        // Tableau eligibility belongs to the assembled model's exact columns and row data;
-        // source mapping discharges rounding bounds and inherited guards before sharing a cut.
         val cuts = lpActive && config.resolved(LpTechnique.CUTS)
         val structuralCuts = cuts && (cutEligible || pseudoBoolean)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
@@ -372,10 +321,8 @@ object LpAutoConfig {
             sourcePreparation = sourcePreparation,
             bounding = base.bounding || lpActive,
             cuts = base.cuts || cuts,
-            // LP learning rides on the bounding path: the objective-bound reason is built from the
-            // exact basis-certificate the sparse solve already computes.
+            // The objective-bound reason reuses the exact basis certificate the bounding solve computes.
             learn = base.learn || lpActive,
-            // The LP-rounding probe solves the root relaxation through the sparse revised simplex.
             probe = base.probe || lpActive,
             circuit = base.circuit || (LpTechnique.CIRCUIT in acceptedHulls),
             element = base.element || (LpTechnique.ELEMENT in acceptedHulls),
@@ -397,12 +344,10 @@ object LpAutoConfig {
             impliedBoundCuts = base.impliedBoundCuts ||
                 (structuralCuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
             flowCoverCuts = base.flowCoverCuts || (structuralCuts && config.resolved(LpTechnique.FLOW_COVER)),
-            // Boolean RLT is a no-op without 0/1 knapsack rows.
             booleanRlt = base.booleanRlt || (structuralCuts && config.resolved(LpTechnique.BOOLEAN_RLT)),
             lagrangian = base.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
             energeticReasoning = base.energeticReasoning || energetic,
-            // Derive the cadence only when the auto path is the one enabling the check — an
-            // explicit caller enablement keeps the caller's cadence untouched.
+            // An explicit caller enablement keeps the caller's cadence.
             energeticEvery = if (energetic && !base.energeticReasoning) {
                 maxOf(base.energeticEvery.toLong(), 1L + (energeticOps - 1L) / ENERGETIC_OPS_PER_CHECK)
                     .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
@@ -477,11 +422,9 @@ object LpAutoConfig {
         return plan
     }
 
-    /** Relaxation-size proxy `m × (n + m + 1)` for `rows = m` constraint rows and `cols = n`
-     *  structural columns (plus the `m` slacks and the rhs column). */
+    // Size proxy, not an allocation: m rows times n structural columns plus m slacks and the rhs.
     private fun tableauCells(rows: Long, cols: Long): Long = rows * (cols + rows + 1L)
 
-    /** A gated hull's estimated added columns and rows, summed over its factors of one kind. */
     private class HullEstimate(
         val key: LpTechnique,
         val cols: Long,
@@ -491,19 +434,14 @@ object LpAutoConfig {
 
     private class HullSelection(val techniques: Set<LpTechnique>, val elementIndexes: Set<Int>)
 
-    /** Whether [h]'s hull may compete for the size budget under [config]: an explicit override wins;
-     *  else the technique's cost tier must be permitted by the emphasis (`AGGRESSIVE`), or — the middle
-     *  tier — the per-node simplex is on ([LpTiming.MEDIUM] permitted) and the hull is small enough
-     *  ([SMALL_HULL_DIM]). */
     private fun hullAdmitted(config: LpConfig, h: HullEstimate): Boolean {
         config.overrides[h.key]?.let { return it }
         if (h.key.timing in config.emphasis.timings) return true
         return LpTiming.MEDIUM in config.emphasis.timings && h.cols + h.rows <= SMALL_HULL_DIM
     }
 
-    /** Accept hulls smallest-first while the combined `base + accepted` size stays under [maxCells]
-     *  (the hull budget: the base cap or the ceiling); the rest are shed (their flag stays off),
-     *  so a stack of hulls can't push the per-node LP past the budget. */
+    // Smallest-first, so a stack of hulls sheds its largest members instead of pushing the per-node LP
+    // past the budget.
     private fun acceptUnderBudget(
         baseRows: Long,
         baseCols: Long,
@@ -553,8 +491,7 @@ object LpAutoConfig {
         return estimates
     }
 
-    /** Arc-model columns (`Σ` candidate arcs) + degree/channel rows over the under-cap [Circuit]
-     *  factors (mirrors `CpToLpRelaxation.buildArcModel`; subcircuit keeps self-loop arcs). */
+    // Mirrors `CpToLpRelaxation.buildArcModel`.
     private suspend fun SequenceScope<Unit>.circuitEstimate(problem: Problem): HullEstimate? {
         var visits = 0
         var cols = 0L
@@ -567,8 +504,7 @@ object LpAutoConfig {
             val selfLoops = circuitFactor.subcircuit
             val n = succ.size
             if (n < 2) continue
-            // Mirrors the build's own decline: an open-sided successor gets no arc model, so its arcs
-            // must not enter the estimate either.
+            // The build declines an open-sided successor.
             if (!prepareStatesBothBounds(problem, succ)) continue
             val arcs = prepareCandidateArcCount(
                 succ, selfLoops, CpToLpRelaxation.MAX_CIRCUIT_ARCS, problem::rootDomainOf,
@@ -581,9 +517,7 @@ object LpAutoConfig {
         return if (any) HullEstimate(LpTechnique.CIRCUIT, cols, rows) else null
     }
 
-    /** The aggregate hull size of every factor in the [family] convex-hull family, summing each factor's
-     *  own LP hull estimate — the single source shared with the build, so
-     *  the gating estimate cannot drift from the rows actually emitted. */
+    // Sums the per-factor estimate the build also uses, so gating cannot drift from the emitted rows.
     private suspend fun SequenceScope<Unit>.hullEstimate(
         problem: Problem,
         boxes: RootBoxes,
@@ -605,8 +539,7 @@ object LpAutoConfig {
         return if (any) HullEstimate(technique, cols, rows) else null
     }
 
-    /** Time-indexed `x_{i,t}` columns + resource/assignment/channel rows over the bounded-horizon
-     *  scheduling factors, honouring the horizon / column caps (mirrors `buildCumulativeTimeIndexed`). */
+    // Mirrors `buildCumulativeTimeIndexed`, including its horizon and column caps.
     private suspend fun SequenceScope<Unit>.timeIndexedEstimate(problem: Problem): HullEstimate? {
         var visits = 0
         var cols = 0L
@@ -614,8 +547,7 @@ object LpAutoConfig {
         var any = false
         for (v in prepareSchedulingViews(problem)) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            // Mirrors the build's own decline: a view with an open-sided start gets no time-indexed
-            // model, so its columns must not enter the estimate either.
+            // The build declines a view with an open-sided start.
             if (!prepareStatesBothBounds(problem, v.starts)) continue
             val n = v.starts.size
             var t0 = Long.MAX_VALUE

@@ -38,24 +38,15 @@ import com.eignex.klause.util.ExecutionControl
 /**
  * Per-call params for [BacktrackSolver].
  *
- *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). Unbounded by default.
- *    It bounds one *slice*: a driver that re-enters the engine starts a fresh allowance. [nodeBudget]
- *    bounds the whole solve in the same unit.
- *  - [nodeBudget] — a decision-node cap spanning the whole solve, for measurement; see [NodeBudget].
- *  - [randomSeed] — seeds the engine RNG that's threaded into [variableSelector] and
- *    [valueSelector]. `null` picks a fresh seed per call.
+ *  - [randomSeed] — seeds the engine RNG used by [variableSelector] and [valueSelector]; `null` picks a fresh
+ *    seed per call.
  *  - [assumptions] — variables pinned for the duration of the call.
- *  - [variableSelector] — picks the next variable to branch on. Defaults to
- *    [Vsids] for conflict-driven search; alternatives include [SmallestDomain]
- *    (first-fail), [InputOrder], and [RandomVariable].
- *  - [valueSelector] — picks the order in which to try values of the chosen variable.
- *    Defaults to [IndomainRandom]; alternatives include [IndomainMin] / [IndomainMax] /
- *    [IndomainMiddle] / [IndomainSet] for hole domains.
- *  - [minHammingDistance] / [recentWindow] — opt-in diversity filter for the
- *    [BacktrackSolver.enumerate] path; only set them when you want to *skip* models that
- *    are within `minHammingDistance` of a previously yielded model. The DFS enumerator
- *    never yields the same model twice on its own, so the default `0 / 0` (no filter) is
- *    correct for all standard use. Ignored by `solve` / `samples`.
+ *  - [variableSelector] — picks the next variable to branch on. Defaults to [Vsids]; alternatives include
+ *    [SmallestDomain] (first-fail), [InputOrder], and [RandomVariable].
+ *  - [valueSelector] — orders the values of the chosen variable. Defaults to [IndomainRandom]; alternatives
+ *    include [IndomainMin] / [IndomainMax] / [IndomainMiddle] / [IndomainSet] for hole domains.
+ *  - [minHammingDistance] / [recentWindow] — opt-in diversity filter for [BacktrackSolver.enumerate] that skips
+ *    models within `minHammingDistance` of a recently yielded model. Ignored by `solve` / `samples`.
  */
 data class BacktrackParams(
     /**
@@ -72,17 +63,13 @@ data class BacktrackParams(
      */
     val maxDecisions: Long = Long.MAX_VALUE,
     /**
-     * Wall-clock-independent operation budget across all backends. For [BacktrackSolver]
-     * one instruction = one decision attempt (the same unit [maxDecisions] counts). When
-     * both are set, the smaller wins. `null` = no instruction-budget cap; use [maxDecisions]
-     * alone. Each backend maps it onto its own primary unit (flips for local search, steps for
-     * brute force).
+     * Wall-clock-independent operation budget. For [BacktrackSolver] one instruction is one decision attempt,
+     * the unit [maxDecisions] counts; when both are set, the smaller wins. `null` means no cap.
      */
     val maxInstructions: Long? = null,
     /**
-     * Solve-spanning cap on decision nodes; see [NodeBudget]. Enforced through [cancellation], so it
-     * stops the search on the same cooperative path a deadline uses rather than through a second exit.
-     * `null` (default) leaves the search bounded by [maxDecisions] and the deadline alone.
+     * Solve-spanning cap on decision nodes; see [NodeBudget]. Enforced through [cancellation], the same
+     * cooperative path a deadline uses. `null` (default) leaves no solve-wide cap.
      */
     val nodeBudget: NodeBudget? = null,
     val randomSeed: Long? = null,
@@ -92,81 +79,55 @@ data class BacktrackParams(
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
     /**
-     * Luby restart base. When non-null, the search pops back to root after
-     * `lubyN(restartIdx) * lubyRestartBase` decisions in the current run and starts
-     * fresh from level 0. Phase-saving (see [phaseSaving]) and the B&B bound (in
-     * [com.eignex.klause.solver.Optimizer.minimize]) survive the restart, so each
-     * restart resumes with strictly more information than the previous run. Disabled
-     * by default (`null`); set a strictly positive unit (for example `256`) to enable Luby restarts
+     * Luby restart base: when non-null, the search restarts from level 0 after
+     * `lubyN(restartIdx) * lubyRestartBase` decisions. Saved phases and the branch-and-bound bound survive
+     * the restart. Must be positive; `null` (default) disables Luby restarts
      * (M. Luby, A. Sinclair, D. Zuckerman, "Optimal speedup of Las Vegas algorithms", Inf. Process. Lett. 47(4), 1993,
      * https://doi.org/10.1016/0020-0190(93)90029-9).
      */
     val lubyRestartBase: Long? = null,
     /**
-     * LBD-adaptive restarts for the pure-Boolean search path.
-     * When true, the engine restarts based on learned-clause quality — a short window of
-     * recent LBD running hotter than the long-run average forces a re-pick — with trail-size
-     * blocking that suppresses the restart when the solver is driving deep toward a model.
-     * See [GlucoseRestart]. Selectable *alongside* [lubyRestartBase] rather than replacing it:
-     * when adaptive restarts are on the Luby budget is ignored, so SAT-heavy configs opt into
-     * data-driven restarts while the CP optimization path keeps Luby. Disabled by default.
+     * LBD-adaptive restarts: a short window of recent LBD running hotter than the long-run average forces a
+     * restart, and trail-size blocking suppresses it while the search drives deep toward a model. See
+     * [GlucoseRestart]. When on, [lubyRestartBase] is ignored. Disabled by default.
      */
     val adaptiveRestart: Boolean = false,
     /**
-     * EMA-based adaptive restarts — the moving-average variant of [adaptiveRestart].
-     * Instead of [GlucoseRestart]'s bounded LBD/trail windows, restarts are driven by exponential
-     * moving averages of learned-clause LBD (a fast recent average against a slow long-run one) with
+     * The exponential-moving-average variant of [adaptiveRestart]: a fast LBD average against a slow one, with
      * the same trail-size blocking. See [EmaRestart]. Takes precedence over [adaptiveRestart] and
-     * [lubyRestartBase] when set. Disabled by default.
+     * [lubyRestartBase]. Disabled by default.
      */
     val emaRestart: Boolean = false,
     /**
-     * Stable/focused mode-switching restarts. The search dives without restarting until a first
-     * feasible solution, then alternates a stable mode (sparse Luby restarts, diving on the saved phase)
-     * with focused proving modes (frequent adaptive restarts), so it is robust on optimization without
-     * hand-tuning a Luby base. See [ModeSwitchingRestartSchedule]. Takes
-     * precedence over [emaRestart], [adaptiveRestart], and [lubyRestartBase] when set. Disabled by
-     * default.
+     * Stable/focused mode-switching restarts: no restarts until a first feasible solution, then a stable mode
+     * (sparse Luby restarts, diving on the saved phase) alternating with focused modes (frequent adaptive
+     * restarts). See [ModeSwitchingRestartSchedule]. Takes precedence over [emaRestart], [adaptiveRestart], and
+     * [lubyRestartBase]. Disabled by default.
      */
     val modeSwitchingRestart: Boolean = false,
     /**
-     * Phase-saving: cache the last value the search committed to for each variable.
-     * On a fresh descent (after a backtrack or restart) the cached value is tried
-     * first, so the search doesn't lose the work spent narrowing down the right
-     * polarity each time (K. Pipatsrisawat, A. Darwiche, "A lightweight component caching scheme for
+     * Phase saving: a fresh descent tries each variable's last committed value first
+     * (K. Pipatsrisawat, A. Darwiche, "A lightweight component caching scheme for
      * satisfiability solvers", SAT 2007, https://doi.org/10.1007/978-3-540-72788-0_28). Disabled by default.
      */
     val phaseSaving: Boolean = false,
     /**
-     * Target phasing and rephasing on top of plain [phaseSaving]. When enabled, the engine
-     * tracks the deepest conflict-free Boolean assignment seen so far (the "target" phase,
-     * the trail prefix at the most-assigned point before a backtrack) and biases fresh
-     * Boolean decisions toward it. A rephasing schedule periodically rotates the polarity
-     * source — target, saved, all-true, all-false, random — every [rephaseInterval] conflicts
-     * to escape basins the saved phase keeps reproducing. Pure-Boolean: integer value
-     * selection is untouched (it still follows plain phase saving when [phaseSaving] is set).
-     * Disabled by default, leaving plain phase saving as the baseline behaviour.
+     * Target phasing and rephasing on top of [phaseSaving]: fresh Boolean decisions lean toward the deepest
+     * conflict-free Boolean assignment seen so far, and every [rephaseInterval] conflicts the polarity source
+     * rotates (target, saved, all-true, all-false, random) to escape basins the saved phase keeps reproducing.
+     * Integer value selection is untouched. Disabled by default.
      */
     val targetPhasing: Boolean = false,
-    /**
-     * Conflicts between rephasing rotations when [targetPhasing] is on. Each rotation
-     * advances the Boolean polarity source through target → saved → all-true → all-false →
-     * random and back. Ignored when [targetPhasing] is false. Must be positive.
-     */
+    /** Conflicts between rephasing rotations when [targetPhasing] is on. Must be positive. */
     val rephaseInterval: Long = 1000L,
     /**
-     * Solution-based phasing. When enabled, each new feasible incumbent seeds the phase source with its
-     * Boolean polarities and
-     * integer values, and the stable phase (and the `SOLUTION` rephase mode) dives toward that incumbent
-     * rather than the last-committed value — objective-good rather than quality-blind. Complements
-     * [targetPhasing] (deepest conflict-free prefix) with the full best solution. Disabled by default.
+     * Solution-based phasing: each new incumbent seeds the phase source with its Boolean polarities and integer
+     * values, so the stable phase and the `SOLUTION` rephase mode dive toward it. Disabled by default.
      */
     val solutionPhasing: Boolean = false,
     /**
-     * Cap on the learned-clause database size. When non-null, a forgetting pass runs at every
-     * restart once the database exceeds the cap: permanent clauses and clauses with
-     * LBD ≤ [lbdGlueThreshold] ("glue clauses") are kept regardless; among the rest, the
-     * lowest-LBD clauses are kept up to the cap and higher-LBD clauses are dropped (G. Audemard,
+     * Cap on the learned-clause database size. Once exceeded, a forgetting pass at each restart keeps permanent
+     * clauses and glue clauses (LBD ≤ [lbdGlueThreshold]) and the lowest-LBD rest up to the cap (G. Audemard,
      * L. Simon, "Predicting learnt clauses quality in modern SAT solvers", IJCAI 2009,
      * https://www.ijcai.org/Proceedings/09/Papers/074.pdf). `null` (default) disables forgetting.
      */
@@ -177,61 +138,44 @@ data class BacktrackParams(
     val learnedMemoryWork: Long = 65_536L,
     /** Maximum modeled scratch bytes for retained-memory preparation and publication. */
     val learnedMemoryScratchBytes: Long = 1_048_576L,
-    /**
-     * Glue threshold for [maxLearnedClauses] — clauses with LBD ≤ this are always
-     * retained, since they typically capture cross-cutting "high-leverage" constraints.
-     */
+    /** Glue threshold for [maxLearnedClauses]: clauses with LBD ≤ this are always retained. */
     val lbdGlueThreshold: Int = 2,
     /**
-     * Three-tier learned-clause database. When true (and [maxLearnedClauses] is set),
-     * the restart-driven reduction replaces the binary glue split with three tiers: a
-     * permanent core (LBD ≤ [lbdGlueThreshold]), a mid tier (LBD ≤ [midLbdThreshold]) kept
-     * across reductions but demoted when idle, and a local tier deleted aggressively. Clauses
-     * that participate in a later conflict (detect it or force a unit) are promoted on the
-     * next reduction; mid-tier clauses idle across a reduction are demoted. Disabled by default.
+     * Three-tier learned-clause database, when [maxLearnedClauses] is set: a permanent core
+     * (LBD ≤ [lbdGlueThreshold]), a mid tier (LBD ≤ [midLbdThreshold]) demoted when idle across a reduction, and
+     * a local tier deleted aggressively. Clauses used in a later conflict are promoted on the next reduction.
+     * Disabled by default.
      */
     val tieredLearnedDb: Boolean = false,
     /**
-     * Mid-tier LBD threshold for [tieredLearnedDb]: a freshly learned clause with
-     * `lbdGlueThreshold < LBD ≤ midLbdThreshold` starts in the mid tier, higher LBD in the
-     * local tier.
+     * Mid-tier LBD threshold for [tieredLearnedDb]: a learned clause with
+     * `lbdGlueThreshold < LBD ≤ midLbdThreshold` starts in the mid tier, higher LBD in the local tier.
      */
     val midLbdThreshold: Int = 6,
     /**
-     * Clause vivification as an inprocessing pass. When true the engine periodically
-     * — at restart boundaries, where the trail is at root and assumptions are clean — walks a
-     * bounded slice of the learned-clause database and strengthens each clause by tentatively
-     * asserting the negations of its literals under propagation: a remaining literal already
-     * falsified is dropped; one forced true (or a conflict) shortens the clause to the
-     * literals tried so far (C. Piette, Y. Hamadi, L. Saïs, "Vivifying propositional clausal formulae",
-     * ECAI 2008, https://doi.org/10.3233/978-1-58603-891-5-525). Pure-Boolean; atom-literal clauses are
-     * skipped. Disabled by default. Only honoured when [assumptions] is empty.
+     * Clause vivification at restart boundaries: walks a bounded slice of the learned-clause database and
+     * shortens each clause by asserting the negations of its literals under propagation
+     * (C. Piette, Y. Hamadi, L. Saïs, "Vivifying propositional clausal formulae",
+     * ECAI 2008, https://doi.org/10.3233/978-1-58603-891-5-525). Atom-literal clauses are skipped. Disabled by
+     * default; only honoured when [assumptions] is empty.
      */
     val vivification: Boolean = false,
     /**
-     * Maximum number of learned clauses vivified per restart when [vivification] is on. The
-     * pass advances a cursor across the database round-robin so the per-restart cost stays
-     * bounded while the whole database is covered over successive restarts. Must be positive.
+     * Learned clauses vivified per restart when [vivification] is on. A round-robin cursor covers the whole
+     * database over successive restarts. Must be positive.
      */
     val vivifyBatch: Int = 256,
     /**
-     * Clause subsumption and self-subsuming resolution as an inprocessing pass. When true
-     * the engine periodically — at restart boundaries, alongside [vivification] — walks a bounded
-     * slice of the learned-clause database, drops each clause another learned clause subsumes, and
-     * strengthens each clause a self-subsuming resolution shortens. Pure-Boolean; atom-literal
-     * clauses are skipped. Disabled by default. Only honoured when [assumptions] is empty.
+     * Subsumption and self-subsuming resolution over a bounded slice of the learned-clause database at restart
+     * boundaries. Atom-literal clauses are skipped. Disabled by default; only honoured when [assumptions] is
+     * empty.
      */
     val subsumption: Boolean = false,
-    /**
-     * Maximum number of learned clauses checked for subsumption per scheduled run when
-     * [subsumption] is on; the round-robin cursor mirrors [vivifyBatch]. Must be positive.
-     */
+    /** Learned clauses checked per scheduled run when [subsumption] is on. Must be positive. */
     val subsumeBatch: Int = 1024,
     /**
-     * Run the scheduled inprocessing loop every Nth restart. The passes' root probing
-     * competes with conflict throughput, and restart-heavy configurations hit the boundary often —
-     * a cadence above 1 buys the simplification at a fraction of the per-restart cost. Only
-     * meaningful when at least one pass (e.g. [vivification]) is enabled. Must be positive.
+     * Run the scheduled inprocessing loop every Nth restart, so restart-heavy configurations pay a fraction of
+     * the per-restart cost. Must be positive.
      */
     val inprocessingCadence: Int = 1,
     /** Simplify Boolean clauses against unconditional facts at safe complete roots. */
@@ -259,196 +203,139 @@ data class BacktrackParams(
     /** Non-inprocessing propagation work required after any scheduled attempt. */
     val inprocessingCooldown: Long = 0L,
     /**
-     * Externally-supplied objective upper bound for branch-and-bound minimisation. When
-     * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
-     * engines read it at each leaf-attempt and prune the subtree whenever the
-     * `LinearObjective` lower bound on the current partial assignment is `≥ supplier()`.
-     * Used by the parallel CP portfolio to share the best-known incumbent across workers
-     * — each worker keeps pruning against a tightening external bound even when its own
-     * local incumbent is worse. `null` (default) disables external bound sharing; the
-     * engine still tracks and prunes against its own internal incumbent. Only honoured
-     * for [com.eignex.klause.solver.objective.LinearObjective] — arbitrary objective subtypes
-     * can't yield a sound LB and silently skip external pruning.
+     * Shared objective upper bound for branch-and-bound minimization: the search prunes a subtree whose linear
+     * objective lower bound is `≥ supplier()`, alongside its own incumbent. Ignored for non-linear objectives,
+     * which yield no sound lower bound. `null` (default) disables external bound sharing.
      */
     val objectiveBoundSupplier: (() -> Double)? = null,
     /**
-     * Sink for global objective **lower** bounds this worker proves — the dual of
-     * [objectiveBoundSupplier]'s shared incumbent cutoff. The root LP relaxation bound (and any raised
-     * objective floor) is published here so a portfolio keeps their cross-arm maximum and can
-     * prove optimality by pairing one arm's bound with another's incumbent. Every published value is a
-     * sound lower bound on the optimum. `null` (default) disables lower-bound sharing; only meaningful for
-     * a [com.eignex.klause.solver.objective.LinearObjective].
+     * Sink for objective lower bounds this worker proves, such as the root LP relaxation bound. Every published
+     * value is a sound lower bound on the optimum. `null` (default) disables lower-bound sharing.
      */
     val objectiveLowerBoundSink: ((Double) -> Unit)? = null,
     /**
-     * Supplier of the portfolio's shared objective lower bound (the cross-arm maximum of every arm's
-     * [objectiveLowerBoundSink] publications). Every feasible solution has objective `≥` the
-     * optimum `≥` this bound, so the engine tightens its single ascending objective variable to
-     * `⌈supplier()⌉` before each search slice: a sound floor (it removes no solution) that lets a peer
-     * arm's proven bound strengthen this arm's propagation and pruning. `null` (default) disables it; a
-     * no-op without a single ascending objective variable.
+     * Shared objective lower bound. Before each search slice the engine tightens its single ascending objective
+     * variable to `⌈supplier()⌉`, which removes no solution. `null` (default) disables it; a no-op without a
+     * single ascending objective variable.
      */
     val objectiveLowerBoundSupplier: (() -> Double)? = null,
-    /**
-     * Sink for each improving feasible incumbent this worker finds — its [Sample] and objective, the
-     * assignment companion of [objectiveLowerBoundSink]. A portfolio folds these into a shared solution
-     * pool so peers can dive toward or improve a globally-good assignment. `null` (default) disables it.
-     */
+    /** Sink for each improving incumbent this worker finds, with its objective. `null` (default) disables it. */
     val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
     /**
-     * The verified incumbent any arm has published — the read counterpart of [improvedSolutionSink]. On each
-     * restart the engine adopts a not-yet-seen incumbent as solution-phasing hints (see [solutionPhasing]) so
-     * its stable phase dives toward the globally-good assignment instead of only its own. Value hints
-     * reorder trials (out-of-domain integers are clamped) without supplying pruning authority.
-     * Incumbents from this source are engine results. Non-restarting retained optimization with
-     * [objectiveBoundSupplier] adopts the current assignment at its first root, once it satisfies this run's pins,
-     * as a starting proof bound, without priming guidance or earning progress.
-     * After its first discovered incumbent,
-     * [SolutionGuided] value selection
-     * adopts better pooled incumbents when optimization resumes, without restarting traversal.
-     * LP-bounding search may prefer those values before its first local witness.
-     * `null` (default) disables it.
+     * Verified incumbents published by other workers. On each restart the engine adopts an unseen incumbent as
+     * solution-phasing hints (see [solutionPhasing]); value hints reorder trials (out-of-domain integers are
+     * clamped) without pruning authority. Non-restarting retained optimization with [objectiveBoundSupplier]
+     * adopts the current assignment at its first root, once it satisfies this run's pins, as a starting proof
+     * bound, without priming guidance or earning progress. After its first incumbent, [SolutionGuided] value
+     * selection adopts better pooled incumbents when optimization resumes. LP-bounding search may prefer those
+     * values before its first local witness. `null` (default) disables it.
      */
     val pooledIncumbents: IncumbentSource<Sample, Double>? = null,
     /**
-     * Sink for the **globally-valid** decision-level-0 integer-variable bound tightenings this worker
-     * proves — `(varId, lo, hi)`, each a bound that holds at *every* solution (root propagation, the
-     * variable-shaving deductions), published so a portfolio can keep their cross-arm intersection. Only
-     * unconditional tightenings are published here; incumbent-relative reduced-cost fixings are not (they
-     * stay arm-local against the shared cutoff). `null` (default) disables it.
+     * Sink for level-0 integer bound tightenings `(varId, lo, hi)` that hold at every solution. Incumbent-relative
+     * reduced-cost fixings are not published. `null` (default) disables it.
      */
     val globalVarBoundSink: ((varId: Int, lo: Long, hi: Long) -> Unit)? = null,
     /**
-     * Suppliers of the portfolio's shared globally-valid level-0 variable bounds — the tightest lower /
-     * upper bound any arm has proven for an integer variable. The engine imports them at its own level 0
-     * (`Int.MIN_VALUE` / `Int.MAX_VALUE` meaning "nothing shared"). Sound: every shared bound holds at
-     * every solution, so importing one only tightens a domain. `null` (default) disables import.
+     * Shared globally valid lower bound per integer variable, imported at level 0. `Int.MIN_VALUE` /
+     * `Int.MAX_VALUE` mean nothing is shared. `null` (default) disables import.
      */
     val globalVarLowerSupplier: ((varId: Int) -> Long)? = null,
     /** Companion of [globalVarLowerSupplier] for the shared upper bounds. */
     val globalVarUpperSupplier: ((varId: Int) -> Long)? = null,
     /**
-     * Told each time an imported shared bound actually tightened a domain here — `(varId, lower)`, `lower` naming
-     * the side — so a portfolio can credit the arm that proved it. `null` (default) reports nothing.
+     * Told each time an imported shared bound tightened a domain here, `lower` naming the side, so a portfolio
+     * can credit the arm that proved it. `null` (default) reports nothing.
      */
     val globalVarImportSink: ((varId: Int, lower: Boolean) -> Unit)? = null,
     /**
-     * Told the nanoseconds each exchange of the objective floor or shared variable bounds took, by channel, so a
-     * portfolio can report what sharing costs this arm. `null` (default) measures nothing.
+     * Told the nanoseconds each exchange of the objective floor or shared variable bounds took, by channel.
+     * `null` (default) measures nothing.
      */
     val sharingTimer: ((channel: SharingChannel, nanos: Long) -> Unit)? = null,
     /**
-     * The emphasis-driven LP-relaxation selector: an [LpEmphasis] cost ceiling + per-technique
-     * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]
-     * at `minimize`/`improvements`. `null` (the raw default) uses the explicit per-technique flags
-     * below verbatim — no LP unless one is set; the user-facing entry points (`--lp`, the portfolio
-     * arms) supply an [LpConfig] so LP is on by default with the emphasis level as the only dial.
-     * `LpConfig.AGGRESSIVE` enables every structurally-applicable technique.
-     * Resolved flags are OR-ed onto any explicit ones, so an explicit flag is never turned off.
+     * Emphasis-driven LP-relaxation selector: an [LpEmphasis] cost ceiling plus per-technique overrides, resolved
+     * against the problem's structure by [LpAutoConfig.resolve]. Resolved flags are OR-ed onto [lpPlan], so an
+     * explicit flag is never turned off. `null` (default) uses [lpPlan] verbatim.
      */
     val lpConfig: LpConfig? = null,
-    /**
-     * The resolved per-technique LP-relaxation plan; see [LpPlan]. [LpAutoConfig.resolve] OR-es the
-     * structurally-applicable techniques onto this from [lpConfig]'s emphasis. The raw default is the
-     * all-off [LpPlan] (no LP unless a field is set or [lpConfig] resolves one on).
-     */
+    /** Per-technique LP-relaxation plan; the default is all off. */
     val lpPlan: LpPlan = LpPlan(),
     /** Use reliable, recent directional LP gains for finite branching; missing history keeps ordinary LP guidance. */
     val lpDirectionalGains: Boolean = false,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /**
-     * Tolerance semantics for continuous leaves: when set, a float LP optimum is accepted without exact
-     * certification if this check accepts the completed sample, and an incumbent without exact reals is admitted
-     * when it passes the same check. A captured source policy can require exact optimum certification while
-     * retaining this point filter. `null` keeps exact semantics.
-     * Exact repair may publish a source-accepted improving primal while leaving the leaf unresolved;
-     * that publication grants no completion certificate or nominal exact coordinates.
+     * Tolerance semantics for continuous leaves: a float LP optimum is accepted without exact certification if
+     * this check accepts the completed sample, and an incumbent without exact reals is admitted when it passes
+     * the same check. A captured source policy can still require exact optimum certification. Exact repair may
+     * publish a source-accepted improving primal while leaving the leaf unresolved; that grants no completion
+     * certificate or exact coordinates. `null` keeps exact semantics.
      */
     val toleranceCheck: ((Sample) -> Boolean)? = null,
     /**
      * Gap within which minimization ends: nodes are pruned against its cutoff of the incumbent, and an exhausted
      * search reports the incumbent optimal with the bound it proved
-     * ([com.eignex.klause.solver.result.MinimizeResult.Optimal.gapBound]), the only signal that the optimum is not
-     * exact. `null` closes the bound completely. A repairing search ignores it, and a problem whose source declares
-     * an exact tolerance rejects it.
+     * ([com.eignex.klause.solver.result.MinimizeResult.Optimal.gapBound]). `null` closes the bound completely. A
+     * repairing search ignores it, and a problem whose source declares an exact tolerance rejects it.
      */
     val optimalityGap: OptimalityGap? = null,
     /** Cooperative cancellation predicate; see [ExecutionControl]. */
     val cancellation: ExecutionControl = ExecutionControl.Never,
-    /** Per-call fire floor before propagation polls [cancellation]; see [PROPAGATION_CANCEL_FLOOR].
-     *  Overridable so a test can force the runaway-fixpoint deadline path deterministically. */
+    /**
+     * Per-call fire floor before propagation polls [cancellation]; see [PROPAGATION_CANCEL_FLOOR]. Overridable so a
+     * test can force the runaway-fixpoint deadline path deterministically.
+     */
     val propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
     /**
-     * Total wall-clock solve budget in milliseconds, when the caller knows it (the `-t` deadline).
-     * Advisory only — the hard stop remains [cancellation]; this just lets the LP subsystem size its
-     * wall-clock sub-budgets as a fraction of the whole (the one-shot root-LP cap and the per-node LP
-     * circuit breaker). `null` (default, no deadline) leaves those caps off.
+     * Total wall-clock solve budget in milliseconds, when the caller knows it. Advisory: [cancellation] is the
+     * hard stop; this sizes the LP subsystem's wall-clock sub-budgets. `null` (default) leaves those caps off.
      */
     val solveBudgetMillis: Long? = null,
     /**
-     * Optional live-event listener; see [SearchEvent]. Called
-     * inline on the search thread at coarse points only (restarts, learned-DB sweeps,
-     * incumbents). `null` (default) disables observation entirely.
+     * Live-event listener; see [SearchEvent]. Called inline on the search thread at coarse points only
+     * (restarts, learned-DB sweeps, incumbents). `null` (default) disables observation.
      */
     val onEvent: ((SearchEvent) -> Unit)? = null,
     /**
-     * Optional cross-arm learned-clause exchange; see [ClauseExchange]. Invoked at each restart
-     * boundary (decision level 0) so a portfolio can import nogoods other arms learned and export
-     * this arm's new glue clauses. `null` (default) means no sharing — a standalone solve is
-     * unaffected. All arms must be built from the same problem for the shared clauses to be valid.
+     * Learned-clause exchange invoked at each restart boundary to import other workers' nogoods and export this
+     * search's glue clauses; see [ClauseExchange]. All participants must be built from the same problem. `null`
+     * (default) means no sharing.
      */
     val clauseExchange: ClauseExchange? = null,
     /**
-     * Optional cross-arm global-cut exchange; see [com.eignex.klause.lp.cut.CutExchange].
-     * Invoked at each restart boundary so a portfolio can import the globally-valid LP cuts other arms
-     * harvested and export this arm's own. `null` (default) means no cut sharing. Like [clauseExchange]
-     * it requires every arm to be built from the same problem; only globally valid cuts cross arms, so
-     * importing one only tightens a relaxation.
+     * Globally valid LP cut exchange invoked at each restart boundary; see [CutExchange]. Like [clauseExchange] it
+     * requires every participant to be built from the same problem. `null` (default) means no cut sharing.
      */
     val cutExchange: CutExchange? = null,
     /**
-     * Whether to route an eligible pure-Boolean problem (no integer variables, all clause factors)
-     * through the native-SAT BCP lane: arena-packed two-watched-literal propagation with
-     * no atom store or factor-queue overhead. `null` (default) auto-dispatches — the lane is selected
-     * exactly when the propagation projection is native-SAT eligible. `true`
-     * requests it (still a no-op on an ineligible problem); `false` forces the general LCG path.
+     * Whether to route an eligible pure-Boolean problem through the native-SAT lane (arena-packed
+     * two-watched-literal propagation). `null` (default) selects it exactly when the propagation projection is
+     * eligible; `true` requests it (a no-op on an ineligible problem); `false` forces the general path.
      */
     val nativeSat: Boolean? = null,
     /**
-     * Whether to learn pseudo-Boolean cutting-planes nogoods on conflicts over pseudo-Boolean / cardinality
-     * constraints: conflict analysis runs a division-based resolvent seeded
-     * from the violated bound, with a clause-resolvent fallback, and stores learned PB constraints
-     * alongside clauses. `null` (default) auto-dispatches — on for pure-Boolean problems, where cutting
-     * planes refute counting structure that resolution cannot (pigeonhole has polynomial cutting-planes
-     * proofs but only exponential resolution proofs: A. Haken, "The intractability of resolution",
-     * Theor. Comput. Sci. 39, 1985, https://doi.org/10.1016/0304-3975(85)90144-6). `true`/`false` force
-     * it. Explicit enablement also admits Boolean-only conflicts in mixed models; an integer atom
-     * in any reached reason retains clause fallback.
+     * Whether to learn pseudo-Boolean cutting-planes constraints from conflicts over pseudo-Boolean / cardinality
+     * constraints, by division-based resolution with a clause fallback. `null` (default) enables it on
+     * pure-Boolean problems, where cutting planes refute counting structure that resolution cannot (A. Haken,
+     * "The intractability of resolution", Theor. Comput. Sci. 39, 1985,
+     * https://doi.org/10.1016/0304-3975(85)90144-6). Explicit enablement also admits Boolean-only conflicts in
+     * mixed models; an integer atom in any reached reason keeps the clause fallback.
      */
     val pbLearning: Boolean? = null,
     /** Learn exact mandatory integer rows from finite conflicts; disabled by default. */
     val integerRowLearning: Boolean = false,
     /**
-     * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
-     * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a
-     * permanent constraint, so branch-and-bound prunes against it and cutting-planes conflict analysis can
-     * refute it to prove optimality — the standard bound-enforcement a weighted-Boolean objective
-     * otherwise lacks (it has no objective variable to tighten). Ignored when the objective is a single
-     * integer variable (that path tightens the variable directly).
-     *
-     * Off by default and enabled per proving-focused arm: enforcing the cutoff strengthens optimality
-     * reasoning but constrains the search for improving incumbents.
+     * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective: each
+     * incumbent `K` posts `Σ boolWeights·x ≤ K − 1` at the root, so cutting-planes conflict analysis can refute it
+     * to prove optimality. Ignored when the objective is a single integer variable. Disabled by default because
+     * the cutoff constrains the search for improving incumbents.
      */
     val pbObjectiveCutoff: Boolean = false,
     /**
-     * Objective-guided value selection on the minimisation path: try each decision variable's
-     * objective-improving polarity first (for `min Σ w·x`, `x=0` when `w ≥ 0`, `x=1` when `w < 0`; the
-     * cost-minimising domain end for any integer coefficient). Dives toward cheap solutions so the
-     * incumbent improves fast; applies to any linear objective. A no-op for a pure-satisfaction
-     * problem (every coefficient is zero). **Off by default and enabled per arm**: as a uniform default it
-     * would collapse the portfolio's value-order diversity. When on, replaces the value selector on the
-     * optimize path, kept incumbent-guided by the phase heuristic on top.
+     * Objective-guided value selection on the minimization path: try each variable's objective-improving value
+     * first (the cost-minimizing polarity or domain end), replacing [valueSelector]. Disabled by default because
+     * a uniform default would collapse value-order diversity across portfolio arms.
      */
     val objectiveGuidedValues: Boolean = false,
     /** Collect bounded factor-family propagation, reason and learned-use diagnostics. */

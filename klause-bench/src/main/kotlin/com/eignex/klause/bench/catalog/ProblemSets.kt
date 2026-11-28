@@ -3,22 +3,16 @@ package com.eignex.klause.bench.catalog
 import com.eignex.klause.bench.source.CorpusFetcher
 import java.io.File
 
-/** One problem of a named set: the suite that has it and its name there, as `select` prints them. */
 internal data class SetEntry(val suite: String, val problem: String)
 
-/**
- * Named problem sets: fixed lists in `klause-bench/sets/<name>.txt`, so benches that name one run the same problems
- * whatever the corpus holds. A line is `<suite>/<problem>`, `@<set>` includes another set,
- * and `#` starts a comment.
- */
+// Fixed lists, so benches that name a set run the same problems whatever the corpus holds. A line is
+// `<suite>/<problem>`, `@<set>` includes another set, and `#` starts a comment.
 internal object ProblemSets {
     fun dir(): File = File(CorpusFetcher.workspaceRoot(), "klause-bench/sets")
 
-    /** Every set's name. */
     fun names(root: File = dir()): List<String> =
         root.listFiles { f -> f.extension == "txt" }.orEmpty().map { it.nameWithoutExtension }.sorted()
 
-    /** The problems of the sets [names], in file order, each once. */
     fun load(names: List<String>, root: File = dir()): List<SetEntry> {
         val entries = LinkedHashSet<SetEntry>()
         fun read(name: String, seen: List<String>) {

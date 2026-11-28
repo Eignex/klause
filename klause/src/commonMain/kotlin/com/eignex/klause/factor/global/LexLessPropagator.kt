@@ -7,7 +7,6 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
-/** CP propagation logic for `lex_less` / `lex_lesseq`. */
 internal class LexLessPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
@@ -16,12 +15,7 @@ internal class LexLessPropagator(
     private val strict: Boolean,
 ) : Propagator {
 
-    /**
-     * Advisor subscription: lexicographic propagation is bound-only (see [propagate], which
-     * reasons from `min`/`max` at the deciding position). An interior hole moves no bound, so the
-     * factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
-     * interior `VALUE_REMOVED` wakes.
-     */
+    // Propagation reads only bounds, so interior value removals need no wake.
     override val initialIntEventWatches: IntArray = run {
         val distinct = IntHashSet()
         for (v in intVars) distinct.add(v)
@@ -43,31 +37,16 @@ internal class LexLessPropagator(
         return collectLinearTightenAntecedents(state, combined, excludeIdx = -1, extraLit = 0)
     }
 
-    /**
-     * Lexicographic filtering after Frisch, Hnich, Kiziltan, Miguel, Walsh, "Global Constraints for
-     * Lexicographic Orderings", CP 2002, https://doi.org/10.1007/3-540-46135-3_7. Each call recomputes
-     * the two pointers from the current domains:
-     *
-     *  - `α` (`a`): the deciding index — the first position whose `(x, y)` pair is not yet pinned
-     *    to a common value, so every earlier position is fixed-equal and the relation hinges here.
-     *  - `β` (`b`): the most significant index from which the suffix is forced the wrong way
-     *    (`x ≥ y`); `β = ∞` when the suffix can stay equal to the end without violating the
-     *    length tie-break.
-     *
-     * The extra strength over a plain `xα ≤ yα` step is the `β` look-ahead: when `β = α + 1` the
-     * suffix cannot rescue equality at `α`, so the position must be *strictly* ordered and the
-     * bound tightens to `xα ≤ yα.max − 1` / `yα ≥ xα.min + 1`. `α ≥ β` means no lexicographic
-     * completion survives — a contradiction.
-     */
+    // Frisch, Hnich, Kiziltan, Miguel, Walsh, "Global Constraints for Lexicographic Orderings", CP 2002,
+    // https://doi.org/10.1007/3-540-46135-3_7. `α` (`a`) is the first position not pinned to a common
+    // value; `β` (`b`) the most significant index from which the suffix is forced `x ≥ y`, or `∞` when
+    // the suffix may stay equal. `β = α + 1` forces a strict step at `α`; `α ≥ β` is a contradiction.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         state.propagatorFailures.remove(this)
         val nx = xs.size
         val ny = ys.size
         val len = minOf(nx, ny)
-        // When the whole common prefix is forced equal, the relation is settled by the length
-        // tie-break: a proper-prefix `xs` is strictly less; equal length needs `!strict`; a longer
-        // `xs` is strictly greater and so violates. `tailAllowsEquality` is also `β`'s `∞` test —
-        // a suffix that may stay equal to the end forces no strict step at `α`.
+        // A fully equal common prefix is settled by the length tie-break; this is also the `β = ∞` test.
         val tailAllowsEquality = nx < ny || (nx == ny && !strict)
 
         var a = 0
@@ -139,12 +118,8 @@ internal class LexLessPropagator(
         }
     }
 
-    /**
-     * Premise variables whose current bounds justify the tightening at `α`: the fixed-equal prefix
-     * (why `α` is the deciding index), the `α` pair itself, and — when the step is strict — the
-     * scanned suffix `α+1..scanStop` that forced strictness. A superset is sound; original-domain
-     * bounds are level-0 facts and drop out inside [PropagationState.composeIntVarAtomAntecedents].
-     */
+    // The fixed-equal prefix, the `α` pair, and for a strict step the suffix `α+1..scanStop`. A superset
+    // is sound; root-domain bounds drop out as level-0 facts.
     private fun reasonVars(a: Int, scanStop: Int, strictHere: Boolean): IntArray {
         val vars = IntArrayList(2 * (a + 1))
         for (j in 0 until a) {

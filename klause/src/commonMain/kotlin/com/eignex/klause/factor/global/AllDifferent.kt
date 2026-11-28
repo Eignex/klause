@@ -34,19 +34,12 @@ import com.eignex.util.arrays.emptyLongArray
 class AllDifferent(
     /** Integer variable ids required to be pairwise distinct. */
     val vars: IntArray,
-    /** Per-position presence literals; empty for the non-opt fast path. When non-empty,
-     *  only present positions are required pairwise-different, and matching-based filtering treats
-     *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
-     *  slot nor block other positions from claiming their value. */
+    /** Per-position presence literals, or empty when every position is present. Only present
+     *  positions are required pairwise-different. */
     override val presents: IntArray = emptyIntArray(),
-    /** Values exempt from the distinctness requirement: any number of variables may share a
-     *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family). Empty for
-     *  plain all-different. Excepted values are modelled inside `reginFilter` as `n` capacity-1 value
-     *  copies, so the exact Hall/matching machinery applies unchanged. */
+    /** Values any number of variables may share (`alldifferent_except`); empty for plain all-different. */
     val exceptSet: LongArray = emptyLongArray(),
-    /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller asked for
-     *  bounds-consistency rather than full GAC. The matching/SCC machinery is then skipped in favour of
-     *  a much cheaper Hall-interval filter, trading pruning strength for per-node throughput. */
+    /** Request bounds consistency (a Hall-interval filter) instead of matching-based GAC. */
     val boundsConsistent: Boolean = false,
 ) : Factor,
     OptionalFactor {
@@ -70,7 +63,6 @@ class AllDifferent(
         }
     }
 
-    /** Canonical excepted values (deduped, sorted) for [structuralKey] / [remap]. */
     private val exceptSorted: LongArray =
         if (exceptSet.isEmpty()) emptyLongArray() else exceptSet.distinct().sorted().toLongArray()
 
@@ -82,12 +74,8 @@ class AllDifferent(
 
     override fun remapStructuralHash(mapping: VarRemap): Int = remap(mapping).structuralKey().hashCode()
 
-    /** Plain distinctness ignores which values are used — invariant under any value relabeling;
-     *  an excepted-value set names those values, so it is not value-anonymous. */
     override fun isValueAnonymous(): Boolean = exceptSet.isEmpty()
 
-    /** Plain all-different names no value, so any relabeling leaves it unchanged; with an
-     *  excepted-value set the excepted values are named and must be relabeled too. */
     override fun remapValues(valueMap: (Long) -> Long): Factor? = if (exceptSet.isEmpty()) {
         this
     } else {
@@ -106,13 +94,8 @@ class AllDifferent(
         boundsConsistent,
     )
 
-    // Structural reductions for a plain all-different (the optional / excepted-value variants have
-    // weaker semantics and are left alone):
-    //  - two variables → the disequality `v0 != v1` (a cheap binary propagator instead of matching);
-    //  - otherwise, split into independent all-differents over value-disjoint components — when the
-    //    variables' value ranges partition into groups that cannot share a value, distinctness across
-    //    groups is automatic, so each group is its own (smaller, cheaper) all-different and any
-    //    singleton group drops. Exact, and it exposes per-component symmetry the whole constraint hid.
+    // Only plain all-different reduces. Groups whose value ranges cannot overlap are independent, so
+    // each becomes its own all-different, which also exposes per-component symmetry.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         if (presents.isNotEmpty() || exceptSet.isNotEmpty()) return Unchanged
         if (vars.size == 2) {
@@ -123,13 +106,8 @@ class AllDifferent(
         return splitIntoValueDisjointComponents(domains)
     }
 
-    /** Partition [vars] into value-range-connected components (a sweep over `[min, max]` intervals: two
-     *  variables are connected when their intervals overlap). With more than one component the
-     *  all-different splits into one per multi-variable component — singleton components impose nothing
-     *  and drop — else there is nothing to split. */
     private fun splitIntoValueDisjointComponents(domains: Array<IntDomain>): FactorReduction {
-        // Sort by interval min and cut a new component wherever the next interval starts beyond the
-        // running max — each component is a contiguous slice of the sorted order.
+        // Components of overlapping `[min, max]` intervals are contiguous slices of the min-sorted order.
         val order = vars.indices.sortedBy { domains[vars[it]].min }
         val components = ArrayList<List<Int>>()
         var start = 0
