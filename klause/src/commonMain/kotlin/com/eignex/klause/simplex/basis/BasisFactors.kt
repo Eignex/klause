@@ -195,6 +195,11 @@ private fun LuAttemptResult.result(report: LuBuildReport): LuBuildResult = when 
     is LuAttemptResult.Rejected -> LuBuildResult.Rejected(reason, work, report)
 }
 
+private class LuPivotBuckets(dimension: Int) {
+    val rows = LuCountBuckets(dimension)
+    val columns = LuCountBuckets(dimension)
+}
+
 private class LuConstruction(
     private val source: SparseMatrix,
     private val basisColumns: IntArray,
@@ -206,8 +211,7 @@ private class LuConstruction(
     private val n = source.rows
     private val columns = Array(n) { MutableIntDoubleMap() }
     private val rows = Array(n) { IntHashSet() }
-    private val rowBuckets = LuCountBuckets(n)
-    private val columnBuckets = LuCountBuckets(n)
+    private val searchBuckets = if (proposedOrder == null) LuPivotBuckets(n) else null
     private val columnMax = DoubleArray(n)
     private val rowOrder = IntArray(n)
     private val columnOrder = IntArray(n)
@@ -315,14 +319,20 @@ private class LuConstruction(
             if (storageStopped || !permitted()) return false
             refreshMaximum(j)
         }
-        for (i in n - 1 downTo 0) {
-            rowBuckets.move(i, rows[i].size)
-            columnBuckets.move(i, columns[i].size)
+        val buckets = searchBuckets
+        if (buckets != null) {
+            for (i in n - 1 downTo 0) {
+                buckets.rows.move(i, rows[i].size)
+                buckets.columns.move(i, columns[i].size)
+            }
         }
         return finite
     }
 
     private fun singleton(): LuPivot? {
+        val buckets = checkNotNull(searchBuckets)
+        val rowBuckets = buckets.rows
+        val columnBuckets = buckets.columns
         var j = columnBuckets.first(1)
         while (j >= 0) {
             var row = -1
@@ -351,6 +361,9 @@ private class LuConstruction(
     // sparsest columns and rows. H. M. Markowitz, "The elimination form of the inverse and its application to
     // linear programming", Management Science 3(3), 1957, https://doi.org/10.1287/mnsc.3.3.255.
     private fun markowitz(): LuPivot? {
+        val buckets = checkNotNull(searchBuckets)
+        val rowBuckets = buckets.rows
+        val columnBuckets = buckets.columns
         var best: LuPivot? = null
         var bestMerit = Long.MAX_VALUE
         var bestMagnitude = 0.0
@@ -413,9 +426,11 @@ private class LuConstruction(
         val affectedRowCount = collectAffectedRows(i, j)
         val affectedColumnCount = collectAffectedColumns(i)
         if (!recordMultipliers(j, diagonal, affectedRowCount)) return false
-        rowBuckets.remove(i)
+        val buckets = searchBuckets
+        buckets?.rows?.remove(i)
         activeRows[i] = false
-        columnBuckets.remove(j)
+        val columnBuckets = buckets?.columns
+        columnBuckets?.remove(j)
         for (position in 0 until affectedColumnCount) {
             val column = affectedColumns[position]
             val top = columns[column].getOrDefault(i, 0.0)
@@ -424,7 +439,7 @@ private class LuConstruction(
             columns[column].remove(i)
             if (column == j) continue
             if (!schurUpdate(column, top, affectedRowCount)) return false
-            columnBuckets.move(column, columns[column].size)
+            columnBuckets?.move(column, columns[column].size)
             refreshMaximum(column)
         }
         detachPivotColumn(j, affectedRowCount)
@@ -491,10 +506,11 @@ private class LuConstruction(
     }
 
     private fun detachPivotColumn(j: Int, affectedRowCount: Int) {
+        val rowBuckets = searchBuckets?.rows
         for (position in 0 until affectedRowCount) {
             val row = affectedRows[position]
             rows[row].remove(j)
-            rowBuckets.move(row, rows[row].size)
+            rowBuckets?.move(row, rows[row].size)
         }
     }
 

@@ -90,8 +90,9 @@ exact rank determination establishes singularity. Koblas supplies the containers
 and kernels; see [integration contracts](22-exact-arithmetic.md#numerical-dependencies).
 
 The default backend can export symbolic pivot-order proposals, including after
-Forrest-Tomlin updates; replay validates every numerical pivot and keeps the cost
-of a failed proposal and its fallback. It can also hand a private owner a copy of
+Forrest-Tomlin updates. Replay validates every numerical pivot. A fallback builds
+its own pivot-search buckets and retains the work of the failed proposal. The backend
+can also hand a private owner a copy of
 its current numerical basis that shares immutable LU matrices, permutations and
 published Forrest-Tomlin slices while adjacency, transforms, scratch and meters stay
 private. Updates replace published slices rather than mutate them, so refactoring
