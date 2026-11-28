@@ -3,7 +3,9 @@ package com.eignex.klause.bench.runner
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.metric.MINIZINC_SOLUTION_SEPARATOR
 import com.eignex.klause.bench.metric.SolveEvidence
+import com.eignex.klause.bench.metric.SolverOutput
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.FlatZincObjective
 import com.eignex.klause.formats.flatzinc.linearObjective
@@ -92,11 +94,15 @@ internal class MiniZincRunner(
      * the model's output variables, enum values by name and no FlatZinc-introduced variables, plus `_objective` for an
      * optimisation model. Throws, saying why, when the mapping fails.
      */
-    fun modelOutput(ref: ProblemRef, flatSolution: String): String {
+    fun modelOutput(ref: ProblemRef, flatSolution: Sequence<String>, maxChars: Int): String? {
         val ozn = compileOutput(ref)
         val dir = Files.createTempDirectory("klause-ozn-").toFile()
         try {
-            val input = File(dir, "flat.dzn").apply { writeText("$flatSolution\n----------\n") }
+            val input = File(dir, "flat.dzn")
+            input.bufferedWriter().use { writer ->
+                for (line in flatSolution) writer.appendLine(line)
+                writer.appendLine(MINIZINC_SOLUTION_SEPARATOR)
+            }
             val output = File(dir, "model.dzn")
             val log = File(dir, "solns2out.log")
             val proc = ProcessBuilder(MiniZincCompatibility.compiler.executable, "--ozn-file", ozn.absolutePath)
@@ -105,13 +111,12 @@ internal class MiniZincRunner(
                 check(proc.waitFor(OUTPUT_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     "minizinc --ozn-file timed out after ${OUTPUT_TIMEOUT_SECONDS}s"
                 }
-                val text = output.readText()
                 check(proc.exitValue() == 0) {
-                    "minizinc --ozn-file failed (exit ${proc.exitValue()}): ${(log.readText() + text).trim().take(500)}"
+                    val diagnostic = CharArray(500)
+                    val size = log.bufferedReader().use { it.read(diagnostic).coerceAtLeast(0) }
+                    "minizinc --ozn-file failed (exit ${proc.exitValue()}): ${diagnostic.concatToString(0, size).trim()}"
                 }
-                return checkNotNull(SolveEvidence.miniZincSolution(text)) {
-                    "minizinc --ozn-file printed no complete solution: ${text.trim().take(500)}"
-                }
+                return SolveEvidence.mappedMiniZincSolution(SolverOutput.Spool(output), maxChars)
             } finally {
                 if (proc.isAlive) proc.destroyForcibly().waitFor()
             }

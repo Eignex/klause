@@ -22,6 +22,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
+import java.io.IOException
 import java.time.Instant
 
 /** One problem's result for one settings+budget — the durable per-problem record the lab reads. */
@@ -150,10 +151,15 @@ internal object SolveMetric {
                 } to null
             },
         )
-        raw?.copyTo(stdoutFile)
+        val outputStats = try {
+            raw?.copyTo(stdoutFile)
+            emptyMap()
+        } catch (failure: IOException) {
+            mapOf("outputArtifactFailure" to outputFailureReason(failure))
+        }
         // Excludes serialization and writing of the timing record itself.
         timings.finish("harnessSolveOneMs", started)
-        val retained = rec.copy(stats = rec.stats + timings.stats())
+        val retained = rec.copy(stats = rec.stats + outputStats + timings.stats())
         File(outDir, "$name.json").writeText(Reports.json.encodeToString(retained))
         return retained
     }
@@ -218,7 +224,7 @@ internal object SolveMetric {
         installedBuild: () -> BuildProvenance? = { InstalledBuild.current },
         invoke: (ResolvedProblem, SolverInvocation.Settings, Budget, Boolean) -> SolverInvocation.Result =
             SolverInvocation::run,
-        modelOutput: (ProblemRef, String) -> String = MiniZincRunner()::modelOutput,
+        modelOutput: (ProblemRef, Sequence<String>, Int) -> String? = MiniZincRunner()::modelOutput,
         timings: HarnessTimings = HarnessTimings(),
     ): Pair<SolveRecord, SolverOutput?> {
         val started = timings.start()
@@ -252,8 +258,12 @@ internal object SolveMetric {
                 null to mapOf("finalWitnessUnavailable" to unavailable)
             } else if (r.feasible == true) {
                 timings.measure("harnessWitnessMs") {
-                    witness(entry.ref, r.stdout) { ref, raw ->
-                        timings.measure("harnessOutputMappingMs") { modelOutput(ref, raw) }
+                    try {
+                        witness(entry.ref, r.stdout) { ref, lines, limit ->
+                            timings.measure("harnessOutputMappingMs") { modelOutput(ref, lines, limit) }
+                        }
+                    } catch (failure: IOException) {
+                        null to mapOf("finalWitnessUnavailable" to outputFailureReason(failure))
                     }
                 }
             } else {
@@ -297,20 +307,22 @@ internal object SolveMetric {
     private fun witness(
         ref: ProblemRef,
         raw: SolverOutput,
-        modelOutput: (ProblemRef, String) -> String,
+        modelOutput: (ProblemRef, Sequence<String>, Int) -> String?,
     ): Pair<String?, Map<String, String>> {
         if (ref.format != Format.MINIZINC) {
             return SolveEvidence.finalWitness(ref.format, raw) to emptyMap()
         }
         return runCatching {
-            val witness = SolveEvidence.finalWitness(ref.format, raw) { modelOutput(ref, it) }
+            val witness = SolveEvidence.finalWitness(ref.format, raw) { lines, limit -> modelOutput(ref, lines, limit) }
             witness to mapOf("finalWitnessLevel" to "model")
         }.getOrElse { failure ->
-            val reason = (failure.message ?: failure::class.simpleName.orEmpty()).take(REASON_CAP)
             SolveEvidence.finalWitness(ref.format, raw) to
-                mapOf("finalWitnessLevel" to "flatzinc", "finalWitnessMappingError" to reason)
+                mapOf("finalWitnessLevel" to "flatzinc", "finalWitnessMappingError" to outputFailureReason(failure))
         }
     }
+
+    private fun outputFailureReason(failure: Throwable): String =
+        (failure.message ?: failure::class.simpleName.orEmpty()).take(REASON_CAP)
 
     private fun record(
         entry: ResolvedProblem,

@@ -80,20 +80,22 @@ internal object SolveEvidence {
         raw: String,
         maxChars: Int = MAX_WITNESS_CHARS,
         modelOutput: ((String) -> String)? = null,
-    ): String? = finalWitness(format, SolverOutput.Text(raw), maxChars, modelOutput)
+    ): String? = finalWitness(format, SolverOutput.Text(raw), maxChars, modelOutput?.let { map ->
+        { lines, _ -> map(lines.joinToString("\n")) }
+    })
 
     fun finalWitness(
         format: Format,
         raw: SolverOutput,
         maxChars: Int = MAX_WITNESS_CHARS,
-        modelOutput: ((String) -> String)? = null,
+        modelOutput: ((Sequence<String>, Int) -> String?)? = null,
     ): String? {
         val witness = when (format) {
-            Format.MINIZINC -> miniZincWitness(raw, modelOutput)
+            Format.MINIZINC -> miniZincWitness(raw, maxChars, modelOutput)
 
             Format.SMTLIB -> finalSmtModel(raw, maxChars)
 
-            Format.XCSP3 -> raw.reader().useLines(::xcspInstantiation)?.let { "v $it" }
+            Format.XCSP3 -> raw.reader().useLines { xcspInstantiation(it, maxChars - 2) }?.let { "v $it" }
 
             Format.OPB, Format.DIMACS, Format.WCNF, Format.MPS ->
                 raw.reader().useLines { lines -> lines.lastOrNull { it == "v" || it.startsWith("v ") } }
@@ -103,10 +105,24 @@ internal object SolveEvidence {
         return witness?.takeIf { it.length <= maxChars }
     }
 
-    /** The assignments of the last complete DZN solution in [raw], from its first assignment line on. */
-    fun miniZincSolution(raw: String): String? = miniZincFrame(SolverOutput.Text(raw))?.assignments
+    fun mappedMiniZincSolution(raw: SolverOutput, maxChars: Int): String? {
+        val frame = checkNotNull(miniZincFrame(raw)) { "minizinc --ozn-file printed no complete solution" }
+        return raw.reader().useLines { lines ->
+            val assignments = miniZincAssignments(frame.select(lines)).iterator()
+            check(assignments.hasNext()) { "minizinc --ozn-file printed no assignments" }
+            boundedLines(assignments.asSequence(), maxChars)
+        }
+    }
 
-    private data class MiniZincFrame(val assignments: String?, val comments: String, val exactCoordinates: Boolean)
+    private data class MiniZincFrame(val start: Long, val end: Long) {
+        fun select(lines: Sequence<String>): Sequence<String> = sequence {
+            var position = 0L
+            for (line in lines) {
+                if (position >= end) break
+                if (position++ >= start) yield(line)
+            }
+        }
+    }
 
     private fun miniZincFrame(raw: SolverOutput): MiniZincFrame? {
         // Retain the line range of the last complete frame, even if the writer stopped inside the next one.
@@ -124,58 +140,91 @@ internal object SolveEvidence {
                 position++
             }
         }
-        if (frameEnd < 0) return null
-        val assignments = StringBuilder()
-        val comments = StringBuilder()
-        var exactCoordinates = false
-        raw.reader().useLines { lines ->
-            var position = 0L
-            for (line in lines) {
-                if (position >= frameEnd) break
-                if (position++ < frameStart) continue
-                val trimmed = line.trim()
-                val exact = line.startsWith("% klause-exact: ") || line.startsWith("% klause-coordinate: ")
-                if (exact || line.startsWith("% klause-float-") || line.startsWith("% klause-assignment")) {
-                    comments.appendLine(line)
-                    exactCoordinates = exactCoordinates || exact
-                }
-                if (trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====") &&
-                    (assignments.isNotEmpty() || ASSIGNMENT.containsMatchIn(line))
-                ) {
-                    assignments.appendLine(line)
-                }
-            }
-        }
-        if (assignments.isNotEmpty()) assignments.setLength(assignments.length - 1)
-        if (comments.isNotEmpty()) comments.setLength(comments.length - 1)
-        return MiniZincFrame(assignments.toString().ifEmpty { null }, comments.toString(), exactCoordinates)
+        return if (frameEnd < 0) null else MiniZincFrame(frameStart, frameEnd)
     }
+
+    private fun miniZincAssignments(lines: Sequence<String>): Sequence<String> = lines.filter { line ->
+        val trimmed = line.trim()
+        trimmed.isNotEmpty() && !trimmed.startsWith('%') && !trimmed.startsWith("=====")
+    }.dropWhile { !ASSIGNMENT.containsMatchIn(it) }
 
     /** The last complete DZN solution, mapped by [modelOutput] when given, with the `% klause-exact:`,
      *  `% klause-coordinate:` and `% klause-float-` lines of that solution appended; an exact-coordinate-only
      *  solution keeps those lines alone. */
-    private fun miniZincWitness(raw: SolverOutput, modelOutput: ((String) -> String)?): String? {
+    private fun miniZincWitness(
+        raw: SolverOutput,
+        maxChars: Int,
+        modelOutput: ((Sequence<String>, Int) -> String?)?,
+    ): String? {
         val frame = miniZincFrame(raw) ?: return null
-        val candidate = frame.assignments?.let { modelOutput?.invoke(it) ?: it }
-            ?: if (frame.exactCoordinates) "" else return null
-        return if (frame.comments.isEmpty()) candidate else candidate + "\n" + frame.comments
+        return raw.reader().useLines { lines ->
+            val comments = BoundedWitness(maxChars)
+            var exactCoordinates = false
+            val solution = miniZincAssignments(frame.select(lines).onEach { line ->
+                val exact = line.startsWith("% klause-exact: ") || line.startsWith("% klause-coordinate: ")
+                if (exact || line.startsWith("% klause-float-") || line.startsWith("% klause-assignment")) {
+                    comments.append(line)
+                    exactCoordinates = exactCoordinates || exact
+                }
+            }).iterator()
+            val candidate = when {
+                solution.hasNext() -> if (modelOutput == null) boundedLines(solution.asSequence(), maxChars)
+                    else modelOutput(solution.asSequence(), maxChars)
+                exactCoordinates -> ""
+                else -> null
+            } ?: return@useLines null
+            while (solution.hasNext()) solution.next()
+            val evidence = comments.text() ?: return@useLines null
+            when {
+                evidence.isEmpty() -> candidate
+                candidate.length < maxChars - evidence.length -> candidate + "\n" + evidence
+                else -> null
+            }
+        }
     }
 
     /** The last complete XCSP3 `<instantiation>` of the `v ` lines, without their prefix. */
-    private fun xcspInstantiation(lines: Sequence<String>): String? {
-        var candidate: StringBuilder? = null
+    private fun xcspInstantiation(lines: Sequence<String>, maxChars: Int): String? {
+        var candidate: BoundedWitness? = null
         var witness: String? = null
         for (line in lines.filter { it.startsWith("v ") }.map { it.removePrefix("v ") }) {
-            if (line.trimStart().startsWith("<instantiation")) candidate = StringBuilder()
+            val start = line.trimStart().startsWith("<instantiation")
+            val end = line.trimEnd().endsWith("</instantiation>")
+            if (start) candidate = BoundedWitness(maxChars)
             val current = candidate ?: continue
-            if (current.isNotEmpty()) current.append('\n')
-            current.append(line)
-            if (line.trimEnd().endsWith("</instantiation>")) {
-                witness = current.toString().trim()
+            val content = if (start) line.trimStart() else line
+            current.append(if (end) content.trimEnd() else content)
+            if (end) {
+                witness = current.text()
                 candidate = null
             }
         }
         return witness
+    }
+
+    private fun boundedLines(lines: Sequence<String>, maxChars: Int): String? {
+        val witness = BoundedWitness(maxChars)
+        for (line in lines) if (!witness.append(line)) return null
+        return witness.text()
+    }
+
+    private class BoundedWitness(private val maxChars: Int) {
+        private val content = StringBuilder()
+        private var exceeded = false
+
+        fun append(line: String): Boolean {
+            if (exceeded) return false
+            val separator = if (content.isEmpty()) 0 else 1
+            if (line.length > maxChars - content.length - separator) {
+                exceeded = true
+                return false
+            }
+            if (separator > 0) content.append('\n')
+            content.append(line)
+            return true
+        }
+
+        fun text(): String? = if (exceeded) null else content.toString()
     }
 
     private fun finalSmtModel(raw: SolverOutput, maxChars: Int): String? {
