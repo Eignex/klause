@@ -95,7 +95,7 @@ Constraints keep their global structure where Klause has a matching factor:
 |---|---|
 | `extension` | Positive tables become `Table` with wildcards and ranges in short tuples; negative tables are complemented into a `Table` when the domain product is at most 10^6 and become nogood clauses otherwise |
 | `intension` | Linear relations become `Linear` or `ReifiedLinear`; disjunctions of single-variable comparisons become one `ComparisonClause`; other Boolean structure uses Tseitin literals |
-| `sum`, `count`, `knapsack`, `binPacking` | Exact linear rows over the terms or over reified 0/1 channels; `count` needs one constant value, `binPacking` constant sizes and a `le` capacity or loads |
+| `sum`, `count`, `knapsack`, `binPacking` | Exact linear rows over the terms or over reified 0/1 channels; `count` needs one constant value, `binPacking` constant sizes and a `le` capacity, constant per-bin limits or loads |
 | `allDifferent`, `allEqual`, `ordered`, `instantiation` | `AllDifferent` (with `except`, per row and column for matrices), `AllDifferentTuples` for multiple lists, pairwise equalities, `Increasing` chains (or difference rows with lengths) and fixings |
 | `element`, `channel`, `minimum`, `maximum` | `Element` (including constant and variable matrices), `Inverse` and channel rows, `ArrayMinMax` with optional index |
 | `cardinality`, `nValues`, `precedence`, `lex` | `GlobalCardinality` (with `closed`), `NValue`, `ValuePrecede`, `LexLess` chains including matrix rows and columns |
@@ -337,8 +337,8 @@ route under the declared feasibility tolerance, or exactly at zero tolerance. A 
 without an admitted strategy returns undecided.
 
 Supported float operations retain exact relations: strict and reified comparisons,
-`RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling and
-products. Finite float choices become `RealFiniteDomain` memberships, products with
+`RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling,
+products and division, a product with a nonzero divisor. Finite float choices become `RealFiniteDomain` memberships, products with
 a finite operand keep `ContinuousProduct` with the declared values, and
 unrestricted products go to [polynomial completion](19-nonlinear-arithmetic.md#polynomial-real-arithmetic). Linear
 consumers install alternatives privately; an LP relaxation alone never establishes
