@@ -289,7 +289,7 @@ private class RefinementRun(
         if (remaining <= 0L) meter.stop(LpRefinementDecline.WORK)
         val before = scope.metrics
         return try {
-            scope.solveFloat(warm, allowance.copy(work = remaining))
+            scope.solveRefinementFloat(warm, allowance.copy(work = remaining))
         } finally {
             val after = scope.metrics
             val preparation = after.solves.preparationOps - before.solves.preparationOps

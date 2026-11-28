@@ -385,6 +385,21 @@ internal class LpScopedSolver(
         token: ExecutionControl = cancellation,
         allowance: LpFloatAllowance? = null,
     ): Pair<LpSolver, FloatLpResult?>? {
+        require(warm == null || allowance == null) { "an explicit allowance requires retained factors" }
+        return solveFloatQuery(warm, token, allowance)
+    }
+
+    fun solveRefinementFloat(
+        warm: Basis?,
+        token: ExecutionControl,
+        allowance: LpFloatAllowance,
+    ): Pair<LpSolver, FloatLpResult?>? = solveFloatQuery(warm, token, allowance)
+
+    private fun solveFloatQuery(
+        warm: Basis?,
+        token: ExecutionControl,
+        allowance: LpFloatAllowance?,
+    ): Pair<LpSolver, FloatLpResult?>? {
         requireAvailable()
         discardFloatProgress()
         lastResult = null
