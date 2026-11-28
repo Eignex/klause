@@ -2,6 +2,7 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.factor.global.internals.GccAssignmentReplay
 import com.eignex.klause.factor.global.internals.GccIncrementalState
 import com.eignex.klause.factor.global.internals.GccPropCache
 import com.eignex.klause.factor.table.internals.allEventWatches
@@ -360,6 +361,7 @@ internal class GlobalCardinalityPropagator(
         val source = 0
         val sink = 1
         // Node ids: variable i is `2 + i`, cover value k is `2 + n + k`.
+        val firstValue = 2 + n
         val flow = cache.flow
         // The fixed-bound, no-presence path keeps a persistent network built for the root domains, with the
         // flow on the trail. Removing a flow-free edge keeps the flow maximum; a removed flow-carrying edge is
@@ -447,6 +449,12 @@ internal class GlobalCardinalityPropagator(
             superSource = baseNodes
             superSink = baseNodes + 1
             flow.reset(baseNodes + 2)
+            val replay = if (presents.isEmpty()) {
+                (cache.assignmentReplay ?: GccAssignmentReplay(n, m).also { cache.assignmentReplay = it })
+                    .also { it.reset() }
+            } else {
+                null
+            }
             val excess = cache.excess(baseNodes + 2)
             // Persist only the first build, which sees the root domains and so spans every later state.
             // `anyOther` is not monotone under backtracking, so a later build could miss edges a restored
@@ -471,7 +479,8 @@ internal class GlobalCardinalityPropagator(
                 if (lo[k] > hi[k]) return false
                 excess[2 + n + k] -= lo[k]
                 excess[sink] += lo[k]
-                flow.addEdge(2 + n + k, sink, hi[k] - lo[k])
+                val aboveMinimum = flow.addEdge(firstValue + k, sink, hi[k] - lo[k])
+                replay?.aboveMinimum?.set(k, aboveMinimum)
             }
             if (otherNode != -1) flow.addEdge(otherNode, sink, n)
             excess[sink] -= n
@@ -481,11 +490,16 @@ internal class GlobalCardinalityPropagator(
             for (v in 0 until baseNodes) {
                 when {
                     excess[v] > 0 -> {
-                        flow.addEdge(superSource, v, excess[v])
+                        val supply = flow.addEdge(superSource, v, excess[v])
+                        if (v in 2 until firstValue) replay?.supply?.set(v - 2, supply)
                         req += excess[v]
                     }
 
-                    excess[v] < 0 -> flow.addEdge(v, superSink, -excess[v])
+                    excess[v] < 0 -> {
+                        val drain = flow.addEdge(v, superSink, -excess[v])
+                        if (v == sink) replay?.remainingTotal = drain
+                        if (v in firstValue until firstValue + m) replay?.minimum?.set(v - firstValue, drain)
+                    }
                 }
             }
             requiredSSFlow = req
@@ -501,13 +515,13 @@ internal class GlobalCardinalityPropagator(
             }
         }
         if (needFlowSolve) {
-            if (presents.isEmpty()) {
+            cache.assignmentReplay?.let { replay ->
                 val assign = cache.flowAssign ?: RevIntArray(state, n, -1).also { cache.flowAssign = it }
                 for (i in 0 until n) {
                     val k = assign[i]
-                    if (k in 0 until m && xToCovEdgeIdx[i * m + k] >= 0) {
-                        flow.augmentThroughEdge(superSource, superSink, 2 + i, 2 + n + k)
-                    }
+                    if (k !in 0 until m) continue
+                    val choice = xToCovEdgeIdx[i * m + k]
+                    if (choice >= 0) flow.seedAssignment(replay, i, k, choice)
                 }
             }
             val obtained = flow.maxFlow(superSource, superSink)

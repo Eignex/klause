@@ -133,63 +133,26 @@ internal class GccFlowBuilder {
         return true
     }
 
-    fun augmentThroughEdge(source: Int, sink: Int, viaU: Int, viaV: Int): Boolean {
-        var viaEdge = -1
-        val nu = adj[viaU]
-        for (k in 0 until nu.size) {
-            val e = nu[k]
-            if (edgeTo[e] == viaV && capGet(e) > 0) {
-                viaEdge = e
-                break
-            }
+    fun seedAssignment(replay: GccAssignmentReplay, variable: Int, value: Int, choice: Int) {
+        val supply = replay.supply[variable]
+        if (capGet(supply) == 0 || capGet(choice) == 0) return
+        val minimum = replay.minimum[value]
+        if (minimum >= 0 && capGet(minimum) > 0) {
+            pushUnit(minimum)
+        } else {
+            val aboveMinimum = replay.aboveMinimum[value]
+            val remainingTotal = replay.remainingTotal
+            if (remainingTotal < 0 || capGet(aboveMinimum) == 0 || capGet(remainingTotal) == 0) return
+            pushUnit(aboveMinimum)
+            pushUnit(remainingTotal)
         }
-        if (viaEdge < 0) return false
-        val parent = parentEdge
-        parent.fill(-1, 0, numNodes)
-        parent[source] = -2
-        val q = bfsQueue
-        var h = 0
-        var t = 0
-        q[t++] = source
-        var found = false
-        while (h < t && !found) {
-            val u = q[h++]
-            if (u == viaU) {
-                if (parent[viaV] == -1) {
-                    parent[viaV] = viaEdge
-                    if (viaV == sink) found = true else q[t++] = viaV
-                }
-            } else {
-                val neigh = adj[u]
-                for (k in 0 until neigh.size) {
-                    val e = neigh[k]
-                    val v = edgeTo[e]
-                    if (parent[v] != -1 || capGet(e) <= 0) continue
-                    parent[v] = e
-                    if (v == sink) {
-                        found = true
-                        break
-                    }
-                    q[t++] = v
-                }
-            }
-        }
-        if (!found) return false
-        var bottleneck = Int.MAX_VALUE
-        var cur = sink
-        while (cur != source) {
-            val e = parent[cur]
-            if (capGet(e) < bottleneck) bottleneck = capGet(e)
-            cur = edgeTo[e xor 1]
-        }
-        cur = sink
-        while (cur != source) {
-            val e = parent[cur]
-            capSet(e, capGet(e) - bottleneck)
-            capSet(e xor 1, capGet(e xor 1) + bottleneck)
-            cur = edgeTo[e xor 1]
-        }
-        return true
+        pushUnit(supply)
+        pushUnit(choice)
+    }
+
+    private fun pushUnit(edge: Int) {
+        capSet(edge, capGet(edge) - 1)
+        capSet(edge xor 1, capGet(edge xor 1) + 1)
     }
 
     fun addEdge(u: Int, v: Int, c: Int): Int {
