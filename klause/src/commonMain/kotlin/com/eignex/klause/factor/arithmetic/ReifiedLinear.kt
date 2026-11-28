@@ -29,7 +29,7 @@ import com.eignex.util.numbers.BigInt
  * `auxBoolVar ↔ (Σ coeff(i)·vars(i) ⟨op⟩ bound)`. Created by the compiler when a
  * multi-variable [com.eignex.klause.model.IntCompare] appears non-top-level so the rest of the
  * Tseitin lowering can treat its truth as a Boolean literal. Terms pair [vars] with the coefficients
- * in [constants].
+ * in [constants]; [op] compares their sum against the bound.
  */
 class ReifiedLinear private constructor(
     override val auxBoolVar: Int,

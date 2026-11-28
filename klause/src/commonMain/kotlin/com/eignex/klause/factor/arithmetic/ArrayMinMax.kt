@@ -17,7 +17,7 @@ import com.eignex.klause.ir.materializeKey
 
 /**
  * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,
- * xs)` / `array_int_minimum(result, xs)` builtins. Mode selected by [max].
+ * xs)` / `array_int_minimum(result, xs)` builtins. [result] is the extremum of [xs]; the mode is selected by [max].
  */
 class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor {
 

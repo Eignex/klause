@@ -78,7 +78,7 @@ class Geometric(
 
 /**
  * Geometric cooling whose rate adapts each round to hold the acceptance ratio near [targetAcceptance]:
- * acceptance above target cools faster, below target cools slower, within `[minRate, maxRate]`. The
+ * acceptance above target cools faster, below target cools slower, within [minRate] and [maxRate]. The
  * acceptance ratio is used alone because it is scale-free.
  */
 class AdaptiveCooling(
