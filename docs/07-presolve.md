@@ -65,21 +65,23 @@ admission, probe selection, reconstruction guarantees or source authority.
 
 The round-boundary diminishing-return check counts live factors plus integer-domain
 endpoint spans, saturating at `Long.MAX_VALUE` in incremental and rebuilt hosts
-alike, so saturation can hide reductions. A round below the abort fraction (0.001 by
-default) ends iteration; this structural heuristic supplies no runtime guarantee.
+alike, so saturation can hide reductions; the source lane counts live factors only. A
+round below the abort fraction (0.001 by default) ends iteration; this structural
+heuristic supplies no runtime guarantee.
 
 | Family | Passes |
 |---|---|
 | Linear | Coefficient strengthening, Diophantine tightening, bound fusion, affine elimination, sub-sum aggregation, row sparsification, dependent equalities, singleton projection |
-| Structural | Redundancy and subsumption, structural reduction, extensional composition, comparison-clause folding, duplicate-column merging, dual fixing |
+| Structural | Redundancy and subsumption, structural reduction, extensional composition, comparison-clause folding, duplicate-column merging, dual fixing, table value substitution |
 | Boolean | Original-clause subsumption, implication graph, bounded variable elimination, blocked clause elimination, at-most-one clique merging, XOR unit derivation |
-| Symmetry | Symmetry breaking and value precedence |
+| Symmetry | Symmetry breaking, objective symmetry and value precedence |
 | Probing | Failed literals, integer bounds and holes, open ranges |
-| Around the rounds | Binary column substitution, LP harvest, difference-system posting |
+| Around the rounds | Tuple packing, binary column substitution, LP harvest, difference-system posting |
 
 `PresolveEmphasis` selects elective cost tiers: `off` disables them, `conservative`
 applies the cheap tier once, `default` iterates cheap and moderate tiers to a
-fixpoint and `aggressive` adds exhaustive probing, all within 16 rounds. Passes can
+fixpoint and `aggressive` adds the exhaustive tier (probing, implication graph,
+bounded variable and blocked-clause elimination, LP harvest), all within 16 rounds. Passes can
 be enabled or disabled by name, but a pass that would break the query's required
 guarantee stays disabled. Explicitly enabling a problem pass under `off` gives both
 schedules the default round cap; an explicit zero round cap still suppresses them.
@@ -478,8 +480,9 @@ root fixings. Dimensions, available occurrence counts and explicit column narrow
 describe yield without another whole-model scan.
 
 `PresolvePreparationStats` separately attributes pre-bake LPs, root and engine
-bakes, finite-session construction/materialization, source encoder rebuilding and
-finite exact-real difference assembly, including with elective passes disabled.
+bakes, finite-session construction/materialization, source encoder rebuilding,
+finite exact-real difference assembly and source descriptor selection, row
+installation and ownership, including with elective passes disabled.
 Nested observations own their time and work exclusively. Pass work, preparation
 phase work and any unattributed remainder account for the phase total.
 

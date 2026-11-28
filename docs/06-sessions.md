@@ -186,7 +186,7 @@ optional work. Resource exhaustion does not establish search-space exhaustion.
 
 `ExecutionOptions` distinguishes `auto`, `unlimited` and a nonnegative remaining
 amount; omission selects `auto`. For `node-limit`, automatic and unlimited both mean
-no solve work cap and `0` is an exhausted `NodeBudget`. For `presolve-work-limit`,
+no solve work cap and `0` is an exhausted `NodeBudget`. For the CLI's `presolve-work-limit`,
 automatic derives work from the preparation time policy, unlimited removes the cap
 and `0` stops optional preparation; the preparation clock and solve deadline still
 apply. The legacy nonpositive `klause.presolve.budget.ms` disables the derived cap
