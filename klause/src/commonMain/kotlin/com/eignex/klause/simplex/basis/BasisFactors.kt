@@ -499,16 +499,12 @@ private class LuConstruction(
     }
 
     private fun refreshMaximum(column: Int) {
-        val entries = stageColumn(column)
-        maximumEntries = saturatedAdd(maximumEntries, entries.toLong())
-        columnMax[column] = SparseSlices.activeColumnMaxAbs(
-            stagedRows,
-            0,
-            stagedValues,
-            0,
-            entries,
-            activeRows,
-        )
+        val entries = columns[column]
+        maximumEntries = saturatedAdd(maximumEntries, entries.size.toLong())
+        // Loading and Schur updates admit only finite entries, and elimination removes every retired row.
+        var maximum = 0.0
+        entries.forEach { _, value -> maximum = maxOf(maximum, abs(value)) }
+        columnMax[column] = maximum
     }
 
     private fun stageColumn(column: Int): Int {

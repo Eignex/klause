@@ -226,29 +226,6 @@ internal object SparseSlices {
         return result
     }
 
-    fun activeColumnMaxAbs(
-        rowIndices: IntArray,
-        indexOffset: Int,
-        values: DoubleArray,
-        valueOffset: Int,
-        count: Int,
-        activeRows: BooleanArray,
-    ): Double {
-        requireWindow(rowIndices.size, indexOffset, count, "row indices")
-        requireWindow(values.size, valueOffset, count, "values")
-        validateIndices(rowIndices, indexOffset, count, activeRows.size, "row indices")
-        // A nonfinite entry answers NaN at once, since a magnitude comparison against it would be arbitrary, and
-        // no active entry answers zero, so an empty column is distinguishable from one whose first entry won.
-        var maximum = 0.0
-        for (k in 0 until count) {
-            if (!activeRows[rowIndices[indexOffset + k]]) continue
-            val value = values[valueOffset + k]
-            if (!value.isFinite()) return Double.NaN
-            maximum = maxOf(maximum, abs(value))
-        }
-        return maximum
-    }
-
     @Suppress("LongParameterList")
     fun pivotCandidatePositions(
         rowIndices: IntArray,

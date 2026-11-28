@@ -146,11 +146,8 @@ class SparseSlicesTest {
         val values = doubleArrayOf(9.0, 9.0, 4.0, Double.NaN, -2.0)
         val active = booleanArrayOf(false, true, true)
         val out = IntArray(5) { -1 }
-        val maximum = SparseSlices.activeColumnMaxAbs(rows, 1, values, 2, 3, active)
+        val count = SparseSlices.pivotCandidatePositions(rows, 1, values, 2, 3, active, 4.0, 1.0, 0.5, out, 1)
 
-        val count = SparseSlices.pivotCandidatePositions(rows, 1, values, 2, 3, active, maximum, 1.0, 0.5, out, 1)
-
-        assertEquals(4.0, maximum)
         assertEquals(2, count)
         assertContentEquals(intArrayOf(-1, 0, 2, -1, -1), out)
     }
@@ -306,38 +303,6 @@ class SparseSlicesTest {
         assertContentEquals(doubleArrayOf(0.0, 2.0, 3.0, 0.0), values)
         assertContentEquals(intArrayOf(0, 5, 5, 0), marks)
         assertContentEquals(intArrayOf(7, 3, 0, 7), touched)
-    }
-
-    @Test
-    fun `active maximum should ignore inactive rows`() {
-        val maximum = SparseSlices.activeColumnMaxAbs(
-            intArrayOf(4, 1, 3),
-            0,
-            doubleArrayOf(Double.POSITIVE_INFINITY, -7.0, 5.0),
-            0,
-            3,
-            BooleanArray(5) { it != 4 },
-        )
-
-        assertEquals(7.0, maximum)
-    }
-
-    @Test
-    fun `active maximum should report nonfinite and empty support`() {
-        val rows = intArrayOf(0, 2)
-
-        val nonfinite = SparseSlices.activeColumnMaxAbs(
-            rows,
-            0,
-            doubleArrayOf(3.0, Double.NaN),
-            0,
-            2,
-            BooleanArray(3) { true },
-        )
-        val empty = SparseSlices.activeColumnMaxAbs(rows, 0, doubleArrayOf(3.0, 4.0), 0, 2, BooleanArray(3))
-
-        assertTrue(nonfinite.isNaN())
-        assertEquals(0.0, empty)
     }
 
     @Test
