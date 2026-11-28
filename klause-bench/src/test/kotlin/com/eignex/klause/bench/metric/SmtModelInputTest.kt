@@ -33,7 +33,7 @@ class SmtModelInputTest {
                 assertEquals("(set-option :produce-models true)\n" +
                     source.replace("\n(check-sat)\n", "\n(check-sat)\n(get-model)\n\n"), file.readText())
                 SolverInvocation.Result(true, null, null, proven = false, stats = emptyMap(),
-                    rawOutput = "sat\n(\n)\n", command = file.path)
+                    stdout = SolverOutput.Text("sat\n(\n)\n"), command = file.path)
             }
 
             assertEquals(source, original.readText())
@@ -89,7 +89,7 @@ class SmtModelInputTest {
             val result = SmtModelInput.withInput(original, {}) { file ->
                 assertEquals(original, file)
                 SolverInvocation.Result(false, null, null, proven = true, stats = emptyMap(),
-                    rawOutput = "unsat\n", command = file.path)
+                    stdout = SolverOutput.Text("unsat\n"), command = file.path)
             }
 
             assertEquals(false, result.feasible)
@@ -113,12 +113,12 @@ class SmtModelInputTest {
                 SmtModelInput.withInput(original, {}) { file ->
                     staged = file
                     throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
-                        stats = emptyMap(), rawOutput = "partial", command = file.path), "failed")
+                        stats = emptyMap(), stdout = SolverOutput.Text("partial"), command = file.path), "failed")
                 }
             }
 
             assertFalse(assertNotNull(staged).exists())
-            assertEquals("partial", failure.result.rawOutput)
+            assertEquals(SolverOutput.Text("partial"), failure.result.stdout)
             assertEquals(setOf("smtOriginal", "smtEffective"), failure.result.compiledInputHashes.keys)
             assertEquals("(check-sat)\n", original.readText())
         } finally {

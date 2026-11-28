@@ -413,6 +413,10 @@ installed-build identity and available witnesses. Inspect the JSON record even
 when the bench process exits successfully. Independent source validation runs in
 the lab; the bench records `validationPolicy=reported-result-v1`.
 
+Solver stdout is written to disk as the bench reads it. The record takes its
+MiniZinc objective and witness from the last complete solution frame. An unfinished
+frame stays in the output artifact for diagnosis.
+
 Failed MiniZinc identity queries retain `compilerDiscovery` evidence separately
 from an accepted `compilerIdentity`. `solve.log` retains query lifecycle receipts,
 including the option, executable hash, startup/wait/cleanup times, exit and cancellation.

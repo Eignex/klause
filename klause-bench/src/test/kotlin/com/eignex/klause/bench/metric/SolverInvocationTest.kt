@@ -86,7 +86,7 @@ class SolverInvocationTest {
                 assertEquals(staging.directory.canonicalFile, plain.parentFile.parentFile.canonicalFile)
                 assertTrue(remaining.timeoutMillis in 1..10_000)
                 SolverInvocation.Result(true, null, 2L, proven = false,
-                    stats = emptyMap(), rawOutput = "sat", command = plain.path, elapsedMs = 3L)
+                    stats = emptyMap(), stdout = SolverOutput.Text("sat"), command = plain.path, elapsedMs = 3L)
             }
 
             assertFalse(assertNotNull(staged).exists())
@@ -137,12 +137,12 @@ class SolverInvocationTest {
                 SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, _ ->
                     staged = plain
                     throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
-                        stats = mapOf("exit" to "2"), rawOutput = "partial", command = "cli", elapsedMs = 3), "failed")
+                        stats = mapOf("exit" to "2"), stdout = SolverOutput.Text("partial"), command = "cli", elapsedMs = 3), "failed")
                 }
             }
 
             assertFalse(assertNotNull(staged).exists())
-            assertEquals("partial", failure.result.rawOutput)
+            assertEquals(SolverOutput.Text("partial"), failure.result.stdout)
             assertEquals("2", failure.result.stats["exit"])
             assertEquals(3L, failure.result.elapsedMs)
             assertTrue(listOf("sourceDecodeMs", "sourceCleanupMs", "sourceCliMs", "sourceInvocationMs")
@@ -190,7 +190,7 @@ class SolverInvocationTest {
             assertEquals(997L, remaining.timeoutMillis)
             nanos += 12_000_000
             SolverInvocation.Result(null, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "unknown", command = "cli", elapsedMs = 10)
+                stats = emptyMap(), stdout = SolverOutput.Text("unknown"), command = "cli", elapsedMs = 10)
         }
 
         assertEquals("cli", result.stats["sourceStaging"])
@@ -238,7 +238,7 @@ class SolverInvocationTest {
             assertEquals(997L, remaining.timeoutMillis)
             nanos += 10_000_000
             SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+                stats = emptyMap(), stdout = SolverOutput.Text("sat"), command = "cli")
         }
 
         assertEquals("3", result.stats["sourceObservationSetupMs"])
@@ -263,7 +263,7 @@ class SolverInvocationTest {
         ) { _, _ ->
             nanos = 10_000_000
             SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+                stats = emptyMap(), stdout = SolverOutput.Text("sat"), command = "cli")
         }
 
         assertEquals("2", result.stats["sourceObservationFinishMs"])
@@ -287,7 +287,7 @@ class SolverInvocationTest {
         ) { _, remaining ->
             assertEquals(998L, remaining.timeoutMillis)
             SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+                stats = emptyMap(), stdout = SolverOutput.Text("sat"), command = "cli")
         }
 
         assertEquals("2", result.stats["sourcePreparationMs"])
@@ -298,7 +298,7 @@ class SolverInvocationTest {
     fun `ordinary invocation omits optional harness counters`() {
         val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000)) { _, _ ->
             SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli")
+                stats = emptyMap(), stdout = SolverOutput.Text("sat"), command = "cli")
         }
 
         assertTrue(result.stats.keys.none {
@@ -335,12 +335,12 @@ class SolverInvocationTest {
             ) { _, _ ->
                 nanos = 7_000_000
                 throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
-                    stats = emptyMap(), rawOutput = "partial", command = "cli"), "failed")
+                    stats = emptyMap(), stdout = SolverOutput.Text("partial"), command = "cli"), "failed")
             }
         }
 
         assertEquals("7", failure.result.stats["sourceHarnessThreadCpuMs"])
-        assertEquals("partial", failure.result.rawOutput)
+        assertEquals(SolverOutput.Text("partial"), failure.result.stdout)
     }
 
     @Test
@@ -350,7 +350,7 @@ class SolverInvocationTest {
         val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos }) { _, _ ->
             nanos = 12_000_000
             SolverInvocation.Result(true, null, null, proven = false,
-                stats = emptyMap(), rawOutput = "sat", command = "cli", elapsedMs = 10)
+                stats = emptyMap(), stdout = SolverOutput.Text("sat"), command = "cli", elapsedMs = 10)
         }
 
         assertEquals("0", result.stats["sourceDecodeMs"])
@@ -388,7 +388,7 @@ class SolverInvocationTest {
 
         assertEquals("prepared model\n", result.stderr)
         assertTrue(result.stderrComplete)
-        assertEquals("----------\n", result.rawOutput)
+        assertEquals(SolverOutput.Text("----------\n"), result.stdout)
         assertEquals(true, result.feasible)
     }
 
@@ -403,7 +403,7 @@ class SolverInvocationTest {
         assertTrue(text.isNotEmpty() && text.length <= 16 * 1024)
         assertTrue(text.all { it == ' ' })
         assertFalse(result.stderrComplete)
-        assertEquals("----------\n", result.rawOutput)
+        assertEquals(SolverOutput.Text("----------\n"), result.stdout)
     }
 
     @Test
@@ -603,7 +603,7 @@ class SolverInvocationTest {
         assertTrue(r.proven)
         assertEquals(-1.0 / 3.0, r.objective)
         assertNotNull(r.timeToBestMs)
-        assertEquals("o -1/3\ns OPTIMUM FOUND\n", r.rawOutput)
+        assertEquals(SolverOutput.Text("o -1/3\ns OPTIMUM FOUND\n"), r.stdout)
     }
 
     @Test
@@ -743,8 +743,8 @@ class SolverInvocationTest {
         assertNull(result.objective)
         assertNull(result.stats["optimizationStatus"])
         assertEquals("1", result.stats["smtQueryResponses"])
-        assertEquals("sat\n$model\n", result.rawOutput)
-        assertEquals(model, SolveEvidence.finalWitness(Format.SMTLIB, result.rawOutput))
+        assertEquals(SolverOutput.Text("sat\n$model\n"), result.stdout)
+        assertEquals(model, SolveEvidence.finalWitness(Format.SMTLIB, result.stdout))
     }
 
     @Test
@@ -822,7 +822,7 @@ class SolverInvocationTest {
                 Attribution("true-best", exactObjective = "-3", elapsedMs = 20, processElapsedMs = 120),
                 Attribution("late-but-worse", exactObjective = "2", elapsedMs = 30, processElapsedMs = 130),
             ),
-            rawOutput = "",
+            stdout = SolverOutput.Text(""),
             command = "",
         )
 
@@ -843,7 +843,7 @@ class SolverInvocationTest {
                 Attribution("continuous", exactObjective = "0", continuousObjective = 60.0, elapsedMs = 20),
                 Attribution("mixed", exactObjective = "-3", continuousObjective = -63.5, elapsedMs = 30),
             ),
-            rawOutput = "",
+            stdout = SolverOutput.Text(""),
             command = "",
         )
 
