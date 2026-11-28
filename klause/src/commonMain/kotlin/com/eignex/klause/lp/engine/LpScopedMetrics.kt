@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.util.numbers.saturatedAdd
+
 internal data class LpScopedMetrics(
     val editAttempts: Long,
     val editSuccesses: Long,
@@ -23,6 +25,8 @@ internal data class LpScopedMetrics(
     val editDeclines: Long get() = editAttempts - editSuccesses
     val preparationDeclines: Long get() = preparationAttempts - preparationSuccesses
     val currentOwners: Long get() = createdOwners - closedOwners
+    val measuredPreparationWork: Long
+        get() = saturatedAdd((preparationWork - reservedConstructionWork).coerceAtLeast(0L), constructionWork)
 }
 
 internal fun basisWorkUnits(work: com.eignex.klause.simplex.basis.BasisOperationWork?): Long? =

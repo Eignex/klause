@@ -389,7 +389,7 @@ internal fun certifyLpResult(
     basisLimits: ExactBasisLimits = ExactBasisLimits(),
     certificationGrant: (() -> LpCertificationGrant)? = null,
 ): CertifiedLpResult {
-    require(certificationGrant == null || claim == LpClaim.ATTAINED_OPTIMUM)
+    require(certificationGrant == null || (claim == LpClaim.ATTAINED_OPTIMUM && observer != null))
     val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
     val pairing = observer?.let { LpRejectionPairing() }
     var completed = false

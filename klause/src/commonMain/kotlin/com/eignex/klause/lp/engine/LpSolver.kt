@@ -322,6 +322,10 @@ internal interface PersistentLpSolver : RetainedLpSolver {
 
     val basisLifecycleWork: BasisOperationWork? get() = null
 
+    fun <T> withFloatAllowance(allowance: LpFloatAllowance?, solve: () -> T): T = solve()
+
+    fun takePendingPreparationWork(): Long = 0L
+
     // Null [allowance] uses construction limits; zero work is unbounded and zero iterations uses the size-derived
     // limit. Neither zero means exhausted.
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult?

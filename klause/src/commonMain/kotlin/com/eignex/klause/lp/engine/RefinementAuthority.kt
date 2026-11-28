@@ -596,6 +596,7 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
         val dualExponent = minOf(exponent, scaleExponent(dualViolation, previousDual, meter))
         val sp = meter.number(BigFraction.of(BIG_ONE shl exponent, BIG_ONE))
         val sd = meter.number(BigFraction.of(BIG_ONE shl dualExponent, BIG_ONE))
+        meter.charge(source.keySize, 128L + source.keySize * 8L)
         val columns = List(source.numVars) { j ->
             fun side(value: ExactLpSide?): ExactLpSide? = value?.let {
                 ExactLpSide(ExactLpNumber.of(meter.multiply(sp, meter.add(it.number.value, x[j].negated()))))
@@ -603,13 +604,13 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
             ExactLpColumn(ExactLpBounds(side(bounds[j].lower), side(bounds[j].upper)), integral = false)
         }
         val working = ExactLpModel(
-            List(source.n) { source.entries(it) },
+            List(source.n, source::columnEntries),
             residual.map { ExactLpNumber.of(meter.multiply(sp, it)) },
             columns,
             List(source.m) { source.row(it).copy(strict = false) },
             ExactLpObjective(reduced.map { ExactLpNumber.of(meter.multiply(sd, it)) }),
         )
-        return ResidualModel(refinementWorking(state, working, meter), sp, sd, exponent, dualExponent)
+        return ResidualModel(LpWorkingModel(state, working), sp, sd, exponent, dualExponent)
     }
 }
 

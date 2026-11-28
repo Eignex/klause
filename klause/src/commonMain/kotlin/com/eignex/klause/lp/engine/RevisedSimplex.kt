@@ -20,6 +20,7 @@ import com.eignex.klause.util.pollStop
 import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -1207,21 +1208,28 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-        check(activeSolve == null) { "LP solve is suspended" }
-        val previous = solveControl.floatAllowance
-        solveControl.floatAllowance = allowance
-        return try {
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+        withFloatAllowance(allowance) {
             val progress = SolveProgress()
             immediateLpSolve {
                 runNumericalSolve(progress) { reset ->
                     solveCore(null, reuse = true, reset = reset, progress = progress)
                 }
             }
+        }
+
+    override fun <T> withFloatAllowance(allowance: LpFloatAllowance?, solve: () -> T): T {
+        check(activeSolve == null) { "LP solve is suspended" }
+        val previous = solveControl.floatAllowance
+        solveControl.floatAllowance = allowance
+        return try {
+            solve()
         } finally {
             solveControl.floatAllowance = previous
         }
     }
+
+    override fun takePendingPreparationWork(): Long = pendingNumericalWork.ops.also { pendingNumericalWork.reset() }
 
     private fun clearNumericalPublication() {
         solvedExactState = null
@@ -1278,6 +1286,8 @@ internal class RevisedSimplex(
         try {
             return runChargedSolve(progress, block)
         } finally {
+            observations.lastPreparationOps = saturatedAdd(observations.lastPreparationOps,
+                takePendingPreparationWork())
             solveControl.chargeWork()
             val trace = progressTrace
             if (started != null && trace != null) {
@@ -1449,8 +1459,7 @@ internal class RevisedSimplex(
         infeasibleRay = null
         observations.reset(warmAttempted)
         solveControl.resetWork()
-        observations.lastPreparationOps = pendingNumericalWork.ops
-        pendingNumericalWork.reset()
+        observations.lastPreparationOps = takePendingPreparationWork()
         observations.warmStarted = false
     }
 
