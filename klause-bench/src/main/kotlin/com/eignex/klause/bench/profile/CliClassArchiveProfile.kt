@@ -15,7 +15,8 @@ object CliClassArchiveProfile {
         require(args.size >= 3)
         val root = File(requireNotNull(System.getenv("LAB_WORKTREE"))).canonicalFile
         val out = File(requireNotNull(System.getenv("OUT"))).canonicalFile
-        val train = root.resolve(args[1]).also { require(it.isFile) }
+        val trainOnHelp = args[1] == "--help"
+        val train = root.resolve(if (trainOnHelp) args[2] else args[1]).also { require(it.isFile) }
         val training = out.resolve("training").apply { mkdirs() }
         val format = args[0]
         val archive = training.resolve(if (format == "dynamic") "cli.jsa" else "cli.aot")
@@ -28,7 +29,12 @@ object CliClassArchiveProfile {
         val use = if (format == "dynamic") "-XX:SharedArchiveFile=$archive" else "-XX:AOTCache=$archive"
         val cacheOptions = linking + listOf(use, "-Xlog:aot*=off:stdout", "-Xlog:aot*=warning:stderr")
         val force = if (format == "dynamic") "-Xshare:on" else "-XX:AOTMode=on"
-        val trainingWall = CliStartupProfile.captureFresh(root, train, training, 1, DEFAULT_SEED, linking + create).single()
+        val trainingOptions = linking + create
+        val trainingWall = if (trainOnHelp) {
+            CliStartupProfile.captureHelp(root, training, trainingOptions)
+        } else {
+            CliStartupProfile.captureFresh(root, train, training, 1, DEFAULT_SEED, trainingOptions).single()
+        }
         check(archive.length() > 0) { "Archive was not created: $archive" }
         training.resolve("identity.tsv").writeText(
             "format\tbytes\ttrainingWallNs\tjavaRuntime\n" +

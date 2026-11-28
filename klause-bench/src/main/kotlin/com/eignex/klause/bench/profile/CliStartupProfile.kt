@@ -83,6 +83,12 @@ object CliStartupProfile {
         }
     }
 
+    internal fun captureHelp(root: File, directory: File, jvmOptions: List<String>): Long {
+        val launcher = root.resolve(CLI_INSTALL).resolve("bin/klause-cli")
+        return runProcess(listOf(launcher.absolutePath, "--help"), runtime + jvmOptions, root,
+            directory.resolve("fresh-1"))
+    }
+
     internal fun captureWarm(
         root: File, input: File, out: File, repeats: Int, seed: Long, jvmOptions: List<String> = emptyList(),
     ) {
