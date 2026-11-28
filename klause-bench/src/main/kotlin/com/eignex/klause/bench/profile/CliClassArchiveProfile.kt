@@ -19,14 +19,16 @@ object CliClassArchiveProfile {
         val training = out.resolve("training").apply { mkdirs() }
         val format = args[0]
         val archive = training.resolve(if (format == "dynamic") "cli.jsa" else "cli.aot")
+        val linking = if (format == "aot-unlinked") listOf("-XX:-AOTClassLinking") else emptyList()
         val create = when (format) {
             "dynamic" -> "-XX:ArchiveClassesAtExit=$archive"
-            "aot" -> "-XX:AOTCacheOutput=$archive"
+            "aot", "aot-unlinked" -> "-XX:AOTCacheOutput=$archive"
             else -> error("Unknown archive format: $format")
         }
         val use = if (format == "dynamic") "-XX:SharedArchiveFile=$archive" else "-XX:AOTCache=$archive"
+        val cacheOptions = linking + listOf(use, "-Xlog:aot*=off:stdout", "-Xlog:aot*=warning:stderr")
         val force = if (format == "dynamic") "-Xshare:on" else "-XX:AOTMode=on"
-        val trainingWall = CliStartupProfile.captureFresh(root, train, training, 1, DEFAULT_SEED, listOf(create)).single()
+        val trainingWall = CliStartupProfile.captureFresh(root, train, training, 1, DEFAULT_SEED, linking + create).single()
         check(archive.length() > 0) { "Archive was not created: $archive" }
         training.resolve("identity.tsv").writeText(
             "format\tbytes\ttrainingWallNs\tjavaRuntime\n" +
@@ -35,7 +37,7 @@ object CliClassArchiveProfile {
         val preflight = out.resolve("preflight").apply { mkdirs() }
         val loading = preflight.resolve("class-load.log")
         CliStartupProfile.captureFresh(root, train, preflight, 1, DEFAULT_SEED,
-            listOf(use, force, "-Xlog:class+load=info:file=$loading"))
+            cacheOptions + listOf(force, "-Xlog:class+load=info:file=$loading"))
         check(loading.useLines { lines ->
             lines.any { "com.eignex.klause.cli.MainKt source: shared objects file" in it }
         }) { "The application did not use the archive" }
@@ -47,7 +49,7 @@ object CliClassArchiveProfile {
             val stderr = fixture.resolve("control/fresh-1.err").readBytes()
             fixture.resolve("cold.tsv").printWriter().use { timings ->
                 timings.println("repeat\tarm\twallNs\tcpuMs")
-                for (repeat in 1..COLD_REPEATS) for ((arm, options) in arms(repeat, use)) {
+                for (repeat in 1..COLD_REPEATS) for ((arm, options) in arms(repeat, cacheOptions)) {
                     val directory = fixture.resolve("cold-$repeat-$arm").apply { check(mkdir()) }
                     val wall = CliStartupProfile.captureFresh(root, input, directory, 1, DEFAULT_SEED, options).single()
                     val cpu = directory.resolve("fresh-1.time").readText().trim().split('\t')
@@ -57,7 +59,7 @@ object CliClassArchiveProfile {
                     timings.println("$repeat\t$arm\t$wall\t$cpu")
                 }
             }
-            for (repeat in 1..WARM_REPEATS) for ((arm, options) in arms(repeat, use)) {
+            for (repeat in 1..WARM_REPEATS) for ((arm, options) in arms(repeat, cacheOptions)) {
                 val directory = fixture.resolve("warm-$repeat-$arm").apply { check(mkdir()) }
                 CliStartupProfile.captureWarm(root, input, directory, WARM_CALLS, DEFAULT_SEED, options)
                 check(stderr.contentEquals(directory.resolve("warm.err").readBytes())) { directory }
@@ -76,8 +78,8 @@ object CliClassArchiveProfile {
         return directory.resolve("fresh-1.out").readBytes()
     }
 
-    private fun arms(repeat: Int, option: String): List<Pair<String, List<String>>> {
-        val arms = listOf("base" to emptyList<String>(), "archive" to listOf(option))
+    private fun arms(repeat: Int, options: List<String>): List<Pair<String, List<String>>> {
+        val arms = listOf("base" to emptyList<String>(), "archive" to options)
         return if (repeat % 2 == 1) arms else arms.reversed()
     }
 }
