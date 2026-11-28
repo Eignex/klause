@@ -231,6 +231,7 @@ refutation, unboundedness and optimum markers.
 Integer min/max predicates retain `ArrayMinMax`; integer and Boolean array selection
 retain one-based `Element` relations with ordered repeated entries. Set selection
 shares one index across membership indicators and forbids members outside the result
+universe. An intersection forbids inputs from sharing any member outside the result
 universe. Integer set membership keeps signed-word values.
 
 `int_div` and `int_mod` share truncating
