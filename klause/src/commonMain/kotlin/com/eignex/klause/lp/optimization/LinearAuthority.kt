@@ -140,14 +140,25 @@ internal class LinearAuthority(
     private var cutConflictQuery: LinearAuthorityQuery? = null
 
     fun rootConditionalCuts(source: SourceProofContext, cancellation: ExecutionControl): List<SourceEvidence> {
-        val prepared = query ?: return emptyList()
+        val denseBaseline = denseRootBaseline
+        val prepared = query ?: run {
+            if (denseBaseline != null) pointPolicy?.observe("DenseFiniteQueryUnavailable")
+            return emptyList()
+        }
         if (source.scope.condition != SourceCondition() ||
             !prepared.matches(source, cuts = true, cutMask = prepared.cutMask,
-                checkUnselectedCuts = prepared.checkUnselectedCuts, retainMaskedCuts = prepared.retainMaskedCuts) ||
-            cancellation() || budget.funding?.paused == true) return emptyList()
+                checkUnselectedCuts = prepared.checkUnselectedCuts, retainMaskedCuts = prepared.retainMaskedCuts)) {
+            if (denseBaseline != null) pointPolicy?.observe("DenseFiniteQueryMismatch")
+            return emptyList()
+        }
+        if (cancellation() || budget.funding?.paused == true) {
+            if (denseBaseline != null) pointPolicy?.observe("DenseFiniteOfferStopped")
+            return emptyList()
+        }
         val family = template ?: return emptyList()
         val rows = family.cuts?.rows ?: return emptyList()
         cutCost(1L + rows.size, 256L)
+        if (denseBaseline === family) pointPolicy?.observe("DenseFiniteOrdinaryRecipe")
         val result = ArrayList<SourceEvidence>(2)
         var selected = 0
         for ((id, cut) in rows.withIndex()) {
@@ -157,11 +168,14 @@ internal class LinearAuthority(
             if (id !in prepared.checkedCuts) continue
             result += SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
         }
-        if (result.isEmpty() && denseRootBaseline != null && denseRootBaseline !== family) {
+        if (result.isEmpty() && denseBaseline != null && denseBaseline !== family) {
+            val installed = prepared.installedCuts.count { it >= family.ordinaryCuts }
+            pointPolicy?.observe("DenseFiniteInstalledSelected", installed.toLong())
+            if (installed == 0) pointPolicy?.observe("DenseFiniteEmptySelection")
             for (id in family.ordinaryCuts until rows.size) {
                 cutCost(1L, 0L)
                 if (cancellation() || budget.funding?.paused == true) break
-                if (id !in prepared.cutFamilies) continue
+                if (id !in prepared.installedCuts) continue
                 val cut = rows[id]
                 pointPolicy?.observe("DenseFiniteSelectedScanned")
                 if (cut.mixed) {
