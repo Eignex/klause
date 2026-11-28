@@ -26,7 +26,7 @@ internal object WcnfMode {
             val parsed = openTextFile(path).useSource { Dimacs.parseWcnf(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
-            logVerbose(common.verbose) {
+            cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: vars=${parsed.numOriginalBoolVars} " +
                     "auxiliaries=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"
             }

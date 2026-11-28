@@ -77,7 +77,7 @@ internal object MiniZincMode {
             val original = program.sourceProgram
             sourceSemantics = original.semantics
             floatSource = original.floatVarsByName.isNotEmpty()
-            logVerbose(common.verbose) {
+            cliLogger(common.verbose).v {
                 "parsed $path: bools=${original.problem.numBoolVars} ints=${original.problem.numIntVars} " +
                     "factors=${original.problem.numFactors}"
             }

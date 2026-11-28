@@ -25,7 +25,7 @@ internal object Xcsp3Mode {
             val parsed = openTextFile(path).useSource { source ->
                 Xcsp3.parse(source, common.config.problemSettings(), semanticOverrides = overrides)
             }
-            logVerbose(common.verbose) {
+            cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
                     "factors=${parsed.problem.numFactors}"
             }

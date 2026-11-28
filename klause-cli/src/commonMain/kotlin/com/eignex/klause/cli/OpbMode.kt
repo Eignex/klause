@@ -26,7 +26,7 @@ internal object OpbMode {
             val parsed = openTextFile(path).useSource { Opb.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
-            logVerbose(common.verbose) {
+            cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} factors=${parsed.problem.numFactors}"
             }
             // Only the declared x1..xN belong in the `v` line — not the Tseitin/soft indicators that

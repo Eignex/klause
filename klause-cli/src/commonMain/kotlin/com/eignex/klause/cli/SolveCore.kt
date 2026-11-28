@@ -513,7 +513,7 @@ internal object SolveCore {
                 ).result
         }
         val preparation = result.preparation
-        logVerbose(common.verbose, common.diagnostic) {
+        cliLogger(common.verbose, common.diagnostic).v {
             val p0 = solvable.finiteProblem
             val p1 = preparation.problem
             "presolve [${request.engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
@@ -637,8 +637,9 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
 /** Live-event listener for `-v`; null when not verbose so the engines skip observation. */
 internal fun verboseListener(verbose: Boolean, emit: (String) -> Unit = ::printErrorLine): ((SearchEvent) -> Unit)? {
     if (!verbose) return null
+    val log = cliLogger(verbose = true, emit = emit)
     val start = nowMillis()
-    return { e -> emit("% ${describeEvent(e, nowMillis() - start)}") }
+    return { e -> log.v { describeEvent(e, nowMillis() - start) } }
 }
 
 /**
@@ -655,8 +656,9 @@ internal fun portfolioVerboseListener(
     verbose: Boolean, emit: (String) -> Unit = ::printErrorLine,
 ): ((String, SearchEvent) -> Unit)? {
     if (!verbose) return null
+    val log = cliLogger(verbose = true, emit = emit)
     val start = nowMillis()
-    return { worker, e -> emit("% ${describeEvent(e, nowMillis() - start, worker)}") }
+    return { worker, e -> log.v { describeEvent(e, nowMillis() - start, worker) } }
 }
 
 /** Bytes per mebibyte — heap figures are reported in MiB, the unit `-Xmx` is set in. */

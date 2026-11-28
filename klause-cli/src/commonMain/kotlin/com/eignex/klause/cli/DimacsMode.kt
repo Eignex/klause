@@ -23,7 +23,7 @@ internal object DimacsMode {
             val problem = openTextFile(path).useSource { Dimacs.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
-            logVerbose(common.verbose) {
+            cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${problem.numBoolVars} factors=${problem.numFactors}"
             }
             val render: (Sample) -> String = { s -> renderDimacsModel(problem.numBoolVars, s) }

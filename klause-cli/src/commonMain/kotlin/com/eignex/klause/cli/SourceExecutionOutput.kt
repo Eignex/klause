@@ -94,7 +94,7 @@ internal fun solveCapturedSource(
                 }
             }
             controls.presolveBudget?.let { budget ->
-                logVerbose(common.verbose) { "presolve [open]: work ${budget.spent()} of ${budget.allowance}" }
+                cliLogger(common.verbose).v { "presolve [open]: work ${budget.spent()} of ${budget.allowance}" }
             }
         }
 

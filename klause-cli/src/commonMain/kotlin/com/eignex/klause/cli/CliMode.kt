@@ -95,7 +95,7 @@ internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) 
         SourceProblemRoute.Refuted -> "refuted"
     }
     frontendRouting = CliRoutingStats(lane, elapsedMs)
-    logVerbose(verbose, diagnostic) {
+    cliLogger(verbose, diagnostic).v {
         "route: $lane in ${elapsedMs}ms" + presolveBudget?.let { ", routing work ${it.spent()}" }.orEmpty()
     }
 }

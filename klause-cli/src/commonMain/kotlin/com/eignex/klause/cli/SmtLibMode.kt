@@ -111,7 +111,7 @@ internal object SmtLibMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            logVerbose(common.verbose, common.diagnostic) {
+            cliLogger(common.verbose, common.diagnostic).v {
                 "parsed ${fileName(path)}: bool=${bools.size} int=${ints.size} real=${reals.size}"
             }
             val objective = parsed.objective?.toLinearObjective()
