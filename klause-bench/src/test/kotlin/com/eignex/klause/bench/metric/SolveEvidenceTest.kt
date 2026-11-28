@@ -228,11 +228,12 @@ class SolveEvidenceTest {
     fun `SMT witness size should be limited by the complete model length`(extra: String) {
         val prefix = "(\n  (define-fun x () Int "
         val suffix = ")\n)"
-        val digits = "1".repeat(8 * 1024 * 1024 - prefix.length - suffix.length)
+        val limit = 64
+        val digits = "1".repeat(limit - prefix.length - suffix.length)
         val model = "$prefix$digits$extra$suffix"
         val raw = "sat\n(\n)\n$model\n"
 
-        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw)
+        val witness = SolveEvidence.finalWitness(Format.SMTLIB, raw, limit)
 
         assertEquals(if (extra.isEmpty()) model else null, witness)
     }

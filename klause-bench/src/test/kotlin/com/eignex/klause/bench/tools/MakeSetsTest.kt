@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class MakeSetsTest {
     @Test
-    fun `the generator draws what Python's random Random(1) draws`() {
+    fun `the generator draws what Python's seeded random generator draws`() {
         // Values from CPython 3.14: Random(1).getrandbits(32) three times, then getrandbits(5) and (1).
         val bits = PythonRandom(1)
         assertEquals(listOf(577090037L, 2444712010L, 3639700191L, 25L, 1L), listOf(32, 32, 32, 5, 1).map(bits::bits))
@@ -45,7 +45,7 @@ class MakeSetsTest {
     }
 
     @Test
-    fun `a set takes proven problems of its theme by tier, each problem once, and the unions name the sets`() {
+    fun `a set takes proven problems of its theme by tier once each and the unions name the sets`() {
         val dir = Files.createTempDirectory("sets")
         val features = Files.createDirectories(dir.resolve("features"))
         val problems = (0 until 40).map { "f${it % 4}/p$it" }
