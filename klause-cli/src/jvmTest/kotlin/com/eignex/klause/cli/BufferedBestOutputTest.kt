@@ -18,7 +18,7 @@ class BufferedBestOutputTest(private val format: String) {
         fun formats(): List<String> = listOf("wcnf", "opb/wbo")
     }
 
-    private val mode = if (format == "wcnf") CliMode.WCNF else CliMode.OPB
+    private val mode = if (format == "wcnf") WcnfMode else OpbMode
     private val first = if (format == "wcnf") "v 10" else "v x1 -x2"
     private val second = if (format == "wcnf") "v 01" else "v -x1 x2"
 

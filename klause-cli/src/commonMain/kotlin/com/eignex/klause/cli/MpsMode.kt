@@ -32,11 +32,15 @@ import kotlin.math.floor
 import kotlin.time.TimeSource
 
 // Captures numerical declarations, rows and objective once and registers them with the source invocation.
-internal object MpsMode {
-    fun newSession(): ModeSession = Session()
+internal object MpsMode : CliMode {
+    override val names = listOf("mps")
+    override val extensions = listOf("mps")
+    override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
         private var outputState = MpsOutputState()
+
+        override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val start = TimeSource.Monotonic.markNow()

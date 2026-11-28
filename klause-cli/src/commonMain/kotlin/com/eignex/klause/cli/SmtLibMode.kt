@@ -30,12 +30,16 @@ import com.eignex.util.numbers.unaryMinus
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
 
-internal object SmtLibMode {
-    fun newSession(): ModeSession = Session()
+internal object SmtLibMode : CliMode {
+    override val names = listOf("smtlib", "smt", "smt2")
+    override val extensions = listOf("smt2", "smt")
+    override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
         private var latestSourceObjective: BigFraction? = null
         private var latestInterpretation: SmtSessionModel? = null
+
+        override fun flags(): List<FlagSpec> = emptyList()
 
         override fun runCommands(path: String, common: CommonOptions): Boolean {
             val source = openTextFile(path)

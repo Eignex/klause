@@ -35,10 +35,10 @@ suffix is set aside before the extension is matched, and reading it can require 
 matching decompressor (`zstd`, `xz`, `gzip`, `bzip2`) on `PATH`. MiniZinc source
 models go through the
 [MiniZinc integration](../klause-mzn-lib/README.md), which compiles them to FlatZinc
-first. The format registry and flags in
-[CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
-define supported names, aliases and help text. A frontend opens a session when it
-is selected or when its invocation-local flags participate in argument parsing.
+first. The registry in
+[Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/Main.kt) and the
+flags in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
+define supported names, aliases and help text.
 
 Usage, configuration and format errors exit with status 2. Status 3 reports an
 `UnsoundnessException` that reached the CLI: an independent check refuted an engine verdict.
@@ -236,6 +236,10 @@ apply. Exhausted candidates or work yield UNKNOWN; LS and ALNS keep checked incu
 and neighborhood exhaustion supplies no global claim.
 
 ### Statistics
+
+The CLI adds invocation and source-preparation statistics when statistics output
+is enabled. Witnesses, verdicts and their source qualifications use the format's
+output protocol for every invocation.
 
 Verbose portfolio diagnostics stream to stderr separately from the solution
 protocol. The subprocess caller owns retention, persistence and stream-completion

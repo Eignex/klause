@@ -19,7 +19,6 @@ internal fun reportLinearOptimization(
     budgetExhausted: (Boolean) -> Boolean = { it },
     receipt: SourceIncumbentPublication? = null,
 ) {
-    val stats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
     val point = receipt?.sample ?: result.incumbent
     val value = receipt?.value ?: result.value?.let { SourceValue.Rational(it) }
     val accepted = point?.let {
@@ -34,11 +33,12 @@ internal fun reportLinearOptimization(
         SourceClaim.Refutation -> Verdict.UNSATISFIABLE
         else -> if (point != null) Verdict.BEST_FOUND else Verdict.UNKNOWN
     }
-    output.onVerdictContext(VerdictContext(budgetExhausted = budgetExhausted(stats.run.timedOut),
+    output.onVerdictContext(VerdictContext(budgetExhausted = budgetExhausted(result.stats.run.timedOut),
         terminationReason = result.reason, completePool = completePool))
     if (accepted) output.onLinearResult(result)
     output.onComplete(verdict)
     if (statistics) {
+        val stats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
         output.onStatistics(stats, stats.run.wallMs + routingElapsedMs, publication.solutions)
     }
 }

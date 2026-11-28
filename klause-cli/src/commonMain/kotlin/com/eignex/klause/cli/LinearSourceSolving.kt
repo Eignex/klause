@@ -86,8 +86,7 @@ internal fun solveLinearSource(
     }
     val incumbentAccepted = qualified.incumbent?.let(::publish) == true
     output.onLinearSourceResult(result)
-    val nativeStats = result.linearSourceStats()
-    val stats = nativeStats.copy(presolve = result.preparationStats ?: nativeStats.presolve)
+    val stats = result.linearSourceStats()
     output.onVerdictContext(
         VerdictContext(
             budgetExhausted = stats.run.timedOut,
@@ -139,6 +138,7 @@ internal fun solveLinearSource(
         )
     )
     val sourceStats = stats.copy(
+        presolve = result.preparationStats ?: stats.presolve,
         ls = stats.ls.copy(incumbentObjective = qualified.incumbent?.objective?.toDouble() ?: Double.NaN),
         lp = stats.lp.mergedWith(solvable.routingLpStats),
     )

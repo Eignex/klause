@@ -353,7 +353,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.KLAUSE,
         valueLabel = "name",
-        help = "force a front-end: " + CliMode.entries.joinToString(" | ") { it.names.first() },
+        help = "force a front-end: " + MODES.joinToString(" | ") { it.names.first() },
     ) { o.formatOverride = it },
     FlagSpec(
         listOf("--presolve"),
@@ -579,7 +579,7 @@ internal interface OutputProtocol {
 
 // Created fresh per run so mode-specific flag state never leaks between invocations.
 internal interface ModeSession {
-    fun flags(): List<FlagSpec> = emptyList()
+    fun flags(): List<FlagSpec>
     fun load(path: String, common: CommonOptions): Solvable
     fun output(common: CommonOptions): OutputProtocol
 
@@ -692,32 +692,12 @@ private fun functionalObjectiveFor(objective: LinearObjective, sweep: Definition
     return sweep.functionalObjective(terms, coeffs, objective.constant, minimize = true, boolTerms, boolCoeffs)
 }
 
-// Format metadata is available before a front-end session is opened.
-internal enum class CliMode(
-    val names: List<String>,
-    val extensions: List<String>,
-    private val hasModeFlags: Boolean = false,
-) {
-    MINIZINC(listOf("minizinc", "fzn", "flatzinc"), listOf("fzn"), hasModeFlags = true),
-    XCSP3(listOf("xcsp3", "xcsp"), listOf("xml", "xcsp", "xcsp3")),
-    SMTLIB(listOf("smtlib", "smt", "smt2"), listOf("smt2", "smt")),
-    DIMACS(listOf("dimacs", "cnf", "sat"), listOf("cnf")),
-    OPB(listOf("opb", "pb", "wbo"), listOf("opb", "wbo")),
-    WCNF(listOf("wcnf", "maxsat"), listOf("wcnf")),
-    MPS(listOf("mps"), listOf("mps")),
-    ;
+// Stateless; per-run state lives in the ModeSession it creates.
+internal interface CliMode {
+    // `--format` names; the first is canonical.
+    val names: List<String>
 
-    fun newSession(): ModeSession = when (this) {
-        MINIZINC -> MiniZincMode.newSession()
-        XCSP3 -> Xcsp3Mode.newSession()
-        SMTLIB -> SmtLibMode.newSession()
-        DIMACS -> DimacsMode.newSession()
-        OPB -> OpbMode.newSession()
-        WCNF -> WcnfMode.newSession()
-        MPS -> MpsMode.newSession()
-    }
-
-    companion object {
-        val withFlags: List<CliMode> = entries.filter { it.hasModeFlags }
-    }
+    // Lowercase, no dot.
+    val extensions: List<String>
+    fun newSession(): ModeSession
 }
