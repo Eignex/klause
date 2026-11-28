@@ -468,7 +468,8 @@ nonlinear products use [polynomial completion](19-nonlinear-arithmetic.md#polyno
 Shared Boolean choices select active rows in one LP containing integer and real
 columns. The [integer branch order](#solving-and-composition-1) applies unchanged.
 The double-bounded transform preserves integer/real sorts and branches only on
-integer coordinates.
+integer coordinates. When the default point hints are installed, automatic
+branching orders Boolean decisions by conflict activity.
 
 Finite integers count as decided only when their finite owner fixes them. A completed
 point can guide an equality-first split followed by lower and upper remainders;
