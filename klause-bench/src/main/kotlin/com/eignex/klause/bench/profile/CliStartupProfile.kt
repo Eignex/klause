@@ -73,15 +73,19 @@ object CliStartupProfile {
 
     private const val CLI_INSTALL = "klause-cli/build/install/klause-cli-jvm"
 
-    internal fun captureFresh(root: File, input: File, out: File, repeats: Int, seed: Long): List<Long> {
+    internal fun captureFresh(
+        root: File, input: File, out: File, repeats: Int, seed: Long, jvmOptions: List<String> = emptyList(),
+    ): List<Long> {
         val script = root.resolve(CLI_INSTALL).resolve("bin/klause-cli")
         val command = listOf(script.absolutePath) + solveOptions(input, seed)
         return (1..repeats).map { iteration ->
-            runProcess(command, runtime, root, out.resolve("fresh-$iteration"))
+            runProcess(command, runtime + jvmOptions, root, out.resolve("fresh-$iteration"))
         }
     }
 
-    internal fun captureWarm(root: File, input: File, out: File, repeats: Int, seed: Long) {
+    internal fun captureWarm(
+        root: File, input: File, out: File, repeats: Int, seed: Long, jvmOptions: List<String> = emptyList(),
+    ) {
         val dist = root.resolve(CLI_INSTALL)
         val script = dist.resolve("bin/klause-cli")
         val launcherDefaults = script.useLines { lines -> lines.first { it.startsWith("DEFAULT_JVM_OPTS=") } }
@@ -93,7 +97,7 @@ object CliStartupProfile {
             .substringAfter('=').replace("\$APP_HOME", dist.absolutePath)
         val classpath = launcherClasspath + File.pathSeparator + helper
         val invocation = listOf("-cp", classpath, javaClass.name, "warm", "$repeats", out.absolutePath)
-        runProcess(listOf(java) + defaults + runtime + invocation + solveOptions(input, seed),
+        runProcess(listOf(java) + defaults + runtime + jvmOptions + invocation + solveOptions(input, seed),
             emptyList(), root, out.resolve("warm"))
     }
 
