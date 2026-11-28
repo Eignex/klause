@@ -154,7 +154,8 @@ Two analyzers share this construction. The native CP analyzer learns over CP rea
 and stores into the native clause database. The shared first-UIP analyzer in
 `SearchSession` learns over component reasons and stores into `SearchLearning`; a
 shared conflict with usable reasons asserts and backjumps, while a sound resolvent
-that cannot assert keeps chronological fallback. Unexplained component publications cannot supply missing antecedents.
+that cannot assert keeps chronological fallback. Unexplained component
+publications cannot supply missing antecedents.
 
 ## Learned-object authority and lifetime
 

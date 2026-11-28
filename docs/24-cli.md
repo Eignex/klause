@@ -32,7 +32,8 @@ the optimizing tier for long runs.
 `--format <name>` (alias `--mode`) takes priority over the input extension; an
 unrecognized extension defaults to MiniZinc mode. A trailing `.zst`, `.xz`, `.gz` or `.bz2`
 suffix is set aside before the extension is matched, and reading it can require the
-matching decompressor (`zstd`, `xz`, `gzip`, `bzip2`) on `PATH`. MiniZinc source models go through the
+matching decompressor (`zstd`, `xz`, `gzip`, `bzip2`) on `PATH`. MiniZinc source
+models go through the
 [MiniZinc integration](../klause-mzn-lib/README.md), which compiles them to FlatZinc
 first. The registry in
 [Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/Main.kt) and the
@@ -171,8 +172,8 @@ this is separate from heap measurements and diagnostic payload-category sums.
     portfolio ignoring search annotations. Selector `--param`s edit the whole pool;
     `bt-arm=label,…` pins named arms.
   - `mixed` (default; aliases `portfolio`, `pf`): backtrack plus local search.
-  - `localsearch` (aliases `ls`, `local-search`): local-search portfolio. Strategy `--param`s and the
-    recipe axes `sources`, `scoring` and `acceptance` edit the pool; `arm=label`
+  - `localsearch` (aliases `ls`, `local-search`): local-search portfolio. Strategy
+    `--param`s and the recipe axes `sources`, `scoring` and `acceptance` edit the pool; `arm=label`
     pins one catalog arm, which the axes still edit.
   - `alns` (aliases `lns`, `hybrid-lns`): adaptive large-neighbourhood search.
 - `--presolve <strength>`: `off`, `conservative`, `default` or `aggressive`, with
