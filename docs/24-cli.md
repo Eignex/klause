@@ -19,9 +19,8 @@ the optimizing tier for long runs.
 
 ### JVM startup cache
 
-For repeated short JVM invocations, train a HotSpot ahead-of-time cache with `--help` and
-reuse the cached startup classes across processes. These POSIX shell commands use the
-installed launcher on `PATH`.
+On HotSpot JDK 25, train an ahead-of-time cache with `--help` to reuse startup classes across
+short JVM invocations. These POSIX shell commands use the installed launcher on `PATH`.
 
 ```sh
 aot_options="-XX:-AOTClassLinking"
