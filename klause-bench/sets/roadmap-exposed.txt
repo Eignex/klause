@@ -181,3 +181,7 @@ maxsat-weighted/warehouses_wt-warehouse0.wcsp
 pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_opers/normalized-fir01_area_opers
 pb07-opb/OPT-SMALLINT-LIN/submittedPB07/poldner/PB/testset/normalized-10_20
 pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_100_25_3
+
+# #4657 primary applicability includes both independently generated families.
+klause-generated-4657-v1/assignment-1
+klause-generated-4657-v1/production-1

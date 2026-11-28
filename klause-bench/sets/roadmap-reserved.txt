@@ -20,9 +20,7 @@ klause-generated-4646-v1/drift-72
 klause-generated-4646-v1/drift-256
 
 # #4657 owns these generated instances and all related encodings.
-klause-generated-4657-v1/assignment-1
 klause-generated-4657-v1/assignment-2
-klause-generated-4657-v1/production-1
 klause-generated-4657-v1/production-2
 
 # #4651 owns these generated source families and their related encodings.
