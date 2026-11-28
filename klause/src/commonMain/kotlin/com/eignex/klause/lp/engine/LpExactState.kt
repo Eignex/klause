@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.binarySearchInt
@@ -23,6 +24,8 @@ internal class LpProjectionMeter(
         private set
     var allocation: Long = 0L
         private set
+    var decline: ContinuationDecline? = null
+        private set
     val work: Long get() = matrixWork + vectorWork
 
     init {
@@ -30,7 +33,7 @@ internal class LpProjectionMeter(
     }
 
     fun poll() {
-        if (cancellation.pollStop()) throw LpProjectionStop()
+        if (cancellation.pollStop()) stop(ContinuationDecline.CANCELLED)
     }
 
     fun reserveVectors(model: ExactLpModel, materialize: Boolean = true) {
@@ -39,12 +42,18 @@ internal class LpProjectionMeter(
     }
 
     fun reserve(work: Long, bytes: Long, matrix: Boolean) {
-        if (cancellation.pollStop(work.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt())) throw LpProjectionStop()
-        if (work < 0L || bytes < 0L || work > workLimit - this.work || bytes > allocationLimit - allocation) {
-            throw LpProjectionStop()
+        if (cancellation.pollStop(work.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt())) {
+            stop(ContinuationDecline.CANCELLED)
         }
+        if (work < 0L || work > workLimit - this.work) stop(ContinuationDecline.WORK)
+        if (bytes < 0L || bytes > allocationLimit - allocation) stop(ContinuationDecline.ALLOCATION)
         if (matrix) matrixWork += work else vectorWork += work
         allocation += bytes
+    }
+
+    private fun stop(reason: ContinuationDecline): Nothing {
+        decline = reason
+        throw LpProjectionStop()
     }
 }
 

@@ -239,10 +239,18 @@ internal class ReconstructionMeter(
     }
 }
 
-internal class ReconstructionAuthority(val model: LpModel, val meter: ReconstructionMeter) {
-    val n = model.n
-    val m = model.m
-    val size = model.numVars
+internal class ReconstructionAuthority private constructor(
+    private val state: LpExactState?,
+    private val floating: LpModel?,
+    val meter: ReconstructionMeter,
+) {
+    constructor(model: LpModel, meter: ReconstructionMeter) : this(model.exactState, model, meter)
+    constructor(state: LpExactState, meter: ReconstructionMeter) : this(state, null, meter)
+
+    private val source = state?.model
+    val n = source?.n ?: requireNotNull(floating).n
+    val m = source?.m ?: requireNotNull(floating).m
+    val size = source?.numVars ?: requireNotNull(floating).numVars
     val matrix: List<List<Pair<Int, BigFraction>>>
     val bounds: List<ExactLpBounds>
     val hasOpenStructuralBounds: Boolean
@@ -259,24 +267,24 @@ internal class ReconstructionAuthority(val model: LpModel, val meter: Reconstruc
             throw ReconstructionStop(ReconstructionDecline.DIMENSION)
         }
         meter.storage(size.toLong() * 96L)
-        val captureSize = model.exactState?.model?.keySize
-            ?: (model.doubleView?.colVal?.size ?: model.csc.colVal.size).toLong() * 3L
+        val captureSize = source?.keySize ?: requireNotNull(floating).let {
+            (it.doubleView?.colVal?.size ?: it.csc.colVal.size).toLong() * 3L
+        }
         meter.step(captureSize)
         meter.storage(captureSize * 8L)
-        if (!model.finiteExactInput()) throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
+        if (floating?.finiteExactInput() == false) throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
         var entries = 0
         fun admit(value: BigFraction) {
             if (++entries > meter.limits.maxEntries) throw ReconstructionStop(ReconstructionDecline.DIMENSION)
             meter.storage(32L)
             meter.fraction(value)
         }
-        val source = model.exactState?.model
         val retained = source?.reconstructionColumns()
         matrix = if (retained == null) {
             List(size) { j ->
                 meter.step()
                 val column = ArrayList<Pair<Int, BigFraction>>()
-                model.forEachRationalColumn(j) { row, value ->
+                forEachColumn(j) { row, value ->
                     admit(value)
                     column += row to value
                 }
@@ -291,7 +299,7 @@ internal class ReconstructionAuthority(val model: LpModel, val meter: Reconstruc
         }
         var openStructuralBounds = false
         bounds = List(size) { j ->
-            model.exactBounds(j).also { b ->
+            (source?.effectiveBounds(j) ?: requireNotNull(floating).exactBounds(j)).also { b ->
                 if (j < n && (b.lower == null || b.upper == null)) openStructuralBounds = true
                 b.lower?.let { side ->
                     meter.fraction(side.number.value)
@@ -307,14 +315,23 @@ internal class ReconstructionAuthority(val model: LpModel, val meter: Reconstruc
         hasOpenStructuralBounds = openStructuralBounds
         for (i in 0 until m) {
             meter.step()
-            chargePremises(model.exactState?.model?.row(i)?.premises)
+            chargePremises(source?.row(i)?.premises)
         }
-        costs = List(size) { meter.fraction(model.exactCost(it)) }
-        rhs = List(m) { meter.fraction(model.exactRhs(it)) }
-        origins = List(n) { meter.fraction(model.exactShift(it)) }
-        constant = meter.fraction(model.exactConstant())
-        scale = meter.fraction(model.exactState?.model?.objective?.scale?.value ?: BigFraction.ONE)
-        external = meter.fraction(model.exactState?.model?.objective?.externalConstant?.value ?: BigFraction.ZERO)
+        costs = List(size) { meter.fraction(source?.objective?.cost(it)?.value ?: requireNotNull(floating).exactCost(it)) }
+        rhs = List(m) { meter.fraction(source?.rhs(it)?.value ?: requireNotNull(floating).exactRhs(it)) }
+        origins = List(n) { meter.fraction(source?.column(it)?.origin?.value ?: requireNotNull(floating).exactShift(it)) }
+        constant = meter.fraction(source?.objective?.constant?.value ?: requireNotNull(floating).exactConstant())
+        scale = meter.fraction(source?.objective?.scale?.value ?: BigFraction.ONE)
+        external = meter.fraction(source?.objective?.externalConstant?.value ?: BigFraction.ZERO)
+    }
+
+    private inline fun forEachColumn(column: Int, action: (Int, BigFraction) -> Unit) {
+        val exact = source
+        if (exact == null) {
+            requireNotNull(floating).forEachRationalColumn(column, action)
+        } else {
+            exact.forEachRationalColumn(column, action)
+        }
     }
 
     private fun chargePremises(premises: ExactLpPremises?) {
@@ -326,7 +343,7 @@ internal class ReconstructionAuthority(val model: LpModel, val meter: Reconstruc
 
     fun support(y: List<BigFraction>, selected: List<ExactSimplexBound>): LpExactSupport? {
         meter.phase = ReconstructionPhase.SUPPORT
-        val state = model.exactState ?: return null
+        val state = state ?: return null
         meter.storage((m.toLong() + selected.size) * 32L)
         val rows = BooleanArray(m)
         for (i in y.indices) {

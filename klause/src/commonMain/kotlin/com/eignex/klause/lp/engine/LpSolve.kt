@@ -374,6 +374,7 @@ internal fun certifyLpResult(
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     reconstructionLimits: ReconstructionLimits = ReconstructionLimits(),
     basisLimits: ExactBasisLimits = ExactBasisLimits(),
+    continueFeasibility: Boolean = true,
 ): CertifiedLpResult {
     val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
     val pairing = observer?.let { LpRejectionPairing() }
@@ -383,7 +384,7 @@ internal fun certifyLpResult(
         val certified = certifyLpResultWithin(
             model, solver, result, cancellation, observation, policy, counterResults, continuationCache,
             continuationLimits, fullContinuation, refinement, sparsePointRecovery, claim, pairing,
-            reconstructionLimits, basisLimits,
+            reconstructionLimits, basisLimits, continueFeasibility,
         )
         completed = true
         if (observer !is LpClaimObservation) observation?.finish(certified, certified.certificationReused)
@@ -422,6 +423,7 @@ private fun certifyLpResultWithin(
     pairing: LpRejectionPairing? = null,
     reconstructionLimits: ReconstructionLimits = ReconstructionLimits(),
     basisLimits: ExactBasisLimits = ExactBasisLimits(),
+    continueFeasibility: Boolean,
 ): CertifiedLpResult {
     fun stopped(): Boolean = cancellation().also {
         if (it) {
@@ -471,7 +473,7 @@ private fun certifyLpResultWithin(
             if (!stopped()) counterResults?.remember(model, certified, policy)
             return if (stopped()) CertifiedLpResult(null, null, null, null, null, false, { null }) else certified
         }
-        if (solver.solvedExactState !== state &&
+        if (continueFeasibility && solver.solvedExactState !== state &&
             (
                 refinement?.source?.state !== state ||
                     (solver.recessionDirection == null && continuationTarget().basis != null)
@@ -550,7 +552,7 @@ private fun certifyLpResultWithin(
         (certificationStarted?.elapsedNow() ?: Duration.ZERO) - (pointRecovery?.elapsed ?: Duration.ZERO)
     fun refine() {
         if (refinement == null || state == null || stopped()) return
-        if (result == null) {
+        if (result == null && continueFeasibility) {
             val decline = continuationTarget().metrics.decline
             if (decline != null && decline != ContinuationDecline.NO_BASIS) return
         }
@@ -560,7 +562,8 @@ private fun certifyLpResultWithin(
             (exactBasis?.metrics?.allocation ?: 0L) + (capturedTarget?.metrics?.allocation ?: 0L)
         val recovered = refineLp(
             model, refinement, result?.primal, result?.duals,
-            result?.basis ?: continuationTarget().basis, numericalWitness, cancellation,
+            result?.basis ?: if (continueFeasibility) continuationTarget().basis else null,
+            numericalWitness, cancellation,
             directWork = (directWork - chargedWork).coerceAtLeast(0L),
             directAllocation = (directAllocation - chargedAllocation).coerceAtLeast(0L),
             needPoint = numericalWitness == null, direction = solver.recessionDirection,
@@ -582,14 +585,14 @@ private fun certifyLpResultWithin(
         chargedElapsed = directElapsed()
         recovered.sourceSingularBasis?.let { rejected ->
             (observer as? LpClaimObservation)?.refuse("SINGULAR")
-            continuationTarget()
+            if (continueFeasibility) continuationTarget()
             solver.rejectSingularBasis(model, rejected)
         }
         observer?.observe(
             LpCertifier.RATIONAL,
             recovered.witness != null || recovered.bound != null ||
                 recovered.conflict != null || recovered.unboundedness != null,
-            LpCertifierCost.Metered(recovered.metrics.work),
+            LpCertifierCost.Metered(recovered.metrics.work, recovered.metrics.allocation),
         )
         numericalWitness = numericalWitness ?: recovered.witness
         numericalBound = recovered.bound ?: numericalBound
@@ -637,7 +640,7 @@ private fun certifyLpResultWithin(
         observer?.observe(
             LpCertifier.RATIONAL,
             reconstruction.witness != null || reconstruction.bound != null,
-            LpCertifierCost.Metered(reconstruction.metrics.work),
+            LpCertifierCost.Metered(reconstruction.metrics.work, reconstruction.metrics.allocation),
         )
         numericalWitness = reconstruction.witness ?: numericalWitness
         numericalBound = reconstruction.bound ?: numericalBound
@@ -703,7 +706,7 @@ private fun certifyLpResultWithin(
         )
         exactBasis = checked
         if (checked.singularRank != null) {
-            continuationTarget()
+            if (continueFeasibility) continuationTarget()
             solver.rejectSingularBasis(model, result.basis)
         }
         numericalWitness = checked.witness ?: numericalWitness
@@ -749,7 +752,7 @@ private fun certifyLpResultWithin(
             observer?.observe(
                 LpCertifier.RATIONAL,
                 reconstruction.conflict != null,
-                LpCertifierCost.Metered(reconstruction.metrics.work),
+                LpCertifierCost.Metered(reconstruction.metrics.work, reconstruction.metrics.allocation),
             )
             numericalConflict = reconstruction.conflict
             conflict = policy.acceptNullable(LpCertifier.RATIONAL, reconstruction.conflict)
@@ -770,7 +773,7 @@ private fun certifyLpResultWithin(
             )
             exactBasis = checked
             if (checked.singularRank != null) {
-                continuationTarget()
+                if (continueFeasibility) continuationTarget()
                 solver.rejectSingularBasis(model, basis)
             }
             numericalConflict = checked.conflict
@@ -787,7 +790,7 @@ private fun certifyLpResultWithin(
     ) {
         refine()
     }
-    if (continued == null && witness == null && !withheldWitness && !withheldConflict &&
+    if (continueFeasibility && continued == null && witness == null && !withheldWitness && !withheldConflict &&
         ray == null && conflict == null && (state != null || result == null || model.hasContinuous)
     ) {
         continued = continueExactLp(

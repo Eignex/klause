@@ -364,6 +364,7 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
         ) {
             throw ContinuationStop(ContinuationDecline.INVALID_INPUT)
         }
+        budget.step(bytes = input.total.toLong())
         val seen = BooleanArray(input.total)
         for (column in input.headings) {
             budget.step()
@@ -463,10 +464,10 @@ private class RationalContinuationLane<F>(
 ) : ContinuationLane {
     private val width = input.total + 1
     private var table: List<MutableList<F>>
-    private var headings = checkpoint?.headings ?: MutableList(input.m) { input.n + it }
+    private var headings: MutableList<Int>
     private var seats: MutableList<F>
     private var seatEpsilon: MutableList<F>?
-    private var statuses = checkpoint?.statuses ?: MutableList(input.total) { j -> canonical(j) }
+    private var statuses: MutableList<ContinuationStatus>
     private var lower: List<F?>
     private var upper: List<F?>
     override var position = 0
@@ -485,8 +486,10 @@ private class RationalContinuationLane<F>(
     init {
         if (checkpoint != null) {
             table = checkpoint.table
+            headings = checkpoint.headings
             seats = checkpoint.seats
             seatEpsilon = checkpoint.seatEpsilon
+            statuses = checkpoint.statuses
             lower = checkpoint.lower
             upper = checkpoint.upper
             position = checkpoint.position
@@ -495,6 +498,8 @@ private class RationalContinuationLane<F>(
             scalarPeak = checkpoint.scalarPeak
         } else {
             budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L)
+            headings = MutableList(input.m) { input.n + it }
+            statuses = MutableList(input.total, ::canonical)
             lower = input.lower.map { it?.let { value -> fromBig(value, budget) } }
             upper = input.upper.map { it?.let { value -> fromBig(value, budget) } }
             table = List(input.m) { row ->

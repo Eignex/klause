@@ -90,8 +90,11 @@ internal sealed interface RealOptimizationResult {
         val incumbent: List<BigFraction>?,
         override val withinTolerance: Boolean,
         val infimum: BigFraction? = null,
+        val stop: RealOptimizationStop? = null,
     ) : RealOptimizationResult
 }
+
+internal enum class RealOptimizationStop { WORK, ALLOCATION, DIMENSION, SCALAR, PIVOTS, TIME, CANCELLED }
 
 // [widened], the optimization within the source tolerance, and [exact] in its place when [widened] is absent or cannot
 // state the point; null when neither is. Under a tolerance only a [widened] result decides the point: a caller reads an
@@ -120,7 +123,7 @@ private class ToleranceFirstOptimization(
             val step = active.advance(cancellation, remaining, shouldPause)
             val result = (step as? RealOptimizationStep.Completed)?.result ?: return step
             val stated = result !is RealOptimizationResult.Undecided || result.incumbent != null ||
-                result.infimum != null || cancellation()
+                result.infimum != null || result.stop != null || cancellation()
             val fallback = exact.takeUnless { stated } ?: return step
             exact = null
             val next = fallback() ?: return step

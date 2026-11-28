@@ -88,6 +88,7 @@ import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.RealCompletionOptimization
 import com.eignex.klause.solver.validation.RealOptimizationResult
 import com.eignex.klause.solver.validation.RealOptimizationStep
+import com.eignex.klause.solver.validation.RealOptimizationStop
 import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.checkPointRestrictions
 import com.eignex.klause.solver.validation.exactRealCosts
@@ -167,6 +168,7 @@ internal class ResumableMinimize(
 
     // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
     private var sawIndeterminateLeaf = false
+    private var leafResourceStop: TerminationReason? = null
 
     // The least objective value a leaf approached without attaining. An incumbent at or below it is optimal over those
     // leaves; one above it is not.
@@ -370,6 +372,7 @@ internal class ResumableMinimize(
     private val choiceSearch =
         if (realCosts != null && problem.statesRealChoices()) AbsRealCompletion(problem) else null
     private var pendingOptimization: RealCompletionOptimization? = null
+    private var stoppedOptimizationLeaf: LeafRealResult? = null
 
     private fun clearOptimization() {
         val pending = pendingOptimization
@@ -421,7 +424,20 @@ internal class ResumableMinimize(
         val result = (step as? RealOptimizationStep.Completed)?.result ?: return null
         clearOptimization()
         val searched = optimizedLeaf(sample, real, result)
-        if (!stop()) cacheSearched(searched)
+        if (!stop()) {
+            val resourceStop = when ((result as? RealOptimizationResult.Undecided)?.stop) {
+                RealOptimizationStop.WORK, RealOptimizationStop.PIVOTS -> TerminationReason.BudgetExhausted
+                RealOptimizationStop.ALLOCATION, RealOptimizationStop.DIMENSION, RealOptimizationStop.SCALAR ->
+                    TerminationReason.RepresentationDeclined
+                RealOptimizationStop.TIME -> TerminationReason.Timeout
+                RealOptimizationStop.CANCELLED, null -> null
+            }
+            if (resourceStop != null) {
+                leafResourceStop = resourceStop
+                stoppedOptimizationLeaf = searched
+            }
+            cacheSearched(searched)
+        }
         return searched
     }
 
@@ -957,6 +973,8 @@ internal class ResumableMinimize(
         pendingIncumbent = null
         unboundedLeaf = null
         sawIndeterminateLeaf = false
+        leafResourceStop = null
+        stoppedOptimizationLeaf = null
         unattainedFloor = null
     }
 
@@ -1077,7 +1095,8 @@ internal class ResumableMinimize(
     }
 
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
-        val reason = (run.componentStop?.stopCause ?: searchSession.executionControls.stopCause).terminationReason()
+        val reason = (run.componentStop?.stopCause ?: searchSession.executionControls.stopCause)?.terminationReason()
+            ?: leafResourceStop ?: TerminationReason.Unsupported
         val b = incumbents.current()
         // A leaf's unattained infimum below the incumbent leaves better values open.
         val floorBelow = unattainedFloor?.let { floor ->
@@ -1798,12 +1817,14 @@ internal class ResumableMinimize(
             val sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp.assignmentKey))
             var unresolved = false
             var incomplete = false
+            var resourceStopped = false
             val incumbent = if (problem.numRealVars == 0) {
                 recordIfImproving(sample, objective.evaluate(sample))
             } else {
                 val real = searchedLeaf(sample, if (pausable) {
                     advanceRealLeaf(sample) ?: return SearchModelDisposition.Pause
                 } else completeLeaf(sample, runEndToken())) ?: return SearchModelDisposition.Pause
+                resourceStopped = real === stoppedOptimizationLeaf
                 real.unattainedInfimum?.let { return infimumLeaf(sample, real, it) }
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
@@ -1845,10 +1866,17 @@ internal class ResumableMinimize(
                 }
             }
             pendingRealResult = null
+            stoppedOptimizationLeaf = null
             clearOptimization()
             pendingIncumbent = incumbent
             return when {
                 unboundedLeaf != null -> SearchModelDisposition.Surface
+
+                resourceStopped -> {
+                    sawIndeterminateLeaf = true
+                    if (incumbent != null) run.surfaceSkippedModel()
+                    SearchModelDisposition.Skip
+                }
 
                 unresolved || incomplete -> SearchModelDisposition.Retry(surface = incumbent != null)
 

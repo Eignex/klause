@@ -204,12 +204,13 @@ private class RefinementRun(
         )
         output.dual = y
         output.dualUsesBasis = false
-        if (sufficient(output) || meter.limits.maxRounds == 0) return
+        val remainingRounds = (meter.limits.maxRounds - meter.metrics.rounds).coerceAtLeast(0)
+        if (sufficient(output) || remainingRounds == 0) return
         var residual = a.residual(x, y, basis, 0, 0)
         var nextReconstruction = 1
         var stalls = 0
         withChild(residual.working, anchor) { scope, firstAllowance ->
-            for (round in 1..(meter.limits.maxRounds - meter.metrics.rounds).coerceAtLeast(0)) {
+            for (round in 1..remainingRounds) {
                 meter.poll()
                 if (round > 1 && !scope.replaceState(residual.working)) {
                     meter.poll()
@@ -262,6 +263,7 @@ private class RefinementRun(
                     if (!output.luAttempted) exactCandidate(a, requireNotNull(basis), factors, output)
                     break
                 }
+                if (round == remainingRounds) break
                 residual = a.residual(x, y, basis, residual.primalExponent, residual.dualExponent)
             }
         }
@@ -776,9 +778,9 @@ internal fun refineLp(
                 current.candidate.point != null)
         ) {
             null
-        } else {
-            LpRefinementDecline.CANDIDATE
-        }
+        } else if (limits.maxRounds > 0 && meter.metrics.rounds == limits.maxRounds) {
+            LpRefinementDecline.ROUNDS
+        } else LpRefinementDecline.CANDIDATE
     } catch (stop: RefinementStop) {
         reason = stop.reason
     } finally {

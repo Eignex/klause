@@ -802,18 +802,42 @@ internal fun verifyRationalCertificate(
     basis: Basis? = null,
     cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
+): ReconstructedCertificate = verifyRationalCertificate(
+    model.n, model.m, sourcePrimal, duals, ray, basis, cancellation, limits,
+) { ReconstructionAuthority(model, it) }
+
+internal fun verifyRationalCertificate(
+    state: LpExactState,
+    sourcePrimal: List<BigFraction>?,
+    ray: List<BigFraction>?,
+    cancellation: ExecutionControl,
+    limits: ReconstructionLimits,
+): ReconstructedCertificate = verifyRationalCertificate(
+    state.model.n, state.model.m, sourcePrimal, null, ray, null, cancellation, limits,
+) { ReconstructionAuthority(state, it) }
+
+private inline fun verifyRationalCertificate(
+    columns: Int,
+    rows: Int,
+    sourcePrimal: List<BigFraction>?,
+    duals: List<BigFraction>?,
+    ray: List<BigFraction>?,
+    basis: Basis?,
+    cancellation: ExecutionControl,
+    limits: ReconstructionLimits,
+    capture: (ReconstructionMeter) -> ReconstructionAuthority,
 ): ReconstructedCertificate {
     val meter = ReconstructionMeter(limits, cancellation)
     var run: ReconstructionRun? = null
     var decline: ReconstructionDecline? = null
     try {
         meter.step()
-        if ((sourcePrimal != null && sourcePrimal.size != model.n) || (duals != null && duals.size != model.m) ||
-            (ray != null && ray.size != model.m)
+        if ((sourcePrimal != null && sourcePrimal.size != columns) || (duals != null && duals.size != rows) ||
+            (ray != null && ray.size != rows)
         ) {
             throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
         }
-        val authority = ReconstructionAuthority(model, meter)
+        val authority = capture(meter)
         val current = ReconstructionRun(authority, meter)
         run = current
         meter.storage(((sourcePrimal?.size ?: 0).toLong() + (duals?.size ?: 0) + (ray?.size ?: 0)) * 24L)
