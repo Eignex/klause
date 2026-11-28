@@ -17,20 +17,16 @@ import com.eignex.util.io.useSource
  * when true, `-xi` when false. Satisfaction emits its `v` line after the final status.
  * `-s` statistics are emitted as `c` comment lines.
  */
-internal object OpbMode : CliMode {
-    override val names = listOf("opb", "pb", "wbo")
-    override val extensions = listOf("opb", "wbo")
-    override fun newSession(): ModeSession = Session()
+internal object OpbMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        override fun flags(): List<FlagSpec> = emptyList()
-
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(opbSemantics)
             val parsed = openTextFile(path).useSource { Opb.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
-            cliLogger(common.verbose).v {
+            logVerbose(common.verbose) {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} factors=${parsed.problem.numFactors}"
             }
             // Only the declared x1..xN belong in the `v` line — not the Tseitin/soft indicators that

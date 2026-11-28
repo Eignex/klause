@@ -17,10 +17,6 @@ import com.eignex.util.runtime.diagnostics.startHeapPeakSampler
  * Each invocation solves one instance.
  */
 
-/** Front-end registry, matched in order by `--format` name or file extension. MiniZinc is the fallback
- *  because MiniZinc invokes this binary with `.fzn` files and standard flags. */
-internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode, OpbMode, WcnfMode, MpsMode)
-
 /** Parse args once, select the front-end mode, load the instance and run the shared driver. */
 fun main(args: Array<String>) {
     val code = runCli(args)
@@ -72,8 +68,8 @@ private fun run(args: Array<String>) {
     // One parse over the union of common + every mode's flags. Each mode's flags mutate that
     // mode's own session; only the finally selected session is used, so mode flag names must be
     // unique across modes.
-    val sessions = MODES.associateWith { it.newSession() }
-    val specs = commonFlagSpecs(common) + sessions.values.flatMap { it.flags() }
+    val flagSessions = CliMode.entries.filter { it.hasModeFlags }.associateWith { it.newSession() }
+    val specs = commonFlagSpecs(common) + flagSessions.values.flatMap { it.flags() }
     parseArgs(args, specs) { positional ->
         if (common.inputPath != null) usageError("multiple input paths: ${common.inputPath}, $positional")
         common.inputPath = positional
@@ -104,7 +100,7 @@ private fun run(args: Array<String>) {
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
     common.startDebugStatistics(processProperty("klause.debug") == "true")
     val mode = pickMode(common, path)
-    val session = sessions.getValue(mode)
+    val session = flagSessions[mode] ?: mode.newSession()
     // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and
     // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
     if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
@@ -114,8 +110,8 @@ private fun run(args: Array<String>) {
     val solvable = session.load(path, common)
     common.loadElapsedMs = nowMillis() - loadStart
     val comment = when (mode) {
-        MiniZincMode -> "%"
-        SmtLibMode -> ";"
+        CliMode.MINIZINC -> "%"
+        CliMode.SMTLIB -> ";"
         else -> "c"
     }
     SolveCore.solve(solvable, common, session.output(common).sourceQualified(common.sourceSemantics, comment))
@@ -126,10 +122,10 @@ private const val USAGE =
         "Try 'klause-cli --help' for the full option list."
 
 /** Long `--help` output (stdout). The option list is rendered from the live [specs] (so it can't
- *  drift from the real flags); the surrounding prose (formats, examples) reads the [MODES]
+ *  drift from the real flags); the surrounding prose (formats, examples) reads the [CliMode]
  *  registry, so a new front-end shows up automatically too. */
 private fun helpText(specs: List<FlagSpec>): String {
-    val byExtension = MODES.joinToString(", ") { m -> ".${m.extensions.first()} → ${m.names.first()}" }
+    val byExtension = CliMode.entries.joinToString(", ") { m -> ".${m.extensions.first()} → ${m.names.first()}" }
     return """
         |${BuildInfo.versionLine()} — SMT-flavored finite-domain constraint solver
         |
@@ -177,8 +173,8 @@ private fun renderOptionRow(spec: FlagSpec): String {
 private fun pickMode(common: CommonOptions, path: String): CliMode {
     common.formatOverride?.let { fmt ->
         val f = fmt.lowercase()
-        return MODES.firstOrNull { f in it.names } ?: usageError("unknown format `$fmt`")
+        return CliMode.entries.firstOrNull { f in it.names } ?: usageError("unknown format `$fmt`")
     }
     val ext = fileExtension(path).lowercase()
-    return MODES.firstOrNull { ext in it.extensions } ?: MiniZincMode
+    return CliMode.entries.firstOrNull { ext in it.extensions } ?: CliMode.MINIZINC
 }

@@ -34,16 +34,12 @@ import kotlin.time.TimeSource
  * SMT-LIB command sessions (`.smt2` / `.smt`). Models require an explicit query
  * solver statistics and objective observations use SMT-LIB comments.
  */
-internal object SmtLibMode : CliMode {
-    override val names = listOf("smtlib", "smt", "smt2")
-    override val extensions = listOf("smt2", "smt")
-    override fun newSession(): ModeSession = Session()
+internal object SmtLibMode {
+    fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
         private var latestSourceObjective: BigFraction? = null
         private var latestInterpretation: SmtSessionModel? = null
-
-        override fun flags(): List<FlagSpec> = emptyList()
 
         override fun runCommands(path: String, common: CommonOptions): Boolean {
             val source = openTextFile(path)
@@ -115,7 +111,7 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            cliLogger(common.verbose, common.diagnostic).v {
+            logVerbose(common.verbose, common.diagnostic) {
                 "parsed ${fileName(path)}: bool=${bools.size} int=${ints.size} real=${reals.size}"
             }
             val objective = parsed.objective?.toLinearObjective()
