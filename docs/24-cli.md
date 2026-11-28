@@ -25,13 +25,18 @@ model and reuse it across processes. These POSIX shell commands use the installe
 
 ```sh
 KLAUSE_CLI_OPTS="-XX:AOTCacheOutput=klause.aot" klause-cli training.cnf
-KLAUSE_CLI_OPTS="-XX:AOTCache=klause.aot" klause-cli input.cnf
+KLAUSE_CLI_OPTS="-XX:AOTCache=klause.aot -Xlog:aot*=off:stdout -Xlog:aot*=warning:stderr" \
+  klause-cli input.cnf
 ```
 
-Training runs the model and builds the cache when the JVM exits. Keep the cache outside the
-installation and use the same installed distribution, JDK build, platform and JVM options for
-training and reuse. Rebuild the cache when any of those change. For troubleshooting, add
-`-XX:AOTMode=on` to the reuse command to fail if the JVM cannot load the cache.
+Training runs the model and prints JVM diagnostics while building the cache at exit. Run it
+separately from consumers of solver output. Keep the cache outside the installation and use the
+same installed distribution, JDK build, platform and JVM runtime settings for training and reuse.
+Rebuild the cache when any of those change.
+
+The reuse command sends AOT diagnostics to stderr. HotSpot can fall back to a normal run if the
+cache is missing or incompatible. For troubleshooting, add `-XX:AOTMode=on` to fail if the JVM
+cannot load the cache.
 See the [Java launcher reference](https://docs.oracle.com/en/java/javase/25/docs/specs/man/java.html#ahead-of-time-cache).
 
 ## Formats and dispatch
