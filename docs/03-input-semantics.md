@@ -271,7 +271,7 @@ same serializers.
 | `IntExpr` | `ref`, literal, `add`, `mul`, `truncDiv`, `truncMod`, `pow`, `abs`, `min`, `max`, `if`, `element`, `card` |
 | `BoolExpr` logic | `ref`, `notRef`, `nominalEq`, `not`, `and`, `or`, `xor`, `implies`, `iff`, `atMost`, `atLeast`, `cardinality`, `pseudoBoolean` |
 | `BoolExpr` relations | `le`, `lt`, `ge`, `gt`, `eq`, `ne`, `floatLinear`, `realEq`, set `in`, `labelIn`, `subset`, `disjoint`, `setEq` |
-| `BoolExpr` globals | `allDifferent`, `symmetricAllDifferent`, `inverse`, `table`, `regular`, `costRegular`, `mdd`, `costMdd`, `circuit`, `subcircuit`, `cumulative`, `cumulativeVars`, `disjunctive`, `sort`, `increasing`, `diffn`, `lexLess` and the `…Opt` presence forms |
+| `BoolExpr` globals | `allDifferent`, `symmetricAllDifferent`, `inverse`, `table`, `regular`, `costRegular`, `mdd`, `costMdd`, `circuit`, `subcircuit`, `cumulative`, `cumulativeVars`, `disjunctive`, `sort`, `increasing`, `diffn`, `lexLess`, `nValue` and the `…Opt` presence forms |
 | `BoolExpr` native | `factor`: a factor-codec node with its `bools`, `ints` and `reals` bindings |
 | `SetExpr` | `ref`, `elements`, `labels`, `union`, `intersect`, `diff` |
 | `ContinuousRealExpr` | `affine`, `mul`, `pow` |
@@ -350,8 +350,8 @@ operators with literal operands, the receiver helpers `x.abs()`, `x.min(y)`,
 `x.max(y)` and `x.pow(n)`, and `ifThenElse(cond, then, otherwise)` with literal or
 expression branches. Integer `/` and `%` build `truncDiv` and `truncMod`, and
 `minOf` and `maxOf` build the variadic integer forms. Each library keeps its own
-nodes, so equal spellings can still encode differently: Klause writes `ne` and
-constant multiples with its `ne` and `scale` keys.
+nodes, so equal spellings can still encode differently: Klause writes `ne` with its
+own `ne` key.
 
 ### Integer extrema and selection
 
