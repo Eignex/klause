@@ -220,25 +220,11 @@ internal fun continueExactLp(
                     checks = 1,
                     restarts = metrics.restarts + checked.metrics.verificationRestarts + checked.metrics.vectorRestarts,
                     decline = if (point == null && conflict == null) {
-                        checked.metrics.decline?.let {
-                            when (it) {
-                                ReconstructionDecline.CANCELLED -> if (cancellation()) {
-                                    ContinuationDecline.CANCELLED
-                                } else {
-                                    ContinuationDecline.TIME
-                                }
-
-                                ReconstructionDecline.WORK -> ContinuationDecline.WORK
-
-                                ReconstructionDecline.ALLOCATION -> ContinuationDecline.ALLOCATION
-
-                                ReconstructionDecline.BITS -> ContinuationDecline.BITS
-
-                                ReconstructionDecline.DIMENSION -> ContinuationDecline.DIMENSION
-
-                                else -> ContinuationDecline.CANDIDATE
-                            }
-                        } ?: ContinuationDecline.CANDIDATE
+                        if (checked.metrics.decline == ReconstructionDecline.CANCELLED && !cancellation()) {
+                            ContinuationDecline.TIME
+                        } else {
+                            checked.metrics.decline?.continuationDecline() ?: ContinuationDecline.CANDIDATE
+                        }
                     } else {
                         null
                     },
@@ -287,6 +273,15 @@ internal fun continueExactLp(
 
 internal fun ExactContinuationLimits.admitsDimensions(model: LpModel): Boolean =
     admitsDimensions(model.m, model.numVars)
+
+internal fun ReconstructionDecline.continuationDecline(): ContinuationDecline = when (this) {
+    ReconstructionDecline.CANCELLED -> ContinuationDecline.CANCELLED
+    ReconstructionDecline.WORK -> ContinuationDecline.WORK
+    ReconstructionDecline.ALLOCATION -> ContinuationDecline.ALLOCATION
+    ReconstructionDecline.BITS -> ContinuationDecline.BITS
+    ReconstructionDecline.DIMENSION -> ContinuationDecline.DIMENSION
+    else -> ContinuationDecline.CANDIDATE
+}
 
 private fun admitContinuation(model: LpModel, budget: ContinuationBudget) {
     if (!budget.limits.admitsDimensions(model)) {

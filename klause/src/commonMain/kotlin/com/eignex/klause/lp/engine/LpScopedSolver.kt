@@ -20,6 +20,7 @@ internal class LpScopedSolver(
     private val maxRetainedRows: Int = Int.MAX_VALUE,
     private val pricing: LpPricingOptions = LpPricingOptions(),
     private val componentSplit: Boolean = false,
+    private val preparationAllocationLimit: Long = Long.MAX_VALUE,
 ) : AutoCloseable {
     private val queryOwner = context.onQuery?.let { Any() }
     private var querySequence = 0L
@@ -59,6 +60,8 @@ internal class LpScopedSolver(
     private var preparationAttempts = 0L
     private var preparationSuccesses = 0L
     private var preparationWork = 0L
+    var preparationAllocation = 0L
+        private set
     private var preparationRefactorizations = 0L
     private var createdOwners = 0L
     private var closedOwners = 0L
@@ -870,6 +873,7 @@ internal class LpScopedSolver(
         var failure: Throwable? = null
         val projection = LpProjectionMeter(
             workLimit = if (workBudget > 0L) workBudget else Long.MAX_VALUE,
+            allocationLimit = (preparationAllocationLimit - preparationAllocation).coerceAtLeast(0L),
             cancellation = token,
         )
         var constructionBound = 0L
@@ -943,6 +947,7 @@ internal class LpScopedSolver(
             throw primary
         } finally {
             preparationWork = saturatedAdd(preparationWork, projection.work)
+            preparationAllocation = saturatedAdd(preparationAllocation, projection.allocation)
             reservedConstructionWork = saturatedAdd(reservedConstructionWork, constructionBound)
             if (!accepted && candidate != null) {
                 closeRejectedCandidate(candidate, recordRejectedAppendWork, failure)

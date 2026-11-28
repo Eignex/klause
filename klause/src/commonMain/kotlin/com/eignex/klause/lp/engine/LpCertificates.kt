@@ -370,8 +370,8 @@ internal fun LpModel.exactConstant(): BigFraction = exactState?.model?.objective
 internal fun LpModel.exactLower(j: Int): BigFraction = exactBounds(j).lower?.number?.value ?: BigFraction.ZERO
 
 internal fun LpModel.exactBounds(j: Int): ExactLpBounds {
-    val source = exactState?.model?.column(j)?.bounds
-    val bounds = source ?: ExactLpBounds(
+    exactState?.model?.let { return it.effectiveBounds(j) }
+    val bounds = ExactLpBounds(
         if (j >= n || !probeClampedLo[j]) ExactLpSide(ExactLpNumber.of(0L)) else null,
         if (hasFiniteUpper(j) && (j >= n || !probeClampedHi[j])) ExactLpSide(ExactLpNumber.of(exactUpper(j))) else null,
     )
@@ -380,6 +380,13 @@ internal fun LpModel.exactBounds(j: Int): ExactLpBounds {
     } else {
         bounds
     }
+}
+
+internal fun ExactLpModel.effectiveBounds(column: Int): ExactLpBounds {
+    val bounds = column(column).bounds
+    if (column < n || !row(column - n).strict) return bounds
+    val lower = bounds.lower ?: return bounds
+    return if (lower.number.value.isZero) bounds.copy(lower = lower.copy(strict = true)) else bounds
 }
 
 private fun LpModel.exactRowStrict(row: Int): Boolean = exactState?.model?.row(row)?.strict ?: rowStrict[row]
@@ -452,13 +459,18 @@ internal fun LpModel.finiteExactInput(): Boolean {
 
 internal fun exactDouble(value: Double): BigFraction = checkNotNull(BigFraction.ofDouble(value))
 
+internal inline fun ExactLpModel.forEachRationalColumn(j: Int, action: (Int, BigFraction) -> Unit) {
+    if (j >= n) action(j - n, BigFraction.ONE)
+    else for (entry in columnEntries(j)) action(entry.row, entry.number.value)
+}
+
 internal inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFraction) -> Unit) {
     if (j >= n) {
         action(j - n, BigFraction.ONE)
     } else {
         val source = exactState?.model
         if (source != null) {
-            for (entry in source.columnEntries(j)) action(entry.row, entry.number.value)
+            source.forEachRationalColumn(j, action)
             return
         }
         val dv = doubleView

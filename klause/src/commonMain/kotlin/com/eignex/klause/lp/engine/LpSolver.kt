@@ -15,7 +15,7 @@ internal sealed interface LpCertifierCost {
     // [LpCertificationObserver.observeContinuation].
     data object Reported : LpCertifierCost
 
-    data class Metered(val work: Long) : LpCertifierCost
+    data class Metered(val work: Long, val allocation: Long = 0L) : LpCertifierCost
 }
 
 // Each pass visits every structural entry, column and row once. A pass with Long-wide products costs one unit per

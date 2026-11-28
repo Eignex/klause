@@ -22,15 +22,29 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.RealOptimizationResult
 import com.eignex.klause.solver.validation.RealOptimizationStep
+import com.eignex.klause.solver.validation.RealOptimizationStop
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
@@ -39,6 +53,7 @@ import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -72,6 +87,104 @@ class RealLeafOptimizationTest {
     private val leaf = Sample(BooleanArray(0), LongArray(0))
 
     private fun costs(vararg values: Long) = values.map(BigFraction::ofLong)
+
+    @Test
+    fun `a feasible leaf should reach its exact optimum after correction exhaustion`() {
+        val source = Problem(
+            0, 0, emptyArray(),
+            arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(2.0), LinearOp.GE, 1.0)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
+        )
+        var corrections = 0
+        var cell: LpExactState? = null
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: ExecutionControl,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                if (model.n == 0 || model.costD(0) == 0.0) return delegate
+                if (cell == null) cell = model.exactState
+                return object : PersistentLpSolver by delegate {
+                    private var active = model.exactState
+                    override val solvedExactState get() = active
+                    override val lastPivots = 1
+                    override val lastMetrics = LpSolveMetrics(workOps = 1L, pivots = 1)
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
+                        delegate.adopt(state, token).also { if (it) active = state }
+                    override fun solve(warm: Basis?): FloatLpResult {
+                        val sourceModel = checkNotNull(active).model
+                        val headings = IntArray(sourceModel.m) { sourceModel.n + it }
+                        val statuses = Array(sourceModel.numVars) {
+                            if (it < sourceModel.n) VarStatus.AT_LOWER else VarStatus.BASIC
+                        }
+                        val primal = if (active === cell) {
+                            checkNotNull(delegate.resolveBounds()).primal
+                        } else {
+                            corrections++
+                            if (headings.isNotEmpty()) {
+                                statuses[headings[0]] = VarStatus.FIXED
+                                headings[0] = 0
+                                statuses[0] = VarStatus.BASIC
+                            }
+                            DoubleArray(sourceModel.n)
+                        }
+                        return FloatLpResult(Basis(headings, statuses), 0.0, DoubleArray(sourceModel.m), primal,
+                            exactState = active)
+                    }
+                    override fun resolveBounds(allowance: LpFloatAllowance?) = solve(null)
+                }
+            }
+        }
+        val context = LpSolveContext(engineFactory = factory)
+        val step = AbsRealCompletion(source).optimize(leaf, costs(1), context).use {
+            it.advance(ExecutionControl.Never)
+        }
+
+        val optimum = assertIs<RealOptimizationResult.Optimum>(assertIs<RealOptimizationStep.Completed>(step).result)
+        assertEquals(BigFraction.ofDouble(0.5), optimum.value)
+        assertEquals(64, corrections)
+    }
+
+    @Test
+    fun `a resource stopped cell should keep its checked point without opening an optimization query`() {
+        var objectiveQuery = false
+        val context = LpSolveContext(
+            exactContinuationLimits = ExactContinuationLimits(maxAllocation = 0),
+            onQuery = { query ->
+                objectiveQuery = objectiveQuery || (0 until query.model.n).any { query.model.costD(it) != 0.0 }
+            },
+        )
+
+        val step = AbsRealCompletion(oppositeMagnitudes).optimize(leaf, costs(0, 0, 1, -1), context).use {
+            it.advance(ExecutionControl.Never)
+        }
+
+        val stopped = assertIs<RealOptimizationResult.Undecided>(assertIs<RealOptimizationStep.Completed>(step).result)
+        assertEquals(RealOptimizationStop.ALLOCATION, stopped.stop)
+        assertEquals(BigFraction.ZERO, stopped.incumbent?.let { it[2] - it[3] })
+        assertFalse(objectiveQuery)
+    }
+
+    @Test
+    fun `a resource stopped leaf should surface its incumbent before the incomplete result`() {
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(0.0, 0.0, 1.0, -1.0))
+        val context = LpSolveContext(exactContinuationLimits = ExactContinuationLimits(maxAllocation = 0))
+        val params = BacktrackParams(randomSeed = 0L,
+            lpPlan = LpPlan(bounding = false, probe = false, rootCutHarvest = false, componentSplit = false))
+
+        val results = BacktrackSolver(oppositeMagnitudes.bake(), context).improvements(objective, params).toList()
+
+        assertEquals(listOf(0.0, 0.0), results.map { it.objectiveValue })
+        assertEquals(TerminationReason.RepresentationDeclined, assertIs<MinimizeResult.BestFound>(results.last()).reason)
+    }
 
     @Test
     fun `minimization should reach the optimum of opposite absolute values the leaf relaxation misses`() {

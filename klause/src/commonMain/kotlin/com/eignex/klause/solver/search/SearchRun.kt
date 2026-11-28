@@ -54,6 +54,7 @@ class SearchRun internal constructor(
     private val cancellationPoller = SearchCancellationPoller()
     internal var pauseBeforeDecision: () -> Boolean = { false }
     private var pendingAdvance = false
+    private var surfaceSkip = false
     private var pendingCancellation = false
     private var pendingCheck = false
     private var retryingAssertion = false
@@ -376,6 +377,10 @@ class SearchRun internal constructor(
         }
     }
 
+    internal fun surfaceSkippedModel() {
+        surfaceSkip = true
+    }
+
     private fun completeModel(model: AssembledSearchModel): SearchRunEvent? {
         pendingModel = null
         resumeAfterSolution = true
@@ -408,6 +413,11 @@ class SearchRun internal constructor(
             SearchModelDisposition.Skip -> {
                 resumeAfterSolution = false
                 lastModel = null
+                if (surfaceSkip) {
+                    surfaceSkip = false
+                    pendingAdvance = true
+                    return SearchRunEvent.Satisfied(model)
+                }
                 skipModel()?.let { return it }
             }
 
@@ -804,6 +814,7 @@ class SearchRun internal constructor(
         componentStopReplayed = false
         budgetInterrupted = false
         pendingAdvance = false
+        surfaceSkip = false
         pendingCancellation = false
         pendingCheck = false
         retryingAssertion = false

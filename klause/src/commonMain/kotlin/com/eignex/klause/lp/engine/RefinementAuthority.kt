@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigRationalConflict
+import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.BIG_ONE
@@ -46,6 +47,7 @@ internal enum class LpRefinementDecline {
     WORK,
     ALLOCATION,
     PIVOTS,
+    ROUNDS,
     TIME,
     CANCELLED,
     PROJECTION,
@@ -437,25 +439,26 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
     init {
         val previousStage = meter.diagnostic?.stage
         meter.diagnostic?.stage = LpRefinementStage.SOURCE_AUTHORITY
-        if (source.numVars > meter.limits.maxCoordinates || source.keySize >
-            meter.limits.maxEntries * 3L + source.numVars * 16L + source.m * 16L
-        ) {
-            meter.stop(
-                LpRefinementDecline.DIMENSION,
-            )
+        if (source.numVars > meter.limits.maxCoordinates) meter.stop(LpRefinementDecline.DIMENSION)
+        meter.charge(source.m.toLong(), source.m * 32L)
+        if (source.keySize > meter.limits.maxEntries * 3L + source.numVars * 16L + source.m * 16L) {
+            meter.stop(LpRefinementDecline.DIMENSION)
         }
+        var entries = source.m.toLong()
+        for (j in 0 until source.n) {
+            meter.charge()
+            entries += source.columnEntries(j).size
+            if (entries > meter.limits.maxEntries) meter.stop(LpRefinementDecline.DIMENSION)
+        }
+        if (entries > meter.limits.maxEntries) meter.stop(LpRefinementDecline.DIMENSION)
         meter.charge(source.numVars.toLong() + source.m, source.numVars * 96L + source.m * 64L)
-        var entries = 0
+        meter.charge(entries, entries * 32L)
         matrix = List(source.numVars) { j ->
-            val column = if (j < source.n) {
-                source.entries(j).map { it.row to meter.number(it.number.value) }
+            if (j < source.n) {
+                source.columnEntries(j).map { it.row to meter.number(it.number.value) }
             } else {
                 listOf(j - source.n to BigFraction.ONE)
             }
-            entries += column.size
-            if (entries > meter.limits.maxEntries) meter.stop(LpRefinementDecline.DIMENSION)
-            meter.charge(column.size.toLong(), column.size * 32L)
-            column
         }
         rhs = List(source.m) { meter.number(source.rhs(it).value) }
         costs = List(source.numVars) { meter.number(source.objective.cost(it).value) }
@@ -469,7 +472,19 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
         meter.number(source.objective.constant.value)
         meter.number(source.objective.scale.value)
         meter.number(source.objective.externalConstant.value)
-        model = state.toWorkingModel() ?: meter.stop(LpRefinementDecline.PROJECTION)
+        val projection = LpProjectionMeter(meter.remainingWork, meter.remainingAllocation, meter.token)
+        model = try {
+            state.ownerWorkingModel(projection) ?: run {
+                meter.poll()
+                meter.stop(when (projection.decline) {
+                    ContinuationDecline.WORK -> LpRefinementDecline.WORK
+                    ContinuationDecline.ALLOCATION -> LpRefinementDecline.ALLOCATION
+                    else -> LpRefinementDecline.PROJECTION
+                })
+            }
+        } finally {
+            meter.completed(projection.work, projection.allocation)
+        }
         previousStage?.let { meter.diagnostic.stage = it }
     }
 

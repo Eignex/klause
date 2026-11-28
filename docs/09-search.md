@@ -100,8 +100,12 @@ Real-choice optimization also retains unfinished rounds within a worker slice:
 the round owns its cutoff and component search, including the shared trail, branch
 stack and work already charged. Safe search boundaries suspend that owner rather
 than decline its proof; candidate cells, incumbents and unattained infima survive
-the pause. Run-end cancellation retires the unfinished round without a verdict,
-and worker close or reseeding releases its component owners.
+the pause. [Exact cell certification](21-lp-engine.md#refinement-and-strict-inequalities)
+retains its in-progress query and spends the remaining leaf allowance. An explicit
+resource stop retains the checked point, leaves the leaf unresolved and lets the
+traversal visit other alternatives. Run-end cancellation retires the unfinished
+round without a verdict, and worker close or reseeding releases its component
+owners.
 Resolved retry models follow the containing traversal's model-blocking policy at
 the shared root. The selected prefix then replays against that blocker, so overlapping
 retained prefixes cannot repeat an enumerated model.

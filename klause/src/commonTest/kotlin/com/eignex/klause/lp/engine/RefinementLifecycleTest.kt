@@ -43,7 +43,9 @@ class RefinementLifecycleTest {
 
                 assertEquals(if (rounds == 64) LpVerdict.FEASIBLE else LpVerdict.ATTAINED_OPTIMUM, result.verdict,
                     result.refinement.toString())
-                assertEquals(rounds, assertNotNull(result.refinement).rounds)
+                val metrics = assertNotNull(result.refinement)
+                assertEquals(rounds, metrics.rounds)
+                assertEquals(if (rounds == 64) LpRefinementDecline.ROUNDS else null, metrics.decline)
                 assertNull(result.continuation)
             }
         }

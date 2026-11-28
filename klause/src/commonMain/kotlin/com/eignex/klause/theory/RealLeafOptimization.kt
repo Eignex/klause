@@ -5,7 +5,10 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactWitness
+import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
@@ -19,15 +22,22 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpExactOptimization
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpRefinementLimits
+import com.eignex.klause.lp.engine.LpRefinementRequest
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolveStep
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.ReconstructionLimits
+import com.eignex.klause.lp.engine.certifyLpResult
+import com.eignex.klause.lp.engine.optimizeFeasibleExactLp
 import com.eignex.klause.lp.exactComparison
+import com.eignex.klause.simplex.exact.ContinuationDecline
+import com.eignex.klause.simplex.exact.ContinuationStop
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -36,10 +46,14 @@ import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.solver.validation.RealCompletionOptimization
 import com.eignex.klause.solver.validation.RealOptimizationResult
 import com.eignex.klause.solver.validation.RealOptimizationStep
+import com.eignex.klause.solver.validation.RealOptimizationStop
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.counting
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.saturatedAdd
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.TimeSource
 
 // Minimizes `sum(costs(r) * x(r))` over the real coordinates of [sample]'s discrete point by a branch and bound over
 // the choices of the completion [search]: the disjunct of each disjunction, such as the sign of an absolute value, the
@@ -82,6 +96,16 @@ internal class RealLeafOptimization(
     private var decided: RealOptimizationResult? = null
     private var pending: LpSolveCursor<RealOptimizationResult>? = null
     private var invocation = ExecutionControl.Never
+    private var caller = ExecutionControl.Never
+    private val limits = context.exactContinuationLimits ?: CELL_CONTINUATION.copy(
+        startArbitraryPrecision = context.startArbitraryPrecision,
+        preserveOverflowCheckpoint = context.preserveOverflowCheckpoint,
+    )
+    private val funding = SourceLpFunding(limits.maxWork, limits.maxAllocation)
+    private var exactTimeNs = 0L
+    private var spentPivots = 0
+    private val remainingPivots get() = (limits.maxPivots - spentPivots).coerceAtLeast(0)
+    private val remainingWork get() = minOf(funding.remainingWork, caller.admission?.quotaRemaining ?: Long.MAX_VALUE)
     private var closed = false
     private val cancellation = object : ExecutionControl() {
         override fun isCancelled(): Boolean = invocation()
@@ -89,6 +113,7 @@ internal class RealLeafOptimization(
         override val accounting get() = invocation.accounting
         override val admission get() = admissionFrom(invocation)
         override val workScheduled get() = invocation.workScheduled
+        override val stopPolling get() = caller.stopPolling
     }
 
     override fun advance(
@@ -99,12 +124,15 @@ internal class RealLeafOptimization(
         require(workLimit >= 0L)
         decided?.let { return RealOptimizationStep.Completed(it) }
         check(!closed) { "real optimization is closed" }
+        caller = cancellation
         invocation = cancellation.counting { units ->
             work = if (units > Long.MAX_VALUE - work) Long.MAX_VALUE else work + units
         }
         val cursor = pending ?: LpSolveCursor<RealOptimizationResult> {
             while (decided == null) {
-                if (this@RealLeafOptimization.cancellation()) return@LpSolveCursor undecided()
+                if (this@RealLeafOptimization.cancellation()) {
+                    return@LpSolveCursor undecided(RealOptimizationStop.CANCELLED)
+                }
                 round()
                 if (decided == null && !this@RealLeafOptimization.cancellation()) checkpoint(spent)
             }
@@ -121,6 +149,7 @@ internal class RealLeafOptimization(
             }
         } finally {
             invocation = ExecutionControl.Never
+            caller = ExecutionControl.Never
         }
     }
 
@@ -159,6 +188,7 @@ internal class RealLeafOptimization(
             (step as LpSolveStep.Completed).value
         }
         if (cancellation()) return
+        if (found is AbsRealCompletion.Result.Witness) nearest = found.reals
         checkpoint(spent)
         if (cancellation()) return
         when (found) {
@@ -166,33 +196,34 @@ internal class RealLeafOptimization(
             AbsRealCompletion.Result.Refuted -> if (!cancellation()) {
                 decide(
                     when {
-                        floor != null -> RealOptimizationResult.Undecided(incumbent ?: nearest, tolerant, floor)
+                        floor != null -> RealOptimizationResult.Undecided(bestPoint(), tolerant, floor)
                         attained != null -> RealOptimizationResult.Optimum(checkNotNull(incumbent), attained, tolerant)
                         else -> RealOptimizationResult.Refuted(tolerant)
                     },
                 )
             }
             AbsRealCompletion.Result.Undecided -> if (!cancellation()) decide(undecided())
-            is AbsRealCompletion.Result.Witness -> when (val cell = cellOptimum(model, found.reals, cancellation)) {
-                is CellOptimum.Attained -> {
-                    incumbent = cell.reals
-                    value = cell.value
-                }
-                is CellOptimum.Infimum -> {
-                    if (floor == null || cell.value < floor) infimum = cell.value
-                    nearest = found.reals
-                }
-                is CellOptimum.Unbounded ->
-                    decide(RealOptimizationResult.Unbounded(cell.reals, cell.direction, tolerant))
-                CellOptimum.Undecided -> if (!cancellation()) {
-                    nearest = found.reals
-                    decide(undecided())
+            is AbsRealCompletion.Result.Witness -> {
+                val cell = cellOptimum(model, found.reals, cancellation)
+                if (cancellation()) return
+                when (cell) {
+                    is CellOptimum.Attained -> {
+                        incumbent = cell.reals
+                        value = cell.value
+                    }
+                    is CellOptimum.Infimum -> if (floor == null || cell.value < floor) infimum = cell.value
+                    is CellOptimum.Unbounded ->
+                        decide(RealOptimizationResult.Unbounded(cell.reals, cell.direction, tolerant))
+                    is CellOptimum.Undecided -> decide(undecided(cell.stop))
                 }
             }
         }
     }
 
-    private fun undecided() = RealOptimizationResult.Undecided(incumbent ?: nearest, tolerant)
+    private fun bestPoint() = nearest?.takeIf { value?.let { best -> objectiveAt(it) < best } != false } ?: incumbent
+
+    private fun undecided(stop: RealOptimizationStop? = null) =
+        RealOptimizationResult.Undecided(bestPoint(), tolerant, stop = stop)
 
     private fun decide(result: RealOptimizationResult) {
         decided = result
@@ -217,75 +248,194 @@ internal class RealLeafOptimization(
         // The polyhedron's infimum, which a strict row keeps it from attaining.
         class Infimum(val value: BigFraction) : CellOptimum
         class Unbounded(val reals: List<BigFraction>, val direction: List<BigFraction>) : CellOptimum
-        data object Undecided : CellOptimum
+        class Undecided(val stop: RealOptimizationStop? = null) : CellOptimum
     }
 
-    // The exact optimum over the polyhedron of [model] that [point] selects, which contains [point]. A polyhedron with
-    // a strict row and no certified optimum is read through its closure, whose optimum is the polyhedron's infimum.
+    // The exact optimum over the polyhedron of [model] that [point] selects, which contains [point].
     private suspend fun LpSolveCursor<RealOptimizationResult>.cellOptimum(
         model: Problem,
         point: List<BigFraction>,
         cancellation: ExecutionControl,
     ): CellOptimum {
-        val rows = cellRows(model, point, cancellation) ?: return CellOptimum.Undecided
+        val captured = try {
+            captureCell(model, point)
+        } catch (stopped: ContinuationStop) {
+            return CellOptimum.Undecided(stopped.reason.realStop())
+        } ?: return CellOptimum.Undecided()
+        val (rows, bounds, lp) = captured
         checkpoint(spent)
-        if (cancellation()) return CellOptimum.Undecided
-        val columns = model.numRealVars
-        fun side(bound: Double) = BigFraction.ofDouble(bound)?.let { ExactLpSide(ExactLpNumber.of(it)) }
-
-        val bounds = List(columns) { real -> ExactLpBounds(side(model.realLower[real]), side(model.realUpper[real])) }
-        val open = solve(rows, columns, bounds, point, cancellation)
-        if (open != CellOptimum.Undecided || rows.none { it.strict } || cancellation()) return open
+        if (cancellation()) return CellOptimum.Undecided(RealOptimizationStop.CANCELLED)
+        solveFast(lp, rows, bounds, point, cancellation)?.let { return it }
         checkpoint(spent)
-        if (cancellation()) return CellOptimum.Undecided
-        val closure = rows.map { ExactRationalInequality(it.columns, it.coefficients, it.rhs) }
-        return when (val closed = solve(closure, columns, bounds, point, cancellation)) {
-            is CellOptimum.Attained ->
-                if (holds(closed.reals, rows, bounds)) closed else CellOptimum.Infimum(closed.value)
-            // The model's point holds every strict row, so it moves along the closure's ray inside the polyhedron.
-            is CellOptimum.Unbounded ->
-                if (recedes(closed.direction, rows, bounds)) CellOptimum.Unbounded(point, closed.direction)
-                else CellOptimum.Undecided
-            else -> closed
+        if (cancellation()) return CellOptimum.Undecided(RealOptimizationStop.CANCELLED)
+        val remaining = limits.copy(
+            maxWork = remainingWork,
+            maxAllocation = funding.remainingAllocation,
+            maxTimeNs = limits.maxTimeNs?.let { (it - exactTimeNs).coerceAtLeast(0L) },
+            maxPivots = remainingPivots,
+        )
+        val exact = optimizeFeasibleExactLp(
+            lp, remaining, cancellation, context.certificationPolicy,
+            observe = { work, allocation, elapsed, pivots ->
+                chargeCell(work, allocation)
+                exactTimeNs = saturatedAdd(exactTimeNs, elapsed)
+                chargePivots(pivots)
+            },
+            remainingWork = { remainingWork },
+        ) { checkpoint(spent) }
+        checkpoint(spent)
+        if (cancellation()) return CellOptimum.Undecided(RealOptimizationStop.CANCELLED)
+        val columns = bounds.size
+        return when (exact) {
+            is LpExactOptimization.Optimum -> attain(exact.point.take(columns), rows, bounds, point)
+                ?: CellOptimum.Undecided()
+            is LpExactOptimization.Infimum -> {
+                val endpoint = exact.endpoint.take(columns)
+                if (endpoint.size == columns && holds(endpoint, rows, bounds, closure = true)) {
+                    CellOptimum.Infimum(objectiveAt(endpoint))
+                } else CellOptimum.Undecided()
+            }
+            is LpExactOptimization.Unbounded -> {
+                val direction = exact.direction.take(columns)
+                if (direction.size == columns && recedes(direction, rows, bounds)) {
+                    CellOptimum.Unbounded(point, direction)
+                } else CellOptimum.Undecided()
+            }
+            is LpExactOptimization.Declined -> CellOptimum.Undecided(exact.reason.realStop())
         }
     }
 
-    private fun solve(
+    private data class CapturedCell(
+        val rows: List<ExactRationalInequality>,
+        val bounds: List<ExactLpBounds>,
+        val lp: ExactLpModel,
+    )
+
+    private fun captureCell(model: Problem, point: List<BigFraction>): CapturedCell? {
+        val started = TimeSource.Monotonic.markNow()
+        val grant = limits.maxTimeNs?.let { (it - exactTimeNs).coerceAtLeast(0L).nanoseconds }
+        fun admit(work: Long, allocation: Long) {
+            if (cancellation()) throw ContinuationStop(ContinuationDecline.CANCELLED)
+            if (grant != null && started.elapsedNow() >= grant) throw ContinuationStop(ContinuationDecline.TIME)
+            if (work > remainingWork) throw ContinuationStop(ContinuationDecline.WORK)
+            if (allocation > funding.remainingAllocation) throw ContinuationStop(ContinuationDecline.ALLOCATION)
+            chargeCell(work, allocation)
+        }
+        return try {
+            val rows = cellRows(model, point, ::admit) ?: return null
+            val columns = model.numRealVars
+            val variables = columns.toLong() + rows.size
+            if (variables + rows.size >= Int.MAX_VALUE) throw ContinuationStop(ContinuationDecline.DIMENSION)
+            admit(variables + rows.size, variables * 160L + rows.size * 96L)
+            fun side(bound: Double) = BigFraction.ofDouble(bound)?.let { ExactLpSide(ExactLpNumber.of(it)) }
+            val bounds = List(columns) { real ->
+                ExactLpBounds(side(model.realLower[real]), side(model.realUpper[real]))
+            }
+            if (!holds(point, rows, bounds)) return null
+            CapturedCell(rows, bounds, cellModel(rows, columns, bounds, ::admit))
+        } finally {
+            exactTimeNs = saturatedAdd(exactTimeNs, started.elapsedNow().inWholeNanoseconds)
+        }
+    }
+
+    private fun solveFast(
+        lp: ExactLpModel,
         rows: List<ExactRationalInequality>,
-        columns: Int,
         bounds: List<ExactLpBounds>,
         point: List<BigFraction>,
         cancellation: ExecutionControl,
-    ): CellOptimum {
-        val lp = cellModel(rows, columns, bounds, cancellation) ?: return CellOptimum.Undecided
-        val certified = LpScopedSolver(LpExactState(lp), cancellation, context).use { solver ->
-            try {
-                solver.solve(token = cancellation, observer = Metered(cancellation), refinementLimits = CELL_REFINEMENT,
-                    continuationLimits = CELL_CONTINUATION, fullContinuation = true, claim = LpClaim.ATTAINED_OPTIMUM)
-            } finally {
-                cancellation.charge(solver.lastMetrics.workOps + solver.lastMetrics.preparationOps)
-            }
+    ): CellOptimum? {
+        if (remainingWork == 0L || funding.remainingAllocation == 0L || remainingPivots == 0) return null
+        val started = TimeSource.Monotonic.markNow()
+        val activeNs = limits.maxTimeNs?.let { (it - exactTimeNs).coerceAtLeast(0L) }
+        val token = activeNs?.let { cancellation or ExecutionControl.until(started + it.nanoseconds) } ?: cancellation
+        val certified = try {
+            proposeAndCheck(lp, token)
+        } finally {
+            exactTimeNs = saturatedAdd(exactTimeNs, started.elapsedNow().inWholeNanoseconds)
         }
-        if (certified == null || cancellation()) return CellOptimum.Undecided
-        cancellation.charge((certified.refinement?.work ?: 0L) + (certified.reconstruction?.work ?: 0L))
+        if (certified == null || token()) return null
+        val columns = bounds.size
         return when (certified.verdict) {
-            LpVerdict.ATTAINED_OPTIMUM -> {
-                val optimum = certified.exactPrimal?.take(columns) ?: return CellOptimum.Undecided
-                val optimal = objectiveAt(optimum)
-                if (optimum.size != columns || !holds(optimum, rows, bounds) || optimal > objectiveAt(point)) {
-                    CellOptimum.Undecided
-                } else CellOptimum.Attained(optimum, optimal)
-            }
+            LpVerdict.ATTAINED_OPTIMUM -> certified.exactPrimal?.take(columns)?.let { attain(it, rows, bounds, point) }
             LpVerdict.UNBOUNDED -> {
                 val unboundedness = checkNotNull(certified.unboundedness)
                 val start = unboundedness.witness.primal.take(columns)
                 val direction = unboundedness.direction.take(columns)
                 if (start.size == columns && direction.size == columns && holds(start, rows, bounds) &&
                     recedes(direction, rows, bounds)
-                ) CellOptimum.Unbounded(start, direction) else CellOptimum.Undecided
+                ) CellOptimum.Unbounded(start, direction) else null
             }
-            else -> CellOptimum.Undecided
+            else -> null
         }
+    }
+
+    private fun proposeAndCheck(lp: ExactLpModel, token: ExecutionControl): CertifiedLpResult? {
+        val state = LpExactState(lp)
+        val iterationLimit = remainingPivots.takeUnless { it == Int.MAX_VALUE } ?: 0
+        return LpScopedSolver(
+            state, token, context, workLimit = remainingWork, iterationLimit = iterationLimit,
+            preparationAllocationLimit = funding.remainingAllocation,
+        ).use { solver ->
+            val proposal = try {
+                solver.solveFloat(token = token)
+            } finally {
+                val used = solver.lastMetrics
+                val prepared = solver.metrics
+                val setup = (prepared.preparationWork - prepared.reservedConstructionWork).coerceAtLeast(0L)
+                chargeCell(saturatedAdd(saturatedAdd(used.workOps, used.preparationOps),
+                    saturatedAdd(setup, prepared.constructionWork)), solver.preparationAllocation)
+                chargePivots(used.pivots)
+            }
+            if (proposal == null || token() || remainingWork == 0L || funding.remainingAllocation == 0L) {
+                return@use null
+            }
+            val work = remainingWork
+            val bytes = funding.remainingAllocation
+            val basis = context.basisLimits
+            fun funded(limits: ReconstructionLimits) = limits.copy(
+                maxWork = minOf(limits.maxWork, work),
+                maxAllocation = minOf(limits.maxAllocation, bytes),
+            )
+            val refinement = LpRefinementRequest(solver, solver.refinementCache,
+                CELL_REFINEMENT.copy(maxWork = work, maxAllocation = bytes, maxPivots = remainingPivots),
+                onBasisVerification = context.onRefinementBasisVerification)
+            try {
+                certifyLpResult(
+                    checkNotNull(state.ownerWorkingModel()), proposal.first, proposal.second, token,
+                    observer = Metered(::chargeCell), policy = context.certificationPolicy, refinement = refinement,
+                    claim = LpClaim.ATTAINED_OPTIMUM, continueFeasibility = false,
+                    reconstructionLimits = funded(context.reconstructionLimits),
+                    basisLimits = basis.copy(
+                        factor = basis.factor.copy(work = minOf(basis.factor.work, work),
+                            allocationBytes = minOf(basis.factor.allocationBytes, bytes)),
+                        verification = funded(basis.verification),
+                    ),
+                ).takeUnless { funding.spent > limits.maxWork || funding.allocated > limits.maxAllocation }
+            } finally {
+                chargePivots(solver.refinementCache.pivots)
+            }
+        }
+    }
+
+    private fun attain(
+        optimum: List<BigFraction>,
+        rows: List<ExactRationalInequality>,
+        bounds: List<ExactLpBounds>,
+        point: List<BigFraction>,
+    ): CellOptimum.Attained? {
+        if (optimum.size != bounds.size || !holds(optimum, rows, bounds)) return null
+        val value = objectiveAt(optimum)
+        return CellOptimum.Attained(optimum, value).takeIf { value <= objectiveAt(point) }
+    }
+
+    private fun chargeCell(work: Long, allocation: Long) {
+        funding.charge(work, allocation)
+        cancellation.charge(work)
+    }
+
+    private fun chargePivots(pivots: Int) {
+        spentPivots = (spentPivots.toLong() + pivots).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
     // The rows over the real columns of the polyhedron [point] selects: every row of a conjunction, the first disjunct
@@ -294,8 +444,9 @@ internal class RealLeafOptimization(
     private fun cellRows(
         model: Problem,
         point: List<BigFraction>,
-        cancellation: ExecutionControl,
+        admit: (Long, Long) -> Unit,
     ): List<ExactRationalInequality>? {
+        admit(1L, 128L)
         val columns = model.numRealVars
         val witness = object : ExactWitness {
             override fun at(column: Int): BigFraction = if (column < columns) point[column]
@@ -305,22 +456,27 @@ internal class RealLeafOptimization(
         }
         val mixed = ArrayList<ExactRationalInequality>()
         for (factor in model.factors) {
-            cancellation.charge(1)
-            if (cancellation()) return null
-            fun comparison(row: LinearRow) = row.exactComparison(columns,
-                row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth)
+            admit(1L, 0L)
+            fun comparison(row: LinearRow): ExactComparison {
+                admit(row.size + 1L, row.size * 128L + 256L)
+                return row.exactComparison(columns,
+                    row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth)
+            }
             when (val form = factor.linearForm) {
                 is LinearForm.Conjunction -> for (row in form.rows) comparison(row).rowsInto(mixed, witness)
-                is LinearForm.Disjunction ->
-                    (form.rows.map(::comparison).firstOrNull { it.holdsAt(witness) } ?: return null)
-                        .rowsInto(mixed, witness)
+                is LinearForm.Disjunction -> {
+                    val selected = form.rows.firstNotNullOfOrNull { row ->
+                        comparison(row).takeIf { it.holdsAt(witness) }
+                    } ?: return null
+                    selected.rowsInto(mixed, witness)
+                }
                 else -> if (factor.variables.reals.isNotEmpty()) return null
             }
         }
+        admit(1L, mixed.size * 8L)
         val rows = ArrayList<ExactRationalInequality>(mixed.size)
         for (row in mixed) {
-            cancellation.charge(row.columns.size.toLong() + 1L)
-            if (cancellation()) return null
+            admit(row.columns.size + 1L, row.columns.size * 32L + 64L)
             var rhs = row.rhs
             val kept = ArrayList<Int>()
             for (index in row.columns.indices) {
@@ -342,12 +498,11 @@ internal class RealLeafOptimization(
         rows: List<ExactRationalInequality>,
         columns: Int,
         bounds: List<ExactLpBounds>,
-        cancellation: ExecutionControl,
-    ): ExactLpModel? {
+        admit: (Long, Long) -> Unit,
+    ): ExactLpModel {
         val entries = List(columns) { ArrayList<ExactLpEntry>() }
         for ((index, row) in rows.withIndex()) {
-            cancellation.charge(row.columns.size.toLong() + 1L)
-            if (cancellation()) return null
+            admit(row.columns.size + 1L, row.columns.size * 64L)
             for (k in row.columns.indices) {
                 entries[row.columns[k]] += ExactLpEntry(index, ExactLpNumber.of(row.coefficients[k]))
             }
@@ -363,14 +518,19 @@ internal class RealLeafOptimization(
         )
     }
 
-    private fun holds(point: List<BigFraction>, rows: List<ExactRationalInequality>, bounds: List<ExactLpBounds>) =
+    private fun holds(
+        point: List<BigFraction>,
+        rows: List<ExactRationalInequality>,
+        bounds: List<ExactLpBounds>,
+        closure: Boolean = false,
+    ) =
         point.indices.all { real ->
             val bound = bounds[real]
             bound.lower?.let { point[real] >= it.number.value } != false &&
                 bound.upper?.let { point[real] <= it.number.value } != false
         } && rows.all { row ->
             val activity = activity(row, point)
-            if (row.strict) activity < row.rhs else activity <= row.rhs
+            if (row.strict && !closure) activity < row.rhs else activity <= row.rhs
         }
 
     // Whether moving along [direction] keeps every row and bound and lowers the objective.
@@ -393,10 +553,9 @@ internal class RealLeafOptimization(
         return total
     }
 
-    // Charges the exact LP's reported work to [cancellation].
-    private class Metered(private val cancellation: ExecutionControl) : LpCertificationObserver {
+    private class Metered(private val charge: (Long, Long) -> Unit) : LpCertificationObserver {
         override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-            if (cost is LpCertifierCost.Metered) cancellation.charge(cost.work)
+            if (cost is LpCertifierCost.Metered) charge(cost.work, cost.allocation)
         }
 
         override fun observeExactInput(accepted: Boolean) = Unit
@@ -404,14 +563,23 @@ internal class RealLeafOptimization(
         // The solve's own work is read from the solver once it returns.
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
 
-        override fun observeBasisVerification(metrics: ExactBasisMetrics) = cancellation.charge(metrics.work)
+        override fun observeBasisVerification(metrics: ExactBasisMetrics) = charge(metrics.work, metrics.allocation)
 
-        override fun observeContinuation(metrics: ExactContinuationMetrics) = cancellation.charge(metrics.work)
+        override fun observeContinuation(metrics: ExactContinuationMetrics) = charge(metrics.work, metrics.allocation)
     }
 }
 
-// Refinement seeks an optimum under the caller's stop. Feasibility continuation can recover a missing point,
-// but neither that point nor exhausted refinement rounds establish attainment.
+private fun ContinuationDecline.realStop(): RealOptimizationStop? = when (this) {
+    ContinuationDecline.WORK -> RealOptimizationStop.WORK
+    ContinuationDecline.ALLOCATION -> RealOptimizationStop.ALLOCATION
+    ContinuationDecline.DIMENSION -> RealOptimizationStop.DIMENSION
+    ContinuationDecline.BITS -> RealOptimizationStop.SCALAR
+    ContinuationDecline.PIVOTS, ContinuationDecline.IMPORT_LIMIT -> RealOptimizationStop.PIVOTS
+    ContinuationDecline.TIME -> RealOptimizationStop.TIME
+    ContinuationDecline.CANCELLED -> RealOptimizationStop.CANCELLED
+    else -> null
+}
+
 private const val CELL_EXACT_ALLOCATION = 256L * 1024L * 1024L
 
 private val CELL_REFINEMENT = LpRefinementLimits(

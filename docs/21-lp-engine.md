@@ -345,12 +345,23 @@ close. Feasibility auxiliaries shift the box to contain zero and maximize
 `0 <= tau <= 1` with column `-b * tau`: a witness at one proves feasibility, and an
 exact bound below one refutes it.
 
-The caller selects the maximum correction rounds. Exhausting rounds can retain a
-checked point or bound but cannot establish attainment. Feasibility continuation
-runs when a point is missing; an existing feasible point with a missing optimum
-certificate does not trigger it, and feasibility continuation is not an optimizer.
-Real-cell optimization selects 64 rounds and a 256 MiB modeled allocation envelope;
-an undecided cell remains unavailable for an optimality claim.
+Exhausting the correction rounds can retain a checked point or bound. Ordinary
+feasibility continuation looks for a missing point. A feasible real cell instead
+uses up to 64 initial correction rounds, then seeks a point and a matching exact
+dual bound in one feasibility query. For `M x = b`, it enforces
+`M^T y + p - q = c` and `c^T x = b^T y + l^T p - u^T q`. The nonnegative
+multipliers `p` and `q` exist only for finite lower and upper sides. A strict
+cell keeps its open sides in this query. A checked refutation followed by a
+closure optimum establishes an unattained infimum. If the closure excludes a
+matching bound, a separate exact query checks a recession direction with
+`M r = 0`, the required side signs and `c^T r <= -1`.
+
+The selected cell's floating attempt and exact queries spend the same containing
+allowance. Each exact query retains its tableau across pivot batches, and
+auxiliary admission checks indexed shape and modeled allocation before building.
+Work and allocation spent on a declined query remain charged to the leaf. By
+default the leaf admits 256 MiB of modeled exact allocation. A resource stop
+preserves the feasible point without creating a leaf bound or refutation.
 
 Floating solves the closure of strict rows, so a boundary point proves neither
 strict feasibility nor refutation. The strict-margin auxiliary adds
